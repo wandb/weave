@@ -200,29 +200,25 @@ def history_keys(run: wdt.Run) -> list[str]:
     return list(object_type.property_types.keys())
 
 
-def read_history_parquet(run: wdt.Run, columns=None):
-    io = io_service.get_sync_client()
-    object_type = refine_history_type(run, columns=columns)
-    tables = []
-    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
-        local_path = io.ensure_file_downloaded(url)
-        if local_path is not None:
-            path = io.fs.path(local_path)
-            with tracer.trace("pq.read_metadata") as span:
-                span.set_tag("path", path)
-                meta = pq.read_metadata(path)
-            file_schema = meta.schema
-            columns_to_read = [
-                c for c in columns if c in file_schema.to_arrow_schema().names
-            ]
-            with tracer.trace("pq.read_table") as span:
-                span.set_tag("path", path)
-                table = pq.read_table(path, columns=columns_to_read)
+def local_path_to_parquet_table(
+    path: str, object_type: typing.Optional[types.TypedDict], columns: list[str] = []
+):
+    with tracer.trace("pq.read_metadata") as span:
+        span.set_tag("path", path)
+        meta = pq.read_metadata(path)
+    file_schema = meta.schema
+    columns_to_read = [c for c in columns if c in file_schema.to_arrow_schema().names]
+    with tracer.trace("pq.read_table") as span:
+        span.set_tag("path", path)
+        table = pq.read_table(path, columns=columns_to_read)
 
-            # convert table to ArrowWeaveList
-            with tracer.trace("make_awl") as span:
-                awl: ArrowWeaveList = ArrowWeaveList(table, object_type=object_type)
-            tables.append(awl)
+    # convert table to ArrowWeaveList
+    with tracer.trace("make_awl") as span:
+        awl: ArrowWeaveList = ArrowWeaveList(table, object_type=object_type)
+    return awl
+
+
+def process_history_awl_tables(tables: list[ArrowWeaveList]):
     list = make_list(**{str(i): table for i, table in enumerate(tables)})
     concatted = use(concat(list))
     if isinstance(concatted, ArrowWeaveList):
@@ -242,6 +238,19 @@ def read_history_parquet(run: wdt.Run, columns=None):
 
     with tracer.trace("pq.take"):
         return parquet_history.take(table_sorted_indices)
+
+
+def read_history_parquet(run: wdt.Run, columns=None):
+    io = io_service.get_sync_client()
+    object_type = refine_history_type(run, columns=columns)
+    tables = []
+    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+        local_path = io.ensure_file_downloaded(url)
+        if local_path is not None:
+            path = io.fs.path(local_path)
+            awl = local_path_to_parquet_table(path, object_type, columns=columns)
+            tables.append(awl)
+    return process_history_awl_tables(tables)
 
 
 def mock_history_rows(

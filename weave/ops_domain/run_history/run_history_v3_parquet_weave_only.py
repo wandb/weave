@@ -1,6 +1,8 @@
 import dataclasses
 import typing
 
+from weave import io_service
+
 from ...ref_base import Ref
 from ...compile_domain import wb_gql_op_plugin
 from ...api import op
@@ -228,18 +230,26 @@ def _refine_history_type_inner(
     return HistoryToWeaveFinalResult(types.TypedDict(dict_keys), encoded_paths_final)
 
 
-def _process_run_dict_item(val, run_path: typing.Optional[wb_util.RunPath] = None):
-    if isinstance(val, dict) and "_type" in val:
-        if wandb_stream_table.is_weave_encoded_history_cell(val):
-            return wandb_stream_table.from_weave_encoded_history_cell(val)
-        return None
-
-    return val
+# Copy from common - need to merge back
+def _read_history_parquet(run: wdt.Run, object_type, columns=None):
+    io = io_service.get_sync_client()
+    tables = []
+    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+        local_path = io.ensure_file_downloaded(url)
+        if local_path is not None:
+            path = io.fs.path(local_path)
+            awl = history_op_common.local_path_to_parquet_table(
+                path, None, columns=columns
+            )
+            tables.append(awl)
+    return history_op_common.process_history_awl_tables(tables)
 
 
 def _get_history_stream(run: wdt.Run, columns=None):
     final_object_type = _refine_history_type(run, columns=columns)
-    parquet_history = history_op_common.read_history_parquet(run, columns=columns)
+    parquet_history = _read_history_parquet(
+        run, final_object_type.weave_type, columns=columns
+    )
     live_data = run.gql["sampledParquetHistory"]["liveData"]
     return _get_history_stream_inner(final_object_type, live_data, parquet_history)
 
@@ -248,33 +258,17 @@ def _get_history_stream_inner(
     final_type: HistoryToWeaveFinalResult,
     live_data: list[dict],
     parquet_history: typing.Any,
-    # columns=None,
 ):
     with tracer.trace("get_history") as span:
         span.set_tag("history_version", 3)
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
     object_type = final_type.weave_type
-    # scalar_keys = list(object_type.property_types.keys())
-
-    # columns = scalar_keys  # [c for c in columns if c in scalar_keys]
-
     live_data = _reconstruct_original_live_data(live_data)
-
-    # # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    # for row in live_data:
-    #     for colname in columns:
-    #         if colname not in row:
-    #             row[colname] = None
-    #         else:
-    #             row[colname] = _process_run_dict_item(row[colname])
 
     artifact = artifact_mem.MemArtifact()
     # turn live data into arrow
     if live_data is not None and len(live_data) > 0:
         with tracer.trace("live_data_to_arrow"):
-            # live_data_processed = ArrowWeaveList(
-            #     pa.array(live_data), object_type, artifact
-            # )
             live_data_processed = convert.to_arrow(
                 live_data,
                 types.List(object_type),
@@ -372,11 +366,7 @@ def _reconstruct_original_live_data_cell(live_data: typing.Any) -> typing.Any:
         return [_reconstruct_original_live_data_cell(cell) for cell in live_data]
     if isinstance(live_data, dict):
         if wandb_stream_table.is_weave_encoded_history_cell(live_data):
-            val = live_data["_val"]
-            # if isinstance(val, str):
-            #     return Ref.from_str(val)
-            # return wandb_stream_table.from_weave_encoded_history_cell(live_data)
-            return val
+            return live_data["_val"]
         return {
             key: _reconstruct_original_live_data_cell(val)
             for key, val in live_data.items()
