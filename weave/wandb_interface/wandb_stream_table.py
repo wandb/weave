@@ -29,7 +29,7 @@ if typing.TYPE_CHECKING:
 # Shawn recommended we only encode leafs, but in my testing, nested structures
 # are not handled as well in in gorilla and we can do better using just weave.
 # Uncomment the below to use gorilla for nested structures.
-TRUST_GORILLA_FOR_NESTED_STRUCTURES = False
+TRUST_GORILLA_FOR_NESTED_STRUCTURES = True
 
 # Weave types are parametrized, but gorilla expects just simple strings. We could
 # send the top-level string over the wire, but this fails to encode type specifics

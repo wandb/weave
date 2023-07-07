@@ -323,6 +323,8 @@ def compile_apply_column_pushdown(
         "mapped_run-history2",
         "run-history",
         "mapped_run-history",
+        "run-history_stream",
+        "mapped_run-history_stream",
     ]
 
     if not graph.filter_nodes_full(

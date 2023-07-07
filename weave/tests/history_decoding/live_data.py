@@ -6,12 +6,12 @@ live_data = [
             {
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -30,11 +30,11 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                         "custom_1": {
@@ -42,8 +42,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -66,8 +66,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -85,16 +85,16 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -115,25 +115,25 @@ live_data = [
                         },
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -155,12 +155,12 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -179,17 +179,17 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -213,12 +213,12 @@ live_data = [
                         "dict_data_2": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -237,19 +237,19 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             },
-                            "none_key": null,
+                            "none_key": None,
                         },
                         "list_data_mixed_2": [
                             {
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -266,7 +266,7 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "custom_1": {
@@ -274,8 +274,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -292,12 +292,12 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -317,21 +317,21 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -354,21 +354,21 @@ live_data = [
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -390,13 +390,13 @@ live_data = [
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -414,19 +414,19 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -462,10 +462,10 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 },
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -483,8 +483,8 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -499,8 +499,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -517,13 +517,13 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
                 "custom_1": {
@@ -531,8 +531,8 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -555,13 +555,13 @@ live_data = [
                         "list_data_mixed_2": [
                             {
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -579,7 +579,7 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "string_key": "hi",
@@ -587,8 +587,8 @@ live_data = [
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -606,7 +606,7 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
@@ -614,8 +614,8 @@ live_data = [
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -633,18 +633,18 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -666,15 +666,15 @@ live_data = [
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -692,8 +692,8 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -704,10 +704,10 @@ live_data = [
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -724,23 +724,23 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -758,17 +758,17 @@ live_data = [
                             },
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -805,11 +805,11 @@ live_data = [
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -829,14 +829,14 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 "list_data_mixed_2": [
                     {
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -856,9 +856,9 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "number_key": 42,
@@ -866,8 +866,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -886,17 +886,17 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -914,15 +914,15 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -945,15 +945,15 @@ live_data = [
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_weave_type": {
                             "propertyTypes": {
@@ -971,8 +971,8 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -980,16 +980,16 @@ live_data = [
                 ],
             },
             {
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -1010,12 +1010,12 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -1036,12 +1036,12 @@ live_data = [
                         },
                         "dict_data_2": {
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -1060,19 +1060,19 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -1089,17 +1089,17 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -1116,7 +1116,7 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -1125,8 +1125,8 @@ live_data = [
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -1144,17 +1144,17 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -1178,20 +1178,20 @@ live_data = [
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -1212,14 +1212,14 @@ live_data = [
                         ],
                         "list_data_uniform_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -1236,12 +1236,12 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -1260,10 +1260,10 @@ live_data = [
                     },
                 },
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "type": "typedDict",
@@ -1283,15 +1283,15 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                     },
                 },
                 "list_data_mixed_2": [
                     {
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -1311,11 +1311,11 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
                         "custom_1": {
@@ -1335,22 +1335,22 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -1370,11 +1370,11 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -1392,8 +1392,8 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -1402,20 +1402,20 @@ live_data = [
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -1438,14 +1438,14 @@ live_data = [
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -1462,21 +1462,21 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
             },
             {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -1496,14 +1496,14 @@ live_data = [
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -1521,10 +1521,10 @@ live_data = [
                             },
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -1542,8 +1542,8 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -1551,14 +1551,14 @@ live_data = [
                         },
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -1575,7 +1575,7 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
@@ -1586,8 +1586,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -1604,17 +1604,17 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -1632,17 +1632,17 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -1664,21 +1664,21 @@ live_data = [
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -1700,10 +1700,10 @@ live_data = [
                             {
                                 "custom_1": {
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -1721,13 +1721,13 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -1748,13 +1748,13 @@ live_data = [
                 },
                 "dict_data_2": {
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -1772,7 +1772,7 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "list_data_mixed_2": [
@@ -1780,8 +1780,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -1800,20 +1800,20 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -1833,12 +1833,12 @@ live_data = [
                         },
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -1849,30 +1849,6 @@ live_data = [
                                             "string_key": "string",
                                             "bool_key": "boolean",
                                             "none_key": "none",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        },
-                        "none_key": null,
-                        "string_key": "hi",
-                    },
-                    {
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
                                         },
                                         "type": "typedDict",
                                     }
@@ -1880,9 +1856,33 @@ live_data = [
                                 "type": "typedDict",
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        },
+                        "none_key": None,
+                        "string_key": "hi",
+                    },
+                    {
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -1890,20 +1890,20 @@ live_data = [
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -1925,12 +1925,12 @@ live_data = [
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -1949,7 +1949,7 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
@@ -1961,13 +1961,13 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -1986,17 +1986,17 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -2017,12 +2017,12 @@ live_data = [
                         "list_data_mixed_2": [
                             {
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -2041,14 +2041,14 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -2067,17 +2067,17 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -2097,16 +2097,16 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -2130,13 +2130,13 @@ live_data = [
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -2155,8 +2155,8 @@ live_data = [
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                             },
@@ -2168,8 +2168,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -2186,13 +2186,13 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "type": "typedDict",
@@ -2210,12 +2210,12 @@ live_data = [
                     },
                 },
                 "dict_data_2": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -2234,20 +2234,20 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -2268,65 +2268,65 @@ live_data = [
                         },
                     },
                     {
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                    },
-                    {
-                        "bool_key": true,
-                        "custom_1": {
-                            "_val": {
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        },
-                        "none_key": null,
-                        "string_key": "hi",
-                    },
-                    {
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                    },
+                    {
+                        "bool_key": True,
+                        "custom_1": {
+                            "_val": {
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        },
+                        "none_key": None,
+                        "string_key": "hi",
+                    },
+                    {
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -2345,27 +2345,27 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                         },
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -2387,7 +2387,7 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -2405,21 +2405,21 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
             {
                 "custom_3": {
@@ -2443,8 +2443,8 @@ live_data = [
                             {
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -2464,9 +2464,9 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "custom_1": {
@@ -2486,26 +2486,26 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -2525,11 +2525,11 @@ live_data = [
                                 },
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -2553,21 +2553,21 @@ live_data = [
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -2588,12 +2588,12 @@ live_data = [
                         ],
                         "list_data_uniform_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -2612,15 +2612,15 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -2639,22 +2639,22 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -2693,27 +2693,27 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -2737,8 +2737,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -2757,7 +2757,7 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -2767,8 +2767,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -2785,18 +2785,18 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -2818,20 +2818,20 @@ live_data = [
                         },
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -2851,15 +2851,15 @@ live_data = [
                         },
                     },
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -2881,14 +2881,14 @@ live_data = [
             },
             {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -2910,15 +2910,15 @@ live_data = [
                     "_val": {
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -2943,8 +2943,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -2961,83 +2961,83 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                },
-                                "none_key": null,
-                                "string_key": "hi",
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                },
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                },
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                },
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            {
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -3074,26 +3074,26 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -3115,13 +3115,13 @@ live_data = [
                         },
                         "dict_data_2": {
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -3139,7 +3139,7 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                         },
                     },
@@ -3161,7 +3161,7 @@ live_data = [
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -3180,16 +3180,16 @@ live_data = [
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -3207,27 +3207,27 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
             },
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -3250,14 +3250,14 @@ live_data = [
                     "_val": {
                         "list_data_uniform_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -3274,21 +3274,21 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -3307,14 +3307,14 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
                         "dict_data_2": {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -3331,21 +3331,21 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -3369,8 +3369,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -3388,18 +3388,18 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -3417,16 +3417,16 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -3449,21 +3449,21 @@ live_data = [
                                 "string_key": "hi",
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -3501,7 +3501,7 @@ live_data = [
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -3519,13 +3519,13 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
@@ -3546,25 +3546,25 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -3581,17 +3581,17 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -3613,20 +3613,20 @@ live_data = [
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -3649,14 +3649,14 @@ live_data = [
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -3673,11 +3673,11 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             },
@@ -3685,8 +3685,8 @@ live_data = [
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -3723,26 +3723,26 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -3760,7 +3760,7 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
@@ -3768,10 +3768,10 @@ live_data = [
                         "string_key": "hi",
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -3789,16 +3789,16 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -3816,20 +3816,20 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -3848,20 +3848,20 @@ live_data = [
                         },
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -3883,16 +3883,16 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -3912,21 +3912,21 @@ live_data = [
                         },
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_val": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                 },
                 "_weave_type": {
                     "propertyTypes": {
@@ -3947,7 +3947,7 @@ live_data = [
             [
                 {
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "type": "typedDict",
@@ -3965,21 +3965,21 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                 }
             ],
             [
                 {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -3998,8 +3998,8 @@ live_data = [
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                     },
@@ -4011,8 +4011,8 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -4029,14 +4029,14 @@ live_data = [
                             },
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 {
                     "custom_1": {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -4056,20 +4056,20 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                 },
                 {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -4089,22 +4089,22 @@ live_data = [
                     },
                 },
                 {
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
                 "hi",
-                true,
+                True,
                 42,
-                null,
+                None,
                 {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -4125,12 +4125,12 @@ live_data = [
             {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -4149,7 +4149,7 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
             },
             {
                 "_weave_type": {
@@ -4169,12 +4169,12 @@ live_data = [
                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 "_val": {
                     "dict_data_2": {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -4193,13 +4193,13 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "list_data_mixed_2": [
                         {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -4217,13 +4217,13 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         {
@@ -4234,8 +4234,8 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -4252,16 +4252,16 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                         },
                         {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -4279,17 +4279,17 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "string_key": "hi",
                         },
                         {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -4313,18 +4313,18 @@ live_data = [
                         {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "hi",
-                        true,
+                        True,
                         42,
-                        null,
+                        None,
                         {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -4346,15 +4346,15 @@ live_data = [
                     ],
                     "list_data_uniform_2": [
                         {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -4375,17 +4375,17 @@ live_data = [
                             },
                         }
                     ],
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -4407,16 +4407,16 @@ live_data = [
         ],
         "list_data_mixed_2": [
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "type": "typedDict",
@@ -4453,12 +4453,12 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             },
@@ -4466,8 +4466,8 @@ live_data = [
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -4486,13 +4486,13 @@ live_data = [
                         },
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
             {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -4510,23 +4510,23 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                 },
                 "number_key": 42,
             },
-            {"none_key": null, "number_key": 42, "string_key": "hi", "bool_key": true},
+            {"none_key": None, "number_key": 42, "string_key": "hi", "bool_key": True},
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_val": {
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
@@ -4567,15 +4567,15 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                 },
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -4595,22 +4595,22 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
-                "none_key": null,
-                "bool_key": true,
+                "none_key": None,
+                "bool_key": True,
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -4628,21 +4628,21 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
                         "dict_data_2": {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -4659,15 +4659,15 @@ live_data = [
                                     },
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -4685,24 +4685,24 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                 },
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -4721,12 +4721,12 @@ live_data = [
                                 },
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -4745,53 +4745,53 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
-                                "string_key": "hi",
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                },
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                },
-                                "number_key": 42,
+                                "none_key": None,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                },
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                },
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            {
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -4812,11 +4812,11 @@ live_data = [
                         ],
                         "list_data_uniform_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -4836,12 +4836,12 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -4861,14 +4861,14 @@ live_data = [
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -4906,88 +4906,88 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                    },
-                    {
-                        "none_key": null,
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                    },
-                    {
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                    },
+                    {
+                        "none_key": None,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                    },
+                    {
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -5012,8 +5012,8 @@ live_data = [
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -5032,10 +5032,10 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                 },
             }
         ],
@@ -5046,8 +5046,8 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -5064,13 +5064,13 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             }
         ],
-        "dict_data_4.dict_data_2.none_key": null,
+        "dict_data_4.dict_data_2.none_key": None,
         "custom_3": {
             "_weave_type": {
                 "propertyTypes": {
@@ -5090,13 +5090,13 @@ live_data = [
             "_val": {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -5117,14 +5117,14 @@ live_data = [
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -5141,7 +5141,7 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 "list_data_mixed_2": [
                     {
@@ -5150,8 +5150,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -5168,18 +5168,18 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -5196,13 +5196,13 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -5220,22 +5220,22 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -5258,21 +5258,21 @@ live_data = [
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -5292,16 +5292,16 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -5321,17 +5321,17 @@ live_data = [
                         },
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
             },
         },
-        "dict_data_2.bool_key": true,
-        "bool_key": true,
+        "dict_data_2.bool_key": True,
+        "bool_key": True,
         "dict_data_4.dict_data_2.custom_1": {
             "_val": {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
             },
             "_weave_type": {
                 "propertyTypes": {
@@ -5353,7 +5353,7 @@ live_data = [
             "_val": {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -5373,19 +5373,19 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                 },
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -5408,14 +5408,14 @@ live_data = [
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -5439,10 +5439,10 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -5459,19 +5459,19 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -5493,12 +5493,12 @@ live_data = [
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -5520,19 +5520,19 @@ live_data = [
                         "number_key": 42,
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -5555,14 +5555,14 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -5579,12 +5579,12 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
             },
             "_weave_type": {
                 "propertyTypes": {
@@ -5607,13 +5607,13 @@ live_data = [
             {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -5631,20 +5631,20 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
             }
         ],
-        "dict_data_4.bool_key": true,
+        "dict_data_4.bool_key": True,
         "number_key": 42,
-        "dict_data_4.dict_data_2.bool_key": true,
-        "dict_data_4.none_key": null,
+        "dict_data_4.dict_data_2.bool_key": True,
+        "dict_data_4.none_key": None,
         "custom_1": {
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
             "_weave_type": {
                 "propertyTypes": {
@@ -5661,15 +5661,15 @@ live_data = [
                 "type": "typedDict",
             },
         },
-        "dict_data_2.none_key": null,
+        "dict_data_2.none_key": None,
         "dict_data_4.list_data_mixed_2": [
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -5688,7 +5688,7 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
             },
             {
@@ -5712,15 +5712,15 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                 },
-                "none_key": null,
+                "none_key": None,
             },
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -5738,24 +5738,24 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
             },
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -5775,17 +5775,17 @@ live_data = [
                 "number_key": 42,
                 "string_key": "hi",
             },
-            {"string_key": "hi", "bool_key": true, "none_key": null, "number_key": 42},
+            {"string_key": "hi", "bool_key": True, "none_key": None, "number_key": 42},
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_val": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                 },
                 "_weave_type": {
                     "propertyTypes": {
@@ -5808,8 +5808,8 @@ live_data = [
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
                 "string_key": "hi",
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
                 "number_key": 42,
             },
             "_weave_type": {
@@ -5829,8 +5829,8 @@ live_data = [
         },
         "dict_data_2.custom_1": {
             "_val": {
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             },
@@ -5861,7 +5861,7 @@ live_data = [
         "dict_data_4.string_key": "hi",
         "list_data_mixed_4": [
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -5879,8 +5879,8 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -5888,17 +5888,17 @@ live_data = [
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -5917,13 +5917,13 @@ live_data = [
                         },
                         "dict_data_2": {
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -5941,17 +5941,17 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -5970,7 +5970,7 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
@@ -5979,10 +5979,10 @@ live_data = [
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -5999,17 +5999,17 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -6027,19 +6027,19 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -6059,20 +6059,20 @@ live_data = [
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -6093,17 +6093,17 @@ live_data = [
                         ],
                         "list_data_uniform_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -6141,7 +6141,7 @@ live_data = [
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "type": "typedDict",
@@ -6160,21 +6160,21 @@ live_data = [
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 "list_data_mixed_2": [
                     {
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -6192,9 +6192,9 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "custom_1": {
@@ -6215,17 +6215,17 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -6243,23 +6243,23 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -6278,23 +6278,23 @@ live_data = [
                         },
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -6318,7 +6318,7 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -6336,28 +6336,28 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
             },
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
                 "custom_1": {
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -6378,14 +6378,14 @@ live_data = [
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -6403,17 +6403,17 @@ live_data = [
                             },
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -6438,8 +6438,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -6456,12 +6456,12 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                                 "custom_1": {
@@ -6483,15 +6483,15 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -6511,18 +6511,18 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -6545,22 +6545,22 @@ live_data = [
                                 "number_key": 42,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -6581,11 +6581,11 @@ live_data = [
                         "list_data_uniform_2": [
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -6605,11 +6605,11 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -6629,16 +6629,16 @@ live_data = [
                     },
                 },
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -6659,14 +6659,14 @@ live_data = [
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -6683,7 +6683,7 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
@@ -6692,10 +6692,10 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -6712,14 +6712,14 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -6738,18 +6738,18 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -6768,23 +6768,23 @@ live_data = [
                         },
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -6806,7 +6806,7 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -6826,24 +6826,24 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
             },
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "type": "typedDict",
@@ -6864,13 +6864,13 @@ live_data = [
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -6891,7 +6891,7 @@ live_data = [
                         "dict_data_2": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -6909,17 +6909,17 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                         },
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -6937,23 +6937,23 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -6978,8 +6978,8 @@ live_data = [
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -6998,9 +6998,9 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "custom_1": {
@@ -7020,31 +7020,31 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                 },
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -7068,14 +7068,14 @@ live_data = [
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -7092,10 +7092,10 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -7117,12 +7117,12 @@ live_data = [
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -7141,19 +7141,19 @@ live_data = [
                             },
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -7176,8 +7176,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -7196,7 +7196,7 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -7206,8 +7206,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -7224,13 +7224,13 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -7248,29 +7248,29 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
                         "number_key": 42,
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -7292,7 +7292,7 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -7310,23 +7310,23 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
             },
             {
                 "dict_data_2": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -7345,25 +7345,25 @@ live_data = [
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -7380,7 +7380,7 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
@@ -7388,8 +7388,8 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -7407,17 +7407,17 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -7436,16 +7436,16 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -7468,21 +7468,21 @@ live_data = [
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -7503,15 +7503,15 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -7534,12 +7534,12 @@ live_data = [
                 ],
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -7561,14 +7561,14 @@ live_data = [
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -7586,7 +7586,7 @@ live_data = [
                             },
                         },
                         "dict_data_2": {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -7606,19 +7606,19 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -7637,8 +7637,8 @@ live_data = [
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                 },
@@ -7647,8 +7647,8 @@ live_data = [
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -7667,7 +7667,7 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -7676,8 +7676,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -7695,19 +7695,19 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -7728,20 +7728,20 @@ live_data = [
                                 "number_key": 42,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -7764,13 +7764,13 @@ live_data = [
                         "list_data_uniform_2": [
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -7788,11 +7788,11 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -7814,10 +7814,10 @@ live_data = [
             },
             {
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -7837,18 +7837,18 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                     },
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -7868,15 +7868,15 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
                         "string_key": "hi",
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -7896,17 +7896,17 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -7924,17 +7924,17 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -7957,14 +7957,14 @@ live_data = [
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_weave_type": {
                             "propertyTypes": {
@@ -7982,10 +7982,10 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                     },
                 ],
@@ -7994,8 +7994,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -8014,26 +8014,26 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -8053,10 +8053,10 @@ live_data = [
                             },
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -8076,16 +8076,16 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                             },
                         },
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -8104,77 +8104,77 @@ live_data = [
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                 },
-                            },
-                            {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                    "_weave_type": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                    },
-                                },
-                                "none_key": null,
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                },
-                                "none_key": null,
-                                "string_key": "hi",
                             },
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                    "_weave_type": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                    },
+                                },
+                                "none_key": None,
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                },
+                                "none_key": None,
+                                "string_key": "hi",
+                            },
+                            {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -8195,15 +8195,15 @@ live_data = [
                                 },
                             },
                             {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -8221,17 +8221,17 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                             },
                         ],
                         "list_data_uniform_2": [
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -8249,17 +8249,17 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -8279,16 +8279,16 @@ live_data = [
                 },
             },
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -8325,12 +8325,12 @@ live_data = [
                     "_val": {
                         "list_data_uniform_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -8349,15 +8349,15 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -8377,8 +8377,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
                         "dict_data_2": {
@@ -8387,8 +8387,8 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -8405,14 +8405,14 @@ live_data = [
                                     },
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -8430,22 +8430,22 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
                                 "custom_1": {
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -8463,18 +8463,18 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -8492,15 +8492,15 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
                             },
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -8521,18 +8521,18 @@ live_data = [
                                 },
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -8551,8 +8551,8 @@ live_data = [
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                             },
@@ -8561,12 +8561,12 @@ live_data = [
                 },
                 "dict_data_2": {
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -8585,18 +8585,18 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -8614,18 +8614,18 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -8663,18 +8663,18 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -8694,30 +8694,30 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -8739,13 +8739,13 @@ live_data = [
             {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -8766,13 +8766,13 @@ live_data = [
                 "custom_3": {
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -8808,29 +8808,29 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -8853,8 +8853,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -8872,18 +8872,18 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -8901,7 +8901,7 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
                             },
                             {
@@ -8910,8 +8910,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -8930,18 +8930,18 @@ live_data = [
                                 },
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -8959,16 +8959,16 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                             },
                         ],
                         "list_data_uniform_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -8988,16 +8988,16 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -9017,7 +9017,7 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 },
                 "dict_data_2": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -9037,11 +9037,11 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
@@ -9049,7 +9049,7 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9069,19 +9069,19 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
             },
             {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -9100,8 +9100,8 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                 },
@@ -9124,14 +9124,14 @@ live_data = [
                     "_val": {
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -9148,15 +9148,15 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -9175,7 +9175,7 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -9183,8 +9183,8 @@ live_data = [
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -9203,18 +9203,18 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -9236,22 +9236,22 @@ live_data = [
                                 "string_key": "hi",
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -9271,15 +9271,15 @@ live_data = [
                         ],
                         "list_data_uniform_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -9300,17 +9300,17 @@ live_data = [
                                 },
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9328,14 +9328,14 @@ live_data = [
                             },
                         },
                         "dict_data_2": {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -9352,7 +9352,7 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -9360,11 +9360,11 @@ live_data = [
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -9384,7 +9384,7 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
@@ -9393,8 +9393,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9411,21 +9411,21 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9448,8 +9448,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9469,22 +9469,22 @@ live_data = [
                         },
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -9508,7 +9508,7 @@ live_data = [
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9526,27 +9526,27 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
             },
             {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -9566,7 +9566,7 @@ live_data = [
                     },
                 },
                 "dict_data_2": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "type": "typedDict",
@@ -9584,26 +9584,26 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -9624,15 +9624,15 @@ live_data = [
                         },
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -9652,14 +9652,14 @@ live_data = [
                         },
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -9680,14 +9680,14 @@ live_data = [
                         },
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9708,21 +9708,21 @@ live_data = [
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -9744,14 +9744,14 @@ live_data = [
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -9768,22 +9768,22 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
             },
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 "_val": {
                     "string_key": "hi",
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "_weave_type": {
@@ -9803,10 +9803,10 @@ live_data = [
             },
             [
                 {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -9824,8 +9824,8 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -9834,15 +9834,15 @@ live_data = [
             ],
             [
                 {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -9866,8 +9866,8 @@ live_data = [
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -9886,81 +9886,81 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
-                    "number_key": 42,
-                },
-                {
-                    "string_key": "hi",
-                    "bool_key": true,
-                    "custom_1": {
-                        "_val": {
-                            "bool_key": true,
-                            "none_key": null,
-                            "number_key": 42,
-                            "string_key": "hi",
-                        },
-                        "_weave_type": {
-                            "propertyTypes": {
-                                "a": {
-                                    "propertyTypes": {
-                                        "number_key": "int",
-                                        "string_key": "string",
-                                        "bool_key": "boolean",
-                                        "none_key": "none",
-                                    },
-                                    "type": "typedDict",
-                                }
-                            },
-                            "type": "typedDict",
-                        },
-                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                    },
-                    "none_key": null,
-                },
-                {
-                    "string_key": "hi",
-                    "bool_key": true,
-                    "custom_1": {
-                        "_weave_type": {
-                            "propertyTypes": {
-                                "a": {
-                                    "propertyTypes": {
-                                        "number_key": "int",
-                                        "string_key": "string",
-                                        "bool_key": "boolean",
-                                        "none_key": "none",
-                                    },
-                                    "type": "typedDict",
-                                }
-                            },
-                            "type": "typedDict",
-                        },
-                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        "_val": {
-                            "none_key": null,
-                            "number_key": 42,
-                            "string_key": "hi",
-                            "bool_key": true,
-                        },
-                    },
+                    "none_key": None,
                     "number_key": 42,
                 },
                 {
                     "string_key": "hi",
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "custom_1": {
+                        "_val": {
+                            "bool_key": True,
+                            "none_key": None,
+                            "number_key": 42,
+                            "string_key": "hi",
+                        },
+                        "_weave_type": {
+                            "propertyTypes": {
+                                "a": {
+                                    "propertyTypes": {
+                                        "number_key": "int",
+                                        "string_key": "string",
+                                        "bool_key": "boolean",
+                                        "none_key": "none",
+                                    },
+                                    "type": "typedDict",
+                                }
+                            },
+                            "type": "typedDict",
+                        },
+                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                    },
+                    "none_key": None,
+                },
+                {
+                    "string_key": "hi",
+                    "bool_key": True,
+                    "custom_1": {
+                        "_weave_type": {
+                            "propertyTypes": {
+                                "a": {
+                                    "propertyTypes": {
+                                        "number_key": "int",
+                                        "string_key": "string",
+                                        "bool_key": "boolean",
+                                        "none_key": "none",
+                                    },
+                                    "type": "typedDict",
+                                }
+                            },
+                            "type": "typedDict",
+                        },
+                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        "_val": {
+                            "none_key": None,
+                            "number_key": 42,
+                            "string_key": "hi",
+                            "bool_key": True,
+                        },
+                    },
+                    "number_key": 42,
+                },
+                {
+                    "string_key": "hi",
+                    "bool_key": True,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "hi",
-                true,
+                True,
                 42,
-                null,
+                None,
                 {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -9982,14 +9982,14 @@ live_data = [
             {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -10006,19 +10006,19 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
             },
             {
                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 "_val": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -10036,14 +10036,14 @@ live_data = [
                         },
                     },
                     "dict_data_2": {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -10060,19 +10060,19 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "list_data_mixed_2": [
                         {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -10090,7 +10090,7 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         {
@@ -10100,8 +10100,8 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -10118,7 +10118,7 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         {
@@ -10139,22 +10139,22 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         {
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -10178,20 +10178,20 @@ live_data = [
                             "string_key": "hi",
                         },
                         {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                         "hi",
-                        true,
+                        True,
                         42,
-                        null,
+                        None,
                         {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -10215,13 +10215,13 @@ live_data = [
                         {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -10239,10 +10239,10 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             },
-                            "none_key": null,
+                            "none_key": None,
                         }
                     ],
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
@@ -10264,16 +10264,16 @@ live_data = [
         ],
         "list_data_mixed_2": [
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -10296,8 +10296,8 @@ live_data = [
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -10316,15 +10316,15 @@ live_data = [
                         },
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
             },
             {
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -10343,20 +10343,20 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
             {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -10375,17 +10375,17 @@ live_data = [
                 },
                 "number_key": 42,
             },
-            {"bool_key": true, "none_key": null, "number_key": 42, "string_key": "hi"},
+            {"bool_key": True, "none_key": None, "number_key": 42, "string_key": "hi"},
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 "_val": {
                     "string_key": "hi",
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "_weave_type": {
@@ -10407,19 +10407,19 @@ live_data = [
         "_step": 1,
         "list_data_uniform_4": [
             {
-                "bool_key": true,
+                "bool_key": True,
                 "number_key": 42,
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -10444,8 +10444,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -10463,19 +10463,19 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -10496,9 +10496,9 @@ live_data = [
                         },
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -10516,15 +10516,15 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -10544,29 +10544,29 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -10587,11 +10587,11 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -10611,7 +10611,7 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
@@ -10634,27 +10634,27 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -10674,105 +10674,105 @@ live_data = [
                                 },
                             },
                             {
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                },
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                },
-                            },
-                            {
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                },
-                                "none_key": null,
-                                "string_key": "hi",
-                                "bool_key": true,
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                    "_weave_type": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                },
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                },
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                },
                             },
                             {
-                                "bool_key": true,
-                                "none_key": null,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                },
+                                "none_key": None,
+                                "string_key": "hi",
+                                "bool_key": True,
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                    "_weave_type": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                },
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            {
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -10794,7 +10794,7 @@ live_data = [
                         "list_data_uniform_2": [
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -10812,25 +10812,25 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -10852,12 +10852,12 @@ live_data = [
                         "dict_data_2": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -10876,7 +10876,7 @@ live_data = [
                                     },
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                         },
                     },
                     "_weave_type": {
@@ -10900,12 +10900,12 @@ live_data = [
             {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -10924,22 +10924,22 @@ live_data = [
                         },
                     },
                 },
-                "none_key": null,
+                "none_key": None,
             }
         ],
-        "dict_data_4.dict_data_2.none_key": null,
+        "dict_data_4.dict_data_2.none_key": None,
         "custom_3": {
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -10959,10 +10959,10 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 },
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "type": "typedDict",
@@ -10980,21 +10980,21 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                     },
                 },
                 "list_data_mixed_2": [
                     {
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -11014,7 +11014,7 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
                         "string_key": "hi",
@@ -11035,22 +11035,22 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -11068,9 +11068,9 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "custom_1": {
@@ -11092,28 +11092,28 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -11139,10 +11139,10 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -11159,10 +11159,10 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     }
                 ],
             },
@@ -11181,15 +11181,15 @@ live_data = [
                 "type": "typedDict",
             },
         },
-        "dict_data_2.bool_key": true,
-        "bool_key": true,
+        "dict_data_2.bool_key": True,
+        "bool_key": True,
         "dict_data_4.dict_data_2.custom_1": {
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
             "_weave_type": {
                 "propertyTypes": {
@@ -11224,14 +11224,14 @@ live_data = [
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -11249,17 +11249,17 @@ live_data = [
                     },
                 },
                 "dict_data_2": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -11279,7 +11279,7 @@ live_data = [
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -11297,24 +11297,24 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -11338,8 +11338,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -11358,19 +11358,19 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -11393,20 +11393,20 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -11428,8 +11428,8 @@ live_data = [
                     {
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -11449,25 +11449,25 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
             },
         },
         "string_key": "hi",
         "dict_data_4.list_data_uniform_2": [
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -11486,22 +11486,22 @@ live_data = [
                         },
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             }
         ],
-        "dict_data_4.bool_key": true,
+        "dict_data_4.bool_key": True,
         "number_key": 42,
-        "dict_data_4.dict_data_2.bool_key": true,
-        "dict_data_4.none_key": null,
+        "dict_data_4.dict_data_2.bool_key": True,
+        "dict_data_4.none_key": None,
         "custom_1": {
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
             },
             "_weave_type": {
                 "propertyTypes": {
@@ -11518,19 +11518,19 @@ live_data = [
                 "type": "typedDict",
             },
         },
-        "dict_data_2.none_key": null,
+        "dict_data_2.none_key": None,
         "dict_data_4.list_data_mixed_2": [
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -11549,16 +11549,16 @@ live_data = [
                 },
             },
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -11577,7 +11577,7 @@ live_data = [
                 },
             },
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "type": "typedDict",
@@ -11596,17 +11596,17 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
             },
             {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -11626,24 +11626,24 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                 },
                 "number_key": 42,
             },
-            {"bool_key": true, "none_key": null, "number_key": 42, "string_key": "hi"},
+            {"bool_key": True, "none_key": None, "number_key": 42, "string_key": "hi"},
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 "_val": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                 },
                 "_weave_type": {
                     "propertyTypes": {
@@ -11666,8 +11666,8 @@ live_data = [
             "_val": {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
             },
             "_weave_type": {
                 "propertyTypes": {
@@ -11686,8 +11686,8 @@ live_data = [
         },
         "dict_data_2.custom_1": {
             "_val": {
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             },
@@ -11718,9 +11718,9 @@ live_data = [
         "dict_data_4.string_key": "hi",
         "list_data_mixed_4": [
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -11739,8 +11739,8 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                 },
@@ -11764,21 +11764,21 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -11802,7 +11802,7 @@ live_data = [
                         "list_data_mixed_2": [
                             {
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -11822,11 +11822,11 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "custom_1": {
@@ -11848,17 +11848,17 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -11876,23 +11876,23 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -11913,22 +11913,22 @@ live_data = [
                                 "number_key": 42,
                             },
                             {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -11948,12 +11948,12 @@ live_data = [
                         ],
                         "list_data_uniform_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -11972,15 +11972,15 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -11999,14 +11999,14 @@ live_data = [
                 },
                 "dict_data_2": {
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -12023,19 +12023,19 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -12073,26 +12073,26 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -12114,14 +12114,14 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -12142,17 +12142,17 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -12175,12 +12175,12 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -12199,7 +12199,7 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
@@ -12208,13 +12208,13 @@ live_data = [
             {
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -12240,8 +12240,8 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -12259,42 +12259,42 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                    },
-                    {
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_val": {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        },
-                        "none_key": null,
-                    },
-                    {
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                    },
+                    {
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_val": {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        },
+                        "none_key": None,
+                    },
+                    {
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -12313,27 +12313,27 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                         },
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -12355,16 +12355,16 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -12384,14 +12384,14 @@ live_data = [
                         },
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
                 "custom_1": {
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -12414,17 +12414,17 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -12444,9 +12444,9 @@ live_data = [
                         },
                         "list_data_mixed_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -12466,110 +12466,110 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
                             },
                             {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                },
-                                "none_key": null,
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                },
-                                "none_key": null,
-                                "string_key": "hi",
-                            },
-                            {
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                },
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                },
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                },
+                                "none_key": None,
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                },
+                                "none_key": None,
+                                "string_key": "hi",
+                            },
+                            {
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                },
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                },
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -12593,8 +12593,8 @@ live_data = [
                             {
                                 "custom_1": {
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -12614,22 +12614,22 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -12664,14 +12664,14 @@ live_data = [
                     },
                 },
                 "dict_data_2": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -12688,7 +12688,7 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
@@ -12715,13 +12715,13 @@ live_data = [
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -12739,13 +12739,13 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -12763,8 +12763,8 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -12772,12 +12772,12 @@ live_data = [
                         "dict_data_2": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -12796,16 +12796,16 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                         },
                         "list_data_mixed_2": [
                             {
                                 "custom_1": {
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -12823,17 +12823,17 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "string_key": "hi",
                                 "custom_1": {
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -12852,17 +12852,17 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -12879,20 +12879,20 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -12912,20 +12912,20 @@ live_data = [
                                 "number_key": 42,
                             },
                             {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
                                 },
@@ -12949,7 +12949,7 @@ live_data = [
                 },
                 "dict_data_2": {
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -12967,24 +12967,24 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -13002,15 +13002,15 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -13029,19 +13029,19 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -13080,29 +13080,29 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                         },
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -13129,8 +13129,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -13148,15 +13148,15 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -13174,8 +13174,8 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -13185,15 +13185,15 @@ live_data = [
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -13215,14 +13215,14 @@ live_data = [
                         "dict_data_2": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -13239,11 +13239,11 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                         },
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -13261,21 +13261,21 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -13294,12 +13294,12 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -13318,23 +13318,23 @@ live_data = [
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
                             },
                             {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -13355,22 +13355,22 @@ live_data = [
                                 },
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -13390,16 +13390,16 @@ live_data = [
                         ],
                         "list_data_uniform_2": [
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -13436,11 +13436,11 @@ live_data = [
                     },
                 },
                 "dict_data_2": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -13460,15 +13460,15 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
                 "list_data_mixed_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -13486,113 +13486,113 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
                     },
                     {
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            "_weave_type": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                            },
-                        },
-                        "none_key": null,
-                    },
-                    {
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                        "none_key": null,
-                    },
-                    {
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                            },
-                            "_weave_type": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "a": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                        },
-                                    }
-                                },
-                            },
-                        },
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            "_weave_type": {
+                                "type": "typedDict",
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                            },
+                        },
+                        "none_key": None,
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                        "none_key": None,
+                    },
+                    {
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                            },
+                            "_weave_type": {
+                                "type": "typedDict",
+                                "propertyTypes": {
+                                    "a": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                        },
+                                    }
+                                },
+                            },
+                        },
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
+                    },
+                    {
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -13613,10 +13613,10 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -13635,8 +13635,8 @@ live_data = [
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                         },
@@ -13644,14 +13644,14 @@ live_data = [
                 ],
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -13671,14 +13671,14 @@ live_data = [
             },
             {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_3": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -13718,22 +13718,22 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "list_data_mixed_2": [
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -13752,16 +13752,16 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -13780,12 +13780,12 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -13805,21 +13805,21 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
                             },
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -13841,15 +13841,15 @@ live_data = [
                                 "string_key": "hi",
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -13869,8 +13869,8 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                             },
                         ],
@@ -13881,8 +13881,8 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -13899,16 +13899,16 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "type": "typedDict",
@@ -13923,959 +13923,959 @@ live_data = [
                                 "type": "typedDict",
                             }
                         },
-                    },
-                },
-                "dict_data_2": {
-                    "number_key": 42,
-                    "string_key": "hi",
-                    "bool_key": true,
-                    "custom_1": {
-                        "_val": {
-                            "number_key": 42,
-                            "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
-                        },
-                        "_weave_type": {
-                            "propertyTypes": {
-                                "a": {
-                                    "propertyTypes": {
-                                        "bool_key": "boolean",
-                                        "none_key": "none",
-                                        "number_key": "int",
-                                        "string_key": "string",
-                                    },
-                                    "type": "typedDict",
-                                }
-                            },
-                            "type": "typedDict",
-                        },
-                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                    },
-                    "none_key": null,
-                },
-                "list_data_mixed_2": [
-                    {
-                        "custom_1": {
-                            "_val": {
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        },
-                        "none_key": null,
-                        "number_key": 42,
-                        "bool_key": true,
-                    },
-                    {
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                    },
-                    {
-                        "none_key": null,
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                            },
-                            "_weave_type": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "a": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                        },
-                                    }
-                                },
-                            },
-                        },
-                    },
-                    {
-                        "bool_key": true,
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                            },
-                            "_weave_type": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "a": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                        },
-                                    }
-                                },
-                            },
-                        },
-                        "number_key": 42,
-                        "string_key": "hi",
-                    },
-                    {
-                        "bool_key": true,
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                    },
-                    "hi",
-                    true,
-                    42,
-                    null,
-                    {
-                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        "_val": {
-                            "bool_key": true,
-                            "none_key": null,
-                            "number_key": 42,
-                            "string_key": "hi",
-                        },
-                        "_weave_type": {
-                            "propertyTypes": {
-                                "a": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {
-                                        "bool_key": "boolean",
-                                        "none_key": "none",
-                                        "number_key": "int",
-                                        "string_key": "string",
-                                    },
-                                }
-                            },
-                            "type": "typedDict",
-                        },
-                    },
-                ],
-                "list_data_uniform_2": [
-                    {
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                        },
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                        "none_key": null,
-                    }
-                ],
-                "none_key": null,
-                "number_key": 42,
-            },
-            {
-                "bool_key": true,
-                "custom_1": {
-                    "_weave_type": {
-                        "propertyTypes": {
-                            "a": {
-                                "propertyTypes": {
-                                    "none_key": "none",
-                                    "number_key": "int",
-                                    "string_key": "string",
-                                    "bool_key": "boolean",
-                                },
-                                "type": "typedDict",
-                            }
-                        },
-                        "type": "typedDict",
-                    },
-                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                    "_val": {
-                        "bool_key": true,
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                    },
-                },
-                "custom_3": {
-                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                    "_val": {
-                        "custom_1": {
-                            "_val": {
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        },
-                        "dict_data_2": {
-                            "string_key": "hi",
-                            "bool_key": true,
-                            "custom_1": {
-                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                "_val": {
-                                    "number_key": 42,
-                                    "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
-                                },
-                                "_weave_type": {
-                                    "propertyTypes": {
-                                        "a": {
-                                            "type": "typedDict",
-                                            "propertyTypes": {
-                                                "number_key": "int",
-                                                "string_key": "string",
-                                                "bool_key": "boolean",
-                                                "none_key": "none",
-                                            },
-                                        }
-                                    },
-                                    "type": "typedDict",
-                                },
-                            },
-                            "none_key": null,
-                            "number_key": 42,
-                        },
-                        "list_data_mixed_2": [
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                },
-                                "none_key": null,
-                                "number_key": 42,
-                            },
-                            {
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                },
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                            }
-                                        },
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                },
-                                "none_key": null,
-                                "string_key": "hi",
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                },
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            {
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            "hi",
-                            true,
-                            42,
-                            null,
-                            {
-                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                "_val": {
-                                    "none_key": null,
-                                    "number_key": 42,
-                                    "string_key": "hi",
-                                    "bool_key": true,
-                                },
-                                "_weave_type": {
-                                    "propertyTypes": {
-                                        "a": {
-                                            "type": "typedDict",
-                                            "propertyTypes": {
-                                                "bool_key": "boolean",
-                                                "none_key": "none",
-                                                "number_key": "int",
-                                                "string_key": "string",
-                                            },
-                                        }
-                                    },
-                                    "type": "typedDict",
-                                },
-                            },
-                        ],
-                        "list_data_uniform_2": [
-                            {
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                },
-                            }
-                        ],
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "bool_key": true,
-                    },
-                    "_weave_type": {
-                        "type": "typedDict",
-                        "propertyTypes": {
-                            "a": {
-                                "propertyTypes": {
-                                    "none_key": "none",
-                                    "number_key": "int",
-                                    "string_key": "string",
-                                    "bool_key": "boolean",
-                                },
-                                "type": "typedDict",
-                            }
-                        },
-                    },
-                },
-                "dict_data_2": {
-                    "none_key": null,
-                    "number_key": 42,
-                    "string_key": "hi",
-                    "bool_key": true,
-                    "custom_1": {
-                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        "_val": {
-                            "bool_key": true,
-                            "none_key": null,
-                            "number_key": 42,
-                            "string_key": "hi",
-                        },
-                        "_weave_type": {
-                            "propertyTypes": {
-                                "a": {
-                                    "propertyTypes": {
-                                        "number_key": "int",
-                                        "string_key": "string",
-                                        "bool_key": "boolean",
-                                        "none_key": "none",
-                                    },
-                                    "type": "typedDict",
-                                }
-                            },
-                            "type": "typedDict",
-                        },
-                    },
-                },
-                "list_data_mixed_2": [
-                    {
-                        "bool_key": true,
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                        "none_key": null,
-                        "number_key": 42,
-                    },
-                    {
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                        },
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                        "none_key": null,
-                    },
-                    {
-                        "custom_1": {
-                            "_val": {
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        },
-                        "none_key": null,
-                        "string_key": "hi",
-                        "bool_key": true,
-                    },
-                    {
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_val": {
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                            "none_key": "none",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        },
-                    },
-                    {
-                        "bool_key": true,
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                    },
-                    "hi",
-                    true,
-                    42,
-                    null,
-                    {
-                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                        "_val": {
-                            "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
-                            "number_key": 42,
-                        },
-                        "_weave_type": {
-                            "propertyTypes": {
-                                "a": {
-                                    "propertyTypes": {
-                                        "none_key": "none",
-                                        "number_key": "int",
-                                        "string_key": "string",
-                                        "bool_key": "boolean",
-                                    },
-                                    "type": "typedDict",
-                                }
-                            },
-                            "type": "typedDict",
-                        },
-                    },
-                ],
-                "none_key": null,
-                "number_key": 42,
-                "string_key": "hi",
-            },
-            {
-                "string_key": "hi",
-                "bool_key": true,
-                "custom_1": {
-                    "_weave_type": {
-                        "type": "typedDict",
-                        "propertyTypes": {
-                            "a": {
-                                "propertyTypes": {
-                                    "none_key": "none",
-                                    "number_key": "int",
-                                    "string_key": "string",
-                                    "bool_key": "boolean",
-                                },
-                                "type": "typedDict",
-                            }
-                        },
-                    },
-                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                    "_val": {
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
-                    },
-                },
-                "custom_3": {
-                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                    "_val": {
-                        "list_data_uniform_2": [
-                            {
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                },
-                                            }
-                                        },
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                    },
-                                },
-                                "none_key": null,
-                            }
-                        ],
-                        "none_key": null,
-                        "number_key": 42,
-                        "string_key": "hi",
-                        "bool_key": true,
-                        "custom_1": {
-                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                            "_val": {
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                            },
-                            "_weave_type": {
-                                "propertyTypes": {
-                                    "a": {
-                                        "propertyTypes": {
-                                            "none_key": "none",
-                                            "number_key": "int",
-                                            "string_key": "string",
-                                            "bool_key": "boolean",
-                                        },
-                                        "type": "typedDict",
-                                    }
-                                },
-                                "type": "typedDict",
-                            },
-                        },
-                        "dict_data_2": {
-                            "bool_key": true,
-                            "custom_1": {
-                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                "_val": {
-                                    "none_key": null,
-                                    "number_key": 42,
-                                    "string_key": "hi",
-                                    "bool_key": true,
-                                },
-                                "_weave_type": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {
-                                        "a": {
-                                            "type": "typedDict",
-                                            "propertyTypes": {
-                                                "number_key": "int",
-                                                "string_key": "string",
-                                                "bool_key": "boolean",
-                                                "none_key": "none",
-                                            },
-                                        }
-                                    },
-                                },
-                            },
-                            "none_key": null,
-                            "number_key": 42,
-                            "string_key": "hi",
-                        },
-                        "list_data_mixed_2": [
-                            {
-                                "none_key": null,
-                                "number_key": 42,
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
-                                    },
-                                },
-                            },
-                            {
-                                "none_key": null,
-                                "number_key": 42,
-                                "string_key": "hi",
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                    },
-                                    "_weave_type": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "a": {
-                                                "propertyTypes": {
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                },
-                                                "type": "typedDict",
-                                            }
-                                        },
-                                    },
-                                },
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_weave_type": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "none_key": "none",
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                },
-                                            }
-                                        },
-                                    },
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "number_key": 42,
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
-                                    },
-                                },
-                                "none_key": null,
-                                "string_key": "hi",
-                            },
-                            {
-                                "bool_key": true,
-                                "custom_1": {
-                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                    "_val": {
-                                        "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
-                                        "number_key": 42,
-                                    },
-                                    "_weave_type": {
-                                        "propertyTypes": {
-                                            "a": {
-                                                "type": "typedDict",
-                                                "propertyTypes": {
-                                                    "number_key": "int",
-                                                    "string_key": "string",
-                                                    "bool_key": "boolean",
-                                                    "none_key": "none",
-                                                },
-                                            }
-                                        },
-                                        "type": "typedDict",
-                                    },
-                                },
-                                "number_key": 42,
-                                "string_key": "hi",
-                            },
-                            {
-                                "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
-                                "number_key": 42,
-                            },
-                            "hi",
-                            true,
-                            42,
-                            null,
-                            {
-                                "_weave_type": {
-                                    "propertyTypes": {
-                                        "a": {
-                                            "propertyTypes": {
-                                                "string_key": "string",
-                                                "bool_key": "boolean",
-                                                "none_key": "none",
-                                                "number_key": "int",
-                                            },
-                                            "type": "typedDict",
-                                        }
-                                    },
-                                    "type": "typedDict",
-                                },
-                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
-                                "_val": {
-                                    "none_key": null,
-                                    "number_key": 42,
-                                    "string_key": "hi",
-                                    "bool_key": true,
-                                },
-                            },
-                        ],
-                    },
-                    "_weave_type": {
-                        "propertyTypes": {
-                            "a": {
-                                "propertyTypes": {
-                                    "number_key": "int",
-                                    "string_key": "string",
-                                    "bool_key": "boolean",
-                                    "none_key": "none",
-                                },
-                                "type": "typedDict",
-                            }
-                        },
-                        "type": "typedDict",
                     },
                 },
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
+                    "custom_1": {
+                        "_val": {
+                            "number_key": 42,
+                            "string_key": "hi",
+                            "bool_key": True,
+                            "none_key": None,
+                        },
+                        "_weave_type": {
+                            "propertyTypes": {
+                                "a": {
+                                    "propertyTypes": {
+                                        "bool_key": "boolean",
+                                        "none_key": "none",
+                                        "number_key": "int",
+                                        "string_key": "string",
+                                    },
+                                    "type": "typedDict",
+                                }
+                            },
+                            "type": "typedDict",
+                        },
+                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                    },
+                    "none_key": None,
+                },
+                "list_data_mixed_2": [
+                    {
+                        "custom_1": {
+                            "_val": {
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        },
+                        "none_key": None,
+                        "number_key": 42,
+                        "bool_key": True,
+                    },
+                    {
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                        "none_key": None,
+                        "number_key": 42,
+                        "string_key": "hi",
+                    },
+                    {
+                        "none_key": None,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                            },
+                            "_weave_type": {
+                                "type": "typedDict",
+                                "propertyTypes": {
+                                    "a": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                        },
+                                    }
+                                },
+                            },
+                        },
+                    },
+                    {
+                        "bool_key": True,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                            },
+                            "_weave_type": {
+                                "type": "typedDict",
+                                "propertyTypes": {
+                                    "a": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                        },
+                                    }
+                                },
+                            },
+                        },
+                        "number_key": 42,
+                        "string_key": "hi",
+                    },
+                    {
+                        "bool_key": True,
+                        "none_key": None,
+                        "number_key": 42,
+                        "string_key": "hi",
+                    },
+                    "hi",
+                    True,
+                    42,
+                    None,
+                    {
+                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        "_val": {
+                            "bool_key": True,
+                            "none_key": None,
+                            "number_key": 42,
+                            "string_key": "hi",
+                        },
+                        "_weave_type": {
+                            "propertyTypes": {
+                                "a": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {
+                                        "bool_key": "boolean",
+                                        "none_key": "none",
+                                        "number_key": "int",
+                                        "string_key": "string",
+                                    },
+                                }
+                            },
+                            "type": "typedDict",
+                        },
+                    },
+                ],
+                "list_data_uniform_2": [
+                    {
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                        },
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                        "none_key": None,
+                    }
+                ],
+                "none_key": None,
+                "number_key": 42,
+            },
+            {
+                "bool_key": True,
+                "custom_1": {
+                    "_weave_type": {
+                        "propertyTypes": {
+                            "a": {
+                                "propertyTypes": {
+                                    "none_key": "none",
+                                    "number_key": "int",
+                                    "string_key": "string",
+                                    "bool_key": "boolean",
+                                },
+                                "type": "typedDict",
+                            }
+                        },
+                        "type": "typedDict",
+                    },
+                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                    "_val": {
+                        "bool_key": True,
+                        "none_key": None,
+                        "number_key": 42,
+                        "string_key": "hi",
+                    },
+                },
+                "custom_3": {
+                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                    "_val": {
+                        "custom_1": {
+                            "_val": {
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        },
+                        "dict_data_2": {
+                            "string_key": "hi",
+                            "bool_key": True,
+                            "custom_1": {
+                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                "_val": {
+                                    "number_key": 42,
+                                    "string_key": "hi",
+                                    "bool_key": True,
+                                    "none_key": None,
+                                },
+                                "_weave_type": {
+                                    "propertyTypes": {
+                                        "a": {
+                                            "type": "typedDict",
+                                            "propertyTypes": {
+                                                "number_key": "int",
+                                                "string_key": "string",
+                                                "bool_key": "boolean",
+                                                "none_key": "none",
+                                            },
+                                        }
+                                    },
+                                    "type": "typedDict",
+                                },
+                            },
+                            "none_key": None,
+                            "number_key": 42,
+                        },
+                        "list_data_mixed_2": [
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                },
+                                "none_key": None,
+                                "number_key": 42,
+                            },
+                            {
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                },
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                            }
+                                        },
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                },
+                                "none_key": None,
+                                "string_key": "hi",
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                },
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            {
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            "hi",
+                            True,
+                            42,
+                            None,
+                            {
+                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                "_val": {
+                                    "none_key": None,
+                                    "number_key": 42,
+                                    "string_key": "hi",
+                                    "bool_key": True,
+                                },
+                                "_weave_type": {
+                                    "propertyTypes": {
+                                        "a": {
+                                            "type": "typedDict",
+                                            "propertyTypes": {
+                                                "bool_key": "boolean",
+                                                "none_key": "none",
+                                                "number_key": "int",
+                                                "string_key": "string",
+                                            },
+                                        }
+                                    },
+                                    "type": "typedDict",
+                                },
+                            },
+                        ],
+                        "list_data_uniform_2": [
+                            {
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                },
+                            }
+                        ],
+                        "none_key": None,
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
+                    },
+                    "_weave_type": {
+                        "type": "typedDict",
+                        "propertyTypes": {
+                            "a": {
+                                "propertyTypes": {
+                                    "none_key": "none",
+                                    "number_key": "int",
+                                    "string_key": "string",
+                                    "bool_key": "boolean",
+                                },
+                                "type": "typedDict",
+                            }
+                        },
+                    },
+                },
+                "dict_data_2": {
+                    "none_key": None,
+                    "number_key": 42,
+                    "string_key": "hi",
+                    "bool_key": True,
+                    "custom_1": {
+                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        "_val": {
+                            "bool_key": True,
+                            "none_key": None,
+                            "number_key": 42,
+                            "string_key": "hi",
+                        },
+                        "_weave_type": {
+                            "propertyTypes": {
+                                "a": {
+                                    "propertyTypes": {
+                                        "number_key": "int",
+                                        "string_key": "string",
+                                        "bool_key": "boolean",
+                                        "none_key": "none",
+                                    },
+                                    "type": "typedDict",
+                                }
+                            },
+                            "type": "typedDict",
+                        },
+                    },
+                },
+                "list_data_mixed_2": [
+                    {
+                        "bool_key": True,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                        "none_key": None,
+                        "number_key": 42,
+                    },
+                    {
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                        },
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                        "none_key": None,
+                    },
+                    {
+                        "custom_1": {
+                            "_val": {
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        },
+                        "none_key": None,
+                        "string_key": "hi",
+                        "bool_key": True,
+                    },
+                    {
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_val": {
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                            "none_key": "none",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        },
+                    },
+                    {
+                        "bool_key": True,
+                        "none_key": None,
+                        "number_key": 42,
+                        "string_key": "hi",
+                    },
+                    "hi",
+                    True,
+                    42,
+                    None,
+                    {
+                        "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                        "_val": {
+                            "string_key": "hi",
+                            "bool_key": True,
+                            "none_key": None,
+                            "number_key": 42,
+                        },
+                        "_weave_type": {
+                            "propertyTypes": {
+                                "a": {
+                                    "propertyTypes": {
+                                        "none_key": "none",
+                                        "number_key": "int",
+                                        "string_key": "string",
+                                        "bool_key": "boolean",
+                                    },
+                                    "type": "typedDict",
+                                }
+                            },
+                            "type": "typedDict",
+                        },
+                    },
+                ],
+                "none_key": None,
+                "number_key": 42,
+                "string_key": "hi",
+            },
+            {
+                "string_key": "hi",
+                "bool_key": True,
+                "custom_1": {
+                    "_weave_type": {
+                        "type": "typedDict",
+                        "propertyTypes": {
+                            "a": {
+                                "propertyTypes": {
+                                    "none_key": "none",
+                                    "number_key": "int",
+                                    "string_key": "string",
+                                    "bool_key": "boolean",
+                                },
+                                "type": "typedDict",
+                            }
+                        },
+                    },
+                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                    "_val": {
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "none_key": None,
+                    },
+                },
+                "custom_3": {
+                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                    "_val": {
+                        "list_data_uniform_2": [
+                            {
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                },
+                                            }
+                                        },
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                    },
+                                },
+                                "none_key": None,
+                            }
+                        ],
+                        "none_key": None,
+                        "number_key": 42,
+                        "string_key": "hi",
+                        "bool_key": True,
+                        "custom_1": {
+                            "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                            "_val": {
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                            },
+                            "_weave_type": {
+                                "propertyTypes": {
+                                    "a": {
+                                        "propertyTypes": {
+                                            "none_key": "none",
+                                            "number_key": "int",
+                                            "string_key": "string",
+                                            "bool_key": "boolean",
+                                        },
+                                        "type": "typedDict",
+                                    }
+                                },
+                                "type": "typedDict",
+                            },
+                        },
+                        "dict_data_2": {
+                            "bool_key": True,
+                            "custom_1": {
+                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                "_val": {
+                                    "none_key": None,
+                                    "number_key": 42,
+                                    "string_key": "hi",
+                                    "bool_key": True,
+                                },
+                                "_weave_type": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {
+                                        "a": {
+                                            "type": "typedDict",
+                                            "propertyTypes": {
+                                                "number_key": "int",
+                                                "string_key": "string",
+                                                "bool_key": "boolean",
+                                                "none_key": "none",
+                                            },
+                                        }
+                                    },
+                                },
+                            },
+                            "none_key": None,
+                            "number_key": 42,
+                            "string_key": "hi",
+                        },
+                        "list_data_mixed_2": [
+                            {
+                                "none_key": None,
+                                "number_key": 42,
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                        "none_key": None,
+                                    },
+                                },
+                            },
+                            {
+                                "none_key": None,
+                                "number_key": 42,
+                                "string_key": "hi",
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                    },
+                                    "_weave_type": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "a": {
+                                                "propertyTypes": {
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                },
+                                                "type": "typedDict",
+                                            }
+                                        },
+                                    },
+                                },
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_weave_type": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "none_key": "none",
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                },
+                                            }
+                                        },
+                                    },
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "number_key": 42,
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                        "none_key": None,
+                                    },
+                                },
+                                "none_key": None,
+                                "string_key": "hi",
+                            },
+                            {
+                                "bool_key": True,
+                                "custom_1": {
+                                    "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                    "_val": {
+                                        "string_key": "hi",
+                                        "bool_key": True,
+                                        "none_key": None,
+                                        "number_key": 42,
+                                    },
+                                    "_weave_type": {
+                                        "propertyTypes": {
+                                            "a": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "number_key": "int",
+                                                    "string_key": "string",
+                                                    "bool_key": "boolean",
+                                                    "none_key": "none",
+                                                },
+                                            }
+                                        },
+                                        "type": "typedDict",
+                                    },
+                                },
+                                "number_key": 42,
+                                "string_key": "hi",
+                            },
+                            {
+                                "string_key": "hi",
+                                "bool_key": True,
+                                "none_key": None,
+                                "number_key": 42,
+                            },
+                            "hi",
+                            True,
+                            42,
+                            None,
+                            {
+                                "_weave_type": {
+                                    "propertyTypes": {
+                                        "a": {
+                                            "propertyTypes": {
+                                                "string_key": "string",
+                                                "bool_key": "boolean",
+                                                "none_key": "none",
+                                                "number_key": "int",
+                                            },
+                                            "type": "typedDict",
+                                        }
+                                    },
+                                    "type": "typedDict",
+                                },
+                                "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
+                                "_val": {
+                                    "none_key": None,
+                                    "number_key": 42,
+                                    "string_key": "hi",
+                                    "bool_key": True,
+                                },
+                            },
+                        ],
+                    },
+                    "_weave_type": {
+                        "propertyTypes": {
+                            "a": {
+                                "propertyTypes": {
+                                    "number_key": "int",
+                                    "string_key": "string",
+                                    "bool_key": "boolean",
+                                    "none_key": "none",
+                                },
+                                "type": "typedDict",
+                            }
+                        },
+                        "type": "typedDict",
+                    },
+                },
+                "dict_data_2": {
+                    "number_key": 42,
+                    "string_key": "hi",
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -14895,22 +14895,22 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -14928,16 +14928,16 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
             },
             {
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "type": "typedDict",
@@ -14955,8 +14955,8 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -14983,19 +14983,19 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
                         "dict_data_2": {
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -15013,18 +15013,18 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "list_data_mixed_2": [
                             {
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -15042,7 +15042,7 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             {
@@ -15065,18 +15065,18 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -15096,19 +15096,19 @@ live_data = [
                                     "_val": {
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                     },
                                 },
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -15130,21 +15130,21 @@ live_data = [
                                 "number_key": 42,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -15166,14 +15166,14 @@ live_data = [
                         "list_data_uniform_2": [
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "type": "typedDict",
@@ -15190,14 +15190,14 @@ live_data = [
                                         },
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -15217,7 +15217,7 @@ live_data = [
                 "list_data_mixed_2": [
                     {
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -15235,20 +15235,20 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -15267,19 +15267,19 @@ live_data = [
                                 },
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -15301,12 +15301,12 @@ live_data = [
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -15328,22 +15328,22 @@ live_data = [
                         "number_key": 42,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -15365,11 +15365,11 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -15389,10 +15389,10 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
             },
             {
@@ -15402,8 +15402,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -15421,17 +15421,17 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -15449,7 +15449,7 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -15473,21 +15473,21 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -15510,20 +15510,20 @@ live_data = [
                         "number_key": 42,
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -15545,13 +15545,13 @@ live_data = [
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -15569,22 +15569,22 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -15603,13 +15603,13 @@ live_data = [
                 },
                 "dict_data_2": {
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -15627,20 +15627,20 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                 },
             },
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 "_val": {
                     "string_key": "hi",
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                     "number_key": 42,
                 },
                 "_weave_type": {
@@ -15660,7 +15660,7 @@ live_data = [
             },
             [
                 {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -15680,24 +15680,24 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 }
             ],
             [
                 {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -15723,8 +15723,8 @@ live_data = [
                     "string_key": "hi",
                     "custom_1": {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -15744,12 +15744,12 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 {
-                    "none_key": null,
+                    "none_key": None,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -15768,21 +15768,21 @@ live_data = [
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                     },
                 },
                 {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -15805,18 +15805,18 @@ live_data = [
                 {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
-                    "none_key": null,
+                    "bool_key": True,
+                    "none_key": None,
                 },
                 "hi",
-                true,
+                True,
                 42,
-                null,
+                None,
                 {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -15854,23 +15854,23 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
             {
                 "_val": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_weave_type": {
                             "propertyTypes": {
@@ -15890,16 +15890,16 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                     },
                     "dict_data_2": {
                         "custom_1": {
                             "_val": {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "_weave_type": {
@@ -15918,22 +15918,22 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "list_data_mixed_2": [
                         {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                     "number_key": 42,
                                 },
                                 "_weave_type": {
@@ -15958,8 +15958,8 @@ live_data = [
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -15976,14 +15976,14 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
                         {
-                            "none_key": null,
+                            "none_key": None,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -16001,10 +16001,10 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                             },
                         },
@@ -16026,26 +16026,26 @@ live_data = [
                                 },
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                             },
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                         },
                         {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "hi",
-                        true,
+                        True,
                         42,
-                        null,
+                        None,
                         {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -16063,8 +16063,8 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -16074,14 +16074,14 @@ live_data = [
                         {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "propertyTypes": {
@@ -16098,7 +16098,7 @@ live_data = [
                                     "type": "typedDict",
                                 },
                             },
-                            "none_key": null,
+                            "none_key": None,
                         }
                     ],
                 },
@@ -16123,8 +16123,8 @@ live_data = [
             {
                 "custom_1": {
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -16144,19 +16144,19 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
-                "bool_key": true,
+                "bool_key": True,
             },
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -16177,7 +16177,7 @@ live_data = [
                 },
             },
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_weave_type": {
                         "propertyTypes": {
@@ -16195,13 +16195,13 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
             },
             {
@@ -16224,25 +16224,25 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                 },
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
-            {"none_key": null, "number_key": 42, "string_key": "hi", "bool_key": true},
+            {"none_key": None, "number_key": 42, "string_key": "hi", "bool_key": True},
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_val": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                 },
                 "_weave_type": {
                     "propertyTypes": {
@@ -16267,11 +16267,11 @@ live_data = [
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -16291,19 +16291,19 @@ live_data = [
                         },
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
                 "number_key": 42,
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -16320,7 +16320,7 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
@@ -16343,21 +16343,21 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -16376,16 +16376,16 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -16410,20 +16410,20 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "propertyTypes": {
@@ -16441,12 +16441,12 @@ live_data = [
                         },
                     },
                 ],
-                "none_key": null,
-                "bool_key": true,
+                "none_key": None,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -16471,7 +16471,7 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -16491,22 +16491,22 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
                         "dict_data_2": {
-                            "none_key": null,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
+                            "bool_key": True,
                             "custom_1": {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
-                                    "none_key": null,
+                                    "bool_key": True,
+                                    "none_key": None,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -16529,8 +16529,8 @@ live_data = [
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
                                     },
@@ -16549,9 +16549,9 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             {
                                 "number_key": 42,
@@ -16573,24 +16573,24 @@ live_data = [
                                     },
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                             },
                             {
-                                "none_key": null,
+                                "none_key": None,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -16611,14 +16611,14 @@ live_data = [
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                                 "custom_1": {
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
-                                        "none_key": null,
+                                        "none_key": None,
                                         "number_key": 42,
                                         "string_key": "hi",
-                                        "bool_key": true,
+                                        "bool_key": True,
                                     },
                                     "_weave_type": {
                                         "propertyTypes": {
@@ -16639,21 +16639,21 @@ live_data = [
                             },
                             {
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                             },
                             "hi",
-                            true,
+                            True,
                             42,
-                            null,
+                            None,
                             {
                                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                 "_val": {
-                                    "none_key": null,
+                                    "none_key": None,
                                     "number_key": 42,
                                     "string_key": "hi",
-                                    "bool_key": true,
+                                    "bool_key": True,
                                 },
                                 "_weave_type": {
                                     "type": "typedDict",
@@ -16677,8 +16677,8 @@ live_data = [
                                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                                     "_val": {
                                         "string_key": "hi",
-                                        "bool_key": true,
-                                        "none_key": null,
+                                        "bool_key": True,
+                                        "none_key": None,
                                         "number_key": 42,
                                     },
                                     "_weave_type": {
@@ -16696,13 +16696,13 @@ live_data = [
                                         "type": "typedDict",
                                     },
                                 },
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             }
                         ],
-                        "none_key": null,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "propertyTypes": {
@@ -16723,12 +16723,12 @@ live_data = [
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -16747,7 +16747,7 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
@@ -16755,14 +16755,14 @@ live_data = [
         ],
         "list_data_uniform_2": [
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     "_weave_type": {
                         "type": "typedDict",
@@ -16779,12 +16779,12 @@ live_data = [
                         },
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             }
         ],
-        "dict_data_4.dict_data_2.none_key": null,
+        "dict_data_4.dict_data_2.none_key": None,
         "custom_3": {
             "_weave_type": {
                 "propertyTypes": {
@@ -16802,12 +16802,12 @@ live_data = [
             },
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -16827,13 +16827,13 @@ live_data = [
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 },
                 "dict_data_2": {
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                         },
                         "_weave_type": {
@@ -16851,7 +16851,7 @@ live_data = [
                             "type": "typedDict",
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
                 },
@@ -16860,8 +16860,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -16880,9 +16880,9 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
-                        "bool_key": true,
+                        "bool_key": True,
                     },
                     {
                         "number_key": 42,
@@ -16890,8 +16890,8 @@ live_data = [
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -16910,16 +16910,16 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -16937,18 +16937,18 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -16969,19 +16969,19 @@ live_data = [
                         "string_key": "hi",
                     },
                     {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_val": {
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                             "number_key": 42,
                             "string_key": "hi",
                         },
@@ -17005,12 +17005,12 @@ live_data = [
                 "list_data_uniform_2": [
                     {
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
@@ -17029,22 +17029,22 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             },
         },
-        "dict_data_2.bool_key": true,
-        "bool_key": true,
+        "dict_data_2.bool_key": True,
+        "bool_key": True,
         "dict_data_4.dict_data_2.custom_1": {
             "_val": {
                 "string_key": "hi",
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
                 "number_key": 42,
             },
             "_weave_type": {
@@ -17068,7 +17068,7 @@ live_data = [
             "_val": {
                 "list_data_mixed_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "propertyTypes": {
@@ -17086,13 +17086,13 @@ live_data = [
                             },
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
@@ -17102,8 +17102,8 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                             "_weave_type": {
                                 "propertyTypes": {
@@ -17120,20 +17120,20 @@ live_data = [
                                 "type": "typedDict",
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     {
-                        "none_key": null,
+                        "none_key": None,
                         "string_key": "hi",
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -17152,13 +17152,13 @@ live_data = [
                         },
                     },
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_val": {
-                                "none_key": null,
+                                "none_key": None,
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
+                                "bool_key": True,
                             },
                             "_weave_type": {
                                 "type": "typedDict",
@@ -17182,13 +17182,13 @@ live_data = [
                     {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "hi",
-                    true,
+                    True,
                     42,
-                    null,
+                    None,
                     {
                         "_weave_type": {
                             "propertyTypes": {
@@ -17208,14 +17208,14 @@ live_data = [
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                     },
                 ],
                 "list_data_uniform_2": [
                     {
-                        "bool_key": true,
+                        "bool_key": True,
                         "custom_1": {
                             "_weave_type": {
                                 "type": "typedDict",
@@ -17235,25 +17235,25 @@ live_data = [
                             "_val": {
                                 "number_key": 42,
                                 "string_key": "hi",
-                                "bool_key": true,
-                                "none_key": null,
+                                "bool_key": True,
+                                "none_key": None,
                             },
                         },
-                        "none_key": null,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     }
                 ],
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -17274,14 +17274,14 @@ live_data = [
                 "dict_data_2": {
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                     "custom_1": {
                         "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                         "_val": {
                             "number_key": 42,
                             "string_key": "hi",
-                            "bool_key": true,
-                            "none_key": null,
+                            "bool_key": True,
+                            "none_key": None,
                         },
                         "_weave_type": {
                             "type": "typedDict",
@@ -17298,7 +17298,7 @@ live_data = [
                             },
                         },
                     },
-                    "none_key": null,
+                    "none_key": None,
                 },
             },
             "_weave_type": {
@@ -17319,14 +17319,14 @@ live_data = [
         "string_key": "hi",
         "dict_data_4.list_data_uniform_2": [
             {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -17348,10 +17348,10 @@ live_data = [
                 },
             }
         ],
-        "dict_data_4.bool_key": true,
+        "dict_data_4.bool_key": True,
         "number_key": 42,
-        "dict_data_4.dict_data_2.bool_key": true,
-        "dict_data_4.none_key": null,
+        "dict_data_4.dict_data_2.bool_key": True,
+        "dict_data_4.none_key": None,
         "custom_1": {
             "_weave_type": {
                 "propertyTypes": {
@@ -17371,19 +17371,19 @@ live_data = [
             "_val": {
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
             },
         },
-        "dict_data_2.none_key": null,
+        "dict_data_2.none_key": None,
         "dict_data_4.list_data_mixed_2": [
             {
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -17401,9 +17401,9 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
-                "bool_key": true,
+                "bool_key": True,
             },
             {
                 "number_key": 42,
@@ -17411,8 +17411,8 @@ live_data = [
                 "custom_1": {
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                     "_val": {
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                         "string_key": "hi",
                     },
@@ -17431,15 +17431,15 @@ live_data = [
                         "type": "typedDict",
                     },
                 },
-                "none_key": null,
+                "none_key": None,
             },
             {
-                "bool_key": true,
+                "bool_key": True,
                 "custom_1": {
                     "_val": {
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                         "number_key": 42,
                     },
                     "_weave_type": {
@@ -17458,7 +17458,7 @@ live_data = [
                     },
                     "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 },
-                "none_key": null,
+                "none_key": None,
                 "string_key": "hi",
             },
             {
@@ -17466,8 +17466,8 @@ live_data = [
                     "_val": {
                         "number_key": 42,
                         "string_key": "hi",
-                        "bool_key": true,
-                        "none_key": null,
+                        "bool_key": True,
+                        "none_key": None,
                     },
                     "_weave_type": {
                         "type": "typedDict",
@@ -17487,20 +17487,20 @@ live_data = [
                 },
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
-            {"none_key": null, "number_key": 42, "string_key": "hi", "bool_key": true},
+            {"none_key": None, "number_key": 42, "string_key": "hi", "bool_key": True},
             "hi",
-            true,
+            True,
             42,
-            null,
+            None,
             {
                 "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
                 "_val": {
-                    "none_key": null,
+                    "none_key": None,
                     "number_key": 42,
                     "string_key": "hi",
-                    "bool_key": true,
+                    "bool_key": True,
                 },
                 "_weave_type": {
                     "propertyTypes": {
@@ -17520,8 +17520,8 @@ live_data = [
         ],
         "dict_data_4.custom_1": {
             "_val": {
-                "bool_key": true,
-                "none_key": null,
+                "bool_key": True,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
             },
@@ -17558,10 +17558,10 @@ live_data = [
             },
             "_type": '_wt_::{"type": "typedDict", "propertyTypes": {"a": {"type": "typedDict", "propertyTypes": {"string_key": "string", "bool_key": "boolean", "number_key": "int", "none_key": "none"}}}}',
             "_val": {
-                "none_key": null,
+                "none_key": None,
                 "number_key": 42,
                 "string_key": "hi",
-                "bool_key": true,
+                "bool_key": True,
             },
         },
         "dict_data_4.dict_data_2.number_key": 42,

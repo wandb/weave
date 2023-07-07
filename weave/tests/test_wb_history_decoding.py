@@ -1,25 +1,69 @@
 import datetime
 import time
 import typing
+import datetime
+
+import pytest
 import weave
-from weave.ops_domain.run_history.history_op_common import TypeCount
+from .. import context_state as _context
+from PIL import Image
+import numpy as np
+
+# from weave.ops_domain.run_history.history_op_common import TypeCount
 from weave.ops_domain.run_history.run_history_v3_parquet_weave_only import (
     _refine_history_type_inner,
 )
+
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+
 from weave.wandb_client_api import wandb_gql_query, wandb_public_api
+from weave.wandb_interface import wandb_stream_table
 
 
-def test_weave_history_decoding_snapshot():
-    from .history_decoding.logs import logs
-    from .history_decoding.history_keys import history_keys
-    from .history_decoding.live_data import live_data
-    from .history_decoding.weave_type import weave_type
+# def test_weave_type_decoding(user_by_api_key_in_env):
+#     rows = [{"a": 1}]
 
-    type_parse = _refine_history_type_inner(history_keys["keys"])
-    w_type = weave.types.TypeRegistry.type_from_dict(weave_type)
+#     run = InMemoryLazyLiteRun(project_name="dev_test_weave_ci")
 
-    assert w_type.assign_type(type_parse.weave_type)
+#     total_rows = []
+#     all_keys = set()
+#     for row in rows:
+#         run.log(row)
+#         new_row = {
+#             "_step": len(total_rows),
+#             "_timestamp": datetime.datetime.now().timestamp(),
+#             **row,
+#         }
+#         total_rows.append(new_row)
+#         all_keys.update(list(row.keys()))
+#     run.finish()
+
+#     row_type = weave.types.TypeRegistry.type_of([{}, *total_rows])
+#     run_node = weave.ops.project(run._entity_name, run._project_name).run(run._run_name)
+
+#     history_node = run_node.history2()
+#     assert row_type.assign_type(history_node.type)
+
+#     for key in all_keys:
+#         column_node = history_node[key]
+#         column_value = weave.use(column_node).to_pylist_raw()
+#         assert column_value == [row.get(key) for row in total_rows]
+
+
+# def test_weave_history_decoding_snapshot():
+#     from .history_decoding.logs import logs
+#     from .history_decoding.history_keys import history_keys
+#     from .history_decoding.live_data import live_data
+#     from .history_decoding.weave_type import weave_type
+
+#     type_parse = _refine_history_type_inner(history_keys["keys"])
+#     w_type = weave.types.TypeRegistry.type_from_dict(weave_type)
+#     w_object_type = weave.types.union(w_type.object_type, weave.types.TypedDict())
+#     p_object_type = type_parse.weave_type
+
+#     for key, val in p_object_type.property_types.items():
+#         assert key in w_object_type.property_types
+#         assert w_object_type.property_types[key].assign_type(val)
 
 
 # from pyarrow import parquet as pq
@@ -167,8 +211,111 @@ def test_weave_history_decoding_snapshot():
 #     assert res == None
 
 
-# # def test_history_logging(user_by_api_key_in_env):
-# def test_history_logging():
+def image():
+    imarray = np.random.rand(100, 100, 3) * 255
+    return Image.fromarray(imarray.astype("uint8")).convert("RGBA")
+
+
+_loading_builtins_token = _context.set_loading_built_ins()
+
+
+@weave.type()
+class TestType:
+    a: int
+    b: str
+
+
+_context.clear_loading_built_ins(_loading_builtins_token)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [
+            {
+                # "a": 1, "b": "hi", "c": TestType(2, "bye"),
+                "i": image()
+            }
+        ]
+    ],
+)
+def test_row_batch(user_by_api_key_in_env, rows):
+    do_batch_test(user_by_api_key_in_env.username, rows)
+
+
+def compare_objects(a, b):
+    if isinstance(a, Image.Image) and isinstance(b, Image.Image):
+        return a.tobytes() == b.tobytes()
+    elif isinstance(a, list) and isinstance(b, list):
+        return all(compare_objects(a_, b_) for a_, b_ in zip(a, b))
+    return a == b
+
+
+def do_batch_test(username, rows):
+    table_name = "test_table_" + str(int(time.time()))
+    st = wandb_stream_table.StreamTable(
+        table_name=table_name, project_name="dev_test_weave_ci", entity_name=username
+    )
+
+    row_accumulator = []
+
+    all_keys = set()
+    for row in rows:
+        st.log(row)
+        new_row = {
+            "_step": len(row_accumulator),
+            "_timestamp": datetime.datetime.now().timestamp(),
+            **row,
+        }
+        row_accumulator.append(new_row)
+        all_keys.update(list(row.keys()))
+
+    row_type = weave.types.TypeRegistry.type_of([{}, *row_accumulator])
+    run_node = weave.ops.project(
+        st._lite_run._entity_name, st._lite_run._project_name
+    ).run(st._lite_run._run_name)
+
+    def do_assertion():
+        history_node = run_node.history_stream()
+        assert row_type.assign_type(history_node.type)
+
+        for key in all_keys:
+            column_node = history_node[key]
+            column_value = weave.use(column_node).to_pylist_tagged()
+            assert compare_objects(
+                column_value, [row.get(key) for row in row_accumulator]
+            )
+
+    def history_is_uploaded():
+        history = get_raw_gorilla_history(
+            st._lite_run._entity_name,
+            st._lite_run._project_name,
+            st._lite_run._run_name,
+        )
+        return (
+            len(history.get("liveData", [])) == len(row_accumulator)
+            and history.get("parquetUrls") == []
+        )
+
+    # def history_is_compacted():
+    #     history = get_raw_gorilla_history(
+    #         run._entity_name, run._project_name, run._run_name
+    #     )
+    #     return history.get("liveData") == [] and len(history.get("parquetUrls", [])) > 0
+
+    # First assertion is with liveset
+    wait_for_x_times(history_is_uploaded)
+    do_assertion()
+    st.finish()
+
+    # Second assertion is with parquet files
+    # This is not supported
+    # ensure_history_compaction_runs(run._entity_name, run._project_name, run._run_name)
+    # wait_for_x_times(history_is_compacted)
+    # do_assertion()
+
+
+# def test_history_logging(user_by_api_key_in_env):
 #     rows = [{"a": 1}]
 #     run = InMemoryLazyLiteRun(project_name="dev_test_weave_ci")
 
@@ -218,71 +365,71 @@ def test_weave_history_decoding_snapshot():
 
 #     # Second assertion is with parquet files
 #     run.finish()
-#     # Sad...can't quite figure this out
+#     # This is not supported
 #     # ensure_history_compaction_runs(run._entity_name, run._project_name, run._run_name)
 #     wait_for_x_times(history_is_compacted)
 #     do_assertion()
 
 
-# def wait_for_x_times(for_fn, times=10, wait=1):
-#     done = False
-#     while times > 0 and not done:
-#         times -= 1
-#         done = for_fn()
-#         time.sleep(wait)
-#     assert times > 0
+def wait_for_x_times(for_fn, times=10, wait=1):
+    done = False
+    while times > 0 and not done:
+        times -= 1
+        done = for_fn()
+        time.sleep(wait)
+    assert times > 0
 
 
-# def get_raw_gorilla_history(entity_name, project_name, run_name):
-#     query = """query WeavePythonCG($entityName: String!, $projectName: String!, $runName: String! ) {
-#             project(name: $projectName, entityName: $entityName) {
-#                 run(name: $runName) {
-#                     # historyKeys
-#                     parquetHistory(liveKeys: ["_timestamp"]) {
-#                         liveData
-#                         parquetUrls
-#                     }
-#                 }
-#             }
-#     }"""
-#     variables = {
-#         "entityName": entity_name,
-#         "projectName": project_name,
-#         "runName": run_name,
-#     }
-#     res = wandb_gql_query(query, variables)
-#     return res.get("project", {}).get("run", {}).get("parquetHistory", {})
+def get_raw_gorilla_history(entity_name, project_name, run_name):
+    query = """query WeavePythonCG($entityName: String!, $projectName: String!, $runName: String! ) {
+            project(name: $projectName, entityName: $entityName) {
+                run(name: $runName) {
+                    # historyKeys
+                    parquetHistory(liveKeys: ["_timestamp"]) {
+                        liveData
+                        parquetUrls
+                    }
+                }
+            }
+    }"""
+    variables = {
+        "entityName": entity_name,
+        "projectName": project_name,
+        "runName": run_name,
+    }
+    res = wandb_gql_query(query, variables)
+    return res.get("project", {}).get("run", {}).get("parquetHistory", {})
 
 
-# def ensure_history_compaction_runs(entity_name, project_name, run_name):
-#     client = wandb_public_api().client
-#     # original_url = client._client.transport.url
-#     # original_schema = client._client.schema
-#     # client._client.transport.url = "http://localhost:8080/admin/parquet_workflow"
+def ensure_history_compaction_runs(entity_name, project_name, run_name):
+    client = wandb_public_api().client
+    # original_url = client._client.transport.url
+    # original_schema = client._client.schema
+    # client._client.transport.url = "http://localhost:8080/admin/parquet_workflow"
 
-#     test_api_key = wandb_public_api().api_key
+    test_api_key = wandb_public_api().api_key
 
-#     post_args = {
-#         "headers": client._client.transport.headers,
-#         "cookies": client._client.transport.cookies,
-#         "auth": ("api", test_api_key),
-#         "timeout": client._client.transport.default_timeout,
-#         "data": {
-#             "task_type": "export_history_to_parquet",
-#             "run_key": {
-#                 "entity_name": entity_name,
-#                 "project_name": project_name,
-#                 "run_name": run_name,
-#             },
-#         },
-#     }
-#     request = client._client.transport.session.post(
-#         "http://localhost:8080/admin/parquet_workflow", **post_args
-#     )
+    post_args = {
+        "headers": client._client.transport.headers,
+        "cookies": client._client.transport.cookies,
+        "auth": ("api", test_api_key),
+        "timeout": client._client.transport.default_timeout,
+        "data": {
+            "task_type": "export_history_to_parquet",
+            "run_key": {
+                "entity_name": entity_name,
+                "project_name": project_name,
+                "run_name": run_name,
+            },
+        },
+    }
+    request = client._client.transport.session.post(
+        "http://localhost:8080/admin/parquet_workflow", **post_args
+    )
 
-#     print(request)
+    print(request)
 
-#     client.execute()
+    client.execute()
 
-#     # client._client.transport.url = original_url
-#     # client._client.schema = original_schema
+    # client._client.transport.url = original_url
+    # client._client.schema = original_schema
