@@ -22,7 +22,7 @@ interface NormExecGraph {
 
 // Batched version of above; batching allows us to retain and share node
 // identity among graphs
-export interface BatchedNormExecGraphs {
+interface BatchedNormExecGraphs {
   ng: NormExecGraph;
   roots: Set<EditingNode>;
 }
@@ -92,9 +92,9 @@ function isSerializedOp(x: any): x is SerializedOp {
 }
 
 // Final data structure before JSON serialization
-export type FlatSerializableGraph = SerializedNode[];
+type FlatSerializableGraph = SerializedNode[];
 
-export interface BatchedGraphs {
+interface BatchedGraphs {
   // Misleading, this may actually be multiple disconnected subgraphs, but the naive TS type
   // is indistinguishable
   nodes: FlatSerializableGraph;

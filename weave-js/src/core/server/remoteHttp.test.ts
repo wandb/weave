@@ -26,7 +26,7 @@ describe('RemoteHttpServer', () => {
     const result = server.query([constNumber(42)]);
     return result.then(r => {
       expect(fetch).toHaveBeenCalledWith('https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]}}',
+        body: '{"graphs":{"nodes":["const","number",42,{"nodeType":0,"type":1,"val":2}],"targetNodes":[3]},"serializeAllValues":true}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
@@ -54,7 +54,7 @@ describe('RemoteHttpServer', () => {
     const result = server.query([constNumber(42), constString('foo')]);
     return result.then(r => {
       expect(fetch).toHaveBeenCalledWith('https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42},{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0,1]}}',
+        body: '{"graphs":{"nodes":["const","number",42,{"nodeType":0,"type":1,"val":2},"string","foo",{"nodeType":0,"type":4,"val":5}],"targetNodes":[3,6]},"serializeAllValues":true}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
@@ -86,7 +86,7 @@ describe('RemoteHttpServer', () => {
     ]);
     return result.then(r => {
       expect(fetch).toHaveBeenCalledWith('https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42},{"nodeType":"const","type":"string","val":"foo"},{"nodeType":"const","type":"boolean","val":true}],"targetNodes":[0,1,2]}}',
+        body: '{"graphs":{"nodes":["const","number",42,{"nodeType":0,"type":1,"val":2},"string","foo",{"nodeType":0,"type":4,"val":5},"boolean",true,{"nodeType":0,"type":7,"val":8}],"targetNodes":[3,6,9]},"serializeAllValues":true}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
@@ -130,7 +130,7 @@ describe('RemoteHttpServer', () => {
 
     return result.then(r => {
       expect(fetch).toHaveBeenNthCalledWith(1, 'https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]}}',
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]},"serializeAllValues":false}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
@@ -139,7 +139,7 @@ describe('RemoteHttpServer', () => {
         method: 'POST',
       });
       expect(fetch).toHaveBeenNthCalledWith(2, 'https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]}}',
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]},"serializeAllValues":false}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
@@ -148,7 +148,7 @@ describe('RemoteHttpServer', () => {
         method: 'POST',
       });
       expect(fetch).toHaveBeenNthCalledWith(3, 'https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"boolean","val":true}],"targetNodes":[0]}}',
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"boolean","val":true}],"targetNodes":[0]},"serializeAllValues":false}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
@@ -189,7 +189,7 @@ describe('RemoteHttpServer', () => {
 
     return result.then(r => {
       expect(fetch).toHaveBeenNthCalledWith(1, 'https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"output","fromOp":1,"type":"number","id":"3831373993168090"},{"name":"number-add","inputs":{"lhs":2,"rhs":2}},{"nodeType":"const","type":"number","val":10},{"nodeType":"output","fromOp":4,"type":"number","id":"2790509981729619"},{"name":"number-mult","inputs":{"lhs":2,"rhs":5}},{"nodeType":"const","type":"number","val":5}],"targetNodes":[0,3]}}',
+        body: '{"graphs":{"nodes":[{"nodeType":"output","fromOp":1,"type":"number","id":"3831373993168090"},{"name":"number-add","inputs":{"lhs":2,"rhs":2}},{"nodeType":"const","type":"number","val":10},{"nodeType":"output","fromOp":4,"type":"number","id":"2790509981729619"},{"name":"number-mult","inputs":{"lhs":2,"rhs":5}},{"nodeType":"const","type":"number","val":5}],"targetNodes":[0,3]},"serializeAllValues":false}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
@@ -198,7 +198,7 @@ describe('RemoteHttpServer', () => {
         method: 'POST',
       });
       expect(fetch).toHaveBeenNthCalledWith(2, 'https://weave-host/execute', {
-        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]}}',
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]},"serializeAllValues":false}',
         credentials: 'include',
         headers: {
           'weave-shadow': 'false',
