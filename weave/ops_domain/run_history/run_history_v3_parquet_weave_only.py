@@ -1,7 +1,11 @@
 import dataclasses
+import datetime
 import typing
+import pyarrow.compute as pc
+import pyarrow as pa
 
 from weave import io_service
+from ...ops_arrow.list_ import PathType, weave_arrow_type_check
 
 from ...ref_base import Ref
 from ...compile_domain import wb_gql_op_plugin
@@ -234,6 +238,9 @@ def _refine_history_type_inner(
 def _read_history_parquet(run: wdt.Run, object_type, columns=None):
     io = io_service.get_sync_client()
     tables = []
+    # FIXME: according to MinYoung, the tables MAY have different schemas before
+    # compaction. Need to move _convert_gorilla_parquet_to_weave_arrow  to this
+    # loop. This will require modifying tests too
     for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
@@ -320,10 +327,8 @@ def _get_history_stream_inner(
 
     if parquet_history is not None and len(parquet_history) > 0:
         with tracer.trace("parquet_history_to_arrow"):
-            parquet_history = ArrowWeaveList(
-                parquet_history,
-                object_type,
-                artifact=artifact,
+            parquet_history = _convert_gorilla_parquet_to_weave_arrow(
+                parquet_history, object_type, artifact
             )
     else:
         parquet_history = []
@@ -335,6 +340,103 @@ def _get_history_stream_inner(
     elif len(parquet_history) == 0:
         return live_data_processed
     return use(concat([parquet_history, live_data_processed]))
+
+
+def _convert_gorilla_parquet_to_weave_arrow(
+    gorilla_parquet_history, target_object_type, artifact
+):
+    # Note: this arrow Weave List is NOT properly constructed. We blindly create it from the gorilla parquet
+    gorilla_awl = ArrowWeaveList(
+        gorilla_parquet_history,
+        artifact=artifact,
+    )
+
+    prototype_awl = convert.to_arrow(
+        [],
+        types.List(target_object_type),
+        artifact=artifact,
+    )
+
+    target_path_types = {}
+
+    def path_accumulator(
+        awl: ArrowWeaveList, path: PathType
+    ) -> typing.Optional["ArrowWeaveList"]:
+        nonlocal target_path_types
+        target_path_types[path] = awl.object_type
+        return None
+
+    prototype_awl.map_column(path_accumulator)
+
+    def pre_mapper(
+        awl: ArrowWeaveList, path: PathType
+    ) -> typing.Optional["ArrowWeaveList"]:
+        if path == ():  # root
+            return None
+
+        # Here we want to:
+        # a) unflatten the top-level dictionaries (i believe gorilla will have them dot-separated)
+        # b) reduce the encoded cells to their vals (this should only be Object and Custom Types)
+        # c) Modify non-simple unions to our union structure
+        if path not in target_path_types:
+            raise ValueError(f"Path {path} not found in target path types")
+
+        target_type = target_path_types[path]
+        if types.is_optional(target_type):
+            target_type = types.non_none(target_type)
+        current_type = awl.object_type
+        if types.is_optional(current_type):
+            current_type = types.non_none(current_type)
+
+        # If the types are the same, we don't need to do anything! That is the happy state
+        if types.optional(target_type).assign_type(current_type):
+            return None
+
+        # If both types are list-like, then we can handle the differences on the next loop
+        base_list_type = types.optional(types.List())
+        if base_list_type.assign_type(target_type) and base_list_type.assign_type(
+            current_type
+        ):
+            return None
+
+        # If both types are unions, we are in trouble. Have to somehow map the union types from gorilla
+        # to the union types in weave. This is a hard problem.
+        # if isinstance(target_type, types.UnionType) and isinstance(current_type, types.UnionType):
+
+        # TODO: Unions...
+        # TODO: Generalize this to not blindly assume _val
+        # TODO: This double val goes away
+        data = awl._arrow_data.field("_val").field("_val")
+
+        if target_type.assign_type(types.Timestamp()):
+            data = (
+                pc.floor(data)
+                .cast("int64")
+                .cast(pa.timestamp("ms", tz=datetime.timezone.utc))
+            )
+
+        return ArrowWeaveList(
+            data,
+            target_type,
+            awl._artifact,
+        )
+        return None
+
+    def post_mapper(
+        awl: ArrowWeaveList, path: PathType
+    ) -> typing.Optional["ArrowWeaveList"]:
+        return None
+
+    corrected_awl = gorilla_awl.map_column(post_mapper, pre_mapper)
+
+    reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
+
+    if reason != None:
+        raise ValueError(
+            f"Failed to effectively convert Gorilla Parquet History to expected history type: {reason}"
+        )
+
+    return corrected_awl
 
 
 def _reconstruct_original_live_data(live_data: list[dict]):
