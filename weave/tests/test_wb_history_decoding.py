@@ -137,18 +137,8 @@ def do_batch_test(username, rows):
     ).run(st._lite_run._run_name)
 
     def do_assertion():
-        # history_node = run_node.history2()
         history_node = run_node.history_stream()
-
-        # history_row_type = history_node.type.object_type
         row_object_type = make_optional_type(row_type.object_type)
-
-        # Custom assign so we can debug easier
-        # for k, ptype in row_object_type.property_types.items():
-        #     if isinstance(ptype, weave.types.NoneType) or k in ["_step", "_timestamp"]:
-        #         continue
-        #     assert k in history_row_type.property_types
-        #     assert_type_assignment(ptype, history_row_type.property_types[k])
 
         for key in all_keys:
             column_node = history_node[key]
@@ -156,9 +146,15 @@ def do_batch_test(username, rows):
                 row_object_type.property_types[key], column_node.type.object_type
             )
             column_value = weave.use(column_node).to_pylist_tagged()
-            assert compare_objects(
-                column_value, [row.get(key) for row in row_accumulator]
-            )
+            expected = []
+
+            # NOTICE: This is super weird b/c right now gorilla does not
+            # give back rows that are missing keys. Once this fix is deployed
+            # will need to update this test
+            for row in row_accumulator:
+                if key in row and row[key] is not None:
+                    expected.append(row[key])
+            assert compare_objects(column_value, expected)
 
     def history_is_uploaded():
         history_node = run_node.history_stream()
