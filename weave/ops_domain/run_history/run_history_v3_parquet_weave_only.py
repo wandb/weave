@@ -272,14 +272,15 @@ def _get_history_stream_inner(
     # turn live data into arrow
     if live_data is not None and len(live_data) > 0:
         with tracer.trace("live_data_to_arrow"):
-            live_data_processed = ArrowWeaveList(
-                pa.array(live_data), object_type, artifact
-            )
-            # live_data_processed = convert.to_arrow(
-            #     live_data,
-            #     types.List(object_type),
-            #     artifact=artifact,
+            # live_data_processed = ArrowWeaveList(
+            #     pa.array(live_data), object_type, artifact
             # )
+            live_data_processed = convert.to_arrow(
+                live_data,
+                types.List(object_type),
+                artifact=artifact,
+                py_objs_already_mapped=True,
+            )
     else:
         live_data_processed = []
 
@@ -367,8 +368,8 @@ def _clean_live_data_cell(live_data: typing.Any) -> typing.Any:
     if isinstance(live_data, dict):
         if wandb_stream_table.is_weave_encoded_history_cell(live_data):
             val = live_data["_val"]
-            # if isinstance(val, str):
-            #     return Ref.from_str(val)
+            if isinstance(val, str):
+                return Ref.from_str(val)
             # return wandb_stream_table.from_weave_encoded_history_cell(live_data)
             return val
         return {key: _clean_live_data_cell(val) for key, val in live_data.items()}

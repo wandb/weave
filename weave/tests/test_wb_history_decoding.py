@@ -227,16 +227,48 @@ class TestType:
 
 _context.clear_loading_built_ins(_loading_builtins_token)
 
+base_types = {
+    "number": 42,
+    "string": "hello world",
+    "boolean": True,
+    "object": TestType(1, "hi"),
+    "custom": image(),
+}
+base_types["list"] = list(base_types.values()) + [{**base_types}, None]
+base_types["dict"] = {**base_types}
+
 
 @pytest.mark.parametrize(
     "rows",
     [
+        [{"a": TestType(1, "hi")}],
+        [base_types],
         [
+            {"a": 1, "b": "hi", "c": TestType(2, "bye"), "i": image()},
+            {"a": 1, "b": "hi", "c": TestType(2, "bye"), "i": image()},
+            {"a": True, "b": True, "c": True, "i": True},
             {
-                # "a": 1, "b": "hi", "c": TestType(2, "bye"),
-                "i": image()
-            }
-        ]
+                "a": [
+                    1,
+                    "hi",
+                    True,
+                    TestType(2, "bye"),
+                    {"a": 1, "b": "hi", "c": TestType(2, "bye"), "i": image()},
+                ]
+            },
+            {
+                "randomly": {
+                    "nested": {
+                        "objects": {
+                            "a": 1,
+                            "b": "hi",
+                            "c": TestType(2, "bye"),
+                            "i": image(),
+                        }
+                    }
+                }
+            },
+        ],
     ],
 )
 def test_row_batch(user_by_api_key_in_env, rows):
@@ -251,6 +283,27 @@ def compare_objects(a, b):
     return a == b
 
 
+def make_optional_type(type_: weave.types.Type):
+    if isinstance(type_, weave.types.List):
+        type_ = weave.types.List(make_optional_type(type_.object_type))
+    elif isinstance(type_, weave.types.TypedDict):
+        type_ = weave.types.TypedDict(
+            {k: make_optional_type(v) for k, v in type_.property_types.items()}
+        )
+    return weave.types.optional(type_)
+
+
+def assert_type_assignment(a, b):
+    if weave.types.optional(weave.types.TypedDict({})).assign_type(
+        a
+    ) and weave.types.optional(weave.types.TypedDict({})).assign_type(b):
+        for k, ptype in a.property_types.items():
+            assert k in b.property_types
+            assert_type_assignment(ptype, b.property_types[k])
+        return
+    assert a.assign_type(b)
+
+
 def do_batch_test(username, rows):
     table_name = "test_table_" + str(int(time.time()))
     st = wandb_stream_table.StreamTable(
@@ -259,7 +312,7 @@ def do_batch_test(username, rows):
 
     row_accumulator = []
 
-    all_keys = set()
+    all_keys = set(["_step"])
     for row in rows:
         st.log(row)
         new_row = {
@@ -277,24 +330,42 @@ def do_batch_test(username, rows):
 
     def do_assertion():
         history_node = run_node.history_stream()
-        assert row_type.assign_type(history_node.type)
+
+        # history_row_type = history_node.type.object_type
+        row_object_type = make_optional_type(row_type.object_type)
+
+        # Custom assign so we can debug easier
+        # for k, ptype in row_object_type.property_types.items():
+        #     if isinstance(ptype, weave.types.NoneType) or k in ["_step", "_timestamp"]:
+        #         continue
+        #     assert k in history_row_type.property_types
+        #     assert_type_assignment(ptype, history_row_type.property_types[k])
 
         for key in all_keys:
             column_node = history_node[key]
+            assert_type_assignment(
+                row_object_type.property_types[key], column_node.type.object_type
+            )
             column_value = weave.use(column_node).to_pylist_tagged()
             assert compare_objects(
                 column_value, [row.get(key) for row in row_accumulator]
             )
 
     def history_is_uploaded():
-        history = get_raw_gorilla_history(
+        history_node = run_node.history_stream()
+        run_data = get_raw_gorilla_history(
             st._lite_run._entity_name,
             st._lite_run._project_name,
             st._lite_run._run_name,
         )
+        history = run_data.get("parquetHistory", {})
         return (
-            len(history.get("liveData", [])) == len(row_accumulator)
+            len(history.get("liveData", []))
+            == len(row_accumulator)
+            == (run_data.get("historyKeys", {}).get("lastStep", -999) + 1)
             and history.get("parquetUrls") == []
+            and len(row_type.object_type.property_types)
+            == len(history_node.type.object_type.property_types)
         )
 
     # def history_is_compacted():
@@ -384,7 +455,7 @@ def get_raw_gorilla_history(entity_name, project_name, run_name):
     query = """query WeavePythonCG($entityName: String!, $projectName: String!, $runName: String! ) {
             project(name: $projectName, entityName: $entityName) {
                 run(name: $runName) {
-                    # historyKeys
+                    historyKeys
                     parquetHistory(liveKeys: ["_timestamp"]) {
                         liveData
                         parquetUrls
@@ -398,7 +469,7 @@ def get_raw_gorilla_history(entity_name, project_name, run_name):
         "runName": run_name,
     }
     res = wandb_gql_query(query, variables)
-    return res.get("project", {}).get("run", {}).get("parquetHistory", {})
+    return res.get("project", {}).get("run", {})
 
 
 def ensure_history_compaction_runs(entity_name, project_name, run_name):

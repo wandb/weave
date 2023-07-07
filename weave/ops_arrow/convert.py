@@ -289,7 +289,10 @@ def to_arrow_from_list_and_artifact(
 
 
 def to_arrow(
-    obj, wb_type=None, artifact: typing.Optional[artifact_base.Artifact] = None
+    obj,
+    wb_type=None,
+    artifact: typing.Optional[artifact_base.Artifact] = None,
+    py_objs_already_mapped: bool = False,
 ):
     if isinstance(obj, ArrowWeaveList):
         return obj
@@ -311,7 +314,9 @@ def to_arrow(
         mapper = mappers_arrow.map_to_arrow(merged_object_type, artifact)
         pyarrow_type = arrow_util.arrow_type(mapper.result_type())
 
-        arrow_obj = recursively_build_pyarrow_array(obj, pyarrow_type, mapper)
+        arrow_obj = recursively_build_pyarrow_array(
+            obj, pyarrow_type, mapper, py_objs_already_mapped
+        )
         weave_obj: ArrowWeaveList = ArrowWeaveList(
             arrow_obj, merged_object_type, artifact
         )

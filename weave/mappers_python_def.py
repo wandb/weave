@@ -286,13 +286,13 @@ class DefaultToPy(mappers.Mapper):
                     uri = existing_ref.initial_uri
                 return str(uri)
         ref = None
-        # if isinstance(obj, ref_base.Ref):
-        #     ref = obj
-        # elif isinstance(obj, str):
-        #     try:
-        #         ref = ref_base.Ref.from_str(obj)
-        #     except errors.WeaveInternalError:
-        #         pass
+        if isinstance(obj, ref_base.Ref):
+            ref = obj
+        elif isinstance(obj, str):
+            try:
+                ref = ref_base.Ref.from_str(obj)
+            except errors.WeaveInternalError:
+                pass
         if ref is None:
             # This defines the artifact layout!
             name = "/".join(self._path + [str(self._row_id)])
