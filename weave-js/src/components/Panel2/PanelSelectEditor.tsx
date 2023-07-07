@@ -46,12 +46,15 @@ export const PanelSelectEditorConfigComponent: React.FC<
     },
     [updateConfig2]
   );
+  const choicesNode = useMemo(() => {
+    return config?.choices ?? voidNode();
+  }, [config?.choices]);
 
   return (
     <ConfigSection label={`Properties`}>
       <ConfigOption label={`choices`}>
         <ExpressionConfigField
-          expr={config?.choices ?? voidNode()}
+          expr={choicesNode}
           setExpression={updateChoicesExpr}
         />
       </ConfigOption>
