@@ -18,6 +18,7 @@ import {Spec as PanelEach} from './components/Panel2/PanelEach';
 import {Spec as PanelRootBrowser} from './components/Panel2/PanelRootBrowser/PanelRootBrowser';
 // import {Spec as PanelSections} from './components/Panel2/PanelSections';
 import {Spec as PanelSlider} from './components/Panel2/PanelSlider';
+import {Spec as PanelSelectEditor} from './components/Panel2/PanelSelectEditor';
 import {
   RowSize,
   TABLE_CONFIG_DEFAULTS,
@@ -117,6 +118,7 @@ const UNHIDE_PANELS = [
   // PanelSections,
   PanelEach,
   PanelSlider,
+  PanelSelectEditor,
 ];
 
 export const NotebookComputeGraphContextProvider: React.FC = React.memo(
