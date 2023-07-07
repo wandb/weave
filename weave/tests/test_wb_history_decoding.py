@@ -115,7 +115,10 @@ def assert_type_assignment(a, b):
 def do_batch_test(username, rows):
     table_name = "test_table_" + str(int(time.time()))
     st = wandb_stream_table.StreamTable(
-        table_name=table_name, project_name="dev_test_weave_ci", entity_name=username
+        table_name=table_name,
+        project_name="dev_test_weave_ci",
+        entity_name=username,
+        _disable_async_logging=True,
     )
 
     row_accumulator = []
@@ -124,8 +127,11 @@ def do_batch_test(username, rows):
     for row in rows:
         st.log(row)
         new_row = {
+            # Need to simulate the extra fields that the logger a
             "_step": len(row_accumulator),
             "_timestamp": datetime.datetime.now().timestamp(),
+            "_client_id": "dummy",
+            "timestamp": datetime.datetime.utcnow(),
             **row,
         }
         row_accumulator.append(new_row)
