@@ -49,7 +49,9 @@ def refine_history_stream_with_columns_type(
     run: wdt.Run, history_cols: list[str]
 ) -> types.Type:
     return ArrowWeaveListType(
-        _refine_history_type(run, columns=history_cols).weave_type
+        _refine_history_type(
+            run, columns=list(set([*history_cols, "_step"]))
+        ).weave_type
     )
 
 
@@ -61,7 +63,7 @@ def refine_history_stream_with_columns_type(
     hidden=True,
 )
 def history_stream_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history_stream(run, history_cols)
+    return _get_history_stream(run, list(set([*history_cols, "_step"])))
 
 
 @op(

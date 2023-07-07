@@ -294,7 +294,7 @@ def check_server_up(
             "--platform",
             "linux/amd64",
             # Temporary image until we have a new one with parquet support
-            f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:feature-parquet-in-server",
+            f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:tim-franken_branch_parquet",
             # f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:{wandb_server_tag}",
         ]
         subprocess.Popen(command)

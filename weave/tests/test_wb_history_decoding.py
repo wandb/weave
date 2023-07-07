@@ -1,18 +1,14 @@
 import datetime
-import os
 import time
 import datetime
 
 import pytest
 import weave
-from weave.ops_domain.run_history import run_history_v3_parquet_weave_only
-from weave.ops_domain.run_history import history_op_common
 from .. import context_state as _context
 from PIL import Image
 import numpy as np
 
-import requests
-from weave.wandb_client_api import wandb_gql_query, wandb_public_api
+from weave.wandb_client_api import wandb_gql_query
 from weave.wandb_interface import wandb_stream_table
 
 
@@ -76,38 +72,9 @@ rows_tests = [
 ]
 
 
-@pytest.mark.parametrize(
-    "rows, mocked_parquet_file_path",
-    [
-        (rows, f"./test_parquet_files/test_{test_ndx}.parquet")
-        for test_ndx, rows in enumerate(rows_tests)
-    ],
-)
-def test_row_batch(user_by_api_key_in_env, rows, mocked_parquet_file_path):
-    do_batch_test(user_by_api_key_in_env.username, rows, mocked_parquet_file_path)
-
-
-# Uncomment this skip test and run it with a locally authenticated machine
-# to generate local parquet files for testing
-@pytest.mark.skip(reason="local test for generating parquet files")
-def test_make_parquet_files():
-    for test_ndx, rows in enumerate(rows_tests):
-        row_accumulator, st, all_keys = do_logging("timssweeney", rows, finish=True)
-        wait_for_x_times(
-            lambda: history_is_compacted(
-                st._lite_run._entity_name,
-                st._lite_run._project_name,
-                st._lite_run._run_name,
-            )
-        )
-        run = get_raw_gorilla_history(
-            st._lite_run._entity_name,
-            st._lite_run._project_name,
-            st._lite_run._run_name,
-        )
-        r = requests.get(run["parquetHistory"]["parquetUrls"][0], allow_redirects=True)
-        os.makedirs("test_parquet_files", exist_ok=True)
-        open(f"test_parquet_files/test_{test_ndx}.parquet", "wb").write(r.content)
+@pytest.mark.parametrize("rows", rows_tests)
+def test_row_batch(user_by_api_key_in_env, rows):
+    do_batch_test(user_by_api_key_in_env.username, rows)
 
 
 def do_logging(username, rows, finish=False):
@@ -125,11 +92,13 @@ def do_logging(username, rows, finish=False):
     for row in rows:
         st.log(row)
         new_row = {
-            # Need to simulate the extra fields that the logger a
+            # Extra fields automatically added from the Run
             "_step": len(row_accumulator),
             "_timestamp": datetime.datetime.now().timestamp(),
+            # Extra fields automatically added from the StreamTable
             "_client_id": "dummy",
             "timestamp": datetime.datetime.utcnow(),
+            # User fields
             **row,
         }
         row_accumulator.append(new_row)
@@ -148,7 +117,7 @@ def do_logging(username, rows, finish=False):
 #
 
 
-def do_batch_test(username, rows, mocked_parquet_file_path):
+def do_batch_test(username, rows):
     row_accumulator, st, all_keys = do_logging(username, rows)
 
     row_type = weave.types.TypeRegistry.type_of([{}, *row_accumulator])
@@ -176,41 +145,6 @@ def do_batch_test(username, rows, mocked_parquet_file_path):
                     expected.append(row[key])
             assert compare_objects(column_value, expected)
 
-        # # For now we have to mock the parquet file bit (until gorilla has parquet in local)
-        # # Once the local backend supports compaction, we can remove this whole bit, the mocked
-        # # parquet files, etc... And just do the second assertion pass at the end of this function.
-        # history_row_type = history_node.type.object_type.value
-        # history_awl = run_history_v3_parquet_weave_only._get_history_stream_inner(
-        #     run_history_v3_parquet_weave_only.HistoryToWeaveFinalResult(
-        #         history_row_type, []
-        #     ),
-        #     live_data=[],
-        #     parquet_history=history_op_common.process_history_awl_tables(
-        #         [
-        #             history_op_common.local_path_to_parquet_table(
-        #                 path=mocked_parquet_file_path,
-        #                 object_type=None,
-        #                 columns=list(history_row_type.property_types.keys()),
-        #             )
-        #         ]
-        #     ),
-        # )
-        # history_results = history_awl.to_pylist_tagged()
-        # for key in all_keys:
-        #     # NOTICE: This is super weird b/c right now gorilla does not
-        #     # give back rows that are missing keys. Once this fix is deployed
-        #     # will need to update this test
-        #     expected = []
-        #     for row in row_accumulator:
-        #         if key in row and row[key] is not None:
-        #             expected.append(row[key])
-
-        #     found = []
-        #     for row in history_results:
-        #         found.append(row[key])
-
-        #     assert compare_objects(found, expected)
-
     def history_is_uploaded():
         history_node = run_node.history_stream()
         run_data = get_raw_gorilla_history(
@@ -234,9 +168,8 @@ def do_batch_test(username, rows, mocked_parquet_file_path):
     st.finish()
 
     # Second assertion is with parquet files
-    # ensure_history_compaction_runs(run._entity_name, run._project_name, run._run_name)
     wait_for_x_times(
-        lambda: history_is_compacted(
+        lambda: history_moved_to_parquet(
             st._lite_run._entity_name,
             st._lite_run._project_name,
             st._lite_run._run_name,
@@ -245,7 +178,7 @@ def do_batch_test(username, rows, mocked_parquet_file_path):
     do_assertion()
 
 
-def history_is_compacted(entity_name, project_name, run_name):
+def history_moved_to_parquet(entity_name, project_name, run_name):
     history = get_raw_gorilla_history(entity_name, project_name, run_name)
     return (
         history.get("parquetHistory", {}).get("liveData") == []
@@ -314,38 +247,3 @@ def get_raw_gorilla_history(entity_name, project_name, run_name):
     }
     res = wandb_gql_query(query, variables)
     return res.get("project", {}).get("run", {})
-
-
-# Doesn't work yet
-# def ensure_history_compaction_runs(entity_name, project_name, run_name):
-#     client = wandb_public_api().client
-#     # original_url = client._client.transport.url
-#     # original_schema = client._client.schema
-#     # client._client.transport.url = "http://localhost:8080/admin/parquet_workflow"
-
-#     test_api_key = wandb_public_api().api_key
-
-#     post_args = {
-#         "headers": client._client.transport.headers,
-#         "cookies": client._client.transport.cookies,
-#         "auth": ("api", test_api_key),
-#         "timeout": client._client.transport.default_timeout,
-#         "data": {
-#             "task_type": "export_history_to_parquet",
-#             "run_key": {
-#                 "entity_name": entity_name,
-#                 "project_name": project_name,
-#                 "run_name": run_name,
-#             },
-#         },
-#     }
-#     request = client._client.transport.session.post(
-#         "http://localhost:8080/admin/parquet_workflow", **post_args
-#     )
-
-#     print(request)
-
-#     client.execute()
-
-#     # client._client.transport.url = original_url
-#     # client._client.schema = original_schema
