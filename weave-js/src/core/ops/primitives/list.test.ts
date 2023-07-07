@@ -283,26 +283,7 @@ describe('List Ops', () => {
   });
 
   it('opDropna - verify unions are stripped of nones', async () => {
-    const type: Type = {
-      type: 'list',
-      objectType: {
-        type: 'union',
-        members: [
-          'none',
-          {
-            type: 'list',
-            objectType: {
-              type: 'typedDict',
-              propertyTypes: {},
-            },
-          },
-        ],
-      },
-      maxLength: 50,
-    };
-
-    // const objectType = listObjectType(type);
-
+    const type = list(maybe(list(typedDict({}))));
     const input = [
       [
         {col_a: 1, col_b: 'hello'},
@@ -312,10 +293,10 @@ describe('List Ops', () => {
       [{col_a: 3, col_b: 'hello'}],
     ];
 
-    // const elemNodes = input.map(elem => constNode(objectType, elem));
-
-    await testNode(opDropNa({arr: constNode(type as any, input)}), {
+    await testNode(opDropNa({arr: constNode(type, input)}), {
       value: input.filter(elem => elem !== null),
+      type: list(list(typedDict({})), 0),
+      resolvedType: list(list(typedDict({})), 0),
     });
   });
 });
