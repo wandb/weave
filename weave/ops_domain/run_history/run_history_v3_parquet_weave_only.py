@@ -124,7 +124,7 @@ def _history_key_type_count_to_weave_type(
     elif isinstance(tc_type, str):
         possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
         if possible_type is not None:
-            return HistoryToWeaveResult(possible_type, [keyname])
+            return HistoryToWeaveResult(possible_type, [[keyname]])
     return HistoryToWeaveResult(types.UnknownType())
 
 
@@ -225,7 +225,7 @@ def _refine_history_type_inner(
             else:
                 encoded_paths_final.append(path)
 
-    return HistoryToWeaveFinalResult(types.TypedDict(prop_types), encoded_paths_final)
+    return HistoryToWeaveFinalResult(types.TypedDict(dict_keys), encoded_paths_final)
 
 
 def _process_run_dict_item(val, run_path: typing.Optional[wb_util.RunPath] = None):
@@ -258,7 +258,7 @@ def _get_history_stream_inner(
 
     # columns = scalar_keys  # [c for c in columns if c in scalar_keys]
 
-    live_data = _clean_live_data(live_data)
+    live_data = _reconstruct_original_live_data(live_data)
 
     # # turn the liveset into an arrow table. the liveset is a list of dictionaries
     # for row in live_data:
@@ -343,34 +343,42 @@ def _get_history_stream_inner(
     return use(concat([parquet_history, live_data_processed]))
 
 
-def _clean_live_data(live_data: list[dict]):
+def _reconstruct_original_live_data(live_data: list[dict]):
     # in this function we want to:
     # a) unflatted top-level dictionaries
     # b) reduce the encoded cells to their vals
 
-    return [_clean_live_data_row(row) for row in live_data]
+    return [_reconstruct_original_live_data_row(row) for row in live_data]
 
 
-def _clean_live_data_row(row: dict):
+def _reconstruct_original_live_data_row(row: dict):
     # Handles unflattening the top-level dictionaries
-    new_row = {}
+    new_row: dict[str, typing.Any] = {}
     for col, cell in row.items():
-        new_cell = _clean_live_data_cell(cell)
-        for path in col.split(".")[::-1]:
-            new_cell = {path: new_cell}
-        new_row.update(new_cell)
+        new_cell = _reconstruct_original_live_data_cell(cell)
+        target = new_row
+        path_parts = col.split(".")
+        final_part = path_parts[-1]
+        for path in path_parts[:-1]:
+            if path not in target:
+                target[path] = {}
+            target = target[path]
+        target[final_part] = new_cell
     return new_row
 
 
-def _clean_live_data_cell(live_data: typing.Any) -> typing.Any:
+def _reconstruct_original_live_data_cell(live_data: typing.Any) -> typing.Any:
     if isinstance(live_data, list):
-        return [_clean_live_data_cell(cell) for cell in live_data]
+        return [_reconstruct_original_live_data_cell(cell) for cell in live_data]
     if isinstance(live_data, dict):
         if wandb_stream_table.is_weave_encoded_history_cell(live_data):
             val = live_data["_val"]
-            if isinstance(val, str):
-                return Ref.from_str(val)
+            # if isinstance(val, str):
+            #     return Ref.from_str(val)
             # return wandb_stream_table.from_weave_encoded_history_cell(live_data)
             return val
-        return {key: _clean_live_data_cell(val) for key, val in live_data.items()}
+        return {
+            key: _reconstruct_original_live_data_cell(val)
+            for key, val in live_data.items()
+        }
     return live_data

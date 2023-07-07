@@ -115,12 +115,15 @@ def get_full_columns(columns: typing.Optional[list[str]]):
 
 def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
+    # I moved the column pushdown before the gql step, so we actually have the
+    # columns directly available here.... could be possible we need to revisit
+    top_level_keys = inputs.raw.get("history_cols")
+    if top_level_keys == None:
+        stitch_obj = inputs.stitched_obj
+        key_tree = compile_table.get_projection(stitch_obj)
 
-    stitch_obj = inputs.stitched_obj
-    key_tree = compile_table.get_projection(stitch_obj)
-
-    # we only pushdown the top level keys for now.
-    top_level_keys = get_top_level_keys(key_tree)
+        # we only pushdown the top level keys for now.
+        top_level_keys = get_top_level_keys(key_tree)
 
     if not top_level_keys:
         # If no keys, then we cowardly refuse to blindly fetch entire history table
