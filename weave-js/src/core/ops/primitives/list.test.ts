@@ -6,6 +6,7 @@ import {
   functionType,
   list,
   maybe,
+  nonNullable,
   taggedValue,
   typedDict,
 } from '../../model';
@@ -246,6 +247,37 @@ describe('List Ops', () => {
         } as any),
       }),
       {type: list(type, 0, 3), resolvedType: list(type, 0, 3), value: input}
+    );
+  });
+
+  it('opDropna - drop one', async () => {
+    const type: Type = maybe(
+      typedDict({col_a: 'number', col_b: maybe('string')})
+    );
+
+    const input = [
+      {col_a: 1, col_b: 'hello'},
+      {col_a: 2, col_b: null},
+      {col_a: 3, col_b: 'world'},
+      null,
+    ];
+
+    const elemNodes = input.map(elem => constNode(type, elem));
+
+    await testNode(
+      opDropNa({
+        arr: opArray({
+          '0': elemNodes[0],
+          '1': elemNodes[1],
+          '2': elemNodes[2],
+          '3': elemNodes[3],
+        } as any),
+      }),
+      {
+        type: list(nonNullable(type), 0, 4),
+        resolvedType: list(nonNullable(type), 0, 4),
+        value: input.slice(0, 3),
+      }
     );
   });
 });
