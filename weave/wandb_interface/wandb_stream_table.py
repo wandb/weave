@@ -19,6 +19,7 @@ from .. import weave_types
 from .. import artifact_base
 from .. import file_util
 from .. import graph
+from .. import errors
 from ..core_types.stream_table_type import StreamTableType
 from ..ops_domain import stream_table_ops
 from ..ops_primitives import weave_api
@@ -168,15 +169,18 @@ class StreamTable:
             )
         return self._weave_stream_table
 
+    def rows(self) -> graph.Node:
+        self._ensure_weave_stream_table()
+        if self._weave_stream_table_ref is None:
+            raise errors.WeaveInternalError("ref is None after ensure")
+        return stream_table_ops.rows(
+            weave_api.get(str(self._weave_stream_table_ref.uri))
+        )
+
     def _ipython_display_(self) -> graph.Node:
         from .. import show
 
-        self._ensure_weave_stream_table()
-        if self._weave_stream_table_ref is None:
-            return show(None)
-        return show(
-            stream_table_ops.rows(weave_api.get(str(self._weave_stream_table_ref.uri)))
-        )
+        return show(self.rows())
 
     def _log_row(self, row: dict) -> None:
         self._lite_run.ensure_run()

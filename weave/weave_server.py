@@ -256,6 +256,7 @@ def execute():
         "deref": True,
         "serialize_fn": storage.make_js_serializer(),
     }
+    root_span = tracer.current_root_span()
     if not PROFILE_DIR:
         start_time = time.time()
         with client_safe_http_exceptions_as_werkzeug():
@@ -272,13 +273,14 @@ def execute():
             elapsed = time.time() - start_time
             profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
             profile.dump_stats(profile_filename)
-            root_span = tracer.current_root_span()
             if root_span:
                 root_span.set_tag(
                     "profile_url",
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
+    if root_span is not None:
+        root_span.set_tag("request_size", len(req_bytes))
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
     response_payload = _value_or_errors_to_response(fixed_response)
