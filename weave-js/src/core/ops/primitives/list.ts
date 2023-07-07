@@ -423,9 +423,8 @@ export const opGetIndexCheckpointTag = makeTagGetterOp({
   hidden: true,
 });
 
-export const opDropNa = makeConfigurableStandardOp({
+export const opDropNa = makeBasicOp({
   name: 'dropna',
-  typeConfig: {dims: 1},
   argTypes: {
     arr: {type: 'list', objectType: 'any'},
   },
