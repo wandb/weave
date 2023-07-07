@@ -176,40 +176,40 @@ def do_batch_test(username, rows, mocked_parquet_file_path):
                     expected.append(row[key])
             assert compare_objects(column_value, expected)
 
-        # For now we have to mock the parquet file bit (until gorilla has parquet in local)
-        # Once the local backend supports compaction, we can remove this whole bit, the mocked
-        # parquet files, etc... And just do the second assertion pass at the end of this function.
-        history_row_type = history_node.type.object_type.value
-        history_awl = run_history_v3_parquet_weave_only._get_history_stream_inner(
-            run_history_v3_parquet_weave_only.HistoryToWeaveFinalResult(
-                history_row_type, []
-            ),
-            live_data=[],
-            parquet_history=history_op_common.process_history_awl_tables(
-                [
-                    history_op_common.local_path_to_parquet_table(
-                        path=mocked_parquet_file_path,
-                        object_type=None,
-                        columns=list(history_row_type.property_types.keys()),
-                    )
-                ]
-            ),
-        )
-        history_results = history_awl.to_pylist_tagged()
-        for key in all_keys:
-            # NOTICE: This is super weird b/c right now gorilla does not
-            # give back rows that are missing keys. Once this fix is deployed
-            # will need to update this test
-            expected = []
-            for row in row_accumulator:
-                if key in row and row[key] is not None:
-                    expected.append(row[key])
+        # # For now we have to mock the parquet file bit (until gorilla has parquet in local)
+        # # Once the local backend supports compaction, we can remove this whole bit, the mocked
+        # # parquet files, etc... And just do the second assertion pass at the end of this function.
+        # history_row_type = history_node.type.object_type.value
+        # history_awl = run_history_v3_parquet_weave_only._get_history_stream_inner(
+        #     run_history_v3_parquet_weave_only.HistoryToWeaveFinalResult(
+        #         history_row_type, []
+        #     ),
+        #     live_data=[],
+        #     parquet_history=history_op_common.process_history_awl_tables(
+        #         [
+        #             history_op_common.local_path_to_parquet_table(
+        #                 path=mocked_parquet_file_path,
+        #                 object_type=None,
+        #                 columns=list(history_row_type.property_types.keys()),
+        #             )
+        #         ]
+        #     ),
+        # )
+        # history_results = history_awl.to_pylist_tagged()
+        # for key in all_keys:
+        #     # NOTICE: This is super weird b/c right now gorilla does not
+        #     # give back rows that are missing keys. Once this fix is deployed
+        #     # will need to update this test
+        #     expected = []
+        #     for row in row_accumulator:
+        #         if key in row and row[key] is not None:
+        #             expected.append(row[key])
 
-            found = []
-            for row in history_results:
-                found.append(row[key])
+        #     found = []
+        #     for row in history_results:
+        #         found.append(row[key])
 
-            assert compare_objects(found, expected)
+        #     assert compare_objects(found, expected)
 
     def history_is_uploaded():
         history_node = run_node.history_stream()
@@ -234,10 +234,15 @@ def do_batch_test(username, rows, mocked_parquet_file_path):
     st.finish()
 
     # Second assertion is with parquet files
-    # This is not supported
     # ensure_history_compaction_runs(run._entity_name, run._project_name, run._run_name)
-    # wait_for_x_times(lambda: history_is_compacted(run._entity_name, run._project_name, run._run_name))
-    # do_assertion()
+    wait_for_x_times(
+        lambda: history_is_compacted(
+            st._lite_run._entity_name,
+            st._lite_run._project_name,
+            st._lite_run._run_name,
+        )
+    )
+    do_assertion()
 
 
 def history_is_compacted(entity_name, project_name, run_name):
