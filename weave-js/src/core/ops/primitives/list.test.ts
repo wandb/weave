@@ -5,14 +5,12 @@ import {
   constNumberList,
   functionType,
   list,
-  listObjectType,
   maybe,
   nonNullable,
   taggedValue,
   typedDict,
 } from '../../model';
 import {constFunction, constNone, constNumber, constString} from '../../model';
-import {OpDefWeave} from '../../opStore';
 import {normalizeType, testClient, testNode} from '../../testUtil';
 import {randomlyDownsample} from '../util';
 import {
