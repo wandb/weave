@@ -38,7 +38,7 @@ type PanelSelectEditorProps = Panel2.PanelProps<
 export const PanelSelectEditorConfigComponent: React.FC<
   PanelSelectEditorProps
 > = props => {
-  const config = props.config;
+  const config = props.config!;
   const updateConfig2 = useUpdateConfig2(props);
   const updateChoicesExpr = useCallback(
     (newExpr: NodeOrVoidNode) => {
@@ -46,15 +46,12 @@ export const PanelSelectEditorConfigComponent: React.FC<
     },
     [updateConfig2]
   );
-  const choicesNode = useMemo(() => {
-    return config?.choices ?? voidNode();
-  }, [config?.choices]);
 
   return (
     <ConfigSection label={`Properties`}>
       <ConfigOption label={`choices`}>
         <ExpressionConfigField
-          expr={choicesNode}
+          expr={config.choices}
           setExpression={updateChoicesExpr}
         />
       </ConfigOption>
@@ -63,17 +60,15 @@ export const PanelSelectEditorConfigComponent: React.FC<
 };
 
 export const PanelSelectEditor: React.FC<PanelSelectEditorProps> = props => {
-  const config = props.config;
-  const choicesNode = useMemo(() => {
-    return config?.choices ?? voidNode();
-  }, [config?.choices]);
+  const config = props.config!;
+
   const uniqueChoicesNode = useMemo(() => {
-    if (choicesNode.nodeType === 'void') {
+    if (config.choices.nodeType === 'void') {
       return voidNode();
     } else {
-      return opUnique({arr: choicesNode});
+      return opUnique({arr: config.choices});
     }
-  }, [choicesNode]);
+  }, [config.choices]);
   const choicesQuery = useNodeValue(uniqueChoicesNode);
   const choices = useMemo(() => choicesQuery.result ?? [], [choicesQuery]);
   const valueNode = props.input;
@@ -87,23 +82,23 @@ export const PanelSelectEditor: React.FC<PanelSelectEditorProps> = props => {
         let newVal = chosen.filter(v => v !== val);
         // TODO: This is a major hack, backend expects a union here
         // But its been removed by the time we have it.
-        if (isNullable(listObjectType(choicesNode.type))) {
+        if (isNullable(listObjectType(config.choices.type))) {
           newVal = newVal.map(v => ({_val: v, _union_id: 1})) as any;
         }
-        setVal({val: constNodeUnsafe(choicesNode.type, newVal)});
+        setVal({val: constNodeUnsafe(config.choices.type, newVal)});
         return;
       } else {
         let newVal = [...chosen, val];
         // TODO: This is a major hack, backend expects a union here
         // But its been removed by the time we have it.
-        if (isNullable(listObjectType(choicesNode.type))) {
+        if (isNullable(listObjectType(config.choices.type))) {
           newVal = newVal.map(v => ({_val: v, _union_id: 1})) as any;
         }
-        setVal({val: constNodeUnsafe(choicesNode.type, newVal)});
+        setVal({val: constNodeUnsafe(config.choices.type, newVal)});
         return;
       }
     },
-    [chosen, choicesNode.type, setVal]
+    [chosen, config.choices.type, setVal]
   );
 
   // if (valueQuery.loading) {
