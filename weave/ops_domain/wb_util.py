@@ -1,12 +1,13 @@
 import typing
 from urllib import parse
 
+
 from .. import weave_types as types
 from .. import decorator_type
 from ..wandb_interface import wandb_stream_table
 
 
-from . import table
+from .run_history import history_op_common
 from .. import artifact_fs
 
 from dataclasses import dataclass
@@ -17,7 +18,6 @@ from ..artifact_wandb import (
     WeaveWBLoggedArtifactURI,
 )
 
-from . import history
 from ..runfiles_wandb import WeaveWBRunFilesURI, WandbRunFiles
 
 
@@ -35,7 +35,7 @@ class WbHistogram:
     values: list[int]
 
 
-def filesystem_artifact_file_from_artifact_path(artifact_path: str):
+def _filesystem_artifact_file_from_artifact_path(artifact_path: str):
     uri = WeaveWBLoggedArtifactURI.parse(artifact_path)
     artifact = WandbArtifact(uri=uri, name=uri.name)
     file_path = uri.path
@@ -44,7 +44,7 @@ def filesystem_artifact_file_from_artifact_path(artifact_path: str):
     return artifact_fs.FilesystemArtifactFile(artifact, file_path)
 
 
-def filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
+def _filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
     uri = WeaveWBRunFilesURI.from_run_identifiers(
         run_path.entity_name,
         run_path.project_name,
@@ -96,17 +96,17 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
         if val["_type"] == "table-file":
             if "artifact_path" in val:
                 artifact_path = escape_artifact_path(val["artifact_path"])
-                return filesystem_artifact_file_from_artifact_path(artifact_path)
+                return _filesystem_artifact_file_from_artifact_path(artifact_path)
             elif "path" in val and run_path is not None:
-                return filesystem_runfiles_from_run_path(run_path, val["path"])
+                return _filesystem_runfiles_from_run_path(run_path, val["path"])
 
         if val["_type"] in ["joined-table", "partitioned-table"]:
-            return filesystem_artifact_file_from_artifact_path(val["artifact_path"])
+            return _filesystem_artifact_file_from_artifact_path(val["artifact_path"])
 
         if val["_type"] == "image-file" and run_path is not None:
             from . import ImageArtifactFileRef
 
-            fs_artifact_file = filesystem_runfiles_from_run_path(run_path, val["path"])
+            fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return ImageArtifactFileRef(
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
@@ -121,7 +121,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             image_list: list[ImageArtifactFileRef] = []
 
             for path in val["filenames"]:
-                fs_artifact_file = filesystem_runfiles_from_run_path(run_path, path)
+                fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, path)
                 image_list.append(
                     ImageArtifactFileRef(
                         fs_artifact_file.artifact,
@@ -162,7 +162,7 @@ def process_run_dict_type(run_dict):
 def _process_run_dict_item_type(val):
     if isinstance(val, dict):
         type_count = {"type": val.get("_type", None)}
-        type = history.history_key_type_count_to_weave_type(type_count)
+        type = history_op_common.history_key_type_count_to_weave_type(type_count)
         if type != types.UnknownType():
             return type
     return types.TypeRegistry.type_of(val)
