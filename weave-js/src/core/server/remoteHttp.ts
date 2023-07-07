@@ -3,7 +3,7 @@ import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
-import {Node, serializeMulti, serializeAllValues} from '../model';
+import {Node, serialize, serializeMulti} from '../model';
 import type {OpStore} from '../opStore';
 import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
 import type {Server} from './types';
@@ -250,15 +250,9 @@ export class RemoteHttpServer implements Server {
     this.trace(`Flushing ${nodeEntries.length} nodes`);
 
     const nodes = nodeEntries.map(e => e.node);
-
-    // Currently, `serializeMulti` still uses the old serialization format.
-    // `contiguousBatchesOnly` should always be `false` so we effectively always use the new serialization.
-    // If we have to support `contiguousBatchesOnly = true`,
-    // then we should make a `serializeMulti` for the new serialization format.
-    const usingSerializeAllValues = !this.opts.contiguousBatchesOnly;
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
       ? serializeMulti(nodes)
-      : [[serializeAllValues(nodes)], [_.range(nodes.length)]];
+      : [[serialize(nodes)], [_.range(nodes.length)]];
 
     for (
       let reqIdx = 0;
@@ -308,7 +302,6 @@ export class RemoteHttpServer implements Server {
       const p = new Promise(async resolve => {
         const payloadJSON = {
           graphs: payload,
-          serializeAllValues: usingSerializeAllValues,
         };
         const body = JSON.stringify(payloadJSON);
 
