@@ -38,7 +38,7 @@ import type {EditingNode} from './editing';
 
 type SerializedRef = number;
 
-type BatchedGraphs = {
+export type BatchedGraphsAllValuesSerialized = {
   nodes: any[];
   targetNodes: SerializedRef[];
 };
@@ -97,7 +97,9 @@ function hash(v: any): string {
 }
 
 // Array of CG -> Normalized Graph -> Serializable Graph + Roots -> Flat Serializable Graph
-export function serializeAllValues(graphs: EditingNode[]): BatchedGraphs {
+export function serializeAllValues(
+  graphs: EditingNode[]
+): BatchedGraphsAllValuesSerialized {
   const serializer = createSerializer();
 
   const targetNodes = graphs.map(graph => serializeValue(serializer, graph));
@@ -141,7 +143,7 @@ function serializeObject(
 export function deserializeAllValues({
   nodes,
   targetNodes,
-}: BatchedGraphs): EditingNode[] {
+}: BatchedGraphsAllValuesSerialized): EditingNode[] {
   return targetNodes.map(targetNode => deserializeValue(nodes, targetNode));
 }
 
