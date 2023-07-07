@@ -9,7 +9,7 @@ from .. import weave_internal
 from .. import graph
 from .. import panel
 from .. import panel_util
-from .bank import default_panel_bank_flow_section_config
+from .bank import default_panel_bank_flow_section_config, flow_layout
 
 ItemsType = typing.TypeVar("ItemsType")
 
@@ -75,6 +75,12 @@ class GroupConfig(typing.Generic[ItemsType]):
 GroupConfigType = typing.TypeVar("GroupConfigType")
 
 
+@dataclasses.dataclass
+class GroupLayoutFlow:
+    rows: int
+    columns: int
+
+
 @weave.type()
 class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     id = "Group"
@@ -83,27 +89,29 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     )
     # items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
 
-    def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
+    def __init__(
+        self, input_node=graph.VoidNode(), vars=None, config=None, **options
+    ) -> None:
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:
             self.config = GroupConfig()
         if "layoutMode" in options:
-            self.config.layoutMode = options["layoutMode"]
-            self.config.gridConfig = default_panel_bank_flow_section_config()
+            layout_mode = options["layoutMode"]
+            if isinstance(layout_mode, GroupLayoutFlow):
+                self.config.layoutMode = "flow"
+                self.config.gridConfig = flow_layout(
+                    layout_mode.rows, layout_mode.columns
+                )
+            else:
+                self.config.layoutMode = layout_mode
+                self.config.gridConfig = default_panel_bank_flow_section_config()
         if "items" in options:
             self.config.items = options["items"]
         if "showExpressions" in options:
             self.config.showExpressions = options["showExpressions"]
-        if "layered" in options:
-            self.config.layered = options["layered"]
         if "enableAddPanel" in options:
             self.config.enableAddPanel = options["enableAddPanel"]
-        if "preferHorizontal" in options:
-            self.config.preferHorizontal = options["preferHorizontal"]
-            self.config.layoutMode = (
-                "horizontal" if options["preferHorizontal"] else "vertical"
-            )
         if "equalSize" in options:
             self.config.equalSize = options["equalSize"]
         if "style" in options:
@@ -115,6 +123,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             frame = {}
         frame = copy.copy(frame)
         frame.update(self.vars)
+        frame["input"] = self.input_node
 
         items = {}
         for name, p in self.config.items.items():

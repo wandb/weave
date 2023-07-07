@@ -1,0 +1,219 @@
+import typing
+
+import weave
+from .. import weave_internal
+
+
+@weave.type()
+class AutoBoardConfig:
+    pass
+
+
+def timeseries_avg_line(
+    input_node: weave.Node[list[typing.Any]],
+    bin_domain_node: weave.Node,
+    x_axis_key: str,
+    y_axis_key: str,
+    groupby_key: typing.Union[weave.Node[str], str],
+    x_domain: weave.Node,
+) -> weave.Panel:
+    x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
+    if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
+        bin_fn = weave.ops.timestamp_bins_nice
+    elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
+        bin_fn = weave.ops.numbers_bins_equal
+    else:
+        raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
+    return weave.panels.Plot(
+        input_node,
+        x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, 100))["start"],
+        x_title=x_axis_key,
+        y=lambda row: row[y_axis_key].avg(),
+        y_title="avg" + y_axis_key,
+        label=lambda row: row[groupby_key],
+        groupby_dims=["x", "label"],
+        mark="line",
+        no_legend=True,
+        domain_x=x_domain,
+    )
+
+
+def timeseries_count_bar(
+    input_node: weave.Node[list[typing.Any]],
+    bin_domain_node: weave.Node,
+    x_axis_key: str,
+    groupby_key: typing.Union[weave.Node[str], str],
+    x_domain: weave.Node,
+) -> weave.Panel:
+    x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
+    if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
+        bin_fn = weave.ops.timestamp_bins_nice
+    elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
+        bin_fn = weave.ops.numbers_bins_equal
+    else:
+        raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
+    return weave.panels.Plot(
+        input_node,
+        x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, 100)),
+        x_title=x_axis_key,
+        y=lambda row: row.count(),
+        label=lambda row: row[groupby_key],
+        groupby_dims=["x", "label"],
+        mark="bar",
+        domain_x=x_domain,
+    )
+
+
+def categorical_dist(
+    input_node: weave.Node[list[typing.Any]],
+    key: str,
+) -> weave.Panel:
+    return weave.panels.Plot(
+        input_node,
+        y=lambda row: row[key],
+        x=lambda row: row.count(),
+        label=lambda row: row[key],
+        groupby_dims=["y", "label"],
+        mark="bar",
+    )
+
+
+def auto_panels(
+    input_node: weave.Node[list[typing.Any]],
+    config: typing.Optional[AutoBoardConfig] = None,
+) -> weave.Panel:
+    input_type = input_node.type
+    if isinstance(input_type, weave.types.Function):
+        input_type = input_type.output_type
+    if not weave.types.is_list_like(input_type):
+        raise ValueError("Input node must be a list")
+    object_type = input_type.object_type  # type: ignore
+    if not weave.types.TypedDict().assign_type(object_type):
+        raise ValueError("Input node must be a list of objects")
+    property_types = typing.cast(
+        dict[str, weave.types.Type], object_type.property_types
+    )
+    x_axis = None
+
+    for k, prop_type in property_types.items():
+        if not weave.types.NoneType().assign_type(prop_type) and weave.types.optional(
+            weave.types.Timestamp()
+        ).assign_type(prop_type):
+            x_axis = k
+            x_axis_type = prop_type
+            break
+    if x_axis is None:
+        for step_key in ["_step", "step"]:
+            if step_key in property_types and weave.types.optional(
+                weave.types.Int()
+            ).assign_type(property_types[step_key]):
+                x_axis = step_key
+                x_axis_type = property_types[step_key]
+
+    if x_axis is None:
+        # TODO: handle instead
+        raise ValueError(
+            'No suitable x-axis (Timestamp type, or _step) property found in input type "%s"'
+            % input_type
+        )
+
+    groupby = weave_internal.const(None)
+    for k, prop_type in property_types.items():
+        if "version" in k and weave.types.optional(weave.types.String()).assign_type(
+            prop_type
+        ):
+            groupby = weave_internal.const(k)
+
+    metric_panels = []
+    categorical_panels = []
+
+    data_node = weave_internal.make_var_node(input_node.type, "data")
+    x_domain_node = weave_internal.make_var_node(
+        weave.types.optional(weave.types.List(x_axis_type)), "zoom_range"
+    )
+    time_domain_node = weave_internal.make_var_node(
+        weave.types.List(x_axis_type), "bin_range"
+    )
+    window_data_node = weave_internal.make_var_node(input_node.type, "window_data")
+
+    groupby_key_node = weave_internal.make_var_node(groupby.type, "groupby")
+
+    for key, prop_type in property_types.items():
+
+        if weave.types.optional(weave.types.Number()).assign_type(prop_type):
+            panel = timeseries_avg_line(
+                data_node,
+                time_domain_node,
+                x_axis,
+                key,
+                groupby_key_node,
+                x_domain_node,
+            )
+            metric_panels.append(panel)
+        elif (
+            weave.types.optional(weave.types.String()).assign_type(prop_type)
+            and key != "prompt"
+            and key != "completion"
+        ):
+            panel = categorical_dist(window_data_node, key)
+            categorical_panels.append(panel)
+
+    metrics = weave.panels.Group(
+        layoutMode=weave.panels.GroupLayoutFlow(2, 3),
+        items={"panel%s" % i: panel for i, panel in enumerate(metric_panels)},
+    )
+    categoricals = weave.panels.Group(
+        layoutMode=weave.panels.GroupLayoutFlow(2, 3),
+        items={"panel%s" % i: panel for i, panel in enumerate(categorical_panels)},
+    )
+    control_items = {
+        "data": input_node,
+        "zoom_range": None,
+        "data_range": lambda data: weave.ops.make_list(
+            a=data[x_axis].min(), b=data[x_axis].max()
+        ),
+        "bin_range": lambda zoom_range, data_range: zoom_range.coalesce(data_range),
+        "groupby": weave.panels.Expression(groupby),
+        "window_data": lambda data, bin_range: data.filter(
+            lambda row: weave.ops.Boolean.bool_and(
+                row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1]
+            )
+        ),
+    }
+
+    panels = [
+        weave.panels.BoardPanel(
+            metrics,
+            id="metrics",
+            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12),
+        ),
+        weave.panels.BoardPanel(
+            categoricals,
+            id="categoricals",
+            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12),
+        ),
+    ]
+    if "step" not in x_axis:
+        panels.insert(
+            0,
+            weave.panels.BoardPanel(
+                timeseries_count_bar(
+                    data_node, time_domain_node, x_axis, groupby_key_node, x_domain_node
+                ),
+                id="volume",
+                layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+            ),
+        )
+    return weave.panels.Board(vars=control_items, panels=panels)
+
+
+# The interface for constructing this Panel from Python
+@weave.type()
+class AutoBoard(weave.Panel):
+    id = "AutoBoard"
+    input_node: weave.Node[list[typing.Any]]
+    config: typing.Optional[AutoBoardConfig] = None
+
+    @weave.op()  # type: ignore
+    def render(self) -> weave.panels.Group:
+        return auto_panels(self.input_node, self.config)  # type: ignore

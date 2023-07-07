@@ -7,7 +7,7 @@ from .panel_auto import *
 # layout
 from .panel_labeled_item import LabeledItem
 from .panel_card import Card, CardTab
-from .panel_group import Group
+from .panel_group import Group, GroupLayoutFlow
 from .panel_each import Each
 
 from .panel_facet_tabs import FacetTabs
