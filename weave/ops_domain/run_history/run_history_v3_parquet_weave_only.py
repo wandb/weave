@@ -9,7 +9,6 @@ from weave.language_features.tagging.tagged_value_type import TaggedValueType
 from ...ops_arrow.list_ import (
     PathItemList,
     PathItemObjectField,
-    PathItemOuterList,
     PathItemStructField,
     PathItemType,
     PathType,
@@ -303,15 +302,6 @@ def _get_history_stream_inner(
             parquet_history = _gorilla_parquet_table_to_corrected_awl(
                 parquet_history, object_type
             )
-            # parquet_history = pa.StructArray.from_arrays(
-            #     # TODO: we shouldn't need to combine chunks, we can produce this in the
-            #     # original chunked form for zero copy
-            #     [c.combine_chunks() for c in parquet_history.columns],
-            #     names=parquet_history.column_names,
-            # )
-            # parquet_history = _convert_gorilla_parquet_to_weave_arrow(
-            #     parquet_history, object_type, artifact
-            # )
     else:
         parquet_history = []
 
@@ -322,103 +312,6 @@ def _get_history_stream_inner(
     elif len(parquet_history) == 0:
         return live_data_processed
     return use(concat([parquet_history, live_data_processed]))
-
-
-# def _convert_gorilla_parquet_to_weave_arrow(
-#     gorilla_parquet, target_object_type, artifact
-# ):
-#     # Note: this arrow Weave List is NOT properly constructed. We blindly create it from the gorilla parquet
-#     gorilla_awl = ArrowWeaveList(
-#         gorilla_parquet,
-#         artifact=artifact,
-#     )
-
-#     prototype_awl = convert.to_arrow(
-#         [],
-#         types.List(target_object_type),
-#         artifact=artifact,
-#     )
-
-#     target_path_types = {}
-
-#     def path_accumulator(
-#         awl: ArrowWeaveList, path: PathType
-#     ) -> typing.Optional["ArrowWeaveList"]:
-#         nonlocal target_path_types
-#         target_path_types[path] = awl.object_type
-#         return None
-
-#     prototype_awl.map_column(path_accumulator)
-
-#     def pre_mapper(
-#         awl: ArrowWeaveList, path: PathType
-#     ) -> typing.Optional["ArrowWeaveList"]:
-#         if path == ():  # root
-#             return None
-
-#         # Here we want to:
-#         # a) unflatten the top-level dictionaries (i believe gorilla will have them dot-separated)
-#         # b) reduce the encoded cells to their vals (this should only be Object and Custom Types)
-#         # c) Modify non-simple unions to our union structure
-#         if path not in target_path_types:
-#             raise ValueError(f"Path {path} not found in target path types")
-
-#         target_type = target_path_types[path]
-#         if types.is_optional(target_type):
-#             target_type = types.non_none(target_type)
-#         current_type = awl.object_type
-#         if types.is_optional(current_type):
-#             current_type = types.non_none(current_type)
-
-#         # If the types are the same, we don't need to do anything! That is the happy state
-#         if types.optional(target_type).assign_type(current_type):
-#             return None
-
-#         # If both types are list-like, then we can handle the differences on the next loop
-#         base_list_type = types.optional(types.List())
-#         if base_list_type.assign_type(target_type) and base_list_type.assign_type(
-#             current_type
-#         ):
-#             return None
-
-#         # If both types are unions, we are in trouble. Have to somehow map the union types from gorilla
-#         # to the union types in weave. This is a hard problem.
-#         # if isinstance(target_type, types.UnionType) and isinstance(current_type, types.UnionType):
-
-#         # TODO: Unions...
-#         # TODO: Generalize this to not blindly assume _val
-#         # TODO: This double val goes away
-#         data = awl._arrow_data.field("_val").field("_val")
-
-#         if target_type.assign_type(types.Timestamp()):
-#             data = (
-#                 pc.floor(data)
-#                 .cast("int64")
-#                 .cast(pa.timestamp("ms", tz=datetime.timezone.utc))
-#             )
-
-#         return ArrowWeaveList(
-#             data,
-#             target_type,
-#             awl._artifact,
-#         )
-#         return None
-
-#     def post_mapper(
-#         awl: ArrowWeaveList, path: PathType
-#     ) -> typing.Optional["ArrowWeaveList"]:
-#         return None
-
-#     corrected_awl = gorilla_awl.map_column(post_mapper, pre_mapper)
-
-#     reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
-
-#     if reason != None:
-#         raise ValueError(
-#             f"Failed to effectively convert Gorilla Parquet History to expected history type: {reason}"
-#         )
-
-#     return corrected_awl
 
 
 def _reconstruct_original_live_data(live_data: list[dict]):
@@ -458,17 +351,6 @@ def _reconstruct_original_live_data_cell(live_data: typing.Any) -> typing.Any:
     return live_data
 
 
-# list(zip(parquet_history.schema.names, parquet_history.schema.types))
-
-# Plan:
-## 1) convert history keys to weave type
-## 2) convert weave type to arrow type (target type)
-## 3) for each path (leaf column) in the target arrow type,
-#           map to the weave type leaf path (pretty sure i can this)
-#           map from the weave type leaf path to the gorilla parquet leaf path ()
-#           copy the gorilla parquet leaf path to the target arrow type leaf path
-
-
 # TODO: Clean this up - there is a lot of waste from dev work
 @dataclasses.dataclass
 class TargetAWLSpec:
@@ -495,13 +377,21 @@ def _gorilla_parquet_table_to_corrected_awl(
     target_path_summary: PathSummary = _summarize_awl_paths(prototype_awl)
     # current_path_summary: PathSummary = _summarize_awl_paths(gorilla_awl)
 
-    column_map: dict[PathType, pa.Array] = {}
+    column_tree: PathTree = PathTree()
 
     def column_getter(
         awl: ArrowWeaveList, path: PathType
     ) -> typing.Optional[ArrowWeaveList]:
-        nonlocal column_map
-        column_map[path] = awl._arrow_data
+        nonlocal column_tree
+        if path == ():
+            return None
+        pt = column_tree
+        for path_part in path:
+            if path_part not in pt.children:
+                pt.children[path_part] = PathTree()
+            pt = pt.children[path_part]
+        pt.data = awl._arrow_data
+
         return None
 
     gorilla_awl.map_column(column_getter)
@@ -519,13 +409,92 @@ def _gorilla_parquet_table_to_corrected_awl(
         while s != None:
             source_path_parts = [*s.remap_path, *source_path_parts]
             s = s.parent
-        source_path = tuple(source_path_parts)
+        source_path = source_path_parts
 
-        if source_path not in column_map:
+        tree = column_tree
+        for path_part in source_path:
+            if path_part in tree.children:
+                tree = tree.children[path_part]
+            else:
+                # Critical injection of union handling
+                if tree.data != None and pa.types.is_struct(tree.data.type):
+                    union_path = PathItemStructField("_type_struct")
+                    if (union_path in tree.children) and path_part in tree.children[
+                        union_path
+                    ].children:
+                        # Awesome! We found the hidden union
+                        tree = tree.children[union_path].children[path_part]
+                        continue
+
+                raise errors.WeaveHistoryDecodingError(
+                    f"Given target type {target_object_type}, attempt to populate arrow column at {target_spec.remap_path}, but failed to find source path {source_path}"
+                )
+
+        # Final Union Consideration
+        # When to do this? When we are at a gorilla union!
+        if len(tree.children) > 0 and all(
+            [
+                (
+                    isinstance(path_part, PathItemStructField)
+                    and path_part.key.startswith("_type_")
+                )
+                for path_part in tree.children.keys()
+            ]
+        ):
+            # float64 | utf8 | bool | struct | list | binary
+            self_type = types.non_none(target_spec.weave_type)
+            intermediate_union_path = None
+            if isinstance(self_type, primitive_types):
+                if isinstance(
+                    self_type,
+                    (
+                        types.Number,
+                        types.Int,
+                        types.Float,
+                    ),
+                ):
+                    intermediate_union_path = PathItemStructField("_type_float64")
+                elif isinstance(self_type, (types.Boolean,)):
+                    intermediate_union_path = PathItemStructField("_type_bool")
+                elif isinstance(self_type, (types.String,)):
+                    intermediate_union_path = PathItemStructField("_type_utf8")
+                else:
+                    raise errors.WeaveHistoryDecodingError(
+                        "Programmer Error: Unhandled type"
+                    )
+            elif isinstance(self_type, union_types):
+                raise errors.WeaveHistoryDecodingError(
+                    "Programmer Error: Nested Unions not supported"
+                )
+            elif isinstance(self_type, list_types):
+                intermediate_union_path = PathItemStructField("_type_list")
+            elif isinstance(self_type, dict_types):
+                intermediate_union_path = PathItemStructField("_type_struct")
+            elif isinstance(self_type, object_types):
+                intermediate_union_path = PathItemStructField("_type_struct")
+            elif isinstance(self_type, custom_types):
+                intermediate_union_path = PathItemStructField("_type_utf8")
+
+            else:
+                raise errors.WeaveHistoryDecodingError(
+                    "Programmer Error: Unhandled type"
+                )
+
+            if (
+                intermediate_union_path != None
+                and intermediate_union_path in tree.children
+            ):
+                tree = tree.children[intermediate_union_path]
+                # if path_part in tree.children:
+                #     tree = tree.children[path_part]
+                #     continue
+
+        if tree.data == None:
             raise errors.WeaveHistoryDecodingError(
-                f"Given target type {target_object_type}, attempt to populate arrow column at {target_spec.remap_path}, but failed to find source path {source_path} from history paths {list(column_map.keys())}"
+                "Missing data in column tree path {source_path}"
             )
-        data_array = column_map[source_path]
+
+        data_array = tree.data
         reason = weave_arrow_type_check(target_spec.weave_type, data_array)
 
         if reason != None:
@@ -539,10 +508,6 @@ def _gorilla_parquet_table_to_corrected_awl(
         )
 
     corrected_awl = prototype_awl.map_column(column_setter, retain_masks=False)
-    # for target_spec in target_path_summary.leaf_paths.values():
-    #     source_path: PathType = _target_awl_spec_to_gorilla_path(target_spec, current_path_summary.all_paths)
-    #     data_array = _get_data_at_path(gorilla_parquet, source_path)
-    #     _update_data_at_path(final_awl, target_spec.arrow_leaf_path, data_array)
 
     reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
 
@@ -575,10 +540,12 @@ object_types = (types.ObjectType,)
 custom_types = (types.Type,)
 
 
-# @dataclasses.dataclass
-# class PathTree:
-#     children: typing.Dict[PathItemType, "PathTree"] = dataclasses.field(default_factory=dict)
-#     data: TargetAWLSpec
+@dataclasses.dataclass
+class PathTree:
+    children: typing.Dict[PathItemType, "PathTree"] = dataclasses.field(
+        default_factory=dict
+    )
+    data: typing.Optional[pa.Array] = None
 
 
 @dataclasses.dataclass
@@ -604,38 +571,24 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
         self_type = types.non_none(weave_type)
         arrow_type = awl._arrow_data.type
         # weave_leaf_path = PathItemOuterList
-        remap_path = (final_path,)
+        self_path = (final_path,)
         parent_spec = None
         # TODO: It really feels like this can be collapsed into the below switch
-        if len(path) == 1:
-            if isinstance(self_type, primitive_types):
-                remap_path = (final_path,)
-            elif isinstance(self_type, union_types):
-                remap_path = (final_path,)
-            elif isinstance(self_type, list_types):
-                remap_path = (final_path,)
-            elif isinstance(self_type, dict_types):
-                remap_path = (final_path,)
-            elif isinstance(self_type, object_types):
-                assert isinstance(final_path, PathItemObjectField)
-                # FIXME: Ugg this double _val is a bit of a hack.
-                remap_path = (
-                    final_path,
-                    PathItemStructField("_val"),
-                    PathItemStructField("_val"),
-                )
-            elif isinstance(self_type, custom_types):
-                # FIXME: Ugg this double _val is a bit of a hack.
-                remap_path = (
-                    final_path,
-                    PathItemStructField("_val"),
-                    PathItemStructField("_val"),
-                )
-            else:
-                raise errors.WeaveHistoryDecodingError(
-                    "Programmer Error: Unhandled type"
-                )
+
+        extra_path = ()
+        if isinstance(
+            self_type, primitive_types + union_types + list_types + dict_types
+        ):
+            self_path = (final_path,)
+        elif isinstance(self_type, object_types + custom_types):
+            extra_path = (
+                PathItemStructField("_val"),
+                PathItemStructField("_val"),
+            )
         else:
+            raise errors.WeaveHistoryDecodingError("Programmer Error: Unhandled type")
+
+        if len(path) > 1:
             parent_path = tuple(path[:-1])
             if parent_path not in path_summary.all_paths:
                 raise errors.WeaveHistoryDecodingError(
@@ -646,15 +599,8 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                 parent_spec = path_summary.leaf_paths.pop(parent_path)
 
             # Construct weave_leaf_path from parent.
-            # 6 Cases to handle:
             # PathItemStructField,
             # PathItemList,
-
-            # PathItemOuterList,
-            # PathItemUnionEntry,
-            # PathItemObjectField,
-            # PathItemTaggedValueTag,
-            # PathItemTaggedValueValue,
             parent_weave_type = types.non_none(parent_spec.weave_type)
             if isinstance(parent_weave_type, primitive_types):
                 raise errors.WeaveHistoryDecodingError(
@@ -671,11 +617,11 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                             types.Float,
                         ),
                     ):
-                        remap_path = (PathItemStructField("_type_float64"),)
+                        self_path = (PathItemStructField("_type_float64"),)
                     elif isinstance(self_type, (types.Boolean,)):
-                        remap_path = (PathItemStructField("_type_bool"),)
+                        self_path = (PathItemStructField("_type_bool"),)
                     elif isinstance(self_type, (types.String,)):
-                        remap_path = (PathItemStructField("_type_utf8"),)
+                        self_path = (PathItemStructField("_type_utf8"),)
                     else:
                         raise errors.WeaveHistoryDecodingError(
                             "Programmer Error: Unhandled type"
@@ -685,31 +631,30 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                         "Programmer Error: Nested Unions not supported"
                     )
                 elif isinstance(self_type, list_types):
-                    remap_path = (PathItemStructField("_type_list"),)
+                    self_path = (PathItemStructField("_type_list"),)
                 elif isinstance(self_type, dict_types):
-                    remap_path = (PathItemStructField("_type_struct"),)
+                    self_path = (PathItemStructField("_type_struct"),)
                 elif isinstance(self_type, object_types):
-                    remap_path = (PathItemStructField("_type_struct"),)
+                    self_path = (PathItemStructField("_type_struct"),)
                 elif isinstance(self_type, custom_types):
-                    remap_path = (
-                        PathItemStructField("_type_struct"),
-                        PathItemStructField("_val"),
-                    )
+                    self_path = (PathItemStructField("_type_struct"),)
                 else:
                     raise errors.WeaveHistoryDecodingError(
                         "Programmer Error: Unhandled type"
                     )
             elif isinstance(parent_weave_type, list_types):
-                remap_path = (PathItemList("element"),)
+                self_path = (PathItemList(),)
             elif isinstance(parent_weave_type, dict_types):
                 assert isinstance(final_path, PathItemStructField)
-                remap_path = (final_path,)
+                # No-op
+                self_path = (final_path,)
+                # remap_path = (final_path,)
             elif isinstance(parent_weave_type, object_types):
                 assert isinstance(final_path, PathItemObjectField)
                 # FIXME: Ugg this double _val is a bit of a hack.
-                remap_path = (
-                    PathItemStructField("_val"),
-                    PathItemStructField("_val"),
+                self_path = (
+                    # PathItemStructField("_val"),
+                    # PathItemStructField("_val"),
                     PathItemStructField(final_path.attr),
                 )
             elif isinstance(parent_weave_type, custom_types):
@@ -723,7 +668,7 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
 
         path_summary.all_paths[path] = TargetAWLSpec(
             arrow_leaf_path=final_path,
-            remap_path=remap_path,
+            remap_path=(*self_path, *extra_path),
             # weave_leaf_path=weave_leaf_path,
             weave_type=weave_type,
             arrow_type=arrow_type,
@@ -753,257 +698,3 @@ def _create_prototype_awl_from_object_type(
         types.List(target_object_type),
         artifact=artifact,
     )
-
-
-# def _target_awl_spec_to_gorilla_path(spec: TargetAWLSpec, gorilla_paths: dict[PathType, TargetAWLSpec]) -> PathType:
-#     # First, assemble a path from the root to the leaf
-#     target_spec_path: list[TargetAWLSpec] = []
-#     curr_spec = spec
-#     while curr_spec is not None:
-#         target_spec_path.append(curr_spec)
-#         curr_spec = curr_spec.parent
-#     target_spec_path.reverse()
-
-
-#     # Work backwards from the root to the leaf
-#     # gorilla_path: list[PathItemType] = []
-
-#     current_spec: typing.Optional[TargetAWLSpec] = spec
-
-
-#     child_spec: typing.Optional[TargetAWLSpec] = None
-#     while current_spec is not None:
-#         # 6 Cases to handle:
-#         weave_type = current_spec.weave_type
-
-#         # Step 0: Break off the Nones - they are not needed.
-#         if isinstance(current_spec.weave_type, types.UnionType):
-#             weave_type = types.non_none(weave_type)
-
-#         # Step 1: Check if the weave type is a primitive type
-#         if isinstance(weave_type, primitive_types):
-#             pass  # There is nothing to do here
-
-#         # Step 2: Check if the weave type is a non-simple union
-#         if isinstance(weave_type, union_types):
-#             # When we hit a union, we would expect
-
-#         child_spec = current_spec
-#         current_spec = current_spec.parent
-
-
-#     return tuple(gorilla_path[::-1])
-
-
-# def _reconstruct_awl_from_gorilla_parquet_outer(
-#     gorilla_parquet: pa.Array,
-#     target_object_type: types.TypedDict,
-# ) -> pa.Array:
-#     artifact = artifact_mem.MemArtifact()
-#     prototype_awl = convert.to_arrow(
-#         [],
-#         types.List(target_object_type),
-#         artifact=artifact,
-#     )
-#     return _recursively_reconstruct_awl_from_gorilla_parquet(
-#         gorilla_parquet,
-#         target_object_type,
-#         prototype_awl._arrow_data.type,
-#     )
-
-
-# def _recursively_reconstruct_awl_from_gorilla_parquet(
-#     gorilla_parquet: pa.Array,
-#     target_object_type: types.TypedDict,
-#     target_pyarrow_type: pa.DataType,
-# ) -> pa.Array:
-#     # arrays: list[pa.Array] = []
-#     current_pyarrow_type: pa.DataType = gorilla_parquet.type
-
-#     if target_pyarrow_type == current_pyarrow_type:
-#         return gorilla_parquet
-
-#     if (
-#         isinstance(target_object_type, types.UnionType)
-#         and target_object_type.is_simple_nullable()
-#     ):
-#         nonnull_type = [
-#             m for m in target_object_type.members if m.type != types.NoneType()
-#         ][0]
-
-#         return _recursively_reconstruct_awl_from_gorilla_parquet(
-#             gorilla_parquet,
-#             nonnull_type,
-#         )
-#     elif pa.types.is_null(target_pyarrow_type):
-#         # Here we want to extract just the nulls from the gorilla parquet
-#         return pa.array(
-#             pa.nulls(len(gorilla_parquet)),
-#             type=target_pyarrow_type,
-#         )
-#     elif pa.types.is_struct(target_pyarrow_type):
-#         keys: list[str] = []
-#         # keeps track of null values so that we can null entries at the struct level
-#         mask: list[bool] = []
-
-#         assert isinstance(
-#             target_object_type, (types.TypedDict, TaggedValueType, types.ObjectType)
-#         )
-
-#         # handle empty struct case - the case where the struct has no fields
-#         if len(target_pyarrow_type) == 0:
-#             return pa.array(py_objs, type=target_pyarrow_type)
-
-#         for i, field in enumerate(target_pyarrow_type):
-#             data: list[typing.Any] = []
-#             if isinstance(
-#                 mapper,
-#                 mappers_arrow.TypedDictToArrowStruct,
-#             ):
-#                 for py_obj in py_objs:
-#                     if py_obj is None:
-#                         data.append(None)
-#                     else:
-#                         data.append(py_obj.get(field.name, None))
-#                     if i == 0:
-#                         mask.append(py_obj is None)
-
-#                 array = _recursively_reconstruct_awl_from_gorilla_parquet(
-#                     data,
-#                     field.type,
-#                     mapper._property_serializers[field.name],
-#                     py_objs_already_mapped,
-#                 )
-#             if isinstance(
-#                 mapper,
-#                 mappers_arrow.ObjectToArrowStruct,
-#             ):
-#                 for py_obj in py_objs:
-#                     if py_obj is None:
-#                         data.append(None)
-#                     elif py_objs_already_mapped:
-#                         if isinstance(py_obj, dict) and "_val" in py_obj:
-#                             py_obj = py_obj["_val"]
-#                         data.append(py_obj.get(field.name, None))
-#                     else:
-#                         data.append(getattr(py_obj, field.name, None))
-#                     if i == 0:
-#                         mask.append(py_obj is None)
-
-#                 array = _recursively_reconstruct_awl_from_gorilla_parquet(
-#                     data,
-#                     field.type,
-#                     mapper._property_serializers[field.name],
-#                     py_objs_already_mapped,
-#                 )
-
-#             elif isinstance(mapper, mappers_arrow.TaggedValueToArrowStruct):
-#                 if field.name == "_tag":
-#                     for py_obj in py_objs:
-#                         if py_obj is None:
-#                             data.append(None)
-#                         else:
-#                             data.append(tag_store.get_tags(py_obj))
-#                         if i == 0:
-#                             mask.append(py_obj is None)
-
-#                     array = _recursively_reconstruct_awl_from_gorilla_parquet(
-#                         data,
-#                         field.type,
-#                         mapper._tag_serializer,
-#                         py_objs_already_mapped,
-#                     )
-#                 else:
-#                     for py_obj in py_objs:
-#                         if py_obj is None:
-#                             data.append(None)
-#                         else:
-#                             data.append(box.unbox(py_obj))
-#                         if i == 0:
-#                             mask.append(py_obj is None)
-
-#                     array = _recursively_reconstruct_awl_from_gorilla_parquet(
-#                         data,
-#                         field.type,
-#                         mapper._value_serializer,
-#                         py_objs_already_mapped,
-#                     )
-
-#             arrays.append(array)
-#             keys.append(field.name)
-#         return pa.StructArray.from_arrays(
-#             arrays, keys, mask=pa.array(mask, type=pa.bool_())
-#         )
-#     elif pa.types.is_union(target_pyarrow_type):
-#         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
-#         type_codes: list[int] = [
-#             0
-#             if o == None
-#             else target_object_type_code_of_obj(o, py_objs_already_mapped)
-#             for o in py_objs
-#         ]
-#         offsets: list[int] = []
-#         py_data: list[list] = []
-#         for _ in range(len(target_pyarrow_type)):
-#             py_data.append([])
-
-#         for row_index, type_code in enumerate(type_codes):
-#             offsets.append(len(py_data[type_code]))
-#             py_data[type_code].append(py_objs[row_index])
-
-#         for i, raw_py_data in enumerate(py_data):
-#             array = _recursively_reconstruct_awl_from_gorilla_parquet(
-#                 raw_py_data,
-#                 target_pyarrow_type.field(i).type,
-#                 mapper.mapper_of_type_code(i),
-#                 py_objs_already_mapped,
-#             )
-#             arrays.append(array)
-
-#         return pa.UnionArray.from_dense(
-#             pa.array(type_codes, type=pa.int8()),
-#             pa.array(offsets, type=pa.int32()),
-#             arrays,
-#         )
-#     elif pa.types.is_list(target_pyarrow_type):
-#         assert isinstance(mapper, mappers_arrow.ListToArrowArr)
-#         offsets = [0]
-#         flattened_objs = []
-#         mask = []
-#         for obj in py_objs:
-#             mask.append(obj == None)
-#             if obj == None:
-#                 obj = []
-#             offsets.append(offsets[-1] + len(obj))
-#             flattened_objs += obj
-#         new_objs = _recursively_reconstruct_awl_from_gorilla_parquet(
-#             flattened_objs,
-#             target_pyarrow_type.value_type,
-#             mapper._object_type,
-#             py_objs_already_mapped,
-#         )
-#         return pa.ListArray.from_arrays(
-#             offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
-#         )
-
-#     if py_objs_already_mapped:
-#         return pa.array(
-#             [p["_val"] if isinstance(p, dict) and "_val" in p else p for p in py_objs],
-#             target_pyarrow_type,
-#         )
-
-#     values = [mapper.apply(o) if o is not None else None for o in py_objs]
-
-#     # These are plain values.
-
-#     if target_object_type == types.Number():
-#         # Let pyarrow infer this type.
-#         # This covers the case where a Weave0 table includes a Number column that
-#         # contains integers that are too large for float64. We map Number to float64,
-#         # but allow it to be int64 as well in our ArrowWeaveList.validate method.
-#         res = pa.array(values)
-#         if pa.types.is_null(res.type):
-#             res = res.cast(pa.int64())
-#     else:
-#         res = pa.array(values, type=target_pyarrow_type)
-#     return res

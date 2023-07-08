@@ -105,7 +105,6 @@ class PathItemObjectField:
 
 @dataclasses.dataclass(frozen=True)
 class PathItemList:
-    item_name: str = "item"
     pass
 
 
