@@ -33,7 +33,7 @@ def to_number(self):
     )
 
 
-def adjust_multiple_s(multiple_s: int) -> typing.Tuple[int, str]:
+def adjust_multiple_s(multiple_s: float) -> typing.Tuple[int, str]:
     unit = "second"
 
     # Critical: Arrow silently fails if the unit is < 1. In such cases,
@@ -50,7 +50,7 @@ def adjust_multiple_s(multiple_s: int) -> typing.Tuple[int, str]:
     input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
-def floor(self, multiple_s: int):
+def floor(self, multiple_s: float):
     multiple_s, unit = adjust_multiple_s(multiple_s)
     return ArrowWeaveList(
         pc.floor_temporal(self._arrow_data, multiple=multiple_s, unit=unit),
@@ -64,7 +64,7 @@ def floor(self, multiple_s: int):
     input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
-def ceil(self, multiple_s: int):
+def ceil(self, multiple_s: float):
     multiple_s, unit = adjust_multiple_s(multiple_s)
     return ArrowWeaveList(
         pc.ceil_temporal(
