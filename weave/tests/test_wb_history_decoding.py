@@ -45,6 +45,7 @@ rows_tests = [
     # Here we have 1 test for all the types
     [base_types],
     # Here is a nasty test with really hard unions
+    [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],
     [
         {"a": 1, "b": "hi", "c": TestType(2, "bye"), "i": image()},
         {"a": True, "b": True, "c": True, "i": True},

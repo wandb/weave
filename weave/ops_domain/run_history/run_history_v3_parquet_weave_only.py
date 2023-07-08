@@ -351,6 +351,22 @@ def _reconstruct_original_live_data_cell(live_data: typing.Any) -> typing.Any:
     return live_data
 
 
+# Damnit ... still didn't do the dot notation...
+# Another fundamnetal problem: list length... since list paths have non uniform lengths, we can't query through them in a 1-1 mapping.
+
+# OK, som we need to try a version 4 of the history converter
+# Now that we know how to map between the two forms, we can use that information.
+
+# Essentially this approach would map_columns over the gorilla parequet,
+# applying transformation rules at the parent level. This feels prone to error
+# but the inverse (my current implementation) maps over the ideal array, and
+# since the shapes are not exactly the same and list are not static length
+# this approach will not work.
+
+# Alternatively: how can we scope this down?
+# can we totally change the paradigm?
+
+
 # TODO: Clean this up - there is a lot of waste from dev work
 @dataclasses.dataclass
 class TargetAWLSpec:
@@ -485,9 +501,6 @@ def _gorilla_parquet_table_to_corrected_awl(
                 and intermediate_union_path in tree.children
             ):
                 tree = tree.children[intermediate_union_path]
-                # if path_part in tree.children:
-                #     tree = tree.children[path_part]
-                #     continue
 
         if tree.data == None:
             raise errors.WeaveHistoryDecodingError(
@@ -507,7 +520,7 @@ def _gorilla_parquet_table_to_corrected_awl(
             awl._artifact,
         )
 
-    corrected_awl = prototype_awl.map_column(column_setter, retain_masks=False)
+    corrected_awl = prototype_awl.map_column(column_setter, is_full_replacement=False)
 
     reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
 
