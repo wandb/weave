@@ -7,6 +7,7 @@ import CustomPanelRenderer, {
   MultiTableDataType,
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
+import * as S from './styles';
 import {
   constNode,
   constFunction,
@@ -595,6 +596,30 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     [config, updateConfig, xScaleConfigEnabled, yScaleConfigEnabled]
   );
 
+  const [showAdvancedProperties, setShowAdvancedProperties] =
+    useState<boolean>(false);
+  const toggleAdvancedProperties = () => {
+    setShowAdvancedProperties(!showAdvancedProperties);
+  };
+  const advancedPropertiesDom = useMemo(() => {
+    return (
+      <>
+        {showAdvancedProperties ? (
+          <div onClick={toggleAdvancedProperties}>
+            {scaleConfigDom}
+            <S.AdvancedPropertiesHeader>
+              Hide advanced properties
+            </S.AdvancedPropertiesHeader>
+          </div>
+        ) : (
+          <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
+            Advanced properties
+          </S.AdvancedPropertiesHeader>
+        )}
+      </>
+    );
+  }, [showAdvancedProperties]);
+
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const configTabs = useMemo(() => {
     if (enableDashUi) {
@@ -687,6 +712,8 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     );
   }, [config.series, input, weave]);
 
+  console.log(config);
+
   return useMemo(
     () =>
       enableDashUi ? (
@@ -695,6 +722,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
             {dashboardConfigOptions}
             <VariableView newVars={cellFrame} />
             {seriesConfigDom}
+            {advancedPropertiesDom}
           </ConfigSection>
           <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
           <ConfigSection label={`Scale`}>{scaleConfigDom}</ConfigSection>
@@ -715,6 +743,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       configTabs,
       activeTabIndex,
       seriesButtons,
+      showAdvancedProperties,
     ]
   );
 };
