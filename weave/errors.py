@@ -142,3 +142,7 @@ class WeaveClientRequestError(WeaveBaseError):
 
 class WeaveMissingVariableError(WeaveBaseError):
     pass
+
+
+class WeaveHistoryDecodingError(WeaveBaseError):
+    pass

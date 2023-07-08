@@ -573,8 +573,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 ["ArrowWeaveList", PathType], typing.Optional["ArrowWeaveList"]
             ]
         ] = None,
+        retain_masks: bool = True,
     ) -> "ArrowWeaveList":
-        return self._map_column(fn, pre_fn, ())
+        return self._map_column(fn, pre_fn, (), retain_masks)
 
     def _map_column(
         self,
@@ -587,7 +588,14 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             ]
         ],
         path: PathType,
+        retain_masks: bool = True,
     ) -> "ArrowWeaveList":
+        def masked(arr: pa.Array) -> typing.Optional[pa.Array]:
+            if retain_masks:
+                return arr
+            else:
+                return None
+
         if pre_fn is not None:
             pre_mapped = pre_fn(self, path)
             if pre_mapped is not None:
@@ -599,12 +607,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if isinstance(self.object_type, types.Const):
             with_mapped_children = ArrowWeaveList(
                 self._arrow_data, self.object_type.val_type, self._artifact
-            )._map_column(fn, pre_fn, path)
+            )._map_column(fn, pre_fn, path, retain_masks)
         elif isinstance(self.object_type, types.TypedDict):
             arr = self._arrow_data
             properties: dict[str, ArrowWeaveList] = {
                 k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
-                    fn, pre_fn, path + (PathItemStructField(k),)
+                    fn, pre_fn, path + (PathItemStructField(k),), retain_masks
                 )
                 for k, v in self.object_type.property_types.items()
             }
@@ -614,7 +622,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 result_arr = pa.StructArray.from_arrays(
                     [v._arrow_data for v in properties.values()],
                     list(properties.keys()),
-                    mask=pa.compute.is_null(arr),
+                    mask=masked(pa.compute.is_null(arr)),
                 )
 
             # set invalid_reason to the first non-None invalid reason found in
@@ -633,7 +641,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             arr = self._arrow_data
             attrs: dict[str, ArrowWeaveList] = {
                 k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
-                    fn, pre_fn, path + (PathItemObjectField(k),)
+                    fn, pre_fn, path + (PathItemObjectField(k),), retain_masks
                 )
                 for k, v in self.object_type.property_types().items()
             }
@@ -646,7 +654,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 pa.StructArray.from_arrays(
                     [v._arrow_data for v in attrs.values()],
                     list(attrs.keys()),
-                    mask=pa.compute.is_null(arr),
+                    mask=masked(pa.compute.is_null(arr)),
                 ),
                 self.object_type,
                 self._artifact,
@@ -656,14 +664,14 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             arr = self._arrow_data
             items: ArrowWeaveList = ArrowWeaveList(
                 arr.flatten(), self.object_type.object_type, self._artifact
-            )._map_column(fn, pre_fn, path + (PathItemList(),))
+            )._map_column(fn, pre_fn, path + (PathItemList(),), retain_masks)
             # print("SELF OBJECT TYPE", self.object_type)
             # print("SELF ARROW DATA TYPE", self._arrow_data.type)
             with_mapped_children = ArrowWeaveList(
                 pa.ListArray.from_arrays(
                     offsets_starting_at_zero(self._arrow_data),
                     items._arrow_data,
-                    mask=pa.compute.is_null(arr),
+                    mask=masked(pa.compute.is_null(arr)),
                 ),
                 self.object_type.__class__(items.object_type),
                 self._artifact,
@@ -673,15 +681,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             arr = self._arrow_data
             tag: ArrowWeaveList = ArrowWeaveList(
                 self._arrow_data.field("_tag"), self.object_type.tag, self._artifact
-            )._map_column(fn, pre_fn, path + (PathItemTaggedValueTag(),))
+            )._map_column(fn, pre_fn, path + (PathItemTaggedValueTag(),), retain_masks)
             value: ArrowWeaveList = ArrowWeaveList(
                 self._arrow_data.field("_value"), self.object_type.value, self._artifact
-            )._map_column(fn, pre_fn, path + (PathItemTaggedValueValue(),))
+            )._map_column(
+                fn, pre_fn, path + (PathItemTaggedValueValue(),), retain_masks
+            )
             with_mapped_children = ArrowWeaveList(
                 pa.StructArray.from_arrays(
                     [tag._arrow_data, value._arrow_data],
                     ["_tag", "_value"],
-                    mask=pa.compute.is_null(arr),
+                    mask=masked(pa.compute.is_null(arr)),
                 ),
                 tagged_value_type.TaggedValueType(tag.object_type, value.object_type),  # type: ignore
                 self._artifact,
@@ -697,7 +707,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     self._arrow_data,
                     non_none_members[0],
                     self._artifact,
-                )._map_column(fn, pre_fn, path)
+                )._map_column(fn, pre_fn, path, retain_masks)
                 with_mapped_children = ArrowWeaveList(
                     non_none_member._arrow_data,
                     types.optional(non_none_member.object_type),
@@ -711,7 +721,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                         arr.field(i),
                         types.optional(member_type) if nullable else member_type,
                         self._artifact,
-                    )._map_column(fn, pre_fn, path + (PathItemUnionEntry(i),))
+                    )._map_column(
+                        fn, pre_fn, path + (PathItemUnionEntry(i),), retain_masks
+                    )
                     for i, member_type in enumerate(non_none_members)
                 ]
                 new_type_members = [m.object_type for m in members]

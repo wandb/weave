@@ -192,7 +192,9 @@ def _refine_history_type_inner(
 
         # _step is a special key that is always guaranteed to be a nonnull number.
         # other keys may be undefined at particular steps so we make them optional.
-        if key in ["_step", "_runtime", "_timestamp"]:
+        if key in ["_step"]:
+            prop_types[key] = types.Int()
+        elif key in ["_runtime", "_timestamp"]:
             prop_types[key] = wt
         else:
             prop_types[key] = types.optional(wt)
@@ -322,101 +324,101 @@ def _get_history_stream_inner(
     return use(concat([parquet_history, live_data_processed]))
 
 
-def _convert_gorilla_parquet_to_weave_arrow(
-    gorilla_parquet, target_object_type, artifact
-):
-    # Note: this arrow Weave List is NOT properly constructed. We blindly create it from the gorilla parquet
-    gorilla_awl = ArrowWeaveList(
-        gorilla_parquet,
-        artifact=artifact,
-    )
+# def _convert_gorilla_parquet_to_weave_arrow(
+#     gorilla_parquet, target_object_type, artifact
+# ):
+#     # Note: this arrow Weave List is NOT properly constructed. We blindly create it from the gorilla parquet
+#     gorilla_awl = ArrowWeaveList(
+#         gorilla_parquet,
+#         artifact=artifact,
+#     )
 
-    prototype_awl = convert.to_arrow(
-        [],
-        types.List(target_object_type),
-        artifact=artifact,
-    )
+#     prototype_awl = convert.to_arrow(
+#         [],
+#         types.List(target_object_type),
+#         artifact=artifact,
+#     )
 
-    target_path_types = {}
+#     target_path_types = {}
 
-    def path_accumulator(
-        awl: ArrowWeaveList, path: PathType
-    ) -> typing.Optional["ArrowWeaveList"]:
-        nonlocal target_path_types
-        target_path_types[path] = awl.object_type
-        return None
+#     def path_accumulator(
+#         awl: ArrowWeaveList, path: PathType
+#     ) -> typing.Optional["ArrowWeaveList"]:
+#         nonlocal target_path_types
+#         target_path_types[path] = awl.object_type
+#         return None
 
-    prototype_awl.map_column(path_accumulator)
+#     prototype_awl.map_column(path_accumulator)
 
-    def pre_mapper(
-        awl: ArrowWeaveList, path: PathType
-    ) -> typing.Optional["ArrowWeaveList"]:
-        if path == ():  # root
-            return None
+#     def pre_mapper(
+#         awl: ArrowWeaveList, path: PathType
+#     ) -> typing.Optional["ArrowWeaveList"]:
+#         if path == ():  # root
+#             return None
 
-        # Here we want to:
-        # a) unflatten the top-level dictionaries (i believe gorilla will have them dot-separated)
-        # b) reduce the encoded cells to their vals (this should only be Object and Custom Types)
-        # c) Modify non-simple unions to our union structure
-        if path not in target_path_types:
-            raise ValueError(f"Path {path} not found in target path types")
+#         # Here we want to:
+#         # a) unflatten the top-level dictionaries (i believe gorilla will have them dot-separated)
+#         # b) reduce the encoded cells to their vals (this should only be Object and Custom Types)
+#         # c) Modify non-simple unions to our union structure
+#         if path not in target_path_types:
+#             raise ValueError(f"Path {path} not found in target path types")
 
-        target_type = target_path_types[path]
-        if types.is_optional(target_type):
-            target_type = types.non_none(target_type)
-        current_type = awl.object_type
-        if types.is_optional(current_type):
-            current_type = types.non_none(current_type)
+#         target_type = target_path_types[path]
+#         if types.is_optional(target_type):
+#             target_type = types.non_none(target_type)
+#         current_type = awl.object_type
+#         if types.is_optional(current_type):
+#             current_type = types.non_none(current_type)
 
-        # If the types are the same, we don't need to do anything! That is the happy state
-        if types.optional(target_type).assign_type(current_type):
-            return None
+#         # If the types are the same, we don't need to do anything! That is the happy state
+#         if types.optional(target_type).assign_type(current_type):
+#             return None
 
-        # If both types are list-like, then we can handle the differences on the next loop
-        base_list_type = types.optional(types.List())
-        if base_list_type.assign_type(target_type) and base_list_type.assign_type(
-            current_type
-        ):
-            return None
+#         # If both types are list-like, then we can handle the differences on the next loop
+#         base_list_type = types.optional(types.List())
+#         if base_list_type.assign_type(target_type) and base_list_type.assign_type(
+#             current_type
+#         ):
+#             return None
 
-        # If both types are unions, we are in trouble. Have to somehow map the union types from gorilla
-        # to the union types in weave. This is a hard problem.
-        # if isinstance(target_type, types.UnionType) and isinstance(current_type, types.UnionType):
+#         # If both types are unions, we are in trouble. Have to somehow map the union types from gorilla
+#         # to the union types in weave. This is a hard problem.
+#         # if isinstance(target_type, types.UnionType) and isinstance(current_type, types.UnionType):
 
-        # TODO: Unions...
-        # TODO: Generalize this to not blindly assume _val
-        # TODO: This double val goes away
-        data = awl._arrow_data.field("_val").field("_val")
+#         # TODO: Unions...
+#         # TODO: Generalize this to not blindly assume _val
+#         # TODO: This double val goes away
+#         data = awl._arrow_data.field("_val").field("_val")
 
-        if target_type.assign_type(types.Timestamp()):
-            data = (
-                pc.floor(data)
-                .cast("int64")
-                .cast(pa.timestamp("ms", tz=datetime.timezone.utc))
-            )
+#         if target_type.assign_type(types.Timestamp()):
+#             data = (
+#                 pc.floor(data)
+#                 .cast("int64")
+#                 .cast(pa.timestamp("ms", tz=datetime.timezone.utc))
+#             )
 
-        return ArrowWeaveList(
-            data,
-            target_type,
-            awl._artifact,
-        )
-        return None
+#         return ArrowWeaveList(
+#             data,
+#             target_type,
+#             awl._artifact,
+#         )
+#         return None
 
-    def post_mapper(
-        awl: ArrowWeaveList, path: PathType
-    ) -> typing.Optional["ArrowWeaveList"]:
-        return None
+#     def post_mapper(
+#         awl: ArrowWeaveList, path: PathType
+#     ) -> typing.Optional["ArrowWeaveList"]:
+#         return None
 
-    corrected_awl = gorilla_awl.map_column(post_mapper, pre_mapper)
+#     corrected_awl = gorilla_awl.map_column(post_mapper, pre_mapper)
 
-    reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
+#     reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
 
-    if reason != None:
-        raise ValueError(
-            f"Failed to effectively convert Gorilla Parquet History to expected history type: {reason}"
-        )
+#     if reason != None:
+#         raise ValueError(
+#             f"Failed to effectively convert Gorilla Parquet History to expected history type: {reason}"
+#         )
 
-    return corrected_awl
+#     return corrected_awl
 
 
 def _reconstruct_original_live_data(live_data: list[dict]):
@@ -511,9 +513,18 @@ def _gorilla_parquet_table_to_corrected_awl(
         if path not in target_path_summary.leaf_paths:
             return None
         target_spec = target_path_summary.leaf_paths[path]
-        source_path = target_spec.remap_path
+
+        s = target_spec
+        source_path_parts = []
+        while s != None:
+            source_path_parts = [*s.remap_path, *source_path_parts]
+            s = s.parent
+        source_path = tuple(source_path_parts)
+
         if source_path not in column_map:
-            raise ValueError(f"Failed to find source path {source_path}")
+            raise errors.WeaveHistoryDecodingError(
+                f"Given target type {target_object_type}, attempt to populate arrow column at {target_spec.remap_path}, but failed to find source path {source_path} from history paths {list(column_map.keys())}"
+            )
         data_array = column_map[source_path]
         reason = weave_arrow_type_check(target_spec.weave_type, data_array)
 
@@ -527,7 +538,7 @@ def _gorilla_parquet_table_to_corrected_awl(
             awl._artifact,
         )
 
-    corrected_awl = prototype_awl.map_column(column_setter)
+    corrected_awl = prototype_awl.map_column(column_setter, retain_masks=False)
     # for target_spec in target_path_summary.leaf_paths.values():
     #     source_path: PathType = _target_awl_spec_to_gorilla_path(target_spec, current_path_summary.all_paths)
     #     data_array = _get_data_at_path(gorilla_parquet, source_path)
@@ -585,16 +596,22 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
         nonlocal path_summary
         if path == ():
             return None
+        if path in path_summary.all_paths:
+            return None
+
         final_path = path[-1]
         weave_type = awl.object_type
         arrow_type = awl._arrow_data.type
         # weave_leaf_path = PathItemOuterList
-        remap_path = path
+        remap_path = (final_path,)
+        parent_spec = None
         if len(path) > 1:
             parent_path = tuple(path[:-1])
             if parent_path not in path_summary.all_paths:
                 raise ValueError("Programmer Error: Path tree is not complete")
-            parent_spec = path_summary.leaf_paths.pop(parent_path)
+            parent_spec = path_summary.all_paths[parent_path]
+            if parent_path in path_summary.leaf_paths:
+                parent_spec = path_summary.leaf_paths.pop(parent_path)
 
             # Construct weave_leaf_path from parent.
             # 6 Cases to handle:
@@ -650,7 +667,12 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                 remap_path = (final_path,)
             elif isinstance(parent_weave_type, object_types):
                 assert isinstance(final_path, PathItemObjectField)
-                remap_path = (PathItemStructField(final_path.attr),)
+                # FIXME: Ugg this double _val is a bit of a hack.
+                remap_path = (
+                    PathItemStructField("_val"),
+                    PathItemStructField("_val"),
+                    PathItemStructField(final_path.attr),
+                )
             elif isinstance(parent_weave_type, custom_types):
                 raise ValueError("Programmer Error: Unhandled type")
             else:
@@ -662,13 +684,16 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
             # weave_leaf_path=weave_leaf_path,
             weave_type=weave_type,
             arrow_type=arrow_type,
+            parent=parent_spec,
         )
 
         path_summary.leaf_paths[path] = path_summary.all_paths[path]
 
         return None
 
-    prototype_awl.map_column(path_accumulator)
+    # We want to visit parents before children, so
+    # we use the pre-order traversal.
+    prototype_awl.map_column(fn=lambda x, y: None, pre_fn=path_accumulator)
 
     return path_summary
 
