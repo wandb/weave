@@ -529,8 +529,8 @@ def _gorilla_parquet_table_to_corrected_awl(
         reason = weave_arrow_type_check(target_spec.weave_type, data_array)
 
         if reason != None:
-            raise ValueError(
-                f"Failed to effectively convert Gorilla Parquet History to expected history type: {reason}"
+            raise errors.WeaveHistoryDecodingError(
+                f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
             )
         return ArrowWeaveList(
             data_array,
@@ -547,8 +547,8 @@ def _gorilla_parquet_table_to_corrected_awl(
     reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
 
     if reason != None:
-        raise ValueError(
-            f"Failed to effectively convert Gorilla Parquet History to expected history type: {reason}"
+        errors.WeaveHistoryDecodingError(
+            f"Failed to effectively convert  Gorilla Parquet History to expected history type: {reason}"
         )
 
     return corrected_awl
@@ -601,14 +601,46 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
 
         final_path = path[-1]
         weave_type = awl.object_type
+        self_type = types.non_none(weave_type)
         arrow_type = awl._arrow_data.type
         # weave_leaf_path = PathItemOuterList
         remap_path = (final_path,)
         parent_spec = None
-        if len(path) > 1:
+        # TODO: It really feels like this can be collapsed into the below switch
+        if len(path) == 1:
+            if isinstance(self_type, primitive_types):
+                remap_path = (final_path,)
+            elif isinstance(self_type, union_types):
+                remap_path = (final_path,)
+            elif isinstance(self_type, list_types):
+                remap_path = (final_path,)
+            elif isinstance(self_type, dict_types):
+                remap_path = (final_path,)
+            elif isinstance(self_type, object_types):
+                assert isinstance(final_path, PathItemObjectField)
+                # FIXME: Ugg this double _val is a bit of a hack.
+                remap_path = (
+                    final_path,
+                    PathItemStructField("_val"),
+                    PathItemStructField("_val"),
+                )
+            elif isinstance(self_type, custom_types):
+                # FIXME: Ugg this double _val is a bit of a hack.
+                remap_path = (
+                    final_path,
+                    PathItemStructField("_val"),
+                    PathItemStructField("_val"),
+                )
+            else:
+                raise errors.WeaveHistoryDecodingError(
+                    "Programmer Error: Unhandled type"
+                )
+        else:
             parent_path = tuple(path[:-1])
             if parent_path not in path_summary.all_paths:
-                raise ValueError("Programmer Error: Path tree is not complete")
+                raise errors.WeaveHistoryDecodingError(
+                    "Programmer Error: Expected to visit parent path before child path"
+                )
             parent_spec = path_summary.all_paths[parent_path]
             if parent_path in path_summary.leaf_paths:
                 parent_spec = path_summary.leaf_paths.pop(parent_path)
@@ -625,10 +657,11 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
             # PathItemTaggedValueValue,
             parent_weave_type = types.non_none(parent_spec.weave_type)
             if isinstance(parent_weave_type, primitive_types):
-                raise ValueError("Parent weave type cannot be primitive")
+                raise errors.WeaveHistoryDecodingError(
+                    "Unexpectedly encountered primitive parent type in path"
+                )
             elif isinstance(parent_weave_type, union_types):
                 # float64 | utf8 | bool | struct | list | binary
-                self_type = type.non_none(weave_type)
                 if isinstance(self_type, primitive_types):
                     if isinstance(
                         self_type,
@@ -644,9 +677,13 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                     elif isinstance(self_type, (types.String,)):
                         remap_path = (PathItemStructField("_type_utf8"),)
                     else:
-                        raise ValueError("Programmer Error: Unhandled primitive type")
+                        raise errors.WeaveHistoryDecodingError(
+                            "Programmer Error: Unhandled type"
+                        )
                 elif isinstance(self_type, union_types):
-                    raise ValueError("Programmer Error: Unhandled union type")
+                    raise errors.WeaveHistoryDecodingError(
+                        "Programmer Error: Nested Unions not supported"
+                    )
                 elif isinstance(self_type, list_types):
                     remap_path = (PathItemStructField("_type_list"),)
                 elif isinstance(self_type, dict_types):
@@ -656,10 +693,12 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                 elif isinstance(self_type, custom_types):
                     remap_path = (
                         PathItemStructField("_type_struct"),
-                        PathItemStructField("_type_val"),
+                        PathItemStructField("_val"),
                     )
                 else:
-                    raise ValueError("Programmer Error: Unhandled type")
+                    raise errors.WeaveHistoryDecodingError(
+                        "Programmer Error: Unhandled type"
+                    )
             elif isinstance(parent_weave_type, list_types):
                 remap_path = (PathItemList("element"),)
             elif isinstance(parent_weave_type, dict_types):
@@ -674,9 +713,13 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                     PathItemStructField(final_path.attr),
                 )
             elif isinstance(parent_weave_type, custom_types):
-                raise ValueError("Programmer Error: Unhandled type")
+                raise errors.WeaveHistoryDecodingError(
+                    "Custom type parents not yet implemented"
+                )
             else:
-                raise ValueError("Programmer Error: Unhandled type")
+                raise errors.WeaveHistoryDecodingError(
+                    "Programmer Error: Unhandled type"
+                )
 
         path_summary.all_paths[path] = TargetAWLSpec(
             arrow_leaf_path=final_path,
@@ -752,215 +795,215 @@ def _create_prototype_awl_from_object_type(
 #     return tuple(gorilla_path[::-1])
 
 
-def _reconstruct_awl_from_gorilla_parquet_outer(
-    gorilla_parquet: pa.Array,
-    target_object_type: types.TypedDict,
-) -> pa.Array:
-    artifact = artifact_mem.MemArtifact()
-    prototype_awl = convert.to_arrow(
-        [],
-        types.List(target_object_type),
-        artifact=artifact,
-    )
-    return _recursively_reconstruct_awl_from_gorilla_parquet(
-        gorilla_parquet,
-        target_object_type,
-        prototype_awl._arrow_data.type,
-    )
+# def _reconstruct_awl_from_gorilla_parquet_outer(
+#     gorilla_parquet: pa.Array,
+#     target_object_type: types.TypedDict,
+# ) -> pa.Array:
+#     artifact = artifact_mem.MemArtifact()
+#     prototype_awl = convert.to_arrow(
+#         [],
+#         types.List(target_object_type),
+#         artifact=artifact,
+#     )
+#     return _recursively_reconstruct_awl_from_gorilla_parquet(
+#         gorilla_parquet,
+#         target_object_type,
+#         prototype_awl._arrow_data.type,
+#     )
 
 
-def _recursively_reconstruct_awl_from_gorilla_parquet(
-    gorilla_parquet: pa.Array,
-    target_object_type: types.TypedDict,
-    target_pyarrow_type: pa.DataType,
-) -> pa.Array:
-    # arrays: list[pa.Array] = []
-    current_pyarrow_type: pa.DataType = gorilla_parquet.type
+# def _recursively_reconstruct_awl_from_gorilla_parquet(
+#     gorilla_parquet: pa.Array,
+#     target_object_type: types.TypedDict,
+#     target_pyarrow_type: pa.DataType,
+# ) -> pa.Array:
+#     # arrays: list[pa.Array] = []
+#     current_pyarrow_type: pa.DataType = gorilla_parquet.type
 
-    if target_pyarrow_type == current_pyarrow_type:
-        return gorilla_parquet
+#     if target_pyarrow_type == current_pyarrow_type:
+#         return gorilla_parquet
 
-    if (
-        isinstance(target_object_type, types.UnionType)
-        and target_object_type.is_simple_nullable()
-    ):
-        nonnull_type = [
-            m for m in target_object_type.members if m.type != types.NoneType()
-        ][0]
+#     if (
+#         isinstance(target_object_type, types.UnionType)
+#         and target_object_type.is_simple_nullable()
+#     ):
+#         nonnull_type = [
+#             m for m in target_object_type.members if m.type != types.NoneType()
+#         ][0]
 
-        return _recursively_reconstruct_awl_from_gorilla_parquet(
-            gorilla_parquet,
-            nonnull_type,
-        )
-    elif pa.types.is_null(target_pyarrow_type):
-        # Here we want to extract just the nulls from the gorilla parquet
-        return pa.array(
-            pa.nulls(len(gorilla_parquet)),
-            type=target_pyarrow_type,
-        )
-    elif pa.types.is_struct(target_pyarrow_type):
-        keys: list[str] = []
-        # keeps track of null values so that we can null entries at the struct level
-        mask: list[bool] = []
+#         return _recursively_reconstruct_awl_from_gorilla_parquet(
+#             gorilla_parquet,
+#             nonnull_type,
+#         )
+#     elif pa.types.is_null(target_pyarrow_type):
+#         # Here we want to extract just the nulls from the gorilla parquet
+#         return pa.array(
+#             pa.nulls(len(gorilla_parquet)),
+#             type=target_pyarrow_type,
+#         )
+#     elif pa.types.is_struct(target_pyarrow_type):
+#         keys: list[str] = []
+#         # keeps track of null values so that we can null entries at the struct level
+#         mask: list[bool] = []
 
-        assert isinstance(
-            target_object_type, (types.TypedDict, TaggedValueType, types.ObjectType)
-        )
+#         assert isinstance(
+#             target_object_type, (types.TypedDict, TaggedValueType, types.ObjectType)
+#         )
 
-        # handle empty struct case - the case where the struct has no fields
-        if len(target_pyarrow_type) == 0:
-            return pa.array(py_objs, type=target_pyarrow_type)
+#         # handle empty struct case - the case where the struct has no fields
+#         if len(target_pyarrow_type) == 0:
+#             return pa.array(py_objs, type=target_pyarrow_type)
 
-        for i, field in enumerate(target_pyarrow_type):
-            data: list[typing.Any] = []
-            if isinstance(
-                mapper,
-                mappers_arrow.TypedDictToArrowStruct,
-            ):
-                for py_obj in py_objs:
-                    if py_obj is None:
-                        data.append(None)
-                    else:
-                        data.append(py_obj.get(field.name, None))
-                    if i == 0:
-                        mask.append(py_obj is None)
+#         for i, field in enumerate(target_pyarrow_type):
+#             data: list[typing.Any] = []
+#             if isinstance(
+#                 mapper,
+#                 mappers_arrow.TypedDictToArrowStruct,
+#             ):
+#                 for py_obj in py_objs:
+#                     if py_obj is None:
+#                         data.append(None)
+#                     else:
+#                         data.append(py_obj.get(field.name, None))
+#                     if i == 0:
+#                         mask.append(py_obj is None)
 
-                array = _recursively_reconstruct_awl_from_gorilla_parquet(
-                    data,
-                    field.type,
-                    mapper._property_serializers[field.name],
-                    py_objs_already_mapped,
-                )
-            if isinstance(
-                mapper,
-                mappers_arrow.ObjectToArrowStruct,
-            ):
-                for py_obj in py_objs:
-                    if py_obj is None:
-                        data.append(None)
-                    elif py_objs_already_mapped:
-                        if isinstance(py_obj, dict) and "_val" in py_obj:
-                            py_obj = py_obj["_val"]
-                        data.append(py_obj.get(field.name, None))
-                    else:
-                        data.append(getattr(py_obj, field.name, None))
-                    if i == 0:
-                        mask.append(py_obj is None)
+#                 array = _recursively_reconstruct_awl_from_gorilla_parquet(
+#                     data,
+#                     field.type,
+#                     mapper._property_serializers[field.name],
+#                     py_objs_already_mapped,
+#                 )
+#             if isinstance(
+#                 mapper,
+#                 mappers_arrow.ObjectToArrowStruct,
+#             ):
+#                 for py_obj in py_objs:
+#                     if py_obj is None:
+#                         data.append(None)
+#                     elif py_objs_already_mapped:
+#                         if isinstance(py_obj, dict) and "_val" in py_obj:
+#                             py_obj = py_obj["_val"]
+#                         data.append(py_obj.get(field.name, None))
+#                     else:
+#                         data.append(getattr(py_obj, field.name, None))
+#                     if i == 0:
+#                         mask.append(py_obj is None)
 
-                array = _recursively_reconstruct_awl_from_gorilla_parquet(
-                    data,
-                    field.type,
-                    mapper._property_serializers[field.name],
-                    py_objs_already_mapped,
-                )
+#                 array = _recursively_reconstruct_awl_from_gorilla_parquet(
+#                     data,
+#                     field.type,
+#                     mapper._property_serializers[field.name],
+#                     py_objs_already_mapped,
+#                 )
 
-            elif isinstance(mapper, mappers_arrow.TaggedValueToArrowStruct):
-                if field.name == "_tag":
-                    for py_obj in py_objs:
-                        if py_obj is None:
-                            data.append(None)
-                        else:
-                            data.append(tag_store.get_tags(py_obj))
-                        if i == 0:
-                            mask.append(py_obj is None)
+#             elif isinstance(mapper, mappers_arrow.TaggedValueToArrowStruct):
+#                 if field.name == "_tag":
+#                     for py_obj in py_objs:
+#                         if py_obj is None:
+#                             data.append(None)
+#                         else:
+#                             data.append(tag_store.get_tags(py_obj))
+#                         if i == 0:
+#                             mask.append(py_obj is None)
 
-                    array = _recursively_reconstruct_awl_from_gorilla_parquet(
-                        data,
-                        field.type,
-                        mapper._tag_serializer,
-                        py_objs_already_mapped,
-                    )
-                else:
-                    for py_obj in py_objs:
-                        if py_obj is None:
-                            data.append(None)
-                        else:
-                            data.append(box.unbox(py_obj))
-                        if i == 0:
-                            mask.append(py_obj is None)
+#                     array = _recursively_reconstruct_awl_from_gorilla_parquet(
+#                         data,
+#                         field.type,
+#                         mapper._tag_serializer,
+#                         py_objs_already_mapped,
+#                     )
+#                 else:
+#                     for py_obj in py_objs:
+#                         if py_obj is None:
+#                             data.append(None)
+#                         else:
+#                             data.append(box.unbox(py_obj))
+#                         if i == 0:
+#                             mask.append(py_obj is None)
 
-                    array = _recursively_reconstruct_awl_from_gorilla_parquet(
-                        data,
-                        field.type,
-                        mapper._value_serializer,
-                        py_objs_already_mapped,
-                    )
+#                     array = _recursively_reconstruct_awl_from_gorilla_parquet(
+#                         data,
+#                         field.type,
+#                         mapper._value_serializer,
+#                         py_objs_already_mapped,
+#                     )
 
-            arrays.append(array)
-            keys.append(field.name)
-        return pa.StructArray.from_arrays(
-            arrays, keys, mask=pa.array(mask, type=pa.bool_())
-        )
-    elif pa.types.is_union(target_pyarrow_type):
-        assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
-        type_codes: list[int] = [
-            0
-            if o == None
-            else target_object_type_code_of_obj(o, py_objs_already_mapped)
-            for o in py_objs
-        ]
-        offsets: list[int] = []
-        py_data: list[list] = []
-        for _ in range(len(target_pyarrow_type)):
-            py_data.append([])
+#             arrays.append(array)
+#             keys.append(field.name)
+#         return pa.StructArray.from_arrays(
+#             arrays, keys, mask=pa.array(mask, type=pa.bool_())
+#         )
+#     elif pa.types.is_union(target_pyarrow_type):
+#         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
+#         type_codes: list[int] = [
+#             0
+#             if o == None
+#             else target_object_type_code_of_obj(o, py_objs_already_mapped)
+#             for o in py_objs
+#         ]
+#         offsets: list[int] = []
+#         py_data: list[list] = []
+#         for _ in range(len(target_pyarrow_type)):
+#             py_data.append([])
 
-        for row_index, type_code in enumerate(type_codes):
-            offsets.append(len(py_data[type_code]))
-            py_data[type_code].append(py_objs[row_index])
+#         for row_index, type_code in enumerate(type_codes):
+#             offsets.append(len(py_data[type_code]))
+#             py_data[type_code].append(py_objs[row_index])
 
-        for i, raw_py_data in enumerate(py_data):
-            array = _recursively_reconstruct_awl_from_gorilla_parquet(
-                raw_py_data,
-                target_pyarrow_type.field(i).type,
-                mapper.mapper_of_type_code(i),
-                py_objs_already_mapped,
-            )
-            arrays.append(array)
+#         for i, raw_py_data in enumerate(py_data):
+#             array = _recursively_reconstruct_awl_from_gorilla_parquet(
+#                 raw_py_data,
+#                 target_pyarrow_type.field(i).type,
+#                 mapper.mapper_of_type_code(i),
+#                 py_objs_already_mapped,
+#             )
+#             arrays.append(array)
 
-        return pa.UnionArray.from_dense(
-            pa.array(type_codes, type=pa.int8()),
-            pa.array(offsets, type=pa.int32()),
-            arrays,
-        )
-    elif pa.types.is_list(target_pyarrow_type):
-        assert isinstance(mapper, mappers_arrow.ListToArrowArr)
-        offsets = [0]
-        flattened_objs = []
-        mask = []
-        for obj in py_objs:
-            mask.append(obj == None)
-            if obj == None:
-                obj = []
-            offsets.append(offsets[-1] + len(obj))
-            flattened_objs += obj
-        new_objs = _recursively_reconstruct_awl_from_gorilla_parquet(
-            flattened_objs,
-            target_pyarrow_type.value_type,
-            mapper._object_type,
-            py_objs_already_mapped,
-        )
-        return pa.ListArray.from_arrays(
-            offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
-        )
+#         return pa.UnionArray.from_dense(
+#             pa.array(type_codes, type=pa.int8()),
+#             pa.array(offsets, type=pa.int32()),
+#             arrays,
+#         )
+#     elif pa.types.is_list(target_pyarrow_type):
+#         assert isinstance(mapper, mappers_arrow.ListToArrowArr)
+#         offsets = [0]
+#         flattened_objs = []
+#         mask = []
+#         for obj in py_objs:
+#             mask.append(obj == None)
+#             if obj == None:
+#                 obj = []
+#             offsets.append(offsets[-1] + len(obj))
+#             flattened_objs += obj
+#         new_objs = _recursively_reconstruct_awl_from_gorilla_parquet(
+#             flattened_objs,
+#             target_pyarrow_type.value_type,
+#             mapper._object_type,
+#             py_objs_already_mapped,
+#         )
+#         return pa.ListArray.from_arrays(
+#             offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
+#         )
 
-    if py_objs_already_mapped:
-        return pa.array(
-            [p["_val"] if isinstance(p, dict) and "_val" in p else p for p in py_objs],
-            target_pyarrow_type,
-        )
+#     if py_objs_already_mapped:
+#         return pa.array(
+#             [p["_val"] if isinstance(p, dict) and "_val" in p else p for p in py_objs],
+#             target_pyarrow_type,
+#         )
 
-    values = [mapper.apply(o) if o is not None else None for o in py_objs]
+#     values = [mapper.apply(o) if o is not None else None for o in py_objs]
 
-    # These are plain values.
+#     # These are plain values.
 
-    if target_object_type == types.Number():
-        # Let pyarrow infer this type.
-        # This covers the case where a Weave0 table includes a Number column that
-        # contains integers that are too large for float64. We map Number to float64,
-        # but allow it to be int64 as well in our ArrowWeaveList.validate method.
-        res = pa.array(values)
-        if pa.types.is_null(res.type):
-            res = res.cast(pa.int64())
-    else:
-        res = pa.array(values, type=target_pyarrow_type)
-    return res
+#     if target_object_type == types.Number():
+#         # Let pyarrow infer this type.
+#         # This covers the case where a Weave0 table includes a Number column that
+#         # contains integers that are too large for float64. We map Number to float64,
+#         # but allow it to be int64 as well in our ArrowWeaveList.validate method.
+#         res = pa.array(values)
+#         if pa.types.is_null(res.type):
+#             res = res.cast(pa.int64())
+#     else:
+#         res = pa.array(values, type=target_pyarrow_type)
+#     return res
