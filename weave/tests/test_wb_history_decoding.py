@@ -1,4 +1,5 @@
 import datetime
+import json
 import time
 import datetime
 
@@ -73,7 +74,7 @@ rows_tests = [
 
 
 @pytest.mark.parametrize("rows", rows_tests)
-def test_row_batch(user_by_api_key_in_env, rows):
+def test_end_to_end_stream_table_history_path(user_by_api_key_in_env, rows):
     do_batch_test(user_by_api_key_in_env.username, rows)
 
 
@@ -247,3 +248,83 @@ def get_raw_gorilla_history(entity_name, project_name, run_name):
     }
     res = wandb_gql_query(query, variables)
     return res.get("project", {}).get("run", {})
+
+
+@pytest.mark.parametrize(
+    "n_rows, n_cols",
+    [
+        # (100, 100),
+        (1500, 1500),
+        (10_000, 1_000),
+        (1_000_000, 1_000),
+        (1_000_000, 10_000),
+        (10_000_000, 10_000),
+    ],
+)
+def test_stream_table_perf(user_by_api_key_in_env, n_rows, n_cols):
+    print(f"Conducting StreamTable perf test using {n_rows} rows and {n_cols} cols")
+    table_name = "test_table_" + str(int(time.time()))
+    st = wandb_stream_table.StreamTable(
+        table_name=table_name,
+        project_name="dev_test_weave_ci",
+        entity_name=user_by_api_key_in_env.username,
+        _disable_async_logging=True,
+    )
+    timings = {
+        "log": 0,
+        "history2_refine": 0,
+        "history2_fetch_100_cols": 0,
+        "history_stream_refine": 0,
+        "history_stream_fetch_100_cols": 0,
+    }
+    print_interval = int(n_rows / 10)
+    timings["log"] = 0
+    for i in range(n_rows):
+        row = {}
+        for j in range(n_cols):
+            row[f"col_{j}"] = (i * j) + (i + j)
+        timings["log"] -= time.time()
+        st.log(row)
+        timings["log"] += time.time()
+        if i % print_interval == 0:
+            print(f"Logged {i} rows")
+        if i % 100 == 0:
+            time.sleep(0.5)
+
+    print("Finishing Run")
+    timings["log"] -= time.time()
+    st.finish()
+    timings["log"] += time.time()
+    print(f"Log Time: {timings['log']}")
+
+    run_node = weave.ops.project(
+        st._lite_run._entity_name, st._lite_run._project_name
+    ).run(st._lite_run._run_name)
+
+    timings["history2_refine"] -= time.time()
+    history2_node = run_node.history2()
+    timings["history2_refine"] += time.time()
+    print(f"History2 Refine Time: {timings['history2_refine']}")
+
+    fetch_nodes = [history2_node[f"col_{i}"] for i in range(100)]
+    timings["history2_fetch_100_cols"] -= time.time()
+    res = weave.use(fetch_nodes)
+    timings["history2_fetch_100_cols"] += time.time()
+    print(f"History2 Fetch 100 Cols Time: {timings['history2_fetch_100_cols']}")
+
+    timings["history_stream_refine"] -= time.time()
+    history_stream_node = run_node.history_stream()
+    timings["history_stream_refine"] += time.time()
+    print(f"History Stream Refine Time: {timings['history_stream_refine']}")
+
+    fetch_nodes = [history_stream_node[f"col_{i}"] for i in range(100)]
+    timings["history_stream_fetch_100_cols"] -= time.time()
+    res = weave.use(fetch_nodes)
+    timings["history_stream_fetch_100_cols"] += time.time()
+    print(
+        f"History Stream Fetch 100 Cols Time: {timings['history_stream_fetch_100_cols']}"
+    )
+
+    print(f"Perf for {n_rows} rows and {n_cols} cols:")
+    print(json.dumps(timings, indent=2))
+    assert timings == None
