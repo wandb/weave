@@ -126,6 +126,8 @@ def do_logging(username, rows, finish=False):
 # replace _type/_val with _val contents
 #
 
+HISTORY_OP_NAME = "history2"  # history_stream
+
 
 def do_batch_test(username, rows):
     row_accumulator, st, all_keys = do_logging(username, rows)
@@ -136,7 +138,7 @@ def do_batch_test(username, rows):
     ).run(st._lite_run._run_name)
 
     def do_assertion():
-        history_node = run_node.history_stream()
+        history_node = run_node._get_op(HISTORY_OP_NAME)()
         row_object_type = make_optional_type(row_type.object_type)
 
         for key in all_keys:
@@ -156,7 +158,7 @@ def do_batch_test(username, rows):
             assert compare_objects(column_value, expected)
 
     def history_is_uploaded():
-        history_node = run_node.history_stream()
+        history_node = run_node._get_op(HISTORY_OP_NAME)()
         run_data = get_raw_gorilla_history(
             st._lite_run._entity_name,
             st._lite_run._project_name,

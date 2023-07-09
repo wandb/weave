@@ -110,7 +110,8 @@ def get_top_level_keys(key_tree: KeyTree) -> list[str]:
 def get_full_columns(columns: typing.Optional[list[str]]):
     if columns is None:
         return None
-    return list(set([*columns, "_step", "_runtime", "_timestamp"]))
+    return list(set([*columns, "_step"]))
+    # return list(set([*columns, "_step", "_runtime", "_timestamp"]))
 
 
 def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
@@ -154,13 +155,19 @@ def refine_history_type(
     run: wdt.Run,
     columns: typing.Optional[list[str]] = None,
 ) -> types.TypedDict:
-    prop_types: dict[str, types.Type] = {}
-
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
 
     historyKeys = run.gql["historyKeys"]["keys"]
 
+    return _refine_history_type_inner(historyKeys, columns)
+
+
+def _refine_history_type_inner(
+    historyKeys: dict[str, dict],
+    columns: typing.Optional[list[str]] = None,
+) -> types.TypedDict:
+    prop_types: dict[str, types.Type] = {}
     for key, key_details in historyKeys.items():
         if key.startswith("system/") or (columns is not None and key not in columns):
             # skip system metrics for now
