@@ -77,7 +77,9 @@ def python_type_to_type(
                 # which we have to when we want to use NotRequired.
                 # But it can be immediately evaluated in the cases we
                 # use it.
-                t = t._evaluate(None, None, frozenset())
+                t = t._evaluate(
+                    {"NotRequired": typing_extensions.NotRequired}, None, frozenset()
+                )
                 if (
                     hasattr(t, "__origin__")
                     and t.__origin__ == typing_extensions.NotRequired
