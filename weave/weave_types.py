@@ -839,6 +839,8 @@ class TypedDict(Type):
             return False
 
         for k, ptype in self.property_types.items():
+            if is_optional(ptype) and k not in other_type.property_types:
+                continue
             if k not in other_type.property_types or not ptype.assign_type(
                 other_type.property_types[k]
             ):

@@ -121,6 +121,7 @@ def unzip_struct_array(arr: pa.ChunkedArray) -> pa.Table:
     ),
 )
 def map(self, map_fn):
+    breakpoint()
     res = _apply_fn_node_with_tag_pushdown(self, map_fn)
     return res
 
@@ -508,10 +509,14 @@ def count(self: ArrowWeaveList) -> int:
 @op(
     name="ArrowWeaveList-__getitem__",
     output_type=lambda input_types: primitive_list.getitem_output_type(
-        {"arr": input_types["self"]}
+        {"arr": input_types["self"], "index": input_types["index"]},
+        list_type=ArrowWeaveListType,
     ),
 )
-def index(self: ArrowWeaveList, index: typing.Optional[int]):
+def index(
+    self: ArrowWeaveList,
+    index: typing.Optional[typing.Union[int, typing.List[typing.Optional[int]]]],
+):
     return self._index(index)
 
 

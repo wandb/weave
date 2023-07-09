@@ -29,5 +29,8 @@ try:
 
     from . import langchain
 
+    from . import umap
+    from . import hdbscan
+
 finally:
     context_state.clear_loading_built_ins(loading_builtins_token)

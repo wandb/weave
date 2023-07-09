@@ -471,10 +471,12 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
         "RunChain-history",
         "panel_table-active_data",
         "Query-selected",
+        "panel_plot-selected_data",
+        "panel_table-all_rows",
     ]:
         return None
     new_node = weave_internal.use(node)
-    return typing.cast(graph.Node, new_node)
+    return typing.cast(graph.Node, compile_fix_calls([new_node])[0])
 
 
 def compile_node_ops(

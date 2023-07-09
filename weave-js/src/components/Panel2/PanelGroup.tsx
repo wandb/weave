@@ -214,6 +214,8 @@ function dereferenceItemVars(item: any, stack: Stack): any {
     };
   } else if (isNodeOrVoidNode(item)) {
     return dereferenceAllVars(item, stack).node;
+  } else if (_.isArray(item)) {
+    return _.map(item, child => dereferenceItemVars(child, stack));
   } else if (_.isPlainObject(item)) {
     return _.mapValues(item, child => dereferenceItemVars(child, stack));
   }

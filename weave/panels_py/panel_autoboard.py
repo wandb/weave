@@ -38,12 +38,14 @@ def timeseries_avg_line(
     )
 
 
-def timeseries_count_bar(
+def timeseries_sum_bar(
     input_node: weave.Node[list[typing.Any]],
     bin_domain_node: weave.Node,
     x_axis_key: str,
+    y_axis_key: str,
     groupby_key: typing.Union[weave.Node[str], str],
     x_domain: weave.Node,
+    n_bins: int,
 ) -> weave.Panel:
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
@@ -54,7 +56,36 @@ def timeseries_count_bar(
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     return weave.panels.Plot(
         input_node,
-        x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, 100)),
+        x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins)),
+        x_title=x_axis_key,
+        y=lambda row: row[y_axis_key].sum(),
+        y_title="sum_" + y_axis_key,
+        label=lambda row: row[groupby_key],
+        groupby_dims=["x", "label"],
+        mark="bar",
+        no_legend=True,
+        domain_x=x_domain,
+    )
+
+
+def timeseries_count_bar(
+    input_node: weave.Node[list[typing.Any]],
+    bin_domain_node: weave.Node,
+    x_axis_key: str,
+    groupby_key: typing.Union[weave.Node[str], str],
+    x_domain: weave.Node,
+    n_bins: int,
+) -> weave.Panel:
+    x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
+    if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
+        bin_fn = weave.ops.timestamp_bins_nice
+    elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
+        bin_fn = weave.ops.numbers_bins_equal
+    else:
+        raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
+    return weave.panels.Plot(
+        input_node,
+        x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins)),
         x_title=x_axis_key,
         y=lambda row: row.count(),
         label=lambda row: row[groupby_key],
@@ -75,6 +106,7 @@ def categorical_dist(
         label=lambda row: row[key],
         groupby_dims=["y", "label"],
         mark="bar",
+        no_legend=True,
     )
 
 
@@ -119,9 +151,9 @@ def auto_panels(
 
     groupby = weave_internal.const(None)
     for k, prop_type in property_types.items():
-        if "version" in k and weave.types.optional(weave.types.String()).assign_type(
-            prop_type
-        ):
+        if ("version" in k or "snapshot" in k) and weave.types.optional(
+            weave.types.String()
+        ).assign_type(prop_type):
             groupby = weave_internal.const(k)
 
     metric_panels = []
@@ -141,13 +173,14 @@ def auto_panels(
     for key, prop_type in property_types.items():
 
         if weave.types.optional(weave.types.Number()).assign_type(prop_type):
-            panel = timeseries_avg_line(
+            panel = timeseries_sum_bar(
                 data_node,
                 time_domain_node,
                 x_axis,
                 key,
                 groupby_key_node,
                 x_domain_node,
+                50,
             )
             metric_panels.append(panel)
         elif (
@@ -173,7 +206,7 @@ def auto_panels(
             a=data[x_axis].min(), b=data[x_axis].max()
         ),
         "bin_range": lambda zoom_range, data_range: zoom_range.coalesce(data_range),
-        "groupby": weave.panels.Expression(groupby),
+        "groupby": groupby,
         "window_data": lambda data, bin_range: data.filter(
             lambda row: weave.ops.Boolean.bool_and(
                 row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1]
@@ -198,7 +231,12 @@ def auto_panels(
             0,
             weave.panels.BoardPanel(
                 timeseries_count_bar(
-                    data_node, time_domain_node, x_axis, groupby_key_node, x_domain_node
+                    data_node,
+                    time_domain_node,
+                    x_axis,
+                    groupby_key_node,
+                    x_domain_node,
+                    150,
                 ),
                 id="volume",
                 layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),

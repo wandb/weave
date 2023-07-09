@@ -405,6 +405,10 @@ export interface NewRunType {
   _output: Type;
 }
 
+export interface WeaveNDArrayType {
+  type: 'WeaveNDArray';
+}
+
 export interface NewRun {
   _state: {_val: string};
   _prints: string[];
@@ -417,6 +421,7 @@ export type ComplexType =
   | SizedStringConfig
   | Gpt3FineTuneType
   | NewRunType
+  | WeaveNDArrayType
   | PanelType
   | PanelSubType
   | NewImage

@@ -408,6 +408,9 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
         return false;
       }
       return isAssignableTo(type.objectType, toType.objectType);
+    } else if (type.type === 'WeaveNDArray' && toType.type === 'list') {
+      // TODO: not true! Check shape!
+      return true;
     } else if (type.type === 'file' && toType.type === 'file') {
       if (
         toType.wbObjectType != null &&
@@ -908,6 +911,10 @@ export function isList(t: Type): t is ListType {
   return !isSimpleTypeShape(t) && ALL_LIST_TYPES.includes(t.type as any);
 }
 
+export function isArray(t: Type): t is ListType {
+  return !isSimpleTypeShape(t) && t.type === 'WeaveNDArray';
+}
+
 // TODO: Replace isList with isListLike in most places
 export function isListLike(t: Type): t is ListType | Union {
   return (
@@ -1054,6 +1061,9 @@ export const listObjectType = (type: Type): Type => {
   if (isFunction(type)) {
     return listObjectType(type.outputType);
   }
+  if (isArray(type)) {
+    return 'any';
+  }
   if (!isList(type)) {
     throw new Error('listObjectType: incoming type is not a list');
   }
@@ -1079,6 +1089,9 @@ export const listMaxLength = (type: Type): number | undefined => {
     }
     return Math.max(...(memberMaxLengths as number[]));
   }
+  if (isArray(type)) {
+    return undefined;
+  }
   if (!isList(type)) {
     throw new Error('listMaxLength: incoming type is not a list');
   }
@@ -1093,6 +1106,9 @@ export const listMinLength = (type: Type): number | undefined => {
       return undefined;
     }
     return Math.min(...(memberMinLengths as number[]));
+  }
+  if (isArray(type)) {
+    return undefined;
   }
   if (!isList(type)) {
     throw new Error('listMinLength: incoming type is not a list');

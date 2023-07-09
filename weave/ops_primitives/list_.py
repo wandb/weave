@@ -21,12 +21,17 @@ from ..language_features.tagging import (
 import functools
 
 
-def getitem_output_type(input_types):
+def getitem_output_type(input_types, list_type=types.List):
     self_type = input_types["arr"]
+    index_type = input_types["index"]
     if self_type.object_type == types.UnknownType():
         # This happens when we're indexing an empty list
-        return types.NoneType()
-    return self_type.object_type
+        obj_res = types.NoneType()
+    else:
+        obj_res = self_type.object_type
+    if is_list_like(index_type):
+        return list_type(obj_res)
+    return obj_res
 
 
 def general_picker(obj, key):
@@ -50,21 +55,33 @@ class List:
         setter=__setitem__,
         input_type={
             "arr": types.List(types.Any()),
-            "index": types.optional(types.Int()),
         },
         output_type=getitem_output_type,
     )
-    def __getitem__(arr, index):
+    def __getitem__(
+        arr,
+        index: typing.Optional[typing.Union[int, typing.List[typing.Optional[int]]]],
+    ):
         if index == None:
             return None
-        # This is a hack to resolve the fact that WeaveJS expects groupby to
-        # return TaggedValue, while Weave Python currently still returns GroupResult
-        # TODO: Remove when we switch Weave Python over to using TaggedValue for this
-        # case.
-        try:
-            return arr.__getitem__(index)
-        except IndexError:
-            return None
+        if isinstance(index, int):
+            try:
+                return arr.__getitem__(index)
+            except IndexError:
+                return None
+        elif isinstance(index, list):
+            result: list = []
+            for i in index:
+                if i == None:
+                    result.append(None)
+                else:
+                    try:
+                        result.append(arr.__getitem__(i))
+                    except IndexError:
+                        result.append(None)
+            return result
+        else:
+            raise TypeError("Invalid index type")
 
     @op(
         name="filter",
@@ -132,7 +149,8 @@ class List:
         input_type={
             "arr": types.List(types.Any()),
             "mapFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.Any()
+                {"row": input_types["arr"].object_type, "index": types.Int()},
+                types.Any(),
             ),
         },
         output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
@@ -422,8 +440,11 @@ def unnest_return_type(input_types):
     output_type=unnest_return_type,
 )
 def unnest(arr):
-    if not arr:
-        return arr
+    try:
+        if not arr:
+            return arr
+    except:
+        breakpoint()
     list_cols = []
     # Very expensive to recompute type here. We already have it!
     # TODO: need a way to get argument types inside of resolver bodies.
