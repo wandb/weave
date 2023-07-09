@@ -99,8 +99,6 @@ def node_id(node: graph.Node):
         hashable["op_name"] = node.from_op.name
         hashable["inputs"] = {
             arg_name: node_id(arg_node)
-            if not _is_lambda(arg_node)
-            else json.dumps(arg_node.to_json())
             for arg_name, arg_node in node.from_op.inputs.items()
         }
     elif isinstance(node, graph.VarNode):

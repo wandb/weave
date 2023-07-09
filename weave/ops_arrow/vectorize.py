@@ -430,9 +430,9 @@ def vectorize(
 
         input0_name = list(node_inputs.keys())[0]
         input0 = list(node_inputs.values())[0]
-        if input0_name in vectorized_keys and types.List(types.List()).assign_type(
-            input0.type
-        ):
+        if input0_name in vectorized_keys and types.List(
+            types.optional(types.List())
+        ).assign_type(input0.type):
             if node_name.endswith("index") or node_name.endswith("__getitem__"):
                 inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
                 return arraylist_ops.listindex(*inputs_as_awl.values())

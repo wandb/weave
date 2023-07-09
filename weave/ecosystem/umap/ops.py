@@ -1,8 +1,14 @@
+from __future__ import annotations
+from typing_extensions import (
+    NotRequired,
+    TypedDict,
+)
 import warnings
 import threading
 import typing
 import weave
 import pyarrow as pa
+
 
 from ... import ops_arrow
 
@@ -25,11 +31,11 @@ def get_umap():
     return UMAP_LIB
 
 
-class UMAPOptions(typing.TypedDict):
-    n_neighbors: typing.Optional[int]
-    min_dist: typing.Optional[float]
-    n_components: typing.Optional[int]
-    random_state: typing.Optional[int]
+class UMAPOptions(TypedDict):
+    n_neighbors: NotRequired[int]
+    min_dist: NotRequired[float]
+    n_components: NotRequired[int]
+    random_state: NotRequired[int]
 
 
 @weave.op()

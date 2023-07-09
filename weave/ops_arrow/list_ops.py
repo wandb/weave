@@ -121,7 +121,6 @@ def unzip_struct_array(arr: pa.ChunkedArray) -> pa.Table:
     ),
 )
 def map(self, map_fn):
-    breakpoint()
     res = _apply_fn_node_with_tag_pushdown(self, map_fn)
     return res
 

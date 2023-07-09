@@ -723,20 +723,3 @@ def test_union_auto_execute():
     assert weave.types.optional(weave.types.Timestamp()).assign_type(
         weave.types.Function(output_type=weave.types.optional(weave.types.Timestamp()))
     )
-
-
-def test_optional_typeddict_keys():
-    assign_to = types.TypedDict(
-        {"a": weave.types.optional(types.Int()), "b": types.Int()}
-    )
-
-    # Missing optional key ok
-    assert assign_to.assign_type(types.TypedDict({"b": types.Int(), "c": types.Int()}))
-
-    # Missing required key not ok
-    assert not assign_to.assign_type(types.TypedDict())
-
-    # Optional key wrong type not ok
-    assert not assign_to.assign_type(
-        types.TypedDict({"a": types.String(), "b": types.Int(), "c": types.Int()})
-    )

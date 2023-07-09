@@ -22,8 +22,9 @@ import functools
 
 
 def getitem_output_type(input_types, list_type=types.List):
-    self_type = input_types["arr"]
-    index_type = input_types["index"]
+    input_type_values = list(input_types.values())
+    self_type = input_type_values[0]
+    index_type = input_type_values[1]
     if self_type.object_type == types.UnknownType():
         # This happens when we're indexing an empty list
         obj_res = types.NoneType()
@@ -440,11 +441,8 @@ def unnest_return_type(input_types):
     output_type=unnest_return_type,
 )
 def unnest(arr):
-    try:
-        if not arr:
-            return arr
-    except:
-        breakpoint()
+    if not arr:
+        return arr
     list_cols = []
     # Very expensive to recompute type here. We already have it!
     # TODO: need a way to get argument types inside of resolver bodies.
