@@ -858,10 +858,10 @@ class TypedDict(Type):
         property_types = {}
         for key, type_ in self.property_types.items():
             property_types[key] = type_.to_dict()
-        return {
-            "propertyTypes": property_types,
-            "notRequiredKeys": list(self.not_required_keys),
-        }
+        result = {"propertyTypes": property_types}
+        if self.not_required_keys:
+            result["notRequiredKeys"] = list(self.not_required_keys)
+        return result
 
     @classmethod
     def from_dict(cls, d):

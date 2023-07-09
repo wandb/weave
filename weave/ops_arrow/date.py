@@ -33,7 +33,7 @@ def to_number(self):
     )
 
 
-def adjust_multiple_s(multiple_s: float) -> typing.Tuple[int, str]:
+def adjust_multiple_s(multiple_s: float) -> typing.Tuple[float, str]:
     unit = "second"
 
     # Critical: Arrow silently fails if the unit is < 1. In such cases,

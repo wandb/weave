@@ -1,18 +1,22 @@
+from __future__ import annotations
+from typing_extensions import (
+    NotRequired,
+    TypedDict,
+)
+
 import typing
 import weave
-import numpy as np
 
 import pyarrow as pa
-import pyarrow.compute as pc
 
 from ... import ops_arrow
 
 import hdbscan
 
 
-class HDBSCANOptions(typing.TypedDict):
-    min_samples: typing.Optional[int]
-    min_cluster_size: typing.Optional[int]
+class HDBSCANOptions(TypedDict):
+    min_samples: NotRequired[int]
+    min_cluster_size: NotRequired[int]
 
 
 @weave.op()

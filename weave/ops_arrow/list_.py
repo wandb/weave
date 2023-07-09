@@ -1104,7 +1104,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             out_of_bounds, indexes, pa.scalar(None, pa.int64())
         )
         result_rows = pc.take(arr, indexes_bounds_checked)
-        awl = ArrowWeaveList(result_rows, self.object_type, self._artifact)
+        awl: ArrowWeaveList = ArrowWeaveList(
+            result_rows, self.object_type, self._artifact
+        )
         if isinstance(index, int):
             return awl.to_pylist_tagged()[0]
         return awl

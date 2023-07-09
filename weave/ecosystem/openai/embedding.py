@@ -1,3 +1,8 @@
+from __future__ import annotations
+from typing_extensions import (
+    NotRequired,
+    TypedDict,
+)
 import typing
 import logging
 import os
@@ -102,8 +107,8 @@ def embed_texts(texts: list[str], embedding_model: str) -> list[list[float]]:
     return embeddings
 
 
-class OpenAIEmbedOptions(typing.TypedDict):
-    model: typing.Optional[str]
+class OpenAIEmbedOptions(TypedDict):
+    model: NotRequired[str]
 
 
 @weave.op()
@@ -111,5 +116,19 @@ def openai_embed(
     texts: list[typing.Optional[str]], options: OpenAIEmbedOptions
 ) -> ops_arrow.ArrowWeaveList[list[float]]:
     model = typing.cast(str, options.get("model", OPENAI_EMBEDDING_MODEL))
-    res = embed_texts(texts, model)
-    return ops_arrow.to_arrow(res)
+    non_none_texts: list[str] = []
+    result_positions: list[typing.Optional[int]] = []
+    for i, text in enumerate(texts):
+        if text is None or text == None:
+            result_positions.append(None)
+        else:
+            result_positions.append(len(non_none_texts))
+            non_none_texts.append(text)
+    res = embed_texts(non_none_texts, model)
+    final_result: list[typing.Optional[list[float]]] = []
+    for pos in result_positions:
+        if pos is None:
+            final_result.append(None)
+        else:
+            final_result.append(res[pos])
+    return ops_arrow.to_arrow(final_result)

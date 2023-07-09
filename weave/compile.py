@@ -511,8 +511,17 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
         "panel_table-all_rows",
     ]:
         return None
-    new_node = weave_internal.use(node)
-    return typing.cast(graph.Node, compile_fix_calls([new_node])[0])
+    new_node = typing.cast(graph.Node, weave_internal.use(node))
+
+    # The result will typically contain expressions that were sent down as
+    # part of panel configs within Const nodes. They haven't been handled
+    # by deserialize/compile yet.
+    new_node_fixed_calls = compile_fix_calls([new_node])[0]
+
+    # This last line dedupes nodes that are identical. But it doesn't
+    # globally dedupe against the graph we've already compiled.
+    # There is still some duplication left in Weave execution...
+    return compile_merge_by_node_id([new_node_fixed_calls])[0]
 
 
 def compile_node_ops(
@@ -652,8 +661,6 @@ def _compile(
     # those nodes.
     with tracer.trace("compile:refine"):
         results = results.batch_map(_track_errors(compile_refine))
-
-    results = results.batch_map(_track_errors(compile_merge_by_node_id))
 
     # This is very expensive!
     # loggable_nodes = graph_debug.combine_common_nodes(n)

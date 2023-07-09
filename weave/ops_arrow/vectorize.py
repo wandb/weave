@@ -451,7 +451,8 @@ def vectorize(
             elif node_name.endswith("sum"):
                 inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
                 return arraylist_ops.list_numbers_sum(*inputs_as_awl.values())
-        elif node_name == "dropna":
+
+        if node_name == "dropna":
             arg_names = list(node_inputs.keys())
             if arg_names[0] in vectorized_keys:
                 op = registry_mem.memory_registry.get_op(
