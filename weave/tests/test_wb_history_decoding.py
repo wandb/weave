@@ -39,6 +39,10 @@ base_types = {
 base_types["list"] = list(base_types.values()) + [{**base_types}, None]
 base_types["dict"] = {**base_types}
 
+# IDEA: Use Danny's approach with changes:
+# 1. Re-write dot-nested top-level fields to be structs
+# 2. We can directly consume any top-level key that is a nullable primitive, or list/dicts of nullable primitives. Custom Types may work
+# 3. Custom objects or complex unions must be re-constructed to py, then re-written to our arrow.
 rows_tests = [
     # Here we have 1 test per type for easy debugging
     *[[{k: v}] for k, v in base_types.items()],
@@ -46,6 +50,10 @@ rows_tests = [
     [base_types],
     # Here is a nasty test with really hard unions
     [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],
+    [
+        {"a": [{"b": [1]}, {"b": [2, 3]}]},
+        {"a": [{"b": [4, 5, 6]}, {"b": [7, 8, 9, 10]}]},
+    ],
     [
         {"a": 1, "b": "hi", "c": TestType(2, "bye"), "i": image()},
         {"a": True, "b": True, "c": True, "i": True},
