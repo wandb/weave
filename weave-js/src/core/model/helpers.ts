@@ -1,4 +1,4 @@
-import _, {isArray, isObject, mapValues} from 'lodash';
+import _, {isObject, mapValues} from 'lodash';
 
 import {hexToId} from '../util/digest';
 import {has} from '../util/has';
@@ -843,7 +843,7 @@ export function unwrapTaggedValues(result: any): any {
   if (result != null && result._tag !== undefined) {
     return unwrapTaggedValues(result._value);
   }
-  if (isArray(result)) {
+  if (_.isArray(result)) {
     return result.map((row: any) => unwrapTaggedValues(row));
   } else if (isObject(result) && !(result instanceof Date)) {
     return mapValues(result, (v: any) => unwrapTaggedValues(v));
