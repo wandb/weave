@@ -254,6 +254,9 @@ ScaleType = typing.Literal["linear", "log"]
 
 @weave.type()
 class AxisScale:
+    # need to use scaleType instead of `type` here because
+    # `type` serializes to the same key as the
+    # `type` used by ObjectType
     scaleType: typing.Optional[ScaleType]
     range: typing.Optional[
         dict[typing.Literal["field"], typing.Callable[[str], str]]
