@@ -1942,6 +1942,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   );
   */
 
+  function scaleToVegaScale(s: Scale) {
+    return _.mapKeys(_.omitBy(s, _.isNil), (v, k) =>
+      k === 'scaleType' ? 'type' : k
+    );
+  }
+
   type DiscreteMappingScale = {domain: string[]; range: number[][]};
   const lineStyleScale: DiscreteMappingScale = useMemo(() => {
     const scale: DiscreteMappingScale = {
@@ -2794,7 +2800,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
     // TODO(np): fixme
     if (axisSettings.x.scale != null) {
-      newSpec.encoding.x.scale = axisSettings.x.scale;
+      newSpec.encoding.x.scale = scaleToVegaScale(axisSettings.x.scale);
     }
     if (axisSettings.x.noTitle) {
       newSpec.encoding.x.axis.title = null;
@@ -2820,7 +2826,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       newSpec.encoding.y.axis = {...defaultFontStyleDict};
       // TODO(np): fixme
       if (axisSettings.y.scale != null) {
-        newSpec.encoding.y.scale = axisSettings.y.scale;
+        newSpec.encoding.y.scale = scaleToVegaScale(axisSettings.y.scale);
       }
       if (axisSettings.y.noTitle) {
         newSpec.encoding.y.axis.title = null;
@@ -2846,8 +2852,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
 
     if (newSpec.encoding.color != null) {
-      if (axisSettings?.color?.scale) {
-        newSpec.encoding.color.scale = axisSettings.color.scale;
+      if (axisSettings?.color?.scale != null) {
+        newSpec.encoding.color.scale = scaleToVegaScale(
+          axisSettings.color.scale
+        );
       }
 
       if (axisSettings.color && axisSettings.color.noTitle) {

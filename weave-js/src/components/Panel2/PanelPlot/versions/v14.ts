@@ -41,7 +41,7 @@ export const migrate = (config: v13.PlotConfig): PlotConfig => {
         _.set(
           agg,
           axis,
-          _.mapKeys(setting, k => (k === 'type' ? 'scaleType' : k))
+          _.mapKeys(setting, (v, k) => (k === 'type' ? 'scaleType' : k))
         );
         return agg;
       },
