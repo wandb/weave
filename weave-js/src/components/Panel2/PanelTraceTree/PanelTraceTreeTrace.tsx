@@ -1,6 +1,5 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {SpanKindType, SpanType} from '@wandb/weave/core/model/media/traceTree';
-import _ from 'lodash';
 import React, {ReactNode, useMemo} from 'react';
 import {Loader} from 'semantic-ui-react';
 import styled from 'styled-components';
@@ -25,6 +24,12 @@ import {
 import * as S from './lct.style';
 import {useTipOverlay} from './tipOverlay';
 import {useTimelineZoomAndPan} from './zoomAndPan';
+import {
+  LayedOutSpanType,
+  LayedOutSpanWithParentYLevel,
+  layoutTree,
+} from './layout';
+import {treesToFlat} from './util';
 
 const inputType = {
   type: 'wb_trace_tree' as const,
@@ -111,41 +116,53 @@ const PanelTraceTreeTrace: React.FC<PanelTraceTreeTraceProps> = props => {
   return <TraceTreeSpanViewer span={traceSpan} />;
 };
 
-const TraceTreeSpanViewer: React.FC<{
+export const TraceTreeSpanViewer: React.FC<{
   span: SpanType;
 }> = props => {
   const {isFullscreen} = React.useContext(PanelFullscreenContext);
   const split = isFullscreen ? `horizontal` : `vertical`;
 
   const span = props.span;
-  const [selectedSpan, setSelectedSpan] = useUpdatingState<SpanType>(span);
 
   const {tipOverlay, showTipOverlay} = useTipOverlay();
+
+  const layedOutSpan = useMemo(() => {
+    return layoutTree(span);
+  }, [span]);
+  const flatSpans = useMemo(() => treesToFlat([layedOutSpan]), [layedOutSpan]);
 
   const {timelineRef, timelineStyle, scale} = useTimelineZoomAndPan({
     onHittingMinZoom: showTipOverlay,
   });
+  const [selectedSpan, setSelectedSpan] =
+    useUpdatingState<LayedOutSpanType | null>(layedOutSpan);
 
   return (
     <S.TraceWrapper split={split}>
-      <S.TraceTimelineWrapper split={split}>
+      <S.TraceTimelineWrapper>
         <S.TraceTimeline
           ref={timelineRef}
-          style={timelineStyle}
+          style={{
+            ...timelineStyle,
+          }}
           onClick={e => {
             e.stopPropagation();
           }}>
-          <SpanElement
-            span={span}
-            setSelectedTrace={setSelectedSpan}
-            selectedTrace={selectedSpan}
-            scale={scale}
-          />
+          <S.TraceTimelineScale
+            style={{
+              width: `${(scale ?? 1) * 100}%`,
+            }}>
+            <SpanElements
+              spans={flatSpans}
+              setSelectedSpan={setSelectedSpan}
+              selectedSpan={selectedSpan}
+            />
+          </S.TraceTimelineScale>
         </S.TraceTimeline>
         {tipOverlay}
       </S.TraceTimelineWrapper>
       {selectedSpan && (
-        <S.TraceDetail split={split}>
+        <S.TraceDetail>
           <SpanTreeDetail span={selectedSpan} />
         </S.TraceDetail>
       )}
@@ -154,7 +171,7 @@ const TraceTreeSpanViewer: React.FC<{
 };
 
 const getSpanIdentifier = (span: SpanType) => {
-  return span.name ?? span.span_kind ?? 'Unknown';
+  return span.name ?? span._name ?? span.span_kind ?? 'Unknown';
 };
 
 const getSpanDuration = (span: SpanType) => {
@@ -197,30 +214,18 @@ const TooltipLine = styled.div<{bold?: boolean; red?: boolean}>`
   ${p => p.red && `color: ${globals.RED_DARK};`}
 `;
 
-const SpanElement: React.FC<{
-  span: SpanType;
-  selectedTrace: SpanType | null;
-  setSelectedTrace: (trace: SpanType) => void;
-  scale?: number;
-}> = ({span, selectedTrace, setSelectedTrace, scale}) => {
+export const SpanElement: React.FC<{
+  span: LayedOutSpanWithParentYLevel;
+  selectedSpan: LayedOutSpanType | null;
+  setSelectedSpan: (trace: LayedOutSpanType | null) => void;
+}> = ({span, selectedSpan, setSelectedSpan}) => {
   const identifier = getSpanIdentifier(span);
   const trueDuration = getSpanDuration(span);
-  let effectiveDuration = Math.max(1, span.child_spans?.length ?? 0);
-  if (trueDuration) {
-    effectiveDuration = Math.max(trueDuration, effectiveDuration);
-  }
 
   const hasError = span.status_code === 'ERROR';
-  const isSelected = selectedTrace === span;
+  const isSelected = selectedSpan === span;
   const kindStyle = getSpanKindStyle(span.span_kind);
   const executionOrder = span.attributes?.execution_order ?? null;
-  const orderedChildSpans = useMemo(
-    () =>
-      _.sortBy(span.child_spans ?? [], s => {
-        return s.start_time_ms ?? 0;
-      }),
-    [span.child_spans]
-  );
 
   const tooltipContent = useMemo(() => {
     return (
@@ -229,109 +234,104 @@ const SpanElement: React.FC<{
         <TooltipLine>{kindStyle.label}</TooltipLine>
         {hasError && <TooltipLine red>Error</TooltipLine>}
         {trueDuration != null && (
-          <TooltipLine red={hasError}>{trueDuration}ms</TooltipLine>
+          <TooltipLine red={hasError}>
+            {/* Round to up to 3 significant digits */}
+            {parseFloat(trueDuration.toFixed(3))}ms
+          </TooltipLine>
         )}
       </>
     );
   }, [identifier, kindStyle.label, hasError, trueDuration]);
 
+  // All spans are rendered as siblings in the dom, and laid out using absolute
+  // positioning.
   return (
-    <S.TraceTimelineElementWrapper
-      style={scale != null ? {width: `${100 * scale}%`} : undefined}>
-      <TooltipTrigger
-        content={tooltipContent}
-        showWithoutOverflow
-        showInFullscreen
-        noHeader
-        padding={0}
-        positionNearMouse
-        TriggerWrapperComp={TooltipTriggerWrapper}
-        FrameComp={TooltipFrame}
-        BodyComp={TooltipBody}>
-        <S.SpanElementHeader
-          hasError={hasError}
-          isSelected={isSelected}
+    <>
+      <S.TraceTimelineElementWrapper
+        style={{
+          position: 'absolute',
+          left: `${span.xStartFrac * 100}%`,
+          width: `${span.xWidthFrac * 100}%`,
+          top: span.yLevel * 32,
+          height: span.yHeight * 32,
+        }}>
+        <TooltipTrigger
+          content={tooltipContent}
+          showWithoutOverflow
+          showInFullscreen
+          noHeader
+          padding={0}
+          positionNearMouse
+          TriggerWrapperComp={TooltipTriggerWrapper}
+          FrameComp={TooltipFrame}
+          BodyComp={TooltipBody}>
+          <S.SpanElementHeader
+            hasError={hasError}
+            isSelected={isSelected}
+            backgroundColor={kindStyle.color}
+            color={kindStyle.textColor}
+            onClick={e => {
+              e.stopPropagation();
+              setSelectedSpan(isSelected ? null : span);
+            }}>
+            <S.SpanElementInner>
+              <div>
+                {executionOrder != null ? `${executionOrder}: ` : ''}
+                {kindStyle.icon}
+                {identifier}
+              </div>
+              {trueDuration != null && (
+                <S.DurationLabel>
+                  {/* Round to up to 3 significant digits */}
+                  {parseFloat(trueDuration.toFixed(3))}ms
+                </S.DurationLabel>
+              )}
+            </S.SpanElementInner>
+          </S.SpanElementHeader>
+        </TooltipTrigger>
+      </S.TraceTimelineElementWrapper>
+      {span.yLevel > span.parentYLevel + 1 && (
+        <S.SpanParentConnector
+          className={span.name}
           backgroundColor={kindStyle.color}
-          color={kindStyle.textColor}
-          onClick={e => {
-            e.stopPropagation();
-            setSelectedTrace(span);
-          }}>
-          <span>
-            {executionOrder != null ? `${executionOrder}: ` : ''}
-            {kindStyle.icon}
-            {identifier}
-          </span>
-          {trueDuration != null && (
-            <S.DurationLabel>{trueDuration}ms</S.DurationLabel>
-          )}
-        </S.SpanElementHeader>
-      </TooltipTrigger>
-      {orderedChildSpans != null && orderedChildSpans.length > 0 && (
-        <S.SpanElementChildSpansWrapper>
-          {orderedChildSpans.map((child, i) => {
-            let effectiveChildDuration: number = 1;
-            const childDuration = getSpanDuration(child);
-            if (childDuration) {
-              effectiveChildDuration = Math.max(
-                effectiveChildDuration,
-                childDuration
-              );
-            }
-            const dur = effectiveChildDuration / effectiveDuration;
-            const parentStartTime = Math.min(
-              span.start_time_ms ?? 0,
-              child.start_time_ms ?? 0
-            );
-            const childStartTime = Math.max(
-              parentStartTime,
-              child.start_time_ms ?? i
-            );
-            const offset =
-              (childStartTime - parentStartTime) / effectiveDuration;
-            return (
-              <SpanElementChildRun key={i} offsetPct={offset} durationPct={dur}>
-                <SpanElement
-                  span={child}
-                  setSelectedTrace={setSelectedTrace}
-                  selectedTrace={selectedTrace}
-                />
-              </SpanElementChildRun>
-            );
-          })}
-        </S.SpanElementChildSpansWrapper>
+          style={{
+            position: 'absolute',
+            left: `${span.xStartFrac * 100}%`,
+            width: 2,
+            height: (span.yLevel - span.parentYLevel - 1) * 32,
+            top: (span.parentYLevel + 1) * 32,
+            bottom: span.yLevel * 32,
+          }}
+        />
       )}
-    </S.TraceTimelineElementWrapper>
+    </>
   );
 };
 
-const SpanElementChildRun: React.FC<{
-  offsetPct: number;
-  durationPct: number;
-  children: React.ReactNode;
-}> = props => {
+// Wrap in memo so zooming doesn't cause a re-render of all spans.
+export const SpanElementsInner: React.FC<{
+  spans: LayedOutSpanWithParentYLevel[];
+  selectedSpan: LayedOutSpanType | null;
+  setSelectedSpan: (trace: LayedOutSpanType | null) => void;
+}> = ({spans, selectedSpan, setSelectedSpan}) => {
   return (
-    <S.SpanElementChildSpanWrapper>
-      <div
-        style={{
-          width: `${props.offsetPct * 100}%`,
-          flexBasis: `${props.offsetPct * 100}%`,
-        }}>
-        {' '}
-      </div>
-      <div
-        style={{
-          width: `${props.durationPct * 100}%`,
-          flexBasis: `${props.durationPct * 100}%`,
-        }}>
-        {props.children}
-      </div>
-    </S.SpanElementChildSpanWrapper>
+    <>
+      {spans.map((span, i) => (
+        <SpanElement
+          key={i}
+          span={span}
+          setSelectedSpan={setSelectedSpan}
+          selectedSpan={selectedSpan}
+        />
+      ))}
+    </>
   );
 };
+
+export const SpanElements = React.memo(SpanElementsInner);
 
 const SpanTreeDetail: React.FC<{
-  span: SpanType;
+  span: LayedOutSpanType;
 }> = props => {
   const {span} = props;
   const kindStyle = getSpanKindStyle(span.span_kind);

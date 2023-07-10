@@ -467,7 +467,11 @@ def compile_refine(
 def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     if not isinstance(node, graph.OutputNode):
         return None
-    if node.from_op.name != "RunChain-history":
+    if node.from_op.name not in [
+        "RunChain-history",
+        "panel_table-active_data",
+        "Query-selected",
+    ]:
         return None
     new_node = weave_internal.use(node)
     return typing.cast(graph.Node, new_node)

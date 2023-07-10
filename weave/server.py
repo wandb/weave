@@ -20,6 +20,7 @@ from . import value_or_error
 
 from . import execute
 from . import serialize
+from . import serialize_all_values
 from . import storage
 from . import context
 from . import weave_types
@@ -67,7 +68,10 @@ def handle_request(
     tracer = engine_trace.tracer()
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
     with tracer.trace("request:deserialize"):
-        nodes = serialize.deserialize(request["graphs"])
+        if "serializeAllValues" in request and request["serializeAllValues"]:
+            nodes = serialize_all_values.deserialize_all_values(request["graphs"])
+        else:
+            nodes = serialize.deserialize(request["graphs"])
 
     with tracer.trace("request:execute"):
         with execute.top_level_stats() as stats:
