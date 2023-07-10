@@ -16,7 +16,7 @@ from weave.wandb_client_api import wandb_gql_query
 from weave.wandb_interface import wandb_stream_table
 
 
-HISTORY_OP_NAME = "history_stream"
+HISTORY_OP_NAME = "history3"
 
 
 def image():
@@ -319,8 +319,8 @@ def test_stream_table_perf(user_by_api_key_in_env, n_rows, n_cols):
         "log": 0,
         "history2_refine": 0,
         "history2_fetch_100_cols": 0,
-        "history_stream_refine": 0,
-        "history_stream_fetch_100_cols": 0,
+        "history3_refine": 0,
+        "history3_fetch_100_cols": 0,
     }
     print_interval = int(n_rows / 10)
     timings["log"] = 0
@@ -357,18 +357,16 @@ def test_stream_table_perf(user_by_api_key_in_env, n_rows, n_cols):
     timings["history2_fetch_100_cols"] += time.time()
     print(f"History2 Fetch 100 Cols Time: {timings['history2_fetch_100_cols']}")
 
-    timings["history_stream_refine"] -= time.time()
-    history_stream_node = run_node.history_stream()
-    timings["history_stream_refine"] += time.time()
-    print(f"History Stream Refine Time: {timings['history_stream_refine']}")
+    timings["history3_refine"] -= time.time()
+    history3_node = run_node.history3()
+    timings["history3_refine"] += time.time()
+    print(f"History Stream Refine Time: {timings['history3_refine']}")
 
-    fetch_nodes = [history_stream_node[f"col_{i}"] for i in range(100)]
-    timings["history_stream_fetch_100_cols"] -= time.time()
+    fetch_nodes = [history3_node[f"col_{i}"] for i in range(100)]
+    timings["history3_fetch_100_cols"] -= time.time()
     res = weave.use(fetch_nodes)
-    timings["history_stream_fetch_100_cols"] += time.time()
-    print(
-        f"History Stream Fetch 100 Cols Time: {timings['history_stream_fetch_100_cols']}"
-    )
+    timings["history3_fetch_100_cols"] += time.time()
+    print(f"History Stream Fetch 100 Cols Time: {timings['history3_fetch_100_cols']}")
 
     print(f"Perf for {n_rows} rows and {n_cols} cols:")
     print(json.dumps(timings, indent=2))

@@ -240,7 +240,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("file-partitionedTable")
                 or orig_op.name.endswith("run-history")
                 or orig_op.name.endswith("run-history2")
-                or orig_op.name.endswith("run-history_stream")
+                or orig_op.name.endswith("run-history3")
             ):
 
                 def do_one(x):
