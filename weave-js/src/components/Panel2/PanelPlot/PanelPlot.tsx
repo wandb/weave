@@ -750,7 +750,7 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
   axis,
 }) => {
   const currentScaleType =
-    getScaleValue<ScaleType>(`type`) ?? DEFAULT_SCALE_TYPE;
+    getScaleValue<ScaleType>(`scaleType`) ?? DEFAULT_SCALE_TYPE;
 
   const scaleTypeSpecificProp = SCALE_TYPE_SPECIFIC_PROPS[currentScaleType];
   const scaleTypeSpecificPropValue: number | undefined =
@@ -766,7 +766,7 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
           options={SCALE_TYPE_OPTIONS}
           value={currentScaleType}
           onChange={(event, {value}) => {
-            setScaleValue(`type`, value as ScaleType);
+            setScaleValue(`scaleType`, value as ScaleType);
           }}
         />
       </ConfigPanel.ConfigOption>
@@ -2722,7 +2722,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
         for (const axis of [`x`, `y`] as const) {
           if (
-            concreteConfig.axisSettings[axis].scale?.type === `log` &&
+            concreteConfig.axisSettings[axis].scale?.scaleType === `log` &&
             row[vegaCols[i][axis]] <= 0
           ) {
             return false;
