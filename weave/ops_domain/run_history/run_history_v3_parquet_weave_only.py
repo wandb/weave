@@ -228,7 +228,7 @@ def _get_history_stream(run: wdt.Run, columns=None):
             partial_live_data_already_mapped_awl._arrow_data.field(field_ndx)
         )
 
-    live_data_awl = ArrowWeaveList(
+    live_data_awl: ArrowWeaveList = ArrowWeaveList(
         pa.StructArray.from_arrays(field_arrays, field_names),
         flattened_object_type,
         artifact=artifact,
@@ -310,6 +310,10 @@ def _unflatten_pa_table(array: pa.Table) -> pa.StructArray:
             if part not in target.children:
                 target.children[part] = PathTree(data=[])
             target = target.children[part]
+        if not isinstance(target.data, list):
+            raise errors.WeaveWBHistoryTranslationError(
+                f"Encountered unexpected data in PathTree: {type(target.data)}"
+            )
         target.data.append(array[col_name].combine_chunks())
 
     # Recursively resolve the tree
@@ -406,6 +410,7 @@ def _drop_types_mapper(
         {"_type": types.optional(types.String()), "_val": types.Any()}
     ).assign_type(object_type):
         return awl.column("_val")
+    return None
 
 
 def _drop_types_from_encoded_types(awl: ArrowWeaveList) -> ArrowWeaveList:
@@ -491,12 +496,12 @@ def _is_directly_convertible_type(col_type: types.Type):
 
 non_poison_legacy_types = (wbmedia.ImageArtifactFileRefType,)
 poison_legacy_types = (
-    wbmedia.AudioArtifactFileRef.WeaveType,
-    wbmedia.BokehArtifactFileRef.WeaveType,
-    wbmedia.VideoArtifactFileRef.WeaveType,
-    wbmedia.Object3DArtifactFileRef.WeaveType,
-    wbmedia.MoleculeArtifactFileRef.WeaveType,
-    wbmedia.HtmlArtifactFileRef.WeaveType,
+    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
     wbmedia.LegacyTableNDArrayType,
 )
 
