@@ -57,7 +57,7 @@ export function deltaStringToSeconds(timeString: string) {
   const foundUnits: {[key: string]: true} = {};
 
   // If its good enough for chatgpt its good enough for me!
-  // eslint-disable-next-line no-cond-assign
+  // tslint:disable-next-line: no-conditional-assignment
   while ((match = regex.exec(timeString)) !== null) {
     const value = parseInt(match[1], 10);
     const unit = match[2];
