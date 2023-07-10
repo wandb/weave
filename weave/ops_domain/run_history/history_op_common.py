@@ -1,5 +1,7 @@
 import json
 import typing
+
+from weave import artifact_base, artifact_mem
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
 from ...ops_primitives import make_list
@@ -208,8 +210,11 @@ def history_keys(run: wdt.Run) -> list[str]:
 
 
 def local_path_to_parquet_table(
-    path: str, object_type: typing.Optional[types.TypedDict], columns: list[str] = []
-):
+    path: str,
+    object_type: typing.Optional[types.TypedDict],
+    columns: list[str] = [],
+    artifact: typing.Optional[artifact_base.Artifact] = None,
+) -> ArrowWeaveList:
     with tracer.trace("pq.read_metadata") as span:
         span.set_tag("path", path)
         meta = pq.read_metadata(path)
@@ -221,7 +226,9 @@ def local_path_to_parquet_table(
 
     # convert table to ArrowWeaveList
     with tracer.trace("make_awl") as span:
-        awl: ArrowWeaveList = ArrowWeaveList(table, object_type=object_type)
+        awl: ArrowWeaveList = ArrowWeaveList(
+            table, object_type=object_type, artifact=artifact
+        )
     return awl
 
 

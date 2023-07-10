@@ -5,7 +5,7 @@ import typing
 import pyarrow.compute as pc
 import pyarrow as pa
 
-from weave import io_service
+from weave import artifact_base, io_service
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.ops_domain import wbmedia
 from ...ops_arrow.list_ import (
@@ -181,6 +181,8 @@ def _get_history_stream(run: wdt.Run, columns=None):
     # 6. Finally, unflatten the columns and return the result
     # 7. Optionally: verify the AWL
 
+    artifact = artifact_mem.MemArtifact()
+
     # 1. Get the flattened Weave-Type given HistoryKeys
     flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
 
@@ -188,11 +190,8 @@ def _get_history_stream(run: wdt.Run, columns=None):
     raw_live_data = _get_live_data_from_run(run, columns=columns)
 
     # 3. Raw-load each parquet file
-    raw_history_awl_tables = _read_raw_history_awl_tables(run, columns=columns)
-    artifact = (
-        raw_history_awl_tables[0]._artifact
-        if len(raw_history_awl_tables) > 0
-        else artifact_mem.MemArtifact()
+    raw_history_awl_tables = _read_raw_history_awl_tables(
+        run, columns=columns, artifact=artifact
     )
 
     # # 3.5: Split type structs
@@ -243,7 +242,7 @@ def _get_history_stream(run: wdt.Run, columns=None):
                     ArrowWeaveList(
                         table[col_name],
                         None,
-                        raw_history_awl_tables[table_ndx]._artifact,
+                        artifact=artifact,
                     )
                 )
                 raw_history_pa_tables[table_ndx] = table.set_column(
@@ -279,7 +278,6 @@ def _get_history_stream(run: wdt.Run, columns=None):
             )
         ),
         artifact=artifact,
-        py_objs_already_mapped=True,
     )
     partial_live_data_already_mapped_awl = convert.to_arrow(
         live_columns_already_mapped_to_data,
@@ -298,14 +296,16 @@ def _get_history_stream(run: wdt.Run, columns=None):
 
     field_names = []
     field_arrays = []
-    for field in partial_live_data_awl._arrow_data.type:
+    for field_ndx, field in enumerate(partial_live_data_awl._arrow_data.type):
         field_names.append(field.name)
-        field_arrays.append(partial_live_data_awl._arrow_data.field(field.name))
+        field_arrays.append(partial_live_data_awl._arrow_data.field(field_ndx))
 
-    for field in partial_live_data_already_mapped_awl._arrow_data.type:
+    for field_ndx, field in enumerate(
+        partial_live_data_already_mapped_awl._arrow_data.type
+    ):
         field_names.append(field.name)
         field_arrays.append(
-            partial_live_data_already_mapped_awl._arrow_data.field(field.name)
+            partial_live_data_already_mapped_awl._arrow_data.field(field_ndx)
         )
 
     live_data_awl = ArrowWeaveList(
@@ -319,7 +319,9 @@ def _get_history_stream(run: wdt.Run, columns=None):
         [
             live_data_awl,
             *{
-                ArrowWeaveList(table, object_type=flattened_object_type)
+                ArrowWeaveList(
+                    table, object_type=flattened_object_type, artifact=artifact
+                )
                 for table in raw_history_pa_tables
             },
         ]
@@ -343,7 +345,7 @@ def _get_history_stream(run: wdt.Run, columns=None):
     return ArrowWeaveList(
         final_array,
         final_type,
-        artifact,
+        artifact=artifact,
     )
 
     # 7. Optionally: verify the AWL
@@ -367,13 +369,14 @@ def _build_array_from_tree(tree: PathTree) -> pa.Array:
         children_data = {}
         for k, v in tree.children.items():
             children_data[k] = _build_array_from_tree(v)
+            child_is_null = _is_null(children_data[k])
             if mask is None:
-                mask = pa.compute.is_null(children_data[k])
+                mask = child_is_null
             else:
-                mask = pa.compute.or_(mask, pa.compute.is_null(children_data[k]))
+                mask = pa.compute.or_(mask, child_is_null)
 
         children_struct = pa.StructArray.from_arrays(
-            children_data.values(), children_data.keys(), mask=pa.compute.invert(mask)
+            children_data.values(), children_data.keys(), mask=mask
         )
         children_struct_array = [children_struct]
     children_arrays = [*(tree.data or []), *children_struct_array]
@@ -383,22 +386,9 @@ def _build_array_from_tree(tree: PathTree) -> pa.Array:
     elif len(children_arrays) == 1:
         return children_arrays[0]
 
-    num_rows = len(tree.data[0])
-    type_array = pa.nulls(num_rows, type=pa.int8())
-    offset_template = pa.array(list(range(num_rows)), type=pa.int8())
-    arrays = []
-    offsets = []
-    for member_ndx, union_member_array in enumerate(children_arrays):
-        is_usable = pa.compute.invert(pa.compute.is_null(union_member_array))
-        arrays.append(union_member_array.filter(is_usable))
-        offsets.extend(offset_template.filter(is_usable).to_pylist())
-        type_array = pa.compute.replace_with_mask(
-            type_array, is_usable, pa.array([member_ndx], type=pa.int8())
-        )
+    num_rows = len(children_arrays[0])
 
-    return pa.UnionArray.from_dense(
-        type_array, pa.array(offsets + [0], type=pa.int32()), arrays
-    )
+    return _union_from_column_data(num_rows, children_arrays)
 
 
 def _unflatten_pa_table(array: pa.Table) -> pa.StructArray:
@@ -424,34 +414,73 @@ def _union_collapse_mapper(
     if types.TypedDict({}).assign_type(object_type):
         object_type = typing.cast(types.TypedDict, object_type)
         columns = list(object_type.property_types.keys())
+        arrow_data = awl._arrow_data
+        arrow_columns = [c.name for c in arrow_data.type]
         if all([c.startswith("_type_") for c in columns]):
             logging.warning(
                 f"Encountered history store union: this requires a non-vectorized transformation on the order of number of rows (but fortunately does not require transforming to python). Path: {path}, Type: {object_type}"
             )
-            arrow_data = awl._arrow_data
             num_rows = len(arrow_data)
-            type_array = pa.nulls(num_rows, type=pa.int8())
-            offset_template = pa.array(list(range(num_rows)), type=pa.int8())
-            arrays = []
-            offsets = []
             weave_type_members = []
-            for col_ndx, col_name in enumerate(columns):
-                weave_type_members.append(object_type.property_type[col_name])
-                column_data = arrow_data.field(col_name)
-                is_usable = pa.compute.invert(pa.compute.is_null(column_data))
-                arrays.append(column_data.filter(is_usable))
-                offsets.append(offset_template.filter(is_usable).to_pylist())
-                type_array = pa.compute.replace_with_mask(
-                    type_array, is_usable, col_ndx
-                )
-            union_arr = pa.UnionArray.from_dense(
-                type_array, pa.array(offsets + [0], type=pa.int32()), arrays
+            for col_name in columns:
+                weave_type_members.append(object_type.property_types[col_name])
+
+            union_arr = _union_from_column_data(
+                num_rows,
+                [
+                    arrow_data.field(arrow_columns.index(col_name))
+                    for col_name in columns
+                ],
             )
             return ArrowWeaveList(
                 union_arr, types.union(*weave_type_members), awl._artifact
             )
 
     return None
+
+
+def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
+    type_array = pa.nulls(num_rows, type=pa.int8())
+    offset_array = pa.nulls(num_rows, type=pa.int32())
+    # offset_template = pa.array(list(range(num_rows)), type=pa.int32())
+    arrays = []
+    for col_ndx, column_data in enumerate(columns):
+        is_usable = pa.compute.invert(_is_null(column_data))
+        new_data = column_data.filter(is_usable)
+        arrays.append(new_data)
+        type_array = pa.compute.replace_with_mask(
+            type_array,
+            is_usable,
+            pa.array([col_ndx] * len(is_usable), type=pa.int8()),
+        )
+        offset_array = pa.compute.replace_with_mask(
+            offset_array,
+            is_usable,
+            pa.array(list(range(len(new_data))), type=pa.int32()),
+        )
+
+    arrays.append(pa.nulls(1, type=pa.int8()))
+    type_array = pa.compute.fill_null(type_array, len(arrays) - 1)
+    offset_array = pa.compute.fill_null(offset_array, 0)
+
+    return pa.UnionArray.from_dense(type_array, offset_array, arrays)
+
+
+def _is_null(array: pa.Array) -> pa.Array:
+    if isinstance(array, pa.ChunkedArray):
+        array = array.combine_chunks()
+
+    if pa.types.is_struct(array.type):
+        children_nulls = [_is_null(array.field(i)) for i in range(len(array.type))]
+        if len(children_nulls) == 0:
+            return pa.array([True] * len(array), type=pa.bool_())
+        else:
+            curr = children_nulls[0]
+            for child in children_nulls[1:]:
+                curr = pa.compute.and_(curr, child)
+            return curr
+
+    return pa.compute.is_null(array)
 
 
 def _collapse_unions(awl: ArrowWeaveList) -> ArrowWeaveList:
@@ -493,7 +522,22 @@ def set_column_for_live_data(
 
 
 def _process_poisoned_live_column(live_column: list, col_type: types.Type) -> list:
-    return [wb_util._process_run_dict_item(item) for item in live_column]
+    return [_process_poisoned_live_object(item) for item in live_column]
+
+
+def _process_poisoned_live_object(live_data: typing.Any) -> typing.Any:
+    if isinstance(live_data, list):
+        return [_process_poisoned_live_object(cell) for cell in live_data]
+    if isinstance(live_data, dict):
+        if "_type" in live_data:
+            return wb_util._process_run_dict_item(live_data)
+        else:
+            return {
+                key: _process_poisoned_live_object(val)
+                for key, val in live_data.items()
+            }
+    return live_data
+
     # return convert.to_arrow(
     #     processed_data,
     #     types.List(col_type),
@@ -518,7 +562,11 @@ def _process_poisoned_history_column(
 
 
 # Copy from common - need to merge back
-def _read_raw_history_awl_tables(run: wdt.Run, columns=None) -> list[ArrowWeaveList]:
+def _read_raw_history_awl_tables(
+    run: wdt.Run,
+    columns=None,
+    artifact: typing.Optional[artifact_base.Artifact] = None,
+) -> list[ArrowWeaveList]:
     io = io_service.get_sync_client()
     tables = []
     for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
@@ -526,7 +574,7 @@ def _read_raw_history_awl_tables(run: wdt.Run, columns=None) -> list[ArrowWeaveL
         if local_path is not None:
             path = io.fs.path(local_path)
             awl = history_op_common.local_path_to_parquet_table(
-                path, None, columns=columns
+                path, None, columns=columns, artifact=artifact
             )
             tables.append(awl)
     return tables
