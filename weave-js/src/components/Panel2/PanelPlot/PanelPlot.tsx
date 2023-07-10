@@ -58,6 +58,7 @@ import {
   filterNodes,
   taggedValueValueType,
   isTaggedValue,
+  opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -1796,6 +1797,16 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             );
           });
         }
+        // If we have a nominal axis, limit it. We can end up with
+        // tons of unique values and Vega will basically hang.
+        const xAxisType = PlotState.getAxisType(concreteConfig.series[0], 'x');
+        const yAxisType = PlotState.getAxisType(concreteConfig.series[0], 'y');
+        if (xAxisType === 'nominal' || yAxisType === 'nominal') {
+          node = opLimit({
+            arr: node,
+            limit: constNumber(50),
+          });
+        }
       }
 
       /*
@@ -1817,6 +1828,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     listOfTableNodes,
     isDash,
     config.series,
+    concreteConfig.series,
     concreteConfig.signals.domain,
     weave.client.opStore,
   ]); // , isDash]);
