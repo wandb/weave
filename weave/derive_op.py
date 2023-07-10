@@ -26,7 +26,7 @@ USE_PARALLEL_DOWNLOAD = True
 USE_PARALLEL_REFINE = True
 USE_PARALLEL_RESOLVE = True
 
-_PARALLEL_ALLOWLIST = ["refine_history_metrics", "artifactVersion-historyMetrics"]
+_PARALLEL_ALLOWLIST = ["op-refine_history_metrics", "artifactVersion-historyMetrics"]
 PARALLEL_REFINE_ALLOWLIST = _PARALLEL_ALLOWLIST
 PARALLEL_RESOLVE_ALLOWLIST = _PARALLEL_ALLOWLIST
 
