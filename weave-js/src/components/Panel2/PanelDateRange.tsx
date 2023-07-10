@@ -1,16 +1,18 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useMemo, useCallback} from 'react';
 
 import * as Panel from './panel';
 import * as ConfigPanel from './ConfigPanel';
 import {
   NodeOrVoidNode,
+  constTimestampList,
   opNumbersMax,
   opNumbersMin,
   voidNode,
 } from '@wandb/weave/core';
 import {useUpdateConfig2} from './PanelComp';
-import {useNodeValue} from '@wandb/weave/react';
+import {useMutation, useNodeValue} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
+import {ValidatingTextInput} from '../ValidatingTextInput';
 
 const inputType = {
   type: 'union' as const,
@@ -33,6 +35,101 @@ type PanelDateRangeProps = Panel.PanelProps<
   typeof inputType,
   PanelDateRangeConfig
 >;
+
+// From GPT-4
+// This is the inverse of our monthRoundedTime function
+export function deltaStringToSeconds(timeString: string) {
+  const units: {[key: string]: number} = {
+    mo: 60 * 60 * 24 * 30, // month in seconds
+    d: 60 * 60 * 24, // day in seconds
+    h: 60 * 60, // hour in seconds
+    m: 60, // minute in seconds
+    s: 1, // second
+  };
+
+  let timestamp = 0;
+
+  // matches a number followed by a unit
+  const regex = /(\d+)(mo|d|h|m|s)/g;
+  let match;
+
+  // To track which units have been found already
+  let foundUnits: {[key: string]: true} = {};
+
+  while ((match = regex.exec(timeString)) !== null) {
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    if (units[unit] == null) {
+      return null;
+    }
+
+    // Check for invalid inputs: negative values, or a unit appearing more than once
+    if (value < 0 || foundUnits[unit]) {
+      return null;
+    }
+
+    foundUnits[unit] = true;
+    timestamp += value * (units[unit] || 0);
+  }
+
+  // // If the whole string was not matched, it is not valid
+  if (regex.lastIndex == null) {
+    return null;
+  }
+  // if (regex.lastIndex < timeString.length - 2) {
+  //   return null;
+  // }
+
+  return timestamp * 1000;
+}
+
+export const DateEditor: React.FC<{
+  timestamp: number | null;
+  onCommit: (newValue: number) => void;
+  allowDelta?: boolean;
+  deltaDirection?: 'up' | 'down';
+  deltaFromOffset?: number | null;
+}> = props => {
+  const {timestamp} = props;
+  const allowDelta = props.allowDelta && props.deltaFromOffset != null;
+  const dateS =
+    timestamp == null ? 'none' : new Date(timestamp).toLocaleString();
+  return (
+    <ValidatingTextInput
+      key={dateS}
+      initialValue={dateS}
+      dataTest={''}
+      onCommit={function (newValue: string): void {
+        if (!isNaN(new Date(newValue).getTime())) {
+          props.onCommit(new Date(newValue).getTime());
+        } else if (allowDelta && props.deltaFromOffset != null) {
+          const delta = deltaStringToSeconds(newValue);
+          if (delta != null) {
+            const newTimestamp =
+              props.deltaDirection === 'up'
+                ? props.deltaFromOffset + delta
+                : props.deltaFromOffset - delta;
+            props.onCommit(newTimestamp);
+            return;
+          }
+        }
+      }}
+      validateInput={function (value: string): boolean {
+        if (!isNaN(new Date(value).getTime())) {
+          return true;
+        }
+        if (allowDelta) {
+          const delta = deltaStringToSeconds(value);
+          if (delta != null) {
+            return true;
+          }
+        }
+        return false;
+      }}
+    />
+  );
+};
 
 export function initializedPanelDateRange(): PanelDateRangeConfig {
   return {
@@ -72,7 +169,10 @@ export const PanelDateRangeConfigComponent: React.FC<
 
 export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
   const config = props.config!;
-  const valueQuery = useNodeValue(props.input as any);
+  const valueNode = props.input;
+  const valueQuery = useNodeValue(valueNode as any);
+  const setVal = useMutation(valueNode, 'set');
+
   const domainMin = useMemo(() => {
     return config.domain.nodeType === 'void'
       ? voidNode()
@@ -97,6 +197,19 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
     };
   }, [domainMaxQuery.result, domainMinQuery.result, valueQuery.result]);
 
+  const updateStart = useCallback(
+    (newStart: number) => {
+      setVal({val: constTimestampList([newStart, end])});
+    },
+    [end, setVal]
+  );
+  const updateEnd = useCallback(
+    (newEnd: number) => {
+      setVal({val: constTimestampList([start, newEnd])});
+    },
+    [setVal, start]
+  );
+
   const durationMillis = useMemo(() => {
     if (end == null || start == null) {
       return null;
@@ -112,10 +225,26 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
         display: 'flex',
         flexDirection: 'column',
       }}>
-      <div>
-        start {start == null ? 'none' : new Date(start).toLocaleString()}
+      <div style={{display: 'flex', alignItems: 'center', width: '100%'}}>
+        <div style={{width: 40}}>start</div>
+        <DateEditor
+          timestamp={start}
+          onCommit={updateStart}
+          allowDelta={true}
+          deltaDirection="down"
+          deltaFromOffset={end}
+        />
       </div>
-      <div>end {start == null ? 'none' : new Date(end).toLocaleString()}</div>
+      <div style={{display: 'flex', alignItems: 'center', width: '100%'}}>
+        <div style={{width: 40}}>end</div>
+        <DateEditor
+          timestamp={end}
+          onCommit={updateEnd}
+          allowDelta={true}
+          deltaDirection="up"
+          deltaFromOffset={start}
+        />
+      </div>
       {durationMillis != null && (
         <div>duration {monthRoundedTime(durationMillis / 1000)}</div>
       )}

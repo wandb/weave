@@ -66,6 +66,12 @@ export function constNumberList(
 ): ConstNode<{type: 'list'; objectType: 'number'}> {
   return constNodeUnsafe({type: 'list', objectType: 'number'}, ns);
 }
+export function constTimestampList(
+  ns: number[]
+): ConstNode<{type: 'list'; objectType: {type: 'timestamp'}}> {
+  return constNodeUnsafe({type: 'list', objectType: {type: 'timestamp'}}, ns);
+}
+
 export function constStringList(
   ss: string[]
 ): ConstNode<{type: 'list'; objectType: 'string'}> {

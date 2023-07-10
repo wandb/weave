@@ -199,23 +199,44 @@ def auto_panels(
         layoutMode=weave.panels.GroupLayoutFlow(2, 3),
         items={"panel%s" % i: panel for i, panel in enumerate(categorical_panels)},
     )
-    control_items = {
-        "data": input_node,
-        "zoom_range": None,
-        "date_picker": lambda data, zoom_range: weave.panels.DateRange(
-            zoom_range, domain=data[x_axis]
+    control_items = [
+        weave.panels.GroupPanel(
+            input_node,
+            id="data",
         ),
-        "data_range": lambda data: weave.ops.make_list(
-            a=data[x_axis].min(), b=data[x_axis].max()
+        weave.panels.GroupPanel(
+            lambda data: weave.ops.make_list(
+                a=data[x_axis].min(), b=data[x_axis].max()
+            ),
+            id="data_range",
+            hidden=True,
         ),
-        "bin_range": lambda zoom_range, data_range: zoom_range.coalesce(data_range),
-        "groupby": groupby,
-        "window_data": lambda data, bin_range: data.filter(
-            lambda row: weave.ops.Boolean.bool_and(
-                row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1]
-            )
+        weave.panels.GroupPanel(None, id="zoom_range", hidden=True),
+        weave.panels.GroupPanel(
+            lambda zoom_range, data_range: zoom_range.coalesce(data_range),
+            id="bin_range",
+            hidden=True,
         ),
-    }
+        weave.panels.GroupPanel(
+            lambda data, zoom_range: weave.panels.DateRange(
+                zoom_range, domain=data[x_axis]
+            ),
+            id="date_picker",
+        ),
+        weave.panels.GroupPanel(
+            groupby,
+            id="groupby",
+        ),
+        weave.panels.GroupPanel(
+            lambda data, bin_range: data.filter(
+                lambda row: weave.ops.Boolean.bool_and(
+                    row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1]
+                )
+            ),
+            id="window_data",
+            hidden=True,
+        ),
+    ]
 
     panels = [
         weave.panels.BoardPanel(
@@ -245,7 +266,7 @@ def auto_panels(
                 layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
             ),
         )
-    return weave.panels.Board(vars=control_items, panels=panels)
+    return weave.panels.Board(vars=control_items, panels=panels, editable=False)
 
 
 # The interface for constructing this Panel from Python

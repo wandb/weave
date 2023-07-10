@@ -11,6 +11,8 @@ from .. import panel
 from .. import panel_util
 from .bank import default_panel_bank_flow_section_config, flow_layout
 
+from .panel_group_panel_info import PanelInfo
+
 ItemsType = typing.TypeVar("ItemsType")
 
 # I pulled in all the type information from PanelBank, but we're not
@@ -51,10 +53,15 @@ class PanelBankSectionConfig(typing.TypedDict):
 @weave.type()
 class GroupConfig(typing.Generic[ItemsType]):
     layoutMode: str = dataclasses.field(default_factory=lambda: "vertical")
-    showExpressions: bool = dataclasses.field(default_factory=lambda: False)
+    showExpressions: typing.Union[bool, typing.Literal["editable"]] = dataclasses.field(
+        default_factory=lambda: False
+    )
     equalSize: bool = dataclasses.field(default_factory=lambda: False)
     style: str = dataclasses.field(default_factory=lambda: "")
     items: ItemsType = dataclasses.field(default_factory=dict)  # type: ignore
+    panelInfo: typing.Optional[dict[str, typing.Any]] = dataclasses.field(
+        default_factory=lambda: None
+    )
     gridConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(
         default_factory=lambda: None
     )
@@ -79,6 +86,23 @@ GroupConfigType = typing.TypeVar("GroupConfigType")
 class GroupLayoutFlow:
     rows: int
     columns: int
+
+
+@dataclasses.dataclass
+class GroupPanelLayout:
+    x: int
+    y: int
+    h: int
+    w: int
+
+
+@dataclasses.dataclass
+class GroupPanel:
+    panel: typing.Any
+    id: typing.Optional[str] = None
+    hidden: typing.Optional[bool] = None
+    # Only used inside a grid layout
+    layout: typing.Optional[GroupPanelLayout] = None
 
 
 @weave.type()
@@ -107,7 +131,21 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 self.config.layoutMode = layout_mode
                 self.config.gridConfig = default_panel_bank_flow_section_config()
         if "items" in options:
-            self.config.items = options["items"]
+            if isinstance(options["items"], dict):
+                self.config.items = options["items"]
+            else:
+                options_dict = {}
+                panel_info = {}
+                for o in options["items"]:
+                    if isinstance(o, GroupPanel):
+                        options_dict[o.id] = o.panel
+                        panel_info[o.id] = {"hidden": o.hidden}
+                    else:
+                        raise ValueError("Items must be GroupPanel")
+                self.config.items = options_dict
+                if panel_info:
+                    self.config.panelInfo = panel_info  # type: ignore
+
         if "showExpressions" in options:
             self.config.showExpressions = options["showExpressions"]
         if "enableAddPanel" in options:

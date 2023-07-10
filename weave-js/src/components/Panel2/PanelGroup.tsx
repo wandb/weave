@@ -27,6 +27,7 @@ import {
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
+  ChildPanelProps,
   getFullChildPanel,
   isChildPanelFullConfig,
   mutateEnsureItemIsFullChildPanel,
@@ -60,12 +61,16 @@ const LAYOUT_MODES = [
   'layer' as const,
 ];
 
+interface PanelInfo {
+  hidden?: boolean;
+}
 export interface PanelGroupConfig {
   layoutMode: (typeof LAYOUT_MODES)[number];
   equalSize?: boolean;
-  showExpressions?: boolean;
+  showExpressions?: boolean | 'titleBar';
   style?: string;
   items: {[key: string]: ChildPanelConfig};
+  panelInfo?: {[key: string]: PanelInfo};
   gridConfig: PanelBankSectionConfig;
   allowedPanels?: string[];
   enableAddPanel?: boolean;
@@ -548,6 +553,14 @@ export const PanelGroupItem: React.FC<{
     [config, name, updateConfig]
   );
 
+  let controlBar: ChildPanelProps['controlBar'] = 'off';
+  if (config.layoutMode === 'layer' || !config.showExpressions) {
+    controlBar = 'off';
+  } else if (config.showExpressions === 'titleBar') {
+    controlBar = 'titleBar';
+  } else {
+    controlBar = 'editable';
+  }
   return (
     <PanelContextProvider
       newVars={siblingVars}
@@ -556,7 +569,7 @@ export const PanelGroupItem: React.FC<{
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
         config={item}
-        editable={config.layoutMode !== 'layer' && config.showExpressions}
+        controlBar={controlBar}
         updateConfig={itemUpdateConfig}
         updateConfig2={itemUpdateConfig2}
         updateName={itemUpdateName}
@@ -791,6 +804,9 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           const styleItems: string[] = childPanelConfig.style.split(';');
           const widthItem = styleItems.find(i => i.includes('width'));
           width = widthItem?.split(':')[1];
+        }
+        if (config.panelInfo?.[name]?.hidden) {
+          return null;
         }
         return (
           <GroupItem
