@@ -410,21 +410,10 @@ def awl_group_by_result_type(
     ),
 )
 def groupby(self, group_by_fn):
-    unsafe_group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
-    group_table_awl = to_compare_safe(unsafe_group_table_awl)
-
     table = self._arrow_data
-
-    group_table = group_table_awl._arrow_data
-    group_table_as_array = arrow_as_array(group_table)
-
-    # strip tags recursively so we group on values only
-    group_table_as_array_awl = ArrowWeaveList(
-        group_table_as_array, group_table_awl.object_type, self._artifact
-    )
-    group_table_as_array_awl_stripped = (
-        group_table_as_array_awl._arrow_data_asarray_no_tags()
-    )
+    unsafe_group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
+    group_table_awl = to_compare_safe(unsafe_group_table_awl.without_tags())
+    group_table_as_array_awl_stripped = group_table_awl._arrow_data
     group_table_chunked = pa.chunked_array(
         pa.StructArray.from_arrays(
             [
