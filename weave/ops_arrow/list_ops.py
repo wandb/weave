@@ -22,7 +22,7 @@ from .list_ import ArrowWeaveList, PathType, is_list_arrowweavelist
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert
-from .util import _to_compare_safe_call
+from .convert import to_compare_safe
 from .constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
@@ -410,17 +410,8 @@ def awl_group_by_result_type(
     ),
 )
 def groupby(self, group_by_fn):
-    safe_group_by_fn = _to_compare_safe_call(group_by_fn)
-    group_table_awl = _apply_fn_node_with_tag_pushdown(self, safe_group_by_fn)
-
-    if (
-        safe_group_by_fn is group_by_fn
-    ):  # we want to use `is` here since we want to check for identity
-        unsafe_group_table_awl = group_table_awl
-    else:
-        # This only can happen if `_to_compare_safe_call` modifies something - which
-        # in itself only happens if we are grouping by a media asset
-        unsafe_group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
+    unsafe_group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
+    group_table_awl = to_compare_safe(unsafe_group_table_awl)
 
     table = self._arrow_data
 
