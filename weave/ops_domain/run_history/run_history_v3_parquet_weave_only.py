@@ -114,78 +114,91 @@ def _get_history_stream(run: wdt.Run, columns=None):
     # 2. Read in the live set
     raw_live_data = _get_live_data_from_run(run, columns=columns)
 
-    # 3. Raw-load each parquet file
+    # 3.a: Raw-load each parquet file
     raw_history_awl_tables = _read_raw_history_awl_tables(
         run, columns=columns, artifact=artifact
     )
 
-    # 3.75: Collapse unions
+    # 3.b: Collapse unions
     union_collapsed_awl_tables = [
         _collapse_unions(awl) for awl in raw_history_awl_tables
     ]
 
-    # 4. For each flattened column:
+    # 4. Process all the data
     raw_history_pa_tables = [
         history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
     ]
 
-    live_columns = {}
-    live_columns_already_mapped = {}
     run_path = wb_util.RunPath(
         run.gql["project"]["entity"]["name"],
         run.gql["project"]["name"],
         run.gql["name"],
     )
-    for col_name, col_type in flattened_object_type.property_types.items():
-        raw_live_column = _extract_column_from_live_data(raw_live_data, col_name)
-        processed_live_column = None
-        if _is_poison_type(col_type):
-            _non_vectorized_warning(
-                f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
-            )
-            processed_live_column = _process_poisoned_live_column(
-                raw_live_column, run_path
-            )
-            live_columns[col_name] = processed_live_column
+    (
+        live_columns,
+        live_columns_already_mapped,
+        processed_history_pa_tables,
+    ) = _process_all_columns(
+        flattened_object_type, raw_live_data, raw_history_pa_tables, run_path, artifact
+    )
 
-            for table_ndx, table in enumerate(raw_history_pa_tables):
-                fields = [field.name for field in table.schema]
-                new_col = _process_poisoned_history_column(
-                    table[col_name], col_type, run_path, artifact
-                )
-                raw_history_pa_tables[table_ndx] = table.set_column(
-                    fields.index(col_name), col_name, new_col
-                )
+    live_data_awl = _construct_live_data_awl(
+        live_columns,
+        live_columns_already_mapped,
+        flattened_object_type,
+        len(raw_live_data),
+        artifact,
+    )
 
-        elif _is_directly_convertible_type(col_type):
-            live_columns_already_mapped[col_name] = raw_live_column
-            # Important that this runs before the else branch
-            continue
-        else:
-            processed_live_column = _reconstruct_original_live_data_col(raw_live_column)
-            live_columns_already_mapped[col_name] = processed_live_column
-
-            for table_ndx, table in enumerate(raw_history_pa_tables):
-                fields = [field.name for field in table.schema]
-                new_col = _drop_types_from_encoded_types(
-                    ArrowWeaveList(
-                        table[col_name],
-                        None,
-                        artifact=artifact,
-                    )
+    # 5.a Now we concat the converted liveset and parquet files
+    concatted_awl = history_op_common.concat_awls(
+        [
+            live_data_awl,
+            *{
+                ArrowWeaveList(
+                    table, object_type=flattened_object_type, artifact=artifact
                 )
-                raw_history_pa_tables[table_ndx] = table.set_column(
-                    fields.index(col_name), col_name, new_col._arrow_data
-                )
+                for table in processed_history_pa_tables
+            },
+        ]
+    )
 
-    # 5. Now we concat the converted liveset and parquet files
+    sorted_table = history_op_common.sort_history_pa_table(
+        history_op_common.awl_to_pa_table(concatted_awl)
+    )
+
+    # 6. Finally, unflatten the columns
+    final_array = _unflatten_pa_table(sorted_table)
+    final_type = _unflatten_history_object_type(flattened_object_type)
+
+    # 7. Optionally: verify the AWL
+    reason = weave_arrow_type_check(final_type, final_array)
+
+    if reason != None:
+        raise errors.WeaveWBHistoryTranslationError(
+            f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
+        )
+    return ArrowWeaveList(
+        final_array,
+        final_type,
+        artifact=artifact,
+    )
+
+
+def _construct_live_data_awl(
+    live_columns: dict[str, list],
+    live_columns_already_mapped: dict[str, list],
+    flattened_object_type: types.TypedDict,
+    num_rows: int,
+    artifact: typing.Optional[artifact_mem.MemArtifact] = None,
+) -> ArrowWeaveList:
     live_columns_to_data = [
-        {k: v[i] for k, v in live_columns.items()} for i in range(len(raw_live_data))
+        {k: v[i] for k, v in live_columns.items()} for i in range(num_rows)
     ]
 
     live_columns_already_mapped_to_data = [
         {k: v[i] for k, v in live_columns_already_mapped.items()}
-        for i in range(len(raw_live_data))
+        for i in range(num_rows)
     ]
 
     partial_live_data_awl = convert.to_arrow(
@@ -230,45 +243,67 @@ def _get_history_stream(run: wdt.Run, columns=None):
             partial_live_data_already_mapped_awl._arrow_data.field(field_ndx)
         )
 
-    live_data_awl: ArrowWeaveList = ArrowWeaveList(
+    return ArrowWeaveList(
         pa.StructArray.from_arrays(field_arrays, field_names),
         flattened_object_type,
         artifact=artifact,
     )
 
-    # 5. Now we concat the converted liveset and parquet files
-    concatted_awl = history_op_common.concat_awls(
-        [
-            live_data_awl,
-            *{
-                ArrowWeaveList(
-                    table, object_type=flattened_object_type, artifact=artifact
+
+def _process_all_columns(
+    flattened_object_type: types.TypedDict,
+    raw_live_data: list[dict],
+    raw_history_pa_tables: list[pa.Table],
+    run_path: wb_util.RunPath,
+    artifact: artifact_mem.MemArtifact,
+):
+    live_columns = {}
+    live_columns_already_mapped = {}
+    processed_history_pa_tables = [*raw_history_pa_tables]
+
+    for col_name, col_type in flattened_object_type.property_types.items():
+        raw_live_column = _extract_column_from_live_data(raw_live_data, col_name)
+        processed_live_column = None
+        if _is_poison_type(col_type):
+            _non_vectorized_warning(
+                f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
+            )
+            processed_live_column = _process_poisoned_live_column(
+                raw_live_column, run_path
+            )
+            live_columns[col_name] = processed_live_column
+
+            for table_ndx, table in enumerate(processed_history_pa_tables):
+                fields = [field.name for field in table.schema]
+                new_col = _process_poisoned_history_column(
+                    table[col_name], col_type, run_path, artifact
                 )
-                for table in raw_history_pa_tables
-            },
-        ]
-    )
+                processed_history_pa_tables[table_ndx] = table.set_column(
+                    fields.index(col_name), col_name, new_col
+                )
 
-    sorted_table = history_op_common.sort_history_pa_table(
-        history_op_common.awl_to_pa_table(concatted_awl)
-    )
+        elif _is_directly_convertible_type(col_type):
+            live_columns_already_mapped[col_name] = raw_live_column
+            # Important that this runs before the else branch
+            continue
+        else:
+            processed_live_column = _reconstruct_original_live_data_col(raw_live_column)
+            live_columns_already_mapped[col_name] = processed_live_column
 
-    # 6. Finally, unflatten the columns
-    final_array = _unflatten_pa_table(sorted_table)
-    final_type = _unflatten_history_object_type(flattened_object_type)
+            for table_ndx, table in enumerate(processed_history_pa_tables):
+                fields = [field.name for field in table.schema]
+                new_col = _drop_types_from_encoded_types(
+                    ArrowWeaveList(
+                        table[col_name],
+                        None,
+                        artifact=artifact,
+                    )
+                )
+                processed_history_pa_tables[table_ndx] = table.set_column(
+                    fields.index(col_name), col_name, new_col._arrow_data
+                )
 
-    # 7. Optionally: verify the AWL
-    reason = weave_arrow_type_check(final_type, final_array)
-
-    if reason != None:
-        raise errors.WeaveWBHistoryTranslationError(
-            f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
-        )
-    return ArrowWeaveList(
-        final_array,
-        final_type,
-        artifact=artifact,
-    )
+    return live_columns, live_columns_already_mapped, processed_history_pa_tables
 
 
 def _non_vectorized_warning(message: str):
