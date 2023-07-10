@@ -234,6 +234,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 res = execute_fast.fast_map_fn(list_, map_fn)
                 return res
 
+            tag_store_mem_map = tag_store._OBJ_TAGS_MEM_MAP.get()
+            tag_store_curr_node_id = tag_store._OBJ_TAGS_CURR_NODE_ID.get()
+
             # Just do file-table in parallel for now. We'll do parallelization
             # more generally in the future.
             if (
@@ -245,13 +248,16 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             ):
 
                 def download_one(x):
-                    if x == None or types.is_optional(first_arg.type):
-                        return None
-                    called = orig_op(x, **new_inputs)
-                    # Use the use path to get caching.
-                    res = weave_internal.use(called)
-                    res = storage.deref(res)
-                    return res
+                    with tag_store.with_tag_store_state(
+                        tag_store_curr_node_id, tag_store_mem_map
+                    ):
+                        if x == None or types.is_optional(first_arg.type):
+                            return None
+                        called = orig_op(x, **new_inputs)
+                        # Use the use path to get caching.
+                        res = weave_internal.use(called)
+                        res = storage.deref(res)
+                        return res
 
                 if USE_PARALLEL_DOWNLOAD:
                     res = list(parallelism.do_in_parallel(download_one, list_))
@@ -269,11 +275,14 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             if isinstance(orig_op.concrete_output_type, types.TypeType):
 
                 def refine_one(x) -> types.Type:
-                    if x != None or types.is_optional(first_arg.type):
-                        return orig_op.resolve_fn(
-                            **{mapped_param_name: x, **new_inputs}
-                        )
-                    return types.NoneType()
+                    with tag_store.with_tag_store_state(
+                        tag_store_curr_node_id, tag_store_mem_map
+                    ):
+                        if x != None or types.is_optional(first_arg.type):
+                            return orig_op.resolve_fn(
+                                **{mapped_param_name: x, **new_inputs}
+                            )
+                        return types.NoneType()
 
                 if not list_:
                     return types.List(types.NoneType())
@@ -291,20 +300,25 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 list_tags = tag_store.get_tags(list_)
 
             def resolve_one(x):
-                if not (
-                    x is None
-                    or isinstance(x, box.BoxedNone)
-                    or types.is_optional(first_arg.type)
+                with tag_store.with_tag_store_state(
+                    tag_store_curr_node_id, tag_store_mem_map
                 ):
-                    return orig_op.resolve_fn(
-                        **{
-                            mapped_param_name: tag_store.add_tags(box.box(x), list_tags)
-                            if list_tags is not None
-                            else x,
-                            **new_inputs,
-                        }
-                    )
-                return None
+                    if not (
+                        x is None
+                        or isinstance(x, box.BoxedNone)
+                        or types.is_optional(first_arg.type)
+                    ):
+                        return orig_op.resolve_fn(
+                            **{
+                                mapped_param_name: tag_store.add_tags(
+                                    box.box(x), list_tags
+                                )
+                                if list_tags is not None
+                                else x,
+                                **new_inputs,
+                            }
+                        )
+                    return None
 
             if USE_PARALLEL_RESOLVE:
                 return list(parallelism.do_in_parallel(resolve_one, list_))
