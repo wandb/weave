@@ -126,7 +126,7 @@ def do_logging(username, rows, finish=False):
 # replace _type/_val with _val contents
 #
 
-HISTORY_OP_NAME = "history2"  # history_stream
+HISTORY_OP_NAME = "history_stream"  # history_stream
 
 
 def do_batch_test(username, rows):

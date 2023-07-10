@@ -226,25 +226,36 @@ def local_path_to_parquet_table(
 
 
 def process_history_awl_tables(tables: list[ArrowWeaveList]):
-    list = make_list(**{str(i): table for i, table in enumerate(tables)})
-    concatted = use(concat(list))
+    concatted = concat_awls(tables)
     if isinstance(concatted, ArrowWeaveList):
-        rb = pa.RecordBatch.from_struct_array(
-            concatted._arrow_data
-        )  # this pivots to columnar layout
-        parquet_history = pa.Table.from_batches([rb])
+        parquet_history = awl_to_pa_table(concatted)
     else:
         # empty table
         return None
 
-    # sort the history by step
+    return sort_history_pa_table(parquet_history)
+
+
+def concat_awls(awls: list[ArrowWeaveList]):
+    list = make_list(**{str(i): table for i, table in enumerate(awls)})
+    return use(concat(list))
+
+
+def awl_to_pa_table(awl: ArrowWeaveList):
+    rb = pa.RecordBatch.from_struct_array(
+        awl._arrow_data
+    )  # this pivots to columnar layout
+    return pa.Table.from_batches([rb])
+
+
+def sort_history_pa_table(table: pa.Table):
     with tracer.trace("pq.sort"):
         table_sorted_indices = pa.compute.bottom_k_unstable(
-            parquet_history, sort_keys=["_step"], k=len(parquet_history)
+            table, sort_keys=["_step"], k=len(table)
         )
 
     with tracer.trace("pq.take"):
-        return parquet_history.take(table_sorted_indices)
+        return table.take(table_sorted_indices)
 
 
 def read_history_parquet(run: wdt.Run, columns=None):

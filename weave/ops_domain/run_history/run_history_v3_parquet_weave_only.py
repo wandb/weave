@@ -1,11 +1,13 @@
 import dataclasses
 import datetime
+import logging
 import typing
 import pyarrow.compute as pc
 import pyarrow as pa
 
 from weave import io_service
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.ops_domain import wbmedia
 from ...ops_arrow.list_ import (
     PathItemList,
     PathItemObjectField,
@@ -45,7 +47,10 @@ tracer = engine_trace.tracer()
     hidden=True,
 )
 def refine_history_stream_type(run: wdt.Run) -> types.Type:
-    return ArrowWeaveListType(_refine_history_type(run).weave_type)
+    # TODO: Consider merging `_unflatten_history_object_type` into the main path
+    return ArrowWeaveListType(
+        _unflatten_history_object_type(history_op_common.refine_history_type(run))
+    )
 
 
 @op(
@@ -56,10 +61,13 @@ def refine_history_stream_type(run: wdt.Run) -> types.Type:
 def refine_history_stream_with_columns_type(
     run: wdt.Run, history_cols: list[str]
 ) -> types.Type:
+    # TODO: Consider merging `_unflatten_history_object_type` into the main path
     return ArrowWeaveListType(
-        _refine_history_type(
-            run, columns=list(set([*history_cols, "_step"]))
-        ).weave_type
+        _unflatten_history_object_type(
+            history_op_common.refine_history_type(
+                run, columns=history_op_common.get_full_columns(history_cols)
+            )
+        )
     )
 
 
@@ -71,7 +79,7 @@ def refine_history_stream_with_columns_type(
     hidden=True,
 )
 def history_stream_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history_stream(run, list(set([*history_cols, "_step"])))
+    return _get_history_stream(run, history_op_common.get_full_columns(history_cols))
 
 
 @op(
@@ -82,9 +90,16 @@ def history_stream_with_columns(run: wdt.Run, history_cols: list[str]):
     hidden=True,
 )
 def history_stream(run: wdt.Run):
-    # We return mock data here since we will be replaced with the `_with_columns`
-    # version in a compile pass if specific columns are needed
+    # TODO: This is now equivalent to hist2
     return history_op_common.mock_history_rows(run)
+
+
+@dataclasses.dataclass
+class PathTree:
+    children: typing.Dict[PathItemType, "PathTree"] = dataclasses.field(
+        default_factory=dict
+    )
+    data: typing.Optional[typing.Any] = None
 
 
 @dataclasses.dataclass
@@ -144,115 +159,312 @@ def _history_key_type_count_to_weave_type(
     return HistoryToWeaveResult(types.UnknownType())
 
 
-def _refine_history_type(
-    run: wdt.Run,
-    columns: typing.Optional[list[str]] = None,
-) -> HistoryToWeaveFinalResult:
-    if "historyKeys" not in run.gql:
-        raise ValueError("historyKeys not in run gql")
-
-    historyKeys = run.gql["historyKeys"]["keys"]
-    return _refine_history_type_inner(historyKeys, columns=columns)
-
-
 class TopLevelTypeCount(typing.TypedDict):
     typeCounts: list[history_op_common.TypeCount]
 
 
-# split out for testing
-def _refine_history_type_inner(
-    historyKeys: dict[str, TopLevelTypeCount],
-    columns: typing.Optional[list[str]] = None,
-) -> HistoryToWeaveFinalResult:
-    prop_types: dict[str, types.Type] = {}
-    encoded_paths: list[list[str]] = []
+def _get_history_stream(run: wdt.Run, columns=None):
+    # 1. Get the flattened Weave-Type given HistoryKeys
+    # 2. Read in the live set
+    # 3. Raw-load each parquet file
+    # 4. For each flattened column:
+    #   a. If it contains a "poison type" (non simple union, binary, or legacy media), then
+    #       i. For liveset -> we must pass each item `_process_run_dict_item`, then use convert.to_arrow
+    #       ii. For parquet -> we must extract the pyobj, us `_process_run_dict_item`, convert.to_arrow
+    #   b. If the nested type contains a custom type or object type, then we must adjust the structure:
+    #       i. For liveset -> we can pass each item to the simplified `_reconstruct_run_item`, then use convert.to_arrow(already_mapped = true)
+    #       ii. For parquet -> we need to use the `_correct_awl` to adjust the structure.
+    #   c. For all other types
+    #       i. For liveset -> we can just use convert.to_arrow
+    #       ii. For parquet -> no op
+    # 5. Now we concat the converted liveset and parquet files
+    # 6. Finally, unflatten the columns and return the result
+    # 7. Optionally: verify the AWL
 
-    for key, key_details in historyKeys.items():
-        if key.startswith("system/") or (columns is not None and key not in columns):
-            # skip system metrics for now
-            continue
+    # 1. Get the flattened Weave-Type given HistoryKeys
+    flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
 
-        type_counts: list[history_op_common.TypeCount] = key_details["typeCounts"]
-        type_members = []
-        for tc in type_counts:
-            res = _history_key_type_count_to_weave_type(tc, key)
-            type_members.append(res.weave_type)
-            encoded_paths.extend(res.encoded_paths)
-        wt = types.union(*type_members)
+    # 2. Read in the live set
+    raw_live_data = _get_live_data_from_run(run, columns=columns)
 
-        if wt == types.UnknownType():
-            util.capture_exception_with_sentry_if_available(
-                errors.WeaveTypeWarning(
-                    f"Unable to determine history key type for key {key} with types {type_counts}"
-                ),
-                (str([tc["type"] for tc in type_counts]),),
+    # 3. Raw-load each parquet file
+    raw_history_awl_tables = _read_raw_history_awl_tables(run, columns=columns)
+    artifact = (
+        raw_history_awl_tables[0]._artifact
+        if len(raw_history_awl_tables) > 0
+        else artifact_mem.MemArtifact()
+    )
+
+    # # 3.5: Split type structs
+    # type_split_awl_tables = [_split_type_structs(awl) for awl in raw_history_awl_tables]
+
+    # 3.75: Collapse unions
+    union_collapsed_awl_tables = [
+        _collapse_unions(awl) for awl in raw_history_awl_tables
+    ]
+
+    # 4. For each flattened column:
+    raw_history_pa_tables = [
+        history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
+    ]
+    for col_name, col_type in flattened_object_type.property_types.items():
+        raw_live_column = extract_column_from_live_data(raw_live_data, col_name)
+        processed_live_column = None
+        if _is_poison_type(col_type):
+            logging.warning(
+                f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
             )
-            wt = types.NoneType()
+            processed_live_column = _process_poisoned_live_column(
+                raw_live_column, col_type
+            )
+            set_column_for_live_data(raw_live_data, col_name, processed_live_column)
+            for table_ndx, table in enumerate(raw_history_pa_tables):
+                fields = [field.name for field in table.schema]
+                new_col = _process_poisoned_history_column(table[col_name], col_type)
+                raw_history_pa_tables[table_ndx] = table.set_column(
+                    fields.index(col_name), col_name, new_col
+                )
 
-        # _step is a special key that is always guaranteed to be a nonnull number.
-        # other keys may be undefined at particular steps so we make them optional.
-        if key in ["_step"]:
-            prop_types[key] = types.Int()
-        elif key in ["_runtime", "_timestamp"]:
-            prop_types[key] = wt
+        elif _is_directly_convertible_type(col_type):
+            # Important that this runs before the else branch
+            continue
         else:
-            prop_types[key] = types.optional(wt)
+            processed_live_column = _reconstruct_original_live_data_col(raw_live_column)
+            set_column_for_live_data(raw_live_data, col_name, processed_live_column)
+            for table_ndx, table in enumerate(raw_history_pa_tables):
+                fields = [field.name for field in table.schema]
+                new_col = _drop_types_from_encoded_types(
+                    ArrowWeaveList(
+                        table[col_name],
+                        None,
+                        raw_history_awl_tables[table_ndx]._artifact,
+                    )
+                )
+                raw_history_pa_tables[table_ndx] = table.set_column(
+                    fields.index(col_name), col_name, new_col._arrow_data
+                )
 
-    # Need to combine top-level maps. Note: this is not a recursive function
-    # since the flattening only happens top level in gorilla.
-    dict_keys: dict[str, types.Type] = {}
-    for key, val in prop_types.items():
-        path_parts = key.split(".")
-        prop_types = dict_keys
+            # raw_history_pa_tables = history_op_common.awl_to_pa_table(
+            #     _drop_types_from_encoded_types(ArrowWeaveList(
+            #         table[col_name],
 
-        for part in path_parts[:-1]:
-            found = False
-            prop_types_inner: dict[str, types.Type] = {}
-            default_dict = types.TypedDict(prop_types_inner)
-            if part not in prop_types:
-                prop_types[part] = default_dict
-                prop_types = prop_types_inner
-            elif part in prop_types:
-                prop_type = prop_types[part]
-                if isinstance(prop_type, types.TypedDict):
-                    prop_types = prop_type.property_types
-                    found = True
-                elif isinstance(prop_type, types.UnionType):
-                    for member in prop_type.members:
-                        if isinstance(member, types.TypedDict):
-                            prop_types = member.property_types
-                            found = True
-                            break
+            #     ))
+            # )
 
-                if not found:
-                    prop_types[part] = types.union(prop_type, default_dict)
-                    prop_types = prop_types_inner
+    # 5. Now we concat the converted liveset and parquet files
+    live_data_awl = convert.to_arrow(
+        raw_live_data,
+        types.List(flattened_object_type),
+        artifact=artifact,
+    )
 
-        final_part = path_parts[-1]
-        if final_part not in prop_types:
-            prop_types[final_part] = val
-        else:
-            prop_types[final_part] = types.union(val, prop_types[final_part])
+    # 5. Now we concat the converted liveset and parquet files
+    concatted_awl = history_op_common.concat_awls(
+        [
+            live_data_awl,
+            *{
+                ArrowWeaveList(table, object_type=flattened_object_type)
+                for table in raw_history_pa_tables
+            },
+        ]
+    )
 
-    encoded_paths_final = []
-    for path in encoded_paths:
-        if len(encoded_paths) > 0:
-            if "." in path[0]:
-                new_path = [*path[0].split("."), *path[1:]]
-                encoded_paths_final.append(new_path)
+    sorted_table = history_op_common.sort_history_pa_table(
+        history_op_common.awl_to_pa_table(concatted_awl)
+    )
+
+    # 6. Finally, unflatten the columns
+    final_array = _unflatten_pa_table(sorted_table)
+    final_type = _unflatten_history_object_type(flattened_object_type)
+
+    # 7. Optionally: verify the AWL
+    reason = weave_arrow_type_check(final_type, final_array)
+
+    if reason != None:
+        raise errors.WeaveHistoryDecodingError(
+            f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
+        )
+    return ArrowWeaveList(
+        final_array,
+        final_type,
+        artifact,
+    )
+
+    # 7. Optionally: verify the AWL
+
+
+# def _unflatten_mapper(
+#     awl: ArrowWeaveList, path: PathType
+# ) -> typing.Optional[ArrowWeaveList]:
+#     if len(path) == 1:
+#         path_part = path[0]
+#         assert isinstance(path_part, PathItemStructField)
+#         if "." in path_part.key:
+
+#     return None
+
+
+def _build_array_from_tree(tree: PathTree) -> pa.Array:
+    children_struct_array = []
+    if len(tree.children) > 0:
+        mask = None
+        children_data = {}
+        for k, v in tree.children.items():
+            children_data[k] = _build_array_from_tree(v)
+            if mask is None:
+                mask = pa.compute.is_null(children_data[k])
             else:
-                encoded_paths_final.append(path)
+                mask = pa.compute.or_(mask, pa.compute.is_null(children_data[k]))
 
-    return HistoryToWeaveFinalResult(types.TypedDict(dict_keys), encoded_paths_final)
+        children_struct = pa.StructArray.from_arrays(
+            children_data.values(), children_data.keys(), mask=pa.compute.invert(mask)
+        )
+        children_struct_array = [children_struct]
+    children_arrays = [*(tree.data or []), *children_struct_array]
+
+    if len(children_arrays) == 0:
+        raise errors.WeaveHistoryDecodingError("Cannot build array from empty tree")
+    elif len(children_arrays) == 1:
+        return children_arrays[0]
+
+    num_rows = len(tree.data[0])
+    type_array = pa.nulls(num_rows, type=pa.int8())
+    offset_template = pa.array(list(range(num_rows)), type=pa.int8())
+    arrays = []
+    offsets = []
+    for member_ndx, union_member_array in enumerate(children_arrays):
+        is_usable = pa.compute.invert(pa.compute.is_null(union_member_array))
+        arrays.append(union_member_array.filter(is_usable))
+        offsets.extend(offset_template.filter(is_usable).to_pylist())
+        type_array = pa.compute.replace_with_mask(
+            type_array, is_usable, pa.array([member_ndx], type=pa.int8())
+        )
+
+    return pa.UnionArray.from_dense(
+        type_array, pa.array(offsets + [0], type=pa.int32()), arrays
+    )
+
+
+def _unflatten_pa_table(array: pa.Table) -> pa.StructArray:
+    cols = array.schema.names
+    new_tree = PathTree(data=[])
+    for col_name in cols:
+        path = col_name.split(".")
+        target = new_tree
+        for part in path:
+            if part not in target.children:
+                target.children[part] = PathTree(data=[])
+            target = target.children[part]
+            target.data.append(array[col_name].combine_chunks())
+
+    # Recursively resolve the tree
+    return _build_array_from_tree(new_tree)
+
+
+def _union_collapse_mapper(
+    awl: ArrowWeaveList, path: PathType
+) -> typing.Optional[ArrowWeaveList]:
+    object_type = types.non_none(awl.object_type)
+    if types.TypedDict({}).assign_type(object_type):
+        object_type = typing.cast(types.TypedDict, object_type)
+        columns = list(object_type.property_types.keys())
+        if all([c.startswith("_type_") for c in columns]):
+            logging.warning(
+                f"Encountered history store union: this requires a non-vectorized transformation on the order of number of rows (but fortunately does not require transforming to python). Path: {path}, Type: {object_type}"
+            )
+            arrow_data = awl._arrow_data
+            num_rows = len(arrow_data)
+            type_array = pa.nulls(num_rows, type=pa.int8())
+            offset_template = pa.array(list(range(num_rows)), type=pa.int8())
+            arrays = []
+            offsets = []
+            weave_type_members = []
+            for col_ndx, col_name in enumerate(columns):
+                weave_type_members.append(object_type.property_type[col_name])
+                column_data = arrow_data.field(col_name)
+                is_usable = pa.compute.invert(pa.compute.is_null(column_data))
+                arrays.append(column_data.filter(is_usable))
+                offsets.append(offset_template.filter(is_usable).to_pylist())
+                type_array = pa.compute.replace_with_mask(
+                    type_array, is_usable, col_ndx
+                )
+            union_arr = pa.UnionArray.from_dense(
+                type_array, pa.array(offsets + [0], type=pa.int32()), arrays
+            )
+            return ArrowWeaveList(
+                union_arr, types.List(types.union(*weave_type_members)), awl._artifact
+            )
+
+    return None
+
+
+def _collapse_unions(awl: ArrowWeaveList) -> ArrowWeaveList:
+    return awl.map_column(_union_collapse_mapper)
+
+
+def _drop_types_mapper(
+    awl: ArrowWeaveList, path: PathType
+) -> typing.Optional[ArrowWeaveList]:
+    object_type = types.non_none(awl.object_type)
+    if types.TypedDict(
+        {"_type": types.optional(types.String()), "_val": types.Any()}
+    ).assign_type(object_type):
+        return awl.column("_val")
+
+
+def _drop_types_from_encoded_types(awl: ArrowWeaveList) -> ArrowWeaveList:
+    return awl.map_column(_drop_types_mapper)
+
+
+def _get_live_data_from_run(run: wdt.Run, columns=None):
+    raw_live_data = run.gql["sampledParquetHistory"]["liveData"]
+    if columns is None:
+        return raw_live_data
+    column_set = set(columns)
+    return [{k: v for k, v in row.items() if k in column_set} for row in raw_live_data]
+
+
+def extract_column_from_live_data(live_data: list[dict], column_name: str):
+    return [row.get(column_name, None) for row in live_data]
+
+
+def set_column_for_live_data(
+    live_data: list[dict], column_name: str, updated_row: list
+) -> list[dict]:
+    for row, updated_value in zip(live_data, updated_row):
+        row[column_name] = updated_value
+    return live_data
+
+
+def _process_poisoned_live_column(live_column: list, col_type: types.Type) -> list:
+    return [wb_util._process_run_dict_item(item) for item in live_column]
+    # return convert.to_arrow(
+    #     processed_data,
+    #     types.List(col_type),
+    #     artifact=artifact_mem.MemArtifact(),
+    # )
+
+
+def _process_poisoned_history_column(
+    history_column: pa.Array, col_type: types.Type
+) -> pa.Array:
+    pyobj = history_column.to_pylist()
+    processed_data = [
+        wb_util._process_run_dict_item(item) if item is not None else None
+        for item in pyobj
+    ]
+    awl = convert.to_arrow(
+        processed_data,
+        types.List(col_type),
+        artifact=artifact_mem.MemArtifact(),
+    )
+    return pa.chunked_array([awl._arrow_data])
 
 
 # Copy from common - need to merge back
-def _read_history_parquet(run: wdt.Run, object_type, columns=None):
+def _read_raw_history_awl_tables(run: wdt.Run, columns=None) -> list[ArrowWeaveList]:
     io = io_service.get_sync_client()
     tables = []
-    # FIXME: according to MinYoung, the tables MAY have different schemas before
-    # compaction. Need to move _convert_gorilla_parquet_to_weave_arrow  to this
-    # loop. This will require modifying tests too
     for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
@@ -261,16 +473,82 @@ def _read_history_parquet(run: wdt.Run, object_type, columns=None):
                 path, None, columns=columns
             )
             tables.append(awl)
-    return history_op_common.process_history_awl_tables(tables)
+    return tables
+
+    # return history_op_common.process_history_awl_tables(tables)
 
 
-def _get_history_stream(run: wdt.Run, columns=None):
-    final_object_type = _refine_history_type(run, columns=columns)
-    parquet_history = _read_history_parquet(
-        run, final_object_type.weave_type, columns=columns
-    )
-    live_data = run.gql["sampledParquetHistory"]["liveData"]
-    return _get_history_stream_inner(final_object_type, live_data, parquet_history)
+def _is_poison_type(col_type: types.Type):
+    return _is_poison_type_recursive(col_type)
+
+
+def _is_directly_convertible_type(col_type: types.Type):
+    return _is_directly_convertible_type_recursive(col_type)
+
+
+non_poison_legacy_types = (wbmedia.ImageArtifactFileRefType,)
+poison_legacy_types = (
+    wbmedia.AudioArtifactFileRef.WeaveType,
+    wbmedia.BokehArtifactFileRef.WeaveType,
+    wbmedia.VideoArtifactFileRef.WeaveType,
+    wbmedia.Object3DArtifactFileRef.WeaveType,
+    wbmedia.MoleculeArtifactFileRef.WeaveType,
+    wbmedia.HtmlArtifactFileRef.WeaveType,
+    wbmedia.LegacyTableNDArrayType,
+)
+
+
+def _is_poison_type_recursive(col_type: types.Type):
+    if types.NoneType().assign_type(col_type):
+        return False
+    non_none_type = types.non_none(col_type)
+    if isinstance(non_none_type, types.UnionType):
+        return True
+    elif isinstance(poison_legacy_types, poison_legacy_types):
+        return True
+    elif isinstance(non_none_type, types.List):
+        return _is_poison_type_recursive(non_none_type.object_type)
+    elif isinstance(non_none_type, types.TypedDict):
+        for k, v in non_none_type.property_types.items():
+            if _is_poison_type_recursive(v):
+                return True
+        return False
+    else:
+        return False
+
+
+def _is_directly_convertible_type_recursive(col_type: types.Type):
+    if types.NoneType().assign_type(col_type):
+        return True
+    non_none_type = types.non_none(col_type)
+    if types.union(
+        *[
+            types.Number(),
+            types.Int(),
+            types.Float(),
+            types.String(),
+            types.Boolean(),
+        ]
+    ).assign_type(col_type):
+        return True
+    elif isinstance(non_none_type, types.List):
+        return _is_directly_convertible_type_recursive(non_none_type.object_type)
+    elif isinstance(non_none_type, types.TypedDict):
+        for k, v in non_none_type.property_types.items():
+            if not _is_directly_convertible_type_recursive(v):
+                return False
+        return True
+    else:
+        return False
+
+
+# def _get_history_stream(run: wdt.Run, columns=None):
+#     final_object_type = _refine_history_type(run, columns=columns)
+#     parquet_history = _read_history_parquet(
+#         run, final_object_type.weave_type, columns=columns
+#     )
+#     live_data = run.gql["sampledParquetHistory"]["liveData"]
+#     return _get_history_stream_inner(final_object_type, live_data, parquet_history)
 
 
 def _get_history_stream_inner(
@@ -320,6 +598,10 @@ def _reconstruct_original_live_data(live_data: list[dict]):
     # b) reduce the encoded cells to their vals
 
     return [_reconstruct_original_live_data_row(row) for row in live_data]
+
+
+def _reconstruct_original_live_data_col(row: list):
+    return [_reconstruct_original_live_data_cell(cell) for cell in row]
 
 
 def _reconstruct_original_live_data_row(row: dict):
@@ -554,14 +836,6 @@ custom_types = (types.Type,)
 
 
 @dataclasses.dataclass
-class PathTree:
-    children: typing.Dict[PathItemType, "PathTree"] = dataclasses.field(
-        default_factory=dict
-    )
-    data: typing.Optional[pa.Array] = None
-
-
-@dataclasses.dataclass
 class PathSummary:
     all_paths: dict[PathType, TargetAWLSpec] = dataclasses.field(default_factory=dict)
     leaf_paths: dict[PathType, TargetAWLSpec] = dataclasses.field(default_factory=dict)
@@ -711,3 +985,43 @@ def _create_prototype_awl_from_object_type(
         types.List(target_object_type),
         artifact=artifact,
     )
+
+
+def _unflatten_history_object_type(obj_type: types.TypedDict) -> types.TypedDict:
+    # Need to combine top-level maps. Note: this is not a recursive function
+    # since the flattening only happens top level in gorilla.
+    dict_keys: dict[str, types.Type] = {}
+    for key, val in obj_type.property_types.items():
+        path_parts = key.split(".")
+        prop_types = dict_keys
+
+        for part in path_parts[:-1]:
+            found = False
+            prop_types_inner: dict[str, types.Type] = {}
+            default_dict = types.TypedDict(prop_types_inner)
+            if part not in prop_types:
+                prop_types[part] = default_dict
+                prop_types = prop_types_inner
+            elif part in prop_types:
+                prop_type = prop_types[part]
+                if isinstance(prop_type, types.TypedDict):
+                    prop_types = prop_type.property_types
+                    found = True
+                elif isinstance(prop_type, types.UnionType):
+                    for member in prop_type.members:
+                        if isinstance(member, types.TypedDict):
+                            prop_types = member.property_types
+                            found = True
+                            break
+
+                if not found:
+                    prop_types[part] = types.union(prop_type, default_dict)
+                    prop_types = prop_types_inner
+
+        final_part = path_parts[-1]
+        if final_part not in prop_types:
+            prop_types[final_part] = val
+        else:
+            prop_types[final_part] = types.union(val, prop_types[final_part])
+
+    return types.TypedDict(dict_keys)

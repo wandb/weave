@@ -5,6 +5,7 @@ import logging
 import contextvars
 import contextlib
 
+
 from . import value_or_error
 from . import debug_compile
 
@@ -20,6 +21,7 @@ from . import compile_table
 from . import weave_internal
 from . import engine_trace
 from . import errors
+
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -381,7 +383,9 @@ def compile_apply_column_pushdown(
                         node.from_op.name + "_with_columns",
                         {
                             "run": node.from_op.inputs["run"],
-                            "history_cols": weave_internal.const(history_cols),
+                            "history_cols": weave_internal.const(
+                                list(set([*history_cols, "_step"]))
+                            ),
                         },
                     )
         return node
