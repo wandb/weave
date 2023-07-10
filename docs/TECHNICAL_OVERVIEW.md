@@ -1,10 +1,14 @@
 # Weave Technical Overview
 
+Contents
+
 - What is Weave
 - Weave Types
 - Weave Ops
 - Weave Panels
 
+
+# What is Weave
 
 Weave is new kind of visual development environment, designed for developing AI-powered software.
 
@@ -17,7 +21,8 @@ This evolving technical overview accompanies our interactive notebooks to docume
 
 ## Basic Types
 
-Follow along in this notebook to render interactive Weave Panels: ![basic weave types](../examples/experimental/skip_test/basic_weave_types.ipynb)
+Follow along in this notebook to render interactive Weave Panels: [basic weave types](../examples/experimental/skip_test/basic_weave_types.ipynb)
+
 In the code samples below, `weave.save()` creates an object in the Weave node graph and `weave.use()` computes the existing graph and returns the value.
 
 ### Number
@@ -41,12 +46,14 @@ Number()
 The following operations can be called on Number:
 
 **Operands**
+
 Relations between two Weave nodes
 
 - basic comparison ops: !=, ==, >, >=, <, <=
 - basic mathematical operations: +, -, \*, /, //, \*\*, %
 
 **Ecosystem ops**
+
 Weave ops callable on a single Weave node via dot notation
 
 ```
@@ -63,14 +70,14 @@ Weave ops callable on a single Weave node via dot notation
 These advanced ops are not relevant for every instance of a number. They are convenient shorthand to return common
 statistical distributions, configure histogram bins, and set up Weave Panels of a particular dimension
 
-* gauss, random_normal(), random_normal(,)
-* number_bins_fixed, timestamp_bins_fixed
-* \_new_Facet_CellSize(), \_new_Point2D, \_new_Size2D(,)
+* `gauss`, `random_normal()`, `random_normal(,)`
+* `number_bins_fixed`, `timestamp_bins_fixed`
+* `\_new_Facet_CellSize`, `\_new_Point2D`, `\_new_Size2D(,)`
 
 **Misc ops**
 
 Ops available in the ecosystem for demo purposes
-* an_example op, food101, mnist, ca_housing_dataset, days
+* `an_example_op`, `food101`, `mnist`, `ca_housing_dataset`, `days`
 
 ### Number panels
 
@@ -103,7 +110,7 @@ The following Weave ops are available on Strings:
 ```
 >>> greet = hello.replace("hello", "Hi").replace("world", "Weave") + "!"
 >>> weave.use(greet)
-\`Hi Weave!\`
+'Hi Weave!'
 ```
 
 ### String panels
@@ -119,11 +126,11 @@ We can convert between types using ops.
 
 Type conversion ops available so far:
 
-* `toString()` for converting Number to String
-* `toNumber()` for converting String to Number
+* `toString` for converting Number to String
+* `toNumber` for converting String to Number
 
 ```
 >>> num_as_str = num.toString()
 >>> num_as_str.type
 String()
-
+```
