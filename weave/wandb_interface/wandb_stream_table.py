@@ -224,7 +224,7 @@ def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_type
 def is_weave_encoded_history_cell(cell: dict) -> bool:
     return "_val" in cell and (
         "_weave_type" in cell
-        or ("_type" in cell and cell["_type"].startswith(TYPE_ENCODE_PREFIX))
+        or (cell.get("_type") != None and cell["_type"].startswith(TYPE_ENCODE_PREFIX))
     )
 
 

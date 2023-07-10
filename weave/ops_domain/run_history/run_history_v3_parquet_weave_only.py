@@ -209,6 +209,11 @@ def _get_history_stream(run: wdt.Run, columns=None):
 
     live_columns = {}
     live_columns_already_mapped = {}
+    run_path = wb_util.RunPath(
+        run.gql["project"]["entity"]["name"],
+        run.gql["project"]["name"],
+        run.gql["name"],
+    )
     for col_name, col_type in flattened_object_type.property_types.items():
         raw_live_column = extract_column_from_live_data(raw_live_data, col_name)
         processed_live_column = None
@@ -217,13 +222,15 @@ def _get_history_stream(run: wdt.Run, columns=None):
                 f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
             )
             processed_live_column = _process_poisoned_live_column(
-                raw_live_column, col_type
+                raw_live_column, run_path
             )
             live_columns[col_name] = processed_live_column
             # set_column_for_live_data(raw_live_data, col_name, processed_live_column)
             for table_ndx, table in enumerate(raw_history_pa_tables):
                 fields = [field.name for field in table.schema]
-                new_col = _process_poisoned_history_column(table[col_name], col_type)
+                new_col = _process_poisoned_history_column(
+                    table[col_name], col_type, run_path, artifact
+                )
                 raw_history_pa_tables[table_ndx] = table.set_column(
                     fields.index(col_name), col_name, new_col
                 )
@@ -470,6 +477,8 @@ def _is_null(array: pa.Array) -> pa.Array:
     if isinstance(array, pa.ChunkedArray):
         array = array.combine_chunks()
 
+    base_truth = pa.compute.is_null(array)
+
     if pa.types.is_struct(array.type):
         children_nulls = [_is_null(array.field(i)) for i in range(len(array.type))]
         if len(children_nulls) == 0:
@@ -478,9 +487,9 @@ def _is_null(array: pa.Array) -> pa.Array:
             curr = children_nulls[0]
             for child in children_nulls[1:]:
                 curr = pa.compute.and_(curr, child)
-            return curr
+            return pa.compute.or_(curr, base_truth)
 
-    return pa.compute.is_null(array)
+    return base_truth
 
 
 def _collapse_unions(awl: ArrowWeaveList) -> ArrowWeaveList:
@@ -521,19 +530,21 @@ def set_column_for_live_data(
     return live_data
 
 
-def _process_poisoned_live_column(live_column: list, col_type: types.Type) -> list:
-    return [_process_poisoned_live_object(item) for item in live_column]
+def _process_poisoned_live_column(live_column: list, run_path: wb_util.RunPath) -> list:
+    return [_process_poisoned_live_object(item, run_path) for item in live_column]
 
 
-def _process_poisoned_live_object(live_data: typing.Any) -> typing.Any:
+def _process_poisoned_live_object(
+    live_data: typing.Any, run_path: wb_util.RunPath
+) -> typing.Any:
     if isinstance(live_data, list):
-        return [_process_poisoned_live_object(cell) for cell in live_data]
+        return [_process_poisoned_live_object(cell, run_path) for cell in live_data]
     if isinstance(live_data, dict):
-        if "_type" in live_data:
-            return wb_util._process_run_dict_item(live_data)
+        if live_data.get("_type") != None:
+            return wb_util._process_run_dict_item(live_data, run_path)
         else:
             return {
-                key: _process_poisoned_live_object(val)
+                key: _process_poisoned_live_object(val, run_path)
                 for key, val in live_data.items()
             }
     return live_data
@@ -546,17 +557,21 @@ def _process_poisoned_live_object(live_data: typing.Any) -> typing.Any:
 
 
 def _process_poisoned_history_column(
-    history_column: pa.Array, col_type: types.Type
+    history_column: pa.Array,
+    col_type: types.Type,
+    run_path: wb_util.RunPath,
+    artifact: artifact_base.Artifact,
 ) -> pa.Array:
     pyobj = history_column.to_pylist()
-    processed_data = [
-        wb_util._process_run_dict_item(item) if item is not None else None
-        for item in pyobj
-    ]
+    processed_data = _process_poisoned_live_column(pyobj, run_path)
+    # processed_data = [
+    #     wb_util._process_run_dict_item(item, run_path) if item is not None else None
+    #     for item in pyobj
+    # ]
     awl = convert.to_arrow(
         processed_data,
         types.List(col_type),
-        artifact=artifact_mem.MemArtifact(),
+        artifact=artifact,
     )
     return pa.chunked_array([awl._arrow_data])
 

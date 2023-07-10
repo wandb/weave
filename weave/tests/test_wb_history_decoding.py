@@ -51,6 +51,15 @@ rows_tests = [
     # Here is a nasty test with really hard unions
     [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],
     [
+        {
+            "a": image(),
+        },
+        {
+            "a": 1,
+        },
+    ],
+    [{"list_of_image": [image()]}],
+    [
         {"a": [{"b": [1]}, {"b": [2, 3]}]},
         {"a": [{"b": [4, 5, 6]}, {"b": [7, 8, 9, 10]}]},
     ],
