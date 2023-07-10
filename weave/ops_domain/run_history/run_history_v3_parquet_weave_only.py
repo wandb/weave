@@ -207,6 +207,9 @@ def _get_history_stream(run: wdt.Run, columns=None):
     raw_history_pa_tables = [
         history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
     ]
+
+    live_columns = {}
+    live_columns_already_mapped = {}
     for col_name, col_type in flattened_object_type.property_types.items():
         raw_live_column = extract_column_from_live_data(raw_live_data, col_name)
         processed_live_column = None
@@ -217,7 +220,8 @@ def _get_history_stream(run: wdt.Run, columns=None):
             processed_live_column = _process_poisoned_live_column(
                 raw_live_column, col_type
             )
-            set_column_for_live_data(raw_live_data, col_name, processed_live_column)
+            live_columns[col_name] = processed_live_column
+            # set_column_for_live_data(raw_live_data, col_name, processed_live_column)
             for table_ndx, table in enumerate(raw_history_pa_tables):
                 fields = [field.name for field in table.schema]
                 new_col = _process_poisoned_history_column(table[col_name], col_type)
@@ -226,11 +230,13 @@ def _get_history_stream(run: wdt.Run, columns=None):
                 )
 
         elif _is_directly_convertible_type(col_type):
+            live_columns_already_mapped[col_name] = raw_live_column
             # Important that this runs before the else branch
             continue
         else:
             processed_live_column = _reconstruct_original_live_data_col(raw_live_column)
-            set_column_for_live_data(raw_live_data, col_name, processed_live_column)
+            live_columns_already_mapped[col_name] = processed_live_column
+            # set_column_for_live_data(raw_live_data, col_name, processed_live_column)
             for table_ndx, table in enumerate(raw_history_pa_tables):
                 fields = [field.name for field in table.schema]
                 new_col = _drop_types_from_encoded_types(
@@ -252,9 +258,59 @@ def _get_history_stream(run: wdt.Run, columns=None):
             # )
 
     # 5. Now we concat the converted liveset and parquet files
-    live_data_awl = convert.to_arrow(
-        raw_live_data,
-        types.List(flattened_object_type),
+    live_columns_to_data = [
+        {k: v[i] for k, v in live_columns.items()} for i in range(len(raw_live_data))
+    ]
+
+    live_columns_already_mapped_to_data = [
+        {k: v[i] for k, v in live_columns_already_mapped.items()}
+        for i in range(len(raw_live_data))
+    ]
+
+    partial_live_data_awl = convert.to_arrow(
+        live_columns_to_data,
+        types.List(
+            types.TypedDict(
+                {
+                    k: v
+                    for k, v in flattened_object_type.property_types.items()
+                    if k in live_columns
+                }
+            )
+        ),
+        artifact=artifact,
+        py_objs_already_mapped=True,
+    )
+    partial_live_data_already_mapped_awl = convert.to_arrow(
+        live_columns_already_mapped_to_data,
+        types.List(
+            types.TypedDict(
+                {
+                    k: v
+                    for k, v in flattened_object_type.property_types.items()
+                    if k in live_columns_already_mapped
+                }
+            )
+        ),
+        artifact=artifact,
+        py_objs_already_mapped=True,
+    )
+
+    field_names = []
+    field_arrays = []
+    for field in partial_live_data_awl._arrow_data.type:
+        field_names.append(field.name)
+        field_arrays.append(partial_live_data_awl._arrow_data.field(field.name))
+
+    for field in partial_live_data_already_mapped_awl._arrow_data.type:
+        field_names.append(field.name)
+        field_arrays.append(
+            partial_live_data_already_mapped_awl._arrow_data.field(field.name)
+        )
+
+    live_data_awl = ArrowWeaveList(
+        pa.StructArray.from_arrays(field_arrays, field_names),
+        flattened_object_type,
         artifact=artifact,
     )
 
@@ -392,7 +448,7 @@ def _union_collapse_mapper(
                 type_array, pa.array(offsets + [0], type=pa.int32()), arrays
             )
             return ArrowWeaveList(
-                union_arr, types.List(types.union(*weave_type_members)), awl._artifact
+                union_arr, types.union(*weave_type_members), awl._artifact
             )
 
     return None
