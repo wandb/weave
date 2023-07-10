@@ -103,8 +103,7 @@ def test_end_to_end_stream_table_history_path(user_by_api_key_in_env, rows):
             assert_type_assignment(
                 row_object_type.property_types[key], column_node.type.object_type
             )
-            with error_on_non_vectorized_history_transform():
-                column_value = weave.use(column_node).to_pylist_tagged()
+            column_value = weave.use(column_node).to_pylist_tagged()
             expected = []
 
             for row in row_accumulator:
