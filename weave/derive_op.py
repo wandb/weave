@@ -26,6 +26,10 @@ USE_PARALLEL_DOWNLOAD = True
 USE_PARALLEL_REFINE = True
 USE_PARALLEL_RESOLVE = True
 
+_PARALLEL_ALLOWLIST = ["refine_history_metrics", "artifactVersion-historyMetrics"]
+PARALLEL_REFINE_ALLOWLIST = _PARALLEL_ALLOWLIST
+PARALLEL_RESOLVE_ALLOWLIST = _PARALLEL_ALLOWLIST
+
 
 class DeriveOpHandler:
     """
@@ -286,7 +290,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
                 if not list_:
                     return types.List(types.NoneType())
-                if USE_PARALLEL_REFINE:
+                if USE_PARALLEL_REFINE and orig_op.name in PARALLEL_REFINE_ALLOWLIST:
                     types_to_merge = list(parallelism.do_in_parallel(refine_one, list_))
                 else:
                     types_to_merge = list(map(refine_one, list_))
@@ -318,7 +322,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         )
                     return None
 
-            if USE_PARALLEL_RESOLVE:
+            if USE_PARALLEL_RESOLVE and orig_op.name in PARALLEL_RESOLVE_ALLOWLIST:
                 return list(parallelism.do_in_parallel(resolve_one, list_))
             else:
                 return list(map(resolve_one, list_))
