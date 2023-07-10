@@ -22,7 +22,7 @@ foreign_index_type_names = set(["foreignIndex", "wandb.TableForeignIndex"])
 
 
 # This should ideally match `mediaTable.ts` in Weave0.
-def _convert_type(old_type: Weave0TypeJson) -> types.Type:
+def _convert_type(old_type: Weave0TypeJson, data=None) -> types.Type:
     old_type_name = old_type["wb_type"]
     is_python_object_type = old_type_name == "pythonObject" or old_type_name == "object"
     #
@@ -105,8 +105,13 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return types.Int()
     elif old_type_name == "ndarray":
         # return ops.LegacyTableNDArrayType()
-        # Just return NoneType. The data is None.
-        return types.NoneType()
+        if old_type.get("params", {}).get("serialization_path") is not None:
+            # Just return NoneType. The data is None.
+            return types.NoneType()
+
+        # SDK converted the array to a pylist
+        return types.List(types.UnknownType())
+
         # return NumpyArrayType("f", shape=old_type._params.get("shape", (0,)))
     #
     # Media Types
