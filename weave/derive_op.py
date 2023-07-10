@@ -23,6 +23,12 @@ from . import parallelism
 from .language_features.tagging import tag_store
 
 USE_PARALLEL_DOWNLOAD = True
+USE_PARALLEL_REFINE = True
+USE_PARALLEL_RESOLVE = True
+
+_PARALLEL_ALLOWLIST = ["refine_history_metrics", "artifactVersion-historyMetrics"]
+PARALLEL_REFINE_ALLOWLIST = _PARALLEL_ALLOWLIST
+PARALLEL_RESOLVE_ALLOWLIST = _PARALLEL_ALLOWLIST
 
 
 class DeriveOpHandler:
@@ -232,6 +238,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 res = execute_fast.fast_map_fn(list_, map_fn)
                 return res
 
+            tag_store_mem_map = tag_store._OBJ_TAGS_MEM_MAP.get()
+            tag_store_curr_node_id = tag_store._OBJ_TAGS_CURR_NODE_ID.get()
+
             # Just do file-table in parallel for now. We'll do parallelization
             # more generally in the future.
             if (
@@ -242,19 +251,22 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("run-history2")
             ):
 
-                def do_one(x):
-                    if x == None or types.is_optional(first_arg.type):
-                        return None
-                    called = orig_op(x, **new_inputs)
-                    # Use the use path to get caching.
-                    res = weave_internal.use(called)
-                    res = storage.deref(res)
-                    return res
+                def download_one(x):
+                    with tag_store.with_tag_store_state(
+                        tag_store_curr_node_id, tag_store_mem_map
+                    ):
+                        if x == None or types.is_optional(first_arg.type):
+                            return None
+                        called = orig_op(x, **new_inputs)
+                        # Use the use path to get caching.
+                        res = weave_internal.use(called)
+                        res = storage.deref(res)
+                        return res
 
                 if USE_PARALLEL_DOWNLOAD:
-                    res = list(parallelism.do_in_parallel(do_one, list_))
+                    res = list(parallelism.do_in_parallel(download_one, list_))
                 else:
-                    res = list(map(do_one, list_))
+                    res = list(map(download_one, list_))
 
                 # file-table needs to flow tags, but we lose them going across the
                 # thread boundary.
@@ -265,14 +277,24 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 return res
 
             if isinstance(orig_op.concrete_output_type, types.TypeType):
+
+                def refine_one(x) -> types.Type:
+                    with tag_store.with_tag_store_state(
+                        tag_store_curr_node_id, tag_store_mem_map
+                    ):
+                        if x != None or types.is_optional(first_arg.type):
+                            return orig_op.resolve_fn(
+                                **{mapped_param_name: x, **new_inputs}
+                            )
+                        return types.NoneType()
+
                 if not list_:
                     return types.List(types.NoneType())
-                types_to_merge = [
-                    orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
-                    if (not x == None or types.is_optional(first_arg.type))
-                    else types.NoneType()
-                    for x in list_
-                ]
+                if USE_PARALLEL_REFINE and orig_op.name in PARALLEL_REFINE_ALLOWLIST:
+                    types_to_merge = list(parallelism.do_in_parallel(refine_one, list_))
+                else:
+                    types_to_merge = list(map(refine_one, list_))
+
                 return types.List(types.union(*types_to_merge))
 
             # TODO: use the vectorization described here:
@@ -280,20 +302,30 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             list_tags = None
             if tag_store.is_tagged(list_) and orig_op._gets_tag_by_name != None:
                 list_tags = tag_store.get_tags(list_)
-            return [
-                orig_op.resolve_fn(
-                    **{
-                        mapped_param_name: tag_store.add_tags(box.box(x), list_tags)
-                        if list_tags is not None
-                        else x,
-                        **new_inputs,
-                    }
-                )
-                if not (x is None or isinstance(x, box.BoxedNone))
-                or types.is_optional(first_arg.type)
-                else None
-                for x in list_
-            ]
+
+            def resolve_one(x):
+                with tag_store.with_tag_store_state(
+                    tag_store_curr_node_id, tag_store_mem_map
+                ):
+                    if not (
+                        x is None or isinstance(x, box.BoxedNone)
+                    ) or types.is_optional(first_arg.type):
+                        return orig_op.resolve_fn(
+                            **{
+                                mapped_param_name: tag_store.add_tags(
+                                    box.box(x), list_tags
+                                )
+                                if list_tags is not None
+                                else x,
+                                **new_inputs,
+                            }
+                        )
+                    return None
+
+            if USE_PARALLEL_RESOLVE and orig_op.name in PARALLEL_RESOLVE_ALLOWLIST:
+                return list(parallelism.do_in_parallel(resolve_one, list_))
+            else:
+                return list(map(resolve_one, list_))
 
         # Use the function signature of the original op to compute the signature
         # of the lazy call

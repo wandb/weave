@@ -21,19 +21,19 @@ import typing
 import weakref
 
 
-import pyarrow as pa
-
 from ... import box
 from ... import weave_types as types
 from ... import errors
 
 from collections import defaultdict
 
+NodeTagStoreType = dict[int, dict[str, typing.Any]]
+TagStoreType = defaultdict[int, NodeTagStoreType]
+
+
 # Private global objects used to store the tags for objects
 _OBJ_TAGS_MEM_MAP: contextvars.ContextVar[
-    typing.Optional[
-        defaultdict[int, dict[int, dict[str, typing.Any]]]
-    ]  # shape: {node_id: {obj_id: {tag_key: tag_value}}}
+    typing.Optional[TagStoreType]  # shape: {node_id: {obj_id: {tag_key: tag_value}}}
 ] = contextvars.ContextVar("obj_tags_mem_map", default=None)
 
 # Current node id for scoping tags
@@ -43,11 +43,22 @@ _OBJ_TAGS_CURR_NODE_ID: contextvars.ContextVar[int] = contextvars.ContextVar(
 
 
 # gets the current tag memory map for the current node
-def _current_obj_tag_mem_map() -> typing.Optional[dict[int, dict[str, typing.Any]]]:
+def _current_obj_tag_mem_map() -> typing.Optional[NodeTagStoreType]:
     node_tags = _OBJ_TAGS_MEM_MAP.get()
     if node_tags is None:
         return None
     return node_tags[_OBJ_TAGS_CURR_NODE_ID.get()]
+
+
+@contextmanager
+def with_tag_store_state(
+    curr_node_id: int, tags_mem_map: typing.Optional[TagStoreType]
+) -> typing.Iterator[None]:
+    tag_store_token = _OBJ_TAGS_MEM_MAP.set(tags_mem_map)
+    curr_node_id_token = _OBJ_TAGS_CURR_NODE_ID.set(curr_node_id)
+    yield
+    _OBJ_TAGS_CURR_NODE_ID.reset(curr_node_id_token)
+    _OBJ_TAGS_MEM_MAP.reset(tag_store_token)
 
 
 # sets the current node with optionally merged in parent tags
