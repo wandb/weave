@@ -369,13 +369,16 @@ def compile_apply_column_pushdown(
                 )
             if "run-history" in node.from_op.name:
                 explicitly_requested_paths = list(run_cols.keys())
-                # expand each column into it's flattened form
-                all_known_paths = flatten_typed_dicts(node.type.object_type)  # type: ignore
-                history_cols = []
-                for path in all_known_paths:
-                    for requested_path in explicitly_requested_paths:
-                        if path.split(".")[0] == requested_path:
-                            history_cols.append(path)
+                if hasattr(node.type, "object_type"):
+                    # expand each column into it's flattened form
+                    all_known_paths = flatten_typed_dicts(node.type.object_type)  # type: ignore
+                    history_cols = []
+                    for path in all_known_paths:
+                        for requested_path in explicitly_requested_paths:
+                            if path.split(".")[0] == requested_path:
+                                history_cols.append(path)
+                else:
+                    history_cols = explicitly_requested_paths
 
                 if len(history_cols) > 0:
                     return graph.OutputNode(

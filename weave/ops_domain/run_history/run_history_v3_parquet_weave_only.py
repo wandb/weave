@@ -346,7 +346,7 @@ def _get_history_stream(run: wdt.Run, columns=None):
     reason = weave_arrow_type_check(final_type, final_array)
 
     if reason != None:
-        raise errors.WeaveHistoryDecodingError(
+        raise errors.WeaveWBHistoryTranslationError(
             f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
         )
     return ArrowWeaveList(
@@ -389,7 +389,9 @@ def _build_array_from_tree(tree: PathTree) -> pa.Array:
     children_arrays = [*(tree.data or []), *children_struct_array]
 
     if len(children_arrays) == 0:
-        raise errors.WeaveHistoryDecodingError("Cannot build array from empty tree")
+        raise errors.WeaveWBHistoryTranslationError(
+            "Cannot build array from empty tree"
+        )
     elif len(children_arrays) == 1:
         return children_arrays[0]
 
@@ -843,7 +845,7 @@ def _gorilla_parquet_table_to_corrected_awl(
                         tree = tree.children[union_path].children[path_part]
                         continue
 
-                raise errors.WeaveHistoryDecodingError(
+                raise errors.WeaveWBHistoryTranslationError(
                     f"Given target type {target_object_type}, attempt to populate arrow column at {target_spec.remap_path}, but failed to find source path {source_path}"
                 )
 
@@ -876,11 +878,11 @@ def _gorilla_parquet_table_to_corrected_awl(
                 elif isinstance(self_type, (types.String,)):
                     intermediate_union_path = PathItemStructField("_type_utf8")
                 else:
-                    raise errors.WeaveHistoryDecodingError(
+                    raise errors.WeaveWBHistoryTranslationError(
                         "Programmer Error: Unhandled type"
                     )
             elif isinstance(self_type, union_types):
-                raise errors.WeaveHistoryDecodingError(
+                raise errors.WeaveWBHistoryTranslationError(
                     "Programmer Error: Nested Unions not supported"
                 )
             elif isinstance(self_type, list_types):
@@ -893,7 +895,7 @@ def _gorilla_parquet_table_to_corrected_awl(
                 intermediate_union_path = PathItemStructField("_type_utf8")
 
             else:
-                raise errors.WeaveHistoryDecodingError(
+                raise errors.WeaveWBHistoryTranslationError(
                     "Programmer Error: Unhandled type"
                 )
 
@@ -904,7 +906,7 @@ def _gorilla_parquet_table_to_corrected_awl(
                 tree = tree.children[intermediate_union_path]
 
         if tree.data == None:
-            raise errors.WeaveHistoryDecodingError(
+            raise errors.WeaveWBHistoryTranslationError(
                 "Missing data in column tree path {source_path}"
             )
 
@@ -912,7 +914,7 @@ def _gorilla_parquet_table_to_corrected_awl(
         reason = weave_arrow_type_check(target_spec.weave_type, data_array)
 
         if reason != None:
-            raise errors.WeaveHistoryDecodingError(
+            raise errors.WeaveWBHistoryTranslationError(
                 f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
             )
         return ArrowWeaveList(
@@ -926,7 +928,7 @@ def _gorilla_parquet_table_to_corrected_awl(
     reason = weave_arrow_type_check(target_object_type, corrected_awl._arrow_data)
 
     if reason != None:
-        errors.WeaveHistoryDecodingError(
+        errors.WeaveWBHistoryTranslationError(
             f"Failed to effectively convert  Gorilla Parquet History to expected history type: {reason}"
         )
 
@@ -992,12 +994,14 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                 PathItemStructField("_val"),
             )
         else:
-            raise errors.WeaveHistoryDecodingError("Programmer Error: Unhandled type")
+            raise errors.WeaveWBHistoryTranslationError(
+                "Programmer Error: Unhandled type"
+            )
 
         if len(path) > 1:
             parent_path = tuple(path[:-1])
             if parent_path not in path_summary.all_paths:
-                raise errors.WeaveHistoryDecodingError(
+                raise errors.WeaveWBHistoryTranslationError(
                     "Programmer Error: Expected to visit parent path before child path"
                 )
             parent_spec = path_summary.all_paths[parent_path]
@@ -1009,7 +1013,7 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
             # PathItemList,
             parent_weave_type = types.non_none(parent_spec.weave_type)
             if isinstance(parent_weave_type, primitive_types):
-                raise errors.WeaveHistoryDecodingError(
+                raise errors.WeaveWBHistoryTranslationError(
                     "Unexpectedly encountered primitive parent type in path"
                 )
             elif isinstance(parent_weave_type, union_types):
@@ -1029,11 +1033,11 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                     elif isinstance(self_type, (types.String,)):
                         self_path = (PathItemStructField("_type_utf8"),)
                     else:
-                        raise errors.WeaveHistoryDecodingError(
+                        raise errors.WeaveWBHistoryTranslationError(
                             "Programmer Error: Unhandled type"
                         )
                 elif isinstance(self_type, union_types):
-                    raise errors.WeaveHistoryDecodingError(
+                    raise errors.WeaveWBHistoryTranslationError(
                         "Programmer Error: Nested Unions not supported"
                     )
                 elif isinstance(self_type, list_types):
@@ -1045,7 +1049,7 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                 elif isinstance(self_type, custom_types):
                     self_path = (PathItemStructField("_type_struct"),)
                 else:
-                    raise errors.WeaveHistoryDecodingError(
+                    raise errors.WeaveWBHistoryTranslationError(
                         "Programmer Error: Unhandled type"
                     )
             elif isinstance(parent_weave_type, list_types):
@@ -1064,11 +1068,11 @@ def _summarize_awl_paths(prototype_awl: ArrowWeaveList) -> list[TargetAWLSpec]:
                     PathItemStructField(final_path.attr),
                 )
             elif isinstance(parent_weave_type, custom_types):
-                raise errors.WeaveHistoryDecodingError(
+                raise errors.WeaveWBHistoryTranslationError(
                     "Custom type parents not yet implemented"
                 )
             else:
-                raise errors.WeaveHistoryDecodingError(
+                raise errors.WeaveWBHistoryTranslationError(
                     "Programmer Error: Unhandled type"
                 )
 

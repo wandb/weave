@@ -144,5 +144,5 @@ class WeaveMissingVariableError(WeaveBaseError):
     pass
 
 
-class WeaveHistoryDecodingError(WeaveBaseError):
+class WeaveWBHistoryTranslationError(WeaveBaseError):
     pass

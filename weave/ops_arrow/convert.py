@@ -205,8 +205,7 @@ def recursively_build_pyarrow_array(
     elif pa.types.is_union(pyarrow_type):
         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
         type_codes: list[int] = [
-            0 if o == None else mapper.type_code_of_obj(o, py_objs_already_mapped)
-            for o in py_objs
+            0 if o == None else mapper.type_code_of_obj(o) for o in py_objs
         ]
         offsets: list[int] = []
         py_data: list[list] = []

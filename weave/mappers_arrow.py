@@ -139,20 +139,9 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
                         return member_type_code
                 raise errors.WeaveTypeError(f"Could not find type code for {type}")
 
-    def type_code_of_obj(self, obj, py_objs_already_mapped: bool = False) -> int:
+    def type_code_of_obj(self, obj) -> int:
         """Return the arrow type code for the given object."""
-        obj_type = None
-        if py_objs_already_mapped:
-            if isinstance(obj, dict) and "_type" in obj:
-                type_field = obj["_type"]
-                if isinstance(type_field, str):
-                    type_cls = types.type_name_to_type(type_field)
-                    if type_cls is not None:
-                        obj_type = type_cls()
-                elif isinstance(type_field, dict):
-                    obj_type = types.TypeRegistry.type_from_dict(type_field)
-        if obj_type is None:
-            obj_type = types.TypeRegistry.type_of(obj)
+        obj_type = types.TypeRegistry.type_of(obj)
         return self.type_code_of_type(obj_type)
 
     def mapper_of_type_code(self, type_code: int) -> mappers.Mapper:
