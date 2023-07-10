@@ -8,6 +8,8 @@ from weave.panels.panel_plot import Plot, Series, PlotConstants
 from .test_run_segment import create_experiment
 from .. import storage
 
+from weave import weave_types as types
+
 from contextlib import contextmanager
 
 
@@ -1762,3 +1764,19 @@ def test_actual_config_value(fixed_random_seed):
             "configVersion": 7,
         },
     }
+
+
+def test_panel_plot_scale_serialization():
+    # checks a problem case where scale would not be serialized correctly as an AxisScale object
+    plot = weave.panels.Plot(
+        [1, 2, 3, 4],
+        x=lambda row: row,
+        x_title="x",
+        y=lambda row: row**2,
+        y_title="y",
+        y_axis_type="log",
+    )
+    type = types.TypeRegistry.type_of(plot)
+    serialized = type.to_dict()
+    deserialized = types.TypeRegistry.type_from_dict(serialized)
+    assert deserialized.assign_type(type) and type.assign_type(deserialized)
