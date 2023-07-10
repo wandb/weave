@@ -67,6 +67,7 @@ def Board(vars, panels: list[BoardPanel]):
                         "Slider",
                         "StringEditor",
                         "SelectEditor",
+                        "DateRange",
                     ],
                     enableAddPanel=True,
                     childNameBase="var",

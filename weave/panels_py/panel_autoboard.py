@@ -202,6 +202,9 @@ def auto_panels(
     control_items = {
         "data": input_node,
         "zoom_range": None,
+        "date_picker": lambda data, zoom_range: weave.panels.DateRange(
+            zoom_range, domain=data[x_axis]
+        ),
         "data_range": lambda data: weave.ops.make_list(
             a=data[x_axis].min(), b=data[x_axis].max()
         ),

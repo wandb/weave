@@ -128,3 +128,23 @@ def ge(self, other):
     return ArrowWeaveList(
         pc.greater_equal(self._arrow_data, other), types.Boolean(), self._artifact
     )
+
+
+@op(
+    name="ArrowWeaveListDate-min",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
+    output_type=types.optional(types.Timestamp()),
+)
+def timestamp_min(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.min(array).as_py()
+
+
+@op(
+    name="ArrowWeaveListDate-max",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
+    output_type=types.optional(types.Timestamp()),
+)
+def timestamp_max(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.max(array).as_py()
