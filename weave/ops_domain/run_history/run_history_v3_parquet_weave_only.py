@@ -8,7 +8,7 @@ from .context import get_error_on_non_vectorized_history_transform
 from ...compile_domain import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
-from .. import wb_domain_types as wdt
+from .. import trace_tree, wb_domain_types as wdt
 from ... import artifact_mem
 from .. import wb_util
 from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
@@ -509,6 +509,7 @@ poison_legacy_types = (
     wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
     wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
     wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
+    trace_tree.WBTraceTree.WeaveType,  # type: ignore
     wbmedia.LegacyTableNDArrayType,
 )
 
@@ -519,7 +520,7 @@ def _is_poison_type_recursive(col_type: types.Type):
     non_none_type = types.non_none(col_type)
     if isinstance(non_none_type, types.UnionType):
         return True
-    elif isinstance(poison_legacy_types, poison_legacy_types):
+    elif isinstance(non_none_type, poison_legacy_types):
         return True
     elif isinstance(non_none_type, types.List):
         return _is_poison_type_recursive(non_none_type.object_type)
