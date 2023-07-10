@@ -401,7 +401,7 @@ def _unflatten_pa_table(array: pa.Table) -> pa.StructArray:
             if part not in target.children:
                 target.children[part] = PathTree(data=[])
             target = target.children[part]
-            target.data.append(array[col_name].combine_chunks())
+        target.data.append(array[col_name].combine_chunks())
 
     # Recursively resolve the tree
     return _build_array_from_tree(new_tree)

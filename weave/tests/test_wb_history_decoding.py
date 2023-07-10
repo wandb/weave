@@ -149,12 +149,12 @@ def do_batch_test(username, rows):
             column_value = weave.use(column_node).to_pylist_tagged()
             expected = []
 
-            # NOTICE: This is super weird b/c right now gorilla does not
-            # give back rows that are missing keys. Once this fix is deployed
-            # will need to update this test
             for row in row_accumulator:
-                if key in row and row[key] is not None:
-                    expected.append(row[key])
+                # NOTICE: This is super weird b/c right now gorilla does not
+                # give back rows that are missing keys. Once this fix is deployed
+                # will need to update this test
+                # if key in row and row[key] is not None:
+                expected.append(row.get(key))
             assert compare_objects(column_value, expected)
 
     def history_is_uploaded():
