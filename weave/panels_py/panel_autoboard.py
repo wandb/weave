@@ -266,6 +266,14 @@ def auto_panels(
                 layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
             ),
         )
+
+    panels.append(
+        weave.panels.BoardPanel(
+            window_data_node,
+            id="table",
+            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+        ),
+    )
     return weave.panels.Board(vars=control_items, panels=panels, editable=False)
 
 
