@@ -13,6 +13,9 @@ from weave.wandb_client_api import wandb_gql_query
 from weave.wandb_interface import wandb_stream_table
 
 
+HISTORY_OP_NAME = "history_stream"
+
+
 def image():
     imarray = np.random.rand(100, 100, 3) * 255
     return Image.fromarray(imarray.astype("uint8")).convert("RGBA")
@@ -89,7 +92,79 @@ rows_tests = [
 
 @pytest.mark.parametrize("rows", rows_tests)
 def test_end_to_end_stream_table_history_path(user_by_api_key_in_env, rows):
-    do_batch_test(user_by_api_key_in_env.username, rows)
+    def do_assertion(history_node, row_type, row_accumulator, user_logged_keys):
+        row_object_type = make_optional_type(row_type.object_type)
+
+        for key in user_logged_keys:
+            column_node = history_node[key]
+            assert_type_assignment(
+                row_object_type.property_types[key], column_node.type.object_type
+            )
+            column_value = weave.use(column_node).to_pylist_tagged()
+            expected = []
+
+            for row in row_accumulator:
+                expected.append(row.get(key))
+            assert compare_objects(column_value, expected)
+
+    do_batch_test(user_by_api_key_in_env.username, rows, do_assertion)
+
+
+def test_nested_pick_via_dots(user_by_api_key_in_env):
+    rows = [
+        {
+            "a": 1,
+            "b": {
+                "c": 2,
+            },
+            "d.e": 3,
+        }
+    ]
+
+    def do_assertion(history_node, row_type, row_accumulator):
+        assert weave.use(history_node["a"]).to_pylist_tagged() == [1]
+        assert weave.use(history_node["b"]).to_pylist_tagged() == [{"c": 2}]
+        assert weave.use(history_node["b"]["c"]).to_pylist_tagged() == [2]
+        assert weave.use(history_node["b.c"]).to_pylist_tagged() == [2]
+        assert weave.use(history_node["d"]).to_pylist_tagged() == [{"e": 3}]
+        assert weave.use(history_node["d.e"]).to_pylist_tagged() == [3]
+
+    do_batch_test(user_by_api_key_in_env.username, rows, do_assertion)
+
+
+def do_batch_test(username, rows, do_assertion):
+    row_accumulator, st, user_logged_keys = do_logging(username, rows)
+
+    row_type = weave.types.TypeRegistry.type_of([{}, *row_accumulator])
+    run_node = weave.ops.project(
+        st._lite_run._entity_name, st._lite_run._project_name
+    ).run(st._lite_run._run_name)
+
+    # First assertion is with liveset
+    wait_for_x_times(
+        lambda: history_is_uploaded(
+            run_node,
+            len(row_accumulator),
+            len(row_type.object_type.property_types),
+            st._lite_run._entity_name,
+            st._lite_run._project_name,
+            st._lite_run._run_name,
+        )
+    )
+    history_node = run_node._get_op(HISTORY_OP_NAME)()
+    do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
+    st.finish()
+
+    # Second assertion is with parquet files
+    wait_for_x_times(
+        lambda: history_moved_to_parquet(
+            st._lite_run._entity_name,
+            st._lite_run._project_name,
+            st._lite_run._run_name,
+        )
+    )
+    history_node = run_node._get_op(HISTORY_OP_NAME)()
+    do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
 
 
 def do_logging(username, rows, finish=False):
@@ -123,58 +198,6 @@ def do_logging(username, rows, finish=False):
         st.finish()
 
     return row_accumulator, st, all_keys
-
-
-HISTORY_OP_NAME = "history_stream"  # history_stream
-
-
-def do_batch_test(username, rows):
-    row_accumulator, st, all_keys = do_logging(username, rows)
-
-    row_type = weave.types.TypeRegistry.type_of([{}, *row_accumulator])
-    run_node = weave.ops.project(
-        st._lite_run._entity_name, st._lite_run._project_name
-    ).run(st._lite_run._run_name)
-
-    def do_assertion():
-        history_node = run_node._get_op(HISTORY_OP_NAME)()
-        row_object_type = make_optional_type(row_type.object_type)
-
-        for key in all_keys:
-            column_node = history_node[key]
-            assert_type_assignment(
-                row_object_type.property_types[key], column_node.type.object_type
-            )
-            column_value = weave.use(column_node).to_pylist_tagged()
-            expected = []
-
-            for row in row_accumulator:
-                expected.append(row.get(key))
-            assert compare_objects(column_value, expected)
-
-    # First assertion is with liveset
-    wait_for_x_times(
-        lambda: history_is_uploaded(
-            run_node,
-            len(row_accumulator),
-            len(row_type.object_type.property_types),
-            st._lite_run._entity_name,
-            st._lite_run._project_name,
-            st._lite_run._run_name,
-        )
-    )
-    do_assertion()
-    st.finish()
-
-    # Second assertion is with parquet files
-    wait_for_x_times(
-        lambda: history_moved_to_parquet(
-            st._lite_run._entity_name,
-            st._lite_run._project_name,
-            st._lite_run._run_name,
-        )
-    )
-    do_assertion()
 
 
 def history_is_uploaded(
@@ -265,44 +288,6 @@ def get_raw_gorilla_history(entity_name, project_name, run_name):
     }
     res = wandb_gql_query(query, variables)
     return res.get("project", {}).get("run", {})
-
-
-def test_nested_pick_via_dots(user_by_api_key_in_env):
-    _, st, _ = do_logging(
-        user_by_api_key_in_env.username,
-        [
-            {
-                "a": 1,
-                "b": {
-                    "c": 2,
-                },
-                "d.e": 3,
-            }
-        ],
-    )
-
-    run_node = weave.ops.project(
-        st._lite_run._entity_name, st._lite_run._project_name
-    ).run(st._lite_run._run_name)
-
-    wait_for_x_times(
-        lambda: history_is_uploaded(
-            run_node,
-            1,
-            3 + 4,
-            st._lite_run._entity_name,
-            st._lite_run._project_name,
-            st._lite_run._run_name,
-        )
-    )
-
-    history_node = run_node.history_stream()
-    assert weave.use(history_node["a"]).to_pylist_tagged() == [1]
-    assert weave.use(history_node["b"]).to_pylist_tagged() == [{"c": 2}]
-    assert weave.use(history_node["b"]["c"]).to_pylist_tagged() == [2]
-    assert weave.use(history_node["b.c"]).to_pylist_tagged() == [2]
-    assert weave.use(history_node["d"]).to_pylist_tagged() == [{"e": 3}]
-    assert weave.use(history_node["d.e"]).to_pylist_tagged() == [3]
 
 
 @pytest.mark.skip(reason="Local Perf Testing")
