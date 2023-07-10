@@ -5,6 +5,9 @@ import datetime
 
 import pytest
 import weave
+from weave.ops_domain.run_history.context import (
+    error_on_non_vectorized_history_transform,
+)
 from .. import context_state as _context
 from PIL import Image
 import numpy as np
@@ -100,7 +103,8 @@ def test_end_to_end_stream_table_history_path(user_by_api_key_in_env, rows):
             assert_type_assignment(
                 row_object_type.property_types[key], column_node.type.object_type
             )
-            column_value = weave.use(column_node).to_pylist_tagged()
+            with error_on_non_vectorized_history_transform():
+                column_value = weave.use(column_node).to_pylist_tagged()
             expected = []
 
             for row in row_accumulator:
@@ -121,13 +125,14 @@ def test_nested_pick_via_dots(user_by_api_key_in_env):
         }
     ]
 
-    def do_assertion(history_node, row_type, row_accumulator):
-        assert weave.use(history_node["a"]).to_pylist_tagged() == [1]
-        assert weave.use(history_node["b"]).to_pylist_tagged() == [{"c": 2}]
-        assert weave.use(history_node["b"]["c"]).to_pylist_tagged() == [2]
-        assert weave.use(history_node["b.c"]).to_pylist_tagged() == [2]
-        assert weave.use(history_node["d"]).to_pylist_tagged() == [{"e": 3}]
-        assert weave.use(history_node["d.e"]).to_pylist_tagged() == [3]
+    def do_assertion(history_node, row_type, row_accumulator, user_logged_keys):
+        with error_on_non_vectorized_history_transform():
+            assert weave.use(history_node["a"]).to_pylist_tagged() == [1]
+            assert weave.use(history_node["b"]).to_pylist_tagged() == [{"c": 2}]
+            assert weave.use(history_node["b"]["c"]).to_pylist_tagged() == [2]
+            assert weave.use(history_node["b.c"]).to_pylist_tagged() == [2]
+            assert weave.use(history_node["d"]).to_pylist_tagged() == [{"e": 3}]
+            assert weave.use(history_node["d.e"]).to_pylist_tagged() == [3]
 
     do_batch_test(user_by_api_key_in_env.username, rows, do_assertion)
 

@@ -3,6 +3,8 @@ import logging
 import typing
 import pyarrow as pa
 
+
+from .context import get_error_on_non_vectorized_history_transform
 from ...compile_domain import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
@@ -138,7 +140,7 @@ def _get_history_stream(run: wdt.Run, columns=None):
         raw_live_column = _extract_column_from_live_data(raw_live_data, col_name)
         processed_live_column = None
         if _is_poison_type(col_type):
-            logging.warning(
+            _non_vectorized_warning(
                 f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
             )
             processed_live_column = _process_poisoned_live_column(
@@ -269,6 +271,12 @@ def _get_history_stream(run: wdt.Run, columns=None):
     )
 
 
+def _non_vectorized_warning(message: str):
+    logging.warning(message)
+    if get_error_on_non_vectorized_history_transform():
+        raise errors.WeaveWBHistoryTranslationError(message)
+
+
 def _build_array_from_tree(tree: PathTree) -> pa.Array:
     children_struct_array = []
     if len(tree.children) > 0:
@@ -355,7 +363,6 @@ def _union_collapse_mapper(
 def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
     type_array = pa.nulls(num_rows, type=pa.int8())
     offset_array = pa.nulls(num_rows, type=pa.int32())
-    # offset_template = pa.array(list(range(num_rows)), type=pa.int32())
     arrays = []
     for col_ndx, column_data in enumerate(columns):
         is_usable = pa.compute.invert(_is_null(column_data))
