@@ -129,7 +129,7 @@ class InMemoryLazyLiteRun:
     def log(self, row_dict: dict) -> None:
         stream = self.stream
         row_dict = {
-            **{_sanitize_run_key(key): val for key, val in row_dict.items()},
+            **row_dict,
             "_timestamp": datetime.datetime.utcnow().timestamp(),
         }
         if not self._use_async_file_stream:
@@ -156,10 +156,3 @@ class InMemoryLazyLiteRun:
 
     def __del__(self) -> None:
         self.finish()
-
-
-def _sanitize_run_key(key: str) -> str:
-    sanitized_key = re.sub(
-        r"\W+", "_", key
-    )  # Substitute all non-alphanumeric characters with underscores
-    return sanitized_key

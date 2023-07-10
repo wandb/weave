@@ -375,7 +375,9 @@ def compile_apply_column_pushdown(
                     history_cols = []
                     for path in all_known_paths:
                         for requested_path in explicitly_requested_paths:
-                            if path.split(".")[0] == requested_path:
+                            if path == requested_path or path.startswith(
+                                requested_path + "."
+                            ):
                                 history_cols.append(path)
                 else:
                     history_cols = explicitly_requested_paths

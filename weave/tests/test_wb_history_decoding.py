@@ -152,25 +152,17 @@ def do_batch_test(username, rows):
                 expected.append(row.get(key))
             assert compare_objects(column_value, expected)
 
-    def history_is_uploaded():
-        history_node = run_node._get_op(HISTORY_OP_NAME)()
-        run_data = get_raw_gorilla_history(
+    # First assertion is with liveset
+    wait_for_x_times(
+        lambda: history_is_uploaded(
+            run_node,
+            len(row_accumulator),
+            len(row_type.object_type.property_types),
             st._lite_run._entity_name,
             st._lite_run._project_name,
             st._lite_run._run_name,
         )
-        history = run_data.get("parquetHistory", {})
-        return (
-            len(history.get("liveData", []))
-            == len(row_accumulator)
-            == (run_data.get("historyKeys", {}).get("lastStep", -999) + 1)
-            and history.get("parquetUrls") == []
-            and len(row_type.object_type.property_types)
-            == len(history_node.type.object_type.property_types)
-        )
-
-    # First assertion is with liveset
-    wait_for_x_times(history_is_uploaded)
+    )
     do_assertion()
     st.finish()
 
@@ -183,6 +175,25 @@ def do_batch_test(username, rows):
         )
     )
     do_assertion()
+
+
+def history_is_uploaded(
+    run_node, exp_len, exp_cols_len, entity_name, project_name, run_name
+):
+    history_node = run_node._get_op(HISTORY_OP_NAME)()
+    run_data = get_raw_gorilla_history(
+        entity_name,
+        project_name,
+        run_name,
+    )
+    history = run_data.get("parquetHistory", {})
+    return (
+        len(history.get("liveData", []))
+        == exp_len
+        == (run_data.get("historyKeys", {}).get("lastStep", -999) + 1)
+        and history.get("parquetUrls") == []
+        and exp_cols_len == len(history_node.type.object_type.property_types)
+    )
 
 
 def history_moved_to_parquet(entity_name, project_name, run_name):
@@ -254,6 +265,44 @@ def get_raw_gorilla_history(entity_name, project_name, run_name):
     }
     res = wandb_gql_query(query, variables)
     return res.get("project", {}).get("run", {})
+
+
+def test_nested_pick_via_dots(user_by_api_key_in_env):
+    _, st, _ = do_logging(
+        user_by_api_key_in_env.username,
+        [
+            {
+                "a": 1,
+                "b": {
+                    "c": 2,
+                },
+                "d.e": 3,
+            }
+        ],
+    )
+
+    run_node = weave.ops.project(
+        st._lite_run._entity_name, st._lite_run._project_name
+    ).run(st._lite_run._run_name)
+
+    wait_for_x_times(
+        lambda: history_is_uploaded(
+            run_node,
+            1,
+            3 + 4,
+            st._lite_run._entity_name,
+            st._lite_run._project_name,
+            st._lite_run._run_name,
+        )
+    )
+
+    history_node = run_node.history_stream()
+    assert weave.use(history_node["a"]).to_pylist_tagged() == [1]
+    assert weave.use(history_node["b"]).to_pylist_tagged() == [{"c": 2}]
+    assert weave.use(history_node["b"]["c"]).to_pylist_tagged() == [2]
+    assert weave.use(history_node["b.c"]).to_pylist_tagged() == [2]
+    assert weave.use(history_node["d"]).to_pylist_tagged() == [{"e": 3}]
+    assert weave.use(history_node["d.e"]).to_pylist_tagged() == [3]
 
 
 @pytest.mark.skip(reason="Local Perf Testing")
