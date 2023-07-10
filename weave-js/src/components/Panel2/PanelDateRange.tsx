@@ -54,8 +54,10 @@ export function deltaStringToSeconds(timeString: string) {
   let match;
 
   // To track which units have been found already
-  let foundUnits: {[key: string]: true} = {};
+  const foundUnits: {[key: string]: true} = {};
 
+  // If its good enough for chatgpt its good enough for me!
+  // eslint-disable-next-line no-cond-assign
   while ((match = regex.exec(timeString)) !== null) {
     const value = parseInt(match[1], 10);
     const unit = match[2];
@@ -100,7 +102,7 @@ export const DateEditor: React.FC<{
       key={dateS}
       initialValue={dateS}
       dataTest={''}
-      onCommit={function (newValue: string): void {
+      onCommit={(newValue: string) => {
         if (!isNaN(new Date(newValue).getTime())) {
           props.onCommit(new Date(newValue).getTime());
         } else if (allowDelta && props.deltaFromOffset != null) {
@@ -115,7 +117,7 @@ export const DateEditor: React.FC<{
           }
         }
       }}
-      validateInput={function (value: string): boolean {
+      validateInput={(value: string) => {
         if (!isNaN(new Date(value).getTime())) {
           return true;
         }
