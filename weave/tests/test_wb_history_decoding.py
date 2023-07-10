@@ -39,10 +39,6 @@ base_types = {
 base_types["list"] = list(base_types.values()) + [{**base_types}, None]
 base_types["dict"] = {**base_types}
 
-# IDEA: Use Danny's approach with changes:
-# 1. Re-write dot-nested top-level fields to be structs
-# 2. We can directly consume any top-level key that is a nullable primitive, or list/dicts of nullable primitives. Custom Types may work
-# 3. Custom objects or complex unions must be re-constructed to py, then re-written to our arrow.
 rows_tests = [
     # Here we have 1 test per type for easy debugging
     *[[{k: v}] for k, v in base_types.items()],
@@ -129,12 +125,6 @@ def do_logging(username, rows, finish=False):
     return row_accumulator, st, all_keys
 
 
-# // I think data is screwed up on #6...
-# TODO:
-# I think we need to correct the nesting still...
-# replace _type/_val with _val contents
-#
-
 HISTORY_OP_NAME = "history_stream"  # history_stream
 
 
@@ -159,10 +149,6 @@ def do_batch_test(username, rows):
             expected = []
 
             for row in row_accumulator:
-                # NOTICE: This is super weird b/c right now gorilla does not
-                # give back rows that are missing keys. Once this fix is deployed
-                # will need to update this test
-                # if key in row and row[key] is not None:
                 expected.append(row.get(key))
             assert compare_objects(column_value, expected)
 
@@ -270,6 +256,7 @@ def get_raw_gorilla_history(entity_name, project_name, run_name):
     return res.get("project", {}).get("run", {})
 
 
+@pytest.mark.skip(reason="Local Perf Testing")
 @pytest.mark.parametrize(
     "n_rows, n_cols",
     [

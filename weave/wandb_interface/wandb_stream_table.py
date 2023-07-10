@@ -303,7 +303,6 @@ def leaf_to_weave(leaf: typing.Any, artifact: WandbLiveRunFiles) -> typing.Any:
     type_name = w_type_to_type_name(w_type)
 
     if ENCODE_ENTIRE_TYPE:
-        # return {"_type": type_name, "_val": res}
         return {"_type": type_name, "_val": res["_val"]}
     else:
         return {
