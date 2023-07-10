@@ -304,10 +304,8 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                     tag_store_curr_node_id, tag_store_mem_map
                 ):
                     if not (
-                        x is None
-                        or isinstance(x, box.BoxedNone)
-                        or types.is_optional(first_arg.type)
-                    ):
+                        x is None or isinstance(x, box.BoxedNone)
+                    ) or types.is_optional(first_arg.type):
                         return orig_op.resolve_fn(
                             **{
                                 mapped_param_name: tag_store.add_tags(
