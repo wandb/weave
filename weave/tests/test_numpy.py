@@ -143,8 +143,11 @@ def test_construct_numpy_type_from_table_file():
         "nrows": 1,
     }
 
-    # generate a dummy artifact so we can call _get_rows_and_object_type_from_weave_format
-    # this artifact is not actually used, it just needs to have a file
+    # generate a dummy filesystem artifact file so we can call
+    # _get_rows_and_object_type_from_weave_format. that function
+    # requires a filesystemartifactfile, but doesn't actually use it.
+    # thus we can just use a dummy here.
+
     art = artifact_wandb.WandbArtifact("test")
     fs_artifact_file = artifact_fs.FilesystemArtifactFile(art, "test")
     _, object_type = table._get_rows_and_object_type_from_weave_format(
