@@ -150,8 +150,6 @@ def recursively_build_pyarrow_array(
                     if py_obj is None:
                         data.append(None)
                     elif py_objs_already_mapped:
-                        if isinstance(py_obj, dict) and "_val" in py_obj:
-                            py_obj = py_obj["_val"]
                         data.append(py_obj.get(field.name, None))
                     else:
                         data.append(getattr(py_obj, field.name, None))
@@ -249,12 +247,6 @@ def recursively_build_pyarrow_array(
         )
         return pa.ListArray.from_arrays(
             offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
-        )
-
-    if py_objs_already_mapped:
-        return pa.array(
-            [p["_val"] if isinstance(p, dict) and "_val" in p else p for p in py_objs],
-            pyarrow_type,
         )
 
     values = [mapper.apply(o) if o is not None else None for o in py_objs]
