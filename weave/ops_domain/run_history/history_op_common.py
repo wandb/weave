@@ -291,7 +291,7 @@ def history_keys(run: wdt.Run) -> list[str]:
     return list(object_type.property_types.keys())
 
 
-def local_path_to_parquet_table(
+def awl_from_local_parquet_path(
     path: str,
     object_type: typing.Optional[types.TypedDict],
     columns: list[str] = [],
@@ -355,7 +355,7 @@ def read_history_parquet(run: wdt.Run, columns=None):
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
-            awl = local_path_to_parquet_table(path, object_type, columns=columns)
+            awl = awl_from_local_parquet_path(path, object_type, columns=columns)
             tables.append(awl)
     return process_history_awl_tables(tables)
 
