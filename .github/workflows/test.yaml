@@ -65,8 +65,10 @@ jobs:
       - name: Show changes if pre-commit fails
         if: failure()
         run: |
-          echo "Files were modified, running git diff to show changes"
-          git diff
+          echo "Files were modified, printing names of changed files"
+          git diff --name-only
+          echo "Failing this step to expand logs in the UI"
+          exit 1
 
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
