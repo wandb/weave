@@ -679,7 +679,7 @@ export async function refineNode(
   return (await refineEditingNode(client, node, stack)) as Node;
 }
 
-function isProducibleType(type: Type) {
+function isProducibleType(type: Type): boolean {
   if (isFunction(type)) {
     return isProducibleType(type.outputType);
   }
