@@ -93,7 +93,7 @@ def _get_history3(run: wdt.Run, columns=None):
     # 2. Read in the live set
     # 3. Raw-load each parquet file
     # 4. For each flattened column:
-    #   a. If it contains a "poison type" (non simple union, binary, or legacy media), then
+    #   a. If it contains a type requiring in-mem processing, then
     #       i. For liveset -> we must pass each item `_process_run_dict_item`, then use convert.to_arrow
     #       ii. For parquet -> we must extract the pyobj, us `_process_run_dict_item`, convert.to_arrow
     #   b. If the nested type contains a custom type or object type, then we must adjust the structure:
@@ -264,18 +264,18 @@ def _process_all_columns(
     for col_name, col_type in flattened_object_type.property_types.items():
         raw_live_column = _extract_column_from_live_data(raw_live_data, col_name)
         processed_live_column = None
-        if _is_poison_type(col_type):
+        if _column_type_requires_in_memory_transformation(col_type):
             _non_vectorized_warning(
                 f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
             )
-            processed_live_column = _process_poisoned_live_column(
+            processed_live_column = _process_live_column_in_memory(
                 raw_live_column, run_path
             )
             live_columns[col_name] = processed_live_column
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
                 fields = [field.name for field in table.schema]
-                new_col = _process_poisoned_history_column(
+                new_col = _process_history_column_in_memory(
                     table[col_name], col_type, run_path, artifact
                 )
                 processed_history_pa_tables[table_ndx] = table.set_column(
@@ -471,34 +471,36 @@ def _extract_column_from_live_data(live_data: list[dict], column_name: str):
     return [row.get(column_name, None) for row in live_data]
 
 
-def _process_poisoned_live_column(live_column: list, run_path: wb_util.RunPath) -> list:
-    return [_process_poisoned_live_object(item, run_path) for item in live_column]
+def _process_live_column_in_memory(
+    live_column: list, run_path: wb_util.RunPath
+) -> list:
+    return [_process_live_object_in_memory(item, run_path) for item in live_column]
 
 
-def _process_poisoned_live_object(
+def _process_live_object_in_memory(
     live_data: typing.Any, run_path: wb_util.RunPath
 ) -> typing.Any:
     if isinstance(live_data, list):
-        return [_process_poisoned_live_object(cell, run_path) for cell in live_data]
+        return [_process_live_object_in_memory(cell, run_path) for cell in live_data]
     if isinstance(live_data, dict):
         if live_data.get("_type") != None:
             return wb_util._process_run_dict_item(live_data, run_path)
         else:
             return {
-                key: _process_poisoned_live_object(val, run_path)
+                key: _process_live_object_in_memory(val, run_path)
                 for key, val in live_data.items()
             }
     return live_data
 
 
-def _process_poisoned_history_column(
+def _process_history_column_in_memory(
     history_column: pa.Array,
     col_type: types.Type,
     run_path: wb_util.RunPath,
     artifact: artifact_base.Artifact,
 ) -> pa.Array:
     pyobj = history_column.to_pylist()
-    processed_data = _process_poisoned_live_column(pyobj, run_path)
+    processed_data = _process_live_column_in_memory(pyobj, run_path)
     awl = convert.to_arrow(
         processed_data,
         types.List(col_type),
@@ -528,16 +530,16 @@ def _read_raw_history_awl_tables(
     # return history_op_common.process_history_awl_tables(tables)
 
 
-def _is_poison_type(col_type: types.Type):
-    return _is_poison_type_recursive(col_type)
+def _column_type_requires_in_memory_transformation(col_type: types.Type):
+    return _column_type_requires_in_memory_transformation_recursive(col_type)
 
 
 def _is_directly_convertible_type(col_type: types.Type):
     return _is_directly_convertible_type_recursive(col_type)
 
 
-non_poison_legacy_types = (wbmedia.ImageArtifactFileRefType,)
-poison_legacy_types = (
+_weave_types_requiring_in_memory_transformation = (
+    wbmedia.ImageArtifactFileRefType,  # type: ignore
     wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
     wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
     wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
@@ -549,19 +551,21 @@ poison_legacy_types = (
 )
 
 
-def _is_poison_type_recursive(col_type: types.Type):
+def _column_type_requires_in_memory_transformation_recursive(col_type: types.Type):
     if types.NoneType().assign_type(col_type):
         return False
     non_none_type = types.non_none(col_type)
     if isinstance(non_none_type, types.UnionType):
         return True
-    elif isinstance(non_none_type, poison_legacy_types):
+    elif isinstance(non_none_type, _weave_types_requiring_in_memory_transformation):
         return True
     elif isinstance(non_none_type, types.List):
-        return _is_poison_type_recursive(non_none_type.object_type)
+        return _column_type_requires_in_memory_transformation_recursive(
+            non_none_type.object_type
+        )
     elif isinstance(non_none_type, types.TypedDict):
         for k, v in non_none_type.property_types.items():
-            if _is_poison_type_recursive(v):
+            if _column_type_requires_in_memory_transformation_recursive(v):
                 return True
         return False
     else:
