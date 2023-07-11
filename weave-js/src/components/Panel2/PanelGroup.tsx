@@ -722,7 +722,12 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       keyedChildPanels[name] = unwrappedItem;
       newVars = {
         ...newVars,
-        ...getItemVars(name, item, stack, config.allowedPanels),
+        ...getItemVars(
+          name,
+          item,
+          pushFrame(stack, newVars),
+          config.allowedPanels
+        ),
       };
     });
     return keyedChildPanels;

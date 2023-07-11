@@ -521,7 +521,10 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     # This last line dedupes nodes that are identical. But it doesn't
     # globally dedupe against the graph we've already compiled.
     # There is still some duplication left in Weave execution...
-    return compile_merge_by_node_id([new_node_fixed_calls])[0]
+    new_node_merged = compile_merge_by_node_id([new_node_fixed_calls])[0]
+
+    # Do it again to handle nested calls
+    return compile_node_ops([new_node_merged])[0]
 
 
 def compile_node_ops(
