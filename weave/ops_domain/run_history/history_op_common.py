@@ -121,6 +121,12 @@ def get_full_columns(columns: typing.Optional[list[str]]):
     return list(set([*columns, "_step"]))
 
 
+def get_full_columns_prefixed(run: wdt.RunType, columns: typing.Optional[list[str]]):
+    all_columns = get_full_columns(columns)
+    all_paths = list(run.gql.get("historyKeys", {}).get("keys", {}).keys())
+    return _filter_known_paths_to_requested_paths(all_paths, all_columns)
+
+
 def flatten_typed_dicts(type_: types.TypedDict) -> list[str]:
     props = type_.property_types
     paths = []
@@ -192,6 +198,7 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
         # If no keys, then we cowardly refuse to blindly fetch entire history table
         return "historyKeys"
 
+    top_level_keys = get_full_columns(top_level_keys)
     node = inputs.stitched_obj.node
     if not _node_type_has_keys(node.type):
         node = _get_key_typed_node(node)
