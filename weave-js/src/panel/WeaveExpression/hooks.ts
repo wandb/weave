@@ -460,7 +460,10 @@ export const useSuggestionVisualState = ({
     let rect = domRange.getBoundingClientRect();
 
     if (rect.top === 0 && rect.left === 0) {
-      rect = (domRange.startContainer as any).getBoundingClientRect();
+      const castContainer = domRange.startContainer as any;
+      if (castContainer.getBoundingClientRect) {
+        rect = castContainer.getBoundingClientRect();
+      }
     }
 
     if (rect.top === 0 && rect.left === 0) {

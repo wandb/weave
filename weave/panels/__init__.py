@@ -23,6 +23,7 @@ from .panel_each_column import EachColumn
 from .panel_color import Color
 from .panel_html import PanelHtml
 from .panel_markdown import PanelMarkdown
+from .panel_trace import Trace
 
 
 # sidebar specific

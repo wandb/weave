@@ -40,6 +40,7 @@ class Span:
     status_code: typing.Optional[str] = None
     status_message: typing.Optional[str] = None
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
+    # results is not standard and not representation by OpenTelemetry
     results: typing.Optional[typing.List[typing.Optional[Result]]] = dataclasses.field(
         default_factory=lambda: None
     )
@@ -70,6 +71,18 @@ class Span:
                 setattr(root_span, key, dump_dict[key])
 
         return root_span
+
+
+# Type used when logging normalized (flat) span data instead of a tree.
+# we can add status_code etc...
+class FlatSpanType(typing.TypedDict):
+    trace_id: typing.Optional[str]
+    span_id: typing.Optional[str]
+    parent_id: typing.Optional[str]
+    name: typing.Optional[str]
+    start_time_ms: typing.Optional[int]
+    end_time_ms: typing.Optional[int]
+    attributes: typing.Optional[typing.Dict[str, typing.Any]]
 
 
 def stringified_output(obj: typing.Any) -> str:
