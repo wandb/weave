@@ -1,6 +1,11 @@
 import json
 import typing
 
+from ... import graph
+from ... import compile
+
+
+from ... import registry_mem
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
 from ...ops_primitives import make_list
@@ -14,6 +19,7 @@ from ... import engine_trace
 from ...compile_domain import InputAndStitchProvider
 from ... import compile_table
 from ... import artifact_base
+from ...language_features.tagging.tagged_value_type import TaggedValueType
 
 from ...api import use
 
@@ -115,12 +121,84 @@ def get_full_columns(columns: typing.Optional[list[str]]):
     return list(set([*columns, "_step"]))
 
 
+def flatten_typed_dicts(type_: types.TypedDict) -> list[str]:
+    props = type_.property_types
+    paths = []
+    for key, val in props.items():
+        if types.optional(types.TypedDict({})).assign_type(
+            val
+        ) and not types.NoneType().assign_type(val):
+            subpaths = flatten_typed_dicts(typing.cast(types.TypedDict, val))
+            paths += [f"{key}.{path}" for path in subpaths]
+        else:
+            paths.append(key)
+    return list(set(paths))
+
+
+def _without_tags(type_: types.Type) -> types.Type:
+    if isinstance(type_, TaggedValueType):
+        return _without_tags(type_.value)
+    return type_
+
+
+def _node_type_has_keys(type_: types.Type) -> bool:
+    return (
+        hasattr(type_, "object_type")
+        and hasattr(type_.object_type, "property_types")
+        and len(type_.object_type.property_types) > 0
+    )
+
+
+def _get_key_typed_node(node: graph.Node) -> graph.Node:
+    with tracer.trace("run_history_inner_refine") as span:
+        # This block will not normally be needed. But in some cases (for example lambdas)
+        # we will have to refine the node to get the history type.
+        op = registry_mem.memory_registry._ops[node.from_op.name]
+        with compile.enable_compile():
+            return op.lazy_call(
+                **{
+                    k: n
+                    for k, n in zip(
+                        op.input_type.arg_types, node.from_op.inputs.values()
+                    )
+                }
+            )
+
+
+def _filter_known_paths_to_requested_paths(
+    known_paths: list[str], requested_paths: list[str]
+) -> list[str]:
+    history_cols = []
+    for path in known_paths:
+        for requested_path in requested_paths:
+            if path == requested_path or path.startswith(requested_path + "."):
+                history_cols.append(path)
+    return history_cols
+
+
 def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
+    # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
+    # I moved the column pushdown before the gql step, so we actually have the
+    # columns directly available here.... could be possible we need to revisit
     top_level_keys = inputs.raw.get("history_cols")
+    if top_level_keys == None:
+        stitch_obj = inputs.stitched_obj
+        key_tree = compile_table.get_projection(stitch_obj)
+
+        # we only pushdown the top level keys for now.
+        top_level_keys = get_top_level_keys(key_tree)
 
     if not top_level_keys:
         # If no keys, then we cowardly refuse to blindly fetch entire history table
         return "historyKeys"
+
+    node = inputs.stitched_obj.node
+    if not _node_type_has_keys(node.type):
+        node = _get_key_typed_node(node)
+    all_known_paths = flatten_typed_dicts(_without_tags(node.type.object_type))  # type: ignore
+    history_cols = _filter_known_paths_to_requested_paths(
+        all_known_paths, top_level_keys
+    )
 
     project_fragment = """
         project {
@@ -135,7 +213,7 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
 
     return f"""
     historyKeys
-    sampledParquetHistory: parquetHistory(liveKeys: {json.dumps(top_level_keys)}) {{
+    sampledParquetHistory: parquetHistory(liveKeys: {json.dumps(history_cols)}) {{
         liveData
         parquetUrls
     }}

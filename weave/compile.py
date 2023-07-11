@@ -313,20 +313,6 @@ _execute_nodes_map_fn = _make_auto_op_map_fn(
 _quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
 
 
-def flatten_typed_dicts(type_: types.TypedDict) -> list[str]:
-    props = type_.property_types
-    paths = []
-    for key, val in props.items():
-        if types.optional(types.TypedDict({})).assign_type(
-            val
-        ) and not types.NoneType().assign_type(val):
-            subpaths = flatten_typed_dicts(typing.cast(types.TypedDict, val))
-            paths += [f"{key}.{path}" for path in subpaths]
-        else:
-            paths.append(key)
-    return list(set(paths))
-
-
 def compile_apply_column_pushdown(
     leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
 ) -> list[graph.Node]:
@@ -368,19 +354,7 @@ def compile_apply_column_pushdown(
                     },
                 )
             if "run-history" in node.from_op.name:
-                explicitly_requested_paths = list(run_cols.keys())
-                if hasattr(node.type, "object_type"):
-                    # expand each column into it's flattened form
-                    all_known_paths = flatten_typed_dicts(node.type.object_type)  # type: ignore
-                    history_cols = []
-                    for path in all_known_paths:
-                        for requested_path in explicitly_requested_paths:
-                            if path == requested_path or path.startswith(
-                                requested_path + "."
-                            ):
-                                history_cols.append(path)
-                else:
-                    history_cols = explicitly_requested_paths
+                history_cols = list(run_cols.keys())
 
                 if len(history_cols) > 0:
                     return graph.OutputNode(
@@ -629,12 +603,14 @@ def _compile(
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
-    with tracer.trace("compile:column_pushdown"):
-        results = results.batch_map(_track_errors(compile_apply_column_pushdown))
+
     with tracer.trace("compile:gql"):
         results = results.batch_map(
             _track_errors(compile_domain.apply_domain_op_gql_translation)
         )
+
+    with tracer.trace("compile:column_pushdown"):
+        results = results.batch_map(_track_errors(compile_apply_column_pushdown))
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important
