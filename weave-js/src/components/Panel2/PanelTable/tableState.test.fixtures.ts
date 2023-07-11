@@ -15,7 +15,7 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 
-import * as ServerApiTest from '../../../core/_external/backendProviders/serverApiTest';
+import * as ServerApiTest from '../../../core/_external/backendProviders/serverApiTest2';
 
 export function testClient() {
   return createLocalClient(new ServerApiTest.Client());
