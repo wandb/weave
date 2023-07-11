@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import logging
 import typing
 import pyarrow as pa
@@ -12,6 +13,7 @@ from .. import trace_tree, wb_domain_types as wdt
 from ... import artifact_mem
 from .. import wb_util
 from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
+from ...op_def import map_type
 from ... import engine_trace
 from ... import errors
 from ...wandb_interface import wandb_stream_table
@@ -110,6 +112,7 @@ def _get_history3(run: wdt.Run, columns=None):
 
     # 1. Get the flattened Weave-Type given HistoryKeys
     flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
+    _verify_supported_types(flattened_object_type)
 
     # 2. Read in the live set
     raw_live_data = _get_live_data_from_run(run, columns=columns)
@@ -268,9 +271,7 @@ def _process_all_columns(
             _non_vectorized_warning(
                 f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
             )
-            processed_live_column = _process_live_column_in_memory(
-                raw_live_column, run_path
-            )
+            processed_live_column = _process_column_in_memory(raw_live_column, run_path)
             live_columns[col_name] = processed_live_column
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
@@ -304,6 +305,34 @@ def _process_all_columns(
                 )
 
     return live_columns, live_columns_already_mapped, processed_history_pa_tables
+
+
+unsupported_types = (
+    wbmedia.ImageArtifactFileRefType,  # type: ignore
+    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.LegacyTableNDArrayType,
+    wb_util.WbHistogram,
+)
+
+
+def _verify_supported_type_mapper(type_: types.Type) -> types.Type:
+    from .. import artifact_fs
+
+    type_ = types.non_none(type_)
+    if isinstance(type_, unsupported_types + (artifact_fs.FilesystemArtifactFileType,)):
+        raise errors.WeaveWBHistoryTranslationError(
+            f"Unsupported type in history3: {type_}"
+        )
+    return type_
+
+
+def _verify_supported_types(type_: types.Type) -> None:
+    map_type(type_, _verify_supported_type_mapper)
 
 
 def _non_vectorized_warning(message: str):
@@ -471,9 +500,7 @@ def _extract_column_from_live_data(live_data: list[dict], column_name: str):
     return [row.get(column_name, None) for row in live_data]
 
 
-def _process_live_column_in_memory(
-    live_column: list, run_path: wb_util.RunPath
-) -> list:
+def _process_column_in_memory(live_column: list, run_path: wb_util.RunPath) -> list:
     return [_process_live_object_in_memory(item, run_path) for item in live_column]
 
 
@@ -500,7 +527,7 @@ def _process_history_column_in_memory(
     artifact: artifact_base.Artifact,
 ) -> pa.Array:
     pyobj = history_column.to_pylist()
-    processed_data = _process_live_column_in_memory(pyobj, run_path)
+    processed_data = _process_column_in_memory(pyobj, run_path)
     awl = convert.to_arrow(
         processed_data,
         types.List(col_type),
@@ -524,10 +551,33 @@ def _read_raw_history_awl_tables(
             awl = history_op_common.local_path_to_parquet_table(
                 path, None, columns=columns, artifact=artifact
             )
+            awl.map_column(_parse_bytes_mapper)
             tables.append(awl)
     return tables
 
     # return history_op_common.process_history_awl_tables(tables)
+
+
+def _parse_bytes_to_json(bytes: bytes):
+    return json.loads(bytes.decode("utf-8"))
+
+
+def _parse_bytes_mapper(
+    awl: ArrowWeaveList, path: PathType
+) -> typing.Optional[ArrowWeaveList]:
+    obj_type = types.non_none(awl.object_type)
+    if types.Bytes().assign_type(obj_type):
+        _non_vectorized_warning(
+            f"Encountered bytes in column {path}, requires in-memory processing"
+        )
+        data = [
+            _parse_bytes_to_json(row) if row is not None else None
+            for row in awl._arrow_data.to_pylist()
+        ]
+        return convert.to_arrow(
+            data, None, artifact=awl._artifact, py_objs_already_mapped=True
+        )
+    return None
 
 
 def _column_type_requires_in_memory_transformation(col_type: types.Type):
@@ -539,15 +589,17 @@ def _is_directly_convertible_type(col_type: types.Type):
 
 
 _weave_types_requiring_in_memory_transformation = (
-    wbmedia.ImageArtifactFileRefType,  # type: ignore
-    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
+    # wbmedia.ImageArtifactFileRefType,  # type: ignore
+    # wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
+    # wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
+    # wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
+    # wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
+    # wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
+    # wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
+    # wbmedia.LegacyTableNDArrayType,
+    # wb_util.WbHistogram,
     trace_tree.WBTraceTree.WeaveType,  # type: ignore
-    wbmedia.LegacyTableNDArrayType,
+    types.UnknownType,
 )
 
 
