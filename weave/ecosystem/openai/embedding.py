@@ -61,6 +61,7 @@ OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 chunk_size = 1000
 
 
+# Based on the langchain implementation
 def embed_texts(texts: list[str], embedding_model: str) -> list[list[float]]:
     embeddings: list[list[float]] = [[] for _ in range(len(texts))]
     tokens = []

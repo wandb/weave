@@ -1,4 +1,4 @@
-import _, {isObject, mapValues} from 'lodash';
+import _, {isArray, isObject, mapValues} from 'lodash';
 
 import {hexToId} from '../util/digest';
 import {has} from '../util/has';
@@ -414,9 +414,6 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
         return false;
       }
       return isAssignableTo(type.objectType, toType.objectType);
-    } else if (type.type === 'WeaveNDArray' && toType.type === 'list') {
-      // TODO: not true! Check shape!
-      return true;
     } else if (type.type === 'file' && toType.type === 'file') {
       if (
         toType.wbObjectType != null &&
@@ -843,7 +840,7 @@ export function unwrapTaggedValues(result: any): any {
   if (result != null && result._tag !== undefined) {
     return unwrapTaggedValues(result._value);
   }
-  if (_.isArray(result)) {
+  if (isArray(result)) {
     return result.map((row: any) => unwrapTaggedValues(row));
   } else if (isObject(result) && !(result instanceof Date)) {
     return mapValues(result, (v: any) => unwrapTaggedValues(v));
@@ -915,10 +912,6 @@ export function dict(objectType: Type): Type {
 
 export function isList(t: Type): t is ListType {
   return !isSimpleTypeShape(t) && ALL_LIST_TYPES.includes(t.type as any);
-}
-
-export function isArray(t: Type): t is ListType {
-  return !isSimpleTypeShape(t) && t.type === 'WeaveNDArray';
 }
 
 // TODO: Replace isList with isListLike in most places
@@ -1067,9 +1060,6 @@ export const listObjectType = (type: Type): Type => {
   if (isFunction(type)) {
     return listObjectType(type.outputType);
   }
-  if (isArray(type)) {
-    return 'any';
-  }
   if (!isList(type)) {
     throw new Error('listObjectType: incoming type is not a list');
   }
@@ -1095,9 +1085,6 @@ export const listMaxLength = (type: Type): number | undefined => {
     }
     return Math.max(...(memberMaxLengths as number[]));
   }
-  if (isArray(type)) {
-    return undefined;
-  }
   if (!isList(type)) {
     throw new Error('listMaxLength: incoming type is not a list');
   }
@@ -1112,9 +1099,6 @@ export const listMinLength = (type: Type): number | undefined => {
       return undefined;
     }
     return Math.min(...(memberMinLengths as number[]));
-  }
-  if (isArray(type)) {
-    return undefined;
   }
   if (!isList(type)) {
     throw new Error('listMinLength: incoming type is not a list');

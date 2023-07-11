@@ -1,3 +1,27 @@
+# Notes of stuff to do:
+# - Add filter controls
+# - Make groupby a dropdown
+# - Better categorical detection. Currently we can't tell if something is a unique
+#   string column or categorical. There are three options I see:
+#   - put this information in the type system
+#   - fully weavify the Render body here so it can switch based on the result of .execute
+#     (execute a grouping operation on the input node to get summary stats, then switch
+#     behavior based on the result, or make a summary_stats op and do the same).
+#   - allow panel render bodies to call use. The problem here is we don't want rendering
+#     to incur round-trips. Maybe its already ok since we only recall python panel
+#     renders when the input node or type changes, but no other time.
+#   - There might be a more appealing edge based alternative... like if we could use
+#     .initialize to do the summary, and stick that information in the panel's config?
+#     that might work!
+# - Multiple segments (allow defining multiple segment filters, concat tables together
+#   including segment name, and then groupby segment name)
+# - An earlier version of this used section layout instead of grid, and used ChildPanel
+#   vars instead of VarBar, and it looked really nice in a notebook. We can make it
+#   so you can switch between configurable panel (that can be added into an existing
+#   Board), v whole new board layout. The information is the same in both cases, we
+#   just use different UI structures to render.
+
+
 import typing
 
 import weave
@@ -204,6 +228,8 @@ def auto_panels(
             input_node,
             id="data",
         ),
+        # TODO: We need a filter editor. Can start with a filter expression
+        # editor and make it more user-friendly later
         weave.panels.GroupPanel(
             lambda data: weave.ops.make_list(
                 a=data[x_axis].min(), b=data[x_axis].max()
@@ -223,6 +249,8 @@ def auto_panels(
             ),
             id="date_picker",
         ),
+        # TODO: groupby should really be a Dropdown / multi-select instead
+        # of an expression
         weave.panels.GroupPanel(
             groupby,
             id="groupby",

@@ -1,4 +1,3 @@
-import typing
 import numpy as np
 from . import weave_types as types
 from . import errors
@@ -40,31 +39,26 @@ class NumpyArrayType(types.Type):
         self.dtype = dtype
         self.shape = shape
 
-    def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
-        if isinstance(other_type, types.List):
-            return True
-        return super()._is_assignable_to(other_type)
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(obj.dtype, obj.shape)
 
-    # @classmethod
-    # def type_of_instance(cls, obj):
-    #     return cls(obj.dtype, obj.shape)
+    def _to_dict(self):
+        return {"dtype": str(self.dtype), "shape": self.shape}
 
-    # def _to_dict(self):
-    #     return {"dtype": str(self.dtype), "shape": self.shape}
+    @classmethod
+    def from_dict(cls, d):
+        return cls(np.dtype(d.get("dtype", "object")), d["shape"])
 
-    # @classmethod
-    # def from_dict(cls, d):
-    #     return cls(np.dtype(d.get("dtype", "object")), d["shape"])
-
-    # def _assign_type_inner(self, next_type):
-    #     if not isinstance(next_type, NumpyArrayType):
-    #         return False
-    #     if (
-    #         self.dtype != next_type.dtype
-    #         and next_type.dtype != np.dtype("object")  # object is like "any"
-    #     ) or tuple(self.shape) != tuple(next_type.shape):
-    #         return False
-    #     return True
+    def _assign_type_inner(self, next_type):
+        if not isinstance(next_type, NumpyArrayType):
+            return False
+        if (
+            self.dtype != next_type.dtype
+            and next_type.dtype != np.dtype("object")  # object is like "any"
+        ) or tuple(self.shape) != tuple(next_type.shape):
+            return False
+        return True
 
     def save_instance(self, obj, artifact, name):
         handler = artifact.get_path_handler(name, handler_constructor=NumpyArraySaver)

@@ -267,7 +267,6 @@ def days(days: int) -> datetime.timedelta:
 # date_parse above can be used for flexible parsing.
 @op(name="timestamp", render_info={"type": "function"})
 def timestamp(timestampISO: str) -> typing.Optional[datetime.datetime]:
-    breakpoint()
     try:
         return datetime.datetime.fromisoformat(timestampISO)
     except ValueError:
