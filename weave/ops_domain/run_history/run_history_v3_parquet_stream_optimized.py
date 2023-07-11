@@ -196,7 +196,7 @@ def _construct_live_data_awl(
     live_columns_already_mapped: dict[str, list],
     flattened_object_type: types.TypedDict,
     num_rows: int,
-    artifact: typing.Optional[artifact_mem.MemArtifact] = None,
+    artifact: artifact_mem.MemArtifact,
 ) -> ArrowWeaveList:
     live_columns_to_data = [
         {k: v[i] for k, v in live_columns.items()} for i in range(num_rows)
@@ -220,7 +220,7 @@ def _construct_live_data_awl(
         ),
         artifact=artifact,
     )
-    partial_live_data_already_mapped_awl = convert.to_arrow(
+    partial_live_data_already_mapped_awl = convert.to_arrow_from_list_and_artifact(
         live_columns_already_mapped_to_data,
         types.List(
             types.TypedDict(
@@ -577,8 +577,12 @@ def _parse_bytes_mapper(
             _parse_bytes_to_json(row) if row is not None else None
             for row in awl._arrow_data.to_pylist()
         ]
-        return convert.to_arrow(
-            data, None, artifact=awl._artifact, py_objs_already_mapped=True
+        wb_type = types.TypeRegistry.type_of(data)
+        return convert.to_arrow_from_list_and_artifact(
+            data,
+            wb_type,
+            artifact=awl._artifact or artifact_mem.MemArtifact(),
+            py_objs_already_mapped=True,
         )
     return None
 
