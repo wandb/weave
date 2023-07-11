@@ -51,6 +51,7 @@ import {
   varNode,
   voidNode,
   WeaveInterface,
+  PathType,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -191,6 +192,43 @@ function isNDArrayLike(type: Type): boolean {
   }
   return false;
 }
+const monitoringColumns = [
+  // Added by monitor decorator
+  "result_id",
+  "inputs",
+  "output",
+  "latency_ms",
+  "start_datetime",
+  "end_datetime",
+  "exception",
+  // Added by Stream Table
+  "timestamp",
+  "_client_id",
+  // Added by Run
+  "_timestamp",
+  // Added by Gorilla
+  "_step",
+]
+
+const excludedMonitoringColumns = [
+    // Added by Stream Table
+    "timestamp",
+    "_client_id",
+    // Added by Run
+    "_timestamp",
+    // Added by Gorilla
+    "_step",
+]
+
+function allPathsFromMonitoring(allPaths: PathType[]): boolean {
+  for (const col of monitoringColumns) {
+    if (!allPaths.find(p => p.path[0] === col)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 
 // Try to pick nice default columns to make a table for the given object
 // type. See the initial columns test in tableState.test.ts to see examples
@@ -199,9 +237,19 @@ export function autoTableColumnExpressions(
   tableRowType: Type,
   objectType: Type
 ): Node[] {
-  const allPaths = allObjPaths(objectType).filter(
+  let allPaths = allObjPaths(objectType).filter(
     path => !isNDArrayLike(path.type) && !isAssignableTo(path.type, 'none')
   );
+  console.log(allPathsFromMonitoring(allPaths))
+  if (allPathsFromMonitoring(allPaths)) {
+    allPaths = allPaths.filter(p => !excludedMonitoringColumns.includes(p.path[0]))
+    allPaths = allPaths.sort((a, b) => {
+      const aIdx = monitoringColumns.indexOf(a.path[0])
+      const bIdx = monitoringColumns.indexOf(b.path[0])
+      return aIdx - bIdx
+    })
+  }
+  console.log('allPaths', allPaths)
   return allPaths
     .map(pt => pt.path.map(escapeDots))
     .map(path => {
@@ -233,6 +281,7 @@ export function autoTableColumnExpressions(
       }
       return expr;
     });
+
 }
 
 // Given a row node that we're going to render as a table, try to
