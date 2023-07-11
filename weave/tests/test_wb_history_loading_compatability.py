@@ -45,6 +45,7 @@ def make_base_types():
         "boolean": True,
         "object": CustomHistoryTestType(1, "hi"),
         "custom": image(),
+        "user_defined_timestamp": datetime.datetime.now(),
     }
 
 
@@ -260,6 +261,8 @@ def compare_objects(a, b):
         return len(a) == len(b) and all(
             k in b and compare_objects(a[k], b[k]) for k in a
         )
+    elif isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
+        return int(a.timestamp() * 1000) == int(b.timestamp() * 1000)
     return a == b
 
 

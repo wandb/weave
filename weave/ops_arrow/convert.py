@@ -248,6 +248,9 @@ def recursively_build_pyarrow_array(
         return pa.ListArray.from_arrays(
             offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
         )
+    elif pa.types.is_temporal(pyarrow_type):
+        if py_objs_already_mapped:
+            return pa.array(py_objs, type=pyarrow_type)
 
     values = [mapper.apply(o) if o is not None else None for o in py_objs]
 

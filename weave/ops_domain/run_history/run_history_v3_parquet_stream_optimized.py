@@ -222,14 +222,12 @@ def _construct_live_data_awl(
     )
     partial_live_data_already_mapped_awl = convert.to_arrow_from_list_and_artifact(
         live_columns_already_mapped_to_data,
-        types.List(
-            types.TypedDict(
-                {
-                    k: v
-                    for k, v in flattened_object_type.property_types.items()
-                    if k in live_columns_already_mapped
-                }
-            )
+        types.TypedDict(
+            {
+                k: v
+                for k, v in flattened_object_type.property_types.items()
+                if k in live_columns_already_mapped
+            }
         ),
         artifact=artifact,
         py_objs_already_mapped=True,
@@ -303,8 +301,13 @@ def _process_all_columns(
                         artifact=artifact,
                     )
                 )
+                arrow_col = new_col._arrow_data
+                if types.Timestamp().assign_type(types.non_none(col_type)):
+                    arrow_col = arrow_col.cast("int64").cast(
+                        pa.timestamp("ms", tz="UTC")
+                    )
                 processed_history_pa_tables[table_ndx] = table.set_column(
-                    fields.index(col_name), col_name, new_col._arrow_data
+                    fields.index(col_name), col_name, arrow_col
                 )
 
     return live_columns, live_columns_already_mapped, processed_history_pa_tables
@@ -578,9 +581,14 @@ def _parse_bytes_mapper(
             for row in awl._arrow_data.to_pylist()
         ]
         wb_type = types.TypeRegistry.type_of(data)
+        if not hasattr(wb_type, "object_type"):
+            raise errors.WeaveWBHistoryTranslationError(
+                f"Expected type with object_type attribute, got {wb_type}"
+            )
+        wb_type = typing.cast(types.List, wb_type)
         return convert.to_arrow_from_list_and_artifact(
             data,
-            wb_type,
+            wb_type.object_type,
             artifact=awl._artifact or artifact_mem.MemArtifact(),
             py_objs_already_mapped=True,
         )
