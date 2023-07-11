@@ -37,21 +37,32 @@ class TestType:
 
 _context.clear_loading_built_ins(_loading_builtins_token)
 
-base_types = {
-    "number": 42,
-    "string": "hello world",
-    "boolean": True,
-    "object": TestType(1, "hi"),
-    "custom": image(),
-}
-base_types["list"] = list(base_types.values()) + [{**base_types}, None]
-base_types["dict"] = {**base_types}
+
+def make_base_types():
+    return {
+        "number": 42,
+        "string": "hello world",
+        "boolean": True,
+        "object": TestType(1, "hi"),
+        "custom": image(),
+    }
+
+
+def make_all_types():
+    base_types = make_base_types()
+    base_types["list"] = list(make_base_types().values()) + [
+        {**make_base_types()},
+        None,
+    ]
+    base_types["dict"] = {**make_base_types()}
+    return base_types
+
 
 rows_tests = [
     # Here we have 1 test per type for easy debugging
-    *[[{k: v}] for k, v in base_types.items()],
+    *[[{k: v}] for k, v in make_all_types().items()],
     # # Here we have 1 test for all the types
-    [base_types],
+    [make_all_types()],
     # Here is a nasty test with really hard unions
     [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],
     [
@@ -96,7 +107,13 @@ rows_tests = [
 
 
 @pytest.mark.parametrize("rows", rows_tests)
-def test_end_to_end_stream_table_history_path(user_by_api_key_in_env, rows):
+def test_end_to_end_stream_table_history_path_batch_1(user_by_api_key_in_env, rows):
+    return do_test_end_to_end_stream_table_history_path(
+        user_by_api_key_in_env.username, rows
+    )
+
+
+def do_test_end_to_end_stream_table_history_path(username, rows):
     def do_assertion(history_node, row_type, row_accumulator, user_logged_keys):
         row_object_type = make_optional_type(row_type.object_type)
 
@@ -112,7 +129,7 @@ def test_end_to_end_stream_table_history_path(user_by_api_key_in_env, rows):
                 expected.append(row.get(key))
             assert compare_objects(column_value, expected)
 
-    do_batch_test(user_by_api_key_in_env.username, rows, do_assertion)
+    do_batch_test(username, rows, do_assertion)
 
 
 def test_nested_pick_via_dots(user_by_api_key_in_env):
