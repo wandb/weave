@@ -160,7 +160,7 @@ def do_batch_test(username, rows, do_assertion):
     do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
     st.finish()
 
-    if not os.environ.get("PARQUET_DISABLED", False):
+    if os.environ.get("PARQUET_ENABLED"):
         # Second assertion is with parquet files
         wait_for_x_times(
             lambda: history_moved_to_parquet(
