@@ -30,7 +30,7 @@ _loading_builtins_token = _context.set_loading_built_ins()
 
 
 @weave.type()
-class TestType:
+class CustomHistoryTestType:
     a: int
     b: str
 
@@ -43,7 +43,7 @@ def make_base_types():
         "number": 42,
         "string": "hello world",
         "boolean": True,
-        "object": TestType(1, "hi"),
+        "object": CustomHistoryTestType(1, "hi"),
         "custom": image(),
     }
 
@@ -79,15 +79,15 @@ rows_tests = [
         {"a": [{"b": [4, 5, 6]}, {"b": [7, 8, 9, 10]}]},
     ],
     [
-        {"a": 1, "b": "hi", "c": TestType(2, "bye"), "i": image()},
+        {"a": 1, "b": "hi", "c": CustomHistoryTestType(2, "bye"), "i": image()},
         {"a": True, "b": True, "c": True, "i": True},
         {
             "a": [
                 1,
                 "hi",
                 True,
-                TestType(2, "bye"),
-                {"a": 1, "b": "hi", "c": TestType(2, "bye"), "i": image()},
+                CustomHistoryTestType(2, "bye"),
+                {"a": 1, "b": "hi", "c": CustomHistoryTestType(2, "bye"), "i": image()},
             ]
         },
         {
@@ -96,7 +96,7 @@ rows_tests = [
                     "objects": {
                         "a": 1,
                         "b": "hi",
-                        "c": TestType(2, "bye"),
+                        "c": CustomHistoryTestType(2, "bye"),
                         "i": image(),
                     }
                 }
