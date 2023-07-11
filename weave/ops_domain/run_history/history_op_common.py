@@ -3,8 +3,7 @@ import typing
 
 from ... import graph
 from ... import compile
-
-
+from ... import op_args
 from ... import registry_mem
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
@@ -165,6 +164,10 @@ def _get_key_typed_node(node: graph.Node) -> graph.Node:
             )
         op = registry_mem.memory_registry._ops[node.from_op.name]
         with compile.enable_compile():
+            if not isinstance(op.input_type, op_args.OpNamedArgs):
+                raise errors.WeaveWBHistoryTranslationError(
+                    f"Expected named args, found {type(op.input_type)}"
+                )
             return op.lazy_call(
                 **{
                     k: n
