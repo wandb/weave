@@ -121,7 +121,7 @@ def get_full_columns(columns: typing.Optional[list[str]]):
     return list(set([*columns, "_step"]))
 
 
-def get_full_columns_prefixed(run: wdt.RunType, columns: typing.Optional[list[str]]):
+def get_full_columns_prefixed(run: wdt.Run, columns: typing.Optional[list[str]]):
     all_columns = get_full_columns(columns)
     all_paths = list(run.gql.get("historyKeys", {}).get("keys", {}).keys())
     return _filter_known_paths_to_requested_paths(all_paths, all_columns)
@@ -159,6 +159,10 @@ def _get_key_typed_node(node: graph.Node) -> graph.Node:
     with tracer.trace("run_history_inner_refine") as span:
         # This block will not normally be needed. But in some cases (for example lambdas)
         # we will have to refine the node to get the history type.
+        if not isinstance(node, graph.OutputNode):
+            raise errors.WeaveWBHistoryTranslationError(
+                f"Expected output node, found {type(node)}"
+            )
         op = registry_mem.memory_registry._ops[node.from_op.name]
         with compile.enable_compile():
             return op.lazy_call(
