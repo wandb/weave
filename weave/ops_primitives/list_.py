@@ -89,7 +89,8 @@ class List:
         input_type={
             "arr": types.List(types.Any()),
             "filterFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.optional(types.Boolean())
+                {"row": input_types["arr"].object_type, "index": types.Int()},
+                types.optional(types.Boolean()),
             ),
         },
         output_type=lambda input_types: input_types["arr"],
