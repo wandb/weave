@@ -251,12 +251,17 @@ def awl_2d_projection(
         # coerce to float to turn Nones into nans
         np_array_of_embeddings = np_array_of_embeddings.astype("f")
 
-        # impute nones with average
+        # impute nans with average value for column - this handles the case
+        # where we have a column of Optional[number]
         none_indices = np.argwhere(np.isnan(np_array_of_embeddings))
         column_indices = none_indices[:, 1]
         np_array_of_embeddings[none_indices] = np.nanmean(
             np_array_of_embeddings, axis=0
         )[column_indices]
+
+        # if any remaining nans (can only happen if all values in a column are nan), replace with zeros
+        # such columns will be removed in the next step
+        np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings)
 
         # remove 0-only columns
         np_array_of_embeddings = np_array_of_embeddings[
