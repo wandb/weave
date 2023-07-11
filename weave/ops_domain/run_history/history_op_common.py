@@ -1,5 +1,10 @@
 import json
 import typing
+
+from ... import graph
+from ... import compile
+from ... import op_args
+from ... import registry_mem
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
 from ...ops_primitives import make_list
@@ -12,6 +17,8 @@ from ...mappers_arrow import map_to_arrow
 from ... import engine_trace
 from ...compile_domain import InputAndStitchProvider
 from ... import compile_table
+from ... import artifact_base
+from ...language_features.tagging.tagged_value_type import TaggedValueType
 
 from ...api import use
 
@@ -110,21 +117,102 @@ def get_top_level_keys(key_tree: KeyTree) -> list[str]:
 def get_full_columns(columns: typing.Optional[list[str]]):
     if columns is None:
         return None
-    return list(set([*columns, "_step", "_runtime", "_timestamp"]))
+    return list(set([*columns, "_step"]))
+
+
+def get_full_columns_prefixed(run: wdt.Run, columns: typing.Optional[list[str]]):
+    all_columns = get_full_columns(columns)
+    all_paths = list(run.gql.get("historyKeys", {}).get("keys", {}).keys())
+    return _filter_known_paths_to_requested_paths(all_paths, all_columns)
+
+
+def flatten_typed_dicts(type_: types.TypedDict) -> list[str]:
+    props = type_.property_types
+    paths = []
+    for key, val in props.items():
+        if types.optional(types.TypedDict({})).assign_type(
+            val
+        ) and not types.NoneType().assign_type(val):
+            subpaths = flatten_typed_dicts(typing.cast(types.TypedDict, val))
+            paths += [f"{key}.{path}" for path in subpaths]
+        else:
+            paths.append(key)
+    return list(set(paths))
+
+
+def _without_tags(type_: types.Type) -> types.Type:
+    if isinstance(type_, TaggedValueType):
+        return _without_tags(type_.value)
+    return type_
+
+
+def _node_type_has_keys(type_: types.Type) -> bool:
+    return (
+        hasattr(type_, "object_type")
+        and hasattr(type_.object_type, "property_types")
+        and len(type_.object_type.property_types) > 0
+    )
+
+
+def _get_key_typed_node(node: graph.Node) -> graph.Node:
+    with tracer.trace("run_history_inner_refine") as span:
+        # This block will not normally be needed. But in some cases (for example lambdas)
+        # we will have to refine the node to get the history type.
+        if not isinstance(node, graph.OutputNode):
+            raise errors.WeaveWBHistoryTranslationError(
+                f"Expected output node, found {type(node)}"
+            )
+        op = registry_mem.memory_registry._ops[node.from_op.name]
+        with compile.enable_compile():
+            if not isinstance(op.input_type, op_args.OpNamedArgs):
+                raise errors.WeaveWBHistoryTranslationError(
+                    f"Expected named args, found {type(op.input_type)}"
+                )
+            return op.lazy_call(
+                **{
+                    k: n
+                    for k, n in zip(
+                        op.input_type.arg_types, node.from_op.inputs.values()
+                    )
+                }
+            )
+
+
+def _filter_known_paths_to_requested_paths(
+    known_paths: list[str], requested_paths: list[str]
+) -> list[str]:
+    history_cols = []
+    for path in known_paths:
+        for requested_path in requested_paths:
+            if path == requested_path or path.startswith(requested_path + "."):
+                history_cols.append(path)
+    return history_cols
 
 
 def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
+    # I moved the column pushdown before the gql step, so we actually have the
+    # columns directly available here.... could be possible we need to revisit
+    top_level_keys = inputs.raw.get("history_cols")
+    if top_level_keys == None:
+        stitch_obj = inputs.stitched_obj
+        key_tree = compile_table.get_projection(stitch_obj)
 
-    stitch_obj = inputs.stitched_obj
-    key_tree = compile_table.get_projection(stitch_obj)
-
-    # we only pushdown the top level keys for now.
-    top_level_keys = get_top_level_keys(key_tree)
+        # we only pushdown the top level keys for now.
+        top_level_keys = get_top_level_keys(key_tree)
 
     if not top_level_keys:
         # If no keys, then we cowardly refuse to blindly fetch entire history table
         return "historyKeys"
+
+    top_level_keys = get_full_columns(top_level_keys)
+    node = inputs.stitched_obj.node
+    if not _node_type_has_keys(node.type):
+        node = _get_key_typed_node(node)
+    all_known_paths = flatten_typed_dicts(_without_tags(node.type.object_type))  # type: ignore
+    history_cols = _filter_known_paths_to_requested_paths(
+        all_known_paths, top_level_keys
+    )
 
     project_fragment = """
         project {
@@ -139,7 +227,7 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
 
     return f"""
     historyKeys
-    sampledParquetHistory: parquetHistory(liveKeys: {json.dumps(top_level_keys)}) {{
+    sampledParquetHistory: parquetHistory(liveKeys: {json.dumps(history_cols)}) {{
         liveData
         parquetUrls
     }}
@@ -151,13 +239,19 @@ def refine_history_type(
     run: wdt.Run,
     columns: typing.Optional[list[str]] = None,
 ) -> types.TypedDict:
-    prop_types: dict[str, types.Type] = {}
-
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
 
     historyKeys = run.gql["historyKeys"]["keys"]
 
+    return _refine_history_type_inner(historyKeys, columns)
+
+
+def _refine_history_type_inner(
+    historyKeys: dict[str, dict],
+    columns: typing.Optional[list[str]] = None,
+) -> types.TypedDict:
+    prop_types: dict[str, types.Type] = {}
     for key, key_details in historyKeys.items():
         if key.startswith("system/") or (columns is not None and key not in columns):
             # skip system metrics for now
@@ -197,6 +291,62 @@ def history_keys(run: wdt.Run) -> list[str]:
     return list(object_type.property_types.keys())
 
 
+def awl_from_local_parquet_path(
+    path: str,
+    object_type: typing.Optional[types.TypedDict],
+    columns: list[str] = [],
+    artifact: typing.Optional[artifact_base.Artifact] = None,
+) -> ArrowWeaveList:
+    with tracer.trace("pq.read_metadata") as span:
+        span.set_tag("path", path)
+        meta = pq.read_metadata(path)
+    file_schema = meta.schema
+    columns_to_read = [c for c in columns if c in file_schema.to_arrow_schema().names]
+    with tracer.trace("pq.read_table") as span:
+        span.set_tag("path", path)
+        table = pq.read_table(path, columns=columns_to_read)
+
+    # convert table to ArrowWeaveList
+    with tracer.trace("make_awl") as span:
+        awl: ArrowWeaveList = ArrowWeaveList(
+            table, object_type=object_type, artifact=artifact
+        )
+    return awl
+
+
+def process_history_awl_tables(tables: list[ArrowWeaveList]):
+    concatted = concat_awls(tables)
+    if isinstance(concatted, ArrowWeaveList):
+        parquet_history = awl_to_pa_table(concatted)
+    else:
+        # empty table
+        return None
+
+    return sort_history_pa_table(parquet_history)
+
+
+def concat_awls(awls: list[ArrowWeaveList]):
+    list = make_list(**{str(i): table for i, table in enumerate(awls)})
+    return use(concat(list))
+
+
+def awl_to_pa_table(awl: ArrowWeaveList):
+    rb = pa.RecordBatch.from_struct_array(
+        awl._arrow_data
+    )  # this pivots to columnar layout
+    return pa.Table.from_batches([rb])
+
+
+def sort_history_pa_table(table: pa.Table):
+    with tracer.trace("pq.sort"):
+        table_sorted_indices = pa.compute.bottom_k_unstable(
+            table, sort_keys=["_step"], k=len(table)
+        )
+
+    with tracer.trace("pq.take"):
+        return table.take(table_sorted_indices)
+
+
 def read_history_parquet(run: wdt.Run, columns=None):
     io = io_service.get_sync_client()
     object_type = refine_history_type(run, columns=columns)
@@ -205,40 +355,9 @@ def read_history_parquet(run: wdt.Run, columns=None):
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
-            with tracer.trace("pq.read_metadata") as span:
-                span.set_tag("path", path)
-                meta = pq.read_metadata(path)
-            file_schema = meta.schema
-            columns_to_read = [
-                c for c in columns if c in file_schema.to_arrow_schema().names
-            ]
-            with tracer.trace("pq.read_table") as span:
-                span.set_tag("path", path)
-                table = pq.read_table(path, columns=columns_to_read)
-
-            # convert table to ArrowWeaveList
-            with tracer.trace("make_awl") as span:
-                awl: ArrowWeaveList = ArrowWeaveList(table, object_type=object_type)
+            awl = awl_from_local_parquet_path(path, object_type, columns=columns)
             tables.append(awl)
-    list = make_list(**{str(i): table for i, table in enumerate(tables)})
-    concatted = use(concat(list))
-    if isinstance(concatted, ArrowWeaveList):
-        rb = pa.RecordBatch.from_struct_array(
-            concatted._arrow_data
-        )  # this pivots to columnar layout
-        parquet_history = pa.Table.from_batches([rb])
-    else:
-        # empty table
-        return None
-
-    # sort the history by step
-    with tracer.trace("pq.sort"):
-        table_sorted_indices = pa.compute.bottom_k_unstable(
-            parquet_history, sort_keys=["_step"], k=len(parquet_history)
-        )
-
-    with tracer.trace("pq.take"):
-        return parquet_history.take(table_sorted_indices)
+    return process_history_awl_tables(tables)
 
 
 def mock_history_rows(

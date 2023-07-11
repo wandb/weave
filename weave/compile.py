@@ -5,6 +5,7 @@ import logging
 import contextvars
 import contextlib
 
+
 from . import value_or_error
 from . import debug_compile
 
@@ -20,6 +21,7 @@ from . import compile_table
 from . import weave_internal
 from . import engine_trace
 from . import errors
+
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -323,6 +325,8 @@ def compile_apply_column_pushdown(
         "mapped_run-history2",
         "run-history",
         "mapped_run-history",
+        "run-history3",
+        "mapped_run-history3",
     ]
 
     if not graph.filter_nodes_full(
@@ -351,13 +355,16 @@ def compile_apply_column_pushdown(
                 )
             if "run-history" in node.from_op.name:
                 history_cols = list(run_cols.keys())
+
                 if len(history_cols) > 0:
                     return graph.OutputNode(
                         node.type,
                         node.from_op.name + "_with_columns",
                         {
                             "run": node.from_op.inputs["run"],
-                            "history_cols": weave_internal.const(history_cols),
+                            "history_cols": weave_internal.const(
+                                list(set([*history_cols, "_step"]))
+                            ),
                         },
                     )
         return node
@@ -600,10 +607,12 @@ def _compile(
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
+
     with tracer.trace("compile:gql"):
         results = results.batch_map(
             _track_errors(compile_domain.apply_domain_op_gql_translation)
         )
+
     with tracer.trace("compile:column_pushdown"):
         results = results.batch_map(_track_errors(compile_apply_column_pushdown))
 

@@ -65,8 +65,8 @@ class UntypedOpaqueDict:
         inst._json_dict = json_dict
         return inst
 
-    def get(self, key):
-        return self.json_dict.get(key)
+    def get(self, key, default=None):
+        return self.json_dict.get(key, default)
 
     def __eq__(self, other):
         return self.json_dict == other.json_dict
