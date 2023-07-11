@@ -2,7 +2,6 @@ import * as String from '@wandb/weave/common/util/string';
 import {MetadataNode, ServerAPI} from '@wandb/weave/core';
 import * as _ from 'lodash';
 
-import * as File from '../files';
 import * as Vega3 from '../util/vega3';
 
 export const DB = {
@@ -1440,10 +1439,7 @@ export class Client implements ServerAPI {
     return Promise.resolve();
   }
 
-  getArtifactFileContents(
-    artifactId: string,
-    assetPath: string
-  ): ReturnType<typeof File.cachedLoadArtifactFileContent> {
+  getArtifactFileContents(artifactId: string, assetPath: string): any {
     return new Promise(resolve => {
       // Delay for testing
       setTimeout(() => {
@@ -1467,7 +1463,7 @@ export class Client implements ServerAPI {
     runName: string,
     fileName: string,
     entityName?: string
-  ): ReturnType<typeof File.cachedLoadRunFileContent> {
+  ): any {
     return new Promise(resolve => {
       // Delay for testing
       setTimeout(() => {
@@ -1479,10 +1475,7 @@ export class Client implements ServerAPI {
     });
   }
 
-  getArtifactFileDirectUrl(
-    artifactId: string,
-    assetPath: string
-  ): ReturnType<typeof File.loadArtifactFileDirectUrl> {
+  getArtifactFileDirectUrl(artifactId: string, assetPath: string): any {
     return new Promise(resolve => {
       // Delay for testing
       // TODO: Unnecessary
@@ -1494,10 +1487,7 @@ export class Client implements ServerAPI {
   }
 
   // TODO: NOT DONE
-  getArtifactFileMetadata(
-    artifactId: string,
-    assetPath: string
-  ): ReturnType<typeof File.loadArtifactFilePathMetadata> {
+  getArtifactFileMetadata(artifactId: string, assetPath: string): any {
     return new Promise(resolve => {
       // Delay for testing
       // TODO: Unnecessary
