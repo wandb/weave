@@ -16,6 +16,35 @@ import requests
 import wandb
 
 from weave.wandb_api import from_environment, wandb_api_context, WandbApiContext
+import contextlib
+import os
+
+import filelock
+
+
+# The following code snippet was copied from:
+# https://github.com/pytest-dev/pytest-xdist/issues/84#issuecomment-617566804
+#
+# The purpose of the `serial` fixture is to ensure that any test with `serial`
+# must be run serially. This is critical for tests which use environment
+# variables for auth since the low level W&B API state ends up being shared
+# between tests.
+@pytest.fixture(scope="session")
+def lock(tmp_path_factory):
+    base_temp = tmp_path_factory.getbasetemp()
+    lock_file = base_temp.parent / "serial.lock"
+    yield filelock.FileLock(lock_file=str(lock_file))
+    with contextlib.suppress(OSError):
+        os.remove(path=lock_file)
+
+
+@pytest.fixture()
+def serial(lock):
+    with lock.acquire(poll_intervall=0.1):
+        yield
+
+
+# End of copied code snippet
 
 
 @dataclasses.dataclass
@@ -81,7 +110,7 @@ def user_by_http_headers_in_context(
 
 @pytest.fixture(scope=determine_scope)
 def user_by_api_key_in_env(
-    bootstrap_user: LocalBackendFixturePayload,
+    bootstrap_user: LocalBackendFixturePayload, serial
 ) -> Generator[LocalBackendFixturePayload, None, None]:
     with unittest.mock.patch.dict(
         os.environ,
@@ -97,7 +126,7 @@ def user_by_api_key_in_env(
 
 @pytest.fixture(scope=determine_scope)
 def user_by_http_headers_in_env(
-    bootstrap_user: LocalBackendFixturePayload,
+    bootstrap_user: LocalBackendFixturePayload, serial
 ) -> Generator[LocalBackendFixturePayload, None, None]:
     with unittest.mock.patch.dict(
         os.environ,
