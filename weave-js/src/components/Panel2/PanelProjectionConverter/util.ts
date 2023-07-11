@@ -3,8 +3,8 @@ import {
   isAssignableTo,
   list,
   listObjectType,
-  maybe,
   Node,
+  nonNullable,
   nullableTaggableValue,
   Type,
   typedDict,
@@ -21,10 +21,10 @@ export const getValidColumns = (inputType: Type) => {
     const allPaths = allObjPaths(innerType);
 
     validEmbeddingColumns = allPaths
-      .filter(path => isAssignableTo(path.type, maybe(list('number'))))
+      .filter(path => isAssignableTo(nonNullable(path.type), list('number')))
       .map(path => path.path.join('.'));
     validNumericColumns = allPaths
-      .filter(path => isAssignableTo(path.type, maybe('number')))
+      .filter(path => isAssignableTo(nonNullable(path.type), 'number'))
       .map(path => path.path.join('.'));
   }
   return {
