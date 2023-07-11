@@ -9,6 +9,7 @@ import weave
 from weave.ops_domain.run_history.context import (
     error_on_non_vectorized_history_transform,
 )
+from weave.ops_domain.run_history.history_op_common import _without_tags
 from .. import context_state as _context
 from PIL import Image
 import numpy as np
@@ -256,6 +257,8 @@ def make_optional_type(type_: weave.types.Type):
 
 
 def assert_type_assignment(a, b):
+    a = _without_tags(a)
+    b = _without_tags(b)
     if weave.types.optional(weave.types.TypedDict({})).assign_type(
         a
     ) and weave.types.optional(weave.types.TypedDict({})).assign_type(b):
