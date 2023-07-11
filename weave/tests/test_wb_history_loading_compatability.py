@@ -48,7 +48,7 @@ base_types["dict"] = {**base_types}
 rows_tests = [
     # Here we have 1 test per type for easy debugging
     *[[{k: v}] for k, v in base_types.items()],
-    # Here we have 1 test for all the types
+    # # Here we have 1 test for all the types
     [base_types],
     # Here is a nasty test with really hard unions
     [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],

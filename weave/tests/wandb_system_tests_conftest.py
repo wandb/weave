@@ -49,7 +49,6 @@ def bootstrap_user(
             "WANDB_BASE_URL": base_url,
         },
     ):
-        wandb.teardown()  # type: ignore
         yield LocalBackendFixturePayload(
             username=username,
             password=username,
@@ -57,11 +56,6 @@ def bootstrap_user(
             base_url=base_url,
             cookie="NOT-IMPLEMENTED",
         )
-        wandb.teardown()  # type: ignore
-
-    if not wandb_debug:
-        command = UserFixtureCommand(command="down", username=username)
-        fixture_fn(command)
 
 
 @pytest.fixture(scope=determine_scope)
@@ -96,7 +90,9 @@ def user_by_api_key_in_env(
         },
     ):
         with from_environment():
+            wandb.teardown()  # type: ignore
             yield bootstrap_user
+            wandb.teardown()  # type: ignore
 
 
 @pytest.fixture(scope=determine_scope)
