@@ -104,7 +104,6 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
-          # PARQUET_ENABLED: true
         ports:
           - "8080:8080"
           - "8083:8083"
@@ -121,7 +120,7 @@ jobs:
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
-          PARQUET_ENABLED: false # TODO: Enable parquet after available in CI
+          # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
         run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest ./tests ./ops_arrow --ddtrace
 
   ecosystem-tests:
