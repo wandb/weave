@@ -1,3 +1,4 @@
+import logging
 import re
 import datetime
 import json
@@ -8,6 +9,12 @@ from wandb.sdk.internal import file_stream
 from wandb.sdk.internal.internal_api import Api as InternalApi
 from wandb.sdk.lib import runid
 from weave.wandb_client_api import wandb_public_api
+
+logger = logging.getLogger(__name__)
+
+
+class WeaveWandbRunException(Exception):
+    pass
 
 
 class InMemoryLazyLiteRun:
@@ -36,6 +43,12 @@ class InMemoryLazyLiteRun:
         job_type: typing.Optional[str] = None,
         _use_async_file_stream: bool = False,
     ):
+        authenticated = wandb_public_api().api_key is not None
+        if not authenticated:
+            raise WeaveWandbRunException(
+                f"Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`."
+            )
+
         entity_name = entity_name or wandb_public_api().default_entity
         project_name = project_name or "uncategorized"
 
@@ -125,6 +138,11 @@ class InMemoryLazyLiteRun:
             self._pusher = FilePusher(self.i_api, self.stream)
 
         return self._pusher
+
+    def setup(self) -> None:
+        self.run
+        self.stream
+        self.pusher
 
     def log(self, row_dict: dict) -> None:
         stream = self.stream
