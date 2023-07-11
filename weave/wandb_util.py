@@ -22,7 +22,7 @@ foreign_index_type_names = set(["foreignIndex", "wandb.TableForeignIndex"])
 
 
 # This should ideally match `mediaTable.ts` in Weave0.
-def _convert_type(old_type: Weave0TypeJson, data=None) -> types.Type:
+def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     old_type_name = old_type["wb_type"]
     is_python_object_type = old_type_name == "pythonObject" or old_type_name == "object"
     #
