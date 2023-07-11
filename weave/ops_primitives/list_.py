@@ -70,19 +70,18 @@ class List:
                 return arr.__getitem__(index)
             except IndexError:
                 return None
-        elif isinstance(index, list):
-            result: list = []
-            for i in index:
-                if i == None:
+        # otherwise we have a list-like (list or AWL)
+        indexes = typing.cast(typing.List[typing.Optional[int]], index)
+        result: list = []
+        for i in indexes:
+            if i == None:
+                result.append(None)
+            else:
+                try:
+                    result.append(arr.__getitem__(i))
+                except IndexError:
                     result.append(None)
-                else:
-                    try:
-                        result.append(arr.__getitem__(i))
-                    except IndexError:
-                        result.append(None)
-            return result
-        else:
-            raise TypeError("Invalid index type")
+        return result
 
     @op(
         name="filter",

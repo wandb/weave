@@ -43,6 +43,8 @@ def _convert_specific_opname_to_generic_opname(
         return "index", {"arr": inputs["arr"], "index": inputs["index"]}
     elif name == "ArrowWeaveList-limit":
         return "limit", {"arr": inputs["self"], "limit": inputs["limit"]}
+    elif name == "ArrowWeaveList-map":
+        return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
     elif name == "ArrowWeaveListNumber-min":
         return "numbers-min", {"numbers": inputs["self"]}
     elif name == "ArrowWeaveListNumber-max":
