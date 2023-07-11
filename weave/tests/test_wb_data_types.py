@@ -100,8 +100,8 @@ def make_molecule():
         # Domain Types
         #
         (datetime.datetime.now(), types.Timestamp()),  # type: ignore
-        # See comment in wandb_util.py - this may change in the future
-        (np.array([1, 2, 3]), types.NoneType()),
+        # See comment in wandb_util.py and https://github.com/wandb/weave/pull/140
+        (np.array([1, 2, 3]), types.List(types.UnknownType())),
         #
         # Media Types
         #
