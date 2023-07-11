@@ -104,6 +104,7 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          PARQUET_ENABLED: true
         ports:
           - "8080:8080"
           - "8083:8083"
