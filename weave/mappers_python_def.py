@@ -291,7 +291,7 @@ class DefaultToPy(mappers.Mapper):
         elif isinstance(obj, str):
             try:
                 ref = ref_base.Ref.from_str(obj)
-            except errors.WeaveInternalError:
+            except (errors.WeaveInternalError, NotImplementedError):
                 pass
         if ref is None:
             # This defines the artifact layout!
