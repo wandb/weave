@@ -1,7 +1,7 @@
 import 'react-base-table/lib/TableRow';
 
-import {WBButton} from '@wandb/ui';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {
   constFunction,
   constNumber,
@@ -83,6 +83,7 @@ import {
   useRowsNode,
   useUpdateConfigKey,
 } from './util';
+import {Link} from './Link';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -1043,21 +1044,20 @@ const PanelTableInner: React.FC<
             alignItems: 'center',
             alignContent: 'stretch',
           }}>
-          <div style={{flex: '0 0 auto', paddingBottom: '8px'}}>
+          <div
+            style={{flex: '0 0 auto', paddingBottom: '8px', color: MOON_500}}>
             No rows to display
           </div>
           {tableState.preFilterFunction?.nodeType === 'output' && (
             <div style={{flex: '0 0 auto'}}>
-              <WBButton
-                color="primary"
-                variant="contained"
+              <Link
                 onClick={() => {
                   updateTableState(
                     Table.updatePreFilter(tableState, voidNode())
                   );
                 }}>
-                Clear Filter
-              </WBButton>
+                Clear filters
+              </Link>
             </div>
           )}
         </div>
