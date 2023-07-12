@@ -113,14 +113,12 @@ const HISTO_SPEC_COLORED: VisualizationSpec = {
 const PanelMultiHistogram: React.FC<PanelMultiHistogramProps> = props => {
   const colorNode = useColorNode(props.input);
   const colorNodeValue = CGReact.useNodeValue(colorNode);
-  const isColorable = false; // colorNode.nodeType !== 'void';
+  const isColorable = colorNode.nodeType !== 'void';
 
   const nodeValueQuery = CGReact.useNodeValue(props.input);
-
   const data = useMemo(() => {
     const rows = nodeValueQuery?.result ?? [];
-    if (nodeValueQuery.loading) {
-      // } || colorNodeValue.loading) {
+    if (nodeValueQuery.loading || colorNodeValue.loading) {
       return [];
     }
     const result: Array<{
