@@ -614,14 +614,17 @@ def publish_artifact(
     self: graph.Node[typing.Any],
     artifact_name: typing.Optional[str],
     project_name: typing.Optional[str],
+    entity_name: typing.Optional[str],
     # root_args: typing.Any = None,
 ) -> str:
     head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Publish"), "Publish")
     art_name = artifact_name or head_ref.artifact.name
+
     ref = storage._direct_publish(
         head_ref.get(),
         art_name,
         project_name,
+        wb_entity_name=entity_name,
         metadata=head_ref.artifact.metadata.as_dict(),
     )
     return str(ref)

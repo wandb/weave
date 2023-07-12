@@ -11,24 +11,20 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {useMutation, useNodeWithServerType} from '@wandb/weave/react';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
 
 import {Popover} from '@material-ui/core';
 import styled, {css} from 'styled-components';
-import {
-  IconAddNew,
-  IconBack,
-  IconCopy,
-  IconDelete,
-  IconDocs,
-  IconDown as IconDownUnstyled,
-  IconPencilEdit,
-  IconRedo,
-  IconUndo,
-  IconUp as IconUpUnstyled,
-  IconWeaveLogo,
-} from '../Panel2/Icons';
+import {IconWeaveLogo} from '../Panel2/Icons';
 import {
   useBranchPointFromURIString,
   useCopyCodeFromURI,
@@ -65,6 +61,20 @@ import {getFullChildPanel} from '../Panel2/ChildPanel';
 import _ from 'lodash';
 import {mapPanels} from '../Panel2/panelTree';
 import {DeleteActionModal} from './DeleteActionModal';
+import {PublishModal} from './PublishModal';
+import {
+  IconPencilEdit,
+  IconChevronUp,
+  IconCloud,
+  IconRedo,
+  IconCopy,
+  IconAddNew,
+  IconChevronDown,
+  IconBack,
+  IconDocumentation,
+  IconDelete,
+  IconUndo,
+} from '@wandb/weave/components/Icon';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -107,10 +117,10 @@ const iconStyles = css`
   width: 18px;
   height: 18px;
 `;
-const IconUp = styled(IconUpUnstyled)`
+const IconUp = styled(IconChevronUp)`
   ${iconStyles}
 `;
-const IconDown = styled(IconDownUnstyled)`
+const IconDown = styled(IconChevronDown)`
   ${iconStyles}
 `;
 
@@ -216,9 +226,12 @@ export const PersistenceManager: React.FC<{
   updateNode: (node: NodeOrVoidNode) => void;
   goHome?: () => void;
 }> = props => {
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+
   const maybeURI = uriFromNode(props.inputNode);
   const branchPoint = useBranchPointFromURIString(maybeURI);
   const hasRemote = branchPointIsRemote(branchPoint);
+  const {name: currName} = determineURIIdentifier(maybeURI);
 
   const {nodeState, takeAction, acting} = useStateMachine(
     props.inputNode,
@@ -243,6 +256,14 @@ export const PersistenceManager: React.FC<{
         goHome={props.goHome}
       />
 
+      <PublishModal
+        defaultName={currName}
+        open={isPublishModalOpen}
+        acting={acting}
+        takeAction={takeAction}
+        onClose={() => setIsPublishModalOpen(false)}
+      />
+
       {maybeURI && (
         <HeaderFileControls
           inputNode={props.inputNode}
@@ -252,8 +273,10 @@ export const PersistenceManager: React.FC<{
           branchPoint={branchPoint}
           renameAction={availableActions.renameAction}
           deleteAction={availableActions.deleteAction}
+          storeAction={availableActions.storeAction}
           takeAction={takeAction}
           goHome={props.goHome}
+          setIsPublishModalOpen={setIsPublishModalOpen}
         />
       )}
 
@@ -262,6 +285,7 @@ export const PersistenceManager: React.FC<{
         acting={acting}
         takeAction={takeAction}
         nodeState={nodeState}
+        setIsPublishModalOpen={setIsPublishModalOpen}
       />
     </MainHeaderWrapper>
   );
@@ -280,10 +304,10 @@ const persistenceStateToLabel: {[state in PersistenceState]: string} = {
 
 const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
-  commit: 'Commit',
+  commit: 'Publish changes',
   rename_local: 'Rename',
   publish_as: 'Publish As',
-  publish_new: 'Publish',
+  publish_new: 'Publish board',
   rename_remote: 'Rename',
   delete_local: 'Delete board',
   delete_remote: 'Delete board',
@@ -294,11 +318,14 @@ const HeaderPersistenceControls: React.FC<{
   acting: boolean;
   nodeState: PersistenceState;
   takeAction: TakeActionType;
-}> = ({storeAction, acting, takeAction, nodeState}) => {
+  setIsPublishModalOpen: Dispatch<SetStateAction<boolean>>;
+}> = ({storeAction, acting, takeAction, nodeState, setIsPublishModalOpen}) => {
+  console.log({storeAction, takeAction});
+
   return (
     <PersistenceControlsWrapper>
       {acting ? (
-        <WBButton loading variant={`confirm`}>
+        <WBButton loading variant="confirm">
           Working
         </WBButton>
       ) : storeAction ? (
@@ -309,7 +336,11 @@ const HeaderPersistenceControls: React.FC<{
           <WBButton
             variant={`confirm`}
             onClick={() => {
-              takeAction(storeAction);
+              if (storeAction === 'publish_new') {
+                setIsPublishModalOpen(true);
+              } else {
+                takeAction(storeAction);
+              }
             }}>
             {persistenceActionToLabel[storeAction]}
           </WBButton>
@@ -329,10 +360,12 @@ const HeaderFileControls: React.FC<{
   maybeURI: string | null;
   renameAction: PersistenceRenameActionType | null;
   deleteAction: PersistenceDeleteActionType | null;
+  storeAction: PersistenceStoreActionType | null;
   takeAction: TakeActionType;
   branchPoint: BranchPointType | null;
   updateNode: (node: NodeOrVoidNode) => void;
   goHome?: () => void;
+  setIsPublishModalOpen: Dispatch<SetStateAction<boolean>>;
 }> = ({
   inputNode,
   goHome,
@@ -341,8 +374,10 @@ const HeaderFileControls: React.FC<{
   branchPoint,
   renameAction,
   deleteAction,
+  storeAction,
   takeAction,
   updateNode,
+  setIsPublishModalOpen,
 }) => {
   const [actionRenameOpen, setActionRenameOpen] = useState(false);
   const [actionDeleteOpen, setActionDeleteOpen] = useState(false);
@@ -426,13 +461,13 @@ const HeaderFileControls: React.FC<{
           {currName}
         </HeaderCenterControlsPrimary>
         {expandedFileControls ? (
-          <IconUp
+          <IconChevronUp
             onClick={() => {
               setAnchorFileEl(null);
             }}
           />
         ) : (
-          <IconDown
+          <IconChevronDown
             onClick={() => {
               setAnchorFileEl(headerEl);
             }}
@@ -461,19 +496,7 @@ const HeaderFileControls: React.FC<{
             </MenuItem>
           )}
 
-          {(renameAction || canUndo || canRedo) && <MenuDivider />}
-          {renameAction && (
-            <MenuItem
-              onClick={() => {
-                setAnchorFileEl(null);
-                setActionRenameOpen(true);
-              }}>
-              <MenuIcon>
-                <IconPencilEdit />
-              </MenuIcon>
-              <MenuText>Rename</MenuText>
-            </MenuItem>
-          )}
+          {(canUndo || canRedo) && <MenuDivider />}
           {canUndo && (
             <MenuItem
               onClick={() => {
@@ -500,6 +523,41 @@ const HeaderFileControls: React.FC<{
               <MenuShortcut keys={[isMac ? `Cmd` : `Ctrl`, `Y`]} />
             </MenuItem>
           )}
+
+          <MenuDivider />
+
+          {storeAction && (
+            <MenuItem
+              onClick={() => {
+                setIsPublishModalOpen(true);
+              }}>
+              <MenuIcon>
+                <IconCloud />
+              </MenuIcon>
+              <MenuText>{persistenceActionToLabel[storeAction]}</MenuText>
+            </MenuItem>
+          )}
+
+          <MenuItem
+            disabled={!renameAction}
+            onClick={() => {
+              setAnchorFileEl(null);
+              setActionRenameOpen(true);
+            }}>
+            <MenuIcon>
+              <IconPencilEdit />
+            </MenuIcon>
+            <MenuText>Rename board</MenuText>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              setIsPublishModalOpen(true);
+            }}>
+            <MenuIcon>
+              <IconCopy />
+            </MenuIcon>
+            <MenuText>Duplicate board</MenuText>
+          </MenuItem>
 
           <MenuDivider />
 
@@ -694,7 +752,7 @@ const HeaderLogoControls: React.FC<{
           setAnchorHomeEl(headerEl);
         }}>
         <WeaveLogo open={anchorHomeEl != null} />
-        {expandedHomeControls ? <IconUp /> : <IconDown />}
+        {expandedHomeControls ? <IconChevronUp /> : <IconChevronDown />}
       </HeaderLeftControls>
       <CustomPopover
         open={expandedHomeControls}
@@ -737,7 +795,7 @@ const HeaderLogoControls: React.FC<{
               window.open('https://github.com/wandb/weave', '_blank');
             }}>
             <MenuIcon>
-              <IconDocs />
+              <IconDocumentation />
             </MenuIcon>
             <MenuText>Weave documentation</MenuText>
           </MenuItem>
