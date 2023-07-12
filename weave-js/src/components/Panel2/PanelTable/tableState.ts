@@ -195,37 +195,34 @@ function isNDArrayLike(type: Type): boolean {
 
 const streamTableColumns = [
   // Added by Stream Table
-  "timestamp",
-  "_client_id",
+  'timestamp',
+  '_client_id',
   // Added by Run
-  "_timestamp",
+  '_timestamp',
   // Added by Gorilla
-  "_step",
-]
+  '_step',
+];
 const monitoringColumns = [
   // Added by monitor decorator
-  "result_id",
-  "inputs",
-  "output",
-  "latency_ms",
-  "start_datetime",
-  "end_datetime",
-  "exception",
-  ...streamTableColumns
-] 
+  'result_id',
+  'inputs',
+  'output',
+  'latency_ms',
+  'start_datetime',
+  'end_datetime',
+  'exception',
+  ...streamTableColumns,
+];
 
 const excludedStreamTableColumns = [
-  "_client_id",
+  '_client_id',
   // Added by Run
-  "_timestamp",
+  '_timestamp',
   // Added by Gorilla
-  "_step",
-]
+  '_step',
+];
 
-const excludedMonitoringColumns = [
-    "timestamp",
-    ...excludedStreamTableColumns,
-]
+const excludedMonitoringColumns = ['timestamp', ...excludedStreamTableColumns];
 
 function allPathsFromMonitoring(allPaths: PathType[]): boolean {
   for (const col of monitoringColumns) {
@@ -245,7 +242,6 @@ function allPathsFromStreamTable(allPaths: PathType[]): boolean {
   return true;
 }
 
-
 // Try to pick nice default columns to make a table for the given object
 // type. See the initial columns test in tableState.test.ts to see examples
 // of current behavior.
@@ -258,16 +254,20 @@ export function autoTableColumnExpressions(
   );
 
   if (allPathsFromMonitoring(allPaths)) {
-    allPaths = allPaths.filter(p => !excludedMonitoringColumns.includes(p.path[0]))
+    allPaths = allPaths.filter(
+      p => !excludedMonitoringColumns.includes(p.path[0])
+    );
     allPaths = allPaths.sort((a, b) => {
-      const aIdx = monitoringColumns.indexOf(a.path[0])
-      const bIdx = monitoringColumns.indexOf(b.path[0])
-      return aIdx - bIdx
-    })
+      const aIdx = monitoringColumns.indexOf(a.path[0]);
+      const bIdx = monitoringColumns.indexOf(b.path[0]);
+      return aIdx - bIdx;
+    });
   } else if (allPathsFromStreamTable(allPaths)) {
-    allPaths = allPaths.filter(p => !excludedStreamTableColumns.includes(p.path[0]))
+    allPaths = allPaths.filter(
+      p => !excludedStreamTableColumns.includes(p.path[0])
+    );
   }
-  
+
   return allPaths
     .map(pt => pt.path.map(escapeDots))
     .map(path => {
@@ -299,7 +299,6 @@ export function autoTableColumnExpressions(
       }
       return expr;
     });
-
 }
 
 // Given a row node that we're going to render as a table, try to
