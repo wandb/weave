@@ -83,4 +83,4 @@ class Query(panel.Panel):
                     self.config.tableState.preFilterFunction, {"row": row}
                 ),
             )
-        return weave_internal.use(table_node)
+        return table_node

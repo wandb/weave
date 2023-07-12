@@ -27,4 +27,6 @@ def check_path(path: str) -> None:
 
 def safe_open(path: str, mode: str = "r") -> typing.IO:
     check_path(path)
+    # ensure that the directory exists
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     return open(path, mode)

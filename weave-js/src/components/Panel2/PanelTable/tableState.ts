@@ -52,7 +52,7 @@ import {
   voidNode,
   WeaveInterface,
 } from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import _ from 'lodash';
 
 export type ColumnId = string;
@@ -757,7 +757,7 @@ export function getRowFrame(inputNode: Node) {
   return {
     row: getExampleRow(inputNode),
     // Don't include index in frame for now. We don't need it yet.
-    // index: CG.varNode('number', 'index'),
+    index: varNode('number', 'index'),
     // Don't include arr in frame for now. We don't need it yet and
     // need to fix suggest ordering before including it.
     // arr: inputNode,

@@ -59,7 +59,6 @@ def test_arrow_vectorizer_string_scalar(name, weave_func, expected_output):
     string_ops_test_cases,
 )
 def test_arrow_vectorizer_string_scalar_tagged(name, weave_func, expected_output):
-
     expected_value_type = weave.type_of(expected_output[0])
 
     list = ["bc", "cd", "df"]
@@ -163,7 +162,6 @@ def test_arrow_vectorizer_string_alnum(name, weave_func, expected_output):
     string_alnum_test_cases,
 )
 def test_arrow_vectorizer_string_alnum_tagged(name, weave_func, expected_output):
-
     # NOTE: This optionality is needed because some arrow ops eagerly declare
     # optional returns. See number.py and string.py for commentary on the subject.
     expected_value_type = types.optional(weave.type_of(expected_output[0]))
@@ -251,7 +249,6 @@ def test_arrow_vectorizer_number_ops(name, weave_func, expected_output):
     number_ops_test_cases,
 )
 def test_arrow_vectorizer_number_ops_tagged(name, weave_func, expected_output):
-
     expected_value_type = weave.type_of(expected_output[0])
 
     # This special condition is needed because the expected output is a list of
@@ -327,10 +324,23 @@ def test_arrow_vectorizer_string_vector(name, weave_func, expected_output):
 
 @pytest.mark.parametrize(
     "name,weave_func,expected_output",
+    [("string-toNumber", lambda x: x.toNumber(), [123, 234, 456, None])],
+)
+def test_arrow_vectorizer_string_to_int(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(["123", "234", "456", "a"]))
+
+    fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
+
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    weave.use(called).to_pylist_raw() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
     string_vector_ops_test_cases,
 )
 def test_arrow_vectorizer_string_vector_ops_tagged(name, weave_func, expected_output):
-
     # NOTE: This optionality is needed because some arrow ops eagerly declare
     # optional returns. See number.py and string.py for commentary on the subject.
     expected_value_type = types.optional(weave.type_of(expected_output[0]))
@@ -648,7 +658,6 @@ def test_arrow_typeddict_pick(input_data, name, weave_func, expected_output):
 
 @pytest.mark.parametrize("name,input_data,weave_func,expected_output", pick_cases)
 def test_arrow_typeddict_pick_tagged(input_data, name, weave_func, expected_output):
-
     # tag each dict and one of its values
     for i, elem in enumerate(input_data):
         taggable = box.box(elem)
@@ -751,7 +760,6 @@ def test_arrow_typeddict_merge(
 
 
 def test_arrow_typeddict_simple_merge_tagged():
-
     input_datal = [{"b": "c"}, {"b": "G"}, {"b": "q"}]
     input_datar = [{"c": 4}, {"c": 5}, {"c": 6}]
     weave_func = lambda x, y: x.merge(y)
@@ -795,7 +803,6 @@ def test_arrow_typeddict_simple_merge_tagged():
 
 
 def test_arrow_typeddict_overwrite_merge_tagged():
-
     input_datal = [{"b": "c"}, {"b": "G"}, {"b": "q"}]
     input_datar = [{"b": "g"}, {"b": "q"}, {"b": "a"}]
     weave_func = lambda x, y: x.merge(y)
@@ -1002,7 +1009,6 @@ def test_arrow_dict():
 
 
 def test_vectorize_works_recursively_on_weavifiable_op():
-
     # this op is weavifiable because it just calls add
     @weave.op()
     def add_one(x: int) -> int:

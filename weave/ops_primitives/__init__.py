@@ -9,6 +9,7 @@ from .number_bin import *
 from .boolean import *
 from .date import *
 from .dict import *
+from .timestamp_bin import *
 from .set_ import *
 from .file import *
 from .file_local import *

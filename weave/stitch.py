@@ -303,6 +303,13 @@ def stitch_node_inner(
         inputs[0].tags["joinObj"] = joinKey
         # And we return the original object
         return inputs[0]
+    elif node.from_op.name == "execute":
+        # Special case where the execute op is used to execute a subgraph.
+        # We want the results to flow through
+        fn_node = inputs[0].val
+        if fn_node is None:
+            raise errors.WeaveInternalError("execute function should not be none")
+        return subgraph_stitch(fn_node, {}, sg)
     elif len(inputs) == 0:
         # op does not have any inputs, just track its downstream calls
         return ObjectRecorder(node)

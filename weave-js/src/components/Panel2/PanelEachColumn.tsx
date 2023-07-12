@@ -10,7 +10,7 @@ import {
   varNode,
   voidNode,
 } from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {useCallback, useMemo, useState} from 'react';
 import styled from 'styled-components';
 

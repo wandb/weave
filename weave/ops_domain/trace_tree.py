@@ -21,7 +21,12 @@ class SpanKind:
 
 @weave.type()
 class Result:
-    inputs: typing.Optional[typing.Dict[str, typing.Any]]
+    # NOTE: In principle this type should be typing.Optional[typing.Dict[str, typing.Any]],
+    # but due to a bug in our langchain integration, we have some cases where
+    # inputs was logged as a list[str] instead of a dict[str, Any]. The more flexible type
+    # below allows our PanelTraceViewer to work in both cases, but were it not for that bug,
+    # this extra flexible type wouldn't be needed.
+    inputs: typing.Optional[typing.Union[typing.Dict[str, typing.Any], list[str]]]
     outputs: typing.Optional[typing.Dict[str, typing.Any]]
 
 
@@ -35,7 +40,8 @@ class Span:
     status_code: typing.Optional[str] = None
     status_message: typing.Optional[str] = None
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
-    results: typing.Optional[typing.List[Result]] = dataclasses.field(
+    # results is not standard and not representation by OpenTelemetry
+    results: typing.Optional[typing.List[typing.Optional[Result]]] = dataclasses.field(
         default_factory=lambda: None
     )
     child_spans: typing.Optional[typing.List[dict]] = dataclasses.field(
@@ -53,11 +59,30 @@ class Span:
             if key == "name":
                 setattr(root_span, "_name", dump_dict[key])
             elif key == "results":
-                setattr(root_span, key, [Result(**r) for r in dump_dict[key]])
+                results = dump_dict[key]
+                setattr(
+                    root_span,
+                    key,
+                    [Result(**r) if r is not None else None for r in results]
+                    if results is not None
+                    else None,
+                )
             else:
                 setattr(root_span, key, dump_dict[key])
 
         return root_span
+
+
+# Type used when logging normalized (flat) span data instead of a tree.
+# we can add status_code etc...
+class FlatSpanType(typing.TypedDict):
+    trace_id: typing.Optional[str]
+    span_id: typing.Optional[str]
+    parent_id: typing.Optional[str]
+    name: typing.Optional[str]
+    start_time_ms: typing.Optional[int]
+    end_time_ms: typing.Optional[int]
+    attributes: typing.Optional[typing.Dict[str, typing.Any]]
 
 
 def stringified_output(obj: typing.Any) -> str:
@@ -83,13 +108,29 @@ def get_first_error(span: Span) -> typing.Optional[str]:
     return None
 
 
+def standarize_result_inputs(result: typing.Optional[Result]) -> typing.Dict[str, str]:
+    if result is None:
+        return {}
+    if isinstance(result.inputs, dict):
+        return result.inputs
+    if result.inputs is None:
+        return {}
+    if isinstance(result.inputs, list):
+        # NOTE: In principle this block should not be needed, but due to a bug in our
+        # langchain integration, we have some cases where inputs was logged as a list[str]
+        # instead of a dict[str, Any]. This block allows PanelTraceViewer to work in both cases,
+        # but were it not for that bug, this block wouldn't be needed.
+        return {str(i): v for i, v in enumerate(result.inputs)}
+    raise ValueError(f"Unexpected result inputs type: {type(result.inputs)}")
+
+
 def get_trace_input_str(span: Span) -> str:
     return "\n\n".join(
         [
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (result.inputs or {}).items()
+                    for eKey, eValue in standarize_result_inputs(result).items()
                 ]
             )
             for ndx, result in enumerate(span.results or [])
@@ -103,7 +144,9 @@ def get_trace_output_str(span: Span) -> str:
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (result.outputs or {}).items()
+                    for eKey, eValue in (
+                        (result.outputs or {}) if result is not None else {}
+                    ).items()
                 ]
             )
             for ndx, result in enumerate(span.results or [])

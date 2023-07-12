@@ -22,13 +22,19 @@ import {
   filterNodes,
   isAssignableTo,
   isNodeOrVoidNode,
-  replaceChainRoot,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {
+  RefObject,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
@@ -62,6 +68,12 @@ import {
 } from './availablePanels';
 import {PanelInput, PanelProps} from './panel';
 import {getStackIdAndName} from './panellib/libpanel';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
+
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
+import {IconOverflowHorizontal} from './Icons';
+import {getConfigForPath} from './panelTree';
+import {usePanelPanelContext} from './PanelPanelContextProvider';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -205,7 +217,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const {id: panelId, config: panelConfig} = config;
   let {input_node: panelInputExpr} = config;
   const weave = useWeaveContext();
-  const {stack} = usePanelContext();
+  const {stack, path: parentPath} = usePanelContext();
 
   panelInputExpr = useNodeWithServerType(panelInputExpr).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
@@ -281,7 +293,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         return;
       }
 
-      if (isAssignableTo(newExpression.type, panelInputExpr.type)) {
+      if (isAssignableTo(newExpression.type, handler?.inputType ?? 'invalid')) {
         // If type didn't change, keep current settings
         updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
       } else if (curPanelId === 'Each') {
@@ -306,6 +318,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     [
       weave,
       panelInputExpr,
+      handler?.inputType,
       curPanelId,
       props.allowedPanels,
       updateConfig2,
@@ -397,7 +410,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     () => ({...config.vars, input: panelInputExpr}),
     [config.vars, panelInputExpr]
   );
-  const {path: parentPath} = usePanelContext();
+
   // TODO: we shouldn't need this but pathEl is not always set currently.
   const path = useMemo(
     () =>
@@ -534,6 +547,18 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     setExpressionFocused(false);
   }, []);
 
+  const {
+    config: fullConfig,
+    updateConfig,
+    updateConfig2,
+  } = usePanelPanelContext();
+  const {path} = usePanelContext();
+  const fullPath = [...path, props.pathEl ?? ''].filter(
+    el => el != null && el !== ''
+  );
+  const {ref: editorBarRef, width: editorBarWidth} =
+    useElementWidth<HTMLDivElement>();
+
   return curPanelId == null || handler == null ? (
     <div>
       No panel for type {defaultLanguageBinding.printType(panelInput.type)}
@@ -545,7 +570,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       onMouseLeave={() => setHoverPanel(false)}>
       {props.editable && (
         <Styles.EditorBar>
-          <EditorBarContent className="edit-bar">
+          <EditorBarContent className="edit-bar" ref={editorBarRef}>
             {props.prefixHeader}
             {props.pathEl != null && (
               <EditorPath>
@@ -554,6 +579,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   onCommit={props.updateName ?? (() => {})}
                   validateInput={validateName}
                   initialValue={props.pathEl}
+                  maxWidth={
+                    editorBarWidth != null ? editorBarWidth / 3 : undefined
+                  }
+                  maxLength={24}
                 />{' '}
                 ={' '}
               </EditorPath>
@@ -589,6 +618,20 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 }>
                 Open panel editor
               </Tooltip>
+              {fullConfig && (
+                <OutlineItemPopupMenu
+                  config={fullConfig}
+                  localConfig={getConfigForPath(fullConfig, fullPath)}
+                  path={fullPath}
+                  updateConfig={updateConfig}
+                  updateConfig2={updateConfig2}
+                  trigger={
+                    <IconButton>
+                      <IconOverflowHorizontal />
+                    </IconButton>
+                  }
+                />
+              )}
             </EditorIcons>
           </EditorBarContent>
         </Styles.EditorBar>
@@ -930,3 +973,36 @@ const PanelContainer = styled.div`
   flex-grow: 1;
   overflow-y: auto;
 `;
+
+type ElementWidth<T> = {
+  ref: RefObject<T>;
+  width: number | null;
+};
+
+function useElementWidth<T extends HTMLElement>(): ElementWidth<T> {
+  const [elementWidth, setElementWidth] = useState<number | null>(null);
+  const elementRef = useRef<T>(null);
+
+  useLayoutEffect(() => {
+    if (elementRef.current == null) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry == null) {
+        return;
+      }
+      const w = entry.contentBoxSize[0].inlineSize;
+      setElementWidth(w);
+    });
+
+    resizeObserver.observe(elementRef.current);
+
+    return () => resizeObserver.disconnect();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elementRef.current]);
+
+  return {ref: elementRef, width: elementWidth};
+}

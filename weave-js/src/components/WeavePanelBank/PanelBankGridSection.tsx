@@ -8,7 +8,7 @@ import {
   DropTarget,
 } from '@wandb/weave/common/containers/DragDropContainer';
 import classNames from 'classnames';
-import produce from 'immer';
+import {produce} from 'immer';
 import * as _ from 'lodash';
 import React, {
   useCallback,

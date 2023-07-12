@@ -25,10 +25,24 @@ binary_input_type = {
 )
 def to_number(self):
     return ArrowWeaveList(
-        pc.milliseconds_between(pa.timestamp("ms", 0), self._arrow_data),
+        pc.milliseconds_between(
+            pa.scalar(0, pa.timestamp("us", "UTC")), self._arrow_data
+        ),
         types.optional(types.Timestamp()),
         self._artifact,
     )
+
+
+def adjust_multiple_s(multiple_s: int) -> typing.Tuple[int, str]:
+    unit = "second"
+
+    # Critical: Arrow silently fails if the unit is < 1. In such cases,
+    # we need to convert to make a conversion
+    if multiple_s < 1:
+        unit = "nanosecond"
+        multiple_s = int(multiple_s * 1e9)
+
+    return multiple_s, unit
 
 
 @arrow_op(
@@ -37,8 +51,9 @@ def to_number(self):
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
 def floor(self, multiple_s: int):
+    multiple_s, unit = adjust_multiple_s(multiple_s)
     return ArrowWeaveList(
-        pc.floor_temporal(self._arrow_data, multiple=multiple_s, unit="second"),
+        pc.floor_temporal(self._arrow_data, multiple=multiple_s, unit=unit),
         types.optional(types.Timestamp()),
         self._artifact,
     )
@@ -50,11 +65,12 @@ def floor(self, multiple_s: int):
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
 def ceil(self, multiple_s: int):
+    multiple_s, unit = adjust_multiple_s(multiple_s)
     return ArrowWeaveList(
         pc.ceil_temporal(
             self._arrow_data,
             multiple=multiple_s,
-            unit="second",
+            unit=unit,
             ceil_is_strictly_greater=True,
         ),
         types.optional(types.Timestamp()),

@@ -36,7 +36,7 @@ export const opArray = makeOp({
     // }
     return listWithLength(
       argValues.length,
-      argValues.length > 0 ? union(argValues.map(av => av.type)) : 'invalid'
+      argValues.length > 0 ? union(argValues.map(av => av.type)) : 'unknown'
     );
   },
   resolver: inputs => {
@@ -44,6 +44,8 @@ export const opArray = makeOp({
     return Object.values(inputs);
   },
 });
+
+export const opList = opArray;
 
 export const maybeOpArray = <T extends Node>(items: T[]) => {
   if (items.length === 1) {

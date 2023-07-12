@@ -203,9 +203,6 @@
       "react-app-polyfill/jsdom"
     ],
     "testEnvironment": "jsdom",
-    "transform": {
-      "^.+\\.[t|j]sx?$": "esbuild-jest"
-    },
     "transformIgnorePatterns": [
       "^.+\\.module\\.(css|sass|scss)$"
     ],

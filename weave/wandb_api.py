@@ -295,3 +295,7 @@ class WandbApi:
 
 async def get_wandb_api() -> WandbApiAsync:
     return WandbApiAsync()
+
+
+def get_wandb_api_sync() -> WandbApi:
+    return WandbApi()

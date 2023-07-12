@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import json
 import logging
 import os
@@ -9,6 +10,7 @@ import uuid
 
 from wandb.sdk.lib.paths import LogicalPath
 
+
 from .wandb_lite_run import InMemoryLazyLiteRun
 
 from .. import runfiles_wandb
@@ -17,15 +19,19 @@ from .. import weave_types
 from .. import artifact_base
 from .. import file_util
 from .. import graph
-from .. import ops_domain
+from .. import errors
+from ..core_types.stream_table_type import StreamTableType
+from ..ops_domain import stream_table_ops
+from ..ops_primitives import weave_api
 
 if typing.TYPE_CHECKING:
     from wandb.sdk.internal.file_pusher import FilePusher
 
+
 # Shawn recommended we only encode leafs, but in my testing, nested structures
 # are not handled as well in in gorilla and we can do better using just weave.
 # Uncomment the below to use gorilla for nested structures.
-TRUST_GORILLA_FOR_NESTED_STRUCTURES = False
+TRUST_GORILLA_FOR_NESTED_STRUCTURES = True
 
 # Weave types are parametrized, but gorilla expects just simple strings. We could
 # send the top-level string over the wire, but this fails to encode type specifics
@@ -85,12 +91,19 @@ class StreamTable:
 
     _artifact: typing.Optional[WandbLiveRunFiles] = None
 
+    _weave_stream_table: typing.Optional[StreamTableType] = None
+    _weave_stream_table_ref: typing.Optional[artifact_base.ArtifactRef] = None
+
+    _client_id: str
+
     def __init__(
         self,
         table_name: str,
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
+        _disable_async_logging: bool = False,
     ):
+        self._client_id = str(uuid.uuid1())
         splits = table_name.split("/")
         if len(splits) == 1:
             pass
@@ -122,7 +135,11 @@ class StreamTable:
 
         job_type = "wb_stream_table"
         self._lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name, table_name, job_type
+            entity_name,
+            project_name,
+            table_name,
+            job_type,
+            _use_async_file_stream=not _disable_async_logging,
         )
         self._table_name = table_name
         self._project_name = project_name
@@ -135,18 +152,39 @@ class StreamTable:
         for row in row_or_rows:
             self._log_row(row)
 
+    def _ensure_weave_stream_table(self) -> StreamTableType:
+        if self._weave_stream_table is None:
+            self._weave_stream_table = StreamTableType(
+                table_name=self._table_name,
+                project_name=self._project_name,
+                entity_name=self._entity_name,
+            )
+            # TODO: this generates a second run to save the artifact. Would
+            # be nice if we could just use the current run.
+            self._weave_stream_table_ref = storage._direct_publish(
+                self._weave_stream_table,
+                name=self._table_name,
+                wb_project_name=self._project_name,
+                wb_entity_name=self._entity_name,
+            )
+        return self._weave_stream_table
+
+    def rows(self) -> graph.Node:
+        self._ensure_weave_stream_table()
+        if self._weave_stream_table_ref is None:
+            raise errors.WeaveInternalError("ref is None after ensure")
+        return stream_table_ops.rows(
+            weave_api.get(str(self._weave_stream_table_ref.uri))
+        )
+
     def _ipython_display_(self) -> graph.Node:
         from .. import show
 
-        node = (
-            ops_domain.project(self._entity_name, self._project_name)
-            .run(self._table_name)
-            .history2()
-        )
-        return show(node)
+        return show(self.rows())
 
     def _log_row(self, row: dict) -> None:
         self._lite_run.ensure_run()
+        self._ensure_weave_stream_table()
         if self._artifact is None:
             uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
                 self._entity_name,
@@ -155,7 +193,10 @@ class StreamTable:
             )
             self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
             self._artifact.set_file_pusher(self._lite_run.pusher)
-        payload = row_to_weave(row, self._artifact)
+        row_copy = {**row}
+        row_copy["_client_id"] = self._client_id
+        row_copy["timestamp"] = datetime.datetime.now()
+        payload = row_to_weave(row_copy, self._artifact)
         self._lite_run.log(payload)
 
     def finish(self) -> None:
@@ -187,7 +228,7 @@ def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_type
 def is_weave_encoded_history_cell(cell: dict) -> bool:
     return "_val" in cell and (
         "_weave_type" in cell
-        or ("_type" in cell and cell["_type"].startswith(TYPE_ENCODE_PREFIX))
+        or (cell.get("_type") != None and cell["_type"].startswith(TYPE_ENCODE_PREFIX))
     )
 
 

@@ -19,6 +19,7 @@ from . import wbmedia
 from .. import timestamp as weave_timestamp
 from .. import io_service
 from .. import util
+from ..ops_domain import trace_tree
 
 
 @dataclasses.dataclass(frozen=True)
@@ -383,10 +384,13 @@ def _table_data_to_weave1_objects(
                 cell = weave_timestamp.ms_to_python_datetime(
                     weave_timestamp.unitless_int_to_inferred_ms(cell)
                 )
-        elif isinstance(cell, dict) and isinstance(
-            cell_type, possible_media_type_classes
-        ):
-            cell = _create_media_type_for_cell(cell)
+        elif isinstance(cell, dict):
+            if isinstance(cell_type, possible_media_type_classes):
+                cell = _create_media_type_for_cell(cell)
+            elif isinstance(cell_type, trace_tree.WBTraceTree.WeaveType):  # type: ignore
+                copy = {**cell}
+                copy.pop("_type")
+                cell = trace_tree.WBTraceTree(**copy)
 
         return cell
 
@@ -615,19 +619,25 @@ class _TableLikeAWLFromFileResult:
     data: dict
 
 
-def _get_table_like_awl_from_file(
-    file: typing.Union[
-        artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None
-    ],
-    num_parts: int = 1,
-) -> _TableLikeAWLFromFileResult:
+def _get_table_data_from_file(file: artifact_fs.FilesystemArtifactFile) -> dict:
     tracer = engine_trace.tracer()
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     with file.open() as f:
         with tracer.trace("get_table:jsonload"):
             data = json.load(f)
+    return data
 
+
+def _get_table_like_awl_from_file(
+    file: typing.Union[
+        artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None
+    ],
+    num_parts: int = 1,
+) -> _TableLikeAWLFromFileResult:
+    if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
+        raise errors.WeaveInternalError("File is None or a directory")
+    data = _get_table_data_from_file(file)
     if file.path.endswith(".joined-table.json"):
         awl = _get_joined_table_awl_from_file(data, file)
     elif file.path.endswith(".partitioned-table.json"):
@@ -641,9 +651,11 @@ def _get_table_like_awl_from_file(
     return _TableLikeAWLFromFileResult(awl, data)
 
 
-def _get_table_awl_from_file(
-    data: dict, file: artifact_fs.FilesystemArtifactFile, num_parts: int = 1
-) -> "ops_arrow.ArrowWeaveList":
+def _get_rows_and_object_type_awl_from_file(
+    data: dict,
+    file: artifact_fs.FilesystemArtifactFile,
+    num_parts: int = 1,
+) -> typing.Tuple[list, types.Type]:
     tracer = engine_trace.tracer()
     rows: list = []
     object_type = None
@@ -660,10 +672,24 @@ def _get_table_awl_from_file(
         else:
             raise errors.WeaveInternalError("Unknown table file format for data")
 
+    return rows, object_type
+
+
+def _get_table_awl_from_rows_object_type(
+    rows: list, object_type: types.Type, file: artifact_fs.FilesystemArtifactFile
+) -> "ops_arrow.ArrowWeaveList":
+    tracer = engine_trace.tracer()
     with tracer.trace("get_table:to_arrow"):
         return ops_arrow.to_arrow_from_list_and_artifact(
             rows, object_type, file.artifact
         )
+
+
+def _get_table_awl_from_file(
+    data: dict, file: artifact_fs.FilesystemArtifactFile, num_parts: int = 1
+) -> "ops_arrow.ArrowWeaveList":
+    rows, object_type = _get_rows_and_object_type_awl_from_file(data, file, num_parts)
+    return _get_table_awl_from_rows_object_type(rows, object_type, file)
 
 
 def _get_partitioned_table_awl_from_file(
@@ -681,8 +707,21 @@ def _get_partitioned_table_awl_from_file(
         asyncio.run(ensure_files(part_dir.files))
 
         num_parts = len(part_dir.files)
+        rrows: list[list] = []
+        object_types: list[types.Type] = []
         for file in part_dir.files.values():
-            all_aws.append(_get_table_like_awl_from_file(file, num_parts).awl)
+            data = _get_table_data_from_file(file)
+            rows, object_type = _get_rows_and_object_type_awl_from_file(
+                data, file, num_parts
+            )
+            rrows.append(rows)
+            object_types.append(object_type)
+        object_type = types.union(*object_types)
+
+        for rows, file in zip(rrows, part_dir.files.values()):
+            all_aws.append(
+                _get_table_awl_from_rows_object_type(rows, object_type, file)
+            )
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_aws)
     return arrow_weave_list
 

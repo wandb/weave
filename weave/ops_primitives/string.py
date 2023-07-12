@@ -193,6 +193,12 @@ class String:
             raise ValueError("Expected a list")
         return res
 
+    @op(name="string-toNumber", output_type=types.optional(types.Number()))
+    def to_number(self):
+        if self.isnumeric():
+            return float(self)  # type: ignore
+        return None
+
 
 types.String.instance_class = String
 

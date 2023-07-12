@@ -7,6 +7,8 @@ import {
   opFileSize,
 } from '@wandb/weave/core';
 import numeral from 'numeral';
+import 'prismjs/components/prism-python';
+
 import Prism from 'prismjs';
 import React from 'react';
 import ReactDiffViewer, {DiffMethod} from 'react-diff-viewer';
