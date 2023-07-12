@@ -127,6 +127,7 @@ import {
   IconMinimizeMode,
   IconOverflowHorizontal,
   IconWeave,
+  IconLockedConstrained,
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
@@ -456,7 +457,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const labelConfigDom = useMemo(() => {
     return (
       <>
-        {['X Axis Label', 'Y Axis Label', 'Color Legend Label'].map(name => {
+        {['X axis', 'Y axis', 'Color legend'].map(name => {
           const dimName = name.split(' ')[0].toLowerCase() as
             | 'x'
             | 'y'
@@ -478,7 +479,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
             </ConfigPanel.ConfigOption>
           );
         })}
-        {config.series.map((series, i) => {
+        {/* {config.series.map((series, i) => {
           const seriesName = `Series ${i + 1} Name`;
           return (
             <ConfigPanel.ConfigOption
@@ -498,12 +499,64 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
               />
             </ConfigPanel.ConfigOption>
           );
-        })}
+        })} */}
       </>
     );
   }, [config, updateConfig]);
 
   console.log('config.series', config.series);
+
+  const newSeriesConfigDom = useMemo(() => {
+    return (
+      <>
+        {config.series.map((s, i) => {
+          return (
+            <ConfigSection label={`Series ${i + 1}`}>
+              {
+                <ConfigPanel.ConfigOption
+                  key={`series-${i + 1}`}
+                  label={'Name'}>
+                  <ConfigPanel.TextInputConfigField
+                    dataTest={`series-${i + 1}-label`}
+                    value={s.seriesName}
+                    label={''}
+                    onChange={(event, {value}) => {
+                      updateConfig(
+                        produce(config, draft => {
+                          draft.series[i].seriesName = value;
+                        })
+                      );
+                    }}
+                  />
+                </ConfigPanel.ConfigOption>
+              }
+              {PLOT_DIMS_UI.map(dimName => {
+                const dimIsShared = PlotState.isDimShared(
+                  config.series,
+                  dimName,
+                  weave
+                );
+                const dimIsExpanded = config.configOptionsExpanded[dimName];
+                const dimIsSharedInUI = dimIsShared && !dimIsExpanded;
+                const seriesDim = PlotState.dimConstructors[dimName](s, weave);
+                return (
+                  <ConfigDimComponent
+                    key={`${dimName}-${i}`}
+                    input={input}
+                    config={config}
+                    updateConfig={updateConfig}
+                    indentation={0}
+                    isShared={dimIsSharedInUI}
+                    dimension={seriesDim}
+                  />
+                );
+              })}
+            </ConfigSection>
+          );
+        })}
+      </>
+    );
+  }, [config, weave, input, updateConfig]);
 
   const seriesConfigDom = useMemo(() => {
     const firstSeries = config.series[0];
@@ -817,11 +870,12 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           <ConfigSection label={`Properties`}>
             {dashboardConfigOptions}
             <VariableView newVars={cellFrame} />
-            {seriesConfigDom}
+            {/* {seriesConfigDom} */}
             {advancedPropertiesDom}
           </ConfigSection>
+          {newSeriesConfigDom}
           <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
-          <ConfigSection label={`Scale`}>{scaleConfigDom}</ConfigSection>
+          {/* <ConfigSection label={`Scale`}>{scaleConfigDom}</ConfigSection> */}
         </>
       ) : (
         <>
@@ -1103,11 +1157,13 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return [
-        removeSeriesDropdownOption,
-        addSeriesDropdownOption,
-        collapseDimDropdownOption,
-      ];
+      return enableDashUi
+        ? [collapseDimDropdownOption]
+        : [
+            removeSeriesDropdownOption,
+            addSeriesDropdownOption,
+            collapseDimDropdownOption,
+          ];
     },
     [config, updateConfig, weave]
   );
@@ -1300,16 +1356,20 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     }));
 
     return (
-      <PopupMenu
-        position="bottom left"
-        trigger={
-          <ConfigDimMenuButton>
-            <IconOverflowHorizontal />
-          </ConfigDimMenuButton>
-        }
-        items={menuItems}
-        sections={menuSections}
-      />
+      <>
+        <PopupMenu
+          position="bottom left"
+          trigger={
+            <ConfigDimMenuButton>
+              <IconOverflowHorizontal />
+            </ConfigDimMenuButton>
+          }
+          items={menuItems}
+          sections={menuSections}
+        />
+        <LegacyWBIcon name="locked-constrained" />
+        <span>b</span>
+      </>
     );
 
     function dimOptionToMenuItem({
@@ -1435,7 +1495,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             series={isShared ? config.series : [dimension.series]}
           />
         </ConfigDimLabel>
-        {enableDashUi && (
+        {/* {enableDashUi && (
           <ConfigPanel.ConfigOption label={`Group by ${dimension.name}`}>
             <Checkbox
               checked={config.series[0].table.groupBy.includes(
@@ -1444,7 +1504,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
               onChange={(e, {checked}) => updateGroupBy(checked ?? false)}
             />
           </ConfigPanel.ConfigOption>
-        )}
+        )} */}
       </>
     );
   }
