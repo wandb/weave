@@ -37,3 +37,13 @@ def test_index_arrowlist(self_constructor):
     if isinstance(res, ops_arrow.ArrowWeaveList):
         res = res.to_pylist_notags()
     assert res == ["a", "c"]
+
+
+def test_index_listawl_oob():
+    val = ops_arrow.to_arrow([[0, 1], [2, 3]])
+    val.object_type = ops_arrow.ArrowWeaveListType(val.object_type.object_type)
+    items = weave.save(val)
+    res = weave.use(items[2])
+    if isinstance(res, ops_arrow.ArrowWeaveList):
+        res = res.to_pylist_notags()
+    assert res == None
