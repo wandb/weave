@@ -94,6 +94,7 @@ class MonitorRecord:
 
 def monitor(
     stream_name: typing.Optional[str] = None,
+    *,
     project_name: typing.Optional[str] = None,
     entity_name: typing.Optional[str] = None,
     input_preprocessor: typing.Optional[
@@ -110,38 +111,145 @@ def monitor(
     callbable should return a dictionary with scalar values or wandb Media objects.
 
     Arguments:
+        stream_name (typing.Optional[str]):  The name of the stream to log to.  If None, the stream name will be
+            inferred from the function name.
+        project_name (typing.Optional[str]):  The name of the project to log to.  If None, the project name will be
+            inferred from the environment variable WANDB_PROJECT and fallback to "monitoring".
+        entity_name (typing.Optional[str]):  The name of the entity to log to.  If None, the entity name will be
+            inferred from the current authenticated user.
         input_preprocessor (typing.Callable[..., typing.Any]):  A function that takes the kwargs of the decorated function and
             returns a dictionary of key value pairs to log.
         output_postprocessor (typing.Callable[..., typing.Any]):  A function that takes the return value of the decorated function
             and returns a dictionary or single value to log.
+        auto_log (bool):  If True, the function will automatically log the inputs and outputs of the function call. Set this
+            to False if you want to add additional data to the log after the function call.
+        raise_on_error (bool):  If True, the function will raise an exception if the function call raises an exception.
+            If False, the function will return a MonitorRecord with the exception set.
     """
 
     def decorator(
         fn: typing.Callable[..., typing.Any]
     ) -> typing.Callable[..., MonitorRecord]:
-        mon = MonitorStream(
+        return MonitoredFunction(
             fn,
-            stream_name,
-            project_name,
-            entity_name,
-            input_preprocessor,
-            output_postprocessor,
-            auto_log,
+            stream_name=stream_name,
+            project_name=project_name,
+            entity_name=entity_name,
+            input_preprocessor=input_preprocessor,
+            output_postprocessor=output_postprocessor,
+            auto_log=auto_log,
+            raise_on_error=raise_on_error,
         )
-        tracked_fn = track(raise_on_error)(fn)
-
-        def wrapped_fn(*args: typing.Any, **kwargs: typing.Any) -> MonitorRecord:
-            logger.debug("decorating %s", fn)
-            execution_record = tracked_fn(*args, **kwargs)
-            monitor_record = mon.record(execution_record)
-            return monitor_record
-
-        return wrapped_fn
 
     return decorator
 
 
-def track(
+class MonitoredFunction:
+    _fn: typing.Callable[..., typing.Any]
+    _tracked_fn: typing.Callable[..., ExecutionResult]
+    _stream_table: StreamTableAsync
+    _input_preprocessor: typing.Callable[..., dict[str, typing.Any]]
+    _output_preprocessor: typing.Callable[..., dict[str, typing.Any]]
+    _auto_log: bool
+    _disabled: bool
+    _raise_on_error: bool
+
+    def __init__(
+        self,
+        fn: typing.Callable[..., typing.Any],
+        *,
+        stream_name: typing.Optional[str] = None,
+        project_name: typing.Optional[str] = None,
+        entity_name: typing.Optional[str] = None,
+        input_preprocessor: typing.Optional[
+            typing.Callable[..., dict[str, typing.Any]]
+        ] = None,
+        output_postprocessor: typing.Optional[
+            typing.Callable[..., dict[str, typing.Any]]
+        ] = None,
+        auto_log: bool = True,
+        raise_on_error: bool = True,
+    ):
+        self._fn = fn
+        self._tracked_fn = _track(raise_on_error)(fn)
+        self._disabled = False
+        self._auto_log = auto_log
+        self._raise_on_error = raise_on_error
+
+        try:
+            self._stream_table = StreamTableAsync(
+                stream_name or _get_default_fn_name(fn),
+                project_name or os.environ.get("WANDB_PROJECT", "monitoring"),
+                entity_name,
+            )
+        except WeaveWandbRunException:
+            self._disabled = True
+            logger.error("Monitoring disabled because WANDB_API_KEY is not set.")
+            print("Couldn't find W&B API key, disabling monitoring.", file=sys.stderr)
+            print(
+                "Set the WANDB_API_KEY env variable to enable monitoring.",
+                file=sys.stderr,
+            )
+
+        self._input_preprocessor = input_preprocessor or self._default_input_processor
+        self._output_postprocessor = output_postprocessor or (lambda x: x)
+
+    def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+        execution_record = self._tracked_fn(*args, **kwargs)
+        monitor_record = MonitorRecord(
+            execution_record,
+            self._input_preprocessor,
+            self._output_postprocessor,
+        )
+        if not self._disabled and self._auto_log:
+            self._direct_log(monitor_record)
+        else:
+            monitor_record._on_log = self._direct_log
+        return monitor_record
+
+    # to support instance methods
+    def __get__(self, instance: typing.Any, owner: typing.Any) -> MonitoredFunction:
+        if instance is None:
+            return self
+        else:
+            self._fn = self._fn.__get__(instance, owner)
+            self._tracked_fn = _track(self._raise_on_error)(self._fn)
+            return self
+
+    def _direct_log(self, record: MonitorRecord) -> None:
+        self._stream_table.log(lambda: record.as_dict())
+
+    def _default_input_processor(self, *args: typing.Any, **kwargs: typing.Any) -> dict:
+        arg_dict = _arguments_to_dict(self._fn, args, kwargs)
+        if "self" in arg_dict:
+            del arg_dict["self"]
+        return arg_dict
+
+
+def _arguments_to_dict(
+    fn: typing.Callable, args: tuple[typing.Any, ...], kwargs: dict[str, typing.Any]
+) -> dict[str, typing.Any]:
+    """Given a function and arguments used to call that function, return a dictionary of key value pairs
+    that are the bound arguments to the function.
+    """
+    sig = inspect.signature(fn)
+    bound_params = sig.bind(*args, **kwargs)
+    bound_params.apply_defaults()
+    return dict(bound_params.arguments)
+
+
+def _sanitize_name(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_]", "_", name)
+
+
+def _get_default_fn_name(fn: typing.Callable) -> str:
+    fn_file_name = _sanitize_name(os.path.basename(inspect.getfile(fn)))
+    fn_name = _sanitize_name(fn.__name__)
+
+    return f"{fn_file_name}-{fn_name}"
+
+
+def _track(
     raise_on_error: bool = True,
 ) -> typing.Callable[..., typing.Callable[..., ExecutionResult]]:
     """A low-level utility for tracking function executions."""
@@ -175,91 +283,3 @@ def track(
         return wrapped_fn
 
     return function_monitor_decorator
-
-
-class MonitorStream:
-    _fn: typing.Callable[..., typing.Any]
-    _stream_table: StreamTableAsync
-    _input_preprocessor: typing.Callable[..., dict[str, typing.Any]]
-    _output_preprocessor: typing.Callable[..., dict[str, typing.Any]]
-    _auto_log: bool
-
-    def __init__(
-        self,
-        fn: typing.Callable[..., typing.Any],
-        stream_name: typing.Optional[str] = None,
-        project_name: typing.Optional[str] = None,
-        entity_name: typing.Optional[str] = None,
-        input_preprocessor: typing.Optional[
-            typing.Callable[..., dict[str, typing.Any]]
-        ] = None,
-        output_postprocessor: typing.Optional[
-            typing.Callable[..., dict[str, typing.Any]]
-        ] = None,
-        auto_log: bool = True,
-    ):
-        self._fn = fn
-        self._disabled = False
-        self._auto_log = auto_log
-
-        try:
-            self._stream_table = StreamTableAsync(
-                stream_name or _get_default_fn_name(fn),
-                project_name or "monitoring",
-                entity_name,
-            )
-        except WeaveWandbRunException:
-            self._disabled = True
-            logger.error("Monitoring disabled because WANDB_API_KEY is not set.")
-            print("Couldn't find W&B API key, disabling monitoring.", file=sys.stderr)
-            print(
-                "Set the WANDB_API_KEY env variable to enable monitoring.",
-                file=sys.stderr,
-            )
-
-        self._input_preprocessor = input_preprocessor or self._default_input_processor
-        self._output_postprocessor = output_postprocessor or (lambda x: x)
-
-    def _direct_log(self, record: MonitorRecord) -> None:
-        self._stream_table.log(lambda: record.as_dict())
-
-    def record(self, result: ExecutionResult) -> MonitorRecord:
-        monitor_record = MonitorRecord(
-            result,
-            self._input_preprocessor,
-            self._output_postprocessor,
-        )
-        if not self._disabled and self._auto_log:
-            self._direct_log(monitor_record)
-        else:
-            monitor_record._on_log = self._direct_log
-        return monitor_record
-
-    def _default_input_processor(self, *args: typing.Any, **kwargs: typing.Any) -> dict:
-        arg_dict = _arguments_to_dict(self._fn, args, kwargs)
-        if "self" in arg_dict:
-            del arg_dict["self"]
-        return arg_dict
-
-
-def _arguments_to_dict(
-    fn: typing.Callable, args: tuple[typing.Any, ...], kwargs: dict[str, typing.Any]
-) -> dict[str, typing.Any]:
-    """Given a function and arguments used to call that function, return a dictionary of key value pairs
-    that are the bound arguments to the function.
-    """
-    sig = inspect.signature(fn)
-    bound_params = sig.bind(*args, **kwargs)
-    bound_params.apply_defaults()
-    return dict(bound_params.arguments)
-
-
-def _sanitize_name(name: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_]", "_", name)
-
-
-def _get_default_fn_name(fn: typing.Callable) -> str:
-    fn_file_name = _sanitize_name(os.path.basename(inspect.getfile(fn)))
-    fn_name = _sanitize_name(fn.__name__)
-
-    return f"{fn_file_name}-{fn_name}"

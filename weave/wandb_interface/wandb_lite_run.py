@@ -1,3 +1,4 @@
+import os
 import logging
 import re
 import datetime
@@ -61,7 +62,10 @@ class InMemoryLazyLiteRun:
         self._run_name = run_name or runid.generate_id()
         self._job_type = job_type
 
-        self._use_async_file_stream = _use_async_file_stream
+        self._use_async_file_stream = (
+            _use_async_file_stream
+            and os.getenv("WEAVE_DISABLE_ASYNC_FILE_STREAM") == None
+        )
 
     def ensure_run(self) -> Run:
         return self.run
