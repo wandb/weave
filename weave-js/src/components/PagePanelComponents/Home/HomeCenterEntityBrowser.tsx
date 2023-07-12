@@ -476,7 +476,7 @@ const CenterProjectTablesBrowser: React.FC<
         // Home Page TODO: Enable awesome previews
         {
           icon: IconInfo,
-          label: 'Board details ',
+          label: 'Table details',
           onClick: row => {
             setSelectedRowId(row._id);
             const expr = tableRowToNode(
