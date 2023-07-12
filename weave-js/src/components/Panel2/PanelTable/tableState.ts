@@ -192,6 +192,16 @@ function isNDArrayLike(type: Type): boolean {
   }
   return false;
 }
+
+const streamTableColumns = [
+  // Added by Stream Table
+  "timestamp",
+  "_client_id",
+  // Added by Run
+  "_timestamp",
+  // Added by Gorilla
+  "_step",
+]
 const monitoringColumns = [
   // Added by monitor decorator
   "result_id",
@@ -201,8 +211,10 @@ const monitoringColumns = [
   "start_datetime",
   "end_datetime",
   "exception",
-  // Added by Stream Table
-  "timestamp",
+  ...streamTableColumns
+] 
+
+const excludedStreamTableColumns = [
   "_client_id",
   // Added by Run
   "_timestamp",
@@ -211,17 +223,21 @@ const monitoringColumns = [
 ]
 
 const excludedMonitoringColumns = [
-    // Added by Stream Table
     "timestamp",
-    "_client_id",
-    // Added by Run
-    "_timestamp",
-    // Added by Gorilla
-    "_step",
+    ...excludedStreamTableColumns,
 ]
 
 function allPathsFromMonitoring(allPaths: PathType[]): boolean {
   for (const col of monitoringColumns) {
+    if (!allPaths.find(p => p.path[0] === col)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function allPathsFromStreamTable(allPaths: PathType[]): boolean {
+  for (const col of streamTableColumns) {
     if (!allPaths.find(p => p.path[0] === col)) {
       return false;
     }
@@ -240,7 +256,7 @@ export function autoTableColumnExpressions(
   let allPaths = allObjPaths(objectType).filter(
     path => !isNDArrayLike(path.type) && !isAssignableTo(path.type, 'none')
   );
-  console.log(allPathsFromMonitoring(allPaths))
+
   if (allPathsFromMonitoring(allPaths)) {
     allPaths = allPaths.filter(p => !excludedMonitoringColumns.includes(p.path[0]))
     allPaths = allPaths.sort((a, b) => {
@@ -248,8 +264,10 @@ export function autoTableColumnExpressions(
       const bIdx = monitoringColumns.indexOf(b.path[0])
       return aIdx - bIdx
     })
+  } else if (allPathsFromStreamTable(allPaths)) {
+    allPaths = allPaths.filter(p => !excludedStreamTableColumns.includes(p.path[0]))
   }
-  console.log('allPaths', allPaths)
+  
   return allPaths
     .map(pt => pt.path.map(escapeDots))
     .map(path => {

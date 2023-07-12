@@ -23,13 +23,13 @@ class ExecutionResult:
 
     start_datetime: datetime.datetime
     end_datetime: datetime.datetime
-    args: list[typing.Any]
+    args: tuple[typing.Any, ...]
     kwargs: dict[str, typing.Any]
     output: typing.Any
     exception: typing.Optional[Exception]
     id: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
 
-    def get(self):
+    def get(self) -> typing.Any:
         if self.exception is not None:
             raise self.exception
         return self.output
@@ -41,12 +41,24 @@ class MonitorRecord:
     _input_preprocessor: typing.Callable[..., typing.Any]
     _output_postprocessor: typing.Callable[..., typing.Any] = lambda x: x
     _additional_data: dict = dataclasses.field(default_factory=dict)
+    _on_log: typing.Optional[typing.Callable[..., None]] = None
 
-    def get(self):
+    @property
+    def id(self) -> str:
+        return self._execution_result.id
+
+    def get(self) -> typing.Any:
         return self._execution_result.get()
 
     def add_data(self, data: dict) -> None:
         self._additional_data.update(data)
+
+    def finalize(self) -> None:
+        if self._on_log is not None:
+            self._on_log(self)
+            self._on_log = None
+        else:
+            logger.warning("MonitorRecord already finalized")
 
     @property
     def inputs(self) -> dict:
@@ -56,12 +68,9 @@ class MonitorRecord:
 
     @property
     def output(self) -> typing.Any:
-        logger.debug(
-            "output %s (%s)", self._output, self._output_postprocessor(self._output)
-        )
-        return self._output_postprocessor(self._output)
+        return self._output_postprocessor(self._execution_result.output)
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
         return {
             "result_id": self._execution_result.id,
             "start_datetime": self._execution_result.start_datetime,
@@ -79,7 +88,7 @@ class MonitorRecord:
             **self._additional_data,
         }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"MonitorRecord({self._execution_result.id})"
 
 
@@ -93,6 +102,7 @@ def monitor(
     output_postprocessor: typing.Optional[
         typing.Callable[..., dict[str, typing.Any]]
     ] = None,
+    auto_log: bool = True,
     raise_on_error: bool = True,
 ) -> typing.Callable[..., typing.Callable[..., MonitorRecord]]:
     """Monitor a function.  This is a function decorator for performantely monitoring predictions during inference.
@@ -116,10 +126,11 @@ def monitor(
             entity_name,
             input_preprocessor,
             output_postprocessor,
+            auto_log,
         )
         tracked_fn = track(raise_on_error)(fn)
 
-        def wrapped_fn(*args, **kwargs) -> MonitorRecord:
+        def wrapped_fn(*args: typing.Any, **kwargs: typing.Any) -> MonitorRecord:
             logger.debug("decorating %s", fn)
             execution_record = tracked_fn(*args, **kwargs)
             monitor_record = mon.record(execution_record)
@@ -132,11 +143,13 @@ def monitor(
 
 def track(
     raise_on_error: bool = True,
-):
+) -> typing.Callable[..., typing.Callable[..., ExecutionResult]]:
     """A low-level utility for tracking function executions."""
 
-    def function_monitor_decorator(fn: typing.Callable[..., typing.Any]):
-        def wrapped_fn(*args, **kwargs) -> "ExecutionResult":
+    def function_monitor_decorator(
+        fn: typing.Callable[..., typing.Any]
+    ) -> typing.Callable[..., ExecutionResult]:
+        def wrapped_fn(*args: typing.Any, **kwargs: typing.Any) -> "ExecutionResult":
             output = None
             exception = None
             args = args
@@ -169,6 +182,7 @@ class MonitorStream:
     _stream_table: StreamTableAsync
     _input_preprocessor: typing.Callable[..., dict[str, typing.Any]]
     _output_preprocessor: typing.Callable[..., dict[str, typing.Any]]
+    _auto_log: bool
 
     def __init__(
         self,
@@ -182,9 +196,11 @@ class MonitorStream:
         output_postprocessor: typing.Optional[
             typing.Callable[..., dict[str, typing.Any]]
         ] = None,
+        auto_log: bool = True,
     ):
         self._fn = fn
         self._disabled = False
+        self._auto_log = auto_log
 
         try:
             self._stream_table = StreamTableAsync(
@@ -204,20 +220,30 @@ class MonitorStream:
         self._input_preprocessor = input_preprocessor or self._default_input_processor
         self._output_postprocessor = output_postprocessor or (lambda x: x)
 
-    def record(self, result: ExecutionResult) -> ExecutionResult:
+    def _direct_log(self, record: MonitorRecord) -> None:
+        self._stream_table.log(lambda: record.as_dict())
+
+    def record(self, result: ExecutionResult) -> MonitorRecord:
         monitor_record = MonitorRecord(
-            result, self._input_preprocessor, self._output_postprocessor
+            result,
+            self._input_preprocessor,
+            self._output_postprocessor,
         )
-        if not self._disabled:
-            self._stream_table.log(lambda: monitor_record.as_dict())
+        if not self._disabled and self._auto_log:
+            self._direct_log(monitor_record)
+        else:
+            monitor_record._on_log = self._direct_log
         return monitor_record
 
-    def _default_input_processor(self, *args, **kwargs) -> dict:
-        return _arguments_to_dict(self._fn, args, kwargs)
+    def _default_input_processor(self, *args: typing.Any, **kwargs: typing.Any) -> dict:
+        arg_dict = _arguments_to_dict(self._fn, args, kwargs)
+        if "self" in arg_dict:
+            del arg_dict["self"]
+        return arg_dict
 
 
 def _arguments_to_dict(
-    fn: typing.Callable, args: tuple[typing.Any], kwargs: dict[str, typing.Any]
+    fn: typing.Callable, args: tuple[typing.Any, ...], kwargs: dict[str, typing.Any]
 ) -> dict[str, typing.Any]:
     """Given a function and arguments used to call that function, return a dictionary of key value pairs
     that are the bound arguments to the function.

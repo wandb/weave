@@ -237,7 +237,7 @@ class StreamTableAsync:
         self._stream_table._lite_run.setup()
         self._stream_table._ensure_weave_stream_table()
 
-        self.queue = queue.Queue()
+        self.queue: queue.Queue = queue.Queue()
         atexit.register(self._at_exit)
         self._lock = threading.Lock()
         self._join_event = threading.Event()
@@ -280,12 +280,12 @@ class StreamTableAsync:
         self._join_event.set()
         self._thread.join()
         with self._lock:
-            self.stream_table.finish()
+            self._stream_table.finish()
 
     def __del__(self) -> None:
         self.finish()
 
-    def _at_exit(self):
+    def _at_exit(self) -> None:
         self.finish()
 
 

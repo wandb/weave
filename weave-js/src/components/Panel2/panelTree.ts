@@ -460,7 +460,7 @@ export const ensureDashboardFromItems = (
   if (Object.keys(vars).length === 0) {
     vars = {var0: voidNode()};
   }
-  const sidebarVars = _.mapValues(vars, (node, name) =>
+  let sidebarVars = _.mapValues(vars, (node, name) =>
     getFullChildPanel({
       vars: {},
       input_node: node,
@@ -468,6 +468,10 @@ export const ensureDashboardFromItems = (
       config: null,
     })
   );
+  sidebarVars = _.mapKeys(sidebarVars, (node, name) => {
+    // sanitize key to lowercase and underscore
+    return name.toLowerCase().replace(/[^a-z0-9_]/gi, '_');
+  });
   return makeGroup(
     {
       sidebar: makeGroup(sidebarVars, {
