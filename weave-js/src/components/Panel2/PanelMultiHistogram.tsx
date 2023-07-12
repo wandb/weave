@@ -120,7 +120,7 @@ const PanelMultiHistogram: React.FC<PanelMultiHistogramProps> = props => {
   const data = useMemo(() => {
     const rows = nodeValueQuery?.result ?? [];
     if (nodeValueQuery.loading) {
-      //} || colorNodeValue.loading) {
+      // } || colorNodeValue.loading) {
       return [];
     }
     const result: Array<{
