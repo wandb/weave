@@ -26,7 +26,7 @@ from .trace_tree import *
 
 
 # make root ops top level
-viewer = user_ops.root_viewer
-project = project_ops.project
-entity = entity_ops.entity
-org = org_ops.org
+viewer = user_ops.root_viewer  # type: ignore
+project = project_ops.project  # type: ignore
+entity = entity_ops.entity  # type: ignore
+org = org_ops.org  # type: ignore

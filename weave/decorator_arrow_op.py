@@ -130,6 +130,7 @@ def arrow_op(
     render_info=None,
     pure=True,
     all_args_nullable: bool = True,
+    plugins=None,
 ) -> typing.Callable[[typing.Any], op_def.OpDef]:
     """An arrow op is an op that should obey element-based tag-flow map rules. An arrow op must
 
@@ -161,4 +162,5 @@ def arrow_op(
         render_info=render_info,
         pure=pure,
         _op_def_class=op_def.AutoTagHandlingArrowOpDef,
+        plugins=plugins,
     )

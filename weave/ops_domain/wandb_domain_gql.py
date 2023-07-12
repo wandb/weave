@@ -6,6 +6,9 @@ from inspect import signature, Parameter
 from . import wb_domain_types
 import hashlib
 from .. import errors
+from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType
+from ..decorator_arrow_op import arrow_op
+from .. import op_def
 
 """
 This file contains utilities for constructing GQL ops (used by all the ops in
@@ -37,6 +40,39 @@ def _make_alias(*args: str, prefix: str = "alias") -> str:
     return f"{prefix}_{digest}"
 
 
+def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef) -> None:
+    op_args = scalar_op.input_type
+
+    first_arg_name: str
+    scalar_input_type: weave_types.Type
+    scalar_op_name = scalar_op.name
+    first_arg_name, scalar_input_type = next(iter(op_args.to_dict().items()))
+
+    # we can make this assumption because the GQL prop ops do not have output types dependent
+    # on input types
+    scalar_output_type = typing.cast(weave_types.Type, scalar_op.output_type)
+
+    vectorized_op_name = "ArrowWeaveList-" + scalar_op_name.split("-")[1]
+    arrow_input_type = {first_arg_name: ArrowWeaveListType(scalar_input_type)}
+    arrow_output_type = ArrowWeaveListType(scalar_output_type)
+
+    def vectorized_gql_property_getter_op_fn(**inputs):
+        pass
+
+    vectorized_gql_property_getter_op_fn.__signature__ = (  # type: ignore
+        scalar_op.raw_resolve_fn.__signature__  # type: ignore
+    )
+
+    vectorized_gql_property_getter_op_fn.sig = scalar_op.raw_resolve_fn.sig  # type: ignore
+
+    arrow_op(
+        name=vectorized_op_name,
+        input_type=arrow_input_type,
+        output_type=arrow_output_type,
+        plugins=scalar_op.plugins,
+    )(vectorized_gql_property_getter_op_fn)
+
+
 def gql_prop_op(
     op_name: str,
     input_type: weave_types.Type,
@@ -56,7 +92,7 @@ def gql_prop_op(
     gql_property_getter_op_fn.__signature__ = sig  # type: ignore
     gql_property_getter_op_fn.sig = sig  # type: ignore
 
-    return op(
+    scalar_op = op(
         name=op_name,
         plugins=wb_gql_op_plugin(
             lambda inputs, inner: prop_name,
@@ -64,6 +100,10 @@ def gql_prop_op(
         input_type={first_arg_name: input_type},
         output_type=output_type,
     )(gql_property_getter_op_fn)
+
+    # side effect: register an arrow-vectorized version of the op
+    register_vectorized_gql_prop_op(scalar_op)
+    return scalar_op
 
 
 def _get_required_fragment(output_type: weave_types.Type):
