@@ -832,8 +832,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def separate_awls(
         self,
-    ) -> typing.Tuple["ArrowWeaveList", dict[PathType, list["ArrowWeaveList"]]]:
-        awl_columns: dict[PathType, list[ArrowWeaveList]] = {}
+    ) -> typing.Tuple[
+        "ArrowWeaveList", dict[PathType, list[typing.Optional["ArrowWeaveList"]]]
+    ]:
+        awl_columns: dict[PathType, list[typing.Optional[ArrowWeaveList]]] = {}
 
         def _remove_awls(
             list: ArrowWeaveList, path: PathType
@@ -843,6 +845,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     ArrowWeaveList(
                         a.values, list.object_type.object_type, list._artifact
                     )
+                    if a.values is not None
+                    else None
                     for a in list._arrow_data
                 ]
                 return ArrowWeaveList(
