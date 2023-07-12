@@ -30,6 +30,8 @@ types.Boolean.instance_class = Boolean
 
 
 def none_coalesce_output_type(input_types):
+    if types.NoneType().assign_type(input_types["lhs"]):
+        return input_types["rhs"]
     return types.union(input_types["lhs"], input_types["rhs"])
 
 

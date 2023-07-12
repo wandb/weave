@@ -81,3 +81,30 @@ export const opDict = makeOp({
     return inputs;
   },
 });
+
+export const opTimestamp = makeOp({
+  hidden: true,
+  name: 'timestamp',
+  argTypes: {timestampISO: 'string'},
+  description: `Creates a ${docType(
+    'timestamp'
+  )} from a variable number of arguments`,
+  argDescriptions: {
+    dateISO: `An ISO date string to convert to a ${docType('timestamp')}`,
+  },
+  returnValueDescription: `The ${docType('timestamp')}`,
+  renderInfo: {
+    type: 'function',
+  },
+  returnType: inputs => {
+    return {type: 'union', members: ['none', {type: 'timestamp'}]};
+  },
+  resolver: inputs => {
+    const date = new Date(inputs.timestampISO);
+    const timestamp = date.getTime();
+    if (isNaN(timestamp)) {
+      return null;
+    }
+    return timestamp;
+  },
+});

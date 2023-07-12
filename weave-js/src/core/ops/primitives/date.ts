@@ -1,6 +1,6 @@
 import moment from 'moment';
 
-import {list} from '../../model';
+import {list, listObjectType, maybe, nonNullable} from '../../model';
 import {docType} from '../../util/docs';
 import {makeBasicDimDownOp, makeStandardOp} from '../opKinds';
 
@@ -50,16 +50,72 @@ export const opDateToNumber = makeDateOp({
   },
 });
 
-export const opDatesMin = makeDimDownDateOp({
+export const opDatesMax = makeDimDownDateOp({
   hidden: true,
-  name: 'dates-min',
-  argTypes: {dates: {type: 'list', objectType: 'date'}},
+  name: 'dates-max',
+  argTypes: {
+    dates: {
+      type: 'union',
+      members: [
+        {
+          type: 'list',
+          objectType: {type: 'union', members: ['none', 'date']},
+        },
+        {
+          type: 'list',
+          objectType: {type: 'union', members: ['none', {type: 'timestamp'}]},
+        },
+      ],
+    },
+  },
   description: `Returns the earliest ${docType('date')}`,
   argDescriptions: {dates: 'The list of dates'},
   returnValueDescription: `The earliest ${docType('date')}`,
-  returnType: inputTypes => 'date',
+  returnType: inputTypes => {
+    const objType = listObjectType(inputTypes.dates);
+    if (nonNullable(objType) === 'date') {
+      return maybe('date');
+    } else {
+      return maybe({type: 'timestamp'});
+    }
+  },
   resolver: inputs => {
-    const {dates} = inputs;
+    const dates = inputs.dates as number[];
+    return dates.reduce((a, b) => (a > b ? a : b));
+  },
+});
+
+export const opDatesMin = makeDimDownDateOp({
+  hidden: true,
+  name: 'dates-min',
+  argTypes: {
+    dates: {
+      type: 'union',
+      members: [
+        {
+          type: 'list',
+          objectType: {type: 'union', members: ['none', 'date']},
+        },
+        {
+          type: 'list',
+          objectType: {type: 'union', members: ['none', {type: 'timestamp'}]},
+        },
+      ],
+    },
+  },
+  description: `Returns the earliest ${docType('date')}`,
+  argDescriptions: {dates: 'The list of dates'},
+  returnValueDescription: `The earliest ${docType('date')}`,
+  returnType: inputTypes => {
+    const objType = listObjectType(inputTypes.dates);
+    if (nonNullable(objType) === 'date') {
+      return maybe('date');
+    } else {
+      return maybe({type: 'timestamp'});
+    }
+  },
+  resolver: inputs => {
+    const dates = inputs.dates as number[];
     return dates.reduce((a, b) => (a < b ? a : b));
   },
 });

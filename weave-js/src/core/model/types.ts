@@ -80,6 +80,8 @@ export interface TypedDictType {
   // undefined here forces us to handle cases where properties
   // missing
   propertyTypes: {[key: string]: Type | undefined};
+
+  notRequiredKeys?: string[];
 }
 
 export interface RootObjectType {

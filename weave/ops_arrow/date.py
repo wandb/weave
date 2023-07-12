@@ -33,7 +33,7 @@ def to_number(self):
     )
 
 
-def adjust_multiple_s(multiple_s: int) -> typing.Tuple[int, str]:
+def adjust_multiple_s(multiple_s: float) -> typing.Tuple[float, str]:
     unit = "second"
 
     # Critical: Arrow silently fails if the unit is < 1. In such cases,
@@ -50,7 +50,7 @@ def adjust_multiple_s(multiple_s: int) -> typing.Tuple[int, str]:
     input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
-def floor(self, multiple_s: int):
+def floor(self, multiple_s: float):
     multiple_s, unit = adjust_multiple_s(multiple_s)
     return ArrowWeaveList(
         pc.floor_temporal(self._arrow_data, multiple=multiple_s, unit=unit),
@@ -64,7 +64,7 @@ def floor(self, multiple_s: int):
     input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
-def ceil(self, multiple_s: int):
+def ceil(self, multiple_s: float):
     multiple_s, unit = adjust_multiple_s(multiple_s)
     return ArrowWeaveList(
         pc.ceil_temporal(
@@ -128,3 +128,23 @@ def ge(self, other):
     return ArrowWeaveList(
         pc.greater_equal(self._arrow_data, other), types.Boolean(), self._artifact
     )
+
+
+@op(
+    name="ArrowWeaveListDate-min",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
+    output_type=types.optional(types.Timestamp()),
+)
+def timestamp_min(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.min(array).as_py()
+
+
+@op(
+    name="ArrowWeaveListDate-max",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
+    output_type=types.optional(types.Timestamp()),
+)
+def timestamp_max(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.max(array).as_py()

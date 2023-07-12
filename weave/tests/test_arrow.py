@@ -1856,9 +1856,10 @@ def test_identity_awl_operations_3(
     assert weave.use(awl_node).to_pylist_raw() == data
 
     # Assert concat-ability
-    concat_awl = weave.save(
-        arrow.to_arrow(concat_with_data, types.List(concat_with_weave_type))
+    raw_concat_awl = arrow.to_arrow(
+        concat_with_data, types.List(concat_with_weave_type)
     )
+    concat_awl = weave.save(raw_concat_awl)
     concatted = ops.make_list(a=awl_node, b=concat_awl).concat()
     assert weave.use(concatted).to_pylist_raw() == data + concat_with_data
 

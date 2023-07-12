@@ -41,6 +41,18 @@ def _convert_specific_opname_to_generic_opname(
         return "filter", {"arr": inputs["self"], "filterFn": inputs["filter_fn"]}
     elif name == "list-__getitem__":
         return "index", {"arr": inputs["arr"], "index": inputs["index"]}
+    elif name == "ArrowWeaveList-limit":
+        return "limit", {"arr": inputs["self"], "limit": inputs["limit"]}
+    elif name == "ArrowWeaveList-map":
+        return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
+    elif name == "ArrowWeaveListNumber-min":
+        return "numbers-min", {"numbers": inputs["self"]}
+    elif name == "ArrowWeaveListNumber-max":
+        return "numbers-max", {"numbers": inputs["self"]}
+    elif name == "ArrowWeaveListDate-min":
+        return "dates-min", {"dates": inputs["self"]}
+    elif name == "ArrowWeaveListDate-max":
+        return "dates-max", {"dates": inputs["self"]}
     elif (
         name == "groupresult-__getitem__"
         or name == "artifacts-__getitem__"
