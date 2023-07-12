@@ -227,7 +227,7 @@ def awl_2d_projection(
     data = table._arrow_data_asarray_no_tags()
 
     def default_projection():
-        return np.array([[0, 0] for row in data])
+        return np.zeros((len(data), 2))
 
     if len(inputColumnNames) == 0 or len(data) < 2:
         np_projection = default_projection()
@@ -247,9 +247,28 @@ def awl_2d_projection(
                 col for col in column_data if not isinstance(col, pa.NullArray)
             ]
             np_array_of_embeddings = np.array(column_data).T
+
+        # coerce to float to turn Nones into nans
+        np_array_of_embeddings = np_array_of_embeddings.astype("f")
+
+        # impute nans with average value for column - this handles the case
+        # where we have a column of Optional[number]
+        none_indices = np.argwhere(np.isnan(np_array_of_embeddings))
+        column_indices = none_indices[:, 1]
+
+        np.put(
+            np_array_of_embeddings,
+            none_indices,
+            np.nanmean(np_array_of_embeddings, axis=0)[column_indices],
+        )
+
+        # if any remaining nans (can only happen if all values in a column are nan), replace with zeros
+        # such columns will be removed in the next step
+        np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings)
+
         # remove 0-only columns
         np_array_of_embeddings = np_array_of_embeddings[
-            :, ~(np_array_of_embeddings.sum(axis=0) == 0)
+            :, ~((np_array_of_embeddings == 0).all(axis=0))
         ]
         # If the selected data is not a 2D array, or if it has less than 2 columns, then
         # we can't perform a 2D projection. In this case, we just return a 2D array of
