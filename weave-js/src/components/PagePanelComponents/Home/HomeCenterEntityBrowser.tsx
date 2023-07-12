@@ -274,6 +274,7 @@ const CenterProjectBrowserInner: React.FC<
       loading={assetCounts.loading}
       breadcrumbs={[
         {
+          key: 'entity',
           text: props.entityName,
           onClick: () => {
             props.setSelectedProjectName(undefined);
@@ -362,6 +363,7 @@ const CenterProjectBoardsBrowser: React.FC<
       noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {
+          key: 'entity',
           text: props.entityName,
           onClick: () => {
             props.setSelectedProjectName(undefined);
@@ -369,6 +371,7 @@ const CenterProjectBoardsBrowser: React.FC<
           },
         },
         {
+          key: 'project',
           text: props.projectName,
           onClick: () => {
             props.setSelectedAssetType(undefined);
@@ -584,6 +587,7 @@ const CenterProjectTablesBrowser: React.FC<
       noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {
+          key: 'entity',
           text: props.entityName,
           onClick: () => {
             props.setSelectedProjectName(undefined);
@@ -591,6 +595,7 @@ const CenterProjectTablesBrowser: React.FC<
           },
         },
         {
+          key: 'project',
           text: props.projectName,
           onClick: () => {
             props.setSelectedAssetType(undefined);
