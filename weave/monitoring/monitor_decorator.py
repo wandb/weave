@@ -208,7 +208,7 @@ class MonitoredFunction:
         return monitor_record
 
     # to support instance methods
-    def __get__(self, instance: typing.Any, owner: typing.Any) -> MonitoredFunction:
+    def __get__(self, instance: typing.Any, owner: typing.Any) -> "MonitoredFunction":
         if instance is None:
             return self
         else:
