@@ -248,9 +248,9 @@ def recursively_build_pyarrow_array(
         return pa.ListArray.from_arrays(
             offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
         )
-
-    if py_objs_already_mapped:
-        return pa.array(py_objs, pyarrow_type)
+    elif pa.types.is_temporal(pyarrow_type):
+        if py_objs_already_mapped:
+            return pa.array(py_objs, type=pyarrow_type)
 
     values = [mapper.apply(o) if o is not None else None for o in py_objs]
 
@@ -273,7 +273,10 @@ def recursively_build_pyarrow_array(
 # used in op file-table, to convert from a wandb Table to Weave
 # (that code is very experimental and not totally working yet)
 def to_arrow_from_list_and_artifact(
-    obj: typing.Any, object_type: types.Type, artifact: artifact_base.Artifact
+    obj: typing.Any,
+    object_type: types.Type,
+    artifact: artifact_base.Artifact,
+    py_objs_already_mapped: bool = False,
 ) -> ArrowWeaveList:
     # Get what the parquet type will be.
     merged_object_type = recursively_merge_union_types_if_they_are_unions_of_structs(
@@ -283,13 +286,15 @@ def to_arrow_from_list_and_artifact(
     pyarrow_type = mapper.result_type()
 
     arrow_obj = recursively_build_pyarrow_array(
-        obj, pyarrow_type, mapper, py_objs_already_mapped=False
+        obj, pyarrow_type, mapper, py_objs_already_mapped=py_objs_already_mapped
     )
     return ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
 
 def to_arrow(
-    obj, wb_type=None, artifact: typing.Optional[artifact_base.Artifact] = None
+    obj,
+    wb_type=None,
+    artifact: typing.Optional[artifact_base.Artifact] = None,
 ):
     if isinstance(obj, ArrowWeaveList):
         return obj

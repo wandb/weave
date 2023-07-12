@@ -209,6 +209,9 @@ class DataFrameTable:
     def _count(self):
         return len(self._df)
 
+    def __len__(self):
+        return self._count()
+
     @op()
     def count(self) -> int:
         return self._count()

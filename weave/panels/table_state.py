@@ -112,7 +112,11 @@ class TableState:
         return fn(weave_internal.make_var_node(object_type, "row"), **kwargs)
 
     def add_column(
-        self, select_expr, name="", panel_def: typing.Optional[PanelDef] = None
+        self,
+        select_expr,
+        name="",
+        panel_def: typing.Optional[PanelDef] = None,
+        groupby: bool = False,
     ):
         col_id = self._new_col_id()
         if panel_def is None:
@@ -120,6 +124,8 @@ class TableState:
         self.columns[col_id] = panel_def
         self.columnNames[col_id] = name
         self.order.append(col_id)
+        if groupby:
+            self.enable_groupby(col_id)
         self.update_col(col_id, select_expr)
         return col_id
 

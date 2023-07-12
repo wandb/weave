@@ -3,13 +3,14 @@ import {
   MutableRefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 
 import {useStateWithRef} from '../../../hookUtils';
 
-const SCALE_DELTA_MULTIPLIER = 0.01;
+const SCALE_DELTA_MULTIPLIER = 0.001;
 
 type TimelineZoomAndPanParams = {
   onHittingMinZoom?: () => void;
@@ -54,15 +55,15 @@ export function useTimelineZoomAndPan({
         return;
       }
 
-      const scaleDelta = -deltaY * SCALE_DELTA_MULTIPLIER;
+      const scaleMult = 1 - deltaY * SCALE_DELTA_MULTIPLIER;
 
-      if (scaleDelta < 0 && scaleRef.current === 1) {
+      if (scaleMult < 1 && scaleRef.current === 1) {
         // We're already at minimum zoom
         onHittingMinZoom?.();
         return;
       }
 
-      const newScale = Math.max(scaleRef.current + scaleDelta, 1);
+      const newScale = Math.max(scaleRef.current * scaleMult, 1);
 
       calculateZoomScrollTo();
       setScale(newScale);
@@ -116,7 +117,7 @@ export function useTimelineZoomAndPan({
   }, [setScale, scaleRef, updateCursor, onHittingMinZoom]);
 
   // Scroll to "focused" X coordinate after zoom
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (zoomScrollToRef.current == null) {
       return;
     }

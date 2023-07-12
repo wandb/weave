@@ -127,7 +127,7 @@ export const PanelSelectEditor: React.FC<PanelSelectEditorProps> = props => {
 };
 
 export const Spec: Panel2.PanelSpec = {
-  hidden: false,
+  hidden: true,
   initialize: () => ({choices: voidNode()}),
   id: 'SelectEditor',
   ConfigComponent: PanelSelectEditorConfigComponent,

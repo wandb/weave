@@ -11,8 +11,9 @@ import * as v10 from './v10';
 import * as v11 from './v11';
 import * as v12 from './v12';
 import * as v13 from './v13';
+import * as v14 from './v14';
 
-export type {Scale, ScaleType} from './v10';
+export type {Scale, ScaleType} from './v14';
 export type {Signals} from './v12';
 
 export const PLOT_DIMS_UI = v2.PLOT_DIMS_UI;
@@ -38,7 +39,8 @@ export const {migrate} = migrator
   .add(v10.migrate)
   .add(v11.migrate)
   .add(v12.migrate)
-  .add(v13.migrate);
+  .add(v13.migrate)
+  .add(v14.migrate);
 
 export type AnyPlotConfig = Parameters<typeof migrate>[number];
 export type PlotConfig = ReturnType<typeof migrate>;
@@ -53,5 +55,5 @@ export type ContinuousSelection = v11.ContinuousSelection;
 export type DiscreteSelection = v11.DiscreteSelection;
 export type AxisSelections = v11.AxisSelections;
 
-export type ConcretePlotConfig = v13.ConcretePlotConfig;
+export type ConcretePlotConfig = v14.ConcretePlotConfig;
 export type ConcreteSeriesConfig = ConcretePlotConfig['series'][number];
