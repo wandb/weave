@@ -322,7 +322,7 @@ def test_group_by_bins_arrow_vectorized():
 
     group_key_node = weave.weave(result)[4].groupkey()
     key = api.use(group_key_node)
-    assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
+    assert key == {"number_bin_col_name": {"start": 145.0, "stop": 150.0}}
 
 
 # cache busting didn't work properly with this query before

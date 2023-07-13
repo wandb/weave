@@ -23,6 +23,7 @@ import {Spec as PanelSections} from './PanelSections';
 import {Spec as PanelSlider} from './PanelSlider';
 import {Spec as PanelStringEditor} from './PanelStringEditor';
 import {Spec as PanelSelectEditor} from './PanelSelectEditor';
+import {Spec as PanelDateRange} from './PanelDateRange';
 import {Spec as PanelStringHistogramWeave} from './PanelStringHistogramWeave';
 import {Spec as PanelTextEditor} from './PanelTextEditor';
 import {Spec as PanelWeaveLink} from './PanelWeaveLink';
@@ -38,6 +39,7 @@ export const weavePythonPanelSpecs = () => {
     PanelStringEditor,
     PanelTextEditor,
     PanelSelectEditor,
+    PanelDateRange,
     PanelPanel,
     PanelSlider,
     PanelRef,

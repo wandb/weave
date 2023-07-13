@@ -197,8 +197,8 @@ def _get_rows_node(self: Table) -> Node:
     ):
         data_node = weave.ops.List.filter(
             data_node,
-            lambda row: weave_internal.call_fn(
-                self.config.tableState.preFilterFunction, {"row": row}
+            lambda row, index: weave_internal.call_fn(
+                self.config.tableState.preFilterFunction, {"row": row, "index": index}
             ),
         )
 
@@ -210,10 +210,11 @@ def _get_rows_node(self: Table) -> Node:
         group_ids = set(self.config.tableState.groupBy)
         data_node = weave.ops.List.groupby(
             data_node,
-            lambda row: weave.ops.dict_(
+            lambda row, index: weave.ops.dict_(
                 **{
                     columns[col_id]["columnName"]: weave_internal.call_fn(
-                        columns[col_id]["columnSelectFunction"], {"row": row}
+                        columns[col_id]["columnSelectFunction"],
+                        {"row": row, "index": index},
                     )
                     for col_id in self.config.tableState.groupBy
                 }
@@ -223,11 +224,11 @@ def _get_rows_node(self: Table) -> Node:
     # Apply Selection
     data_node = weave.ops.List.map(
         data_node,
-        lambda row: weave.ops.dict_(
+        lambda row, index: weave.ops.dict_(
             **{
                 col_def["columnName"]: (
                     weave_internal.call_fn(
-                        col_def["columnSelectFunction"], {"row": row}
+                        col_def["columnSelectFunction"], {"row": row, "index": index}
                     )
                     if col_id not in group_ids
                     else
@@ -324,7 +325,7 @@ def data_single_refine(self: Table) -> weave.types.Type:
 )
 def rows(self: Table):
     rows_node = _get_rows_node(self)
-    return weave_internal.use(rows_node)
+    return rows_node
 
 
 # Defined on both Table and Query

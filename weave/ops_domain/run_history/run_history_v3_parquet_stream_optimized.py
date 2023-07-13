@@ -116,6 +116,7 @@ def _get_history3(run: wdt.Run, columns=None):
     # 1. Get the flattened Weave-Type given HistoryKeys
     flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
     _verify_supported_types(flattened_object_type)
+    final_type = _unflatten_history_object_type(flattened_object_type)
 
     # 2. Read in the live set
     raw_live_data = _get_live_data_from_run(run, columns=columns)
@@ -169,13 +170,15 @@ def _get_history3(run: wdt.Run, columns=None):
         ]
     )
 
+    if len(concatted_awl) == 0:
+        return convert.to_arrow([], types.List(final_type), artifact=artifact)
+
     sorted_table = history_op_common.sort_history_pa_table(
         history_op_common.awl_to_pa_table(concatted_awl)
     )
 
     # 6. Finally, unflatten the columns
     final_array = _unflatten_pa_table(sorted_table)
-    final_type = _unflatten_history_object_type(flattened_object_type)
 
     # 7. Optionally: verify the AWL
     reason = weave_arrow_type_check(final_type, final_array)

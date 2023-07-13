@@ -6,6 +6,7 @@ import typing_extensions
 import dataclasses
 import numpy as np
 import pyarrow as pa
+import pyarrow.compute as pc
 import textwrap
 
 from .. import ref_base
@@ -27,6 +28,7 @@ from .arrow import (
     offsets_starting_at_zero,
     pretty_print_arrow_type,
     arrow_zip,
+    arrow_as_array,
 )
 from .. import debug_types
 
@@ -830,8 +832,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def separate_awls(
         self,
-    ) -> typing.Tuple["ArrowWeaveList", dict[PathType, list["ArrowWeaveList"]]]:
-        awl_columns: dict[PathType, list[ArrowWeaveList]] = {}
+    ) -> typing.Tuple[
+        "ArrowWeaveList", dict[PathType, list[typing.Optional["ArrowWeaveList"]]]
+    ]:
+        awl_columns: dict[PathType, list[typing.Optional[ArrowWeaveList]]] = {}
 
         def _remove_awls(
             list: ArrowWeaveList, path: PathType
@@ -841,6 +845,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     ArrowWeaveList(
                         a.values, list.object_type.object_type, list._artifact
                     )
+                    if a.values is not None
+                    else None
                     for a in list._arrow_data
                 ]
                 return ArrowWeaveList(
@@ -1078,23 +1084,41 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             self._arrow_data.dictionary_encode(), self.object_type, self._artifact
         )
 
-    def _index(self, index: typing.Optional[int]):
+    def _index(
+        self,
+        index: typing.Optional[typing.Union[int, typing.List[typing.Optional[int]]]],
+    ):
         if index == None:
             return None
-        index = typing.cast(int, index)
-        if len(self._arrow_data) <= index:
-            return None
-        # Create a temp AWL so we can leverage the `to_pylist_tagged` helper,
-        # but it will only apply to a single element instead of wasting a bunch
-        # of cycles. Note: this was previously memoized on the object but that
-        # is not safe! You cannot save the results of `to_pylist_tagged` since
-        # it is only valid in the tagging context which it was first called!
-        temp_awl: ArrowWeaveList = ArrowWeaveList(
-            self._arrow_data.take([index]), self.object_type, self._artifact
-        )
-        return temp_awl.to_pylist_tagged()[0]
+        indexes: pa.Array
+        if isinstance(index, int):
+            indexes = [index]
+        elif isinstance(index, ArrowWeaveList):
+            indexes = index._arrow_data
+        else:
+            indexes = index
 
-    def __getitem__(self, index: int):
+        arr = self._arrow_data
+        length = len(arr)
+        neg_cond = pc.less(indexes, 0)
+        indexes_neg = pc.add(indexes, length)
+        indexes = pc.choose(neg_cond, indexes, indexes_neg)
+        out_of_bounds = pc.or_(pc.less(indexes, 0), pc.greater_equal(indexes, length))
+        indexes_bounds_checked = pc.choose(
+            out_of_bounds, indexes, pa.scalar(None, pa.int64())
+        )
+        result_rows = pc.take(arr, indexes_bounds_checked)
+        awl: ArrowWeaveList = ArrowWeaveList(
+            result_rows, self.object_type, self._artifact
+        )
+        if isinstance(index, int):
+            return awl.to_pylist_tagged()[0]
+        return awl
+
+    def __getitem__(
+        self,
+        index: typing.Optional[typing.Union[int, typing.List[typing.Optional[int]]]],
+    ):
         return self._index(index)
 
     def _slice(self, start: int, stop: int):

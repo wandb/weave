@@ -369,6 +369,12 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
       for (const key of Object.keys(toType.propertyTypes)) {
         const toKeyType = toType.propertyTypes[key]!;
         const keyType = type.propertyTypes[key];
+        if (
+          (toType.notRequiredKeys ?? []).includes(key) &&
+          keyType === undefined
+        ) {
+          continue;
+        }
         if (keyType === undefined || !isAssignableTo(keyType, toKeyType)) {
           return false;
         }

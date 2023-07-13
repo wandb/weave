@@ -105,28 +105,31 @@ export const SuggestionContainer = styled.div`
   transition: opacity 0.3s;
   opacity: 0;
 `;
+SuggestionContainer.displayName = 'S.SuggestionContainer';
+
 export const SUGGESTION_OPTION_CLASS = 'suggestion-option';
 export const SuggestionPane = styled.div<{isBusy: boolean}>`
-  background-color: rgba(0, 0, 0, 0.9);
-  color: #ddd;
   display: inline-block;
 
-  padding: 10px;
-  border-radius: 3px;
+  background-color: ${globals.WHITE};
+  border: 1px solid ${globals.MOON_250};
+  border-radius: 4px;
+  box-shadow: 0px 12px 24px 0px rgba(14, 16, 20, 0.16);
+
   width: 250px;
 
   & div.type-display {
     font-weight: 600;
 
-    padding-bottom: 10px;
+    padding: 10px;
     margin-bottom: 10px;
-    border-bottom: 2px solid #666;
+    border-bottom: 1px solid ${globals.MOON_250};
   }
 
   & ul.items-list {
     margin: 0px;
     list-style: none;
-    padding: 0px;
+    padding: 0 6px 6px 6px;
     max-height: 250px;
     overflow-y: scroll;
     overflow-x: hidden;
@@ -153,33 +156,29 @@ export const SuggestionPane = styled.div<{isBusy: boolean}>`
     padding-left: 5px;
 
     &.default-suggestion {
-      background-color: rgba(255, 255, 255, 0.2);
-      padding-right: 30px;
-    }
-
-    &.default-suggestion:before {
-      color: ${props => (props.isBusy ? globals.gray500 : globals.primary)};
-      text-align: right;
-      content: '⇥';
-      float: right;
-      margin-right: -25px;
-    }
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: ${globals.MOON_100};
     }
   }
 `;
 
 export const StyledOpDoc = styled(OpDoc)`
   display: inline-block;
+  max-width: 400px;
   vertical-align: top;
   margin-left: 5px;
 
-  background-color: #fffeee;
-  padding: 10px;
-  border-radius: 3px;
-  border: 1px solid black;
+  color: ${globals.WHITE};
+  background-color: ${globals.MOON_900};
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0px 12px 24px 0px rgba(14, 16, 20, 0.16);
 
-  max-width: 250px;
+  & a {
+    color: ${globals.TEAL_500};
+
+    &:hover {
+      color: ${globals.TEAL_450};
+    }
+  }
 `;
+StyledOpDoc.displayName = 'S.StyledOpDoc';

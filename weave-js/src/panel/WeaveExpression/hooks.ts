@@ -1,3 +1,5 @@
+import {computePosition, flip, offset, shift} from '@floating-ui/react';
+
 import {
   AutosuggestResult,
   Parser,
@@ -446,57 +448,47 @@ export const useSuggestionVisualState = ({
       return;
     }
 
-    const domSelection = window.getSelection()!;
-
-    // Hack around a bug where empty spans yield bounding rect of [0,0]->[0,0]
-    if (domSelection.rangeCount < 1) {
-      trace(`SuggestionVisualState: rangeCount < 1, removing style`);
-      element.removeAttribute('style');
-      return;
-    }
-
-    const domRange = domSelection.getRangeAt(0).cloneRange();
-    domRange.setStart(domRange.startContainer, 0);
-    let rect = domRange.getBoundingClientRect();
-
-    if (rect.top === 0 && rect.left === 0) {
-      const castContainer = domRange.startContainer as any;
-      if (castContainer.getBoundingClientRect) {
-        rect = castContainer.getBoundingClientRect();
-      }
-    }
-
-    if (rect.top === 0 && rect.left === 0) {
-      trace(
-        `SuggestionVisualState: rect is [0,0]->[0,0], removing style`,
-        domRange,
-        rect
-      );
-      element.removeAttribute('style');
-      return;
-    }
-
     trace(`SuggestionVisualState: showing`);
     element.style.opacity = '1';
-    element.style.top = `${rect.top + window.pageYOffset + 25}px`;
 
-    // Prevent suggestions pane from extending off the page
-    const maxLeftPosition = document.body.scrollWidth - 510;
-    const naturalLeftPosition = rect.right + window.pageXOffset;
-    element.style.left = `${Math.min(maxLeftPosition, naturalLeftPosition)}px`;
+    const editorRootEl = ReactEditor.toDOMNode(editor, editor.children[0]);
+    computePosition(editorRootEl, element, {
+      placement: 'bottom-start',
+      middleware: [
+        offset(4),
+        flip({
+          fallbackPlacements: ['right', 'left', 'top'],
+        }),
+        shift(),
+      ],
+    }).then(({x, y}) => {
+      Object.assign(element.style, {
+        left: `${x}px`,
+        top: `${y}px`,
+      });
 
-    rect = element.getBoundingClientRect();
-    if (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <=
-        (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-    ) {
-      element
-        .querySelector('ul.items-list li.default-suggestion')!
-        .scrollIntoView({block: 'nearest', inline: 'nearest'});
-    }
+      // User may have pinned the info open, then clicked elsewhere in
+      // the expression editor, causing the defaultSuggestion to change.
+      const rect = element.getBoundingClientRect();
+      if (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <=
+          (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <=
+          (window.innerWidth || document.documentElement.clientWidth)
+      ) {
+        const defaultSuggestion = element.querySelector(
+          'ul.items-list li.default-suggestion'
+        );
+        if (defaultSuggestion) {
+          defaultSuggestion.scrollIntoView({
+            block: 'nearest',
+            inline: 'nearest',
+          });
+        }
+      }
+    });
   });
 
   const showType = React.useMemo(() => {
