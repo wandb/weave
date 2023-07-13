@@ -936,7 +936,7 @@ class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
         elif isinstance(path_or_paths, list):
             return FilesystemArtifactFileIterator(self.artifact, path_or_paths)
         raise errors.WeaveInternalError(
-            "Invalid key if FilesystemArtifactFileIterator __getItem__"
+            "Invalid key in FilesystemArtifactFileIterator __getItem__"
         )
 
     def __len__(self) -> int:
