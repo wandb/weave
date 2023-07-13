@@ -209,7 +209,10 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     node = inputs.stitched_obj.node
     if not _node_type_has_keys(node.type):
         node = _get_key_typed_node(node)
-    all_known_paths = flatten_typed_dicts(_without_tags(node.type.object_type))  # type: ignore
+    if not hasattr(node.type, "object_type"):
+        all_known_paths = ["_step"]
+    else:
+        all_known_paths = flatten_typed_dicts(_without_tags(node.type.object_type))  # type: ignore
     history_cols = _filter_known_paths_to_requested_paths(
         all_known_paths, top_level_keys
     )
