@@ -55,12 +55,17 @@ def _current_obj_tag_mem_map() -> typing.Optional[NodeTagStoreType]:
     return node_tags[_OBJ_TAGS_CURR_NODE_ID.get()]
 
 
-def record_current_tag_store_size() -> None:
+def current_tag_store_size() -> int:
     current_mmap = _OBJ_TAGS_MEM_MAP.get()
     if current_mmap is not None:
         n_tag_store_entries = sum(len(current_mmap[key]) for key in current_mmap)
     else:
         n_tag_store_entries = 0
+    return n_tag_store_entries
+
+
+def record_current_tag_store_size() -> None:
+    n_tag_store_entries = current_tag_store_size()
     logging.info(f"Current number of tag store entries: {n_tag_store_entries}")
     statsd.gauge("weave.tag_store.num_entries", n_tag_store_entries)
 
@@ -233,3 +238,14 @@ def is_tagged(obj: typing.Any) -> bool:
         return False
 
     return id_val in mem_map
+
+
+def clear_tag_store() -> None:
+    tag_store = _OBJ_TAGS_MEM_MAP.get()
+    cur_obj_tag_mem_map = _OBJ_TAGS_CURR_NODE_ID.get()
+
+    if tag_store is not None:
+        tag_store.clear()
+
+    if cur_obj_tag_mem_map is not None:
+        _OBJ_TAGS_CURR_NODE_ID.set(-1)
