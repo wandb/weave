@@ -23,18 +23,18 @@ import {
   opProjectArtifact,
   opRootProject,
   opTableRows,
-  varNode,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
-import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
-import {getFullChildPanel} from '../../Panel2/ChildPanel';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
   HomePreviewSidebarTemplate,
   HomeBoardPreview,
   HomeExpressionPreviewParts,
 } from './HomePreviewSidebar';
+import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import WandbLoader from '@wandb/weave/common/components/WandbLoader';
+import {IconMagicWandStar} from '../../Icon';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -470,7 +470,9 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
-  const makeNewDashboard = useNewDashFromItems();
+  const [seedingBoard, setSeedingBoard] = useState(false);
+
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
@@ -497,13 +499,12 @@ const CenterProjectTablesBrowser: React.FC<
                   icon: IconAddNew,
                   label: 'Seed new board',
                   onClick: () => {
-                    const name =
-                      'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
-                    makeNewDashboard(
-                      name,
-                      {panel0: getFullChildPanel(varNode(expr.type, 'var0'))},
-                      {var0: expr},
+                    setSeedingBoard(true);
+                    makeBoardFromNode(
+                      'py_board-seed_board',
+                      expr,
                       newDashExpr => {
+                        setSeedingBoard(false);
                         props.navigateToExpression(newDashExpr);
                       }
                     );
@@ -526,7 +527,7 @@ const CenterProjectTablesBrowser: React.FC<
       [
         {
           icon: IconAddNew,
-          label: 'Seed new board',
+          label: 'Seed basic board',
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
@@ -534,15 +535,28 @@ const CenterProjectTablesBrowser: React.FC<
               props.projectName,
               row._id
             );
-            const name = 'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
-            makeNewDashboard(
-              name,
-              {panel0: getFullChildPanel(varNode(node.type, 'var0'))},
-              {var0: node},
-              newDashExpr => {
-                props.navigateToExpression(newDashExpr);
-              }
+            setSeedingBoard(true);
+            makeBoardFromNode('py_board-seed_board', node, newDashExpr => {
+              setSeedingBoard(false);
+              props.navigateToExpression(newDashExpr);
+            });
+          },
+        },
+        {
+          icon: IconMagicWandStar,
+          label: 'Seed auto board',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
             );
+            setSeedingBoard(true);
+            makeBoardFromNode('py_board-seed_autoboard', node, newDashExpr => {
+              setSeedingBoard(false);
+              props.navigateToExpression(newDashExpr);
+            });
           },
         },
         {
@@ -559,6 +573,8 @@ const CenterProjectTablesBrowser: React.FC<
             );
           },
         },
+      ],
+      [
         {
           icon: IconCopy,
           label: 'Copy Weave expression',
@@ -577,36 +593,39 @@ const CenterProjectTablesBrowser: React.FC<
         },
       ],
     ];
-  }, [makeNewDashboard, props, weave]);
+  }, [makeBoardFromNode, props, weave]);
 
   return (
-    <CenterBrowser
-      allowSearch
-      title={browserTitle}
-      selectedRowId={selectedRowId}
-      noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
-      breadcrumbs={[
-        {
-          key: 'entity',
-          text: props.entityName,
-          onClick: () => {
-            props.setSelectedProjectName(undefined);
-            props.setSelectedAssetType(undefined);
+    <>
+      {seedingBoard && <WandbLoader />}
+      <CenterBrowser
+        allowSearch
+        title={browserTitle}
+        selectedRowId={selectedRowId}
+        noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
+        breadcrumbs={[
+          {
+            key: 'entity',
+            text: props.entityName,
+            onClick: () => {
+              props.setSelectedProjectName(undefined);
+              props.setSelectedAssetType(undefined);
+            },
           },
-        },
-        {
-          key: 'project',
-          text: props.projectName,
-          onClick: () => {
-            props.setSelectedAssetType(undefined);
+          {
+            key: 'project',
+            text: props.projectName,
+            onClick: () => {
+              props.setSelectedAssetType(undefined);
+            },
           },
-        },
-      ]}
-      loading={isLoading}
-      filters={{kind: {placeholder: 'All table kinds'}}}
-      columns={['name', 'kind', 'updated at', 'created at', 'created by']}
-      data={browserData}
-      actions={browserActions}
-    />
+        ]}
+        loading={isLoading}
+        filters={{kind: {placeholder: 'All table kinds'}}}
+        columns={['name', 'kind', 'updated at', 'created at', 'created by']}
+        data={browserData}
+        actions={browserActions}
+      />
+    </>
   );
 };
