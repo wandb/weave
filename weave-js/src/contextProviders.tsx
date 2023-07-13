@@ -89,7 +89,8 @@ const useRemoteEcosystemClient = (
 export const RemoteEcosystemComputeGraphContextProvider: React.FC<{
   isAdmin?: boolean;
   tokenFunc?: () => Promise<string | undefined>;
-}> = React.memo(({isAdmin, tokenFunc, children}) => {
+  shouldPoll?: boolean;
+}> = React.memo(({isAdmin, tokenFunc, shouldPoll, children}) => {
   const tf = useMemo(() => {
     const dummy = async () => undefined;
     return tokenFunc != null ? tokenFunc : dummy;
@@ -98,6 +99,7 @@ export const RemoteEcosystemComputeGraphContextProvider: React.FC<{
   if (client == null) {
     return <></>;
   }
+  client.setPolling(!!shouldPoll);
   return (
     <ComputeGraphContextProviderFromClient
       client={client}
@@ -144,7 +146,7 @@ export const NotebookComputeGraphContextProvider: React.FC = React.memo(
 
     return (
       <WeaveFeaturesContext.Provider value={defaultWBFeatureState}>
-        <RemoteEcosystemComputeGraphContextProvider>
+        <RemoteEcosystemComputeGraphContextProvider shouldPoll={true}>
           {children}
         </RemoteEcosystemComputeGraphContextProvider>
       </WeaveFeaturesContext.Provider>
