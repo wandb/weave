@@ -667,7 +667,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def _get_file_paths(self) -> list[str]:
         manifest = self._manifest()
         if manifest is None:
-            raise errors.WeaveInternalError("no manifest")
+            raise errors.WeaveInternalError("No manifest when fetching file paths")
         return manifest.get_paths_in_directory("")
 
     @property
