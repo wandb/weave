@@ -94,14 +94,15 @@ def test_artifact_metadata(user_by_api_key_in_env):
         "k_4": "v_6",
     }
 
-
 def test_artifact_files_count(user_by_api_key_in_env):
     run = wandb.init(project="project_exists")
     artifact = wandb.Artifact("test", "datatest")
-    table = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
-    artifact.add(table, "table1")
-    artifact.add(table, "table2")
-    artifact.add(table, "table3")
+    table1 = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
+    table2 = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
+    table3 = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
+    artifact.add(table1, "table1")
+    artifact.add(table2, "table2")
+    artifact.add(table3, "table3")
     run.log_artifact(artifact)
     run.finish()
 

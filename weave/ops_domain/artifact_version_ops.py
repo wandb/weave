@@ -523,6 +523,6 @@ def file_(
 )
 def files(
     artifactVersion: wdt.ArtifactVersion,
-) -> artifact_wandb.FilesystemArtifactFileIterator:
+) -> list[artifact_fs.FilesystemArtifactFile]:
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return artifact_wandb.FilesystemArtifactFileIterator(art_local)

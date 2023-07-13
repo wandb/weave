@@ -669,6 +669,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if manifest is None:
             raise errors.WeaveInternalError("no manifest")
         return manifest.get_paths_in_directory("")
+    
+    def files(
+        self
+    ) -> typing.List["artifact_fs.FilesystemArtifactFile"]:
+        manifest = self._manifest()
+        if manifest is None:
+            return []
+        return [self._path_info(path) for path in self._get_file_paths()]
 
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
@@ -922,18 +930,39 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
 class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
     data: list[str]
     artifact: WandbArtifact
+    idx: int = 0
 
     @property
     def type(self) -> types.Type:
         return types.List(artifact_fs.FilesystemArtifactFileType())
 
-    def __init__(self, artifact: WandbArtifact):
-        self.data = artifact._get_file_paths()
+    def __init__(self, artifact: WandbArtifact, data: list[str] = []):
+        self.data = data if len(data) > 0 else artifact._get_file_paths()
         self.artifact = artifact
+        self.idx = 0
 
-    def __getitem__(self, index):
-        path = self.data[index]
-        return self.artifact.path_info(path)
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            # Get the start, stop, and step from the slice
+            return FilesystemArtifactFileIterator(self.artifact, self.data[key])
+        elif isinstance(key, int):
+            if key < 0: # Handle negative indices
+                key += len(self)
+            if key < 0 or key >= len(self):
+                raise (IndexError, f"The index {key} is out of range.")
+            return self.artifact._path_info(self.data[key]) # Get the data from elsewhere
+        else:
+            raise (TypeError, "Invalid argument type.")
 
-    def __len__(self: "FilesystemArtifactFileIterator") -> int:
+    def __len__(self) -> int:
         return len(self.data)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.idx >= len(self.data):
+            raise StopIteration
+        current_element = self.__getitem__(self.idx)
+        self.idx += 1
+        return current_element
