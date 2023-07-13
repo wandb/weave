@@ -196,15 +196,10 @@ def disable_analytics():
 _in_use = False
 
 
-def set_in_use():
+def set_in_use(state: bool):
     global _in_use
-    _in_use = True
+    _in_use = state
 
 
 def get_in_use():
     return _in_use
-
-
-def clear_in_use():
-    global _in_use
-    _in_use = False
