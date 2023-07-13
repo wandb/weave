@@ -28,6 +28,8 @@ from . import logs
 from . import wandb_api
 from . import util
 from . import graph
+from .language_features.tagging import tag_store
+
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -93,6 +95,7 @@ def handle_request(
                 result = result.safe_map(serialize_fn)
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
+    tag_store.clear_tag_store()
     return HandleRequestResponse(result, nodes)
 
 
