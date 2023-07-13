@@ -669,14 +669,6 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if manifest is None:
             raise errors.WeaveInternalError("no manifest")
         return manifest.get_paths_in_directory("")
-    
-    def files(
-        self
-    ) -> typing.List["artifact_fs.FilesystemArtifactFile"]:
-        manifest = self._manifest()
-        if manifest is None:
-            return []
-        return [self._path_info(path) for path in self._get_file_paths()]
 
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
@@ -946,11 +938,13 @@ class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
             # Get the start, stop, and step from the slice
             return FilesystemArtifactFileIterator(self.artifact, self.data[key])
         elif isinstance(key, int):
-            if key < 0: # Handle negative indices
+            if key < 0:  # Handle negative indices
                 key += len(self)
             if key < 0 or key >= len(self):
                 raise (IndexError, f"The index {key} is out of range.")
-            return self.artifact._path_info(self.data[key]) # Get the data from elsewhere
+            return self.artifact._path_info(
+                self.data[key]
+            )  # Get the data from elsewhere
         else:
             raise (TypeError, "Invalid argument type.")
 
