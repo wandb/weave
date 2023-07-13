@@ -7,7 +7,6 @@ from . import weave_internal as _weave_internal
 from . import errors as _errors
 from . import ops as _ops
 from . import context as _context
-from . import context_state as _context_state
 
 # exposed as part of api
 from . import weave_types as types
@@ -27,10 +26,8 @@ from .server import capture_weave_server_logs
 from .val_const import const
 from .file_base import File, Dir
 from .dispatch import RuntimeConstNode
-from .language_features.tagging import tag_store as _tag_store
 
 from .weave_internal import define_fn
-
 
 Node = _graph.Node
 
@@ -75,15 +72,7 @@ def use(nodes, client=None):
     usage_analytics.use_called()
     if client is None:
         client = _context.get_client()
-
-    call_is_reentrant = _context_state.get_in_use()
-    with _context.in_use():
-        try:
-            result = _weave_internal.use(nodes, client)
-        finally:
-            if not call_is_reentrant:
-                _tag_store.clear_tag_store()
-    return result
+    return _weave_internal.use(nodes, client)
 
 
 def _get_ref(obj):
