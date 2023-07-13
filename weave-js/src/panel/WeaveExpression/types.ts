@@ -33,7 +33,9 @@ export interface SuggestionProps {
   items: Array<AutosuggestResult<any>>;
 
   isBusy: boolean;
+
   suggestionIndex?: number;
+  setSuggestionIndex?: React.Dispatch<React.SetStateAction<number>>;
 
   forceHidden?: boolean;
 

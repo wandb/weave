@@ -630,7 +630,12 @@ const HeaderLogoControls: React.FC<{
               if (uriVal != null && typeof uriVal === 'string') {
                 if (!(uriVal in varMap)) {
                   const baseNameParts = uriVal.split(':')[1].split('/');
-                  const baseName = baseNameParts[baseNameParts.length - 1];
+                  let baseName = baseNameParts[baseNameParts.length - 1];
+                  baseName = baseName.replace(/[^a-z0-9_]/gi, '_');
+                  //  if the first character is not a letter, prepend `v_`
+                  if (!/^[a-z]/i.test(baseName)) {
+                    baseName = 'v_' + baseName;
+                  }
                   let count = 0;
                   let varName = baseName + '_' + count;
                   while (names.has(varName)) {

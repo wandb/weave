@@ -32,6 +32,7 @@ from weave import filesystem
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 from weave import storage
 from weave import wandb_api
+from weave.language_features.tagging import tag_store
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -257,6 +258,7 @@ def execute():
         "serialize_fn": storage.make_js_serializer(),
     }
     root_span = tracer.current_root_span()
+    tag_store.record_current_tag_store_size()
     if not PROFILE_DIR:
         start_time = time.time()
         with client_safe_http_exceptions_as_werkzeug():
