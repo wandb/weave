@@ -233,3 +233,14 @@ def is_tagged(obj: typing.Any) -> bool:
         return False
 
     return id_val in mem_map
+
+
+def clear_tag_store() -> None:
+    tag_store = _OBJ_TAGS_MEM_MAP.get()
+    cur_obj_tag_mem_map = _OBJ_TAGS_CURR_NODE_ID.get()
+
+    if tag_store is not None:
+        tag_store.clear()
+
+    if cur_obj_tag_mem_map is not None:
+        _OBJ_TAGS_CURR_NODE_ID.set(-1)
