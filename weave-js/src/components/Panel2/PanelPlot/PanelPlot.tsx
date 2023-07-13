@@ -122,6 +122,7 @@ import {
 import {toWeaveType} from '../toWeaveType';
 import {ConfigSection} from '../ConfigPanel';
 import {IconButton} from '../../IconButton';
+import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
 import {
   IconAddNew,
   IconCheckmark,
@@ -130,7 +131,6 @@ import {
   IconMinimizeMode,
   IconOverflowHorizontal,
   IconWeave,
-  IconLockedConstrained,
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
@@ -1354,20 +1354,54 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       items: opts.slice(1).map(dimOptionToMenuItem),
     }));
 
+    const zeroMenuOptions =
+      uiStateOptions.length === 1 &&
+      uiStateOptions[0] === null &&
+      extraOptions == null;
+
+    const dimName = dimension.name as (typeof PLOT_DIMS_UI)[number];
+
     return (
       <>
-        <PopupMenu
-          position="bottom left"
-          trigger={
-            <ConfigDimMenuButton>
-              <IconOverflowHorizontal />
-            </ConfigDimMenuButton>
-          }
-          items={menuItems}
-          sections={menuSections}
-        />
-        <LegacyWBIcon name="locked-constrained" />
-        <span>b</span>
+        {!zeroMenuOptions && (
+          <PopupMenu
+            position="bottom left"
+            trigger={
+              <ConfigDimMenuButton>
+                <IconOverflowHorizontal />
+              </ConfigDimMenuButton>
+            }
+            items={menuItems}
+            sections={menuSections}
+          />
+        )}
+        {isShared ? (
+          <S.ConstrainedIconContainer
+            onClick={() => {
+              // "expanding" the dimension means unconstraining it
+              const newConfig = produce(config, draft => {
+                draft.configOptionsExpanded[dimName] = true;
+              });
+              updateConfig(newConfig);
+            }}>
+            <IconLockedConstrained />
+          </S.ConstrainedIconContainer>
+        ) : (
+          <S.UnconstrainedIconContainer
+            // "sharing" the dimension means constraining it
+            onClick={() => {
+              updateConfig(
+                PlotState.makeDimensionShared(
+                  config,
+                  dimension.series,
+                  dimName,
+                  weave
+                )
+              );
+            }}>
+            <IconUnlockedUnconstrained />
+          </S.UnconstrainedIconContainer>
+        )}
       </>
     );
 
