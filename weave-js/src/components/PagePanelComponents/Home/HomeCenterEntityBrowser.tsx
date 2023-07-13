@@ -23,6 +23,7 @@ import {
   opProjectArtifact,
   opRootProject,
   opTableRows,
+  varNode,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
@@ -35,6 +36,8 @@ import {
 import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
 import WandbLoader from '@wandb/weave/common/components/WandbLoader';
 import {IconMagicWandStar} from '../../Icon';
+import {getFullChildPanel} from '../../Panel2/ChildPanel';
+import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -471,6 +474,7 @@ const CenterProjectTablesBrowser: React.FC<
   }, [isLoading, loggedTables.result, runStreams.result]);
 
   const [seedingBoard, setSeedingBoard] = useState(false);
+  const makeNewDashboard = useNewDashFromItems();
 
   const makeBoardFromNode = useMakeLocalBoardFromNode();
   const browserActions: Array<
@@ -499,12 +503,13 @@ const CenterProjectTablesBrowser: React.FC<
                   icon: IconAddNew,
                   label: 'Seed new board',
                   onClick: () => {
-                    setSeedingBoard(true);
-                    makeBoardFromNode(
-                      'py_board-seed_board',
-                      expr,
+                    const name =
+                      'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
+                    makeNewDashboard(
+                      name,
+                      {panel0: getFullChildPanel(varNode(expr.type, 'var0'))},
+                      {var0: expr},
                       newDashExpr => {
-                        setSeedingBoard(false);
                         props.navigateToExpression(newDashExpr);
                       }
                     );
@@ -527,7 +532,7 @@ const CenterProjectTablesBrowser: React.FC<
       [
         {
           icon: IconAddNew,
-          label: 'Seed basic board',
+          label: 'Seed new board',
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
