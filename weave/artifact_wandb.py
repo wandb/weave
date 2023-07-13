@@ -916,7 +916,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         return WandbArtifactRef.from_uri(self)
 
 
-# This is a wrapper around an artifact that acts like a list.
+# This is a wrapper around an artifact that acts like a list of files.
 # It fetchs a file from the manifest on __getItem__ and can return a count without fetching all files
 @dataclasses.dataclass
 class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
@@ -935,16 +935,13 @@ class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
 
     def __getitem__(self, key):
         if isinstance(key, slice):
-            # Get the start, stop, and step from the slice
             return FilesystemArtifactFileIterator(self.artifact, self.data[key])
         elif isinstance(key, int):
             if key < 0:  # Handle negative indices
                 key += len(self)
             if key < 0 or key >= len(self):
                 raise (IndexError, f"The index {key} is out of range.")
-            return self.artifact._path_info(
-                self.data[key]
-            )  # Get the data from elsewhere
+            return self.artifact._path_info(self.data[key])
         else:
             raise (TypeError, "Invalid argument type.")
 
