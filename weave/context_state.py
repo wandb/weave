@@ -189,3 +189,22 @@ def analytics_enabled():
 
 def disable_analytics():
     return _analytics_enabled.set(False)
+
+
+# this is not a context var because we want it to propagate automatically between
+# threads. it should be global to the process.
+_in_use = False
+
+
+def set_in_use():
+    global _in_use
+    _in_use = True
+
+
+def get_in_use():
+    return _in_use
+
+
+def clear_in_use():
+    global _in_use
+    _in_use = False

@@ -91,3 +91,13 @@ def get_frontend_url():
                 raise RuntimeError("Frontend server is not running")
     url += "/__frontend/weave_jupyter"
     return url
+
+
+@contextlib.contextmanager
+def in_use():
+    currently_in_use = context_state.get_in_use()
+    context_state.set_in_use(True)
+    try:
+        yield
+    finally:
+        context_state.set_in_use(currently_in_use)
