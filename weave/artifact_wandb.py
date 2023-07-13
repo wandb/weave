@@ -930,16 +930,14 @@ class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
         self.idx = 0
 
     def __getitem__(self, key):
-        if isinstance(key, slice):
-            return FilesystemArtifactFileIterator(self.artifact, self.data[key])
-        elif isinstance(key, int):
-            if key < 0:  # Handle negative indices
-                key += len(self)
-            if key < 0 or key >= len(self):
-                raise (IndexError, f"The index {key} is out of range.")
-            return self.artifact._path_info(self.data[key])
-        else:
-            raise (TypeError, "Invalid argument type.")
+        path_or_paths = self.data[key]
+        if isinstance(path_or_paths, str):
+            return self.artifact._path_info(path_or_paths)
+        elif isinstance(path_or_paths, list):
+            return FilesystemArtifactFileIterator(self.artifact, path_or_paths)
+        raise errors.WeaveInternalError(
+            "Invalid key if FilesystemArtifactFileIterator __getItem__"
+        )
 
     def __len__(self) -> int:
         return len(self.data)
