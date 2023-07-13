@@ -30,7 +30,7 @@ from ... import engine_trace
 
 from collections import defaultdict
 
-statsd = engine_trace.statsd()
+statsd = engine_trace.statsd()  # type: ignore
 
 NodeTagStoreType = dict[int, dict[str, typing.Any]]
 TagStoreType = defaultdict[int, NodeTagStoreType]
