@@ -71,6 +71,7 @@ class MonitorRecord:
         return self._output_postprocessor(self._execution_result.output)
 
     def as_dict(self) -> dict:
+        exception = self._execution_result.exception
         return {
             "result_id": self._execution_result.id,
             "start_datetime": self._execution_result.start_datetime,
@@ -81,10 +82,12 @@ class MonitorRecord:
             )
             * 1000,
             "inputs": self.inputs,
-            "output": self._execution_result.output,
-            "exception": str(self._execution_result.exception)
-            if self._execution_result.exception is not None
-            else "",
+            "output": self.output,
+            "exception": (
+                f"{type(exception).__name__}: {str(exception)}"
+                if exception is not None
+                else None
+            ),
             **self._additional_data,
         }
 
