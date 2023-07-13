@@ -3,7 +3,7 @@ import {ConstNode, NodeOrVoidNode, Op, OutputNode, VarNode} from './model';
 import {StaticOpStore} from './opStore';
 import {opDefIsLowLevel} from './runtimeHelpers';
 
-export const CONSTRUCTOR_OP_NAMES = ['list', 'get', 'dict', 'op-date_parse'];
+export const CONSTRUCTOR_OP_NAMES = ['list', 'get', 'dict', 'timestamp'];
 
 const CLIENT_MUTATE_OK_ACCESSOR_OP_NAMES = [
   'pick',

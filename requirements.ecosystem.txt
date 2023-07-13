@@ -13,6 +13,8 @@ sqlalchemy>=2.0.1
 faiss-cpu>=1.7.4
 replicate>=0.4.0
 langchain>=0.0.132
+tiktoken>=0.4.0
+hdbscan>=0.8.27
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0

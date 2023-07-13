@@ -58,6 +58,7 @@ import {
   filterNodes,
   taggedValueValueType,
   isTaggedValue,
+  opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -1429,8 +1430,42 @@ function filterTableNodeToContinuousSelection(
 
       let colNode = opPick({obj: row, key: constString(colName)});
 
-      // TODO: make this more general and make use of the type system and config to
-      // emit the correct filter function.
+      const domainDiff = domain[1] - domain[0];
+      if (isAssignableTo(colNode.type, maybe(timestampBin))) {
+        return opAnd({
+          lhs: opNumberGreaterEqual({
+            lhs: opDateToNumber({
+              date: opPick({obj: colNode, key: constString('start')}),
+            }),
+            rhs: constNumber(
+              domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+          rhs: opNumberLessEqual({
+            lhs: opDateToNumber({
+              date: opPick({obj: colNode, key: constString('stop')}),
+            }),
+            rhs: constNumber(
+              domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+        });
+      } else if (isAssignableTo(colNode.type, maybe(numberBin))) {
+        return opAnd({
+          lhs: opNumberGreaterEqual({
+            lhs: opPick({obj: colNode, key: constString('start')}),
+            rhs: constNumber(
+              domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+          rhs: opNumberLessEqual({
+            lhs: opPick({obj: colNode, key: constString('stop')}),
+            rhs: constNumber(
+              domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+        });
+      }
       if (
         isAssignableTo(
           colNode.type,
@@ -1442,8 +1477,6 @@ function filterTableNodeToContinuousSelection(
       ) {
         colNode = opDateToNumber({date: colNode});
       }
-
-      const domainDiff = domain[1] - domain[0];
 
       return opAnd({
         lhs: opNumberGreaterEqual({
@@ -1785,7 +1818,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const series = config.series[i];
 
         const mark = getMark(series, node, series.table);
-        if (['line', 'point', 'area'].includes(mark)) {
+        if (['bar', 'line', 'point', 'area'].includes(mark)) {
           ['x' as const].forEach(axisName => {
             node = filterTableNodeToSelection(
               node,
@@ -1794,6 +1827,16 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               axisName,
               weave.client.opStore
             );
+          });
+        }
+        // If we have a nominal axis, limit it. We can end up with
+        // tons of unique values and Vega will basically hang.
+        const xAxisType = PlotState.getAxisType(concreteConfig.series[0], 'x');
+        const yAxisType = PlotState.getAxisType(concreteConfig.series[0], 'y');
+        if (xAxisType === 'nominal' || yAxisType === 'nominal') {
+          node = opLimit({
+            arr: node,
+            limit: constNumber(50),
           });
         }
       }
@@ -1817,6 +1860,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     listOfTableNodes,
     isDash,
     config.series,
+    concreteConfig.series,
     concreteConfig.signals.domain,
     weave.client.opStore,
   ]); // , isDash]);
@@ -2972,33 +3016,36 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
           if (settingName === 'domain') {
-            ['x' as const, 'y' as const].forEach(dimName => {
-              const axisSignal: [number, number] | string[] = signal[dimName];
-              const currentSetting = currConcreteConfig.signals.domain[dimName];
+            (Object.keys(brushableAxes) as Array<'x' | 'y'>).forEach(
+              dimName => {
+                const axisSignal: [number, number] | string[] = signal[dimName];
+                const currentSetting =
+                  currConcreteConfig.signals.domain[dimName];
 
-              let newDomain: Node;
-              if (brushableAxes[dimName] === 'temporal') {
-                newDomain = constNode(
-                  {type: 'list', objectType: {type: 'timestamp'}},
-                  axisSignal as number[]
-                );
-              } else {
-                newDomain = constNode(toWeaveType(axisSignal), axisSignal);
-              }
+                let newDomain: Node;
+                if (brushableAxes[dimName] === 'temporal') {
+                  newDomain = constNode(
+                    {type: 'list', objectType: {type: 'timestamp'}},
+                    axisSignal as number[]
+                  );
+                } else {
+                  newDomain = constNode(toWeaveType(axisSignal), axisSignal);
+                }
 
-              if (!_.isEqual(currentSetting, axisSignal)) {
-                currMutateDomain[dimName]({
-                  val: newDomain,
+                if (!_.isEqual(currentSetting, axisSignal)) {
+                  currMutateDomain[dimName]({
+                    val: newDomain,
+                  });
+                }
+
+                // need to clear out the old selection, if there is one
+                currUpdateConfig2((oldConfig: PlotConfig) => {
+                  return produce(oldConfig, draft => {
+                    draft.signals.selection[dimName] = undefined;
+                  });
                 });
               }
-
-              // need to clear out the old selection, if there is one
-              currUpdateConfig2((oldConfig: PlotConfig) => {
-                return produce(oldConfig, draft => {
-                  draft.signals.selection[dimName] = undefined;
-                });
-              });
-            });
+            );
           } else {
             currUpdateConfig2((oldConfig: PlotConfig) => {
               return produce(oldConfig, draft => {

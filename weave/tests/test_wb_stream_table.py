@@ -9,7 +9,7 @@ from PIL import Image
 
 def make_stream_table(*args, **kwargs):
     # Unit test backend does not support async logging
-    return StreamTable(*args, **kwargs, _disable_async_logging=True)
+    return StreamTable(*args, **kwargs, _disable_async_file_stream=True)
 
 
 # Example of end to end integration test

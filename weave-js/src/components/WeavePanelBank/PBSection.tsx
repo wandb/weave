@@ -104,7 +104,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
               onScroll={onSectionsScroll}
               onMouseMove={onSectionsMouseMove}>
               <div className="panel-bank__section">
-                {!inJupyter && groupPath != null && (
+                {!inJupyter && groupPath != null && handleAddPanel != null && (
                   <ActionBar ref={actionBarRef}>
                     <Tooltip
                       position="bottom right"

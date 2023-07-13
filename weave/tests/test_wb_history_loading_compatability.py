@@ -198,7 +198,7 @@ def do_logging(username, rows, finish=False):
         table_name=table_name,
         project_name="dev_test_weave_ci",
         entity_name=username,
-        _disable_async_logging=True,
+        _disable_async_file_stream=True,
     )
 
     row_accumulator = []
@@ -338,7 +338,7 @@ def test_stream_table_perf(user_by_api_key_in_env, n_rows, n_cols):
         table_name=table_name,
         project_name="dev_test_weave_ci",
         entity_name=user_by_api_key_in_env.username,
-        _disable_async_logging=True,
+        _disable_async_file_stream=True,
     )
     timings = {
         "log": 0,

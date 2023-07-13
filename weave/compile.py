@@ -1,4 +1,5 @@
 import re
+import random
 import typing
 
 import logging
@@ -9,6 +10,8 @@ import contextlib
 from . import value_or_error
 from . import debug_compile
 
+
+from . import serialize
 from . import compile_domain
 from . import op_args
 from . import weave_types as types
@@ -113,7 +116,13 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
             else:
                 raise
         except:
-            raise errors.WeaveInternalError("Error while dispatching: %s." % node)
+            logging.error(
+                "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
+                from_op.name,
+                from_op.input_types,
+                re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
+            )
+            raise
 
     return None
 
@@ -471,6 +480,33 @@ def compile_refine(
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
+def compile_merge_by_node_id(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    seen_nodes: dict[str, graph.Node] = {}
+
+    def _merge_by_node_id(node: graph.Node) -> graph.Node:
+        try:
+            nid = serialize.node_id(node)
+        except TypeError:
+            nid = str(random.random())
+        if nid in seen_nodes:
+            return seen_nodes[nid]
+        if isinstance(node, graph.OutputNode):
+            node = dispatch.RuntimeOutputNode(
+                node.type, node.from_op.name, node.from_op.inputs
+            )
+        elif isinstance(node, graph.VarNode):
+            node = dispatch.RuntimeVarNode(node.type, node.name)
+        elif isinstance(node, graph.ConstNode):
+            node = dispatch.RuntimeConstNode(node.type, node.val)
+        seen_nodes[nid] = node
+        return node
+
+    return graph.map_nodes_full(nodes, _merge_by_node_id, on_error)
+
+
 def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     if not isinstance(node, graph.OutputNode):
         return None
@@ -478,10 +514,24 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
         "RunChain-history",
         "panel_table-active_data",
         "Query-selected",
+        "panel_plot-selected_data",
+        "panel_table-all_rows",
     ]:
         return None
-    new_node = weave_internal.use(node)
-    return typing.cast(graph.Node, new_node)
+    new_node = typing.cast(graph.Node, weave_internal.use(node))
+
+    # The result will typically contain expressions that were sent down as
+    # part of panel configs within Const nodes. They haven't been handled
+    # by deserialize/compile yet.
+    new_node_fixed_calls = compile_fix_calls([new_node])[0]
+
+    # This last line dedupes nodes that are identical. But it doesn't
+    # globally dedupe against the graph we've already compiled.
+    # There is still some duplication left in Weave execution...
+    new_node_merged = compile_merge_by_node_id([new_node_fixed_calls])[0]
+
+    # Do it again to handle nested calls
+    return compile_node_ops([new_node_merged])[0]
 
 
 def compile_node_ops(

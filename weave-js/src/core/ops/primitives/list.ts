@@ -208,13 +208,32 @@ export const opIndex = makeListOp({
   returnValueDescription: `A value from the ${docType('list')}`,
   argTypes: {
     arr: {type: 'list', objectType: 'any'},
-    index: 'number',
+    index: {
+      type: 'union',
+      members: [
+        'number',
+        {
+          type: 'list',
+          objectType: {type: 'union', members: ['number', 'none']},
+        },
+      ],
+    },
   },
   renderInfo: {
     type: 'brackets',
   },
-  returnType: ({arr}) => listObjectType(arr),
-  resolver: ({arr, index}) => arr[index],
+  returnType: ({arr, index}) => {
+    if (isListLike(index)) {
+      return arr;
+    }
+    return listObjectType(arr);
+  },
+  resolver: ({arr, index}) => {
+    if (_.isArray(index)) {
+      return index.map(i => (i == null ? null : arr[i]));
+    }
+    return arr[index];
+  },
   resolverIsSync: true,
 });
 

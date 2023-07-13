@@ -151,6 +151,7 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   selectedRowId?: string;
   noDataCTA?: string;
   breadcrumbs?: Array<{
+    key: string;
     text: string;
     onClick?: () => void;
   }>;
@@ -244,12 +245,12 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
               color: '#8E949E',
             }}>
             {(props.breadcrumbs ?? []).map((comp, ndx) => {
-              const style: any = {};
+              const style: React.CSSProperties = {};
               if (comp.onClick) {
                 style.cursor = 'pointer';
               }
               return (
-                <>
+                <React.Fragment key={comp.key}>
                   <span style={style} onClick={comp.onClick}>
                     {comp.text}
                   </span>
@@ -259,7 +260,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                     }}>
                     /
                   </span>
-                </>
+                </React.Fragment>
               );
             })}
           </span>

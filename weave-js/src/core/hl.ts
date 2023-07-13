@@ -679,9 +679,11 @@ export async function refineNode(
   return (await refineEditingNode(client, node, stack)) as Node;
 }
 
-function isProducibleType(type: Type) {
+function isProducibleType(type: Type): boolean {
+  if (isFunction(type)) {
+    return isProducibleType(type.outputType);
+  }
   const PRODUCIBLE_TYPES: Type[] = [
-    functionType({}, 'any'),
     'string',
     'number',
     'boolean',
@@ -690,7 +692,7 @@ function isProducibleType(type: Type) {
     maybe('number'),
     maybe('boolean'),
   ];
-  return PRODUCIBLE_TYPES.find(t => isAssignableTo(type, t)) != null;
+  return PRODUCIBLE_TYPES.find(t => isAssignableTo(t, type)) != null;
 }
 
 /**

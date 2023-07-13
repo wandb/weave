@@ -14,8 +14,9 @@ def dereference_variables(
             try:
                 return var_values[n.name]
             except KeyError:
-                if not missing_ok:
-                    raise errors.WeaveMissingVariableError(n.name)
+                pass
+                # if not missing_ok:
+                #     raise errors.WeaveMissingVariableError(n.name)
         return n
 
     return graph.map_nodes_top_level([node], map_fn)[0]

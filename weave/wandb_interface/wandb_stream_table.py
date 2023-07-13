@@ -1,14 +1,19 @@
+import atexit
 import contextlib
 import datetime
 import json
 import logging
 import os
+import queue
 import random
 import shutil
+import threading
 import typing
 import uuid
 
 from wandb.sdk.lib.paths import LogicalPath
+from wandb.sdk.lib.printer import get_printer
+from wandb.sdk.lib.ipython import _get_python_type
 
 
 from .wandb_lite_run import InMemoryLazyLiteRun
@@ -101,7 +106,7 @@ class StreamTable:
         table_name: str,
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
-        _disable_async_logging: bool = False,
+        _disable_async_file_stream: bool = False,
     ):
         self._client_id = str(uuid.uuid1())
         splits = table_name.split("/")
@@ -126,8 +131,8 @@ class StreamTable:
         # For now, we force the user to specify the entity and project
         # technically, we could infer the entity from the API key, but
         # that tends to confuse users.
-        if entity_name is None or entity_name == "":
-            raise ValueError(f"Must specify entity_name")
+        # if entity_name is None or entity_name == "":
+        #     raise ValueError(f"Must specify entity_name")
         elif project_name is None or project_name == "":
             raise ValueError(f"Must specify project_name")
         elif table_name is None or table_name == "":
@@ -139,11 +144,11 @@ class StreamTable:
             project_name,
             table_name,
             job_type,
-            _use_async_file_stream=not _disable_async_logging,
+            _use_async_file_stream=not _disable_async_file_stream,
         )
-        self._table_name = table_name
-        self._project_name = project_name
-        self._entity_name = entity_name
+        self._table_name = self._lite_run._run_name
+        self._project_name = self._lite_run._project_name
+        self._entity_name = self._lite_run._entity_name
 
     def log(self, row_or_rows: typing.Union[dict, list[dict]]) -> None:
         if isinstance(row_or_rows, dict):
@@ -154,6 +159,9 @@ class StreamTable:
 
     def _ensure_weave_stream_table(self) -> StreamTableType:
         if self._weave_stream_table is None:
+            url = f"https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
+            printer = get_printer(_get_python_type() != "python")
+            printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
             self._weave_stream_table = StreamTableType(
                 table_name=self._table_name,
                 project_name=self._project_name,
@@ -206,6 +214,78 @@ class StreamTable:
         self._lite_run.finish()
 
     def __del__(self) -> None:
+        self.finish()
+
+
+ASYNC_ROW_TYPE = typing.Union[dict, typing.Callable[[], dict]]
+
+
+class StreamTableAsync:
+    MAX_UNSAVED_SECONDS = 2
+    _stream_table: StreamTable
+
+    def __init__(
+        self,
+        table_name: str,
+        project_name: typing.Optional[str] = None,
+        entity_name: typing.Optional[str] = None,
+        _disable_async_file_stream: bool = False,
+    ):
+        self._stream_table = StreamTable(
+            table_name, project_name, entity_name, _disable_async_file_stream
+        )
+        self._stream_table._lite_run.setup()
+        self._stream_table._ensure_weave_stream_table()
+
+        self.queue: queue.Queue = queue.Queue()
+        atexit.register(self._at_exit)
+        self._lock = threading.Lock()
+        self._join_event = threading.Event()
+        self._thread = threading.Thread(target=self._thread_body)
+        self._thread.daemon = True
+        self._thread.start()
+
+    def log(self, row_or_fn: ASYNC_ROW_TYPE) -> None:
+        self.queue.put(row_or_fn)
+
+    def flush(self) -> None:
+        with self._lock:
+            for log_dict_or_fn in self._iterate_queue():
+                if callable(log_dict_or_fn):
+                    log_dict = log_dict_or_fn()
+                else:
+                    log_dict = log_dict_or_fn
+
+                self._stream_table.log(log_dict)
+
+    def _iterate_queue(
+        self,
+    ) -> typing.Generator[ASYNC_ROW_TYPE, None, None]:
+        while True:
+            try:
+                record = self.queue.get_nowait()
+            except queue.Empty:
+                break
+            else:
+                yield record
+                self.queue.task_done()
+
+    def _thread_body(self) -> None:
+        join_requested = False
+        while not join_requested:
+            join_requested = self._join_event.wait(self.MAX_UNSAVED_SECONDS)
+            self.flush()
+
+    def finish(self) -> None:
+        self._join_event.set()
+        self._thread.join()
+        with self._lock:
+            self._stream_table.finish()
+
+    def __del__(self) -> None:
+        self.finish()
+
+    def _at_exit(self) -> None:
         self.finish()
 
 
