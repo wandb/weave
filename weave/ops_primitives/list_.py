@@ -533,6 +533,7 @@ def _join_output_type(input_types):
 
 
 @op(
+    hidden=True,
     input_type={
         "arr1": types.List(types.TypedDict({})),
         "arr2": types.List(types.TypedDict({})),
@@ -603,6 +604,7 @@ def _join_2_output_type(input_types):
 
 @op(
     name="join",
+    hidden=True,
     input_type={
         "arr1": types.List(),
         "arr2": types.List(),
@@ -698,6 +700,7 @@ def _all_join_keys_mapping(
 
 @op(
     name="joinAll",
+    hidden=True,
     input_type={
         "arrs": types.List(types.optional(types.List(types.TypedDict({})))),
         "joinFn": lambda input_types: types.Function(

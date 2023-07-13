@@ -793,6 +793,7 @@ const listToDict = (
 // TODO: fix
 export const opJoin = makeOp({
   name: 'join',
+  hidden: true,
   argTypes: {
     arr1: maybe({type: 'list', objectType: 'any'}),
     arr2: maybe({type: 'list', objectType: 'any'}),
@@ -1072,7 +1073,7 @@ const cloneDeepObj = (obj: {[key: string]: any}): any => {
 };
 
 export const opJoinAll = makeOp({
-  hidden: false,
+  hidden: true,
   name: 'joinAll',
   argTypes: {
     arrs: {

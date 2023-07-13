@@ -209,6 +209,7 @@ def _joined_all_output_type_tag_type(
 
 @op(
     name="ArrowWeaveList-joinAll",
+    hidden=True,
     input_type={
         "arrs": types.List(types.optional(ArrowWeaveListType(types.TypedDict({})))),
         "joinFn": lambda input_types: types.Function(
@@ -227,6 +228,7 @@ def _join_2_output_type(input_types):
 
 @op(
     name="ArrowWeaveList-join",
+    hidden=True,
     input_type={
         "arr1": ArrowWeaveListType(types.TypedDict({})),
         "arr2": ArrowWeaveListType(types.TypedDict({})),
