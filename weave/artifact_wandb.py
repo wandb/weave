@@ -924,10 +924,6 @@ class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
     artifact: WandbArtifact
     idx: int = 0
 
-    @property
-    def type(self) -> types.Type:
-        return types.List(artifact_fs.FilesystemArtifactFileType())
-
     def __init__(self, artifact: WandbArtifact, data: list[str] = []):
         self.data = data if len(data) > 0 else artifact._get_file_paths()
         self.artifact = artifact
