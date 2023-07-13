@@ -14,7 +14,7 @@ The primary user-facing functions are:
 * `find_tag` - used to recursively lookup the tag for a given object
 
 """
-
+import logging
 import contextvars
 from contextlib import contextmanager
 import typing
@@ -25,7 +25,12 @@ from ... import box
 from ... import weave_types as types
 from ... import errors
 
+
+from ... import engine_trace
+
 from collections import defaultdict
+
+statsd = engine_trace.statsd()  # type: ignore
 
 NodeTagStoreType = dict[int, dict[str, typing.Any]]
 TagStoreType = defaultdict[int, NodeTagStoreType]
@@ -48,6 +53,16 @@ def _current_obj_tag_mem_map() -> typing.Optional[NodeTagStoreType]:
     if node_tags is None:
         return None
     return node_tags[_OBJ_TAGS_CURR_NODE_ID.get()]
+
+
+def record_current_tag_store_size() -> None:
+    current_mmap = _OBJ_TAGS_MEM_MAP.get()
+    if current_mmap is not None:
+        n_tag_store_entries = sum(len(current_mmap[key]) for key in current_mmap)
+    else:
+        n_tag_store_entries = 0
+    logging.info(f"Current number of tag store entries: {n_tag_store_entries}")
+    statsd.gauge("weave.tag_store.num_entries", n_tag_store_entries)
 
 
 @contextmanager
