@@ -669,7 +669,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if manifest is None:
             raise errors.WeaveInternalError("no manifest")
         return manifest.get_paths_in_directory("")
-    
+
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
         mutable_metadata = {}
@@ -915,7 +915,8 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
     def to_ref(self) -> WandbArtifactRef:
         return WandbArtifactRef.from_uri(self)
 
-# This is a wrapper around an artifact that acts like a list. 
+
+# This is a wrapper around an artifact that acts like a list.
 # It fetchs a file from the manifest on __getItem__ and can return a count without fetching all files
 @dataclasses.dataclass
 class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):

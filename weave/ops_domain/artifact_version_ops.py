@@ -355,6 +355,7 @@ def artifact_version_weave_type(
         _artifact_version_to_wb_artifact(artifactVersion), "obj"
     ).type
 
+
 def _get_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> dict[str, typing.Any]:
@@ -514,6 +515,7 @@ def file_(
 ]:
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return art_local.path_info(path)  # type: ignore
+
 
 @op(
     name="artifactVersion-files",
