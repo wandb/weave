@@ -61,7 +61,7 @@ def record_current_tag_store_size() -> None:
         n_tag_store_entries = sum(len(current_mmap[key]) for key in current_mmap)
     else:
         n_tag_store_entries = 0
-    logging.debug(f"Current number of tag store entries: {n_tag_store_entries}")
+    logging.info(f"Current number of tag store entries: {n_tag_store_entries}")
     statsd.gauge("weave.tag_store.num_entries", n_tag_store_entries)
 
 
