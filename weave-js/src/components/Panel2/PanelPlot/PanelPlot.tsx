@@ -510,7 +510,32 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       <>
         {config.series.map((s, i) => {
           return (
-            <ConfigSection label={`Series ${i + 1}`}>
+            <ConfigSection
+              label={`Series ${i + 1}`}
+              menuItems={[
+                {
+                  key: 'Remove series',
+                  content: 'Remove series',
+                  icon: <IconDelete />,
+                  onClick: () => {
+                    updateConfig(PlotState.removeSeries(config, s));
+                  },
+                },
+                {
+                  key: 'Add series from this series',
+                  content: 'Add series from this series',
+                  icon: <IconAddNew />,
+                  onClick: () => {
+                    const newConfig = PlotState.addSeriesFromSeries(
+                      config,
+                      s,
+                      'x',
+                      weave
+                    );
+                    updateConfig(newConfig);
+                  },
+                },
+              ]}>
               {
                 <ConfigPanel.ConfigOption
                   key={`series-${i + 1}`}

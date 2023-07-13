@@ -17,8 +17,12 @@ import {WeaveExpression} from '../../../panel/WeaveExpression';
 import {themes} from '../Editor.styles';
 import * as S from './styles';
 import * as SN from './stylesNew';
-import {IconCaret} from '../Icons';
+import {IconCaret, IconOverflowHorizontal} from '../Icons';
+
 import {IconDown as IconDownUnstyled} from '../Icons';
+import {MenuItemProps} from 'semantic-ui-react';
+import {PopupMenu} from '../../Sidebar/PopupMenu';
+import {IconButton} from '../../IconButton';
 
 export const ChildConfigContainer = styled.div`
   position: relative;
@@ -63,9 +67,14 @@ export const ConfigSectionOptions = styled.div`
 
 type ConfigSectionProps = {
   label?: string;
+  menuItems?: MenuItemProps[];
 };
 
-export const ConfigSection: FC<ConfigSectionProps> = ({label, children}) => {
+export const ConfigSection: FC<ConfigSectionProps> = ({
+  label,
+  children,
+  menuItems,
+}) => {
   const [expanded, setExpanded] = useState(true);
 
   const toggleExpanded = useCallback(() => {
@@ -77,9 +86,25 @@ export const ConfigSection: FC<ConfigSectionProps> = ({label, children}) => {
       {label && (
         <ConfigSectionHeader onClick={toggleExpanded}>
           {label}
-          <ConfigSectionHeaderButton expanded={expanded}>
-            <IconCaret />
-          </ConfigSectionHeaderButton>
+          <div style={{display: 'flex'}}>
+            {menuItems != null && (
+              <PopupMenu
+                position="bottom left"
+                trigger={
+                  <ConfigDimMenuButton
+                    onClick={e => {
+                      e.stopPropagation();
+                    }}>
+                    <IconOverflowHorizontal />
+                  </ConfigDimMenuButton>
+                }
+                items={menuItems}
+              />
+            )}
+            <ConfigSectionHeaderButton expanded={expanded}>
+              <IconCaret />
+            </ConfigSectionHeaderButton>
+          </div>
         </ConfigSectionHeader>
       )}
       {expanded && <ConfigSectionOptions>{children}</ConfigSectionOptions>}
@@ -265,4 +290,8 @@ const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
 const IconDown = styled(IconDownUnstyled)`
   width: 18px;
   height: 18px;
+`;
+
+const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
+  margin-left: 4px;
 `;
