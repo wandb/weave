@@ -247,7 +247,6 @@ class WeaveWriter:
 
 
 def tracer():
-
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
@@ -311,7 +310,7 @@ def _initialize_statsd():
         return DummyStatsd()
 
 
-def statsd():
+def statsd() -> typing.Any:
     global _STATSD
     if _STATSD is None:
         _STATSD = _initialize_statsd()
