@@ -9,7 +9,7 @@ OpNameRow.displayName = 'S.OpNameRow';
 
 export const OpName = styled.h2`
   flex: 1 1 auto;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   margin-bottom: 2px;
 `;
@@ -25,7 +25,7 @@ export const Section = styled.div`
 `;
 
 export const Subheader = styled.h3`
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   margin-bottom: 2px;
 `;
@@ -49,4 +49,8 @@ export const ArgList = styled.ul`
 export const ArgName = styled.span`
   font-size: 14px;
   font-weight: 600;
+`;
+
+export const Code = styled.code`
+  font-family: Inconsolata;
 `;

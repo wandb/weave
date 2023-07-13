@@ -171,6 +171,7 @@ export const StyledOpDoc = styled(OpDoc)`
   background-color: ${globals.MOON_900};
   padding: 12px;
   border-radius: 4px;
+  box-shadow: 0px 12px 24px 0px rgba(14, 16, 20, 0.16);
 
   & a {
     color: ${globals.TEAL_500};

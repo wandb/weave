@@ -74,7 +74,7 @@ const OpDoc: React.FC<OpDocProps> = ({
       }}>
       <S.OpNameRow>
         <S.OpName>
-          <code>{displayName}</code>
+          <S.Code>{displayName}</S.Code>
         </S.OpName>
         {onClose && (
           <S.OpClose>
