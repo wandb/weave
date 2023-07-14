@@ -27,7 +27,7 @@ st.log({"one_column_name" : "value_a", "another_column_name" : 7})
 st.log([
     {"one_column_name" : "value_b", "another_column_name" : 19},
     {"one_column_name" : "value_c", "another_column_name" : 28},
-    {"one_column_name" : "value_d", "another_column_name" : 36}]
+    {"one_column_name" : "value_d", "another_column_name" : 36}])
 ```
 `.log()` accepts a single dictionary or a list of dictionaries, where each dictionary entry corresponds to one row of the table. In each dictionary, the keys are column names and the values are the corresponding cell values.
 
