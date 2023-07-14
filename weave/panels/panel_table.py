@@ -322,7 +322,7 @@ def data_single_refine(self: Table) -> weave.types.Type:
 # TODO: keep type in arrow
 @weave.op(
     name="panel_table-all_rows",
-    output_type=weave.types.List(weave.types.Any()),
+    output_type=weave.types.List(weave.types.TypedDict({})),
     refine_output_type=rows_refine,
 )
 def rows(self: Table):
