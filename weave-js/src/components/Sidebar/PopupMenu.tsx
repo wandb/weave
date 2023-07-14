@@ -19,7 +19,7 @@ export type Section = {
 
 export type PopupMenuProps = Pick<
   StrictPopupProps,
-  `trigger` | `position` | `onClose` | `onOpen`
+  `trigger` | `position` | `onClose` | `onOpen` | `open`
 > &
   Pick<StrictMenuProps, `items`> & {sections?: Section[]};
 
@@ -30,6 +30,7 @@ const PopupMenuComp: React.FC<PopupMenuProps> = ({
   sections = [],
   onOpen,
   onClose,
+  open,
 }) => {
   const allItems = useMemo(() => {
     return [...items, ..._.flatten(sections.map(sectionToItems))];
@@ -54,6 +55,7 @@ const PopupMenuComp: React.FC<PopupMenuProps> = ({
       trigger={trigger}
       onOpen={onOpen}
       onClose={onClose}
+      open={open}
       content={
         <Menu compact size="small" items={allItems} secondary vertical />
       }

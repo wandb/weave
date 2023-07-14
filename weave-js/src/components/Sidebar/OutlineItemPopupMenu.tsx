@@ -246,7 +246,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       items={menuItems}
       onClose={onClose}
       onOpen={onOpen}
-      isOpen={isOpen}
+      open={isOpen}
     />
   );
 };
