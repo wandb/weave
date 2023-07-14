@@ -4,8 +4,9 @@ Log and explore some basic StreamTables now in the [interactive notebook version
 
 A Weave StreamTable object enables continuous streaming of data from an application or service to W&B. This is an extension of the standard wandb.Table object to handle monitoring use cases. Instead of uploading a complete, immutable Table object once, you can append data repeatedly to the same StreamTable object with `.log([your data rows])`.
 
-A StreamTable of data serves as the foundation to build production monitoring Boards in Weave, like this example to recognize MNIST digits hand-drawn in an [interactive Jupyter notebook](../ProductionMonitoring/ProductionMonitoringConceptualOverview.ipynb) 
-![small_prodmon_board](../../docs/assets/mnist_pm_draw.png)
+A StreamTable of data serves as the foundation to build production monitoring Boards in Weave, like this example to recognize MNIST digits hand-drawn in an [interactive Jupyter notebook](../ProductionMonitoring/ProductionMonitoringConceptualOverview.ipynb).
+
+![small_prodmon_board](../../../docs/assets/mnist_pm_draw.png)
  
 ## Create a StreamTable
 
@@ -20,6 +21,7 @@ If an entity (W&B username or shared team name) is not provided, this will attem
 ## Log data to a StreamTable
 
 Call `.log()` to add rows to a StreamTable:
+
 ```python
 st.log({"one_column_name" : "value_a", "another_column_name" : 7})
 st.log([{"one_column_name" : "value_b", "another_column_name" : 19},
@@ -35,7 +37,8 @@ The first call to `.log()` will return a Weave Panel URL, where you can view, ed
 
 View data at : https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2Fstacey%2Fmesa%2Fmy_stream_table%3Alatest%2Fobj%22%29%0A++.rows
 
-![prodmon_tiny_table](../../docs/assets/small_stream_table.png)
+![prodmon_tiny_table](../../../docs/assets/small_stream_table.png)
+
 
 Subsequent log calls will silently append these rows to the StreamTable instance.
 
@@ -45,7 +48,7 @@ In a notebook, the StreamTable variable on a line by itself will return a Weave 
 * via the weave.wandb.ai/?exp=... URL
 * via "Open in new tab" arrow button, revealed in the menu when you hover on the right side of a StreamTable panel displayed in the notebok)
 
-![stream_table_from_notebook](../../docs/assets/stream_table_from_notebook.png)
+![stream_table_from_notebook](../../../docs/assets/stream_table_from_notebook.png)
 
 Continue logging as much data as you like. If you save the StreamTable Panel as a Board, the Board will continue to update as you send more data to the same StreamTable instance.
 
