@@ -598,7 +598,7 @@ const CenterProjectTablesBrowser: React.FC<
         },
       ],
     ];
-  }, [makeBoardFromNode, props, weave]);
+  }, [makeBoardFromNode, makeNewDashboard, props, weave]);
 
   return (
     <>
