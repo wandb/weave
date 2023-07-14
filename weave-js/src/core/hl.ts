@@ -33,7 +33,6 @@ import {nodesEqual} from './model/graph/editing';
 import {isVarNode} from './model/graph/typeHelpers';
 import {
   allObjPaths,
-  functionType,
   isAssignableTo,
   isConstType,
   isFunction,
