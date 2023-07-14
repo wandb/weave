@@ -123,7 +123,13 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
   // Certain keys have special behavior
   const keyDownHandler = React.useCallback(
     ev => {
-      setIsFirstFocused(false);
+      // Pressing a non-printable character like shift is not enough to cancel
+      // the suggestion panel suppression.
+      const isPrintableCharacter = ev.key.length === 1;
+      if (isPrintableCharacter) {
+        setIsFirstFocused(false);
+      }
+
       if (ev.key === 'Enter' && !ev.shiftKey && !props.liveUpdate) {
         // Apply outstanding changes to expression
         ev.preventDefault();
