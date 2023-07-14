@@ -358,44 +358,6 @@ def wb_viewer():
     return {"authenticated": authenticated}
 
 
-DEBUG_MEM = False
-if not environment.wandb_production() and DEBUG_MEM:
-    # To use, hit /objgraph_getnewids to set a baseline, then do some requests.
-    # Then hit /pdb to drop the server into pdb and do
-    # import objgraph
-    # obj_ids = objgraph.get_new_ids()
-    # This will contain all the ids of objects that have been created since
-    # the last call to objgraph.get_new_ids()
-    # Then you can inspect objects like:
-    # obj_id = obj_ids['TypedDict'][0]
-    # obj = objgraph.at(obj_id)
-    # objgraph.show_backrefs([obj], max_depth=15)
-    #
-    # Other useful objgraph commands:
-    # objgraph.show_most_common_types(limit=20)
-    # obj = objgraph.by_type('TypedDict')[100]
-
-    import gc
-    import objgraph  # type: ignore[import]
-
-    @blueprint.route("/pdb")
-    def pdb():
-        breakpoint()
-        return "ok"
-
-    @blueprint.route("/objgraph_showgrowth")
-    def objgraph_showgrowth():
-        gc.collect()
-        objgraph.show_growth()
-        return "see logs"
-
-    @blueprint.route("/objgraph_getnewids")
-    def objgraph_getnewids():
-        gc.collect()
-        objgraph.get_new_ids()
-        return "see logs"
-
-
 app = make_app()
 
 if os.getenv("WEAVE_SERVER_DEBUG"):
