@@ -169,7 +169,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
 
         <OutlineItemName>{name}</OutlineItemName>
         <OutlineItemPanelID>{curPanelId}</OutlineItemPanelID>
-        {path.length > 0 && (
+        {path.length > 1 && (
           <OutlineItemPopupMenu
             config={config}
             localConfig={localConfig}

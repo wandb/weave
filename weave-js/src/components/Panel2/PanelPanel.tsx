@@ -211,6 +211,10 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
   );
+  const selectedIsSidebarOrMain = useMemo(
+    () => selectedPanel.filter(s => s).length < 2,
+    [selectedPanel]
+  );
   const showOutline = useMemo(
     () => selectedIsRoot && !inspectingRoot,
     [selectedIsRoot, inspectingRoot]
@@ -266,7 +270,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            {!selectedIsRoot && (
+            {!selectedIsRoot && !selectedIsSidebarOrMain && (
               <OutlineItemPopupMenu
                 config={panelConfig}
                 localConfig={getConfigForPath(panelConfig, selectedPanel)}
