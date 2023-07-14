@@ -63,7 +63,7 @@ def enable_touch_on_read() -> bool:
 
 
 def memdump_sighandler_enabled() -> bool:
-    return util.parse_boolean_env_var("WEAVE_MEMDUMP_SIGHANDLER")
+    return util.parse_boolean_env_var("WEAVE_ENABLE_MEMDUMP_SIGHANDLER")
 
 
 def weave_wandb_cookie() -> typing.Optional[str]:
