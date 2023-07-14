@@ -62,7 +62,8 @@ def dump_stack_traces(signal, frame):
 
 
 # Here we set the SIGUSR1 signal handler to our function dump_stack_traces
-signal.signal(signal.SIGUSR1, dump_stack_traces)
+if environment.stack_dump_sighandler_enabled():
+    signal.signal(signal.SIGUSR1, dump_stack_traces)
 
 
 def custom_dd_patch():
