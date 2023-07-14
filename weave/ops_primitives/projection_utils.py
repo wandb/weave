@@ -5,6 +5,7 @@ import queue
 import numpy as np
 from .. import errors
 import typing
+import logging
 import warnings
 
 from sklearn.manifold import TSNE
@@ -99,6 +100,10 @@ def perform_2D_projection_with_timeout(
         result = result_queue.get(timeout=timeout)
     except queue.Empty:
         target.kill()
+        logging.error(
+            f"Projection timed out after {timeout} seconds, killing process {target.pid}, returning empty projection",
+        )
+
         return np.zeros((len(np_array_of_embeddings), 2))
     return result
 
