@@ -195,7 +195,6 @@ def auto_panels(
     groupby_key_node = weave_internal.make_var_node(groupby.type, "groupby")
 
     for key, prop_type in property_types.items():
-
         if weave.types.optional(weave.types.Number()).assign_type(prop_type):
             panel = timeseries_sum_bar(
                 data_node,
@@ -315,3 +314,13 @@ class AutoBoard(weave.Panel):
     @weave.op()  # type: ignore
     def render(self) -> weave.panels.Group:
         return auto_panels(self.input_node, self.config)  # type: ignore
+
+
+@weave.op(  # type: ignore
+    name="py_board-seed_autoboard",
+)
+def seed_autoboard(
+    input_node: weave.Node[typing.Any],
+    config: typing.Optional[AutoBoardConfig] = None,
+) -> weave.panels.Group:
+    return auto_panels(input_node, config)  # type: ignore
