@@ -11,6 +11,7 @@ from . import errors
 from urllib.parse import urlparse
 import netrc
 
+
 # There are currently two cache modes:
 # - full: cache all cacheable intermediate results
 # - minimal: cache only what we're sure we need to cache for performance
@@ -59,6 +60,10 @@ def weave_filesystem_dir() -> str:
 
 def enable_touch_on_read() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_TOUCH_ON_READ")
+
+
+def memdump_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_MEMDUMP_SIGHANDLER")
 
 
 def weave_wandb_cookie() -> typing.Optional[str]:
