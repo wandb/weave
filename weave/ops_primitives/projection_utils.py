@@ -12,6 +12,8 @@ from sklearn.decomposition import PCA
 
 umap_lib = {}
 
+DEFAULT_TIMEOUT = 60  # seconds
+
 
 def _get_umap():
     # Lazily load a cached version of UMAP - umap import
@@ -71,7 +73,7 @@ def perform_2D_projection_with_timeout(
     np_array_of_embeddings: np.ndarray,
     projectionAlgorithm: str,
     algorithmOptions: dict,
-    timeout: typing.Optional[int],
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> np.ndarray:
     if timeout is None:
         return perform_2D_projection(
