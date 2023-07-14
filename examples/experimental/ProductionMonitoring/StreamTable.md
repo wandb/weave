@@ -6,7 +6,7 @@ A Weave StreamTable object enables continuous streaming of data from an applicat
 
 A StreamTable of data serves as the foundation to build production monitoring Boards in Weave, like this example to recognize MNIST digits hand-drawn in an [interactive Jupyter notebook](../ProductionMonitoring/ProductionMonitoringConceptualOverview.ipynb).
 
-![small_prodmon_board](../../../docs/assets/mnist_pm_draw.png)
+![small_prodmon_board](../../../docs/assets/mnist_pm_draw_hover.png)
  
 ## Create a StreamTable
 
@@ -28,7 +28,6 @@ st.log([{"one_column_name" : "value_b", "another_column_name" : 19},
         {"one_column_name" : "value_c", "another_column_name" : 28},
         {"one_column_name" : "value_d", "another_column_name" : 36}]
 ```
-
 `.log()` accepts a single dictionary or a list of dictionaries, where each dictionary entry corresponds to one row of the table. In each dictionary, the keys are column names and the values are the corresponding cell values.
 
 ## Visualize the StreamTable
