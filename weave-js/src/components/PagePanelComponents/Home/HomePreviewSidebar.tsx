@@ -98,7 +98,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
                   justifyContent: 'center',
                   gap: '8px',
                 }}>
-                {props.primaryAction.icon}
+                <props.primaryAction.icon />
                 {props.primaryAction.label}
               </LayoutElements.HStack>
             </WBButton>
@@ -111,7 +111,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
                   justifyContent: 'center',
                   gap: '8px',
                 }}>
-                {props.secondaryAction.icon}
+                <props.secondaryAction.icon />
                 {props.secondaryAction.label}
               </LayoutElements.HStack>
             </WBButton>
