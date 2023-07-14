@@ -538,6 +538,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   );
 
   const [hoverPanel, setHoverPanel] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [expressionFocused, setExpressionFocused] = useState(false);
   const onFocusExpression = useCallback(() => {
@@ -610,7 +611,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             ) : (
               <div style={{width: '100%'}} />
             )}
-            <EditorIcons visible={hoverPanel}>
+            <EditorIcons visible={hoverPanel || isMenuOpen}>
               {props.prefixButtons}
               <Tooltip
                 position="top center"
@@ -624,20 +625,21 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 }>
                 Open panel editor
               </Tooltip>
-              {fullConfig && (
-                <OutlineItemPopupMenu
-                  config={fullConfig}
-                  localConfig={getConfigForPath(fullConfig, fullPath)}
-                  path={fullPath}
-                  updateConfig={updateConfig}
-                  updateConfig2={updateConfig2}
-                  trigger={
-                    <IconButton>
-                      <IconOverflowHorizontal />
-                    </IconButton>
-                  }
-                />
-              )}
+              <OutlineItemPopupMenu
+                config={fullConfig}
+                localConfig={getConfigForPath(fullConfig, fullPath)}
+                path={fullPath}
+                updateConfig={updateConfig}
+                updateConfig2={updateConfig2}
+                trigger={
+                  <IconButton>
+                    <IconOverflowHorizontal />
+                  </IconButton>
+                }
+                onOpen={() => setIsMenuOpen(true)}
+                onClose={() => setIsMenuOpen(false)}
+                isOpen={isMenuOpen}
+              />
             </EditorIcons>
           </EditorBarContent>
         </Styles.EditorBar>
