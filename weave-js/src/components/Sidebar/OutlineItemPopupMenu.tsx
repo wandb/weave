@@ -38,6 +38,7 @@ export type OutlineItemPopupMenuProps = Pick<
   trigger: JSX.Element;
   onClose?: () => void;
   onOpen?: () => void;
+  isOpen: boolean;
 };
 
 const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
@@ -50,6 +51,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   trigger,
   onClose,
   onOpen,
+  isOpen,
 }) => {
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
@@ -244,6 +246,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       items={menuItems}
       onClose={onClose}
       onOpen={onOpen}
+      isOpen={isOpen}
     />
   );
 };
