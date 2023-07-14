@@ -33,7 +33,13 @@ const Divider = styled.div`
 export type OutlineItemPopupMenuProps = Pick<
   OutlinePanelProps,
   `config` | `localConfig` | `path` | `updateConfig` | `updateConfig2`
-> & {goBackToOutline?: () => void; trigger: JSX.Element};
+> & {
+  goBackToOutline?: () => void;
+  trigger: JSX.Element;
+  onClose?: () => void;
+  onOpen?: () => void;
+  isOpen: boolean;
+};
 
 const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   config,
@@ -43,6 +49,9 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   updateConfig2,
   goBackToOutline,
   trigger,
+  onClose,
+  onOpen,
+  isOpen,
 }) => {
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
@@ -231,7 +240,14 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   ]);
 
   return (
-    <PopupMenu trigger={trigger} position={`bottom right`} items={menuItems} />
+    <PopupMenu
+      trigger={trigger}
+      position={`bottom right`}
+      items={menuItems}
+      onClose={onClose}
+      onOpen={onOpen}
+      open={isOpen}
+    />
   );
 };
 
