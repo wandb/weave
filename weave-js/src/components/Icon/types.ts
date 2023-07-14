@@ -22,6 +22,7 @@ export const IconNames = {
   ChevronNext: 'chevron-next',
   ChevronUp: 'chevron-up',
   Close: 'close',
+  Cloud: 'cloud',
   CodeAlt: 'code-alt',
   Collapse: 'collapse',
   Color: 'color',
