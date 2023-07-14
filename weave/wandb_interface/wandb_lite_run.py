@@ -14,6 +14,11 @@ from weave.wandb_client_api import wandb_public_api
 logger = logging.getLogger(__name__)
 
 
+# We disable urllib warnings because they are noisy and not actionable.
+logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
+
+
 class WeaveWandbRunException(Exception):
     pass
 
