@@ -52,6 +52,39 @@ In a notebook, the StreamTable variable on a line by itself will return a Weave 
 
 Continue logging as much data as you like. If you save the StreamTable Panel as a Board, the Board will continue to update as you send more data to the same StreamTable instance.
 
+## StreamTable API Reference
+
+### StreamTable()
+
+Create a StreamTable by providing a table name, with W&B entity (username or team name) and W&B project as optional prefixes to the table name (of the form `entity_name/project_name/table_name`) or separate arguments.
+
+```python
+StreamTable(
+  table_name: str,
+  project_name: typing.Optional[str] = None,
+  entity_name: typing.Optional[str] = None
+)
+```
+
+### .log()
+
+Append rows to the SteamTable. Each row is a dictionary, and `.log()` accepts a single dictionary or a list of dictionaries.
+
+```python
+st = StreamTable("stream_table")
+st.log({"col_A" : 10, "col_B" : "x"})
+st.log([{"col_A" : 20, "col_B" : "y"}, {"col_A" : 30, "col_B" : "z"}])
+```
+
+### .rows()
+
+Add this Weave op to the expression at the top of a Weave Panel to show the contents/actual rows of a StreamTable. Without this op, a StreamTable Panel in the UI will only display the entity, project, and table names (and not the row contents of the StreamTable object).
+
+### .finish()
+
+Wait to show a StreamTable Panel in a notebook UI until all the `.log()` calls have completed / have finished writing to the StreamTable instance (which may mean a longer wait, if e.g. rows are the result of significant computation, running inference, etc).
+ 
+
 ## Important usage notes 
 
 Some details to keep in mind for this early iteration of the StreamTables API:
