@@ -214,7 +214,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     <Container spellCheck="false">
       <Slate
         editor={editor}
-        value={slateValue}
+        initialValue={slateValue}
         onChange={onChangeResetSuggestion}>
         <S.EditableContainer
           ref={containerRef}
