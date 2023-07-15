@@ -2,6 +2,7 @@ import cProfile
 import datetime
 import gc
 import os
+import objgraph
 import logging
 import pathlib
 import time
@@ -46,26 +47,6 @@ if PROFILE_DIR is not None:
 ERROR_STR_LIMIT = 10000
 
 tracer = engine_trace.tracer()
-
-
-def dump_stack_traces(signal, frame):
-    """Function to be executed when the signal is received."""
-    id_to_name = dict([(th.ident, th.name) for th in threading.enumerate()])
-    code = []
-    for threadId, stack in sys._current_frames().items():
-        code.append("\n# Thread: %s(%d)" % (id_to_name.get(threadId, ""), threadId))
-        for filename, lineno, name, line in traceback.extract_stack(stack):
-            code.append('File: "%s", line %d, in %s' % (filename, lineno, name))
-            if line:
-                code.append("  %s" % (line.strip()))
-
-    with open(f"/tmp/weave_thread_stacks.{os.getpid()}.txt", "w+") as f:
-        f.write("\n".join(code))
-
-
-# Here we set the SIGUSR1 signal handler to our function dump_stack_traces
-if environment.stack_dump_sighandler_enabled():
-    signal.signal(signal.SIGUSR1, dump_stack_traces)
 
 
 def custom_dd_patch():
@@ -114,9 +95,33 @@ static_folder = os.path.join(os.path.dirname(__file__), "frontend")
 blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
-if environment.memdump_sighandler_enabled():
-    import objgraph
+if (
+    environment.memdump_sighandler_enabled()
+    or environment.stack_dump_sighandler_enabled()
+):
 
+    def dump_stack_traces(signal, frame):
+        """Function to be executed when the signal is received."""
+        id_to_name = dict([(th.ident, th.name) for th in threading.enumerate()])
+        code = []
+        code.append(f"\nMain thread: {traceback.format_stack(frame)}")
+        for threadId, stack in sys._current_frames().items():
+            thread_name = id_to_name.get(threadId, "")
+            if thread_name == "MainThread":
+                continue
+            code.append("\n# Thread: %s(%d)" % (thread_name, threadId))
+            for filename, lineno, name, line in traceback.extract_stack(stack):
+                code.append('File: "%s", line %d, in %s' % (filename, lineno, name))
+                if line:
+                    code.append("  %s" % (line.strip()))
+
+        with open(
+            f"/tmp/weave_thread_stacks.{os.getpid()}-{datetime.datetime.now()}.txt",
+            "w+",
+        ) as f:
+            f.write("\n".join(code))
+
+    # Here we set the SIGUSR1 signal handler to our function dump_stack_traces
     # To use, send a SIGUSR1 signal to set a baseline, then do some requests.
     # Then send a SIGUSR2 signal to drop the server into pdb and do
     # import objgraph
@@ -138,15 +143,23 @@ if environment.memdump_sighandler_enabled():
         with open(fname, "w") as f:
             objgraph.get_new_ids(limit=100, file=f)
 
-    signal.signal(signal.SIGUSR1, objgraph_getnewids)
+    def sigusr1_handler(signal, frame):
+        if environment.memdump_sighandler_enabled():
+            objgraph_getnewids(signal, frame)
+        if environment.stack_dump_sighandler_enabled():
+            dump_stack_traces(signal, frame)
 
-    def objgraph_showgrowth(signal, frame):
-        gc.collect()
-        fname = f"/tmp/weave-server-objgraph-growth-{os.getpid()}-{datetime.datetime.now().isoformat()}.txt"
-        with open(fname, "w") as f:
-            objgraph.show_growth(limit=100, file=f)
+    signal.signal(signal.SIGUSR1, sigusr1_handler)
 
-    signal.signal(signal.SIGUSR2, objgraph_showgrowth)
+    if environment.memdump_sighandler_enabled():
+
+        def objgraph_showgrowth(signal, frame):
+            gc.collect()
+            fname = f"/tmp/weave-server-objgraph-growth-{os.getpid()}-{datetime.datetime.now().isoformat()}.txt"
+            with open(fname, "w") as f:
+                objgraph.show_growth(limit=100, file=f)
+
+        signal.signal(signal.SIGUSR2, objgraph_showgrowth)
 
 
 def import_ecosystem():
