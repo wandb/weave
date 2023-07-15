@@ -1,4 +1,6 @@
 import cProfile
+import datetime
+import gc
 import os
 import logging
 import pathlib
@@ -57,7 +59,7 @@ def dump_stack_traces(signal, frame):
             if line:
                 code.append("  %s" % (line.strip()))
 
-    with open(f"/tmp/gunicorn_stacks.{os.getpid()}.txt", "w+") as f:
+    with open(f"/tmp/weave_thread_stacks.{os.getpid()}.txt", "w+") as f:
         f.write("\n".join(code))
 
 
@@ -110,6 +112,41 @@ if os.environ.get("FLASK_DEBUG"):
 
 static_folder = os.path.join(os.path.dirname(__file__), "frontend")
 blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
+
+
+if environment.memdump_sighandler_enabled():
+    import objgraph
+
+    # To use, send a SIGUSR1 signal to set a baseline, then do some requests.
+    # Then send a SIGUSR2 signal to drop the server into pdb and do
+    # import objgraph
+    # obj_ids = objgraph.get_new_ids()
+    # This will contain all the ids of objects that have been created since
+    # the last call to objgraph.get_new_ids()
+    # Then you can inspect objects like:
+    # obj_id = obj_ids['TypedDict'][0]
+    # obj = objgraph.at(obj_id)
+    # objgraph.show_backrefs([obj], max_depth=15)
+    #
+    # Other useful objgraph commands:
+    # objgraph.show_most_common_types(limit=20)
+    # obj = objgraph.by_type('TypedDict')[100]
+
+    def objgraph_getnewids(signal, frame):
+        gc.collect()
+        fname = f"/tmp/weave-server-objgraph-newids-{os.getpid()}-{datetime.datetime.now().isoformat()}.txt"
+        with open(fname, "w") as f:
+            objgraph.get_new_ids(limit=100, file=f)
+
+    signal.signal(signal.SIGUSR1, objgraph_getnewids)
+
+    def objgraph_showgrowth(signal, frame):
+        gc.collect()
+        fname = f"/tmp/weave-server-objgraph-growth-{os.getpid()}-{datetime.datetime.now().isoformat()}.txt"
+        with open(fname, "w") as f:
+            objgraph.show_growth(limit=100, file=f)
+
+    signal.signal(signal.SIGUSR2, objgraph_showgrowth)
 
 
 def import_ecosystem():
@@ -378,44 +415,6 @@ def wb_viewer():
     authenticated = current_context is not None
 
     return {"authenticated": authenticated}
-
-
-DEBUG_MEM = False
-if not environment.wandb_production() and DEBUG_MEM:
-    # To use, hit /objgraph_getnewids to set a baseline, then do some requests.
-    # Then hit /pdb to drop the server into pdb and do
-    # import objgraph
-    # obj_ids = objgraph.get_new_ids()
-    # This will contain all the ids of objects that have been created since
-    # the last call to objgraph.get_new_ids()
-    # Then you can inspect objects like:
-    # obj_id = obj_ids['TypedDict'][0]
-    # obj = objgraph.at(obj_id)
-    # objgraph.show_backrefs([obj], max_depth=15)
-    #
-    # Other useful objgraph commands:
-    # objgraph.show_most_common_types(limit=20)
-    # obj = objgraph.by_type('TypedDict')[100]
-
-    import gc
-    import objgraph  # type: ignore[import]
-
-    @blueprint.route("/pdb")
-    def pdb():
-        breakpoint()
-        return "ok"
-
-    @blueprint.route("/objgraph_showgrowth")
-    def objgraph_showgrowth():
-        gc.collect()
-        objgraph.show_growth()
-        return "see logs"
-
-    @blueprint.route("/objgraph_getnewids")
-    def objgraph_getnewids():
-        gc.collect()
-        objgraph.get_new_ids()
-        return "see logs"
 
 
 app = make_app()
