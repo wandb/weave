@@ -93,3 +93,28 @@ def test_artifact_metadata(user_by_api_key_in_env):
         "k_3": "v_4",
         "k_4": "v_6",
     }
+
+
+def test_artifact_files_count(user_by_api_key_in_env):
+    run = wandb.init(project="project_exists")
+    artifact = wandb.Artifact("test", "datatest")
+    table0 = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
+    table1 = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
+    table2 = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
+    table3 = wandb.Table(data=[[1, 2, 3]], columns=["a", "b", "c"])
+    artifact.add(table0, "table0")
+    artifact.add(table1, "nest/table1")
+    artifact.add(table2, "nest/nested/table2")
+    artifact.add(table3, "nest/nested/nesteded/table3")
+    run.log_artifact(artifact)
+    run.finish()
+
+    count_node = (
+        weave.ops.project(run.entity, run.project)
+        .artifact("test")
+        .membershipForAlias("v0")
+        .artifactVersion()
+        .files()
+        .count()
+    )
+    assert weave.use(count_node) == 4

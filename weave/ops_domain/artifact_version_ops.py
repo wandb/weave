@@ -328,7 +328,7 @@ def artifact_version_link(
     )
 
 
-# The following two ops: artifactVersion-isWeaveObject and artifactVersion-files
+# The following op: artifactVersion-isWeaveObject
 # need more work to get artifact version file metadata.
 
 
@@ -354,14 +354,6 @@ def artifact_version_weave_type(
     return artifact_fs.FilesystemArtifactRef(
         _artifact_version_to_wb_artifact(artifactVersion), "obj"
     ).type
-
-
-@op(name="artifactVersion-files")
-def files(
-    artifactVersion: wdt.ArtifactVersion,
-) -> list[artifact_fs.FilesystemArtifactFile]:
-    # TODO: What is the correct data model here? - def don't want to go download everything
-    return []
 
 
 def _get_history_metrics(
@@ -523,3 +515,14 @@ def file_(
 ]:
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return art_local.path_info(path)  # type: ignore
+
+
+@op(
+    name="artifactVersion-files",
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+)
+def files(
+    artifactVersion: wdt.ArtifactVersion,
+) -> list[artifact_fs.FilesystemArtifactFile]:
+    art_local = _artifact_version_to_wb_artifact(artifactVersion)
+    return artifact_wandb.FilesystemArtifactFileIterator(art_local)
