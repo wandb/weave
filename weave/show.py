@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import string
 import urllib
@@ -109,6 +110,8 @@ def _show_params(obj):
 
 
 def show_url(obj=None):
+    if os.environ.get("WEAVE_FRONTEND_DEVMODE"):
+        context.use_frontend_devmode()
     params = _show_params(obj)
     panel_url = f"{context.get_frontend_url()}?fullScreen"
     if "weave_node" in params:

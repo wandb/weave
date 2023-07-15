@@ -651,7 +651,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
           newPath={props.pathEl}>
           {props.controlBar === 'titleBar' &&
           isChildPanelFullConfig(props.config) &&
-          (props.config.id === 'Auto' || props.config.id === 'Expression') ? (
+          curPanelId === 'Expression' ? (
             <div style={{paddingLeft: 16, paddingRight: 16}}>
               <WeaveExpression
                 expr={panelInputExpr}
