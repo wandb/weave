@@ -4,6 +4,8 @@ import logging
 import pathlib
 import time
 import traceback
+import threading
+import signal
 import sys
 import base64
 import typing
@@ -42,6 +44,26 @@ if PROFILE_DIR is not None:
 ERROR_STR_LIMIT = 10000
 
 tracer = engine_trace.tracer()
+
+
+def dump_stack_traces(signal, frame):
+    """Function to be executed when the signal is received."""
+    id_to_name = dict([(th.ident, th.name) for th in threading.enumerate()])
+    code = []
+    for threadId, stack in sys._current_frames().items():
+        code.append("\n# Thread: %s(%d)" % (id_to_name.get(threadId, ""), threadId))
+        for filename, lineno, name, line in traceback.extract_stack(stack):
+            code.append('File: "%s", line %d, in %s' % (filename, lineno, name))
+            if line:
+                code.append("  %s" % (line.strip()))
+
+    with open(f"/tmp/gunicorn_stacks.{os.getpid()}.txt", "w+") as f:
+        f.write("\n".join(code))
+
+
+# Here we set the SIGUSR1 signal handler to our function dump_stack_traces
+if environment.stack_dump_sighandler_enabled():
+    signal.signal(signal.SIGUSR1, dump_stack_traces)
 
 
 def custom_dd_patch():
