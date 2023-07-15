@@ -1,12 +1,19 @@
+import threading
+import multiprocessing
+
+import queue
 import numpy as np
 from .. import errors
-import threading
+import typing
+import logging
 import warnings
 
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
 umap_lib = {}
+
+DEFAULT_TIMEOUT = 60  # seconds
 
 
 def _get_umap():
@@ -46,6 +53,59 @@ def perform_2D_projection(
     else:
         raise Exception("Unknown projection algorithm: " + projectionAlgorithm)
     return projection
+
+
+def perform_2D_projection_async(
+    np_array_of_embeddings: np.ndarray,
+    projectionAlgorithm: str,
+    algorithmOptions: dict,
+    result_queue: multiprocessing.Queue,
+):
+    try:
+        projection = perform_2D_projection(
+            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+        )
+        result_queue.put(projection)
+    except Exception as e:
+        result_queue.put(e)
+
+
+def perform_2D_projection_with_timeout(
+    np_array_of_embeddings: np.ndarray,
+    projectionAlgorithm: str,
+    algorithmOptions: dict,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> np.ndarray:
+    if timeout is None:
+        return perform_2D_projection(
+            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+        )
+
+    # otherwise run it in another process and kill it if it goes over time
+
+    result_queue: multiprocessing.Queue = multiprocessing.Queue()
+    target = multiprocessing.Process(
+        target=perform_2D_projection_async,
+        args=(
+            np_array_of_embeddings,
+            projectionAlgorithm,
+            algorithmOptions,
+            result_queue,
+        ),
+        name="projection",
+    )
+    target.start()
+
+    try:
+        result = result_queue.get(timeout=timeout)
+    except queue.Empty:
+        target.kill()
+        logging.error(
+            f"Projection timed out after {timeout} seconds, killing process {target.pid}, returning empty projection",
+        )
+
+        return np.zeros((len(np_array_of_embeddings), 2))
+    return result
 
 
 def limit_embedding_dimensions(

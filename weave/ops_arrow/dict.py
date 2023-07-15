@@ -280,7 +280,7 @@ def awl_2d_projection(
             np_projection = default_projection()
         else:
             np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings, copy=False)
-            np_projection = projection_utils.perform_2D_projection(
+            np_projection = projection_utils.perform_2D_projection_with_timeout(
                 np_array_of_embeddings, projectionAlgorithm, algorithmOptions
             )
     x_column = np_projection[:, 0]
@@ -377,7 +377,7 @@ def awl_projection_2d(
             np_projection = default_projection()
         else:
             np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings, copy=False)
-            np_projection = projection_utils.perform_2D_projection(
+            np_projection = projection_utils.perform_2D_projection_with_timeout(
                 np_array_of_embeddings, projectionAlgorithm, algorithmOptions
             )
     x_column = np_projection[:, 0]

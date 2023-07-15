@@ -18,6 +18,8 @@ from ..language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,
 )
+
+
 import functools
 
 
@@ -805,8 +807,10 @@ def list_2Dprojection(
                     ]
                 )
         np_array_of_embeddings = np.array(embeddings)
-        np_projection = projection_utils.perform_2D_projection(
-            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+        np_projection = projection_utils.perform_2D_projection_with_timeout(
+            np_array_of_embeddings,
+            projectionAlgorithm,
+            algorithmOptions,
         )
         projection = np_projection.tolist()
     return [
@@ -866,7 +870,7 @@ def list_projection2D(
                     ]
                 )
         np_array_of_embeddings = np.array(embeddings)
-        np_projection = projection_utils.perform_2D_projection(
+        np_projection = projection_utils.perform_2D_projection_with_timeout(
             np_array_of_embeddings, projectionAlgorithm, algorithmOptions
         )
         projection = np_projection.tolist()
