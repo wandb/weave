@@ -59,7 +59,7 @@ def dump_stack_traces(signal, frame):
             if line:
                 code.append("  %s" % (line.strip()))
 
-    with open(f"/tmp/gunicorn_stacks.{os.getpid()}.txt", "w+") as f:
+    with open(f"/tmp/weave_thread_stacks.{os.getpid()}.txt", "w+") as f:
         f.write("\n".join(code))
 
 
