@@ -80,6 +80,10 @@ def weave_wandb_cookie() -> typing.Optional[str]:
     return cookie
 
 
+def stack_dump_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_STACK_DUMP_SIGHANDLER")
+
+
 def _wandb_api_key_via_env() -> typing.Optional[str]:
     api_key = os.environ.get("WANDB_API_KEY")
     if api_key and is_public():

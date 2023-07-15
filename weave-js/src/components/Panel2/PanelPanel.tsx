@@ -207,6 +207,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   } = useScrollbarVisibility();
 
   const [inspectingRoot, setInspectingRoot] = useState(false);
+  const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
   const selectedIsRoot = useMemo(
     () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
@@ -279,6 +280,9 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
                     <IconOverflowHorizontal />
                   </IconButton>
                 }
+                isOpen={isOutlineMenuOpen}
+                onOpen={() => setIsOutlineMenuOpen(true)}
+                onClose={() => setIsOutlineMenuOpen(false)}
               />
             )}
             <IconButton onClick={closeEditor}>
