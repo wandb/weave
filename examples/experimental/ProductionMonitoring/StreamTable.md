@@ -2,9 +2,7 @@
 
 Log and explore some basic StreamTables now in the [interactive notebook version](../ProductionMontoring/stream_table_api.ipynb) of these docs.
 
-A Weave StreamTable object enables continuous streaming of data from an application or service to W&B. This is an extension of the standard wandb.Table object to handle monitoring use cases. Instead of uploading a complete, immutable Table object once, you can append data repeatedly to the same StreamTable object with `.log([your data rows])`.
-
-A StreamTable of data serves as the foundation to build production monitoring Boards in Weave, like this example to recognize MNIST digits hand-drawn in an [interactive Jupyter notebook](../ProductionMonitoring/ProductionMonitoringConceptualOverview.ipynb).
+A Weave StreamTable object enables continuous streaming of data from an application or service to W&B. You can append data repeatedly to the same StreamTable object with `.log([your data rows])` and build dynamic visualizations from the streaming data, like example to recognize MNIST digits hand-drawn in an [interactive Jupyter notebook](../ProductionMonitoring/ProductionMonitoringConceptualOverview.ipynb).
 
 ![small_prodmon_board](../../../docs/assets/mnist_pm_draw_hover.png)
  
@@ -42,7 +40,7 @@ View data at : https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%
 
 Subsequent log calls will silently append these rows to the StreamTable instance.
 
-In a notebook, the StreamTable variable on a line by itself will return a Weave Panel view of the StreamTable. The StreamTable will contain all the logged columns and their values, as well as a `timestamp` column indicating when the row was logged. By default, rows will be ordered by oldest first. You can modify a StreamTable Panel as you would a wandb.Table from the UI: sort, filter, group, etc.
+In a notebook, the StreamTable variable on a line by itself will return a Weave Panel view of the StreamTable. The StreamTable will contain all the logged columns and their values, as well as a `timestamp` column indicating when the row was logged. By default, rows will be ordered by oldest first. You can modify a StreamTable Panel from the UI to sort by columns, group by column values, filter for specific ranges or values, etc.
 
 **Note: Column display order is currently non-deterministic** over repeated views of the Panel. If you would like to modify the order, open the StreamTable Panel in a new window as a Board and edit/save a Board from this seed panel. There are two options to achieve this:
 * via the weave.wandb.ai/?exp=... URL
@@ -82,7 +80,7 @@ Add this Weave op to the expression at the top of a Weave Panel to show the cont
 
 ### .finish()
 
-Wait to show a StreamTable Panel in a notebook UI until all the `.log()` calls have completed / have finished writing to the StreamTable instance (which may mean a longer wait, if e.g. rows are the result of significant computation, running inference, etc).
+Wait to show a StreamTable Panel in a notebook UI until all the `.log()` calls have completed (including any downstream processes, e.g. to compute the values of the rows) and have finished writing to the StreamTable instance.
  
 
 ## Important usage notes 
