@@ -119,5 +119,5 @@ def weave_wandb_api_key() -> typing.Optional[str]:
     return env_api_key or netrc_api_key
 
 
-def projection_timeout_sec() -> typing.Optional[int]:
-    return util.parse_int_env_var("WEAVE_PROJECTION_TIMEOUT_SEC")
+def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
+    return util.parse_number_env_var("WEAVE_PROJECTION_TIMEOUT_SEC")

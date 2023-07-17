@@ -78,7 +78,7 @@ def perform_2D_projection_with_timeout(
     np_array_of_embeddings: np.ndarray,
     projectionAlgorithm: str,
     algorithmOptions: dict,
-    timeout: typing.Optional[int] = DEFAULT_TIMEOUT_SEC,
+    timeout: typing.Optional[typing.Union[int, float]] = DEFAULT_TIMEOUT_SEC,
 ) -> np.ndarray:
     if timeout is None:
         return perform_2D_projection(
