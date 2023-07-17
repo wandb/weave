@@ -174,6 +174,7 @@ def do_batch_test(username, rows, do_assertion):
         )
     )
     history_node = run_node._get_op(HISTORY_OP_NAME)()
+    st._flush()
     do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
     st.finish()
 

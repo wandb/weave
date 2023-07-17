@@ -256,7 +256,7 @@ class StreamTable(_StreamTableSync):
     def log(self, row_or_rows: ROW_TYPE) -> None:
         self.queue.put(row_or_rows)
 
-    def flush(self) -> None:
+    def _flush(self) -> None:
         with self._lock:
             for log_payload in self._iterate_queue():
                 super().log(log_payload)
@@ -277,7 +277,7 @@ class StreamTable(_StreamTableSync):
         join_requested = False
         while not join_requested:
             join_requested = self._join_event.wait(self.MAX_UNSAVED_SECONDS)
-            self.flush()
+            self._flush()
 
     # Override methods of _StreamTableSync
     def finish(self) -> None:
