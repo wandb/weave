@@ -224,9 +224,8 @@ class _StreamTableSync:
         self.finish()
 
 
-class StreamTable:
+class StreamTable(_StreamTableSync):
     MAX_UNSAVED_SECONDS = 2
-    _stream_table: _StreamTableSync
 
     def __init__(
         self,
@@ -236,7 +235,7 @@ class StreamTable:
         entity_name: typing.Optional[str] = None,
         _disable_async_file_stream: bool = False,
     ):
-        self._stream_table = _StreamTableSync(
+        super().__init__(
             table_name=table_name,
             project_name=project_name,
             entity_name=entity_name,
@@ -256,13 +255,8 @@ class StreamTable:
 
     def flush(self) -> None:
         with self._lock:
-            for log_dict_or_fn in self._iterate_queue():
-                if callable(log_dict_or_fn):
-                    log_dict = log_dict_or_fn()
-                else:
-                    log_dict = log_dict_or_fn
-
-                self._stream_table.log(log_dict)
+            for log_payload in self._iterate_queue():
+                super().log(log_payload)
 
     def _iterate_queue(
         self,
@@ -288,20 +282,7 @@ class StreamTable:
             self._join_event.set()
             self._thread.join()
             with self._lock:
-                self._stream_table.finish()
-
-    def __del__(self) -> None:
-        self.finish()
-
-    def _at_exit(self) -> None:
-        self.finish()
-
-    # Proxy methods to _StreamTableSync
-    def rows(self) -> graph.Node:
-        return self._stream_table.rows()
-
-    def _ipython_display_(self) -> graph.Node:
-        return self._stream_table._ipython_display_()
+                super().finish()
 
 
 def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_types.Type]:
