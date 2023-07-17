@@ -157,10 +157,9 @@ class _StreamTableSync:
 
     def _ensure_remote_initialized(self) -> StreamTableType:
         self._lite_run.ensure_run()
+        print_url = False
         if not hasattr(self, "_weave_stream_table"):
-            url = f"https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
-            printer = get_printer(_get_python_type() != "python")
-            printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
+            print_url = True
             self._weave_stream_table = StreamTableType(
                 table_name=self._table_name,
                 project_name=self._project_name,
@@ -182,6 +181,10 @@ class _StreamTableSync:
             )
             self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
             self._artifact.set_file_pusher(self._lite_run.pusher)
+        if print_url:
+            url = f"https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
+            printer = get_printer(_get_python_type() != "python")
+            printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
 
     def log(self, row_or_rows: ROW_TYPE) -> None:

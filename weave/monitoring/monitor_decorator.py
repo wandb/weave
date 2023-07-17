@@ -11,6 +11,7 @@ import logging
 
 from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
+from .. import graph
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +226,9 @@ class MonitoredFunction:
         if "self" in arg_dict:
             del arg_dict["self"]
         return arg_dict
+
+    def rows(self) -> graph.Node:
+        return self._stream_table.rows()
 
 
 def _arguments_to_dict(
