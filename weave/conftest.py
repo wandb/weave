@@ -210,3 +210,12 @@ def io_server_factory():
 def consistent_table_col_ids():
     with table_state.use_consistent_col_ids():
         yield
+
+
+@pytest.fixture()
+def raise_error_in_projection():
+    context_state._test_util_raise_error_in_projection = True
+    try:
+        yield
+    finally:
+        context_state._test_util_raise_error_in_projection = False

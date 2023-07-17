@@ -5,6 +5,7 @@ import queue
 import numpy as np
 from .. import errors
 from .. import environment
+from .. import context_state
 import typing
 import logging
 import warnings
@@ -37,6 +38,10 @@ def perform_2D_projection(
     projectionAlgorithm: str,
     algorithmOptions: dict,
 ) -> np.ndarray:
+    if context_state._test_util_raise_error_in_projection:
+        # This block is only used in tests
+        raise Exception("Test error in projection")
+
     if len(np_array_of_embeddings.shape) != 2:
         raise errors.WeaveInternalError(
             f"The input to the 2D projection must be a 2D array of embeddings, found {np_array_of_embeddings.shape}"

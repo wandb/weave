@@ -189,3 +189,8 @@ def analytics_enabled():
 
 def disable_analytics():
     return _analytics_enabled.set(False)
+
+
+# This needs to not be a contextvar because we want it automatically
+# propagated across processes and threads
+_test_util_raise_error_in_projection = False
