@@ -62,7 +62,7 @@ def perform_2D_projection_async(
     np_array_of_embeddings: np.ndarray,
     projectionAlgorithm: str,
     algorithmOptions: dict,
-    result_queue: multiprocessing.Queue[ResultQueueItemType],
+    result_queue: queue.Queue[ResultQueueItemType],
 ):
     try:
         projection = perform_2D_projection(
@@ -86,7 +86,7 @@ def perform_2D_projection_with_timeout(
 
     # otherwise run it in another process and kill it if it goes over time
 
-    result_queue: multiprocessing.Queue[ResultQueueItemType] = multiprocessing.Queue()
+    result_queue: queue.Queue[ResultQueueItemType] = multiprocessing.Queue()
     target = multiprocessing.Process(
         target=perform_2D_projection_async,
         args=(
