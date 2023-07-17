@@ -80,13 +80,9 @@ Add this Weave op to the expression at the top of a Weave Panel to show the cont
 
 ### .finish()
 
-Wait to show a StreamTable Panel in a notebook UI until all the `.log()` calls have completed (including any downstream processes, e.g. to compute the values of the rows) and have finished writing to the StreamTable instance.
+Call `.finish()` to block the user process until all rows and data have been uploaded successfully. This will also wait to display a StreamTable Panel in the notebook UI until all the `.log()` calls have completed (including any downstream processes, e.g. to compute the values of the rows) and have finished writing to the StreamTable instance.
  
 
-## Important usage notes 
+## Usage notes 
 
-Some details to keep in mind for this early iteration of the StreamTables API:
-
-* **columns must match exactly in each log**: each dictionary passed to `.log()` must contain a key for every column in the StreamTable instance. Skipping a key, even if its value is null, or adding a new key/column name after the first log call, may break the StreamTable. 
-* **columns will union across singleton types but not container types**: we strongly recommend keeping the values in one column to one object type (Number, String, image, etc). Logging multiple different singletons to one column will work—that column will become a Union type across the logged instance types. However, logging a container type—say, a List of objects to a String type column—may break the StreamTable.
-* **optionally use `.finish()` before viewing the StreamTable**: if you'd like to wait for all the rows to finish logging their values before displaying the StreamTable, call `.finish()`. This will take longer to display the Weave Panel if you are logging a large number of rows, or if each log call takes a while to complete (e.g. each row returns the result of running inference on some input to a model). Note that the weave.wandb.ai URL will still show a snapshot of your data at the time it finishes loading — you may need to refresh the page to get all the rows.
+* **optionally use `.finish()` before viewing the StreamTable**: helpful in cases where you'd like all the rows/logging to complete before viewing the StreamTable. Note that the weave.wandb.ai URL will still show a snapshot of your data at the time it finishes loading — you may need to refresh the page to get all the rows.
