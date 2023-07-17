@@ -4,6 +4,7 @@ import multiprocessing
 import queue
 import numpy as np
 from .. import errors
+from .. import environment
 import typing
 import logging
 import warnings
@@ -13,7 +14,9 @@ from sklearn.decomposition import PCA
 
 umap_lib = {}
 
-DEFAULT_TIMEOUT = 60  # seconds
+DEFAULT_TIMEOUT_SEC = environment.projection_timeout_sec()
+
+ResultQueueItemType = typing.Union[Exception, np.ndarray]
 
 
 def _get_umap():
@@ -59,7 +62,7 @@ def perform_2D_projection_async(
     np_array_of_embeddings: np.ndarray,
     projectionAlgorithm: str,
     algorithmOptions: dict,
-    result_queue: multiprocessing.Queue,
+    result_queue: multiprocessing.Queue[ResultQueueItemType],
 ):
     try:
         projection = perform_2D_projection(
@@ -74,7 +77,7 @@ def perform_2D_projection_with_timeout(
     np_array_of_embeddings: np.ndarray,
     projectionAlgorithm: str,
     algorithmOptions: dict,
-    timeout: int = DEFAULT_TIMEOUT,
+    timeout: typing.Optional[int] = DEFAULT_TIMEOUT_SEC,
 ) -> np.ndarray:
     if timeout is None:
         return perform_2D_projection(
@@ -83,7 +86,7 @@ def perform_2D_projection_with_timeout(
 
     # otherwise run it in another process and kill it if it goes over time
 
-    result_queue: multiprocessing.Queue = multiprocessing.Queue()
+    result_queue: multiprocessing.Queue[ResultQueueItemType] = multiprocessing.Queue()
     target = multiprocessing.Process(
         target=perform_2D_projection_async,
         args=(
@@ -105,6 +108,9 @@ def perform_2D_projection_with_timeout(
         )
 
         return np.zeros((len(np_array_of_embeddings), 2))
+    if isinstance(result, Exception):
+        raise result
+
     return result
 
 

@@ -79,6 +79,11 @@ def parse_boolean_env_var(name: str) -> bool:
     return os.getenv(name, "False").lower() in ("true", "1", "t")
 
 
+def parse_int_env_var(name: str) -> typing.Optional[int]:
+    raw_val = os.getenv(name)
+    return int(raw_val) if raw_val is not None else None
+
+
 def find_names(obj):
     if hasattr(obj, "name"):
         return [obj.name]
