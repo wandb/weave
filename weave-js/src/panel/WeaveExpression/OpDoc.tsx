@@ -3,7 +3,10 @@ import {opDisplayName} from '@wandb/weave/core';
 import React from 'react';
 
 import {useWeaveContext} from '../../context';
+
 import * as S from './OpDoc.styles';
+import {IconClose} from '../../components/Panel2/Icons';
+import {IconButton} from '../../components/IconButton';
 
 export interface OpDocProps {
   opName: string;
@@ -11,9 +14,16 @@ export interface OpDocProps {
 
   // For __getattr__ ops only
   attributeName?: string;
+
+  onClose?: () => void;
 }
 
-const OpDoc: React.FC<OpDocProps> = ({opName, className, attributeName}) => {
+const OpDoc: React.FC<OpDocProps> = ({
+  opName,
+  className,
+  attributeName,
+  onClose,
+}) => {
   const {client} = useWeaveContext();
   const opDef = client.opStore.getOpDef(opName);
 
@@ -62,9 +72,18 @@ const OpDoc: React.FC<OpDocProps> = ({opName, className, attributeName}) => {
         // can register!
         ev.preventDefault();
       }}>
-      <S.OpName>
-        <code>{displayName}</code>
-      </S.OpName>
+      <S.OpNameRow>
+        <S.OpName>
+          <S.Code>{displayName}</S.Code>
+        </S.OpName>
+        {onClose && (
+          <S.OpClose>
+            <IconButton onClick={onClose}>
+              <IconClose />
+            </IconButton>
+          </S.OpClose>
+        )}
+      </S.OpNameRow>
       <S.Section>
         <S.Markdown dangerouslySetInnerHTML={{__html: description}} />
       </S.Section>

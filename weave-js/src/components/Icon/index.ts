@@ -23,6 +23,7 @@ export {
   IconChevronNext,
   IconChevronUp,
   IconClose,
+  IconCloud,
   IconCodeAlt,
   IconCollapse,
   IconColor,

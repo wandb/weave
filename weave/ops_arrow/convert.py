@@ -473,7 +473,12 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
         ):
             return ArrowWeaveList(col._arrow_data, types.Number(), None)
         elif pa.types.is_timestamp(col._arrow_data.type):
-            return ArrowWeaveList(col._arrow_data, types.Timestamp(), None)
+            # Cast to int64 and then string. Leaving this as timestamp
+            # means it will later be cast directly to string, which is very expensive in
+            # pyarrow (1.6s for 500k records v. 0.01s for int64, a 100x improvement)
+            return ArrowWeaveList(
+                col._arrow_data.cast(pa.int64()).cast(pa.string()), types.String(), None
+            )
         elif pa.types.is_boolean(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Boolean(), None)
         elif ArtifactAssetType.assign_type(col.object_type):

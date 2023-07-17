@@ -11,6 +11,7 @@ from . import errors
 from urllib.parse import urlparse
 import netrc
 
+
 # There are currently two cache modes:
 # - full: cache all cacheable intermediate results
 # - minimal: cache only what we're sure we need to cache for performance
@@ -61,6 +62,10 @@ def enable_touch_on_read() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_TOUCH_ON_READ")
 
 
+def memdump_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_MEMDUMP_SIGHANDLER")
+
+
 def weave_wandb_cookie() -> typing.Optional[str]:
     cookie = os.environ.get("WEAVE_WANDB_COOKIE")
     if cookie:
@@ -73,6 +78,10 @@ def weave_wandb_cookie() -> typing.Optional[str]:
                 "Please delete ~/.netrc while using WEAVE_WANDB_COOKIE to avoid using your credentials"
             )
     return cookie
+
+
+def stack_dump_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_STACK_DUMP_SIGHANDLER")
 
 
 def _wandb_api_key_via_env() -> typing.Optional[str]:

@@ -569,7 +569,9 @@ def _artifact_ref_from_uri(
 
 
 @mutation
-def merge(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
+def merge_artifact(
+    self: graph.Node[typing.Any], root_args: typing.Any = None
+) -> typing.Any:
     self = compile.compile_fix_calls([self])[0]
     return _merge(_get_uri_from_node(self, "Merge"))
 

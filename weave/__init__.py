@@ -25,6 +25,8 @@ from . import wandb_api as _wandb_api
 
 from .core_types import *
 
+from .panels_py import *
+
 _wandb_api.init()
 
 _context.clear_loading_built_ins(_loading_builtins_token)

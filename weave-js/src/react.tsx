@@ -26,6 +26,7 @@ import {
   opIndex,
   OpInputs,
   opList,
+  opTimestamp,
   pushFrame,
   resolveVar,
   simplify,
@@ -176,10 +177,13 @@ const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
     } else if (
       name === 'Object-__getattr__' ||
       name === 'pick' ||
-      name === 'index'
+      name === 'index' ||
+      name === 'dict' ||
+      name === 'list' ||
+      name === 'timestamp'
     ) {
       let resolvedVal = callResolverSimple(name, inputs, node.fromOp);
-      if (resolvedVal.nodeType != null) {
+      if (resolvedVal != null && resolvedVal.nodeType != null) {
         resolvedVal = clientEval(resolvedVal, env);
       }
       return constNodeUnsafe(node.type, resolvedVal);
@@ -339,6 +343,9 @@ export const useNodeValue = <T extends Type>(
         'Node execution failed (useNodeValue): ' + errorToText(error);
       console.error(message);
       throw new Error(message);
+    }
+    if (isConstNode(node)) {
+      return {loading: false, result: node.val};
     }
     const loading = result.node.nodeType === 'void' || node !== result.node;
     return {
@@ -526,7 +533,7 @@ export const makeCallAction = (
         // it doesn't work for timestamps. This special cases when we have a simple
         // set that sets a const node target to a list of timestamps, as is the
         // case for PanelPlot zoom domain syncing. We set the result to
-        // a list of date constructor ops instead.
+        // a list of timestamp constructor ops instead.
         // TODO: fix this generally. This issue is certainly broader than just the
         //   hack here. We need to know the correct type of mutation results, and we
         //   need a general way of converting objects to constructors op calls.
@@ -536,16 +543,18 @@ export const makeCallAction = (
           isList(inputs.val.type) &&
           isTimestamp(inputs.val.type.objectType)
         ) {
-          const t = newRootNode.type;
           newRootNode = opList({
-            a: callOpVeryUnsafe('op-date_parse', {
-              dt_s: constString(new Date(newRootNode.val[0]).toISOString()),
-            } as any),
-            b: callOpVeryUnsafe('op-date_parse', {
-              dt_s: constString(new Date(newRootNode.val[1]).toISOString()),
-            } as any),
+            a: opTimestamp({
+              timestampISO: constString(
+                new Date(newRootNode.val[0]).toISOString()
+              ),
+            }),
+            b: opTimestamp({
+              timestampISO: constString(
+                new Date(newRootNode.val[1]).toISOString()
+              ),
+            }),
           } as any);
-          newRootNode.type = t;
         }
 
         if (getChainRootVar(target) != null) {
