@@ -15,10 +15,11 @@ from . import environment
 
 
 def dump_folder() -> pathlib.Path:
-    folder = pathlib.Path(os.environ.get("WEAVE_DEBUG_DUMP_FOLDER", ""))
+    raw_folder = os.environ.get("WEAVE_DEBUG_DUMP_FOLDER", "")
+    folder = pathlib.Path(raw_folder)
     tmp = pathlib.Path("/tmp")
-    if folder == "" or not folder.exists():
-        if folder == "":
+    if raw_folder == "" or not folder.exists():
+        if raw_folder == "":
             logging.warning(
                 f"WEAVE_DEBUG_DUMP_FOLDER {folder} does not exist, using /tmp"
             )
