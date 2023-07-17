@@ -14,7 +14,7 @@ The only required argument to create a StreamTable is the name of the StreamTabl
 from weave.monitoring import StreamTable
 st = StreamTable("my_entity_name/my_project_name/my_table_name")
 ```
-If an entity (W&B username or shared team name) is not provided, this will attempt to  default to the current logged in entity on the local machine if there is one (via ~/.netrc file).
+If an entity (W&B username or shared team name) is not provided, this will attempt to default to the current logged-in entity.
 
 ## Log data to a StreamTable
 
@@ -42,7 +42,7 @@ Subsequent log calls will silently append these rows to the StreamTable instance
 
 In a notebook, the StreamTable variable on a line by itself will return a Weave Panel view of the StreamTable. The StreamTable will contain all the logged columns and their values, as well as a `timestamp` column indicating when the row was logged. By default, rows will be ordered by oldest first. You can modify a StreamTable Panel from the UI to sort by columns, group by column values, filter for specific ranges or values, etc.
 
-**Note: Column display order is currently non-deterministic** over repeated views of the Panel. If you would like to modify the order, open the StreamTable Panel in a new window as a Board and edit/save a Board from this seed panel. There are two options to achieve this:
+**Note:** If you would like to customize and save a specific view of a StreamTable Panel, open the StreamTable Panel in a new window as a Board and edit/save a Board from this seed panel. There are two options to achieve this:
 * via the weave.wandb.ai/?exp=... URL
 * via "Open in new tab" arrow button, revealed in the menu when you hover on the right side of a StreamTable panel displayed in the notebok)
 
@@ -54,7 +54,7 @@ Continue logging as much data as you like. If you save the StreamTable Panel as 
 
 ### StreamTable()
 
-Create a StreamTable by providing a table name, with W&B entity (username or team name) and W&B project as optional prefixes to the table name (of the form `entity_name/project_name/table_name`) or separate arguments.
+Create a StreamTable by providing a table name, with W&B entity (username or team name) and W&B project as prefixes (in the form `entity_name/project_name/table_name`) or separate arguments.
 
 ```python
 StreamTable(
