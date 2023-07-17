@@ -19,5 +19,5 @@ def test_projection_timeout_error_propagation():
     embeddings = rng.normal(0, 1, (3, 2, 4))
     with pytest.raises(errors.WeaveInternalError):
         projection_utils.perform_2D_projection_with_timeout(
-            embeddings, "pca", {}, timeout=None
+            embeddings, "pca", {}, timeout=1e4
         )
