@@ -203,7 +203,8 @@ class StreamTable:
             self._artifact.set_file_pusher(self._lite_run.pusher)
         row_copy = {**row}
         row_copy["_client_id"] = self._client_id
-        row_copy["timestamp"] = datetime.datetime.now()
+        if "timestamp" not in row_copy:
+            row_copy["timestamp"] = datetime.datetime.now()
         payload = row_to_weave(row_copy, self._artifact)
         self._lite_run.log(payload)
 
