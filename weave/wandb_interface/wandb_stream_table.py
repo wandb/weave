@@ -157,7 +157,7 @@ class _StreamTableSync:
 
     def _ensure_remote_initialized(self) -> StreamTableType:
         self._lite_run.ensure_run()
-        if self._weave_stream_table is None:
+        if not hasattr(self, "_weave_stream_table"):
             url = f"https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
             printer = get_printer(_get_python_type() != "python")
             printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
@@ -174,7 +174,7 @@ class _StreamTableSync:
                 wb_project_name=self._project_name,
                 wb_entity_name=self._entity_name,
             )
-        if self._artifact is None:
+        if not hasattr(self, "_artifact"):
             uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
                 self._entity_name,
                 self._project_name,
@@ -212,8 +212,10 @@ class _StreamTableSync:
         self._lite_run.log(payload)
 
     def finish(self) -> None:
-        self._artifact.cleanup()
-        self._lite_run.finish()
+        if self._artifact:
+            self._artifact.cleanup()
+        if self._lite_run:
+            self._lite_run.finish()
 
     def __del__(self) -> None:
         self.finish()
