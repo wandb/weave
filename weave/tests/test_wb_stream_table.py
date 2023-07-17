@@ -157,14 +157,12 @@ def test_multi_writers_parallel(user_by_api_key_in_env):
 
 
 def test_stream_unauthed(user_by_api_key_in_env):
-    st = make_stream_table(
-        "test_table",
-        project_name="stream-tables",
-        entity_name="NONEXISTENT_USER",
-    )
     with pytest.raises(weave.errors.WeaveWandbAuthenticationException):
-        st.log({"hello": "world"})
-    st.finish()
+        st = make_stream_table(
+            "test_table",
+            project_name="stream-tables",
+            entity_name="NONEXISTENT_USER",
+        )
 
 
 def test_stream_authed(user_by_api_key_in_env):

@@ -281,7 +281,7 @@ class StreamTable(_StreamTableSync):
 
     # Override methods of _StreamTableSync
     def finish(self) -> None:
-        if self._thread:
+        if hasattr(self, "_thread"):
             self._join_event.set()
             self._thread.join()
             with self._lock:
