@@ -159,6 +159,25 @@ def test_nested_pick_via_dots(user_by_api_key_in_env):
     do_batch_test(user_by_api_key_in_env.username, rows, do_assertion)
 
 
+def test_missing_data(user_by_api_key_in_env):
+    rows = [{"a": "1", "b": "17", "c": "42"}, {"a": "2"}]
+
+    def do_assertion(history_node, row_type, row_accumulator, user_logged_keys):
+        nodes = [
+            history_node[0]["a"],
+            history_node[0]["b"],
+            history_node[1]["a"],
+            history_node[1]["b"],
+        ]
+        res = weave.use(nodes)
+        assert res[0] == "1"
+        assert res[1] == "17"
+        assert res[2] == "2"
+        assert res[3] == None
+
+    do_batch_test(user_by_api_key_in_env.username, rows, do_assertion)
+
+
 def do_batch_test(username, rows, do_assertion):
     row_accumulator, st, user_logged_keys = do_logging(username, rows)
 
