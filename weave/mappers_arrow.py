@@ -299,6 +299,8 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             return pa.string()
         elif self.type.name == "ndarray":
             return pa.null()
+        elif self.type.name == "UntypedOpaqueDict":
+            return
 
         raise errors.WeaveInternalError(
             "Type not yet handled by mappers_arrow: %s" % self.type

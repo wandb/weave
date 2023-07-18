@@ -102,7 +102,7 @@ def gql_prop_op(
     )(gql_property_getter_op_fn)
 
     # side effect: register an arrow-vectorized version of the op
-    register_vectorized_gql_prop_op(scalar_op)
+    # register_vectorized_gql_prop_op(scalar_op)
     return scalar_op
 
 
@@ -188,7 +188,9 @@ def gql_direct_edge_op(
                     output_type.instance_class.from_gql(item)
                     for item in gql_obj.gql[name]
                 ]
-            if gql_obj.gql == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
+            if (
+                gql_obj.gql is None
+            ):  # == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
                 return None
             gql_val = gql_obj.gql.get(name)
             if gql_val is None:
@@ -272,7 +274,9 @@ def gql_connection_op(
             param_str = param_str_fn(InputProvider(additional_inputs))
             name = _make_alias(param_str, prefix=prop_name)
         # If we have a None argument, return an empty list.
-        if gql_obj.gql == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
+        if (
+            gql_obj.gql is None
+        ):  #  == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
             return []
         return [
             output_type.instance_class.from_gql(edge["node"])
