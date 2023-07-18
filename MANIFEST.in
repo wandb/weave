@@ -7,5 +7,8 @@ graft weave/ops_domain
 graft weave/ecosystem
 graft weave/panels
 graft weave/wandb_interface
+graft weave/monitoring
+graft weave/panels_py
+graft weave/core_types
 global-exclude */__pycache__/*
 global-exclude *.pyc
