@@ -33,7 +33,7 @@ from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 from weave import storage
 from weave import wandb_api
 from weave.language_features.tagging import tag_store
-from weave import signal_handlers
+
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -89,8 +89,6 @@ if os.environ.get("FLASK_DEBUG"):
 
 static_folder = os.path.join(os.path.dirname(__file__), "frontend")
 blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
-
-signal_handlers.install_signal_handlers()
 
 
 def import_ecosystem():
