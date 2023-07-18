@@ -60,26 +60,23 @@ def make_all_types():
 
 
 rows_tests = [
-    # Here we have 1 test per type for easy debugging
-    *[[{k: v}] for k, v in make_all_types().items()],
     # # Here we have 1 test for all the types
     [make_all_types()],
+    # Here we have 1 test per type for easy debugging
+    *[[{k: v}] for k, v in make_all_types().items()],
     # Here is a nasty test with really hard unions
-    [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],
     [
+        {"list_of": [1, 2, 3]},
+        {"list_of": [4, 5]},
         {
             "a": image(),
         },
         {
             "a": 1,
         },
-    ],
-    [{"list_of_image": [image()]}],
-    [
+        {"list_of_image": [image()]},
         {"a": [{"b": [1]}, {"b": [2, 3]}]},
         {"a": [{"b": [4, 5, 6]}, {"b": [7, 8, 9, 10]}]},
-    ],
-    [
         {"a": 1, "b": "hi", "c": CustomHistoryTestType(2, "bye"), "i": image()},
         {"a": True, "b": True, "c": True, "i": True},
         {
