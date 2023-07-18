@@ -539,7 +539,8 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
               {
                 <ConfigPanel.ConfigOption
                   key={`series-${i + 1}`}
-                  label={'Name'}>
+                  label={'Name'}
+                  multiline={true}>
                   <ConfigPanel.TextInputConfigField
                     dataTest={`series-${i + 1}-label`}
                     value={s.seriesName}
@@ -572,6 +573,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                     indentation={0}
                     isShared={dimIsSharedInUI}
                     dimension={seriesDim}
+                    multiline={true}
                   />
                 );
               })}
@@ -1037,11 +1039,13 @@ type DimComponentInputType = {
   isShared: boolean;
   dimension: DimensionLike;
   extraOptions?: DimOptionOrSection[];
+  multiline?: boolean;
 };
 
 const ConfigDimLabel: React.FC<
   Omit<DimComponentInputType, 'extraOptions'> & {
     postfixComponent?: React.ReactElement;
+    multiline?: boolean;
   }
 > = props => {
   return (
@@ -1054,7 +1058,8 @@ const ConfigDimLabel: React.FC<
             : ` ${props.config.series.indexOf(props.dimension.series) + 1}`)
         }
         data-test={`${props.dimension.name}-dim-config`}
-        postfixComponent={props.postfixComponent}>
+        postfixComponent={props.postfixComponent}
+        multiline={props.multiline}>
         {props.children}
       </ConfigPanel.ConfigOption>
     </div>
@@ -1138,6 +1143,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     indentation,
     input,
     extraOptions,
+    multiline,
   } = props;
   const weave = useWeaveContext();
   const enableDashUi = useWeaveDashUiEnable();
@@ -1409,7 +1415,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
               });
               updateConfig(newConfig);
             }}>
-            <IconLockedConstrained />
+            <IconLockedConstrained width={18} height={18} />
           </S.ConstrainedIconContainer>
         ) : (
           <S.UnconstrainedIconContainer
@@ -1424,7 +1430,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
                 )
               );
             }}>
-            <IconUnlockedUnconstrained />
+            <IconUnlockedUnconstrained width={18} height={18} />
           </S.UnconstrainedIconContainer>
         )}
       </>
@@ -1518,7 +1524,10 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isDropdown(dimension)) {
     const dimName = dimension.name;
     return (
-      <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
+      <ConfigDimLabel
+        {...props}
+        postfixComponent={postFixComponent}
+        multiline={enableDashUi && multiline}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
           placeholder={dimension.defaultState().compareValue}
@@ -1541,10 +1550,12 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       </ConfigDimLabel>
     );
   } else if (PlotState.isWeaveExpression(dimension)) {
-    console.log(`${dimension.name} IS A WEAVE EXPRESSION IN ORIGINAL CODE`);
     return (
       <>
-        <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
+        <ConfigDimLabel
+          {...props}
+          postfixComponent={postFixComponent}
+          multiline={enableDashUi && multiline}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}

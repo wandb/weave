@@ -160,14 +160,22 @@ const ConfigOptionNew: React.FC<
     children,
     ...restProps
   } = props;
+  const labelField = multiline ? (
+    <SN.PostfixContainerWrap>
+      <SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>
+      <SN.PostfixContainer>{postfixComponent}</SN.PostfixContainer>
+    </SN.PostfixContainerWrap>
+  ) : (
+    <SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>
+  );
   return (
     <SN.ConfigOption multiline={multiline} {...restProps}>
-      {label && <SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>}
+      {label && labelField}
       {actions != null && (
         <SN.ConfigOptionActions>{actions}</SN.ConfigOptionActions>
       )}
       <SN.ConfigOptionField>{children}</SN.ConfigOptionField>
-      {postfixComponent}
+      {!multiline && postfixComponent}
     </SN.ConfigOption>
   );
 };

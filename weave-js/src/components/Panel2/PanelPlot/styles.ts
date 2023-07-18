@@ -13,19 +13,23 @@ export const AdvancedPropertiesHeader = styled.div`
 `;
 
 export const ConstrainedIconContainer = styled.div`
+  height: 24px;
   display: flex;
+  padding: 3px;
   justify-content: center;
   align-items: center;
   background-color: ${globals.TEAL_TRANSPARENT};
   color: ${globals.TEAL};
-  padding: 3px;
-  border-radius: 3px;
+  border-radius: 4px;
+  margin-left: 10px;
 `;
 
 export const UnconstrainedIconContainer = styled.div`
+  height: 24px;
   display: flex;
+  padding: 3px;
   justify-content: center;
   align-items: center;
-  padding: 3px;
-  border-radius: 3px;
+  border-radius: 4px;
+  margin-left: 10px;
 `;
