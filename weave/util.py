@@ -79,6 +79,16 @@ def parse_boolean_env_var(name: str) -> bool:
     return os.getenv(name, "False").lower() in ("true", "1", "t")
 
 
+def parse_number_env_var(name: str) -> typing.Optional[typing.Union[int, float]]:
+    raw_val = os.getenv(name)
+    if raw_val is None:
+        return None
+    try:
+        return int(raw_val)
+    except ValueError:
+        return float(raw_val)
+
+
 def find_names(obj):
     if hasattr(obj, "name"):
         return [obj.name]

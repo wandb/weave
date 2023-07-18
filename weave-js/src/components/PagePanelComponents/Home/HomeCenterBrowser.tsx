@@ -10,6 +10,7 @@ import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 const TableRow = styled.tr<{$highlighted?: boolean}>`
   background-color: ${props => (props.$highlighted ? '#f8f9fa' : '')};
 `;
+TableRow.displayName = 'S.TableRow';
 
 const CenterTable = styled.table`
   width: 100%;
@@ -79,6 +80,7 @@ const CenterTable = styled.table`
     }
   }
 `;
+CenterTable.displayName = 'S.CenterTable';
 
 const CenterTableActionCellAction = styled(LayoutElements.HBlock)`
   padding: 0px 12px;
@@ -92,11 +94,13 @@ const CenterTableActionCellAction = styled(LayoutElements.HBlock)`
     background-color: #f5f6f7;
   }
 `;
+CenterTableActionCellAction.displayName = 'S.CenterTableActionCellAction';
 
 const CenterTableActionCellContents = styled(LayoutElements.VStack)`
   align-items: center;
   justify-content: center;
 `;
+CenterTableActionCellContents.displayName = 'S.CenterTableActionCellContents';
 
 const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
   align-items: center;
@@ -109,26 +113,31 @@ const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
     color: #038194;
   }
 `;
+CenterTableActionCellIcon.displayName = 'S.CenterTableActionCellIcon';
 
 const CenterSpaceTableSpace = styled(LayoutElements.Space)`
   overflow: auto;
 `;
+CenterSpaceTableSpace.displayName = 'S.CenterSpaceTableSpace';
 
 const CenterSpaceControls = styled(LayoutElements.HBlock)`
   gap: 8px;
 `;
+CenterSpaceControls.displayName = 'S.CenterSpaceControls';
 
 const CenterSpaceTitle = styled(LayoutElements.HBlock)`
   font-size: 24px;
   font-weight: 600;
   padding: 12px 8px;
 `;
+CenterSpaceTitle.displayName = 'S.CenterSpaceTitle';
 
 const CenterSpaceHeader = styled(LayoutElements.VBlock)`
   padding: 12px 16px;
   gap: 12px;
   border-bottom: 1px solid #dadee3;
 `;
+CenterSpaceHeader.displayName = 'S.CenterSpaceHeader';
 
 type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
   _id: string;
