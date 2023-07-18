@@ -173,8 +173,10 @@ def do_batch_test(username, rows, do_assertion):
             st._table_name,
         )
     )
-    history_node = run_node._get_op(HISTORY_OP_NAME)()
+    # Wait for files to be uploaded
     st._flush()
+    wait_for_x_times(lambda: st._lite_run.stream._queue.empty())
+    history_node = run_node._get_op(HISTORY_OP_NAME)()
     do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
     st.finish()
 
