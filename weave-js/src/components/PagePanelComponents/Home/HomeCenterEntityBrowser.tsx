@@ -103,7 +103,7 @@ export const CenterEntityBrowserInner: React.FC<
         (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
           ? meta.num_stream_tables + meta.num_logged_tables
           : null,
-      'updated at': moment.utc(meta.updatedAt).calendar(),
+      'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
   }, [projectsMeta.result]);
 
@@ -311,8 +311,8 @@ const CenterProjectBoardsBrowser: React.FC<
     return boards.result.map(b => ({
       _id: b.name,
       name: b.name,
-      'updated at': moment.utc(b.updatedAt).calendar(),
-      'created at': moment.utc(b.createdAt).calendar(),
+      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
     }));
   }, [boards]);
@@ -455,8 +455,8 @@ const CenterProjectTablesBrowser: React.FC<
       _updatedAt: b.updatedAt,
       name: b.name,
       kind: 'Stream Table',
-      'updated at': moment.utc(b.updatedAt).calendar(),
-      'created at': moment.utc(b.createdAt).calendar(),
+      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
     }));
     const logged = loggedTables.result.map(b => ({
@@ -464,8 +464,8 @@ const CenterProjectTablesBrowser: React.FC<
       _updatedAt: b.updatedAt,
       name: b.name,
       kind: 'Logged Table',
-      'updated at': moment.utc(b.updatedAt).calendar(),
-      'created at': moment.utc(b.createdAt).calendar(),
+      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
     }));
     const combined = [...streams, ...logged];

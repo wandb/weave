@@ -658,7 +658,8 @@ class Timestamp(Type):
     def from_isostring(self, iso: str) -> datetime.datetime:
         # NOTE: This assumes ISO 8601 format from GQL endpoints, it does NOT
         # support RFC 3339 strings with a "Z" at the end before python 3.11
-        return datetime.datetime.fromisoformat(iso)
+        tz_naive = datetime.datetime.fromisoformat(iso)
+        return tz_naive.replace(tzinfo=datetime.timezone.utc)
 
     def save_instance(self, obj, artifact, name):
         if artifact is None:
