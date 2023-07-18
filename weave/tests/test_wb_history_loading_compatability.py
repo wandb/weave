@@ -59,98 +59,59 @@ def make_all_types():
     return base_types
 
 
-@pytest.mark.parametrize(
-    "rows",  # Here we have 1 test per type for easy debugging
-    [[{k: v}] for k, v in make_all_types().items()],
-)
-def test_end_to_end_stream_table_history_path_batch_1(user_by_api_key_in_env, rows):
-    return do_test_end_to_end_stream_table_history_path(
-        user_by_api_key_in_env.username, rows
-    )
-
-
-@pytest.mark.parametrize(
-    "rows",  # Here we have 1 test per type for easy debugging
+rows_tests = [
+    # Here we have 1 test per type for easy debugging
+    *[[{k: v}] for k, v in make_all_types().items()],
+    # # Here we have 1 test for all the types
     [make_all_types()],
-)
-def test_end_to_end_stream_table_history_path_batch_2(user_by_api_key_in_env, rows):
-    return do_test_end_to_end_stream_table_history_path(
-        user_by_api_key_in_env.username, rows
-    )
-
-
-@pytest.mark.parametrize(
-    "rows",  # Here we have 1 test per type for easy debugging
+    # Here is a nasty test with really hard unions
+    [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],
     [
-        [{"list_of": [1, 2, 3]}, {"list_of": [4, 5]}],
-        [
-            {
-                "a": image(),
-            },
-            {
-                "a": 1,
-            },
-        ],
+        {
+            "a": image(),
+        },
+        {
+            "a": 1,
+        },
     ],
-)
-def test_end_to_end_stream_table_history_path_batch_3(user_by_api_key_in_env, rows):
-    return do_test_end_to_end_stream_table_history_path(
-        user_by_api_key_in_env.username, rows
-    )
-
-
-@pytest.mark.parametrize(
-    "rows",  # Here we have 1 test per type for easy debugging
+    [{"list_of_image": [image()]}],
     [
-        [{"list_of_image": [image()]}],
-        [
-            {"a": [{"b": [1]}, {"b": [2, 3]}]},
-            {"a": [{"b": [4, 5, 6]}, {"b": [7, 8, 9, 10]}]},
-        ],
+        {"a": [{"b": [1]}, {"b": [2, 3]}]},
+        {"a": [{"b": [4, 5, 6]}, {"b": [7, 8, 9, 10]}]},
     ],
-)
-def test_end_to_end_stream_table_history_path_batch_4(user_by_api_key_in_env, rows):
-    return do_test_end_to_end_stream_table_history_path(
-        user_by_api_key_in_env.username, rows
-    )
-
-
-@pytest.mark.parametrize(
-    "rows",  # Here we have 1 test per type for easy debugging
     [
-        [
-            {"a": 1, "b": "hi", "c": CustomHistoryTestType(2, "bye"), "i": image()},
-            {"a": True, "b": True, "c": True, "i": True},
-            {
-                "a": [
-                    1,
-                    "hi",
-                    True,
-                    CustomHistoryTestType(2, "bye"),
-                    {
+        {"a": 1, "b": "hi", "c": CustomHistoryTestType(2, "bye"), "i": image()},
+        {"a": True, "b": True, "c": True, "i": True},
+        {
+            "a": [
+                1,
+                "hi",
+                True,
+                CustomHistoryTestType(2, "bye"),
+                {"a": 1, "b": "hi", "c": CustomHistoryTestType(2, "bye"), "i": image()},
+            ]
+        },
+        {
+            "randomly": {
+                "nested": {
+                    "objects": {
                         "a": 1,
                         "b": "hi",
                         "c": CustomHistoryTestType(2, "bye"),
                         "i": image(),
-                    },
-                ]
-            },
-            {
-                "randomly": {
-                    "nested": {
-                        "objects": {
-                            "a": 1,
-                            "b": "hi",
-                            "c": CustomHistoryTestType(2, "bye"),
-                            "i": image(),
-                        }
                     }
                 }
-            },
-        ]
+            }
+        },
     ],
+]
+
+
+@pytest.mark.parametrize(
+    "rows",
+    rows_tests,
 )
-def test_end_to_end_stream_table_history_path_batch_5(user_by_api_key_in_env, rows):
+def test_end_to_end_stream_table_history_path_batch_1(user_by_api_key_in_env, rows):
     return do_test_end_to_end_stream_table_history_path(
         user_by_api_key_in_env.username, rows
     )
@@ -217,6 +178,8 @@ def do_batch_test(username, rows, do_assertion):
     )
     # Wait for files to be uploaded
     st._flush()
+    wait_for_x_times(lambda: st._lite_run.pusher._incoming_queue.empty())
+    wait_for_x_times(lambda: st._lite_run.pusher._event_queue.empty())
     wait_for_x_times(lambda: st._lite_run.stream._queue.empty())
     history_node = run_node._get_op(HISTORY_OP_NAME)()
     do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
