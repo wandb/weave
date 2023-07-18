@@ -7,7 +7,7 @@ import logging
 ValueType = typing.TypeVar("ValueType")
 ValueType2 = typing.TypeVar("ValueType2")
 
-DEBUG = False or os.environ.get("WEAVE_VALUE_OR_ERROR_DEBUG", False)
+DEBUG = False or os.environ.get("WEAVE_VALUE_OR_ERROR_DEBUG", True)
 
 
 class _ValueOrErrorInterface(typing.Generic[ValueType]):

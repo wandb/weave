@@ -250,6 +250,7 @@ export class BasicClient implements Client {
       };
 
       const handleCompleteError = (e: any) => {
+        console.error('Error in client batch', e);
         for (const observable of notDoneObservables) {
           rejectObservable(observable, e);
         }

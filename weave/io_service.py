@@ -489,7 +489,7 @@ class AsyncConnection:
         if server_resp.error:
             if server_resp.http_error_code != None:
                 raise server_error_handling.WeaveInternalHttpException.from_code(
-                    server_resp.http_error_code
+                    server_resp.http_error_code, server_resp.value
                 )
             raise errors.WeaveWandbArtifactManagerError(
                 "Request error: " + server_resp.value
