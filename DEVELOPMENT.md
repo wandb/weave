@@ -72,7 +72,7 @@ yarn dev
 Weave backend server. This does not currently auto-reload, so you need to restart it if you change stuff.
 
 ```
-sh weave_server.sh
+WEAVE_FRONTEND_DEVMODE=true sh weave_server.sh
 ```
 
 Now you should be able to go to localhost:3000 to see the weave home page.
