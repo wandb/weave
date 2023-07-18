@@ -62,8 +62,31 @@ def make_all_types():
 rows_tests = [
     # # Here we have 1 test for all the types
     [make_all_types()],
+]
+
+
+@pytest.mark.parametrize("rows", rows_tests)
+def test_end_to_end_stream_table_history_path_batch_1(user_by_api_key_in_env, rows):
+    return do_test_end_to_end_stream_table_history_path(
+        user_by_api_key_in_env.username, rows
+    )
+
+
+rows_tests = [
     # Here we have 1 test per type for easy debugging
-    *[[{k: v}] for k, v in make_all_types().items()],
+    [{k: v}]
+    for k, v in make_all_types().items()
+]
+
+
+@pytest.mark.parametrize("rows", rows_tests)
+def test_end_to_end_stream_table_history_path_batch_2(user_by_api_key_in_env, rows):
+    return do_test_end_to_end_stream_table_history_path(
+        user_by_api_key_in_env.username, rows
+    )
+
+
+rows_tests = [
     # Here is a nasty test with really hard unions
     [
         {"list_of": [1, 2, 3]},
@@ -105,7 +128,7 @@ rows_tests = [
 
 
 @pytest.mark.parametrize("rows", rows_tests)
-def test_end_to_end_stream_table_history_path_batch_1(user_by_api_key_in_env, rows):
+def test_end_to_end_stream_table_history_path_batch_3(user_by_api_key_in_env, rows):
     return do_test_end_to_end_stream_table_history_path(
         user_by_api_key_in_env.username, rows
     )
