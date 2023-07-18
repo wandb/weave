@@ -56,7 +56,7 @@ def test_merge():
     dict_obj = weave.ops.get("local-artifact:///my-dict:latest/obj")
     weave.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
     modified_dict_obj = weave.ops.get("local-artifact:///my-dict:my-branch/obj")
-    new_uri = weave.ops.merge(modified_dict_obj)
+    new_uri = weave.ops.merge_artifact(modified_dict_obj)
     dict_obj_node = weave.ops.get(new_uri)
     assert (
         weave.use(dict_obj_node)
@@ -73,7 +73,7 @@ def test_merge_no_version():
     dict_obj = weave.ops.get(uri)
     weave.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
     modified_dict_obj = weave.ops.get("local-artifact:///my-dict:my-branch/obj")
-    new_uri = weave.ops.merge(modified_dict_obj)
+    new_uri = weave.ops.merge_artifact(modified_dict_obj)
     dict_obj_node = weave.ops.get(new_uri)
     assert weave.use(dict_obj_node) == {"a": 17, "b": 6}
 

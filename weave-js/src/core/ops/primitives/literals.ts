@@ -36,7 +36,7 @@ export const opArray = makeOp({
     // }
     return listWithLength(
       argValues.length,
-      argValues.length > 0 ? union(argValues.map(av => av.type)) : 'invalid'
+      argValues.length > 0 ? union(argValues.map(av => av.type)) : 'unknown'
     );
   },
   resolver: inputs => {
@@ -44,6 +44,8 @@ export const opArray = makeOp({
     return Object.values(inputs);
   },
 });
+
+export const opList = opArray;
 
 export const maybeOpArray = <T extends Node>(items: T[]) => {
   if (items.length === 1) {
@@ -77,5 +79,32 @@ export const opDict = makeOp({
   },
   resolver: inputs => {
     return inputs;
+  },
+});
+
+export const opTimestamp = makeOp({
+  hidden: true,
+  name: 'timestamp',
+  argTypes: {timestampISO: 'string'},
+  description: `Creates a ${docType(
+    'timestamp'
+  )} from a variable number of arguments`,
+  argDescriptions: {
+    dateISO: `An ISO date string to convert to a ${docType('timestamp')}`,
+  },
+  returnValueDescription: `The ${docType('timestamp')}`,
+  renderInfo: {
+    type: 'function',
+  },
+  returnType: inputs => {
+    return {type: 'union', members: ['none', {type: 'timestamp'}]};
+  },
+  resolver: inputs => {
+    const date = new Date(inputs.timestampISO);
+    const timestamp = date.getTime();
+    if (isNaN(timestamp)) {
+      return null;
+    }
+    return timestamp;
   },
 });

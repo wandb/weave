@@ -10,11 +10,10 @@ import {
   isNodeOrVoidNode,
   NodeOrVoidNode,
   pushFrame,
-  replaceChainRoot,
   Stack,
   voidNode,
 } from '@wandb/weave/core';
-import produce, {Draft} from 'immer';
+import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
@@ -28,6 +27,7 @@ import {
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
+  ChildPanelProps,
   getFullChildPanel,
   isChildPanelFullConfig,
   mutateEnsureItemIsFullChildPanel,
@@ -49,6 +49,7 @@ import {toWeaveType} from './toWeaveType';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
 // import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -60,12 +61,16 @@ const LAYOUT_MODES = [
   'layer' as const,
 ];
 
+interface PanelInfo {
+  hidden?: boolean;
+}
 export interface PanelGroupConfig {
   layoutMode: (typeof LAYOUT_MODES)[number];
   equalSize?: boolean;
-  showExpressions?: boolean;
+  showExpressions?: boolean | 'titleBar';
   style?: string;
   items: {[key: string]: ChildPanelConfig};
+  panelInfo?: {[key: string]: PanelInfo};
   gridConfig: PanelBankSectionConfig;
   allowedPanels?: string[];
   enableAddPanel?: boolean;
@@ -172,53 +177,6 @@ export const GroupItem = styled.div<{
         `}
 `;
 
-// This is a mapping from JS PanelIDs to their corresponding Python type name
-export const panelIdAlternativeMapping: {[jsId: string]: string} = {
-  // These are manually defined in Weave1 python panel module.
-  table: 'tablePanel',
-  number: 'PanelNumber',
-  string: 'PanelString',
-  boolean: 'PanelBoolean',
-  date: 'PanelDate',
-  // Below are defined in `panel_legacy.py`
-  barchart: 'PanelBarchart',
-  'web-viz': 'PanelWebViz',
-  'video-file': 'PanelVideoFile',
-  'model-file': 'PanelModelFile',
-  'id-count': 'PanelIdCount',
-  link: 'PanelLink',
-  'run-overview': 'PanelRunOverview',
-  none: 'PanelNone',
-  artifactVersionAliases: 'PanelArtifactVersionAliases',
-  netron: 'PanelNetron',
-  object: 'PanelObject',
-  'audio-file': 'PanelAudioFile',
-  'string-histogram': 'PanelStringHistogram',
-  rawimage: 'PanelRawimage',
-  'precomputed-histogram': 'PanelPrecomputedHistogram',
-  'image-file-compare': 'PanelImageFileCompare',
-  'molecule-file': 'PanelMoleculeFile',
-  'multi-histogram': 'PanelMultiHistogram',
-  'object3D-file': 'PanelObject3DFile',
-  'run-color': 'PanelRunColor',
-  'multi-string-histogram': 'PanelMultiStringHistogram',
-  dir: 'PanelDir',
-  'id-compare-count': 'PanelIdCompareCount',
-  jupyter: 'PanelJupyter',
-  'bokeh-file': 'PanelBokehFile',
-  ndarray: 'PanelNdarray',
-  'id-compare': 'PanelIdCompare',
-  unknown: 'PanelUnknown',
-  'image-file': 'PanelImageFile',
-  'project-overview': 'PanelProjectOverview',
-  textdiff: 'PanelTextdiff',
-  type: 'PanelType',
-  text: 'PanelText',
-  'string-compare': 'PanelStringCompare',
-  'debug-expression-graph': 'PanelDebugExpressionGraph',
-  tracer: 'PanelTracer',
-};
-
 export const fixChildData = (
   fullItem: ChildPanelFullConfig
 ): ChildPanelFullConfig => {
@@ -261,6 +219,8 @@ function dereferenceItemVars(item: any, stack: Stack): any {
     };
   } else if (isNodeOrVoidNode(item)) {
     return dereferenceAllVars(item, stack).node;
+  } else if (_.isArray(item)) {
+    return _.map(item, child => dereferenceItemVars(child, stack));
   } else if (_.isPlainObject(item)) {
     return _.mapValues(item, child => dereferenceItemVars(child, stack));
   }
@@ -593,6 +553,14 @@ export const PanelGroupItem: React.FC<{
     [config, name, updateConfig]
   );
 
+  let controlBar: ChildPanelProps['controlBar'] = 'off';
+  if (config.layoutMode === 'layer' || !config.showExpressions) {
+    controlBar = 'off';
+  } else if (config.showExpressions === 'titleBar') {
+    controlBar = 'titleBar';
+  } else {
+    controlBar = 'editable';
+  }
   return (
     <PanelContextProvider
       newVars={siblingVars}
@@ -601,7 +569,7 @@ export const PanelGroupItem: React.FC<{
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
         config={item}
-        editable={config.layoutMode !== 'layer' && config.showExpressions}
+        controlBar={controlBar}
         updateConfig={itemUpdateConfig}
         updateConfig2={itemUpdateConfig2}
         updateName={itemUpdateName}
@@ -754,7 +722,12 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       keyedChildPanels[name] = unwrappedItem;
       newVars = {
         ...newVars,
-        ...getItemVars(name, item, stack, config.allowedPanels),
+        ...getItemVars(
+          name,
+          item,
+          pushFrame(stack, newVars),
+          config.allowedPanels
+        ),
       };
     });
     return keyedChildPanels;
@@ -836,6 +809,9 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           const styleItems: string[] = childPanelConfig.style.split(';');
           const widthItem = styleItems.find(i => i.includes('width'));
           width = widthItem?.split(':')[1];
+        }
+        if (config.panelInfo?.[name]?.hidden) {
+          return null;
         }
         return (
           <GroupItem

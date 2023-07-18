@@ -1,6 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {Tab} from 'semantic-ui-react';
-import styled, {css} from 'styled-components';
+import styled from 'styled-components';
 
 export const LCTDetailView = styled.div`
   flex: 1 1 auto;
@@ -202,19 +202,28 @@ export const SpanElementHeader = styled.div<SpanElementHeaderProps>`
   font-weight: bold;
   line-height: 26px;
   text-align: left;
-  padding: 2px 8px;
   border-radius: 4px;
-  margin: 2px 0;
   font-size: 14px;
+`;
+
+export const SpanElementInner = styled.div`
+  padding: 2px 8px;
   display: flex;
   justify-content: space-between;
+`;
+
+type SpanParentConnectorProps = {
+  backgroundColor: string;
+};
+export const SpanParentConnector = styled.div<SpanParentConnectorProps>`
+  background-color: ${props => props.backgroundColor};
 `;
 
 export const SpanDetailTable = styled.table`
   width: 100%;
 `;
 
-export const DurationLabel = styled.span`
+export const DurationLabel = styled.div`
   color: #8f8f8fa6;
 `;
 
@@ -284,26 +293,28 @@ export const TraceWrapper = styled.div<SplitProps>`
   justify-content: space-between;
 `;
 
-const traceWrapperChildStyle = css<SplitProps>`
-  ${p => (p.split === `vertical` ? `width` : `height`)}: calc(50% - 0.4em);
-`;
-
 export const TraceTimelineWrapper = styled.div`
+  height: 100%;
+  width: 100%;
   position: relative;
-  ${traceWrapperChildStyle}
 `;
 
 export const TraceDetail = styled.div`
   display: flex;
   flex-direction: column;
-  ${traceWrapperChildStyle}
+  height: 100%;
+  width: 100%;
 `;
 
 export const TraceTimeline = styled.div`
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  position: relative;
   overflow: auto;
+`;
+
+export const TraceTimelineScale = styled.div`
+  height: 100%;
+  position: relative;
 `;
 
 export const SpanDetailIOSectionHeaderTd = styled.td`

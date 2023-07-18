@@ -80,6 +80,8 @@ export interface TypedDictType {
   // undefined here forces us to handle cases where properties
   // missing
   propertyTypes: {[key: string]: Type | undefined};
+
+  notRequiredKeys?: string[];
 }
 
 export interface RootObjectType {
@@ -146,6 +148,7 @@ export const BASIC_MEDIA_TYPES: MediaType[] = [
   {type: 'table', columnTypes: {}},
   {type: 'joined-table', columnTypes: {}},
   {type: 'partitioned-table', columnTypes: {}},
+  {type: 'wb_trace_tree'},
 ];
 // TODO: make this systematic -- we should use some kind of registry
 // to ensure that every type is included
@@ -304,7 +307,8 @@ export type MediaType =
   | PytorchSavedModelType
   | TableType
   | JoinedTableType
-  | PartitionedTableType;
+  | PartitionedTableType
+  | WBTraceTreeType;
 
 export type MediaTypesWithoutPath = WBTraceTreeType;
 
@@ -376,7 +380,7 @@ export interface NDArrayType {
 export interface TimestampType {
   type: 'timestamp';
   // TODO: support additional units in the future.
-  unit: 'ms';
+  unit?: 'ms';
 }
 
 export type QueryPath = ObjectId;

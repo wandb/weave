@@ -28,6 +28,8 @@ from . import logs
 from . import wandb_api
 from . import util
 from . import graph
+from .language_features.tagging import tag_store
+
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -93,6 +95,7 @@ def handle_request(
                 result = result.safe_map(serialize_fn)
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
+    tag_store.clear_tag_store()
     return HandleRequestResponse(result, nodes)
 
 
@@ -192,14 +195,12 @@ class HttpServer(threading.Thread):
         self.srv = make_server(host, port, app, threaded=False)
 
         # if the passed port is zero then a randomly allocated port will be used. this
-        # gets the value of the port that was assigned.  We use portpicker in colab or
-        # if it's available to ensure it's forwarding magic works.
-        try:
-            import portpicker
+        # gets the value of the port that was assigned.
+        self.port = self.srv.socket.getsockname()[1]
 
-            self.port = portpicker.pick_unused_port()
-        except ImportError:
-            self.port = self.srv.socket.getsockname()[1]
+    @property
+    def name(self):
+        return f"Weave Port: {self.port}"
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:

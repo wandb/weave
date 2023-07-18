@@ -28,7 +28,8 @@ class ColumnDef(typing.TypedDict):
 @dataclasses.dataclass
 class TableColumn:
     select: typing.Callable
-    name: str
+    groupby: bool = dataclasses.field(default=False)
+    name: str = dataclasses.field(default_factory=lambda: "")
 
 
 @weave.type("tablePanel")
@@ -52,6 +53,7 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                         table.add_column(
                             column_expr.select,
                             column_expr.name,
+                            groupby=column_expr.groupby,
                         )
                     else:
                         table.add_column(column_expr)
@@ -176,7 +178,7 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
 
     return OutputNode(
         data_or_rows_node.type,
-        "index",
+        "list-__getitem__",
         {
             "arr": data_or_rows_node,
             "index": ConstNode(weave.types.Int(), active_index),
@@ -195,8 +197,8 @@ def _get_rows_node(self: Table) -> Node:
     ):
         data_node = weave.ops.List.filter(
             data_node,
-            lambda row: weave_internal.call_fn(
-                self.config.tableState.preFilterFunction, {"row": row}
+            lambda row, index: weave_internal.call_fn(
+                self.config.tableState.preFilterFunction, {"row": row, "index": index}
             ),
         )
 
@@ -211,7 +213,10 @@ def _get_rows_node(self: Table) -> Node:
             lambda row: weave.ops.dict_(
                 **{
                     columns[col_id]["columnName"]: weave_internal.call_fn(
-                        columns[col_id]["columnSelectFunction"], {"row": row}
+                        columns[col_id]["columnSelectFunction"],
+                        {
+                            "row": row,
+                        },
                     )
                     for col_id in self.config.tableState.groupBy
                 }
@@ -221,11 +226,11 @@ def _get_rows_node(self: Table) -> Node:
     # Apply Selection
     data_node = weave.ops.List.map(
         data_node,
-        lambda row: weave.ops.dict_(
+        lambda row, index: weave.ops.dict_(
             **{
                 col_def["columnName"]: (
                     weave_internal.call_fn(
-                        col_def["columnSelectFunction"], {"row": row}
+                        col_def["columnSelectFunction"], {"row": row, "index": index}
                     )
                     if col_id not in group_ids
                     else
@@ -322,7 +327,7 @@ def data_single_refine(self: Table) -> weave.types.Type:
 )
 def rows(self: Table):
     rows_node = _get_rows_node(self)
-    return weave_internal.use(rows_node)
+    return rows_node
 
 
 # Defined on both Table and Query
@@ -358,7 +363,7 @@ def pinned_rows(self: Table):
 )
 def active_data(self: Table) -> typing.Optional[typing.Any]:
     data_node = _get_active_node(self, self.input_node)
-    return weave.use(data_node)
+    return data_node
 
 
 @weave.op(

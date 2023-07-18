@@ -18,6 +18,7 @@ CACHE_AND_PARALLEL_OP_NAMES = [
 
 CACHE_OP_NAMES = [
     "file-readcsv",
+    "op-run_chain",
     "table-2DProjection",
     "table-projection2D",
     "ArrowWeaveList-2DProjection",
@@ -33,6 +34,9 @@ CACHE_OP_NAMES = [
     "file-partitionedTable",
     "file-table",
     "file-joinedTable",
+    "op-umap_project",
+    "op-openai_embed",
+    "op-hdbscan_cluster",
 ] + CACHE_AND_PARALLEL_OP_NAMES
 
 

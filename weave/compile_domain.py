@@ -109,9 +109,10 @@ def apply_domain_op_gql_translation(
     res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error)
 
     combined_query_fragment = "\n".join(fragments)
-    query_str_const_node.val = _normalize_query_str(
-        f"query WeavePythonCG {{ {combined_query_fragment} }}"
-    )
+    query_str = f"query WeavePythonCG {{ {combined_query_fragment} }}"
+    if combined_query_fragment.strip() != "":
+        query_str = _normalize_query_str(query_str)
+    query_str_const_node.val = query_str
     alias_list_const_node.val = aliases
 
     return res
@@ -148,6 +149,7 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         or op_def.name.endswith("list")
         or op_def.name.endswith("concat")
         or op_def.name.endswith("flatten")
+        or op_def.name.endswith("unnest")
         or op_def.name.endswith("dropna")
         or op_def.name == "list-createIndexCheckpointTag"
     )
@@ -195,7 +197,7 @@ def _get_configsummaryhistory_keys_or_specs(
     if not field.arguments:
         return None
     field_arg0 = field.arguments[0]
-    if field_arg0.name.value not in ["keys", "specs"]:
+    if field_arg0.name.value not in ["keys", "specs", "liveKeys"]:
         raise errors.WeaveInternalError(
             "First argument for custom merge must be 'keys' or 'specs'"
         )
@@ -221,7 +223,12 @@ def _field_selections_hardcoded_merge(
     # Must be kept in sync with run_ops config* and summary_metrics* ops.
     if merge_from.name.value != merge_to.name.value:
         return False
-    if merge_from.name.value not in ["config", "summaryMetrics", "sampledHistory"]:
+    if merge_from.name.value not in [
+        "config",
+        "summaryMetrics",
+        "sampledHistory",
+        "parquetHistory",
+    ]:
         return False
     if (
         merge_from.alias is None
@@ -233,6 +240,7 @@ def _field_selections_hardcoded_merge(
         merge_from.alias.value != "configSubset"
         and merge_from.alias.value != "summaryMetricsSubset"
         and merge_from.alias.value != "sampledHistorySubset"
+        and merge_from.alias.value != "sampledParquetHistory"
     ):
         return False
     merge_from_keys = _get_configsummaryhistory_keys_or_specs(merge_from)

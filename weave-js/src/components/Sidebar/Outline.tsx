@@ -132,6 +132,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   const children = panelChildren(localConfig); // TODO: curPanelId!
 
   const [expanded, setExpanded] = useState(true);
+  const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
 
   const toggleExpanded = useCallback(() => {
     if (children != null) {
@@ -181,6 +182,9 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
                 <IconOverflowHorizontal />
               </OutlineItemMenuButton>
             }
+            isOpen={isOutlineMenuOpen}
+            onOpen={() => setIsOutlineMenuOpen(true)}
+            onClose={() => setIsOutlineMenuOpen(false)}
           />
         )}
       </OutlineItemTitle>

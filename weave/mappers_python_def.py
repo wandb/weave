@@ -122,6 +122,10 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
 
 class PyUnionToUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
+        # Another hack for dealing with lack of union support in weavejs.
+        if self.is_single_object_nullable and obj is None:
+            return None
+
         try:
             has_union_id = "_union_id" in obj
         except TypeError:
@@ -281,11 +285,20 @@ class DefaultToPy(mappers.Mapper):
                 else:
                     uri = existing_ref.initial_uri
                 return str(uri)
-        # This defines the artifact layout!
-        name = "/".join(self._path + [str(self._row_id)])
-        self._row_id += 1
+        ref = None
+        if isinstance(obj, ref_base.Ref):
+            ref = obj
+        elif isinstance(obj, str):
+            try:
+                ref = ref_base.Ref.from_str(obj)
+            except (errors.WeaveInternalError, NotImplementedError):
+                pass
+        if ref is None:
+            # This defines the artifact layout!
+            name = "/".join(self._path + [str(self._row_id)])
+            self._row_id += 1
 
-        ref = self._artifact.set(name, self.type, obj)
+            ref = self._artifact.set(name, self.type, obj)
         if ref.artifact == self._artifact:
             return ref.local_ref_str()
         else:

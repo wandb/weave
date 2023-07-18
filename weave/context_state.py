@@ -6,6 +6,48 @@ from . import client_interface
 from . import server_interface
 from . import uris
 
+# colab currently runs ipykernel < 6.0.  This resets context on every
+# execution, see: https://github.com/ipython/ipykernel/pull/632.  We
+# maintain a global context to work around this.
+# NOTE: This logic assumes all ContextVars will exist as globals
+# in this module with a leading underscore.
+patch_context = False
+try:
+    import ipykernel
+    from IPython.core.getipython import get_ipython
+
+    if ipykernel.version_info[0] < 6:
+        patch_context = True
+except ImportError:
+    pass
+
+if patch_context:
+    _context: typing.Dict[str, typing.Any] = dict()
+
+    def weave_pre_run():
+        glbs = globals()
+        for k, v in _context.items():
+            var = glbs.get("_" + k)
+            if var is not None:
+                var.set(v)
+
+    def weave_post_run():
+        _context.clear()
+        for k, v in contextvars.copy_context().items():
+            _context[k.name] = v
+
+    ipython = get_ipython()
+    if ipython is not None:
+        # Incase this module is loaded multiple times
+        for h in ipython.events.callbacks["pre_run_cell"]:
+            if h.__name__ == "weave_pre_run":
+                ipython.events.unregister("pre_run_cell", h)
+        for h in ipython.events.callbacks["post_run_cell"]:
+            if h.__name__ == "weave_post_run":
+                ipython.events.unregister("post_run_cell", h)
+        ipython.events.register("pre_run_cell", weave_pre_run)
+        ipython.events.register("post_run_cell", weave_post_run)
+
 
 # Set to the op uri if we're in the process of loading
 # an op from an artifact.
@@ -18,7 +60,7 @@ _loading_op_location: contextvars.ContextVar[
 # this prevents us from storing the op as an artifact
 _loading_built_ins: contextvars.ContextVar[
     typing.Optional[bool]
-] = contextvars.ContextVar("loading_builtins", default=False)
+] = contextvars.ContextVar("loading_built_ins", default=False)
 
 
 @contextlib.contextmanager

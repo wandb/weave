@@ -7,7 +7,7 @@ from .panel_auto import *
 # layout
 from .panel_labeled_item import LabeledItem
 from .panel_card import Card, CardTab
-from .panel_group import Group
+from .panel_group import Group, GroupLayoutFlow, GroupPanel
 from .panel_each import Each
 
 from .panel_facet_tabs import FacetTabs
@@ -23,6 +23,7 @@ from .panel_each_column import EachColumn
 from .panel_color import Color
 from .panel_html import PanelHtml
 from .panel_markdown import PanelMarkdown
+from .panel_trace import Trace
 
 
 # sidebar specific
@@ -31,6 +32,7 @@ from .panel_query import Query, QueryConfig, QueryCondition
 # editors
 from .panel_slider import Slider, SliderConfig
 from .panel_select import SelectEditor, SelectEditorConfig
+from .panel_daterange import DateRange
 from .panel_string_editor import StringEditor
 from .panel_function_editor import FunctionEditor, FunctionEditorConfig
 

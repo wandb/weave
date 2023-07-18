@@ -1,6 +1,7 @@
 import weave
 import wandb
 
+
 # Example of end to end integration test
 def test_run_logging(user_by_api_key_in_env):
     run = wandb.init(project="project_exists")

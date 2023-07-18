@@ -18,7 +18,7 @@ import {
   Stack,
   voidNode,
 } from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import * as _ from 'lodash';
 
 import {
@@ -419,7 +419,14 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
           equalSize: false,
           style: 'width:300px;',
           showExpressions: true,
-          allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
+          allowedPanels: [
+            'Expression',
+            'Query',
+            'Slider',
+            'StringEditor',
+            'SelectEditor',
+            'DateRange',
+          ],
           enableAddPanel: true,
           childNameBase: 'var',
         }
@@ -469,7 +476,14 @@ export const ensureDashboardFromItems = (
         equalSize: false,
         style: 'width:300px;',
         showExpressions: true,
-        allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
+        allowedPanels: [
+          'Expression',
+          'Query',
+          'Slider',
+          'StringEditor',
+          'SelectEditor',
+          'DateRange',
+        ],
         enableAddPanel: true,
         childNameBase: 'var',
       }),

@@ -1,4 +1,6 @@
+import typing
 import dateutil
+import dateutil.parser
 from ..api import op, type
 from .. import weave_types as types
 import datetime
@@ -150,7 +152,7 @@ def timedelta_total_seconds(td):
     output_type=types.Number(),
 )
 def to_number(date):
-    return int(date.timestamp())
+    return int(date.timestamp()) * 1000
 
 
 @op(
@@ -167,8 +169,10 @@ def from_number(number):
     input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
     output_type=types.Timestamp(),
 )
-def floor(date, multiple_ms: int):
-    raise NotImplementedError("floor not implemented")
+def floor(date, multiple_s: int):
+    seconds = (date.replace(tzinfo=None) - date.min).seconds
+    rounding = (seconds // multiple_s) * multiple_s
+    return date + datetime.timedelta(0, rounding - seconds, -date.microsecond)
 
 
 @op(
@@ -176,8 +180,12 @@ def floor(date, multiple_ms: int):
     input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
     output_type=types.Timestamp(),
 )
-def ceil(date, multiple_ms: int):
-    raise NotImplementedError("ceil not implemented")
+def ceil(date, multiple_s: int):
+    seconds = (date.replace(tzinfo=None) - date.min).seconds
+    rounding = (seconds // multiple_s) * multiple_s
+    return date + datetime.timedelta(
+        0, rounding - seconds + multiple_s, -date.microsecond
+    )
 
 
 @op(
@@ -238,11 +246,28 @@ def timestamp_max(values):
     return max(values) if len(values) > 0 else None
 
 
+# Flexible date parsing, but not implemented in weaveJS so a round-trip
+# is incurred to use it.
 @op(render_info={"type": "function"})
-def date_parse(dt_s: str) -> datetime.datetime:
-    return dateutil.parser.parse(dt_s)  # type: ignore
+def date_parse(dt_s: str) -> typing.Optional[datetime.datetime]:
+    try:
+        return dateutil.parser.parse(dt_s)  # type: ignore
+    except dateutil.parser.ParserError:
+        return None
 
 
 @op(render_info={"type": "function"})
 def days(days: int) -> datetime.timedelta:
     return datetime.timedelta(days=days)
+
+
+# This is used as a construct, ie, it is specific and not very flexible.
+# It only handles ISO formatted strings. This way we can make it match
+# the js implementation exactly.
+# date_parse above can be used for flexible parsing.
+@op(name="timestamp", render_info={"type": "function"})
+def timestamp(timestampISO: str) -> typing.Optional[datetime.datetime]:
+    try:
+        return datetime.datetime.fromisoformat(timestampISO)
+    except ValueError:
+        return None

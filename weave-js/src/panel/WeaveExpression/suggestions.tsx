@@ -10,6 +10,7 @@ import {
 import * as S from './styles';
 import type {SuggestionProps} from './types';
 import {trace} from './util';
+import {SuggestionRow} from './SuggestionRow';
 
 export const Suggestions = (props: SuggestionProps) => {
   const weave = useWeaveContext();
@@ -18,6 +19,10 @@ export const Suggestions = (props: SuggestionProps) => {
     props,
     weave
   );
+
+  // The tooltip can either appear on hover or be pinned open by clicking the info icon.
+  const [isOverInfo, setIsOverInfo] = React.useState<boolean>(false);
+  const [isOpenInfo, setIsOpenInfo] = React.useState<boolean>(false);
 
   const activeOpName = React.useMemo<string | null>(() => {
     if (
@@ -57,6 +62,12 @@ export const Suggestions = (props: SuggestionProps) => {
   }, [props.items, props.suggestionIndex]);
 
   trace(`Render Suggestions`, props, activeOpName, paneRef.current, showType);
+  const onClose = isOpenInfo
+    ? () => {
+        setIsOverInfo(false);
+        setIsOpenInfo(false);
+      }
+    : undefined;
 
   return createPortal(
     <S.SuggestionContainer ref={paneRef}>
@@ -64,26 +75,27 @@ export const Suggestions = (props: SuggestionProps) => {
         {showType ? <div className="type-display">{props.typeStr}</div> : null}
         <ul className="items-list">
           {props.items.map((s: any, idx: number) => (
-            <li
-              className={
-                (idx === props.suggestionIndex ? 'default-suggestion ' : '') +
-                S.SUGGESTION_OPTION_CLASS
-              }
+            <SuggestionRow
               key={idx}
-              onMouseDown={ev => {
-                // Prevent this element from taking focus
-                // otherwise it disappears before the onClick
-                // can register!
-                ev.preventDefault();
-              }}
-              onClick={() => takeSuggestion(s)}>
-              {s.suggestionString.trim()}
-            </li>
+              idx={idx}
+              suggestion={s}
+              takeSuggestion={takeSuggestion}
+              suggestionIndex={props.suggestionIndex}
+              setSuggestionIndex={props.setSuggestionIndex}
+              hasInfo={activeOpName != null}
+              setIsOverInfo={setIsOverInfo}
+              isOpenInfo={isOpenInfo}
+              setIsOpenInfo={setIsOpenInfo}
+            />
           ))}
         </ul>
       </S.SuggestionPane>
-      {activeOpName && (
-        <S.StyledOpDoc opName={activeOpName} attributeName={activeOpAttrName} />
+      {(isOpenInfo || isOverInfo) && activeOpName && (
+        <S.StyledOpDoc
+          opName={activeOpName}
+          attributeName={activeOpAttrName}
+          onClose={onClose}
+        />
       )}
     </S.SuggestionContainer>,
     document.body

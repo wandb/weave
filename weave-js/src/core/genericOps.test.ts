@@ -902,6 +902,8 @@ describe('generic ops', () => {
       'filter',
       'dropna',
       'map',
+      'join',
+      'contains',
     ]);
     let added = opNumberAdd({lhs: arrNumbers, rhs: constNumber(1)});
     expect(added.type).toEqual(list('number'));

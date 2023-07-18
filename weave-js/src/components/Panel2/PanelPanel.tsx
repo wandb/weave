@@ -1,6 +1,5 @@
-import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import _ from 'lodash';
@@ -33,6 +32,7 @@ import {getConfigForPath} from './panelTree';
 import {IconButton} from '../IconButton';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
+import {PanelPanelContextProvider} from './PanelPanelContextProvider';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -136,10 +136,10 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     stack,
     weave,
   ]);
-  useTraceUpdate('panelQuery', {
-    loading: panelQuery.loading,
-    result: panelQuery.result,
-  });
+  // useTraceUpdate('panelQuery', {
+  //   loading: panelQuery.loading,
+  //   result: panelQuery.result,
+  // });
 
   useSetPanelRenderedConfig(panelConfig);
 
@@ -207,6 +207,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   } = useScrollbarVisibility();
 
   const [inspectingRoot, setInspectingRoot] = useState(false);
+  const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
   const selectedIsRoot = useMemo(
     () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
@@ -279,6 +280,9 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
                     <IconOverflowHorizontal />
                   </IconButton>
                 }
+                isOpen={isOutlineMenuOpen}
+                onOpen={() => setIsOutlineMenuOpen(true)}
+                onClose={() => setIsOutlineMenuOpen(false)}
               />
             )}
             <IconButton onClick={closeEditor}>
@@ -332,11 +336,16 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
         alignContent: 'space-around',
         justifyContent: 'space-around',
       }}>
-      <ChildPanel
+      <PanelPanelContextProvider
         config={panelConfig}
         updateConfig={panelUpdateConfig}
-        updateConfig2={panelUpdateConfig2}
-      />
+        updateConfig2={panelUpdateConfig2}>
+        <ChildPanel
+          config={panelConfig}
+          updateConfig={panelUpdateConfig}
+          updateConfig2={panelUpdateConfig2}
+        />
+      </PanelPanelContextProvider>
     </div>
   );
 };

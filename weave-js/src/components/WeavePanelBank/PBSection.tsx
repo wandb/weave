@@ -6,7 +6,7 @@ import {
   DragDropProvider,
   DragHandle,
 } from '@wandb/weave/common/containers/DragDropContainer';
-import produce from 'immer';
+import {produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useRef, useState} from 'react';
 import Measure from 'react-measure';
@@ -104,7 +104,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
               onScroll={onSectionsScroll}
               onMouseMove={onSectionsMouseMove}>
               <div className="panel-bank__section">
-                {!inJupyter && groupPath != null && (
+                {!inJupyter && groupPath != null && handleAddPanel != null && (
                   <ActionBar ref={actionBarRef}>
                     <Tooltip
                       position="bottom right"
@@ -118,7 +118,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                     </Tooltip>
                     {enableAddPanel && (
                       <WBButton onClick={handleAddPanel}>
-                        <IconAddNew marginRight={6} />
+                        <IconAddNew $marginRight={6} />
                         New panel
                       </WBButton>
                     )}
@@ -265,10 +265,10 @@ const AddPanelBarContainer = styled.div`
   }
 `;
 
-const IconAddNew = styled(IconAddNewUnstyled)<{marginRight?: number}>`
+const IconAddNew = styled(IconAddNewUnstyled)<{$marginRight?: number}>`
   width: 18px;
   height: 18px;
-  margin-right: ${p => p.marginRight ?? 8}px;
+  margin-right: ${p => p.$marginRight ?? 8}px;
 `;
 
 const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`

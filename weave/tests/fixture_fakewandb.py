@@ -354,7 +354,7 @@ class PatchedSDKArtifact(wandb.Artifact):
     def commit_hash(self) -> str:
         if not hasattr(self, "_commit_hash"):
             self._commit_hash = uuid.uuid4().hex[:20]
-        return self._commit_hash
+        return typing.cast(str, self._commit_hash)
 
 
 OriginalArtifactSymbol = wandb.Artifact

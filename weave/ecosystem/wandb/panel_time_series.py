@@ -197,13 +197,13 @@ class TimeSeries(weave.Panel):
             input_node.type, weave.types.optional(weave.types.Timestamp())
         )
 
-        min_x_called = col_fn.val.min()
+        min_x_called = col_fn(input_node).min()  # type: ignore
         min_x = weave_internal.const(
             min_x_called,
             weave.types.Function(col_fn.type.input_types, min_x_called.type),  # type: ignore
         )
 
-        max_x_called = col_fn.val.max()
+        max_x_called = col_fn(input_node).max()  # type: ignore
         max_x = weave_internal.const(
             max_x_called,
             weave.types.Function(col_fn.type.input_types, max_x_called.type),  # type: ignore
@@ -291,7 +291,11 @@ class TimeSeries(weave.Panel):
 
         exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
         bin_size_index = TIME_SERIES_BIN_SIZES_SEC_NODE.map(  # type: ignore
-            lambda x: (x / exact_bin_size - 1).abs()
+            lambda x: (
+                (x - exact_bin_size).abs()
+                / weave.ops.make_list(a=x, b=exact_bin_size).min()
+            )
+            # lambda x: (x / exact_bin_size - 1).abs() # original
         ).argmin()
 
         bin_size = TIME_SERIES_BIN_SIZES_SEC_NODE[bin_size_index]  # type: ignore

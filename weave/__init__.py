@@ -23,6 +23,10 @@ from .panel_util import make_node
 
 from . import wandb_api as _wandb_api
 
+from .core_types import *
+
+from .panels_py import *
+
 _wandb_api.init()
 
 _context.clear_loading_built_ins(_loading_builtins_token)
@@ -35,4 +39,4 @@ _context.clear_loading_built_ins(_loading_builtins_token)
 # def _ipython_display_():
 #     return show(ecosystem())
 
-__version__ = "0.20.0"
+__version__ = "0.23.0"

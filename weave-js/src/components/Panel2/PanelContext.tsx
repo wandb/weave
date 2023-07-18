@@ -2,7 +2,6 @@
 import {
   Definition,
   Frame,
-  getChainRootVar,
   getFreeVars,
   NodeOrVoidNode,
   pushFrame,
@@ -12,6 +11,7 @@ import {consoleGroup, consoleLog} from '@wandb/weave/util';
 import React, {ReactNode, useCallback, useContext, useMemo} from 'react';
 
 import {useDeepMemo} from '../../hookUtils';
+import {getChainRootVar} from '@wandb/weave/core/mutate';
 
 interface ExpressionEventHover {
   id: 'hover';

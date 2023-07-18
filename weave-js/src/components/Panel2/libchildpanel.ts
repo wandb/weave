@@ -1,4 +1,4 @@
-import produce from 'immer';
+import {produce} from 'immer';
 import {useCallback} from 'react';
 
 export const useChildUpdateConfig2 = (

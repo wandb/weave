@@ -17,6 +17,7 @@ export interface WeaveExpressionProps {
 
   liveUpdate?: boolean;
   truncate?: boolean;
+  frozen?: boolean;
 }
 
 export interface SuggestionProps {
@@ -32,7 +33,9 @@ export interface SuggestionProps {
   items: Array<AutosuggestResult<any>>;
 
   isBusy: boolean;
+
   suggestionIndex?: number;
+  setSuggestionIndex?: React.Dispatch<React.SetStateAction<number>>;
 
   forceHidden?: boolean;
 

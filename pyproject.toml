@@ -64,7 +64,11 @@ ignore = "E714"
 
 [tool.ruff]
 line-length = 180
-ignore = ["E711"]
+show-fixes = true
+select = [
+  "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
+  "FIX003",
+]
 
 [tool.flake8]
 max-line-length = 180

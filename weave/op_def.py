@@ -1,5 +1,7 @@
 import collections
 import copy
+import contextvars
+import contextlib
 import typing
 import inspect
 
@@ -24,6 +26,24 @@ from .language_features.tagging import (
     tagged_value_type,
 )
 from . import language_autocall
+
+
+_no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_no_refine", default=False
+)
+
+
+def refine_enabled() -> bool:
+    return not _no_refine.get()
+
+
+@contextlib.contextmanager
+def no_refine():
+    token = _no_refine.set(True)
+    try:
+        yield
+    finally:
+        _no_refine.reset(token)
 
 
 def common_name(name: str) -> str:
@@ -208,6 +228,8 @@ class OpDef:
     # like th GQL ops?
     _gets_tag_by_name: typing.Optional[str] = None
 
+    returns_expansion_node: bool = False
+
     def __init__(
         self,
         name: str,
@@ -225,6 +247,7 @@ class OpDef:
         mutation=False,
         is_builtin: typing.Optional[bool] = None,
         weave_fn: typing.Optional[graph.Node] = None,
+        returns_expansion_node: bool = False,
         *,
         plugins=None,
         _decl_locals=None,  # These are python locals() from the enclosing scope.
@@ -253,6 +276,7 @@ class OpDef:
         self.weave_fn = weave_fn
         self._output_type = None
         self.plugins = plugins
+        self.returns_expansion_node = returns_expansion_node
 
     def __get__(self, instance, owner):
         return BoundOpDef(instance, self)
@@ -292,8 +316,11 @@ class OpDef:
         # Don't try to refine if there are variable nodes, we are building a
         # function in that case!
         final_output_type: types.Type
-        if _self.refine_output_type and not any(
-            graph.expr_vars(arg_node) for arg_node in bound_params.values()
+
+        if (
+            refine_enabled()
+            and _self.refine_output_type
+            and not any(graph.expr_vars(arg_node) for arg_node in bound_params.values())
         ):
             called_refine_output_type = _self.refine_output_type(**bound_params)
             tracer = engine_trace.tracer()  # type: ignore
