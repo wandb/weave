@@ -1,15 +1,16 @@
 import os
 import logging
-import re
 import datetime
 import json
 import typing
+from wandb import errors as wandb_errors
 from wandb.apis.public import Run
 from wandb.sdk.internal.file_pusher import FilePusher
 from wandb.sdk.internal import file_stream
 from wandb.sdk.internal.internal_api import Api as InternalApi
 from wandb.sdk.lib import runid
-from weave.wandb_client_api import wandb_public_api
+from weave import wandb_client_api
+from weave import errors
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,6 @@ logger = logging.getLogger(__name__)
 # We disable urllib warnings because they are noisy and not actionable.
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
-
-
-class WeaveWandbRunException(Exception):
-    pass
 
 
 class InMemoryLazyLiteRun:
@@ -43,23 +40,21 @@ class InMemoryLazyLiteRun:
 
     def __init__(
         self,
-        entity_name: typing.Optional[str] = None,
-        project_name: typing.Optional[str] = None,
+        entity_name: str,
+        project_name: str,
         run_name: typing.Optional[str] = None,
         job_type: typing.Optional[str] = None,
         _use_async_file_stream: bool = False,
     ):
-        authenticated = wandb_public_api().api_key is not None
-        if not authenticated:
-            raise WeaveWandbRunException(
-                f"Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`."
-            )
+        wandb_client_api.assert_wandb_authenticated()
 
-        entity_name = entity_name or wandb_public_api().default_entity
-        project_name = project_name or "uncategorized"
-
-        assert entity_name is not None
-        assert project_name is not None
+        # Technically, we could use the default entity and project here, but
+        # heeding Shawn's advice, we should be explicit about what we're doing.
+        # We can always move to the default later, but we can't go back.
+        if entity_name is None or entity_name == "":
+            raise ValueError(f"Must specify entity_name")
+        elif project_name is None or project_name == "":
+            raise ValueError(f"Must specify project_name")
 
         self._entity_name = entity_name
         self._project_name = project_name
@@ -86,36 +81,39 @@ class InMemoryLazyLiteRun:
     @property
     def run(self) -> Run:
         if self._run is None:
-            # Ensure project exists
-            self.i_api.upsert_project(
-                project=self._project_name, entity=self._entity_name
-            )
+            try:
+                # Ensure project exists
+                self.i_api.upsert_project(
+                    project=self._project_name, entity=self._entity_name
+                )
 
-            # Produce a run
-            run_res, _, _ = self.i_api.upsert_run(
-                name=self._run_name,
-                display_name=self._display_name,
-                job_type=self._job_type,
-                project=self._project_name,
-                entity=self._entity_name,
-            )
+                # Produce a run
+                run_res, _, _ = self.i_api.upsert_run(
+                    name=self._run_name,
+                    display_name=self._display_name,
+                    job_type=self._job_type,
+                    project=self._project_name,
+                    entity=self._entity_name,
+                )
 
-            self._run = Run(
-                wandb_public_api().client,
-                run_res["project"]["entity"]["name"],
-                run_res["project"]["name"],
-                run_res["name"],
-                {
-                    "id": run_res["id"],
-                    "config": "{}",
-                    "systemMetrics": "{}",
-                    "summaryMetrics": "{}",
-                    "tags": [],
-                    "description": None,
-                    "notes": None,
-                    "state": "running",
-                },
-            )
+                self._run = Run(
+                    wandb_client_api.wandb_public_api().client,
+                    run_res["project"]["entity"]["name"],
+                    run_res["project"]["name"],
+                    run_res["name"],
+                    {
+                        "id": run_res["id"],
+                        "config": "{}",
+                        "systemMetrics": "{}",
+                        "summaryMetrics": "{}",
+                        "tags": [],
+                        "description": None,
+                        "notes": None,
+                        "state": "running",
+                    },
+                )
+            except wandb_errors.CommError as e:
+                raise errors.WeaveWandbAuthenticationException()
 
             self.i_api.set_current_run_id(self._run.id)
             self._step = self._run.lastHistoryStep + 1
@@ -147,11 +145,6 @@ class InMemoryLazyLiteRun:
             self._pusher = FilePusher(self.i_api, self.stream)
 
         return self._pusher
-
-    def setup(self) -> None:
-        self.run
-        self.stream
-        self.pusher
 
     def log(self, row_dict: dict) -> None:
         stream = self.stream
