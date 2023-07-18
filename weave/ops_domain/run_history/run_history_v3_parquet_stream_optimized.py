@@ -361,7 +361,7 @@ def _build_array_from_tree(tree: PathTree) -> pa.Array:
             if mask is None:
                 mask = child_is_null
             else:
-                mask = pa.compute.or_(mask, child_is_null)
+                mask = pa.compute.and_(mask, child_is_null)
 
         children_struct = pa.StructArray.from_arrays(
             children_data.values(), children_data.keys(), mask=mask
