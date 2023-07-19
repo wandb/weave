@@ -1050,7 +1050,12 @@ const ConfigDimLabel: React.FC<
   }
 > = props => {
   return (
-    <div style={{paddingLeft: 10 * props.indentation}}>
+    <div
+      style={{
+        paddingLeft: 10 * props.indentation,
+        borderLeft:
+          props.indentation > 0 ? `2px solid ${globals.MOON_200}` : 'none',
+      }}>
       <ConfigPanel.ConfigOption
         label={DIM_NAME_MAP[props.dimension.name]}
         data-test={`${props.dimension.name}-dim-config`}
@@ -1434,7 +1439,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
                 <IconUnlockedUnconstrained width={18} height={18} />
               </S.UnconstrainedIconContainer>
             }>
-            Unconstrain dimension across series
+            Constrain dimension across series
           </Tooltip>
         )}
       </>
