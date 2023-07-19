@@ -49,7 +49,6 @@ def _filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
         run_path.entity_name,
         run_path.project_name,
         run_path.run_name,
-        file_path,
     )
     runfiles = WandbRunFiles(name=uri.name, uri=uri)
     return runfiles.path_info(file_path)
