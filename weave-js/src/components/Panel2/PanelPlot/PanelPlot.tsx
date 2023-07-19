@@ -781,7 +781,8 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       <>
         {showAdvancedProperties ? (
           <div onClick={toggleAdvancedProperties}>
-            {groupByDom}
+            {/* TODO: Grouping */}
+            {/* {groupByDom} */}
             {scaleConfigDom}
             <S.AdvancedPropertiesHeader>
               Hide advanced properties
@@ -794,7 +795,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         )}
       </>
     );
-  }, [showAdvancedProperties]);
+  }, [showAdvancedProperties, scaleConfigDom]);
 
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const configTabs = useMemo(() => {
