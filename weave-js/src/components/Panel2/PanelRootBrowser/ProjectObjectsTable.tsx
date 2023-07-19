@@ -115,7 +115,7 @@ export const ProjectObjectsTable: React.FC<
   );
 
   if (typenames.length === 0) {
-    return <EmptyState />;
+    return <EmptyStateContainer>No objects found</EmptyStateContainer>;
   }
 
   return (
@@ -132,21 +132,10 @@ export const ProjectObjectsTable: React.FC<
   );
 };
 
-const EmptyStateComp: FC = () => {
-  return (
-    <EmptyStateContainer>
-      <EmptyStateContent>No objects found</EmptyStateContent>
-    </EmptyStateContainer>
-  );
-};
-
-const EmptyState = memo(EmptyStateComp);
-
 const EmptyStateContainer = styled.div`
   height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
 `;
-
-const EmptyStateContent = styled.div``;
+EmptyStateContainer.displayName = 'S.EmptyStateContainer';
