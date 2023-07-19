@@ -39,7 +39,6 @@ import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
-import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
 import {IconButton} from '../IconButton';
 import {Tooltip} from '../Tooltip';
@@ -219,7 +218,10 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const weave = useWeaveContext();
   const {stack, path: parentPath} = usePanelContext();
 
-  panelInputExpr = useNodeWithServerType(panelInputExpr).result;
+  // BRANCH(perf3): Don't refine here, we shouldn't need to since we init panels
+  // explicitly now.
+  // panelInputExpr = useNodeWithServerType(panelInputExpr).result;
+  // panelInputExpr
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,
     panelId,
