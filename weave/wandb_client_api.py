@@ -13,7 +13,10 @@ def wandb_public_api() -> public.Api:
 
 
 def assert_wandb_authenticated() -> None:
-    authenticated = wandb_public_api().api_key is not None
+    authenticated = (
+        wandb_public_api().api_key is not None
+        or _thread_local_api_settings.cookies is not None
+    )
     if not authenticated:
         raise errors.WeaveWandbAuthenticationException(
             f"Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`."

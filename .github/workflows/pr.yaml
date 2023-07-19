@@ -30,6 +30,6 @@ jobs:
             revert
             security
             release
-          wip: true
+          wip: false
           validateSingleCommit: false
           validateSingleCommitMatchesPrTitle: false
