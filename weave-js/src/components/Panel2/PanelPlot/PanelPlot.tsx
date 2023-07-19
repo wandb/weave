@@ -872,7 +872,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           </ConfigSection>
           {newSeriesConfigDom}
           <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
-          {/* <ConfigSection label={`Scale`}>{scaleConfigDom}</ConfigSection> */}
         </>
       ) : (
         <>
