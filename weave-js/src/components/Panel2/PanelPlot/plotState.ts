@@ -59,8 +59,7 @@ export const DIM_NAME_MAP: {
   [K in
     | keyof SeriesConfig['dims']
     | 'mark'
-    | 'lineStyle'
-    | 'lineShape']: string;
+    | 'lineStyle']: string;
 } = {
   pointSize: 'Size',
   pointShape: 'Shape',
