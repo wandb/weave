@@ -1021,12 +1021,14 @@ const ConfigDimLabel: React.FC<
   }
 > = props => {
   const dimName = props.dimension.name;
+  const seriesIndexStr =
+    props.isShared || props.config.series.length === 1
+      ? ''
+      : ` ${props.config.series.indexOf(props.dimension.series) + 1}`;
   const label = props.enableDashUi
     ? DASHBOARD_DIM_NAME_MAP[dimName]
-    : DIM_NAME_MAP[dimName] +
-      (props.isShared || props.config.series.length === 1)
-    ? ''
-    : ` ${props.config.series.indexOf(props.dimension.series) + 1}`;
+    : DIM_NAME_MAP[dimName] + seriesIndexStr;
+
   return (
     <div
       style={{
