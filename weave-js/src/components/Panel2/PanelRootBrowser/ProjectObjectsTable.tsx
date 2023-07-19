@@ -25,6 +25,7 @@ import {
   useCopiedVariableName,
   useNewPanelFromRootQueryCallback,
 } from './util';
+import styled from 'styled-components';
 
 const useUniqueTypeNames = (projectNode: Node) => {
   const unique = opUnique({
@@ -114,7 +115,7 @@ export const ProjectObjectsTable: React.FC<
   );
 
   if (typenames.length === 0) {
-    return <></>;
+    return <EmptyStateContainer>No objects found</EmptyStateContainer>;
   }
 
   return (
@@ -130,3 +131,11 @@ export const ProjectObjectsTable: React.FC<
     </PanelContextProvider>
   );
 };
+
+const EmptyStateContainer = styled.div`
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+EmptyStateContainer.displayName = 'S.EmptyStateContainer';
