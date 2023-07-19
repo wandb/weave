@@ -23,6 +23,7 @@ import {ReactComponent as ImportChevronDown} from '../../assets/icons/icon-chevr
 import {ReactComponent as ImportChevronNext} from '../../assets/icons/icon-chevron-next.svg';
 import {ReactComponent as ImportChevronUp} from '../../assets/icons/icon-chevron-up.svg';
 import {ReactComponent as ImportClose} from '../../assets/icons/icon-close.svg';
+import {ReactComponent as ImportCloud} from '../../assets/icons/icon-cloud.svg';
 import {ReactComponent as ImportCodeAlt} from '../../assets/icons/icon-code-alt.svg';
 import {ReactComponent as ImportCollapse} from '../../assets/icons/icon-collapse.svg';
 import {ReactComponent as ImportColor} from '../../assets/icons/icon-color.svg';
@@ -265,6 +266,9 @@ export const IconChevronUp = (props: SVGIconProps) => (
 );
 export const IconClose = (props: SVGIconProps) => (
   <ImportClose {...updateIconProps(props)} />
+);
+export const IconCloud = (props: SVGIconProps) => (
+  <ImportCloud {...updateIconProps(props)} />
 );
 export const IconCodeAlt = (props: SVGIconProps) => (
   <ImportCodeAlt {...updateIconProps(props)} />
@@ -771,6 +775,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'chevron-next': IconChevronNext,
   'chevron-up': IconChevronUp,
   close: IconClose,
+  cloud: IconCloud,
   'code-alt': IconCodeAlt,
   collapse: IconCollapse,
   color: IconColor,

@@ -13,7 +13,6 @@ import {
   useClientContext,
   useRefreshAllNodes,
 } from '@wandb/weave/react';
-import _ from 'lodash';
 import {useCallback} from 'react';
 
 import {usePanelContext} from './PanelContext';

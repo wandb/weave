@@ -9,7 +9,7 @@ from wandb.sdk.internal.sender import _manifest_json_from_proto
 # from wandb.sdk.internal.sender import _manifest_json_from_proto # This symbol moved after our pinned version
 from wandb.sdk.interface.interface import InterfaceBase
 
-from weave.wandb_client_api import wandb_public_api
+from weave import wandb_client_api
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 
@@ -33,6 +33,14 @@ def write_artifact_to_wandb(
 
     assert artifact_name is not None
     assert artifact_type_name is not None
+
+    wandb_client_api.assert_wandb_authenticated()
+
+    # Here we get the default entity if none is provided.
+    # When we support saving dashboards to target entities,
+    # we may want to rework this code path so that the caller
+    # must provide an entity name.
+    entity_name = entity_name or wandb_client_api.wandb_public_api().default_entity
 
     lite_run = InMemoryLazyLiteRun(entity_name, project_name)
 
@@ -71,7 +79,7 @@ def write_artifact_to_wandb(
     lite_run.finish()
 
     if res is not None:
-        art = Artifact.from_id(res["id"], wandb_public_api().client)
+        art = Artifact.from_id(res["id"], wandb_client_api.wandb_public_api().client)
         if art is not None:
             commit_hash = art.commit_hash
 
