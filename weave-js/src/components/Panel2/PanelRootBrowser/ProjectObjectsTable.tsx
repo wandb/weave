@@ -11,7 +11,7 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
-import React, {useCallback, useMemo} from 'react';
+import React, {FC, memo, useCallback, useMemo} from 'react';
 
 import * as Panel2 from '../panel';
 import {PanelCard} from '../PanelCard';
@@ -25,6 +25,7 @@ import {
   useCopiedVariableName,
   useNewPanelFromRootQueryCallback,
 } from './util';
+import styled from 'styled-components';
 
 const useUniqueTypeNames = (projectNode: Node) => {
   const unique = opUnique({
@@ -114,7 +115,7 @@ export const ProjectObjectsTable: React.FC<
   );
 
   if (typenames.length === 0) {
-    return <></>;
+    return <EmptyState />;
   }
 
   return (
@@ -130,3 +131,22 @@ export const ProjectObjectsTable: React.FC<
     </PanelContextProvider>
   );
 };
+
+const EmptyStateComp: FC = () => {
+  return (
+    <EmptyStateContainer>
+      <EmptyStateContent>No objects found</EmptyStateContent>
+    </EmptyStateContainer>
+  );
+};
+
+const EmptyState = memo(EmptyStateComp);
+
+const EmptyStateContainer = styled.div`
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+const EmptyStateContent = styled.div``;
