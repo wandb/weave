@@ -10,11 +10,7 @@ import {
   varNode,
   voidNode,
 } from '@wandb/weave/core';
-import {
-  useMakeMutation,
-  useMutation,
-  useNodeWithServerType,
-} from '@wandb/weave/react';
+import {useMutation, useNodeWithServerType} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
 
@@ -40,6 +36,7 @@ import {
 } from './hooks';
 import {
   PersistenceAction,
+  PersistenceDeleteActionType,
   PersistenceRenameActionType,
   PersistenceState,
   PersistenceStoreActionType,
@@ -67,6 +64,7 @@ import {PanelGroupConfig} from '../Panel2/PanelGroup';
 import {getFullChildPanel} from '../Panel2/ChildPanel';
 import _ from 'lodash';
 import {mapPanels} from '../Panel2/panelTree';
+import {DeleteActionModal} from './DeleteActionModal';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -253,6 +251,7 @@ export const PersistenceManager: React.FC<{
           maybeURI={maybeURI}
           branchPoint={branchPoint}
           renameAction={availableActions.renameAction}
+          deleteAction={availableActions.deleteAction}
           takeAction={takeAction}
           goHome={props.goHome}
         />
@@ -286,6 +285,8 @@ const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   publish_as: 'Publish As',
   publish_new: 'Publish',
   rename_remote: 'Rename',
+  delete_local: 'Delete board',
+  delete_remote: 'Delete board',
 };
 
 const HeaderPersistenceControls: React.FC<{
@@ -327,6 +328,7 @@ const HeaderFileControls: React.FC<{
   headerEl: HTMLElement | null;
   maybeURI: string | null;
   renameAction: PersistenceRenameActionType | null;
+  deleteAction: PersistenceDeleteActionType | null;
   takeAction: TakeActionType;
   branchPoint: BranchPointType | null;
   updateNode: (node: NodeOrVoidNode) => void;
@@ -338,10 +340,12 @@ const HeaderFileControls: React.FC<{
   maybeURI,
   branchPoint,
   renameAction,
+  deleteAction,
   takeAction,
   updateNode,
 }) => {
   const [actionRenameOpen, setActionRenameOpen] = useState(false);
+  const [actionDeleteOpen, setActionDeleteOpen] = useState(false);
   const [acting, setActing] = useState(false);
   const isLocal = maybeURI != null && isLocalURI(maybeURI);
   const entityProjectName = determineURISource(maybeURI, branchPoint);
@@ -349,14 +353,6 @@ const HeaderFileControls: React.FC<{
     determineURIIdentifier(maybeURI);
   const [anchorFileEl, setAnchorFileEl] = useState<HTMLElement | null>(null);
   const expandedFileControls = Boolean(anchorFileEl);
-
-  const makeMutation = useMakeMutation();
-  const deleteCurrentNode = useCallback(async () => {
-    if (isLocal) {
-      await makeMutation(inputNode, 'delete_artifact', {});
-      goHome?.();
-    }
-  }, [goHome, inputNode, isLocal, makeMutation]);
 
   const previousVersionURI = usePreviousVersionFromURIString(maybeURI);
   const canUndo = !!(previousVersionURI && maybeURI);
@@ -544,21 +540,18 @@ const HeaderFileControls: React.FC<{
             </MenuItem>
           )}
 
-          {isLocal && (
-            <>
-              <MenuDivider />
-
-              <MenuItem
-                onClick={() => {
-                  setAnchorFileEl(null);
-                  deleteCurrentNode();
-                }}>
-                <MenuIcon>
-                  <IconDelete />
-                </MenuIcon>
-                <MenuText>Delete</MenuText>
-              </MenuItem>
-            </>
+          {deleteAction && <MenuDivider />}
+          {deleteAction && (
+            <MenuItem
+              onClick={() => {
+                setAnchorFileEl(null);
+                setActionDeleteOpen(true);
+              }}>
+              <MenuIcon>
+                <IconDelete />
+              </MenuIcon>
+              <MenuText>Delete board</MenuText>
+            </MenuItem>
           )}
         </CustomMenu>
       </CustomPopover>
@@ -575,6 +568,21 @@ const HeaderFileControls: React.FC<{
             takeAction(renameAction, {name: newName}, () => {
               setActing(false);
               setActionRenameOpen(false);
+            });
+          }}
+        />
+      )}
+      {deleteAction && (
+        <DeleteActionModal
+          open={actionDeleteOpen}
+          onClose={() => setActionDeleteOpen(false)}
+          acting={acting}
+          onDelete={() => {
+            setActing(true);
+            takeAction(deleteAction, {}, () => {
+              setActing(false);
+              setActionRenameOpen(false);
+              goHome?.();
             });
           }}
         />

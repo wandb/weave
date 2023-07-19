@@ -15,3 +15,5 @@ ruff==0.0.275
 types-pytz
 types-Pillow
 types-Flask-Cors
+build
+twine
