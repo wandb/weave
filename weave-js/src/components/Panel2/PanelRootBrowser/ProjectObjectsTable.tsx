@@ -11,7 +11,7 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
-import React, {FC, memo, useCallback, useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
 import * as Panel2 from '../panel';
 import {PanelCard} from '../PanelCard';
