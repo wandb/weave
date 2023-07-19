@@ -38,7 +38,12 @@ class GQLClassWithKeysType(types.Type):
         return self.keyless_weave_type_class()
 
     def _assign_type_inner(self, other_type: types.Type) -> bool:
-        return isinstance(other_type, GQLClassWithKeysType)
+        # TODO: think more about how this will work with tags - might need to be modified
+        return (
+            isinstance(other_type, GQLClassWithKeysType)
+            and self.keyless_weave_type_class == other_type.keyless_weave_type_class
+            and self.keys == other_type.keys
+        )
 
     def _str_repr(self) -> str:
         keys_repr = dict(sorted([(k, v.__repr__()) for k, v in self.keys.items()]))
