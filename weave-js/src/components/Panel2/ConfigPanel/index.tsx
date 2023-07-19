@@ -58,6 +58,7 @@ export const ConfigSectionHeader = styled.div`
 export const ConfigSectionHeaderButton = styled.div<{expanded: boolean}>`
   display: flex;
   transform: rotate(${p => (p.expanded ? 0 : 180)}deg);
+  margin-left: 10px;
 `;
 
 export const ConfigSectionOptions = styled.div`

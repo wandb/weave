@@ -485,6 +485,55 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     );
   }, [config, updateConfig]);
 
+  // Ensure that user cannot delete the last series
+  const seriesMenuItems = useCallback(
+    (s: SeriesConfig, index: number) => {
+      if (index === 0 && config.series.length === 1) {
+        return [
+          {
+            key: 'Add series from this series',
+            content: 'Add series from this series',
+            icon: <IconAddNew />,
+            onClick: () => {
+              const newConfig = PlotState.addSeriesFromSeries(
+                config,
+                s,
+                'y',
+                weave
+              );
+              updateConfig(newConfig);
+            },
+          },
+        ];
+      }
+      return [
+        {
+          key: 'Remove series',
+          content: 'Remove series',
+          icon: <IconDelete />,
+          onClick: () => {
+            updateConfig(PlotState.removeSeries(config, s));
+          },
+        },
+        {
+          key: 'Add series from this series',
+          content: 'Add series from this series',
+          icon: <IconAddNew />,
+          onClick: () => {
+            const newConfig = PlotState.addSeriesFromSeries(
+              config,
+              s,
+              'y',
+              weave
+            );
+            updateConfig(newConfig);
+          },
+        },
+      ];
+    },
+    [config.series]
+  );
+
   const newSeriesConfigDom = useMemo(() => {
     return (
       <>
@@ -492,30 +541,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           return (
             <ConfigSection
               label={`Series ${i + 1}`}
-              menuItems={[
-                {
-                  key: 'Remove series',
-                  content: 'Remove series',
-                  icon: <IconDelete />,
-                  onClick: () => {
-                    updateConfig(PlotState.removeSeries(config, s));
-                  },
-                },
-                {
-                  key: 'Add series from this series',
-                  content: 'Add series from this series',
-                  icon: <IconAddNew />,
-                  onClick: () => {
-                    const newConfig = PlotState.addSeriesFromSeries(
-                      config,
-                      s,
-                      'y',
-                      weave
-                    );
-                    updateConfig(newConfig);
-                  },
-                },
-              ]}>
+              menuItems={seriesMenuItems(s, i)}>
               {
                 <ConfigPanel.ConfigOption
                   key={`series-${i + 1}`}
