@@ -120,7 +120,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             from . import AudioArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
-            return AudioArtifactFileRef(  #type: ignore
+            return AudioArtifactFileRef(  # type: ignore
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
                 sha256=val["sha256"],
@@ -129,7 +129,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             from . import BokehArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
-            return BokehArtifactFileRef(  #type: ignore
+            return BokehArtifactFileRef(  # type: ignore
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
                 sha256=val["sha256"],
@@ -138,7 +138,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             from . import VideoArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
-            return VideoArtifactFileRef(  #type: ignore
+            return VideoArtifactFileRef(  # type: ignore
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
                 sha256=val["sha256"],
@@ -147,7 +147,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             from . import Object3DArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
-            return Object3DArtifactFileRef(  #type: ignore
+            return Object3DArtifactFileRef(  # type: ignore
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
                 sha256=val["sha256"],
@@ -156,7 +156,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             from . import MoleculeArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
-            return MoleculeArtifactFileRef(  #type: ignore
+            return MoleculeArtifactFileRef(  # type: ignore
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
                 sha256=val["sha256"],
@@ -165,12 +165,12 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             from . import HtmlArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
-            return HtmlArtifactFileRef(  #type: ignore
+            return HtmlArtifactFileRef(  # type: ignore
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
                 sha256=val["sha256"],
             )
-        
+
         if val["_type"] == "images/separated" and run_path is not None:
             from . import ImageArtifactFileRef
 
