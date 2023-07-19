@@ -17,6 +17,7 @@ from . import val_const
 from . import artifact_fs
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
+from .gql_with_keys import GQLClassWithKeysType, GQLTypeMixin
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -84,16 +85,12 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             )
 
 
-class GQLClassWithKeysToPyDict(mappers.Mapper):
-    def __init__(self, type):
-        self._type = type
-
-    def apply(self, obj):
-        return {
-            "_type": self._type.name,
-            "_id": obj.id,
-            "_key": obj.key,
-        }
+class GQLClassWithKeysToPyDict(mappers_weave.GQLMapper):
+    def apply(self, obj: GQLTypeMixin):
+        result = {}
+        for k, prop_serializer in self._property_serializers.items():
+            result[k] = prop_serializer.apply(obj.gql.get(k, None))
+        return result
 
 
 class ListToPyList(mappers_weave.ListMapper):
@@ -362,8 +359,6 @@ def add_mapper(
 
 
 def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
-    from .ops_domain.wb_domain_types import GQLClassWithKeysType
-
     mapper_options = mapper_options or {}
     use_stable_refs = mapper_options.get("use_stable_refs", True)
     if isinstance(type, types.TypeType):
