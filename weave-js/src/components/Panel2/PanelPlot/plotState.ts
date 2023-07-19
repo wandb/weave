@@ -72,7 +72,6 @@ export const DIM_NAME_MAP: {
   tooltip: 'Tooltip',
   y2: 'Y2',
   lineStyle: 'Style',
-  lineShape: 'Style',
 };
 
 export type DimType =
