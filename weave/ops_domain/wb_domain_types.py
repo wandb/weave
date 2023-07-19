@@ -2,7 +2,7 @@ import typing
 from .. import weave_types as types
 from ..decorator_type import type as weave_type
 
-from ..gql_with_keys import GQLClassWithKeysType, GQLTypeMixin
+from ..gql_with_keys import gql_weave_type, GQLTypeMixin
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -33,45 +33,6 @@ require changing a few of the ops to fetch such info as well
       as updating the mocked tests.
 l
 """
-
-
-class WithKeysMixin(types.Type):
-    @classmethod
-    def with_keys(cls, keys: dict[str, types.Type]) -> GQLClassWithKeysType:
-        """Creates a new Weave Type that is assignable to the original Weave Type, but
-        also has the specified keys. This is used during the compile pass for creating a Weave Type
-        to represent the exact output type of a specific GQL query, and for communicating the
-        data shape to arrow."""
-
-        return GQLClassWithKeysType(cls, keys)
-
-    @classmethod
-    def type_of_instance(cls, obj: "GQLTypeMixin") -> types.Type:
-        if obj.gql == {} or obj.gql is None:
-            return cls()
-
-        gql_type = typing.cast(types.TypedDict, types.TypeRegistry.type_of(obj.gql))
-        return cls.with_keys(gql_type.property_types)
-
-
-T = typing.TypeVar("T", bound="GQLTypeMixin")
-
-
-def gql_weave_type(
-    name: str,
-) -> typing.Callable[[typing.Type[T]], typing.Type[T]]:
-    """Decorator that emits a Weave Type for the decorated GQL instance type."""
-
-    def _gql_weave_type(_instance_class):
-        decorator = weave_type(
-            name,
-            True,
-            None,
-            (WithKeysMixin,),
-        )
-        return decorator(_instance_class)
-
-    return _gql_weave_type
 
 
 @gql_weave_type("org")
