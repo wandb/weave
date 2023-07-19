@@ -1816,3 +1816,24 @@ def test_non_const_input_node(fake_wandb):
     assert weave.use(cell_node.indexCheckpoint()) == 5
     assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
+def test_gql_compilation_with_keys(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock_empty_workspace)
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).id()
+    assert cell_node.type == TaggedValueType(
+        types.TypedDict(
+            {
+                "project": wdt.ProjectType.with_keys(
+                    {"runs": wdt.RunType.with_keys({"id": types.String()})}
+                )
+            }
+        ),
+        types.List(
+            object_type=TaggedValueType(
+                TaggedValueType(
+                    {wdt.RunType.with_keys({"id": types.String()})}, types.String()
+                )
+            )
+        ),
+    )
