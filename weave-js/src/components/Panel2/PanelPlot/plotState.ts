@@ -56,10 +56,7 @@ import {
 import * as v1 from './versions/v1';
 
 export const DIM_NAME_MAP: {
-  [K in
-    | keyof SeriesConfig['dims']
-    | 'mark'
-    | 'lineStyle']: string;
+  [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
 } = {
   pointSize: 'Size',
   pointShape: 'Shape',
