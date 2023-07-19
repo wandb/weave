@@ -36,7 +36,7 @@ type PanelTraceTreeTraceTableViewerProps = Panel2.PanelProps<
 >;
 
 const makeTableState = (inputArrayNode: Node, weave: WeaveInterface) => {
-  let ts = emptyTable();
+  const ts = emptyTable();
   const exNode = getRowExampleNode(
     ts.preFilterFunction,
     ts.groupBy,
