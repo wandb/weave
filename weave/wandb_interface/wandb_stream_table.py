@@ -45,6 +45,8 @@ TRUST_GORILLA_FOR_NESTED_STRUCTURES = True
 ENCODE_ENTIRE_TYPE = True
 TYPE_ENCODE_PREFIX = "_wt_::"
 
+ROW_TYPE = typing.Union[dict, list[dict]]
+
 
 class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
     _file_pusher: typing.Optional["FilePusher"] = None
@@ -88,22 +90,23 @@ class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
             self._file_pusher.file_changed(LogicalPath(path), file_path)
 
 
-class StreamTable:
+class _StreamTableSync:
     _lite_run: InMemoryLazyLiteRun
     _table_name: str
     _project_name: str
     _entity_name: str
 
-    _artifact: typing.Optional[WandbLiveRunFiles] = None
+    _artifact: WandbLiveRunFiles
 
-    _weave_stream_table: typing.Optional[StreamTableType] = None
-    _weave_stream_table_ref: typing.Optional[artifact_base.ArtifactRef] = None
+    _weave_stream_table: StreamTableType
+    _weave_stream_table_ref: artifact_base.ArtifactRef
 
     _client_id: str
 
     def __init__(
         self,
         table_name: str,
+        *,
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
         _disable_async_file_stream: bool = False,
@@ -131,8 +134,8 @@ class StreamTable:
         # For now, we force the user to specify the entity and project
         # technically, we could infer the entity from the API key, but
         # that tends to confuse users.
-        # if entity_name is None or entity_name == "":
-        #     raise ValueError(f"Must specify entity_name")
+        if entity_name is None or entity_name == "":
+            raise ValueError(f"Must specify entity_name")
         elif project_name is None or project_name == "":
             raise ValueError(f"Must specify project_name")
         elif table_name is None or table_name == "":
@@ -149,19 +152,14 @@ class StreamTable:
         self._table_name = self._lite_run._run_name
         self._project_name = self._lite_run._project_name
         self._entity_name = self._lite_run._entity_name
+        self._ensure_remote_initialized()
+        atexit.register(self._at_exit)
 
-    def log(self, row_or_rows: typing.Union[dict, list[dict]]) -> None:
-        if isinstance(row_or_rows, dict):
-            row_or_rows = [row_or_rows]
-
-        for row in row_or_rows:
-            self._log_row(row)
-
-    def _ensure_weave_stream_table(self) -> StreamTableType:
-        if self._weave_stream_table is None:
-            url = f"https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
-            printer = get_printer(_get_python_type() != "python")
-            printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
+    def _ensure_remote_initialized(self) -> StreamTableType:
+        self._lite_run.ensure_run()
+        print_url = False
+        if not hasattr(self, "_weave_stream_table"):
+            print_url = True
             self._weave_stream_table = StreamTableType(
                 table_name=self._table_name,
                 project_name=self._project_name,
@@ -175,10 +173,28 @@ class StreamTable:
                 wb_project_name=self._project_name,
                 wb_entity_name=self._entity_name,
             )
+        if not hasattr(self, "_artifact"):
+            uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
+                self._entity_name,
+                self._project_name,
+                self._table_name,
+            )
+            self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
+            self._artifact.set_file_pusher(self._lite_run.pusher)
+        if print_url:
+            url = f"https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
+            printer = get_printer(_get_python_type() != "python")
+            printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
 
+    def log(self, row_or_rows: ROW_TYPE) -> None:
+        if isinstance(row_or_rows, dict):
+            row_or_rows = [row_or_rows]
+
+        for row in row_or_rows:
+            self._log_row(row)
+
     def rows(self) -> graph.Node:
-        self._ensure_weave_stream_table()
         if self._weave_stream_table_ref is None:
             raise errors.WeaveInternalError("ref is None after ensure")
         return stream_table_ops.rows(
@@ -191,16 +207,6 @@ class StreamTable:
         return show(self.rows())
 
     def _log_row(self, row: dict) -> None:
-        self._lite_run.ensure_run()
-        self._ensure_weave_stream_table()
-        if self._artifact is None:
-            uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
-                self._entity_name,
-                self._project_name,
-                self._table_name,
-            )
-            self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
-            self._artifact.set_file_pusher(self._lite_run.pusher)
         row_copy = {**row}
         row_copy["_client_id"] = self._client_id
         if "timestamp" not in row_copy:
@@ -209,34 +215,35 @@ class StreamTable:
         self._lite_run.log(payload)
 
     def finish(self) -> None:
-        if self._artifact is not None:
+        if self._artifact:
             self._artifact.cleanup()
-            self._artifact = None
-        self._lite_run.finish()
+        if self._lite_run:
+            self._lite_run.finish()
 
     def __del__(self) -> None:
         self.finish()
 
+    def _at_exit(self) -> None:
+        self.finish()
 
-ASYNC_ROW_TYPE = typing.Union[dict, typing.Callable[[], dict]]
 
-
-class StreamTableAsync:
+class StreamTable(_StreamTableSync):
     MAX_UNSAVED_SECONDS = 2
-    _stream_table: StreamTable
 
     def __init__(
         self,
         table_name: str,
+        *,
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
         _disable_async_file_stream: bool = False,
     ):
-        self._stream_table = StreamTable(
-            table_name, project_name, entity_name, _disable_async_file_stream
+        super().__init__(
+            table_name=table_name,
+            project_name=project_name,
+            entity_name=entity_name,
+            _disable_async_file_stream=_disable_async_file_stream,
         )
-        self._stream_table._lite_run.setup()
-        self._stream_table._ensure_weave_stream_table()
 
         self.queue: queue.Queue = queue.Queue()
         atexit.register(self._at_exit)
@@ -246,22 +253,17 @@ class StreamTableAsync:
         self._thread.daemon = True
         self._thread.start()
 
-    def log(self, row_or_fn: ASYNC_ROW_TYPE) -> None:
-        self.queue.put(row_or_fn)
+    def log(self, row_or_rows: ROW_TYPE) -> None:
+        self.queue.put(row_or_rows)
 
-    def flush(self) -> None:
+    def _flush(self) -> None:
         with self._lock:
-            for log_dict_or_fn in self._iterate_queue():
-                if callable(log_dict_or_fn):
-                    log_dict = log_dict_or_fn()
-                else:
-                    log_dict = log_dict_or_fn
-
-                self._stream_table.log(log_dict)
+            for log_payload in self._iterate_queue():
+                super().log(log_payload)
 
     def _iterate_queue(
         self,
-    ) -> typing.Generator[ASYNC_ROW_TYPE, None, None]:
+    ) -> typing.Generator[ROW_TYPE, None, None]:
         while True:
             try:
                 record = self.queue.get_nowait()
@@ -275,19 +277,15 @@ class StreamTableAsync:
         join_requested = False
         while not join_requested:
             join_requested = self._join_event.wait(self.MAX_UNSAVED_SECONDS)
-            self.flush()
+            self._flush()
 
+    # Override methods of _StreamTableSync
     def finish(self) -> None:
-        self._join_event.set()
-        self._thread.join()
-        with self._lock:
-            self._stream_table.finish()
-
-    def __del__(self) -> None:
-        self.finish()
-
-    def _at_exit(self) -> None:
-        self.finish()
+        if hasattr(self, "_thread"):
+            self._join_event.set()
+            self._thread.join()
+            with self._lock:
+                super().finish()
 
 
 def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_types.Type]:

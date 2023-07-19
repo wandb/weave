@@ -117,3 +117,7 @@ def weave_wandb_api_key() -> typing.Optional[str]:
             "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
         )
     return env_api_key or netrc_api_key
+
+
+def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
+    return util.parse_number_env_var("WEAVE_PROJECTION_TIMEOUT_SEC")

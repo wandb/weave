@@ -147,34 +147,34 @@ def _collection_and_alias_id_mapping_to_uri(
 ) -> ReadClientArtifactURIResult:
     is_deleted = False
     query = wb_public.gql(
-        """	
-    query ArtifactVersionFromIdAlias(	
-        $id: ID!,	
-        $aliasName: String!	
-    ) {	
-        artifactCollection(id: $id) {	
-            id	
-            name	
+        """
+    query ArtifactVersionFromIdAlias(
+        $id: ID!,
+        $aliasName: String!
+    ) {
+        artifactCollection(id: $id) {
+            id
+            name
             state
-            project {	
-                id	
-                name	
-                entity {	
-                    id	
-                    name	
-                }	
-            }	
-            artifactMembership(aliasName: $aliasName) {	
-                id	
-                versionIndex	
+            project {
+                id
+                name
+                entity {
+                    id
+                    name
+                }
+            }
+            artifactMembership(aliasName: $aliasName) {
+                id
+                versionIndex
                 commitHash
             }
-            defaultArtifactType {	
-                id	
-                name	
+            defaultArtifactType {
+                id
+                name
             }
-        }	
-    }	
+        }
+    }
     """
     )
     res = wandb_client_api.wandb_public_api().client.execute(
@@ -224,19 +224,19 @@ def _collection_and_alias_id_mapping_to_uri(
 def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
     is_deleted = False
     query = wb_public.gql(
-        """	
-    query ArtifactVersionFromServerId(	
-        $id: ID!,	
-    ) {	
-        artifact(id: $id) {	
+        """
+    query ArtifactVersionFromServerId(
+        $id: ID!,
+    ) {
+        artifact(id: $id) {
             id
             state
             commitHash
             versionIndex
-            artifactType {	
-                id	
-                name	
-            }	
+            artifactType {
+                id
+                name
+            }
             artifactSequence {
                 id
                 name
@@ -250,8 +250,8 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
                     }
                 }
             }
-        }	
-    }	
+        }
+    }
     """
     )
     res = wandb_client_api.wandb_public_api().client.execute(
@@ -418,6 +418,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def __repr__(self):
         return "<WandbArtifact %s>" % self.name
+
+    def delete(self) -> None:
+        self._saved_artifact.delete(delete_aliases=True)
 
     @property
     def commit_hash(self) -> str:
