@@ -128,10 +128,13 @@ export const PanelTable: React.FC<
 > = props => {
   const {input, config, updateConfig} = props;
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
-  const typedInputNode = typedInputNodeUse.loading
-    ? undefined
-    : typedInputNodeUse.result;
+  // BRANCH(perf3): Don't refine here. Shouldn't need to since we init
+  // child panels for dashui.
+  // const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  // const typedInputNode = typedInputNodeUse.loading
+  //   ? undefined
+  //   : typedInputNodeUse.result;
+  const typedInputNode = inputNode;
   const mConfig = useMemo(
     () => migrateConfig(config, typedInputNode),
     [config, typedInputNode]
@@ -140,9 +143,11 @@ export const PanelTable: React.FC<
     updateConfig,
     typedInputNode
   );
-  if (typedInputNodeUse.loading) {
-    return <Panel2Loader />;
-  } else if (typedInputNode && isAssignableTo(typedInputNode.type, 'none')) {
+  // BRANCH(perf3): Don't refine here. Shouldn't need to since we init
+  // child panels for dashui.
+  // if (typedInputNodeUse.loading) {
+  //   return <Panel2Loader />;
+  if (typedInputNode && isAssignableTo(typedInputNode.type, 'none')) {
     return <div>-</div>;
   } else if (!nodeIsValidList(typedInputNode)) {
     console.warn(
