@@ -1,6 +1,8 @@
 import json
+import functools
 from dataclasses import field, dataclass
 import typing
+from .. import mappers_python
 from ..decorator_type import type as weave_type
 from .. import weave_types as types
 
@@ -35,7 +37,103 @@ require changing a few of the ops to fetch such info as well
 """
 
 
-# @weave_type("UntypedOpaqueDict", True)
+_gql_type_cache: dict[str, typing.Type[types.Type]] = {}
+
+SubclassOfGQLTypeMixin = typing.Type["GQLTypeMixin"]
+
+
+def gql_weave_type(
+    name,
+) -> typing.Callable[[typing.Type["GQLTypeMixin"]], typing.Type["GQLTypeMixin"]]:
+    """Decorator that emits a Weave Type for the decorated GQL instance type."""
+
+    def _gql_weave_type(
+        _instance_class: typing.Type["GQLTypeMixin"],
+    ) -> typing.Type["GQLTypeMixin"]:
+        decorator = weave_type(name, True)
+        _instance_class = decorator(_instance_class)
+
+        @classmethod  # type: ignore
+        def with_keys(
+            weave_type_cls, keys: dict[str, types.Type]
+        ) -> typing.Type[types.Type]:
+            """Creates a new Weave Type that is assignable to the original Weave Type, but
+            also has the specified keys. This is used during the compile pass for creating a Weave Type
+            to represent the exact output type of a specific GQL query, and for communicating the
+            data shape to arrow."""
+
+            # TODO: make this function have better type hints
+
+            str_repr = f"{weave_type_cls.name}WithKeys({sorted(keys)})"
+            if str_repr in _gql_type_cache:
+                return _gql_type_cache[str_repr]
+
+            class GQLClassWithKeysType(types.Type):
+                instance_class = _instance_class
+                instance_classes = _instance_class
+
+                def _assign_type_inner(self, other_type) -> bool:
+                    return isinstance(other_type, GQLClassWithKeysType)
+
+                @functools.cached_property
+                def _assignment_form(self) -> types.Type:
+                    return weave_type_cls()
+
+                @classmethod
+                def keys(cls) -> dict[str, types.Type]:
+                    return keys
+
+                def __repr__(self):
+                    return str_repr
+
+                def _to_dict(self):
+                    property_types = {}
+                    for key, type_ in self.keys().items():
+                        property_types[key] = type_.to_dict()
+                    result = {"keys": property_types}
+                    return result
+
+                @classmethod
+                def from_dict(cls, d):
+                    property_types = {}
+                    for key, type_ in d["keys"].items():
+                        property_types[key] = types.TypeRegistry.type_from_dict(type_)
+                    NewClass = cls.instance_class.WeaveType.with_keys(property_types)
+                    return NewClass()
+
+                @classmethod
+                def type_of_instance(cls, obj):
+                    property_types = {}
+                    for k, v in obj.items():
+                        property_types[k] = types.TypeRegistry.type_of(v)
+                    return cls(property_types)
+
+                def save_instance(self, obj, artifact, name):
+                    serializer = mappers_python.map_to_python(self, artifact)
+                    result = serializer.apply(obj)
+                    with artifact.new_file(f"{name}.{str_repr}.json") as f:
+                        json.dump(result, f, allow_nan=False)
+
+                def load_instance(self, artifact, name, extra=None):
+                    # with artifact.open(f'{name}.type.json') as f:
+                    #     obj_type = TypeRegistry.type_from_dict(json.load(f))
+                    with artifact.open(f"{name}.{str_repr}.json") as f:
+                        result = json.load(f)
+                    mapper = mappers_python.map_from_python(self, artifact)
+                    mapped_result = mapper.apply(result)
+                    if extra is not None:
+                        return mapped_result[extra[0]]
+                    return mapped_result
+
+            GQLClassWithKeysType.__name__ = str_repr  # type: ignore
+            _gql_type_cache[str_repr] = GQLClassWithKeysType
+            return GQLClassWithKeysType
+
+        wt = _instance_class.WeaveType  # type: ignore
+        wt.with_keys = with_keys
+        return _instance_class
+
+    return _gql_weave_type
 
 
 @dataclass
@@ -101,12 +199,17 @@ class UntypedOpaqueDictType(types.Type):
 class GQLTypeMixin:
     gql: UntypedOpaqueDict = field(default_factory=UntypedOpaqueDict)
 
+    def with_keys(self, *keys) -> "GQLTypeMixin":
+        return self.__class__(
+            gql=UntypedOpaqueDict(json={k: self.gql[k] for k in keys})
+        )
+
     @classmethod
     def from_gql(cls, gql_dict: dict):
         return cls(gql=UntypedOpaqueDict(gql_dict))
 
 
-@weave_type("org", True)
+@gql_weave_type("org")
 class Org(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -118,7 +221,7 @@ OrgType = Org.WeaveType()  # type: ignore
 OrgType = typing.cast(types.Type, OrgType)
 
 
-@weave_type("entity", True)
+@gql_weave_type("entity")
 class Entity(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -130,7 +233,7 @@ EntityType = Entity.WeaveType()  # type: ignore
 EntityType = typing.cast(types.Type, EntityType)
 
 
-@weave_type("user", True)
+@gql_weave_type("user")
 class User(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -142,7 +245,7 @@ UserType = User.WeaveType()  # type: ignore
 UserType = typing.cast(types.Type, UserType)
 
 
-@weave_type("project", True)
+@gql_weave_type("project")
 class Project(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -154,7 +257,7 @@ ProjectType = Project.WeaveType()  # type: ignore
 ProjectType = typing.cast(types.Type, ProjectType)
 
 
-@weave_type("run", True)
+@gql_weave_type("run")
 class Run(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -166,7 +269,7 @@ RunType = Run.WeaveType()  # type: ignore
 RunType = typing.cast(types.Type, RunType)
 
 
-@weave_type("artifactType", True)
+@gql_weave_type("artifactType")
 class ArtifactType(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -178,7 +281,7 @@ ArtifactTypeType = ArtifactType.WeaveType()  # type: ignore
 ArtifactTypeType = typing.cast(types.Type, ArtifactTypeType)
 
 
-@weave_type("artifact", True)  # Name and Class mismatch intention due to weave0
+@gql_weave_type("artifact")  # Name and Class mismatch intention due to weave0
 class ArtifactCollection(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -190,7 +293,7 @@ ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
 ArtifactCollectionType = typing.cast(types.Type, ArtifactCollectionType)
 
 
-@weave_type("artifactVersion", True)
+@gql_weave_type("artifactVersion")
 class ArtifactVersion(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -201,9 +304,7 @@ ArtifactVersionType = ArtifactVersion.WeaveType()  # type: ignore
 ArtifactVersionType = typing.cast(types.Type, ArtifactVersionType)
 
 
-@weave_type(
-    "artifactMembership", True
-)  # Name and Class mismatch intention due to weave0
+@gql_weave_type("artifactMembership")  # Name and Class mismatch intention due to weave0
 class ArtifactCollectionMembership(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -216,7 +317,7 @@ ArtifactCollectionMembershipType = typing.cast(
 )
 
 
-@weave_type("artifactAlias", True)
+@gql_weave_type("artifactAlias")
 class ArtifactAlias(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -227,7 +328,7 @@ ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
 ArtifactAliasType = typing.cast(types.Type, ArtifactAliasType)
 
 
-@weave_type("report", True)
+@gql_weave_type("report")
 class Report(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -238,7 +339,7 @@ ReportType = Report.WeaveType()  # type: ignore
 ReportType = typing.cast(types.Type, ReportType)
 
 
-@weave_type("runQueue", True)
+@gql_weave_type("runQueue")
 class RunQueue(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
@@ -252,7 +353,7 @@ RunQueueType = typing.cast(types.Type, RunQueueType)
 # Simple types (maybe should be put into primitives?)
 
 
-@weave_type("link", True)
+@weave_type("link")
 class Link:
     name: str
     url: str
