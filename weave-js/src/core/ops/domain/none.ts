@@ -143,6 +143,10 @@ export const opNoneCoalesce = makeOp({
       // lhs: NS
       // When the lhs is a nullable, singe value, return the union of nonnull lhs and rhs
       // = union<nonnull<lhs>, rhs>
+      const nonNullLhs = nonNullable(lhs);
+      if (nonNullLhs === 'none') {
+        return inputs.rhs.type;
+      }
       return union([lhsTagged(nonNullable(lhs)), inputs.rhs.type]);
     }
 

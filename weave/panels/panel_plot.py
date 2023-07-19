@@ -882,7 +882,7 @@ def _get_selected_data_node(plot: Plot) -> graph.Node:
         table_config = panel_table.TableConfig(tableState=series.table)
         table_config.tableState.add_column(lambda row: row, "row")
         table_panel = panel_table.Table(plot.input_node, config=table_config)
-        node = list_.unnest(panel_table.rows(table_panel))
+        node = list_.unnest(panel_table._get_rows_node(table_panel))
         columns = table_panel.get_final_named_select_functions()
 
         if selection.x is None and selection.y is None:
@@ -972,4 +972,4 @@ def selected_rows(self: Plot):
 )
 def selected_data(self: Plot):
     selected_data_node = _get_selected_data_node(self)
-    return weave.use(selected_data_node)
+    return selected_data_node

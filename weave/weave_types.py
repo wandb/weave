@@ -658,7 +658,8 @@ class Timestamp(Type):
     def from_isostring(self, iso: str) -> datetime.datetime:
         # NOTE: This assumes ISO 8601 format from GQL endpoints, it does NOT
         # support RFC 3339 strings with a "Z" at the end before python 3.11
-        return datetime.datetime.fromisoformat(iso)
+        tz_naive = datetime.datetime.fromisoformat(iso)
+        return tz_naive.replace(tzinfo=datetime.timezone.utc)
 
     def save_instance(self, obj, artifact, name):
         if artifact is None:
@@ -825,8 +826,15 @@ class TypedDict(Type):
     instance_classes = [dict]
     property_types: dict[str, Type] = dataclasses.field(default_factory=dict)
 
+    # See: https://peps.python.org/pep-0655/
+    # in Typescript this is like key?: value
+    not_required_keys: set[str] = dataclasses.field(default_factory=set)
+
     def _hashable(self):
-        return tuple((k, hash(v)) for k, v in self.property_types.items())
+        return tuple(
+            (k, hash(v), k in self.not_required_keys)
+            for k, v in self.property_types.items()
+        )
 
     def _assign_type_inner(self, other_type):
         if isinstance(other_type, Dict):
@@ -839,6 +847,8 @@ class TypedDict(Type):
             return False
 
         for k, ptype in self.property_types.items():
+            if k in self.not_required_keys and k not in other_type.property_types:
+                continue
             if k not in other_type.property_types or not ptype.assign_type(
                 other_type.property_types[k]
             ):
@@ -849,14 +859,20 @@ class TypedDict(Type):
         property_types = {}
         for key, type_ in self.property_types.items():
             property_types[key] = type_.to_dict()
-        return {"propertyTypes": property_types}
+        result = {"propertyTypes": property_types}
+        if self.not_required_keys:
+            result["notRequiredKeys"] = list(self.not_required_keys)
+        return result
 
     @classmethod
     def from_dict(cls, d):
         property_types = {}
         for key, type_ in d["propertyTypes"].items():
             property_types[key] = TypeRegistry.type_from_dict(type_)
-        return cls(property_types)
+        not_required_keys = set()
+        if "notRequiredKeys" in d:
+            not_required_keys = set(d["notRequiredKeys"])
+        return cls(property_types, not_required_keys)
 
     @classmethod
     def type_of_instance(cls, obj):

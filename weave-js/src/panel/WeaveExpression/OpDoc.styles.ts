@@ -1,23 +1,38 @@
 import styled from 'styled-components';
+import * as globals from '@wandb/weave/common/css/globals.styles';
+
+export const OpNameRow = styled.div`
+  display: flex;
+  height: 24px;
+`;
+OpNameRow.displayName = 'S.OpNameRow';
 
 export const OpName = styled.h2`
-  font-size: 18px;
+  flex: 1 1 auto;
+  font-size: 15px;
   font-weight: 600;
   margin-bottom: 2px;
 `;
+OpName.displayName = 'S.OpName';
+
+export const OpClose = styled.div`
+  margin-left: 10px;
+`;
+OpClose.displayName = 'S.OpClose';
 
 export const Section = styled.div`
   margin-bottom: 8px;
 `;
 
 export const Subheader = styled.h3`
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   margin-bottom: 2px;
 `;
 
 export const Markdown = styled.div`
   font-size: 14px;
+  color: ${globals.MOON_250};
 `;
 
 export const ArgList = styled.ul`
@@ -34,4 +49,8 @@ export const ArgList = styled.ul`
 export const ArgName = styled.span`
   font-size: 14px;
   font-weight: 600;
+`;
+
+export const Code = styled.code`
+  font-family: Inconsolata;
 `;

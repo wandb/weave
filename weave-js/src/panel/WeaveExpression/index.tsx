@@ -109,9 +109,27 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     [editor]
   );
 
+  // Don't show suggestions when the editor is first focused.
+  // A mouse down or key press will unsuppress them.
+  const [isFirstFocused, setIsFirstFocused] = useState(false);
+  const suppressingFocus = () => {
+    setIsFirstFocused(true);
+    onFocus();
+  };
+  const mouseDownHandler = () => {
+    setIsFirstFocused(false);
+  };
+
   // Certain keys have special behavior
   const keyDownHandler = React.useCallback(
     ev => {
+      // Pressing a non-printable character like shift is not enough to cancel
+      // the suggestion panel suppression.
+      const isPrintableCharacter = ev.key.length === 1;
+      if (isPrintableCharacter) {
+        setIsFirstFocused(false);
+      }
+
       if (ev.key === 'Enter' && !ev.shiftKey && !props.liveUpdate) {
         // Apply outstanding changes to expression
         ev.preventDefault();
@@ -196,7 +214,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     <Container spellCheck="false">
       <Slate
         editor={editor}
-        value={slateValue}
+        initialValue={slateValue}
         onChange={onChangeResetSuggestion}>
         <S.EditableContainer
           ref={containerRef}
@@ -211,9 +229,10 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
             // placeholder={<div>"Weave expression"</div>}
             className={isValid ? 'valid' : 'invalid'}
             onCopy={copyHandler}
+            onMouseDown={mouseDownHandler}
             onKeyDown={keyDownHandler}
             onBlur={onBlur}
-            onFocus={onFocus}
+            onFocus={suppressingFocus}
             decorate={decorate}
             renderLeaf={leafProps => <Leaf {...leafProps} />}
             style={{overflowWrap: 'anywhere'}}
@@ -243,9 +262,10 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
         </S.EditableContainer>
         {!props.frozen && (
           <Suggestions
-            forceHidden={suppressSuggestions || isBusy}
+            forceHidden={suppressSuggestions || isBusy || isFirstFocused}
             {...suggestions}
             suggestionIndex={suggestionIndex}
+            setSuggestionIndex={setSuggestionIndex}
           />
         )}
       </Slate>

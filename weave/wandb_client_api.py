@@ -5,9 +5,19 @@ from wandb.apis import public
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
 import typing
 
+from . import errors
+
 
 def wandb_public_api() -> public.Api:
     return public.Api(timeout=30)
+
+
+def assert_wandb_authenticated() -> None:
+    authenticated = wandb_public_api().api_key is not None
+    if not authenticated:
+        raise errors.WeaveWandbAuthenticationException(
+            f"Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`."
+        )
 
 
 def wandb_gql_query(

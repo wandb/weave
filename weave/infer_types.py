@@ -66,9 +66,28 @@ def python_type_to_type(
                 return weave_type
             return weave_type(*args)
     elif is_typed_dict_like(py_type):
-        return weave_types.TypedDict(
-            {k: python_type_to_type(t) for k, t in py_type.__annotations__.items()}
-        )
+        prop_types = {}
+        not_required_keys = set()
+        for (
+            k,
+            t,
+        ) in py_type.__annotations__.items():
+            if isinstance(t, typing.ForwardRef):
+                # Its a ForwardRef if we use typing_extensions.TypedDict
+                # which we have to when we want to use NotRequired.
+                # But it can be immediately evaluated in the cases we
+                # use it.
+                t = t._evaluate(
+                    {"NotRequired": typing_extensions.NotRequired}, None, frozenset()
+                )
+                if (
+                    hasattr(t, "__origin__")
+                    and t.__origin__ == typing_extensions.NotRequired
+                ):
+                    not_required_keys.add(k)
+                    t = t.__args__[0]
+            prop_types[k] = python_type_to_type(t)
+        return weave_types.TypedDict(prop_types, not_required_keys=not_required_keys)
     weave_type = simple_python_type_to_type(py_type)
     if weave_type == weave_types.UnknownType():
         return weave_type

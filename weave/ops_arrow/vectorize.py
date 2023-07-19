@@ -428,25 +428,31 @@ def vectorize(
                     }
                 )
 
-        if node_name.endswith("index") or node_name.endswith("__getitem__"):
-            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
-            return arraylist_ops.listindex(*inputs_as_awl.values())
-        elif node_name.endswith("count"):
-            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
-            return arraylist_ops.list_numbers_count(*inputs_as_awl.values())
-        elif node_name.endswith("max"):
-            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
-            return arraylist_ops.list_numbers_max(*inputs_as_awl.values())
-        elif node_name.endswith("min"):
-            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
-            return arraylist_ops.list_numbers_min(*inputs_as_awl.values())
-        elif node_name.endswith("avg"):
-            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
-            return arraylist_ops.list_numbers_avg(*inputs_as_awl.values())
-        elif node_name.endswith("sum"):
-            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
-            return arraylist_ops.list_numbers_sum(*inputs_as_awl.values())
-        elif node_name == "dropna":
+        input0_name = list(node_inputs.keys())[0]
+        input0 = list(node_inputs.values())[0]
+        if input0_name in vectorized_keys and types.List(
+            types.optional(types.List())
+        ).assign_type(input0.type):
+            if node_name.endswith("index") or node_name.endswith("__getitem__"):
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return arraylist_ops.listindex(*inputs_as_awl.values())
+            elif node_name.endswith("count"):
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return arraylist_ops.list_numbers_count(*inputs_as_awl.values())
+            elif node_name.endswith("max"):
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return arraylist_ops.list_numbers_max(*inputs_as_awl.values())
+            elif node_name.endswith("min"):
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return arraylist_ops.list_numbers_min(*inputs_as_awl.values())
+            elif node_name.endswith("avg"):
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return arraylist_ops.list_numbers_avg(*inputs_as_awl.values())
+            elif node_name.endswith("sum"):
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return arraylist_ops.list_numbers_sum(*inputs_as_awl.values())
+
+        if node_name == "dropna":
             arg_names = list(node_inputs.keys())
             if arg_names[0] in vectorized_keys:
                 op = registry_mem.memory_registry.get_op(
@@ -662,12 +668,15 @@ def _ensure_variadic_fn(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
+    logging.info(f"Vectorizing: %s", fn)
     from .. import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)
+    logging.info(f"Vectorizing. Static branch resolution complete.: %s", fn)
     from .. import graph_debug
 
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
+    logging.info(f"Vectorizing. Vectorized: %s", fn)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)

@@ -205,6 +205,19 @@ index = OpSpec(
             expected=3,
             expected_type=weave.types.Number(),
         ),
+        # I didn't implement negative indexing or list indexing in vectorized
+        # cases yet
+        # TODO: fix!
+        # OpSpecTestCase(
+        #     input=([1, 2, 3], -1),
+        #     expected=3,
+        #     expected_type=weave.types.Number(),
+        # ),
+        # OpSpecTestCase(
+        #     input=([1, 2, 3], [0, -1, 5, None]),
+        #     expected=3,
+        #     expected_type=weave.types.List(weave.types.Number()),
+        # ),
         OpSpecTestCase(
             input=([-5, -6], 2),
             expected=None,

@@ -60,6 +60,9 @@ const LegacyWBIconComp = React.forwardRef<HTMLElement, LegacyWBIconProps>(
       style,
       'data-test': dataTest,
     };
+    if (ref == null) {
+      return <Icon {...passProps} className={className} />;
+    }
     return (
       <Ref innerRef={ref}>
         <Icon {...passProps} className={className} />

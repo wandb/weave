@@ -20,3 +20,10 @@ def default_panel_bank_flow_section_config():
         type="grid",
         sorted=0,
     )
+
+
+def flow_layout(rows: int, cols: int):
+    layout = default_panel_bank_flow_section_config()
+    layout["flowConfig"]["columnsPerPage"] = cols
+    layout["flowConfig"]["rowsPerPage"] = rows
+    return layout
