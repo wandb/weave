@@ -93,6 +93,14 @@ class GQLClassWithKeysToPyDict(mappers_weave.GQLMapper):
         return result
 
 
+class PyDictToGQLClassWithKeys(mappers_weave.GQLMapper):
+    def apply(self, obj: dict) -> GQLTypeMixin:
+        deserialized_obj = {}
+        for k, prop_serializer in self._property_serializers.items():
+            deserialized_obj[k] = prop_serializer.apply(obj.get(k, None))
+        return self.type.keyless_weave_type_class.instance_class(deserialized_obj)
+
+
 class ListToPyList(mappers_weave.ListMapper):
     def apply(self, obj):
         return [self._object_type.apply(item) for item in obj]
@@ -411,6 +419,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
+    elif isinstance(type, GQLClassWithKeysType):
+        return PyDictToGQLClassWithKeys(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
