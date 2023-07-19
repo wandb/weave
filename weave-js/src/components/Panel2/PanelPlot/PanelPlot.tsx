@@ -508,7 +508,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                     const newConfig = PlotState.addSeriesFromSeries(
                       config,
                       s,
-                      'x',
+                      'y',
                       weave
                     );
                     updateConfig(newConfig);
@@ -1387,7 +1387,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
                 <IconLockedConstrained width={18} height={18} />
               </S.ConstrainedIconContainer>
             }>
-            Constrain dimension across series
+            Remove constraint across series
           </Tooltip>
         ) : (
           <Tooltip
