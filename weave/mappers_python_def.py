@@ -84,6 +84,18 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             )
 
 
+class GQLClassWithKeysToPyDict(mappers.Mapper):
+    def __init__(self, type):
+        self._type = type
+
+    def apply(self, obj):
+        return {
+            "_type": self._type.name,
+            "_id": obj.id,
+            "_key": obj.key,
+        }
+
+
 class ListToPyList(mappers_weave.ListMapper):
     def apply(self, obj):
         return [self._object_type.apply(item) for item in obj]
@@ -350,11 +362,15 @@ def add_mapper(
 
 
 def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
+    from .ops_domain.wb_domain_types import GQLClassWithKeysType
+
     mapper_options = mapper_options or {}
     use_stable_refs = mapper_options.get("use_stable_refs", True)
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return TypeToPyType(type, mapper, artifact, path)
+    elif isinstance(type, GQLClassWithKeysType):
+        return GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
         return TypedDictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.Dict):

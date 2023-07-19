@@ -1,3 +1,5 @@
+import typing
+
 from . import mappers
 from . import weave_types as types
 
@@ -8,6 +10,21 @@ class TypedDictMapper(mappers.Mapper):
         self._artifact = artifact
         prop_serializers = {}
         for property_key, property_type in type_.property_types.items():
+            prop_serializer = mapper(
+                property_type, artifact, path=path + [property_key]
+            )
+            prop_serializers[property_key] = prop_serializer
+        self._property_serializers = prop_serializers
+
+
+class GQLMapper(mappers.Mapper):
+    def __init__(self, type_: types.Type, mapper, artifact, path):
+        from .ops_domain.wb_domain_types import GQLClassWithKeysType
+
+        self.type = typing.cast(GQLClassWithKeysType, type_)
+        self._artifact = artifact
+        prop_serializers = {}
+        for property_key, property_type in self.type.keys.items():
             prop_serializer = mapper(
                 property_type, artifact, path=path + [property_key]
             )

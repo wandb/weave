@@ -1,10 +1,8 @@
-import json
-import functools
-from dataclasses import field, dataclass
 import typing
-from .. import mappers_python
 from .. import weave_types as types
 from ..decorator_type import type as weave_type
+
+from ..gql_with_keys import GQLClassWithKeysType, GQLTypeMixin
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -37,93 +35,31 @@ require changing a few of the ops to fetch such info as well
 """
 
 
-class GQLClassWithKeysType(types.Type):
-    # Has no instance classes or instance class - type of is performed in
-    # original weave type
-
-    def __init__(self, keyless_weave_type: types.Type, keys: dict[str, types.Type]):
-        self.keyless_weave_type = keyless_weave_type
-        self.keys = keys
-
-    def _assign_type_inner(self, other_type) -> bool:
-        return isinstance(other_type, GQLClassWithKeysType)
-
-    def _str_repr(self) -> str:
-        keys_repr = dict(sorted([(k, v.__repr__()) for k, v in self.keys.items()]))
-        return f"{self.keyless_weave_type.__class__.name}WithKeys({keys_repr})"
-
-    def __repr__(self) -> str:
-        return self._str_repr()
-
-    def _to_dict(self):
-        property_types = {}
-        for key, type_ in self.keys().items():
-            property_types[key] = type_.to_dict()
-        result = {"keys": property_types}
-        return result
-
-    @classmethod
-    def from_dict(cls, d):
-        property_types = {}
-        for key, type_ in d["keys"].items():
-            property_types[key] = types.TypeRegistry.type_from_dict(type_)
-        NewClass = cls.instance_class.WeaveType.with_keys(property_types)
-        return NewClass()
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        property_types = {}
-        for k, v in obj.items():
-            property_types[k] = types.TypeRegistry.type_of(v)
-        return cls(property_types)
-
-    def save_instance(self, obj, artifact, name):
-        serializer = mappers_python.map_to_python(self, artifact)
-        result = serializer.apply(obj)
-        with artifact.new_file(
-            f"{name}.{self.keyless_weave_type.__class__.__name__}WithKeys.json"
-        ) as f:
-            json.dump(result, f, allow_nan=False)
-
-    def load_instance(self, artifact, name, extra=None):
-        # with artifact.open(f'{name}.type.json') as f:
-        #     obj_type = TypeRegistry.type_from_dict(json.load(f))
-        with artifact.open(
-            f"{name}.{self.keyless_weave_type.__class__.__name__}WithKeys.json"
-        ) as f:
-            result = json.load(f)
-        mapper = mappers_python.map_from_python(self, artifact)
-        mapped_result = mapper.apply(result)
-        if extra is not None:
-            return mapped_result[extra[0]]
-        return mapped_result
-
-
-def with_keys(self, keys: dict[str, types.Type]) -> types.Type:
+@classmethod  # type: ignore
+def with_keys(cls, keys: dict[str, types.Type]) -> types.Type:
     """Creates a new Weave Type that is assignable to the original Weave Type, but
     also has the specified keys. This is used during the compile pass for creating a Weave Type
     to represent the exact output type of a specific GQL query, and for communicating the
     data shape to arrow."""
 
-    return GQLClassWithKeysType(self, keys)
+    return GQLClassWithKeysType(cls, keys)
 
 
-def type_of_instance(self, obj: "GQLTypeMixin") -> types.Type:
+@classmethod  # type: ignore
+def type_of_instance(cls, obj: "GQLTypeMixin") -> types.Type:
     if obj.gql == {} or obj.gql is None:
-        return self
+        return cls
 
     gql_type = typing.cast(types.TypedDict, types.TypeRegistry.type_of(obj.gql))
-    return self.with_keys(gql_type.property_types)
+    return cls.with_keys(gql_type.property_types)
 
 
 def gql_weave_type(
     name,
-) -> typing.Callable[[typing.Type["GQLTypeMixin"]], typing.Type["GQLTypeMixin"]]:
+):  # -> typing.Callable[[typing.Type["GQLTypeMixin"]], typing.Type["GQLTypeMixin"]]:
     """Decorator that emits a Weave Type for the decorated GQL instance type."""
 
-    def _gql_weave_type(
-        _instance_class: typing.Type["GQLTypeMixin"],
-    ) -> typing.Type["GQLTypeMixin"]:
+    def _gql_weave_type(_instance_class):
         decorator = weave_type(
             name,
             True,
@@ -133,79 +69,6 @@ def gql_weave_type(
         return decorator(_instance_class)
 
     return _gql_weave_type
-
-
-@dataclass
-class UntypedOpaqueDict:
-    """
-    UntypedOpaqueDict is a Weave Type that is used to store arbitrary JSON data.
-    Unlike `Dict` or `TypedDict`, this Type does not need to define the keys/fields.
-    This is useful in particular for storing GQL responses where the response schema
-    may change over time. Usage:
-
-    # From JSON String
-    d = UntypedOpaqueDict(json_str='{"a": 1, "b": 2}')
-    d["a"]  # 1
-
-    # From Dictionary
-    d = UntypedOpaqueDict.from_dict({"a": 1, "b": 2})
-    d["a"]  # 1
-
-    Importantly, this will serialize the data as a JSON string, so it can be stored and
-    loaded using the Weave Type system.
-    """
-
-    json: dict = field(default_factory=dict)
-
-    @classmethod
-    def from_json_dict(cls, json_dict: dict):
-        return cls(json_dict)
-
-    def get(self, key, default=None):
-        return self.json.get(key, default)
-
-    def __eq__(self, other):
-        return self.json == other.json
-
-    def __getitem__(self, key):
-        return self.json[key]
-
-    def __setitem__(self, key, value):
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
-
-    def __delitem__(self, key):
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
-
-    def __iter__(self):
-        return iter(self.json)
-
-    def __len__(self):
-        return len(self.json)
-
-
-class UntypedOpaqueDictType(types.Type):
-    instance_class = UntypedOpaqueDict
-    instance_classes = [UntypedOpaqueDict]
-
-    def instance_to_dict(self, obj: UntypedOpaqueDict):
-        return obj.json
-
-    def instance_from_dict(self, obj):
-        return UntypedOpaqueDict(json=obj)
-
-
-@dataclass
-class GQLTypeMixin:
-    gql: UntypedOpaqueDict = field(default_factory=UntypedOpaqueDict)
-
-    def with_keys(self, *keys) -> "GQLTypeMixin":
-        return self.__class__(
-            gql=UntypedOpaqueDict(json={k: self.gql[k] for k in keys})
-        )
-
-    @classmethod
-    def from_gql(cls, gql_dict: dict):
-        return cls(gql=UntypedOpaqueDict(gql_dict))
 
 
 @gql_weave_type("org")
