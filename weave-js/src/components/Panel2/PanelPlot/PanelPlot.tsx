@@ -98,6 +98,7 @@ import {
   DimensionLike,
   ExpressionDimName,
   isValidConfig,
+  DIM_NAME_MAP,
 } from './plotState';
 import {PanelPlotRadioButtons} from './RadioButtons';
 import {
@@ -106,7 +107,6 @@ import {
   AxisSelections,
   ContinuousSelection,
   DEFAULT_SCALE_TYPE,
-  DIM_NAME_MAP,
   DiscreteSelection,
   LAZY_PATHS,
   LINE_SHAPES,
@@ -1051,12 +1051,7 @@ const ConfigDimLabel: React.FC<
   return (
     <div style={{paddingLeft: 10 * props.indentation}}>
       <ConfigPanel.ConfigOption
-        label={
-          DIM_NAME_MAP[props.dimension.name] +
-          (props.isShared || props.config.series.length === 1
-            ? ''
-            : ` ${props.config.series.indexOf(props.dimension.series) + 1}`)
-        }
+        label={DIM_NAME_MAP[props.dimension.name]}
         data-test={`${props.dimension.name}-dim-config`}
         postfixComponent={props.postfixComponent}
         multiline={props.multiline}>

@@ -42,7 +42,6 @@ import {
   ContinuousSelection,
   DEFAULT_LAZY_PATH_VALUES,
   DEFAULT_POINT_SIZE,
-  DIM_NAME_MAP,
   DiscreteSelection,
   LAZY_PATHS,
   LINE_SHAPES,
@@ -55,6 +54,26 @@ import {
   SeriesConfig,
 } from './versions';
 import * as v1 from './versions/v1';
+
+export const DIM_NAME_MAP: {
+  [K in
+    | keyof SeriesConfig['dims']
+    | 'mark'
+    | 'lineStyle'
+    | 'lineShape']: string;
+} = {
+  pointSize: 'Size',
+  pointShape: 'Shape',
+  x: 'X',
+  y: 'Y',
+  label: 'Color',
+  color: 'Color',
+  mark: 'Mark',
+  tooltip: 'Tooltip',
+  y2: 'Y2',
+  lineStyle: 'Style',
+  lineShape: 'Style',
+};
 
 export type DimType =
   | 'optionSelect'
