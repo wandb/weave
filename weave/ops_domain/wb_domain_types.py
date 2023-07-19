@@ -3,8 +3,8 @@ import functools
 from dataclasses import field, dataclass
 import typing
 from .. import mappers_python
-from ..decorator_type import type as weave_type
 from .. import weave_types as types
+from ..decorator_type import type as weave_type
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -37,9 +37,83 @@ require changing a few of the ops to fetch such info as well
 """
 
 
-_gql_type_cache: dict[str, typing.Type[types.Type]] = {}
+class GQLClassWithKeysType(types.Type):
+    # Has no instance classes or instance class - type of is performed in
+    # original weave type
 
-SubclassOfGQLTypeMixin = typing.Type["GQLTypeMixin"]
+    def __init__(self, keyless_weave_type: types.Type, keys: dict[str, types.Type]):
+        self.keyless_weave_type = keyless_weave_type
+        self.keys = keys
+
+    def _assign_type_inner(self, other_type) -> bool:
+        return isinstance(other_type, GQLClassWithKeysType)
+
+    def _str_repr(self) -> str:
+        keys_repr = dict(sorted([(k, v.__repr__()) for k, v in self.keys.items()]))
+        return f"{self.keyless_weave_type.__class__.name}WithKeys({keys_repr})"
+
+    def __repr__(self) -> str:
+        return self._str_repr()
+
+    def _to_dict(self):
+        property_types = {}
+        for key, type_ in self.keys().items():
+            property_types[key] = type_.to_dict()
+        result = {"keys": property_types}
+        return result
+
+    @classmethod
+    def from_dict(cls, d):
+        property_types = {}
+        for key, type_ in d["keys"].items():
+            property_types[key] = types.TypeRegistry.type_from_dict(type_)
+        NewClass = cls.instance_class.WeaveType.with_keys(property_types)
+        return NewClass()
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        property_types = {}
+        for k, v in obj.items():
+            property_types[k] = types.TypeRegistry.type_of(v)
+        return cls(property_types)
+
+    def save_instance(self, obj, artifact, name):
+        serializer = mappers_python.map_to_python(self, artifact)
+        result = serializer.apply(obj)
+        with artifact.new_file(
+            f"{name}.{self.keyless_weave_type.__class__.__name__}WithKeys.json"
+        ) as f:
+            json.dump(result, f, allow_nan=False)
+
+    def load_instance(self, artifact, name, extra=None):
+        # with artifact.open(f'{name}.type.json') as f:
+        #     obj_type = TypeRegistry.type_from_dict(json.load(f))
+        with artifact.open(
+            f"{name}.{self.keyless_weave_type.__class__.__name__}WithKeys.json"
+        ) as f:
+            result = json.load(f)
+        mapper = mappers_python.map_from_python(self, artifact)
+        mapped_result = mapper.apply(result)
+        if extra is not None:
+            return mapped_result[extra[0]]
+        return mapped_result
+
+
+def with_keys(self, keys: dict[str, types.Type]) -> types.Type:
+    """Creates a new Weave Type that is assignable to the original Weave Type, but
+    also has the specified keys. This is used during the compile pass for creating a Weave Type
+    to represent the exact output type of a specific GQL query, and for communicating the
+    data shape to arrow."""
+
+    return GQLClassWithKeysType(self, keys)
+
+
+def type_of_instance(self, obj: "GQLTypeMixin") -> types.Type:
+    if obj.gql == {} or obj.gql is None:
+        return self
+
+    gql_type = typing.cast(types.TypedDict, types.TypeRegistry.type_of(obj.gql))
+    return self.with_keys(gql_type.property_types)
 
 
 def gql_weave_type(
@@ -50,88 +124,13 @@ def gql_weave_type(
     def _gql_weave_type(
         _instance_class: typing.Type["GQLTypeMixin"],
     ) -> typing.Type["GQLTypeMixin"]:
-        decorator = weave_type(name, True)
-        _instance_class = decorator(_instance_class)
-
-        @classmethod  # type: ignore
-        def with_keys(
-            weave_type_cls, keys: dict[str, types.Type]
-        ) -> typing.Type[types.Type]:
-            """Creates a new Weave Type that is assignable to the original Weave Type, but
-            also has the specified keys. This is used during the compile pass for creating a Weave Type
-            to represent the exact output type of a specific GQL query, and for communicating the
-            data shape to arrow."""
-
-            # TODO: make this function have better type hints
-
-            str_repr = f"{weave_type_cls.name}WithKeys({sorted(keys)})"
-            if str_repr in _gql_type_cache:
-                return _gql_type_cache[str_repr]
-
-            class GQLClassWithKeysType(types.Type):
-                instance_class = _instance_class
-                instance_classes = _instance_class
-
-                def _assign_type_inner(self, other_type) -> bool:
-                    return isinstance(other_type, GQLClassWithKeysType)
-
-                @functools.cached_property
-                def _assignment_form(self) -> types.Type:
-                    return weave_type_cls()
-
-                @classmethod
-                def keys(cls) -> dict[str, types.Type]:
-                    return keys
-
-                def __repr__(self):
-                    return str_repr
-
-                def _to_dict(self):
-                    property_types = {}
-                    for key, type_ in self.keys().items():
-                        property_types[key] = type_.to_dict()
-                    result = {"keys": property_types}
-                    return result
-
-                @classmethod
-                def from_dict(cls, d):
-                    property_types = {}
-                    for key, type_ in d["keys"].items():
-                        property_types[key] = types.TypeRegistry.type_from_dict(type_)
-                    NewClass = cls.instance_class.WeaveType.with_keys(property_types)
-                    return NewClass()
-
-                @classmethod
-                def type_of_instance(cls, obj):
-                    property_types = {}
-                    for k, v in obj.items():
-                        property_types[k] = types.TypeRegistry.type_of(v)
-                    return cls(property_types)
-
-                def save_instance(self, obj, artifact, name):
-                    serializer = mappers_python.map_to_python(self, artifact)
-                    result = serializer.apply(obj)
-                    with artifact.new_file(f"{name}.{str_repr}.json") as f:
-                        json.dump(result, f, allow_nan=False)
-
-                def load_instance(self, artifact, name, extra=None):
-                    # with artifact.open(f'{name}.type.json') as f:
-                    #     obj_type = TypeRegistry.type_from_dict(json.load(f))
-                    with artifact.open(f"{name}.{str_repr}.json") as f:
-                        result = json.load(f)
-                    mapper = mappers_python.map_from_python(self, artifact)
-                    mapped_result = mapper.apply(result)
-                    if extra is not None:
-                        return mapped_result[extra[0]]
-                    return mapped_result
-
-            GQLClassWithKeysType.__name__ = str_repr  # type: ignore
-            _gql_type_cache[str_repr] = GQLClassWithKeysType
-            return GQLClassWithKeysType
-
-        wt = _instance_class.WeaveType  # type: ignore
-        wt.with_keys = with_keys
-        return _instance_class
+        decorator = weave_type(
+            name,
+            True,
+            None,
+            {"with_keys": with_keys, "type_of_instance": type_of_instance},
+        )
+        return decorator(_instance_class)
 
     return _gql_weave_type
 

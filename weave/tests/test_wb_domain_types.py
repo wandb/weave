@@ -18,9 +18,10 @@ def test_type_of_run_with_keys():
     )
 
 
-def serialize_deserialize_run_type():
-    run_type: types.Type = wdt.RunType.with_keys({"a": types.String()})
-    assert run_type.from_dict(run_type.to_dict()) == run_type
+def test_serialize_deserialize_run_type():
+    run_type_class: types.Type = wdt.RunType.with_keys({"a": types.String()})
+    run_type = run_type_class()
+    assert run_type_class.from_dict(run_type.to_dict()) == run_type
 
 
 def test_storage_on_type_with_keys():
