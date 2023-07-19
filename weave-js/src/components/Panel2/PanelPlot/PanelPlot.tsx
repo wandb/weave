@@ -1188,7 +1188,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           : null;
 
       return enableDashUi
-        ? [collapseDimDropdownOption]
+        ? []
         : [
             removeSeriesDropdownOption,
             addSeriesDropdownOption,
@@ -1214,7 +1214,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return [expandDim];
+      return enableDashUi ? [] : [expandDim];
     },
     [config, updateConfig]
   );
@@ -1350,10 +1350,6 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   );
 
   const postFixComponent = useMemo(() => {
-    if (dimOptions.length === 0) {
-      return undefined;
-    }
-
     if (!enableDashUi) {
       return (
         <PopupDropdown
