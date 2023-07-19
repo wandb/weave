@@ -49,6 +49,7 @@ def _filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
         run_path.entity_name,
         run_path.project_name,
         run_path.run_name,
+        file_path,
     )
     runfiles = WandbRunFiles(name=uri.name, uri=uri)
     return runfiles.path_info(file_path)
@@ -93,7 +94,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 bins=bins,
                 values=val["values"],
             )
-        if val["_type"] == "table-file":
+        if val["_type"] in ["table-file", "audio-file", "bokeh-file", "video-file", "object3D-file", "molecule-file", "html-file"]:
             if "artifact_path" in val:
                 artifact_path = escape_artifact_path(val["artifact_path"])
                 return _filesystem_artifact_file_from_artifact_path(artifact_path)

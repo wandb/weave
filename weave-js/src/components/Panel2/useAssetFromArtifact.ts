@@ -30,7 +30,11 @@ export const useAssetURLFromArtifact = <
     if (!nodeValueQuery.loading && nodeValueQuery.result != null) {
       return opArtifactVersionFile({
         artifactVersion: opAssetArtifactVersion({asset: inputNode}),
-        path: constString(nodeValueQuery.result.path),
+        path: constString(
+          typeof nodeValueQuery.result === `string`
+            ? nodeValueQuery.result
+            : nodeValueQuery.result.path
+        ),
       });
     } else {
       return voidNode();
