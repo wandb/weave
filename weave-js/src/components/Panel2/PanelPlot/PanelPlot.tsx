@@ -100,6 +100,7 @@ import {
   ExpressionDimName,
   isValidConfig,
   DIM_NAME_MAP,
+  DASHBOARD_DIM_NAME_MAP,
 } from './plotState';
 import {PanelPlotRadioButtons} from './RadioButtons';
 import {
@@ -1016,8 +1017,16 @@ const ConfigDimLabel: React.FC<
   Omit<DimComponentInputType, 'extraOptions'> & {
     postfixComponent?: React.ReactElement;
     multiline?: boolean;
+    enableDashUi?: boolean;
   }
 > = props => {
+  const dimName = props.dimension.name;
+  const label = props.enableDashUi
+    ? DASHBOARD_DIM_NAME_MAP[dimName]
+    : DIM_NAME_MAP[dimName] +
+      (props.isShared || props.config.series.length === 1)
+    ? ''
+    : ` ${props.config.series.indexOf(props.dimension.series) + 1}`;
   return (
     <div
       style={{
@@ -1026,7 +1035,7 @@ const ConfigDimLabel: React.FC<
           props.indentation > 0 ? `2px solid ${globals.MOON_200}` : 'none',
       }}>
       <ConfigPanel.ConfigOption
-        label={DIM_NAME_MAP[props.dimension.name]}
+        label={label}
         data-test={`${props.dimension.name}-dim-config`}
         postfixComponent={props.postfixComponent}
         multiline={props.multiline}>
@@ -1505,7 +1514,8 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       <ConfigDimLabel
         {...props}
         postfixComponent={postFixComponent}
-        multiline={enableDashUi && multiline}>
+        multiline={enableDashUi && multiline}
+        enableDashUi={enableDashUi}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
           placeholder={dimension.defaultState().compareValue}
@@ -1533,7 +1543,8 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         <ConfigDimLabel
           {...props}
           postfixComponent={postFixComponent}
-          multiline={enableDashUi && multiline}>
+          multiline={enableDashUi && multiline}
+          enableDashUi={enableDashUi}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}

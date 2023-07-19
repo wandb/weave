@@ -55,7 +55,7 @@ import {
 } from './versions';
 import * as v1 from './versions/v1';
 
-export const DIM_NAME_MAP: {
+export const DASHBOARD_DIM_NAME_MAP: {
   [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
 } = {
   pointSize: 'Size',
@@ -67,6 +67,21 @@ export const DIM_NAME_MAP: {
   mark: 'Mark',
   tooltip: 'Tooltip',
   y2: 'Y2',
+  lineStyle: 'Style',
+};
+
+export const DIM_NAME_MAP: {
+  [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
+} = {
+  pointSize: 'Size',
+  pointShape: 'Shape',
+  x: 'X Dim',
+  y: 'Y Dim',
+  label: 'Color',
+  color: 'Color',
+  mark: 'Mark',
+  tooltip: 'Tooltip',
+  y2: 'Y2 Dim',
   lineStyle: 'Style',
 };
 
