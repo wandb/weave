@@ -1034,7 +1034,9 @@ const ConfigDimLabel: React.FC<
       style={{
         paddingLeft: 10 * props.indentation,
         borderLeft:
-          props.indentation > 0 ? `2px solid ${globals.MOON_200}` : 'none',
+          props.indentation > 0 && props.enableDashUi
+            ? `2px solid ${globals.MOON_200}`
+            : 'none',
       }}>
       <ConfigPanel.ConfigOption
         label={label}
