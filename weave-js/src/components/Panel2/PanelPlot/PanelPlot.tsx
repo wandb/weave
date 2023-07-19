@@ -479,32 +479,9 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
             </ConfigPanel.ConfigOption>
           );
         })}
-        {/* {config.series.map((series, i) => {
-          const seriesName = `Series ${i + 1} Name`;
-          return (
-            <ConfigPanel.ConfigOption
-              key={seriesName}
-              label={config.series.length > 1 ? seriesName : 'Series'}>
-              <ConfigPanel.TextInputConfigField
-                dataTest={`${seriesName}-label`}
-                value={series.seriesName}
-                label={''}
-                onChange={(event, {value}) => {
-                  updateConfig(
-                    produce(config, draft => {
-                      draft.series[i].seriesName = value;
-                    })
-                  );
-                }}
-              />
-            </ConfigPanel.ConfigOption>
-          );
-        })} */}
       </>
     );
   }, [config, updateConfig]);
-
-  console.log('config.series', config.series);
 
   const newSeriesConfigDom = useMemo(() => {
     return (
@@ -678,98 +655,92 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     [config, updateConfig, xScaleConfigEnabled, yScaleConfigEnabled]
   );
 
-  type GroupDim = {
-    name: string;
-    dim: PlotState.DimensionLike;
-  };
+  // type GroupDim = {
+  //   name: string;
+  //   dim: PlotState.DimensionLike;
+  // };
 
-  const extractWeaveExpressionDims = (dim: PlotState.DimensionLike) => {
-    console.log('dimension.name', dim.name);
-    if (PlotState.isWeaveExpression(dim)) {
-      return [dim];
-    } else if (PlotState.isDropdownWithExpression(dim)) {
-      const newDim =
-        dim.mode() === 'expression' ? dim.expressionDim : dim.dropdownDim;
-      return [newDim];
-    } else if (PlotState.isGroup(dim)) {
-      return dim.activeDimensions();
-    }
-    return [];
-  };
+  // const extractWeaveExpressionDims = (dim: PlotState.DimensionLike) => {
+  //   console.log('dimension.name', dim.name);
+  //   if (PlotState.isWeaveExpression(dim)) {
+  //     return [dim];
+  //   } else if (PlotState.isDropdownWithExpression(dim)) {
+  //     const newDim =
+  //       dim.mode() === 'expression' ? dim.expressionDim : dim.dropdownDim;
+  //     return [newDim];
+  //   } else if (PlotState.isGroup(dim)) {
+  //     return dim.activeDimensions();
+  //   }
+  //   return [];
+  // };
 
-  // groupByDom
-  // I need to grab the list of dimensions.
-  const groupByDims = useMemo(() => {
-    // for each base dimension, if it's expanded
-    // then we need to add to the list
-    const dimensions: GroupDim[] = [];
-    for (const dimName of PLOT_DIMS_UI) {
-      console.log('dimName', dimName);
-      const dimIsShared = PlotState.isDimShared(config.series, dimName, weave);
-      const dimIsExpanded = config.configOptionsExpanded[dimName];
-      const dimIsSharedInUI = dimIsShared && !dimIsExpanded;
+  // // groupByDom
+  // // I need to grab the list of dimensions.
+  // const groupByDims = useMemo(() => {
+  //   // for each base dimension, if it's expanded
+  //   // then we need to add to the list
+  //   const dimensions: GroupDim[] = [];
+  //   for (const dimName of PLOT_DIMS_UI) {
+  //     console.log('dimName', dimName);
+  //     const dimIsShared = PlotState.isDimShared(config.series, dimName, weave);
+  //     const dimIsExpanded = config.configOptionsExpanded[dimName];
+  //     const dimIsSharedInUI = dimIsShared && !dimIsExpanded;
 
-      const dimObject = PlotState.dimConstructors[dimName](
-        config.series[0],
-        weave
-      );
-      console.log('dimIsSharedInUI', dimIsSharedInUI);
-      if (dimIsSharedInUI) {
-        extractWeaveExpressionDims(dimObject).map(dim => {
-          dimensions.push({name: dimName, dim});
-        });
-      } else {
-        for (let i = 0; i < config.series.length; i++) {
-          const seriesDim = PlotState.dimConstructors[dimName](
-            config.series[i],
-            weave
-          );
-          extractWeaveExpressionDims(seriesDim).map(dim => {
-            dimensions.push({name: `${dimName}-${i + 1}`, dim});
-          });
-        }
-      }
-    }
-    return dimensions;
-  }, [config, weave]);
+  //     const dimObject = PlotState.dimConstructors[dimName](
+  //       config.series[0],
+  //       weave
+  //     );
+  //     console.log('dimIsSharedInUI', dimIsSharedInUI);
+  //     if (dimIsSharedInUI) {
+  //       extractWeaveExpressionDims(dimObject).map(dim => {
+  //         dimensions.push({name: dimName, dim});
+  //       });
+  //     } else {
+  //       for (let i = 0; i < config.series.length; i++) {
+  //         const seriesDim = PlotState.dimConstructors[dimName](
+  //           config.series[i],
+  //           weave
+  //         );
+  //         extractWeaveExpressionDims(seriesDim).map(dim => {
+  //           dimensions.push({name: `${dimName}-${i + 1}`, dim});
+  //         });
+  //       }
+  //     }
+  //   }
+  //   return dimensions;
+  // }, [config, weave]);
 
-  const configGroupedDims = useMemo(() => {
-    const groupedDims: string[] = [];
-    config.series.map((s, i) => {
-      s.table.groupBy.map(col => {
-        for (let key in s.dims) {
-          const value = s.dims[key as keyof DIM_NAME_MAP] as string;
-          if (value === col) {
-            groupedDims.push(`${key}-${i + 1}`);
-          }
-        }
-      });
-    });
-    return groupedDims;
-  }, [config]);
+  // const configGroupedDims = useMemo(() => {
+  //   const groupedDims: string[] = [];
+  //   config.series.map((s, i) => {
+  //     s.table.groupBy.map(col => {
+  //       for (let key in s.dims) {
+  //         const value = s.dims[key as keyof DIM_NAME_MAP] as string;
+  //         if (value === col) {
+  //           groupedDims.push(`${key}-${i + 1}`);
+  //         }
+  //       }
+  //     });
+  //   });
+  //   return groupedDims;
+  // }, [config]);
 
-  console.log('config grouped dims', configGroupedDims);
-
-  console.log('current config groupby: ', config.series[0].table.groupBy);
-
-  const groupByDom = useMemo(() => {
-    return (
-      <ConfigPanel.ConfigOption label="Grouping">
-        <ConfigPanel.ModifiedDropdownConfigField
-          multiple
-          options={groupByDims.map(d => {
-            return {key: d.name, text: d.name, value: d.name};
-          })}
-          value={configGroupedDims}
-          onChange={(event, {value}) => {
-            console.log('hey dropdown value set by user', value);
-          }}
-        />
-      </ConfigPanel.ConfigOption>
-    );
-  }, [groupByDims, config]);
-
-  console.log('groupby dimensions', groupByDims);
+  // const groupByDom = useMemo(() => {
+  //   return (
+  //     <ConfigPanel.ConfigOption label="Grouping">
+  //       <ConfigPanel.ModifiedDropdownConfigField
+  //         multiple
+  //         options={groupByDims.map(d => {
+  //           return {key: d.name, text: d.name, value: d.name};
+  //         })}
+  //         value={configGroupedDims}
+  //         onChange={(event, {value}) => {
+  //           console.log('hey dropdown value set by user', value);
+  //         }}
+  //       />
+  //     </ConfigPanel.ConfigOption>
+  //   );
+  // }, [groupByDims, config]);
 
   const [showAdvancedProperties, setShowAdvancedProperties] =
     useState<boolean>(false);
@@ -888,8 +859,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       config.series[0].dims.x
     );
   }, [config.series, input, weave]);
-
-  console.log(config);
 
   return useMemo(
     () =>
