@@ -868,7 +868,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           <ConfigSection label={`Properties`}>
             {dashboardConfigOptions}
             <VariableView newVars={cellFrame} />
-            {/* {seriesConfigDom} */}
             {advancedPropertiesDom}
           </ConfigSection>
           {newSeriesConfigDom}
