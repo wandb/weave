@@ -122,6 +122,7 @@ import {
 import {toWeaveType} from '../toWeaveType';
 import {ConfigSection} from '../ConfigPanel';
 import {IconButton} from '../../IconButton';
+import {Tooltip} from '../../Tooltip';
 import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
 import {
   IconAddNew,
@@ -1398,31 +1399,43 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           />
         )}
         {isShared ? (
-          <S.ConstrainedIconContainer
-            onClick={() => {
-              // "expanding" the dimension means unconstraining it
-              const newConfig = produce(config, draft => {
-                draft.configOptionsExpanded[dimName] = true;
-              });
-              updateConfig(newConfig);
-            }}>
-            <IconLockedConstrained width={18} height={18} />
-          </S.ConstrainedIconContainer>
+          <Tooltip
+            position="top right"
+            trigger={
+              <S.ConstrainedIconContainer
+                onClick={() => {
+                  // "expanding" the dimension means unconstraining it
+                  const newConfig = produce(config, draft => {
+                    draft.configOptionsExpanded[dimName] = true;
+                  });
+                  updateConfig(newConfig);
+                }}>
+                <IconLockedConstrained width={18} height={18} />
+              </S.ConstrainedIconContainer>
+            }>
+            Constrain dimension across series
+          </Tooltip>
         ) : (
-          <S.UnconstrainedIconContainer
-            // "sharing" the dimension means constraining it
-            onClick={() => {
-              updateConfig(
-                PlotState.makeDimensionShared(
-                  config,
-                  dimension.series,
-                  dimName,
-                  weave
-                )
-              );
-            }}>
-            <IconUnlockedUnconstrained width={18} height={18} />
-          </S.UnconstrainedIconContainer>
+          <Tooltip
+            position="top right"
+            trigger={
+              <S.UnconstrainedIconContainer
+                // "sharing" the dimension means constraining it
+                onClick={() => {
+                  updateConfig(
+                    PlotState.makeDimensionShared(
+                      config,
+                      dimension.series,
+                      dimName,
+                      weave
+                    )
+                  );
+                }}>
+                <IconUnlockedUnconstrained width={18} height={18} />
+              </S.UnconstrainedIconContainer>
+            }>
+            Unconstrain dimension across series
+          </Tooltip>
         )}
       </>
     );
