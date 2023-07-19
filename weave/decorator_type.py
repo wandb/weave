@@ -15,7 +15,7 @@ def type(
     __override_name: typing.Optional[str] = None,
     __is_simple: bool = False,
     __init: typing.Optional[bool] = None,
-    __extra_methods: typing.Optional[dict[str, typing.Callable]] = None,
+    __mixins: typing.Optional[list[typing.Type]] = None,
 ):
     def wrap(target):
         init = False
@@ -45,6 +45,10 @@ def type(
             )
         else:
             bases = (base_type,)
+
+        if __mixins is not None:
+            bases = tuple(__mixins) + bases
+
         TargetType = _py_type(f"{target_name}Type", bases, {})
         TargetType.name = target_name
         TargetType.instance_classes = target
@@ -77,10 +81,6 @@ def type(
         for name, default_type in type_vars.items():
             setattr(TargetType, name, default_type)
             TargetType.__dict__["__annotations__"][name] = types.Type
-
-        if __extra_methods is not None:
-            for name, method in __extra_methods.items():
-                setattr(TargetType, name, method)
 
         def property_types_method(self):
             property_types = {}

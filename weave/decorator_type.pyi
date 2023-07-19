@@ -16,5 +16,5 @@ def type(
     __override_name: Optional[str] = None,
     __is_simple: bool = False,
     __init: Optional[bool] = True,
-    __extra_methods: Optional[dict[str, Callable[..., Any]]] = None,
+    __mixins: Optional[list[Type]] = None,
 ) -> Callable[[_T], _T]: ...
