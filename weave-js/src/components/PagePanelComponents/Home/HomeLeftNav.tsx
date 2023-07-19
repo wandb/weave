@@ -2,6 +2,8 @@ import React from 'react';
 
 import styled from 'styled-components';
 import * as LayoutElements from './LayoutElements';
+import {Link} from 'react-router-dom';
+import {MOON_800} from '@wandb/weave/common/css/color.styles';
 
 const LeftNavItemBlock = styled(LayoutElements.HBlock)`
   margin: 0px 0px 0px 12px;
@@ -71,19 +73,21 @@ type LeftNavItemProps = {
   icon: React.FC;
   label: string;
   active?: boolean;
+  to: string;
   onClick?: () => void;
 };
 const LeftNavItem: React.FC<LeftNavItemProps> = props => {
   return (
-    <LeftNavItemBlock
-      style={{
-        backgroundColor: props.active ? '#A9EDF252' : '',
-        color: props.active ? '#038194' : '',
-        fontWeight: props.active ? 600 : '',
-      }}
-      onClick={props.onClick}>
-      <props.icon />
-      {props.label}
-    </LeftNavItemBlock>
+    <Link to={props.to} onClick={props.onClick}>
+      <LeftNavItemBlock
+        style={{
+          backgroundColor: props.active ? '#A9EDF252' : '',
+          color: props.active ? '#038194' : MOON_800,
+          fontWeight: props.active ? 600 : '',
+        }}>
+        <props.icon />
+        {props.label}
+      </LeftNavItemBlock>
+    </Link>
   );
 };
