@@ -143,7 +143,7 @@ def test_artifact_history_remote_with_branch(user_by_api_key_in_env):
     uri = "local-artifact:///art:main/obj"
     weave.save([0], "art:main")
     art = weave.ops.get(uri)
-    published_art_uri = weave.ops.publish_artifact(art, "art", None)
+    published_art_uri = weave.ops.publish_artifact(art, "art", None, None)
 
     art = weave.ops.get(
         f"wandb-artifact:///{user_by_api_key_in_env.username}/weave/art:latest/obj"
@@ -173,7 +173,7 @@ def test_artifact_history_remote_with_hash(user_by_api_key_in_env):
     uri = "local-artifact:///art:main/obj"
     weave.save([0], "art:main")
     art = weave.ops.get(uri)
-    published_art_uri = weave.ops.publish_artifact(art, "art", None)
+    published_art_uri = weave.ops.publish_artifact(art, "art", None, None)
     assert "latest" not in published_art_uri
     assert "main" not in published_art_uri
 
