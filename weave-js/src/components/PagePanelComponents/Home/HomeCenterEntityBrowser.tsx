@@ -14,6 +14,7 @@ import {
   Node,
   callOpVeryUnsafe,
   constString,
+  list,
   opArtifactMembershipArtifactVersion,
   opArtifactMembershipForAlias,
   opArtifactVersionFile,
@@ -23,6 +24,7 @@ import {
   opProjectArtifact,
   opRootProject,
   opTableRows,
+  typedDict,
   varNode,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
@@ -400,9 +402,13 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     const node = opGet({uri: constString(uri)});
     node.type = {type: 'stream_table'} as any;
-    newExpr = callOpVeryUnsafe('stream_table-rows', {
-      self: node,
-    }) as any;
+    newExpr = callOpVeryUnsafe(
+      'stream_table-rows',
+      {
+        self: node,
+      },
+      list(typedDict({}))
+    ) as any;
   } else {
     // This is a  hacky here. Would be nice to have better mapping
     const artNameParts = artName.split('-', 3);
