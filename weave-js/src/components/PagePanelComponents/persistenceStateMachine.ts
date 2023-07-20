@@ -280,7 +280,7 @@ export const useStateMachine = (
             entity_name:
               actionOptions.entityName != null
                 ? constString(actionOptions.entityName)
-                : constString(''),
+                : constNone(),
           },
           newRoot => {
             updateNode(newRoot);

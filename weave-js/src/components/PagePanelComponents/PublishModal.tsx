@@ -85,14 +85,6 @@ export const PublishModal = ({
       entityName: w.constString(entityName),
     }),
   });
-  const projectDataNode = w.opMap({
-    arr: projectsNode,
-    mapFn: w.constFunction({row: 'project'}, ({row}) => {
-      return w.opDict({
-        name: w.opProjectName({project: row}),
-      } as any);
-    }),
-  });
 
   // Initialize the entity selector to first option (user entity)
   useEffect(() => {
@@ -102,13 +94,14 @@ export const PublishModal = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEntities.loading]);
 
+  const projectDataNode = w.opProjectName({project: projectsNode});
   const projectNamesValue = useNodeValue(projectDataNode, {
     skip: entityName === '',
   });
   const projectNames: string[] = projectNamesValue.result
-    ? projectNamesValue.result
-        .map((project: {name: string}) => project.name)
-        .filter((name: string) => name !== 'model-registry')
+    ? projectNamesValue.result.filter(
+        (name: string) => name !== 'model-registry'
+      )
     : [];
 
   projectNames.sort();
