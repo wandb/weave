@@ -620,7 +620,7 @@ def _call_and_ensure_awl(
             implementation in compile."
         if isinstance(res, list):
             res = convert.to_arrow(res)
-            logging.error(err_msg)
+            logging.warning(err_msg)
         else:
             raise errors.WeaveVectorizationError(err_msg)
 
