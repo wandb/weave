@@ -652,8 +652,11 @@ export function addSeriesFromSeries(
   const dimConstructor = dimConstructors[blankDimName];
   const dim = dimConstructor(series, weave);
   const newSeries = dim.imputeThisSeriesWithDefaultState();
+  const namedSeries = produce(newSeries, draft => {
+    draft.seriesName = `Series ${config.series.length + 1}`;
+  });
   return produce(config, draft => {
-    draft.series.push(newSeries);
+    draft.series.push(namedSeries);
     draft.configOptionsExpanded[blankDimName] = true;
   });
 }
