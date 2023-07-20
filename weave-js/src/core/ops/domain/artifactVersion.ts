@@ -117,11 +117,15 @@ export const opArtifactVersionSize = makeArtifactVersionOp({
 export const opArtifactVersionTTLDurationSeconds = makeArtifactVersionOp({
   name: 'artifactVersion-ttlDurationSeconds',
   argTypes: artifactVersionArgTypes,
-  description: `Returns the ttl duration in seconds that ${docType('artifactVersion')} takes to mark as deleted`,
+  description: `Returns the ttl duration in seconds that ${docType(
+    'artifactVersion'
+  )} takes to mark as deleted`,
   argDescriptions: {
     artifactVersion: artifactVersionArgDescription,
   },
-  returnValueDescription: `The ttl duration in seconds for ${docType('artifactVersion')}`,
+  returnValueDescription: `The ttl duration in seconds for ${docType(
+    'artifactVersion'
+  )}`,
   returnType: inputTypes => 'number',
   resolver: ({artifactVersion}) => artifactVersion.ttlDurationSeconds,
 });
