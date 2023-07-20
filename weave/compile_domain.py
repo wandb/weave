@@ -142,18 +142,22 @@ def _get_plugin_output_type(node: graph.OutputNode) -> types.Type:
 
 
 def _output_type_with_keys(
-    op_def: op_def.OpDef, fragment: str, keys: dict[str, types.Type]
+    op_def: "op_def.OpDef", fragment: str, keys: dict[str, types.Type]
 ) -> types.TypedDict:
-    key_name = fragment.split()[0]
+    key_name = _get_outermost_alias(fragment)
     output_type = op_def.concrete_output_type
 
-    # handle gql ops that return lists
-    if types.List().assign_type(output_type):
-        object_type = typing.cast(types.List, output_type).object_type
+    is_list = types.List().assign_type(output_type)
 
-        if isinstance(object_type, gql_with_keys.WithKeysMixin):
-            object_type = object_type.with_keys(keys)
-        output_type = types.List(object_type)
+    # handle gql ops that return lists
+    if is_list:
+        output_type = typing.cast(types.List, output_type).object_type
+
+    if isinstance(output_type, gql_with_keys.WithKeysMixin):
+        output_type = output_type.with_keys(keys)
+
+    if is_list:
+        output_type = types.List(output_type)
 
     return types.TypedDict({key_name: output_type})
 
