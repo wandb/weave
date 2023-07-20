@@ -30,6 +30,8 @@ from ..ops_domain import table
 from ..ops_domain import wb_util
 import wandb
 
+from .. import compile
+
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -1821,7 +1823,8 @@ def test_non_const_input_node(fake_wandb):
 def test_gql_compilation_with_keys(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_empty_workspace)
     cell_node = ops.project("stacey", "mendeleev").runs().limit(1).id()
-    assert cell_node.type == TaggedValueType(
+    compiled_node = compile.compile([cell_node])[0]
+    assert compiled_node.type == TaggedValueType(
         types.TypedDict(
             {
                 "project": wdt.ProjectType.with_keys(
@@ -1830,10 +1833,9 @@ def test_gql_compilation_with_keys(fake_wandb):
             }
         ),
         types.List(
-            object_type=TaggedValueType(
-                TaggedValueType(
-                    {wdt.RunType.with_keys({"id": types.String()})}, types.String()
-                )
+            TaggedValueType(
+                types.TypedDict({"run": wdt.RunType.with_keys({"id": types.String()})}),
+                types.String(),
             )
         ),
     )
