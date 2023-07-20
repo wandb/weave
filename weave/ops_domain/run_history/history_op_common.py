@@ -59,6 +59,8 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
     elif tc_type == "bool":
         return types.Boolean()
     elif tc_type == "map":
+        if "keys" not in tc:
+            return types.TypedDict({})
         return types.TypedDict(
             {
                 key: types.union(

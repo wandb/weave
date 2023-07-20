@@ -89,6 +89,10 @@ async function autosuggestNodes(
   refinedNode: EditingNode;
   suggestions: EditingNode[];
 }> {
+  if (node.varName === "panel1") 
+    {
+      console.log(node)
+    }
   let result: EditingNode[] = [];
   const consumer = findConsumingOp(node, graph);
   const consumingOp = consumer?.outputNode.fromOp;
@@ -824,6 +828,7 @@ export async function autosuggest(
       });
     }
   }
+  console.log(result)
 
   return result;
 }

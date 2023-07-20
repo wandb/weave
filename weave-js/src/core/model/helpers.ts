@@ -368,14 +368,17 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
       // Must have all keys in toType and types must match
       for (const key of Object.keys(toType.propertyTypes)) {
         const toKeyType = toType.propertyTypes[key]!;
-        const keyType = type.propertyTypes[key];
+        let keyType = type.propertyTypes[key];
         if (
           (toType.notRequiredKeys ?? []).includes(key) &&
           keyType === undefined
         ) {
           continue;
         }
-        if (keyType === undefined || !isAssignableTo(keyType, toKeyType)) {
+        if (keyType === undefined) {
+          keyType = 'none' as const
+        }
+        if (!isAssignableTo(keyType, toKeyType)) {
           return false;
         }
       }
@@ -388,6 +391,7 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
         // we can revisit later if we need. This prevents us from creating
         // panels like PanelIdCompare when we have an empty {}, like in the
         // return type of opTableRows.
+        // return true;
         return false;
       }
       for (const key of properties) {
@@ -488,7 +492,8 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
           (type.type as string) === 'tablePanel' &&
           (toType.type as string) === 'tablePanel') ||
         ((type.type as string) === 'Query' &&
-          (toType.type as string) === 'Query')
+          (toType.type as string) === 'Query') || ((type.type as string) === 'tracePanel' &&
+          (toType.type as string) === 'tracePanel')
       ) {
         return true;
       }

@@ -118,6 +118,7 @@ const PanelTraceTreeTrace: React.FC<PanelTraceTreeTraceProps> = props => {
 
 export const TraceTreeSpanViewer: React.FC<{
   span: SpanType;
+  updateSelectedSpan?: (span: SpanType) => void;
 }> = props => {
   const {isFullscreen} = React.useContext(PanelFullscreenContext);
   const split = isFullscreen ? `horizontal` : `vertical`;
@@ -134,8 +135,17 @@ export const TraceTreeSpanViewer: React.FC<{
   const {timelineRef, timelineStyle, scale} = useTimelineZoomAndPan({
     onHittingMinZoom: showTipOverlay,
   });
-  const [selectedSpan, setSelectedSpan] =
+  const [selectedSpan, setSelectedSpanRaw] =
     useUpdatingState<LayedOutSpanType | null>(layedOutSpan);
+
+  const setSelectedSpan = (span: LayedOutSpanType | null) => {
+    setSelectedSpanRaw(span);
+    if (props.updateSelectedSpan) {
+      props.updateSelectedSpan(span);
+    }
+  };
+
+  console.log({selectedSpan, flatSpans, span});
 
   return (
     <S.TraceWrapper split={split}>
