@@ -189,7 +189,7 @@ def _get_fragment_and_gql_root_type(
     forward_obj = stitchedGraph.get_result(node)
     calls = forward_obj.calls
 
-    child_fragments: list[str] = []
+    child_subfragments: list[str] = []
     child_tree: dict[str, types.Type] = {}
 
     for call in calls:
@@ -197,11 +197,11 @@ def _get_fragment_and_gql_root_type(
             sub_fragment, sub_tree = _get_fragment_and_gql_root_type(
                 call.node, stitchedGraph
             )
-            child_fragments.append(sub_fragment)
+            child_subfragments.append(sub_fragment)
             if sub_tree is not None:
                 child_tree.update(sub_tree.property_types)
 
-    child_fragment = "\n".join(child_fragments)
+    child_fragment = "\n".join(child_subfragments)
 
     if is_passthrough:
         return child_fragment, types.TypedDict(child_tree)
