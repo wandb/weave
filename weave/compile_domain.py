@@ -88,7 +88,7 @@ def apply_domain_op_gql_translation(
         if not _is_root_node(node):
             return node
         node = typing.cast(graph.OutputNode, node)
-        inner_fragment, tree = _get_fragment_and_gql_root_type(node, p)
+        inner_fragment, root_type = _get_fragment_and_gql_root_type(node, p)
         fragments.append(inner_fragment)
         alias = _get_outermost_alias(inner_fragment)
         aliases.append(alias)
@@ -96,14 +96,9 @@ def apply_domain_op_gql_translation(
         if custom_resolver is not None:
             return custom_resolver(query_root_node, **node.from_op.inputs)
         else:
-            output_type = typing.cast(
-                gql_with_keys.WithKeysMixin, _get_plugin_output_type(node)
+            output_type = (
+                root_type if root_type is not None else _get_plugin_output_type(node)
             )
-
-            # let the compiler know what keys the types will have
-            type_with_keys = output_type.with_keys({})
-
-            # apply the keys to the type
 
             return graph.OutputNode(
                 output_type,
