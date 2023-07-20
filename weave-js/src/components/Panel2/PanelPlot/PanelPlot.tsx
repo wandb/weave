@@ -799,6 +799,30 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     );
   }, [config.series, input, weave]);
 
+  const addNewSeriesDom = useMemo(() => {
+    return (
+      <>
+        <S.AddNewSeriesContainer
+          onClick={() => {
+            if (config.series.length > 0) {
+              const newConfig = PlotState.addSeriesFromSeries(
+                config,
+                config.series[config.series.length - 1],
+                'y',
+                weave
+              );
+              updateConfig(newConfig);
+            }
+          }}>
+          <S.AddNewSeriesText>New Series</S.AddNewSeriesText>
+          <S.AddNewSeriesButton>
+            <IconAddNew width="18" height="18" />
+          </S.AddNewSeriesButton>
+        </S.AddNewSeriesContainer>
+      </>
+    );
+  }, [config, config.series, updateConfig, weave]);
+
   return useMemo(
     () =>
       enableDashUi ? (
@@ -809,6 +833,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
             {advancedPropertiesDom}
           </ConfigSection>
           {newSeriesConfigDom}
+          {addNewSeriesDom}
           <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
         </>
       ) : (

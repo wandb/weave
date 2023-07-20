@@ -42,3 +42,27 @@ export const UnconstrainedIconContainer = styled.div`
       background-color: ${globals.MOON_100}
   }
 `;
+
+export const AddNewSeriesContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 56px;
+  border-top: 1px solid #dddddd;
+  color: ${globals.MOON_500};
+  cursor: pointer;
+  &:hover {
+    color: ${globals.MOON_600};
+  }
+`;
+
+export const AddNewSeriesText = styled.div`
+  margin-left: 12px;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+`;
+
+export const AddNewSeriesButton = styled.div`
+  margin-right: 12px;
+`;
