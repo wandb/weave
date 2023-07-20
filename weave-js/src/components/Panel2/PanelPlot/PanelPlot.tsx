@@ -489,22 +489,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const seriesMenuItems = useCallback(
     (s: SeriesConfig, index: number) => {
       if (index === 0 && config.series.length === 1) {
-        return [
-          {
-            key: 'Add series from this series',
-            content: 'Add series from this series',
-            icon: <IconAddNew />,
-            onClick: () => {
-              const newConfig = PlotState.addSeriesFromSeries(
-                config,
-                s,
-                'y',
-                weave
-              );
-              updateConfig(newConfig);
-            },
-          },
-        ];
+        return [];
       }
       return [
         {
@@ -513,20 +498,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           icon: <IconDelete />,
           onClick: () => {
             updateConfig(PlotState.removeSeries(config, s));
-          },
-        },
-        {
-          key: 'Add series from this series',
-          content: 'Add series from this series',
-          icon: <IconAddNew />,
-          onClick: () => {
-            const newConfig = PlotState.addSeriesFromSeries(
-              config,
-              s,
-              'y',
-              weave
-            );
-            updateConfig(newConfig);
           },
         },
       ];
@@ -814,7 +785,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
               updateConfig(newConfig);
             }
           }}>
-          <S.AddNewSeriesText>New Series</S.AddNewSeriesText>
+          <S.AddNewSeriesText>New series</S.AddNewSeriesText>
           <S.AddNewSeriesButton>
             <IconAddNew width="18" height="18" />
           </S.AddNewSeriesButton>
@@ -3661,6 +3632,7 @@ export default Spec;
 
 const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
+  padding: 3px;
 `;
 
 const IconBlank = styled.svg`

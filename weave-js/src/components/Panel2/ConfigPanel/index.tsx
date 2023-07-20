@@ -58,7 +58,7 @@ export const ConfigSectionHeader = styled.div`
 export const ConfigSectionHeaderButton = styled.div<{expanded: boolean}>`
   display: flex;
   transform: rotate(${p => (p.expanded ? 0 : 180)}deg);
-  margin-left: 10px;
+  margin-left: 12px;
 `;
 
 export const ConfigSectionOptions = styled.div`
@@ -87,10 +87,14 @@ export const ConfigSection: FC<ConfigSectionProps> = ({
       {label && (
         <ConfigSectionHeader onClick={toggleExpanded}>
           {label}
-          <div style={{display: 'flex'}}>
-            {menuItems != null && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+            }}>
+            {menuItems != null && menuItems.length > 0 && (
               <PopupMenu
-                position="bottom left"
+                position="bottom right"
                 trigger={
                   <ConfigDimMenuButton
                     onClick={e => {
@@ -303,4 +307,5 @@ const IconDown = styled(IconDownUnstyled)`
 
 const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
+  padding: 3px;
 `;
