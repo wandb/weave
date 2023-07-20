@@ -210,7 +210,10 @@ class WeaveWBRunFilesURI(uris.WeaveURI):
 
     @classmethod
     def from_run_identifiers(
-        cls, entity_name: str, project_name: str, run_name: str
+        cls,
+        entity_name: str,
+        project_name: str,
+        run_name: str,
     ) -> "WeaveWBRunFilesURI":
         return cls(
             f"{entity_name}/{project_name}/{run_name}",
