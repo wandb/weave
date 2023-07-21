@@ -154,19 +154,6 @@ def _is_dict_like(type_: types.Type) -> bool:
     return hasattr(type_, "property_types")
 
 
-def _node_type_has_keys(type_: types.Type) -> bool:
-    return (
-        _is_list_like(type_)
-        and _is_dict_like(typing.cast(types.List, type_).object_type)
-        and len(
-            typing.cast(
-                types.TypedDict, typing.cast(types.List, type_).object_type
-            ).property_types
-        )
-        > 0
-    )
-
-
 def _get_key_typed_node(node: graph.Node) -> graph.Node:
     with tracer.trace("run_history_inner_refine") as span:
         # This block will not normally be needed. But in some cases (for example lambdas)
@@ -265,7 +252,7 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     all_known_paths += paths_from_node
 
     history_cols = _filter_known_paths_to_requested_paths(
-        list(set(all_known_paths)), top_level_keys
+        list(set(all_known_paths)), get_full_columns(top_level_keys)
     )
 
     project_fragment = """
