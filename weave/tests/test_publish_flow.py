@@ -116,7 +116,7 @@ There are 3 actions:
    * The branchpoint URI can be any of the 6 location types above.
 
 In summary, there will be 22 tests:
-   
+
 * 6 `Persist` tests
 * 6 `Mutate` tests
 * 2 * 6 `Merge` tests (2 types of branchpoints, and 6 branch location types.)
@@ -965,7 +965,7 @@ def test_publish_saved_node(user_by_api_key_in_env):
     assert saved.from_op.inputs["uri"].val.startswith("local-artifact://")
     assert weave.use(saved) == data
 
-    published_art_uri = weave.ops.publish_artifact(saved, "my_list", None)
+    published_art_uri = weave.ops.publish_artifact(saved, "my_list", None, None)
     assert published_art_uri.startswith("wandb-artifact://")
     assert weave.use(weave.get(published_art_uri)) == data
 
@@ -1018,7 +1018,7 @@ def test_end_to_end_save_and_publish_flow(user_by_api_key_in_env):
     assert weave.use(merged_node) == branched_data
 
     # Step 4: Publish the new version remotely
-    published_uri = weave.ops.publish_artifact(merged_node, "my_list", None)
+    published_uri = weave.ops.publish_artifact(merged_node, "my_list", None, None)
     assert published_uri.startswith("wandb-artifact://")
     assert weave.use(weave.get(published_uri)) == branched_data
 
