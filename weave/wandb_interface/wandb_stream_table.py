@@ -22,6 +22,7 @@ from .. import runfiles_wandb
 from .. import storage
 from .. import weave_types
 from .. import artifact_base
+from .. import environment
 from .. import file_util
 from .. import graph
 from .. import errors
@@ -181,7 +182,8 @@ class _StreamTableSync:
             self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
             self._artifact.set_file_pusher(self._lite_run.pusher)
         if print_url:
-            url = f"https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
+            base_url = environment.weave_server_url()
+            url = f"{base_url}/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
             printer = get_printer(_get_python_type() != "python")
             printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
