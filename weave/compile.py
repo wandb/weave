@@ -173,6 +173,10 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         ):
             output_type = op.unrefined_output_type_for_params(params)
 
+        # Consider: If the UI does a `callOpVeryUnsafe`, it is possible that the
+        # graph is not correctly typed. Consider checking if they type is `Any`,
+        # then we may want to use the concrete output type instead.
+
         res = graph.OutputNode(_remove_optional(output_type), op.uri, params)
         # logging.info("Dispatched (no refine): %s -> %s", node, res.type)
         return res
