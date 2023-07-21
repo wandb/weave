@@ -58,6 +58,7 @@ def test_artifact_metadata(user_by_api_key_in_env):
         weave.ops.get(local_art.uri + "/obj"),
         "test_artifact",
         "test_project",
+        None,
     )
     remote_ref = artifact_wandb.WandbArtifactRef.from_uri(
         artifact_wandb.WeaveWBArtifactURI.parse(remote_uri)

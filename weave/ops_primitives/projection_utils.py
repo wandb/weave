@@ -104,7 +104,7 @@ def perform_2D_projection_with_timeout(
         result = result_queue.get(timeout=timeout)
     except queue.Empty:
         target.kill()
-        logging.error(
+        logging.warning(
             f"Projection timed out after {timeout} seconds, killing process {target.pid}, returning empty projection",
         )
 

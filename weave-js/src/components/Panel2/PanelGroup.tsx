@@ -547,6 +547,15 @@ export const PanelGroupItem: React.FC<{
         produce(config, draft => {
           draft.items[newName] = draft.items[name];
           delete draft.items[name];
+
+          // This updates the grid config with the new name, since we use names as ids
+          // if we had unique ids, we wouldnt have to do this
+          const gridConfigIndex = config.gridConfig.panels.findIndex(
+            p => p.id === name
+          );
+          if (gridConfigIndex !== -1) {
+            draft.gridConfig.panels[gridConfigIndex].id = newName;
+          }
         })
       );
     },

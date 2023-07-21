@@ -27,7 +27,7 @@ export const useAssetURLFromArtifact = <
 ) => {
   const nodeValueQuery = CGReact.useNodeValue(inputNode);
   const fileNode = useMemo(() => {
-    if (!nodeValueQuery.loading) {
+    if (!nodeValueQuery.loading && nodeValueQuery.result != null) {
       return opArtifactVersionFile({
         artifactVersion: opAssetArtifactVersion({asset: inputNode}),
         path: constString(nodeValueQuery.result.path),
