@@ -19,6 +19,9 @@ from . import graph
 
 Ref = ref_base.Ref
 
+if typing.TYPE_CHECKING:
+    from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+
 
 def split_path_dotfile(path, dotfile_name):
     while path != "/":
@@ -60,10 +63,42 @@ def _ensure_object_components_are_published(
 def _assert_valid_name_part(part: typing.Optional[str] = None):
     if part is None:
         return
-    # if not re.match(r"^[a-zA-Z0-9_\-.]+$", part): # from W&B Artifacts
     if not re.match(r"^[a-zA-Z0-9_\-]+$", part):
         raise ValueError(
             "Invalid name part %s. Must be alphanumeric, dashes, or underscores." % part
+        )
+
+
+def _assert_valid_entity_name(part: typing.Optional[str] = None):
+    if part is None:
+        return
+    if not re.match(r"^[a-z0-9_\-]+$", part):
+        raise ValueError(
+            "Invalid entity name %s. Must be lowercase, digits, dashes, or underscores."
+            % part
+        )
+
+
+def _assert_valid_project_name(part: typing.Optional[str] = None):
+    if part is None:
+        return
+    if len(part) > 128:
+        raise ValueError("Invalid project name %s. Must be <= 128 characters." % part)
+    if re.match(r"[\\#?%:]", part):
+        raise ValueError(
+            "Invalid project name %s. Can not contain \\, #, ?, %%, or :" % part
+        )
+
+
+def _assert_valid_artifact_name(part: typing.Optional[str] = None):
+    if part is None:
+        return
+    if len(part) > 128:
+        raise ValueError("Invalid artifact name %s. Must be <= 128 characters." % part)
+    if not re.match(r"^[a-zA-Z0-9_\-.]+$", part):  # from W&B Artifacts
+        raise ValueError(
+            "Invalid artifact name %s. Must be alphanumeric, periods, dashes, or underscores."
+            % part
         )
 
 
@@ -76,6 +111,8 @@ def _direct_publish(
     branch_name: typing.Optional[str] = None,
     metadata: typing.Optional[typing.Dict[str, typing.Any]] = None,
     assume_weave_type: typing.Optional[types.Type] = None,
+    *,
+    _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
 ):
     weave_type = assume_weave_type or _get_weave_type(obj)
 
@@ -83,11 +120,11 @@ def _direct_publish(
     name = name or _get_name(weave_type, obj)
     wb_artifact_type_name = wb_artifact_type_name or weave_type.name
 
-    _assert_valid_name_part(name)
-    _assert_valid_name_part(wb_project_name)
+    _assert_valid_artifact_name(name)
+    _assert_valid_project_name(wb_project_name)
     _assert_valid_name_part(wb_artifact_type_name)
     _assert_valid_name_part(branch_name)
-    _assert_valid_name_part(wb_entity_name)
+    _assert_valid_entity_name(wb_entity_name)
     # Validate entity name once we have them
 
     obj = box.box(obj)
@@ -101,7 +138,10 @@ def _direct_publish(
     #     nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
         artifact.save(
-            project=wb_project_name, entity_name=wb_entity_name, branch=branch_name
+            project=wb_project_name,
+            entity_name=wb_entity_name,
+            branch=branch_name,
+            _lite_run=_lite_run,
         )
 
     return ref

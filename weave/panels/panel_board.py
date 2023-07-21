@@ -29,7 +29,7 @@ class BoardPanel:
     layout: typing.Optional[BoardPanelLayout] = None
 
 
-def Board(vars, panels: list[BoardPanel]):
+def Board(vars, panels: list[BoardPanel], editable=True):
     main_items = {}
     main_panel_layouts: list[panel_group.LayedOutPanel] = []
     for i, p in enumerate(panels):
@@ -49,6 +49,8 @@ def Board(vars, panels: list[BoardPanel]):
                     ),
                 )
             )
+
+    showExpressions = True if editable else "titleBar"
     return panel_group.Group(
         config=panel_group.GroupConfig(
             layoutMode="horizontal",
@@ -60,13 +62,14 @@ def Board(vars, panels: list[BoardPanel]):
                     layoutMode="vertical",
                     equalSize=False,
                     style="width:300px;",
-                    showExpressions=True,
+                    showExpressions=showExpressions,  # type: ignore
                     allowedPanels=[
                         "Expression",
                         "Query",
                         "Slider",
                         "StringEditor",
                         "SelectEditor",
+                        "DateRange",
                     ],
                     enableAddPanel=True,
                     childNameBase="var",
@@ -76,7 +79,7 @@ def Board(vars, panels: list[BoardPanel]):
             "main": panel_group.Group(
                 config=panel_group.GroupConfig(
                     layoutMode="grid",
-                    showExpressions=True,
+                    showExpressions=showExpressions,  # type: ignore
                     enableAddPanel=True,
                     gridConfig=panel_group.PanelBankSectionConfig(
                         id="grid0",

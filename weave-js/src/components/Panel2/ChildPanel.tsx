@@ -196,8 +196,8 @@ export const useChildPanelConfig = (
   return useMemo(() => getFullChildPanel(config), [config]);
 };
 
-interface ChildPanelProps {
-  editable?: boolean;
+export interface ChildPanelProps {
+  controlBar?: 'off' | 'editable' | 'titleBar';
   passthroughUpdate?: boolean;
   pathEl?: string;
   prefixHeader?: JSX.Element;
@@ -538,6 +538,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   );
 
   const [hoverPanel, setHoverPanel] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [expressionFocused, setExpressionFocused] = useState(false);
   const onFocusExpression = useCallback(() => {
@@ -568,7 +569,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       data-weavepath={props.pathEl ?? 'root'}
       onMouseEnter={() => setHoverPanel(true)}
       onMouseLeave={() => setHoverPanel(false)}>
-      {props.editable && (
+      {(props.controlBar === 'titleBar' || props.controlBar === 'editable') && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
             {props.prefixHeader}
@@ -584,27 +585,33 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   }
                   maxLength={24}
                 />{' '}
-                ={' '}
+                {props.controlBar === 'editable' && '= '}
               </EditorPath>
             )}
-            {curPanelId !== 'Expression' && curPanelId !== 'RootBrowser' && (
-              <PanelNameEditor
-                value={curPanelId ?? ''}
-                autocompleteOptions={panelOptions}
-                setValue={handlePanelChange}
-              />
+            {props.controlBar === 'editable' &&
+              curPanelId !== 'Expression' &&
+              curPanelId !== 'RootBrowser' && (
+                <PanelNameEditor
+                  value={curPanelId ?? ''}
+                  autocompleteOptions={panelOptions}
+                  setValue={handlePanelChange}
+                />
+              )}
+            {props.controlBar === 'editable' ? (
+              <EditorExpression data-test="panel-expression-expression">
+                <WeaveExpression
+                  expr={panelInputExpr}
+                  setExpression={updateExpression}
+                  noBox
+                  truncate={!expressionFocused}
+                  onFocus={onFocusExpression}
+                  onBlur={onBlurExpression}
+                />
+              </EditorExpression>
+            ) : (
+              <div style={{width: '100%'}} />
             )}
-            <EditorExpression data-test="panel-expression-expression">
-              <WeaveExpression
-                expr={panelInputExpr}
-                setExpression={updateExpression}
-                noBox
-                truncate={!expressionFocused}
-                onFocus={onFocusExpression}
-                onBlur={onBlurExpression}
-              />
-            </EditorExpression>
-            <EditorIcons visible={hoverPanel}>
+            <EditorIcons visible={hoverPanel || isMenuOpen}>
               {props.prefixButtons}
               <Tooltip
                 position="top center"
@@ -618,20 +625,21 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 }>
                 Open panel editor
               </Tooltip>
-              {fullConfig && (
-                <OutlineItemPopupMenu
-                  config={fullConfig}
-                  localConfig={getConfigForPath(fullConfig, fullPath)}
-                  path={fullPath}
-                  updateConfig={updateConfig}
-                  updateConfig2={updateConfig2}
-                  trigger={
-                    <IconButton>
-                      <IconOverflowHorizontal />
-                    </IconButton>
-                  }
-                />
-              )}
+              <OutlineItemPopupMenu
+                config={fullConfig}
+                localConfig={getConfigForPath(fullConfig, fullPath)}
+                path={fullPath}
+                updateConfig={updateConfig}
+                updateConfig2={updateConfig2}
+                trigger={
+                  <IconButton>
+                    <IconOverflowHorizontal />
+                  </IconButton>
+                }
+                onOpen={() => setIsMenuOpen(true)}
+                onClose={() => setIsMenuOpen(false)}
+                isOpen={isMenuOpen}
+              />
             </EditorIcons>
           </EditorBarContent>
         </Styles.EditorBar>
@@ -641,14 +649,29 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
           newVars={newVars}
           handleVarEvent={handleVarEvent}
           newPath={props.pathEl}>
-          <Panel
-            input={panelInput}
-            panelSpec={handler}
-            config={panelConfig}
-            updateConfig={updatePanelConfig}
-            updateConfig2={updatePanelConfig2}
-            updateInput={updatePanelInput}
-          />
+          {props.controlBar === 'titleBar' &&
+          isChildPanelFullConfig(props.config) &&
+          curPanelId === 'Expression' ? (
+            <div style={{paddingLeft: 16, paddingRight: 16}}>
+              <WeaveExpression
+                expr={panelInputExpr}
+                setExpression={updateExpression}
+                noBox
+                truncate={!expressionFocused}
+                onFocus={onFocusExpression}
+                onBlur={onBlurExpression}
+              />
+            </div>
+          ) : (
+            <Panel
+              input={panelInput}
+              panelSpec={handler}
+              config={panelConfig}
+              updateConfig={updatePanelConfig}
+              updateConfig2={updatePanelConfig2}
+              updateInput={updatePanelInput}
+            />
+          )}
         </PanelContextProvider>
       </PanelContainer>
     </Styles.Main>

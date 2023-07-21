@@ -16,6 +16,35 @@ import requests
 import wandb
 
 from weave.wandb_api import from_environment, wandb_api_context, WandbApiContext
+import contextlib
+import os
+
+import filelock
+
+
+# The following code snippet was copied from:
+# https://github.com/pytest-dev/pytest-xdist/issues/84#issuecomment-617566804
+#
+# The purpose of the `serial` fixture is to ensure that any test with `serial`
+# must be run serially. This is critical for tests which use environment
+# variables for auth since the low level W&B API state ends up being shared
+# between tests.
+@pytest.fixture(scope="session")
+def lock(tmp_path_factory):
+    base_temp = tmp_path_factory.getbasetemp()
+    lock_file = base_temp.parent / "serial.lock"
+    yield filelock.FileLock(lock_file=str(lock_file))
+    with contextlib.suppress(OSError):
+        os.remove(path=lock_file)
+
+
+@pytest.fixture()
+def serial(lock):
+    with lock.acquire(poll_intervall=0.1):
+        yield
+
+
+# End of copied code snippet
 
 
 @dataclasses.dataclass
@@ -49,7 +78,6 @@ def bootstrap_user(
             "WANDB_BASE_URL": base_url,
         },
     ):
-        wandb.teardown()  # type: ignore
         yield LocalBackendFixturePayload(
             username=username,
             password=username,
@@ -57,11 +85,6 @@ def bootstrap_user(
             base_url=base_url,
             cookie="NOT-IMPLEMENTED",
         )
-        wandb.teardown()  # type: ignore
-
-    if not wandb_debug:
-        command = UserFixtureCommand(command="down", username=username)
-        fixture_fn(command)
 
 
 @pytest.fixture(scope=determine_scope)
@@ -87,7 +110,7 @@ def user_by_http_headers_in_context(
 
 @pytest.fixture(scope=determine_scope)
 def user_by_api_key_in_env(
-    bootstrap_user: LocalBackendFixturePayload,
+    bootstrap_user: LocalBackendFixturePayload, serial
 ) -> Generator[LocalBackendFixturePayload, None, None]:
     with unittest.mock.patch.dict(
         os.environ,
@@ -96,12 +119,14 @@ def user_by_api_key_in_env(
         },
     ):
         with from_environment():
+            wandb.teardown()  # type: ignore
             yield bootstrap_user
+            wandb.teardown()  # type: ignore
 
 
 @pytest.fixture(scope=determine_scope)
 def user_by_http_headers_in_env(
-    bootstrap_user: LocalBackendFixturePayload,
+    bootstrap_user: LocalBackendFixturePayload, serial
 ) -> Generator[LocalBackendFixturePayload, None, None]:
     with unittest.mock.patch.dict(
         os.environ,
@@ -287,11 +312,20 @@ def check_server_up(
             f"{FIXTURE_SERVICE_PORT}:{FIXTURE_SERVICE_PORT}",
             "-e",
             "WANDB_ENABLE_TEST_CONTAINER=true",
+            *(
+                ["-e", "PARQUET_ENABLED=true"]
+                if os.environ.get("PARQUET_ENABLED")
+                else []
+            ),
             "--name",
             "wandb-local",
             "--platform",
             "linux/amd64",
-            f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:{wandb_server_tag}",
+            (
+                f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:tim-franken_branch_parquet"
+                if os.environ.get("PARQUET_ENABLED")
+                else f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:{wandb_server_tag}"
+            ),
         ]
         subprocess.Popen(command)
         # wait for the server to start

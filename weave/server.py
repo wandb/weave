@@ -20,7 +20,6 @@ from . import value_or_error
 
 from . import execute
 from . import serialize
-from . import serialize_all_values
 from . import storage
 from . import context
 from . import weave_types
@@ -29,6 +28,8 @@ from . import logs
 from . import wandb_api
 from . import util
 from . import graph
+from .language_features.tagging import tag_store
+
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -68,10 +69,7 @@ def handle_request(
     tracer = engine_trace.tracer()
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
     with tracer.trace("request:deserialize"):
-        if "serializeAllValues" in request and request["serializeAllValues"]:
-            nodes = serialize_all_values.deserialize_all_values(request["graphs"])
-        else:
-            nodes = serialize.deserialize(request["graphs"])
+        nodes = serialize.deserialize(request["graphs"])
 
     with tracer.trace("request:execute"):
         with execute.top_level_stats() as stats:
@@ -97,6 +95,7 @@ def handle_request(
                 result = result.safe_map(serialize_fn)
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
+    tag_store.clear_tag_store()
     return HandleRequestResponse(result, nodes)
 
 
@@ -239,8 +238,14 @@ def capture_weave_server_logs(log_level: int = logging.INFO):
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
 
+    console_log_settings: typing.Optional[logs.LogSettings] = None
+    if not util.is_notebook() or util.parse_boolean_env_var(
+        "WEAVE_SERVER_FORCE_HTTP_SERVER_CONSOLE_LOGS"
+    ):
+        console_log_settings = logs.LogSettings(logs.LogFormat.PRETTY, level=None)
+
     logs.enable_stream_logging(
         root_logger,
-        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, level=None),
+        wsgi_stream_settings=console_log_settings,
         pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, logging.INFO),
     )

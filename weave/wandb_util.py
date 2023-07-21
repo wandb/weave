@@ -105,8 +105,13 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return types.Int()
     elif old_type_name == "ndarray":
         # return ops.LegacyTableNDArrayType()
-        # Just return NoneType. The data is None.
-        return types.NoneType()
+        if old_type.get("params", {}).get("serialization_path") is not None:
+            # Just return NoneType. The data is None.
+            return types.NoneType()
+
+        # SDK converted the array to a pylist
+        return types.List(types.UnknownType())
+
         # return NumpyArrayType("f", shape=old_type._params.get("shape", (0,)))
     #
     # Media Types

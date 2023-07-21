@@ -44,7 +44,7 @@ NICE_BIN_SIZES_SEC_NODE = weave_internal.make_const_node(
         output_type=TimestampBinType,  # type: ignore
     ),
 )
-def timestamp_bins_fixed(bin_size_s: int):
+def timestamp_bins_fixed(bin_size_s: float):
     def body(ts):
         if bin_size_s <= 0:
             raise ValueError("bin_size_s must be greater than zero.")

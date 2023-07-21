@@ -32,6 +32,7 @@ export type PersistenceState =
   | LocalPersistenceStateId
   | CloudPersistenceStateId;
 
+export type PersistenceDeleteActionType = 'delete_local' | 'delete_remote';
 export type PersistenceRenameActionType =
   | 'rename_local' // Only applicable when no remote branch exists
   | 'publish_as' // (publishes a dirty local branch or untracked with remote to a new remote branch)
@@ -42,6 +43,7 @@ export type PersistenceStoreActionType =
   | 'publish_new'; // Pushes local without remote to a new remote branch (uses current name)
 
 export type PersistenceAction =
+  | PersistenceDeleteActionType
   | PersistenceRenameActionType
   | PersistenceStoreActionType;
 
@@ -50,11 +52,13 @@ const actionsRequiringAuthentication: Set<PersistenceAction> = new Set([
   'publish_as',
   'publish_new',
   'rename_remote',
+  'delete_remote',
 ]);
 
 type ActionSetType = {
   storeAction: PersistenceStoreActionType | null;
   renameAction: PersistenceRenameActionType | null;
+  deleteAction: PersistenceDeleteActionType | null;
 };
 
 // Note: each action should have at most 1 rename action and 1 publish/commit/save action
@@ -64,34 +68,42 @@ const persistenceActions: {
   local_untracked: {
     storeAction: 'save',
     renameAction: 'publish_as',
+    deleteAction: 'delete_local',
   },
   local_saved_no_remote: {
     storeAction: 'publish_new',
     renameAction: 'rename_local',
+    deleteAction: 'delete_local',
   },
   local_uncommitted_with_remote: {
     storeAction: 'commit',
     renameAction: 'publish_as',
+    deleteAction: 'delete_local',
   },
   local_published: {
     storeAction: null,
     renameAction: null, // 'rename_remote' - uncomment after implementing
+    deleteAction: 'delete_local',
   },
   cloud_untracked: {
     storeAction: null,
     renameAction: 'publish_as',
+    deleteAction: 'delete_remote',
   },
   cloud_saved_no_remote: {
     storeAction: 'publish_new',
     renameAction: 'publish_as',
+    deleteAction: 'delete_remote',
   },
   cloud_uncommitted_with_remote: {
     storeAction: 'commit',
     renameAction: 'publish_as',
+    deleteAction: 'delete_remote',
   },
   cloud_published: {
     storeAction: null,
     renameAction: null, // 'rename_remote' - uncomment after implementing
+    deleteAction: 'delete_remote',
   },
 };
 
@@ -177,6 +189,11 @@ export const getAvailableActions = (
         actionsRequiringAuthentication.has(actions.renameAction)
           ? null
           : actions.renameAction,
+      deleteAction:
+        actions.deleteAction != null &&
+        actionsRequiringAuthentication.has(actions.deleteAction)
+          ? null
+          : actions.deleteAction,
     };
   }
   return actions;
@@ -213,7 +230,8 @@ export const useStateMachine = (
 
       if (
         persistenceActions[nodeState].storeAction !== action &&
-        persistenceActions[nodeState].renameAction !== action
+        persistenceActions[nodeState].renameAction !== action &&
+        persistenceActions[nodeState].deleteAction !== action
       ) {
         throw new Error(`Invalid action: ${action}`);
       }
@@ -254,17 +272,26 @@ export const useStateMachine = (
             artifact_name:
               actionOptions.name != null
                 ? constString(toArtifactSafeName(actionOptions.name))
-                : constNone(), // TODO: Allow user to specify name
-            project_name: constString('weave'), // TODO: Allow user to specify name
+                : constNone(),
+            project_name:
+              actionOptions.projectName != null
+                ? constString(actionOptions.projectName)
+                : constString('weave'),
+            entity_name:
+              actionOptions.entityName != null
+                ? constString(actionOptions.entityName)
+                : constNone(),
           },
           newRoot => {
             updateNode(newRoot);
           }
         );
       } else if (action === 'commit') {
-        await makeMutation(inputNode, 'merge', {}, newRoot => {
+        await makeMutation(inputNode, 'merge_artifact', {}, newRoot => {
           updateNode(newRoot);
         });
+      } else if (action === 'delete_local' || action === 'delete_remote') {
+        await makeMutation(inputNode, 'delete_artifact', {});
       } else {
         throw new Error(`Not implemented yet: ${action}`);
       }

@@ -253,10 +253,15 @@ ScaleType = typing.Literal["linear", "log"]
 
 
 @weave.type()
-class Scale:
-    type: typing.Optional[ScaleType]
-    range: typing.Optional[dict[typing.Literal["field"], typing.Callable[[str], str]]]
-    base: typing.Optional[float]  # for log scale
+class AxisScale:
+    # need to use scaleType instead of `type` here because
+    # `type` serializes to the same key as the
+    # `type` used by ObjectType
+    scaleType: typing.Optional[ScaleType]
+    range: typing.Optional[
+        dict[typing.Literal["field"], typing.Callable[[str], str]]
+    ] = None
+    base: typing.Optional[float] = None  # for log scale
 
 
 @weave.type()
@@ -265,7 +270,7 @@ class AxisSetting:
     noTitle: bool
     noTicks: bool
     title: typing.Optional[str] = None
-    scale: typing.Optional[Scale] = None
+    scale: typing.Optional[AxisScale] = None
 
 
 @weave.type()
@@ -330,7 +335,7 @@ class PlotConfig:
     legendSettings: typing.Optional[LegendSettings]
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
-    configVersion: int = 12
+    configVersion: int = 14
 
 
 def set_through_array(
@@ -477,6 +482,8 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         no_legend: bool = False,
         x_title: typing.Optional[str] = None,
         y_title: typing.Optional[str] = None,
+        x_axis_type: typing.Optional[ScaleType] = None,
+        y_axis_type: typing.Optional[ScaleType] = None,
         color_title: typing.Optional[str] = None,
         domain_x: typing.Optional[SelectFunction] = None,
         domain_y: typing.Optional[SelectFunction] = None,
@@ -529,6 +536,11 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             config_axisSettings.x.title = x_title
             config_axisSettings.y.title = y_title
             config_axisSettings.color.title = color_title
+
+            if x_axis_type is not None:
+                config_axisSettings.x.scale = AxisScale(scaleType=x_axis_type)
+            if y_axis_type is not None:
+                config_axisSettings.y.scale = AxisScale(scaleType=y_axis_type)
 
             config_legendSettings = LegendSettings(
                 x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
@@ -870,7 +882,7 @@ def _get_selected_data_node(plot: Plot) -> graph.Node:
         table_config = panel_table.TableConfig(tableState=series.table)
         table_config.tableState.add_column(lambda row: row, "row")
         table_panel = panel_table.Table(plot.input_node, config=table_config)
-        node = list_.unnest(panel_table.rows(table_panel))
+        node = list_.unnest(panel_table._get_rows_node(table_panel))
         columns = table_panel.get_final_named_select_functions()
 
         if selection.x is None and selection.y is None:
@@ -960,4 +972,4 @@ def selected_rows(self: Plot):
 )
 def selected_data(self: Plot):
     selected_data_node = _get_selected_data_node(self)
-    return weave.use(selected_data_node)
+    return selected_data_node

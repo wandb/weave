@@ -9,7 +9,7 @@ from PIL import Image
 
 def make_stream_table(*args, **kwargs):
     # Unit test backend does not support async logging
-    return StreamTable(*args, **kwargs, _disable_async_logging=True)
+    return StreamTable(*args, **kwargs, _disable_async_file_stream=True)
 
 
 # Example of end to end integration test
@@ -26,11 +26,13 @@ def test_stream_logging(user_by_api_key_in_env):
     hist_node = (
         weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table")
-        .history2()
+        .history3()
     )
 
-    exp_type = weave_types.TypedDict({"a": weave_types.List(weave_types.Int())})
-    nested_type = hist_node.type.value.object_type.property_types["nested"].members[1]
+    exp_type = weave_types.TypedDict(
+        {"a": weave.types.optional(weave_types.List(weave_types.Int()))}
+    )
+    nested_type = hist_node.type.value.object_type.property_types["nested"]
     assert exp_type.assign_type(nested_type)
     assert weave.use(hist_node["hello"]).to_pylist_tagged() == [
         f"world_{i}" for i in range(10)
@@ -152,3 +154,25 @@ def test_multi_writers_parallel(user_by_api_key_in_env):
     assert weave.use(hist_node["index"]).to_pylist_raw() == indexes
     assert weave.use(hist_node["writer"]).to_pylist_raw() == writers
     assert weave.use(hist_node["_step"]).to_pylist_raw() == [i for i in range(20)]
+
+
+def test_stream_unauthed(user_by_api_key_in_env):
+    with pytest.raises(weave.errors.WeaveWandbAuthenticationException):
+        st = make_stream_table(
+            "test_table",
+            project_name="stream-tables",
+            entity_name="NONEXISTENT_USER",
+        )
+
+
+def test_stream_authed(user_by_api_key_in_env):
+    st = make_stream_table(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
+    st.log({"hello": "world"})
+    st.finish()
+
+    a = weave.use(st.rows()["hello"]).to_pylist_tagged()
+    assert a == ["world"]

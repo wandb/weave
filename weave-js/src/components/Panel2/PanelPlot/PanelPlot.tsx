@@ -58,6 +58,7 @@ import {
   filterNodes,
   taggedValueValueType,
   isTaggedValue,
+  opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -750,7 +751,7 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
   axis,
 }) => {
   const currentScaleType =
-    getScaleValue<ScaleType>(`type`) ?? DEFAULT_SCALE_TYPE;
+    getScaleValue<ScaleType>(`scaleType`) ?? DEFAULT_SCALE_TYPE;
 
   const scaleTypeSpecificProp = SCALE_TYPE_SPECIFIC_PROPS[currentScaleType];
   const scaleTypeSpecificPropValue: number | undefined =
@@ -766,7 +767,7 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
           options={SCALE_TYPE_OPTIONS}
           value={currentScaleType}
           onChange={(event, {value}) => {
-            setScaleValue(`type`, value as ScaleType);
+            setScaleValue(`scaleType`, value as ScaleType);
           }}
         />
       </ConfigPanel.ConfigOption>
@@ -1429,8 +1430,42 @@ function filterTableNodeToContinuousSelection(
 
       let colNode = opPick({obj: row, key: constString(colName)});
 
-      // TODO: make this more general and make use of the type system and config to
-      // emit the correct filter function.
+      const domainDiff = domain[1] - domain[0];
+      if (isAssignableTo(colNode.type, maybe(timestampBin))) {
+        return opAnd({
+          lhs: opNumberGreaterEqual({
+            lhs: opDateToNumber({
+              date: opPick({obj: colNode, key: constString('start')}),
+            }),
+            rhs: constNumber(
+              domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+          rhs: opNumberLessEqual({
+            lhs: opDateToNumber({
+              date: opPick({obj: colNode, key: constString('stop')}),
+            }),
+            rhs: constNumber(
+              domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+        });
+      } else if (isAssignableTo(colNode.type, maybe(numberBin))) {
+        return opAnd({
+          lhs: opNumberGreaterEqual({
+            lhs: opPick({obj: colNode, key: constString('start')}),
+            rhs: constNumber(
+              domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+          rhs: opNumberLessEqual({
+            lhs: opPick({obj: colNode, key: constString('stop')}),
+            rhs: constNumber(
+              domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+        });
+      }
       if (
         isAssignableTo(
           colNode.type,
@@ -1442,8 +1477,6 @@ function filterTableNodeToContinuousSelection(
       ) {
         colNode = opDateToNumber({date: colNode});
       }
-
-      const domainDiff = domain[1] - domain[0];
 
       return opAnd({
         lhs: opNumberGreaterEqual({
@@ -1785,7 +1818,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const series = config.series[i];
 
         const mark = getMark(series, node, series.table);
-        if (['line', 'point', 'area'].includes(mark)) {
+        if (['bar', 'line', 'point', 'area'].includes(mark)) {
           ['x' as const].forEach(axisName => {
             node = filterTableNodeToSelection(
               node,
@@ -1794,6 +1827,16 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               axisName,
               weave.client.opStore
             );
+          });
+        }
+        // If we have a nominal axis, limit it. We can end up with
+        // tons of unique values and Vega will basically hang.
+        const xAxisType = PlotState.getAxisType(concreteConfig.series[0], 'x');
+        const yAxisType = PlotState.getAxisType(concreteConfig.series[0], 'y');
+        if (xAxisType === 'nominal' || yAxisType === 'nominal') {
+          node = opLimit({
+            arr: node,
+            limit: constNumber(50),
           });
         }
       }
@@ -1817,6 +1860,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     listOfTableNodes,
     isDash,
     config.series,
+    concreteConfig.series,
     concreteConfig.signals.domain,
     weave.client.opStore,
   ]); // , isDash]);
@@ -1941,6 +1985,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     config.series
   );
   */
+
+  function scaleToVegaScale(s: Scale) {
+    return _.mapKeys(_.omitBy(s, _.isNil), (v, k) =>
+      k === 'scaleType' ? 'type' : k
+    );
+  }
 
   type DiscreteMappingScale = {domain: string[]; range: number[][]};
   const lineStyleScale: DiscreteMappingScale = useMemo(() => {
@@ -2722,7 +2772,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
         for (const axis of [`x`, `y`] as const) {
           if (
-            concreteConfig.axisSettings[axis].scale?.type === `log` &&
+            concreteConfig.axisSettings[axis].scale?.scaleType === `log` &&
             row[vegaCols[i][axis]] <= 0
           ) {
             return false;
@@ -2794,7 +2844,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
     // TODO(np): fixme
     if (axisSettings.x.scale != null) {
-      newSpec.encoding.x.scale = axisSettings.x.scale;
+      newSpec.encoding.x.scale = scaleToVegaScale(axisSettings.x.scale);
     }
     if (axisSettings.x.noTitle) {
       newSpec.encoding.x.axis.title = null;
@@ -2820,7 +2870,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       newSpec.encoding.y.axis = {...defaultFontStyleDict};
       // TODO(np): fixme
       if (axisSettings.y.scale != null) {
-        newSpec.encoding.y.scale = axisSettings.y.scale;
+        newSpec.encoding.y.scale = scaleToVegaScale(axisSettings.y.scale);
       }
       if (axisSettings.y.noTitle) {
         newSpec.encoding.y.axis.title = null;
@@ -2846,8 +2896,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
 
     if (newSpec.encoding.color != null) {
-      if (axisSettings?.color?.scale) {
-        newSpec.encoding.color.scale = axisSettings.color.scale;
+      if (axisSettings?.color?.scale != null) {
+        newSpec.encoding.color.scale = scaleToVegaScale(
+          axisSettings.color.scale
+        );
       }
 
       if (axisSettings.color && axisSettings.color.noTitle) {
@@ -2964,33 +3016,36 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
           if (settingName === 'domain') {
-            ['x' as const, 'y' as const].forEach(dimName => {
-              const axisSignal: [number, number] | string[] = signal[dimName];
-              const currentSetting = currConcreteConfig.signals.domain[dimName];
+            (Object.keys(brushableAxes) as Array<'x' | 'y'>).forEach(
+              dimName => {
+                const axisSignal: [number, number] | string[] = signal[dimName];
+                const currentSetting =
+                  currConcreteConfig.signals.domain[dimName];
 
-              let newDomain: Node;
-              if (brushableAxes[dimName] === 'temporal') {
-                newDomain = constNode(
-                  {type: 'list', objectType: {type: 'timestamp'}},
-                  axisSignal as number[]
-                );
-              } else {
-                newDomain = constNode(toWeaveType(axisSignal), axisSignal);
-              }
+                let newDomain: Node;
+                if (brushableAxes[dimName] === 'temporal') {
+                  newDomain = constNode(
+                    {type: 'list', objectType: {type: 'timestamp'}},
+                    axisSignal as number[]
+                  );
+                } else {
+                  newDomain = constNode(toWeaveType(axisSignal), axisSignal);
+                }
 
-              if (!_.isEqual(currentSetting, axisSignal)) {
-                currMutateDomain[dimName]({
-                  val: newDomain,
+                if (!_.isEqual(currentSetting, axisSignal)) {
+                  currMutateDomain[dimName]({
+                    val: newDomain,
+                  });
+                }
+
+                // need to clear out the old selection, if there is one
+                currUpdateConfig2((oldConfig: PlotConfig) => {
+                  return produce(oldConfig, draft => {
+                    draft.signals.selection[dimName] = undefined;
+                  });
                 });
               }
-
-              // need to clear out the old selection, if there is one
-              currUpdateConfig2((oldConfig: PlotConfig) => {
-                return produce(oldConfig, draft => {
-                  draft.signals.selection[dimName] = undefined;
-                });
-              });
-            });
+            );
           } else {
             currUpdateConfig2((oldConfig: PlotConfig) => {
               return produce(oldConfig, draft => {

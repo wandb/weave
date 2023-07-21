@@ -10,12 +10,16 @@ import {
   varNode,
   voidNode,
 } from '@wandb/weave/core';
-import {
-  useMakeMutation,
-  useMutation,
-  useNodeWithServerType,
-} from '@wandb/weave/react';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useMutation, useNodeWithServerType} from '@wandb/weave/react';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
 
 import {Popover} from '@material-ui/core';
@@ -40,6 +44,7 @@ import {
 } from './hooks';
 import {
   PersistenceAction,
+  PersistenceDeleteActionType,
   PersistenceRenameActionType,
   PersistenceState,
   PersistenceStoreActionType,
@@ -67,6 +72,8 @@ import {PanelGroupConfig} from '../Panel2/PanelGroup';
 import {getFullChildPanel} from '../Panel2/ChildPanel';
 import _ from 'lodash';
 import {mapPanels} from '../Panel2/panelTree';
+import {DeleteActionModal} from './DeleteActionModal';
+import {PublishModal} from './PublishModal';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -218,9 +225,12 @@ export const PersistenceManager: React.FC<{
   updateNode: (node: NodeOrVoidNode) => void;
   goHome?: () => void;
 }> = props => {
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+
   const maybeURI = uriFromNode(props.inputNode);
   const branchPoint = useBranchPointFromURIString(maybeURI);
   const hasRemote = branchPointIsRemote(branchPoint);
+  const {name: currName} = determineURIIdentifier(maybeURI);
 
   const {nodeState, takeAction, acting} = useStateMachine(
     props.inputNode,
@@ -237,6 +247,14 @@ export const PersistenceManager: React.FC<{
   const headerRef = useRef<HTMLDivElement>(null);
   return (
     <MainHeaderWrapper ref={headerRef}>
+      <PublishModal
+        defaultName={currName}
+        open={isPublishModalOpen}
+        acting={acting}
+        takeAction={takeAction}
+        onClose={() => setIsPublishModalOpen(false)}
+      />
+
       <HeaderLogoControls
         inputNode={props.inputNode}
         inputConfig={props.inputConfig}
@@ -253,6 +271,7 @@ export const PersistenceManager: React.FC<{
           maybeURI={maybeURI}
           branchPoint={branchPoint}
           renameAction={availableActions.renameAction}
+          deleteAction={availableActions.deleteAction}
           takeAction={takeAction}
           goHome={props.goHome}
         />
@@ -263,6 +282,7 @@ export const PersistenceManager: React.FC<{
         acting={acting}
         takeAction={takeAction}
         nodeState={nodeState}
+        setIsPublishModalOpen={setIsPublishModalOpen}
       />
     </MainHeaderWrapper>
   );
@@ -281,11 +301,13 @@ const persistenceStateToLabel: {[state in PersistenceState]: string} = {
 
 const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
-  commit: 'Commit',
+  commit: 'Publish changes',
   rename_local: 'Rename',
   publish_as: 'Publish As',
-  publish_new: 'Publish',
+  publish_new: 'Publish board',
   rename_remote: 'Rename',
+  delete_local: 'Delete board',
+  delete_remote: 'Delete board',
 };
 
 const HeaderPersistenceControls: React.FC<{
@@ -293,11 +315,12 @@ const HeaderPersistenceControls: React.FC<{
   acting: boolean;
   nodeState: PersistenceState;
   takeAction: TakeActionType;
-}> = ({storeAction, acting, takeAction, nodeState}) => {
+  setIsPublishModalOpen: Dispatch<SetStateAction<boolean>>;
+}> = ({storeAction, acting, takeAction, nodeState, setIsPublishModalOpen}) => {
   return (
     <PersistenceControlsWrapper>
       {acting ? (
-        <WBButton loading variant={`confirm`}>
+        <WBButton loading variant="confirm">
           Working
         </WBButton>
       ) : storeAction ? (
@@ -306,9 +329,13 @@ const HeaderPersistenceControls: React.FC<{
             {persistenceStateToLabel[nodeState]}
           </PersistenceLabel>
           <WBButton
-            variant={`confirm`}
+            variant="confirm"
             onClick={() => {
-              takeAction(storeAction);
+              if (storeAction === 'publish_new') {
+                setIsPublishModalOpen(true);
+              } else {
+                takeAction(storeAction);
+              }
             }}>
             {persistenceActionToLabel[storeAction]}
           </WBButton>
@@ -327,6 +354,7 @@ const HeaderFileControls: React.FC<{
   headerEl: HTMLElement | null;
   maybeURI: string | null;
   renameAction: PersistenceRenameActionType | null;
+  deleteAction: PersistenceDeleteActionType | null;
   takeAction: TakeActionType;
   branchPoint: BranchPointType | null;
   updateNode: (node: NodeOrVoidNode) => void;
@@ -338,10 +366,12 @@ const HeaderFileControls: React.FC<{
   maybeURI,
   branchPoint,
   renameAction,
+  deleteAction,
   takeAction,
   updateNode,
 }) => {
   const [actionRenameOpen, setActionRenameOpen] = useState(false);
+  const [actionDeleteOpen, setActionDeleteOpen] = useState(false);
   const [acting, setActing] = useState(false);
   const isLocal = maybeURI != null && isLocalURI(maybeURI);
   const entityProjectName = determineURISource(maybeURI, branchPoint);
@@ -349,14 +379,6 @@ const HeaderFileControls: React.FC<{
     determineURIIdentifier(maybeURI);
   const [anchorFileEl, setAnchorFileEl] = useState<HTMLElement | null>(null);
   const expandedFileControls = Boolean(anchorFileEl);
-
-  const makeMutation = useMakeMutation();
-  const deleteCurrentNode = useCallback(async () => {
-    if (isLocal) {
-      await makeMutation(inputNode, 'delete_artifact', {});
-      goHome?.();
-    }
-  }, [goHome, inputNode, isLocal, makeMutation]);
 
   const previousVersionURI = usePreviousVersionFromURIString(maybeURI);
   const canUndo = !!(previousVersionURI && maybeURI);
@@ -544,21 +566,18 @@ const HeaderFileControls: React.FC<{
             </MenuItem>
           )}
 
-          {isLocal && (
-            <>
-              <MenuDivider />
-
-              <MenuItem
-                onClick={() => {
-                  setAnchorFileEl(null);
-                  deleteCurrentNode();
-                }}>
-                <MenuIcon>
-                  <IconDelete />
-                </MenuIcon>
-                <MenuText>Delete</MenuText>
-              </MenuItem>
-            </>
+          {deleteAction && <MenuDivider />}
+          {deleteAction && (
+            <MenuItem
+              onClick={() => {
+                setAnchorFileEl(null);
+                setActionDeleteOpen(true);
+              }}>
+              <MenuIcon>
+                <IconDelete />
+              </MenuIcon>
+              <MenuText>Delete board</MenuText>
+            </MenuItem>
           )}
         </CustomMenu>
       </CustomPopover>
@@ -575,6 +594,21 @@ const HeaderFileControls: React.FC<{
             takeAction(renameAction, {name: newName}, () => {
               setActing(false);
               setActionRenameOpen(false);
+            });
+          }}
+        />
+      )}
+      {deleteAction && (
+        <DeleteActionModal
+          open={actionDeleteOpen}
+          onClose={() => setActionDeleteOpen(false)}
+          acting={acting}
+          onDelete={() => {
+            setActing(true);
+            takeAction(deleteAction, {}, () => {
+              setActing(false);
+              setActionRenameOpen(false);
+              goHome?.();
             });
           }}
         />
@@ -630,7 +664,12 @@ const HeaderLogoControls: React.FC<{
               if (uriVal != null && typeof uriVal === 'string') {
                 if (!(uriVal in varMap)) {
                   const baseNameParts = uriVal.split(':')[1].split('/');
-                  const baseName = baseNameParts[baseNameParts.length - 1];
+                  let baseName = baseNameParts[baseNameParts.length - 1];
+                  baseName = baseName.replace(/[^a-z0-9_]/gi, '_');
+                  //  if the first character is not a letter, prepend `v_`
+                  if (!/^[a-z]/i.test(baseName)) {
+                    baseName = 'v_' + baseName;
+                  }
                   let count = 0;
                   let varName = baseName + '_' + count;
                   while (names.has(varName)) {

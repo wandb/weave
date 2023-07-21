@@ -40,7 +40,7 @@ def refine_history2_with_columns_type(
 ) -> types.Type:
     return ArrowWeaveListType(
         history_op_common.refine_history_type(
-            run, columns=history_op_common.get_full_columns(history_cols)
+            run, columns=history_op_common.get_full_columns_prefixed(run, history_cols)
         )
     )
 
@@ -53,7 +53,9 @@ def refine_history2_with_columns_type(
     hidden=True,
 )
 def history2_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history2(run, history_op_common.get_full_columns(history_cols))
+    return _get_history2(
+        run, history_op_common.get_full_columns_prefixed(run, history_cols)
+    )
 
 
 @op(

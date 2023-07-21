@@ -93,6 +93,7 @@ export interface MatchParams {
   reportNameAndID?: string;
   sweepName?: string;
   jobId?: string;
+  jobTab?: string;
   queueId?: string;
   tab?: string;
   filePath?: string;

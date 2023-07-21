@@ -10,7 +10,7 @@ def _get_history_node(steam_table: StreamTableType):
     return (
         project(steam_table.entity_name, steam_table.project_name)
         .run(steam_table.table_name)
-        .history2()
+        .history3()
     )
 
 
