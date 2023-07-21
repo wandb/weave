@@ -93,24 +93,13 @@ def gql_prop_op(
     gql_property_getter_op_fn.__signature__ = sig  # type: ignore
     gql_property_getter_op_fn.sig = sig  # type: ignore
 
-    def output_type_func(input_types: dict[str, weave_types.Type]) -> weave_types.Type:
-        if isinstance(output_type, gql_with_keys.WithKeysMixin):
-            provided_input_type = input_types[first_arg_name]
-            if isinstance(provided_input_type, gql_with_keys.GQLClassWithKeysType):
-                # propagate the keys forward in the graph
-                output_type_keys = typing.cast(
-                    weave_types.TypedDict, provided_input_type.keys[prop_name]
-                ).property_types
-                return output_type.with_keys(output_type_keys)
-        return output_type
-
     scalar_op = op(
         name=op_name,
         plugins=wb_gql_op_plugin(
             lambda inputs, inner: prop_name,
         ),
         input_type={first_arg_name: input_type},
-        output_type=output_type_func,
+        output_type=output_type,
     )(gql_property_getter_op_fn)
 
     # side effect: register an arrow-vectorized version of the op
