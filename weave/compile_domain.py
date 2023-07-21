@@ -41,6 +41,10 @@ class GqlOpPlugin:
     root_resolver: typing.Optional["op_def.OpDef"] = None
 
 
+def fragment_to_query(fragment: str) -> str:
+    return f"query WeavePythonCG {{ {fragment} }}"
+
+
 # Ops in `domain_ops` can add this plugin to their op definition to indicate
 # that they need data to be fetched from the GQL API. At it's core, the plugin
 # allows the user to specify a `query_fn` that takes in the inputs to the op and
@@ -90,7 +94,7 @@ def apply_domain_op_gql_translation(
         node = typing.cast(graph.OutputNode, node)
         inner_fragment = _get_fragment(node, p)
         fragments.append(inner_fragment)
-        alias = _get_outermost_alias(inner_fragment)
+        alias = gql_to_weave.get_outermost_alias(inner_fragment)
         aliases.append(alias)
         custom_resolver = _custom_root_resolver(node)
 
@@ -105,13 +109,14 @@ def apply_domain_op_gql_translation(
                     "result_dict": query_root_node,
                     "result_key": graph.ConstNode(types.String(), alias),
                     "output_type": graph.ConstNode(types.TypeType(), output_type),
+                    "obj_gql_query": graph.ConstNode(types.String(), inner_fragment),
                 },
             )
 
     res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error)
 
     combined_query_fragment = "\n".join(fragments)
-    query_str = f"query WeavePythonCG {{ {combined_query_fragment} }}"
+    query_str = fragment_to_query(combined_query_fragment)
     if combined_query_fragment.strip() != "":
         query_str = _normalize_query_str(query_str)
     query_str_const_node.val = query_str
@@ -379,23 +384,6 @@ def _normalize_query_str(query_str: str) -> str:
     return graphql.utilities.strip_ignored_characters(
         graphql.language.print_ast(gql_doc)
     )
-
-
-def _get_outermost_alias(query_str: str) -> str:
-    gql_doc = graphql.language.parse(f"query innerquery {{ {query_str} }}")
-    root_operation = gql_doc.definitions[0]
-    if not isinstance(root_operation, graphql.language.ast.OperationDefinitionNode):
-        raise errors.WeaveInternalError("Only operation definitions are supported.")
-    if len(root_operation.selection_set.selections) != 1:
-        # NOTE: if we ever need a root op to have multiple root selections, we
-        # can easily loosen this restriction and just return a list of aliases
-        raise errors.WeaveInternalError("Only one root selection is supported")
-    inner_selection = root_operation.selection_set.selections[0]
-    if not isinstance(inner_selection, graphql.language.ast.FieldNode):
-        raise errors.WeaveInternalError("Only field selections are supported")
-    if inner_selection.alias is not None:
-        return inner_selection.alias.value
-    return inner_selection.name.value
 
 
 def _is_root_node(node: graph.Node) -> bool:

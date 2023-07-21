@@ -10,10 +10,29 @@ from graphql import (
 import graphql
 import pathlib
 import typing
+
+from . import errors
 from . import weave_types as types
 
 
 _GQL_SCHEMA: typing.Optional[graphql.GraphQLSchema] = None
+
+
+def get_outermost_alias(query_str: str) -> str:
+    gql_doc = graphql.language.parse(f"query innerquery {{ {query_str} }}")
+    root_operation = gql_doc.definitions[0]
+    if not isinstance(root_operation, graphql.language.ast.OperationDefinitionNode):
+        raise errors.WeaveInternalError("Only operation definitions are supported.")
+    if len(root_operation.selection_set.selections) != 1:
+        # NOTE: if we ever need a root op to have multiple root selections, we
+        # can easily loosen this restriction and just return a list of aliases
+        raise errors.WeaveInternalError("Only one root selection is supported")
+    inner_selection = root_operation.selection_set.selections[0]
+    if not isinstance(inner_selection, graphql.language.ast.FieldNode):
+        raise errors.WeaveInternalError("Only field selections are supported")
+    if inner_selection.alias is not None:
+        return inner_selection.alias.value
+    return inner_selection.name.value
 
 
 def get_gql_schema() -> graphql.GraphQLSchema:

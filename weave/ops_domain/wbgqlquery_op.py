@@ -1,4 +1,6 @@
 import logging
+import typing
+
 from .. import weave_types as types
 from ..api import op
 from . import wb_domain_types as wdt
@@ -6,6 +8,8 @@ from ..wandb_client_api import wandb_gql_query
 from ..language_features.tagging import tagged_value_type
 from .. import engine_trace
 from .. import errors
+from .. import gql_to_weave
+from .. import gql_with_keys
 
 
 def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
@@ -39,8 +43,20 @@ def wbgqlquery(query_str, alias_list):
 
 def _querytoobj_output_type(input_types: dict[str, types.Type]) -> types.Type:
     ot = input_types["output_type"]
-    if isinstance(ot, types.Const) and isinstance(ot.val, types.Type):
-        return ot.val
+    original_query = input_types["obj_gql_query"]
+    result_dict_type = typing.cast(types.TypedDict, input_types["result_dict"])
+    if (
+        isinstance(ot, types.Const)
+        and isinstance(ot.val, gql_with_keys.WithKeysMixin)
+        and isinstance(original_query, types.Const)
+        and isinstance(original_query.val, str)
+    ):
+        outermost_alias = gql_to_weave.get_outermost_alias(original_query.val)
+        keys = typing.cast(
+            types.TypedDict, result_dict_type.property_types[outermost_alias]
+        )
+        return ot.val.with_keys(keys.property_types)
+
     return types.Any()
 
 
@@ -49,11 +65,12 @@ def _querytoobj_output_type(input_types: dict[str, types.Type]) -> types.Type:
     input_type={
         "result_dict": types.TypedDict({}),
         "result_key": types.String(),
+        "obj_gql_query": types.String(),
         "output_type": types.TypeType(),
     },
     output_type=_querytoobj_output_type,
 )
-def querytoobj(result_dict, result_key, output_type):
+def querytoobj(result_dict, result_key, obj_gql_query, output_type):
     if isinstance(output_type, tagged_value_type.TaggedValueType):
         output_type = output_type.value
     if output_type.instance_class is None or not issubclass(
