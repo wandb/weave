@@ -182,13 +182,10 @@ function defaultPlot(
   stack: Stack,
   enableDashUi: boolean
 ): PlotConfig {
-  return produce(PlotState.defaultPlot(inputNode, stack), draft => {
-    if (enableDashUi) {
-      draft.series.forEach((s, i) => {
-        s.seriesName = `Series ${i + 1}`;
-      });
-    }
-  });
+  return PlotState.setDefaultSeriesNames(
+    PlotState.defaultPlot(inputNode, stack),
+    enableDashUi
+  );
 }
 
 const useConfig = (
@@ -197,21 +194,14 @@ const useConfig = (
 ): {config: PlotConfig; isRefining: boolean} => {
   const {stack} = usePanelContext();
   const weave = useWeaveContext();
+  const enableDashUi = useWeaveDashUiEnable();
 
-  const newConfig = useMemo(
-    () =>
-      produce(
-        PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
-        draft => {
-          draft.series.forEach((s, i) => {
-            if (s.seriesName == null) {
-              s.seriesName = `Series ${i + 1}`;
-            }
-          });
-        }
-      ),
-    [propsConfig, inputNode, stack]
-  );
+  const newConfig = useMemo(() => {
+    return PlotState.setDefaultSeriesNames(
+      PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
+      !!enableDashUi
+    );
+  }, [propsConfig, inputNode, stack, enableDashUi]);
 
   const defaultColNameStrippedConfig = useMemo(
     () =>

@@ -643,6 +643,21 @@ export const dimConstructors: Record<
     new MarkDimensionGroup(series, weave),
 };
 
+export function setDefaultSeriesNames(
+  config: PlotConfig,
+  enableDashUi: boolean
+): PlotConfig {
+  return produce(config, draft => {
+    if (enableDashUi) {
+      draft.series.forEach((s, i) => {
+        if (s.seriesName == null) {
+          s.seriesName = `Series ${i + 1}`;
+        }
+      });
+    }
+  });
+}
+
 export function addSeriesFromSeries(
   config: PlotConfig,
   series: SeriesConfig,
