@@ -94,14 +94,14 @@ def gql_prop_op(
     gql_property_getter_op_fn.sig = sig  # type: ignore
 
     def output_type_func(input_types: dict[str, weave_types.Type]) -> weave_types.Type:
-        assert isinstance(output_type, gql_with_keys.WithKeysMixin)
-        provided_input_type = input_types[first_arg_name]
-        if isinstance(provided_input_type, gql_with_keys.GQLClassWithKeysType):
-            # propagate the keys forward in the graph
-            output_type_keys = typing.cast(
-                weave_types.TypedDict, provided_input_type.keys[prop_name]
-            ).property_types
-            return output_type.with_keys(output_type_keys)
+        if isinstance(output_type, gql_with_keys.WithKeysMixin):
+            provided_input_type = input_types[first_arg_name]
+            if isinstance(provided_input_type, gql_with_keys.GQLClassWithKeysType):
+                # propagate the keys forward in the graph
+                output_type_keys = typing.cast(
+                    weave_types.TypedDict, provided_input_type.keys[prop_name]
+                ).property_types
+                return output_type.with_keys(output_type_keys)
         return output_type
 
     scalar_op = op(

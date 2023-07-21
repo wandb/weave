@@ -3,12 +3,24 @@ from .. import storage
 from ..ops_domain import wb_domain_types as wdt
 from .. import weave_types as types
 
+from ..language_features.tagging import tagged_value_type
+
 
 def test_with_keys_assignability():
     org_type = wdt.OrgType
-    org_with_keys = org_type.with_keys({"orgName": types.String()})
+    org_with_keys = org_type.with_keys({"name": types.String()})
     assert not org_with_keys.assign_type(org_type)
     assert org_type.assign_type(org_with_keys)
+    assert org_with_keys.assign_type(org_with_keys)
+
+    org_with_keys_2 = org_type.with_keys(
+        {
+            "name": types.String(),
+            "id": types.String(),
+        }
+    )
+
+    assert org_with_keys.assign_type(org_with_keys_2)
 
 
 def test_type_of_run_with_keys():

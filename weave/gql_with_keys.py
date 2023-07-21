@@ -71,10 +71,6 @@ class GQLClassWithKeysType(types.Type):
         self.keyless_weave_type_class = keyless_weave_type_class
         self.keys = keys
 
-    @property
-    def _assignment_form(self) -> types.Type:
-        return self.keyless_weave_type_class()
-
     def _assign_type_inner(self, other_type: types.Type) -> bool:
         # TODO: think more about how this will work with tags - might need to be modified
         return (
@@ -82,6 +78,18 @@ class GQLClassWithKeysType(types.Type):
             and self.keyless_weave_type_class == other_type.keyless_weave_type_class
             and self.keys == other_type.keys
         )
+
+    def _is_assignable_to(self, other_type: types.Type) -> typing.Optional[bool]:
+        if other_type.__class__ is self.keyless_weave_type_class:
+            return True
+
+        if isinstance(other_type, GQLClassWithKeysType):
+            if self.__class__ == other_type.__class__:
+                other_td = types.TypedDict(other_type.keys)
+                self_td = types.TypedDict(self.keys)
+                return other_td.assign_type(self_td)
+
+        return False
 
     def _str_repr(self) -> str:
         keys_repr = dict(sorted([(k, v.__repr__()) for k, v in self.keys.items()]))

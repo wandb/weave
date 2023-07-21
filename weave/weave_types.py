@@ -278,7 +278,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         # throughout this code path, like checking for class equality instead of using isinstance
 
         # Unions or union-like things (tagged unions) must be handled first
-        if next_type.name == "tagged" or "WithKeys" in next_type.name:
+        if next_type.name == "tagged":
             next_type = next_type._assignment_form  # type: ignore
 
         is_assignable_to = next_type._is_assignable_to(self)
