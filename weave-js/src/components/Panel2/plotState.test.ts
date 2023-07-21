@@ -516,7 +516,7 @@ describe('test multiple series', () => {
       produce(config, draft => {
         draft.configOptionsExpanded.mark = false;
         draft.series = [draft.series[0], draft.series[0]];
-        draft.series[-1].seriesName = 'Series 2';
+        draft.series[draft.series.length - 1].seriesName = 'Series 2';
       })
     );
   });
