@@ -19,6 +19,9 @@ from . import graph
 
 Ref = ref_base.Ref
 
+if typing.TYPE_CHECKING:
+    from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+
 
 def split_path_dotfile(path, dotfile_name):
     while path != "/":
@@ -76,6 +79,8 @@ def _direct_publish(
     branch_name: typing.Optional[str] = None,
     metadata: typing.Optional[typing.Dict[str, typing.Any]] = None,
     assume_weave_type: typing.Optional[types.Type] = None,
+    *,
+    _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
 ):
     weave_type = assume_weave_type or _get_weave_type(obj)
 
@@ -101,7 +106,10 @@ def _direct_publish(
     #     nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
         artifact.save(
-            project=wb_project_name, entity_name=wb_entity_name, branch=branch_name
+            project=wb_project_name,
+            entity_name=wb_entity_name,
+            branch=branch_name,
+            _lite_run=_lite_run,
         )
 
     return ref
