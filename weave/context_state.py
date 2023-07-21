@@ -1,10 +1,12 @@
 import contextvars
 import contextlib
 import typing
+import dataclasses
 
 from . import client_interface
 from . import server_interface
 from . import uris
+
 
 # colab currently runs ipykernel < 6.0.  This resets context on every
 # execution, see: https://github.com/ipython/ipykernel/pull/632.  We
@@ -189,3 +191,28 @@ def analytics_enabled():
 
 def disable_analytics():
     return _analytics_enabled.set(False)
+
+
+# Context for wandb api
+# Instead of putting this in a shared file, we put it directly here
+# so that the patching at the top of this file will work correctly
+# for this symbol.
+@dataclasses.dataclass
+class WandbApiContext:
+    user_id: typing.Optional[str] = None
+    api_key: typing.Optional[str] = None
+    headers: typing.Optional[dict[str, str]] = None
+    cookies: typing.Optional[dict[str, str]] = None
+
+    @classmethod
+    def from_json(cls, json: typing.Any) -> "WandbApiContext":
+        return cls(**json)
+
+    def to_json(self) -> typing.Any:
+        return dataclasses.asdict(self)
+
+
+## wandb_api.py context
+_wandb_api_context: contextvars.ContextVar[
+    typing.Optional[WandbApiContext]
+] = contextvars.ContextVar("_weave_api_context", default=None)
