@@ -101,3 +101,94 @@ def test_artifact_query():
             )
         }
     )
+
+
+def test_multi_root_query():
+    query = """
+        query WeavePythonCG{
+            project_8d1592567720841659de23c02c97d594:project(name:"p_0" entityName:"e_0"){
+                id 
+                name
+                createdAt
+            }
+            project_3c237e5b25fed9a705b21513dd7921c6:project(name:"p_1" entityName:"e_1"){
+                id 
+                name
+                runs_c1233b7003317090ab5e2a75db4ad965:runs(first:100){
+                    edges{
+                        node{
+                            id 
+                            name 
+                        }
+                    }
+                }
+            }
+            instance{
+                projects_500:projects(limit:500){
+                    edges{
+                        node{
+                            id 
+                            name
+                            createdAt
+                        }
+                    }
+                }
+            }
+        }
+        """
+
+    return_type = gql_to_weave.get_query_weave_type(query)
+    assert return_type == types.TypedDict(
+        {
+            "project_8d1592567720841659de23c02c97d594": types.TypedDict(
+                {
+                    "id": types.String(),
+                    "name": types.String(),
+                    "createdAt": types.Timestamp(),
+                }
+            ),
+            "project_3c237e5b25fed9a705b21513dd7921c6": types.TypedDict(
+                {
+                    "id": types.String(),
+                    "name": types.String(),
+                    "runs_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
+                        {
+                            "edges": types.List(
+                                types.TypedDict(
+                                    {
+                                        "node": types.TypedDict(
+                                            {
+                                                "id": types.String(),
+                                                "name": types.String(),
+                                            }
+                                        )
+                                    }
+                                )
+                            )
+                        }
+                    ),
+                }
+            ),
+            "instance": types.TypedDict(
+                {
+                    "projects_500": types.TypedDict(
+                        {
+                            "edges": types.List(
+                                types.TypedDict(
+                                    {
+                                        "node": types.TypedDict(
+                                            {
+                                                "id": types.String(),
+                                                "name": types.String(),
+                                                "createdAt": types.Timestamp(),
+                                            }
+                                        )
+                                    }
+                                )
+                            )
+                        }
+                    )
+                }
+            ),
+        }
+    )
