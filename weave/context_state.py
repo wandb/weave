@@ -6,6 +6,9 @@ from . import client_interface
 from . import server_interface
 from . import uris
 
+# This is needed to ensure we patch the contexts for wandb_api
+from .wandb_api import *
+
 # colab currently runs ipykernel < 6.0.  This resets context on every
 # execution, see: https://github.com/ipython/ipykernel/pull/632.  We
 # maintain a global context to work around this.
