@@ -1,6 +1,7 @@
 import contextvars
 import contextlib
 import typing
+import dataclasses
 
 from . import client_interface
 from . import server_interface
