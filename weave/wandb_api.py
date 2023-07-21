@@ -2,8 +2,6 @@
 # Weave interactions with the Weave API should go through this
 # module.
 
-import dataclasses
-import os
 import typing
 import graphql
 import gql
@@ -15,6 +13,7 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
+from . import wandb_api_context_def
 from . import engine_trace
 from . import environment as weave_env
 from . import wandb_client_api
@@ -23,32 +22,14 @@ from . import wandb_client_api
 tracer = engine_trace.tracer()  # type: ignore
 
 
-@dataclasses.dataclass
-class WandbApiContext:
-    user_id: typing.Optional[str] = None
-    api_key: typing.Optional[str] = None
-    headers: typing.Optional[dict[str, str]] = None
-    cookies: typing.Optional[dict[str, str]] = None
-
-    @classmethod
-    def from_json(cls, json: typing.Any) -> "WandbApiContext":
-        return cls(**json)
-
-    def to_json(self) -> typing.Any:
-        return dataclasses.asdict(self)
-
-
-_wandb_api_context: contextvars.ContextVar[
-    typing.Optional[WandbApiContext]
-] = contextvars.ContextVar("_weave_api_context", default=None)
-
-
 def set_wandb_api_context(
     user_id: typing.Optional[str],
     api_key: typing.Optional[str],
     headers: typing.Optional[dict],
     cookies: typing.Optional[dict],
-) -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
+) -> typing.Optional[
+    contextvars.Token[typing.Optional[wandb_api_context_def.WandbApiContext]]
+]:
     cur_ctx = get_wandb_api_context()
     if cur_ctx:
         # WANDB API context is only allowed to be set once per thread, since we
@@ -56,21 +37,25 @@ def set_wandb_api_context(
         # lib right now.
         return None
     wandb_client_api.set_wandb_thread_local_api_settings(api_key, cookies, headers)
-    return _wandb_api_context.set(WandbApiContext(user_id, api_key, headers, cookies))
+    return wandb_api_context_def._wandb_api_context.set(
+        wandb_api_context_def.WandbApiContext(user_id, api_key, headers, cookies)
+    )
 
 
 def reset_wandb_api_context(
-    token: typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]],
+    token: typing.Optional[
+        contextvars.Token[typing.Optional[wandb_api_context_def.WandbApiContext]]
+    ],
 ) -> None:
     if token is None:
         return
     wandb_client_api.reset_wandb_thread_local_api_settings()
-    _wandb_api_context.reset(token)
+    wandb_api_context_def._wandb_api_context.reset(token)
 
 
 @contextlib.contextmanager
 def wandb_api_context(
-    ctx: typing.Optional[WandbApiContext],
+    ctx: typing.Optional[wandb_api_context_def.WandbApiContext],
 ) -> typing.Generator[None, None, None]:
     if ctx:
         token = set_wandb_api_context(
@@ -83,11 +68,15 @@ def wandb_api_context(
             reset_wandb_api_context(token)
 
 
-def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
-    return _wandb_api_context.get()
+def get_wandb_api_context() -> typing.Optional[wandb_api_context_def.WandbApiContext]:
+    return wandb_api_context_def._wandb_api_context.get()
 
 
-def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
+def init() -> (
+    typing.Optional[
+        contextvars.Token[typing.Optional[wandb_api_context_def.WandbApiContext]]
+    ]
+):
     cookie = weave_env.weave_wandb_cookie()
     if cookie:
         cookies = {"wandb": cookie}

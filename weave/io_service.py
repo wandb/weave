@@ -27,6 +27,7 @@ from . import engine_trace
 from . import filesystem
 from . import weave_http
 from . import wandb_api
+from . import wandb_api_context_def
 from . import wandb_file_manager
 from . import server_error_handling
 from . import async_queue
@@ -48,7 +49,7 @@ class ArtifactMetadata(typing.TypedDict):
 @dataclasses.dataclass
 class ServerRequestContext:
     trace_context: typing.Optional[engine_trace.TraceContext]
-    wandb_api_context: typing.Optional[wandb_api.WandbApiContext]
+    wandb_api_context: typing.Optional[wandb_api_context_def.WandbApiContext]
 
     @classmethod
     def from_json(cls, json: typing.Any) -> "ServerRequestContext":
@@ -58,7 +59,7 @@ class ServerRequestContext:
         wandb_api_context = None
         wandb_api_context_json = json.get("wandb_api_context")
         if wandb_api_context_json:
-            wandb_api_context = wandb_api.WandbApiContext.from_json(
+            wandb_api_context = wandb_api_context_def.WandbApiContext.from_json(
                 wandb_api_context_json
             )
         return cls(trace_context=trace_context, wandb_api_context=wandb_api_context)

@@ -6,8 +6,8 @@ from . import client_interface
 from . import server_interface
 from . import uris
 
-# This is needed to ensure we patch the contexts for wandb_api
-from .wandb_api import *
+# Importing this symbol will cause the context to be patched
+from .wandb_api_context_def import _wandb_api_context  # noqa: F401
 
 # colab currently runs ipykernel < 6.0.  This resets context on every
 # execution, see: https://github.com/ipython/ipykernel/pull/632.  We
