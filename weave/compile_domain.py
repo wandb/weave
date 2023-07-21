@@ -6,7 +6,6 @@ from . import stitch
 from . import registry_mem
 from . import errors
 from . import op_args
-from . import gql_with_keys
 from dataclasses import dataclass, field
 import graphql
 
@@ -88,7 +87,7 @@ def apply_domain_op_gql_translation(
         if not _is_root_node(node):
             return node
         node = typing.cast(graph.OutputNode, node)
-        inner_fragment, root_type = _get_fragment_and_gql_root_type(node, p)
+        inner_fragment = _get_fragment(node, p)
         fragments.append(inner_fragment)
         alias = _get_outermost_alias(inner_fragment)
         aliases.append(alias)
@@ -96,10 +95,7 @@ def apply_domain_op_gql_translation(
         if custom_resolver is not None:
             return custom_resolver(query_root_node, **node.from_op.inputs)
         else:
-            output_type = (
-                root_type if root_type is not None else _get_plugin_output_type(node)
-            )
-
+            output_type = _get_plugin_output_type(node)
             return graph.OutputNode(
                 output_type,
                 "gqlroot-querytoobj",
@@ -136,30 +132,7 @@ def _get_plugin_output_type(node: graph.OutputNode) -> types.Type:
     return op_def.concrete_output_type
 
 
-def _output_type_with_keys(
-    op_def: "op_def.OpDef", fragment: str, keys: dict[str, types.Type]
-) -> types.TypedDict:
-    key_name = _get_outermost_alias(fragment)
-    output_type = op_def.concrete_output_type
-
-    is_list = types.List().assign_type(output_type)
-
-    # handle gql ops that return lists
-    if is_list:
-        output_type = typing.cast(types.List, output_type).object_type
-
-    if isinstance(output_type, gql_with_keys.WithKeysMixin):
-        output_type = output_type.with_keys(keys)
-
-    if is_list:
-        output_type = types.List(output_type)
-
-    return types.TypedDict({key_name: output_type})
-
-
-def _get_fragment_and_gql_root_type(
-    node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph
-) -> typing.Tuple[str, typing.Optional[types.TypedDict]]:
+def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -> str:
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     # TODO: make this a helper (it is used in stich.py as well)
     if op_def.derived_from and op_def.derived_from.derived_ops["mapped"] == op_def:
@@ -183,28 +156,20 @@ def _get_fragment_and_gql_root_type(
 
     wb_domain_gql = _get_gql_plugin(op_def)
     if wb_domain_gql is None and not is_passthrough:
-        return "", None
+        return ""
 
     forward_obj = stitchedGraph.get_result(node)
     calls = forward_obj.calls
-
-    child_subfragments: list[str] = []
-    child_tree: dict[str, types.Type] = {}
-
-    for call in calls:
-        if isinstance(call.node, graph.OutputNode):
-            sub_fragment, sub_tree = _get_fragment_and_gql_root_type(
-                call.node, stitchedGraph
-            )
-            child_subfragments.append(sub_fragment)
-            if sub_tree is not None:
-                child_tree.update(sub_tree.property_types)
-
-    child_fragment = "\n".join(child_subfragments)
+    child_fragment = "\n".join(
+        [
+            _get_fragment(call.node, stitchedGraph)
+            for call in calls
+            if isinstance(call.node, graph.OutputNode)
+        ]
+    )
 
     if is_passthrough:
-        return child_fragment, types.TypedDict(child_tree)
-
+        return child_fragment
     wb_domain_gql = typing.cast(GqlOpPlugin, wb_domain_gql)
 
     const_node_input_vals = {
@@ -212,7 +177,6 @@ def _get_fragment_and_gql_root_type(
         for key, value in node.from_op.inputs.items()
         if isinstance(value, graph.ConstNode)
     }
-
     ip = InputAndStitchProvider(const_node_input_vals, forward_obj)
 
     fragment = wb_domain_gql.query_fn(
@@ -220,9 +184,7 @@ def _get_fragment_and_gql_root_type(
         child_fragment,
     )
 
-    tree = _output_type_with_keys(op_def, fragment, child_tree)
-
-    return fragment, tree
+    return fragment
 
 
 def _get_configsummaryhistory_keys_or_specs(
