@@ -1,4 +1,5 @@
 include requirements.*
+include weave/schema.gql
 graft weave/frontend
 graft weave/language_features
 graft weave/ops_primitives

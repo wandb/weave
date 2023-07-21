@@ -107,7 +107,7 @@ input ProjectIdentifierInput {
   EntityName: String
 }
 
-type User implements Node @resource(IDType: "int32") {
+type User implements Node {
   id: ID!
   name: String!
   username: String
@@ -126,7 +126,7 @@ type UserEdge {
 
 union Initiator = Run | User
 
-type Project implements Node @resource(IDType: "int32") {
+type Project implements Node {
   createdAt: DateTime!
   updatedAt: DateTime
   id: ID!
@@ -153,7 +153,7 @@ type ProjectConnection {
   edges: [ProjectEdge!]!
 }
 
-type ProjectEdge @internal(method: "ProjectID() int32") {
+type ProjectEdge {
   node: Project
   cursor: String!
 }
@@ -188,12 +188,12 @@ type RunConnection {
   edges: [RunEdge!]!
 }
 
-type RunEdge @internal(method: "ProjectID() int32") {
+type RunEdge {
   node: Run!
   cursor: String!
 }
 
-type RepoInsightsRowConnection @internal(method: "EntityID() int32") {
+type RepoInsightsRowConnection {
   totalCount: Int!
   pageInfo: PageInfo!
   schema: JSON!
@@ -201,7 +201,7 @@ type RepoInsightsRowConnection @internal(method: "EntityID() int32") {
   isNormalizedUserCount: Boolean!
 }
 
-type RowConnection @internal(method: "ProjectID() int32") {
+type RowConnection {
   totalCount: Int!
   pageInfo: PageInfo!
   schema: JSON!
@@ -257,7 +257,7 @@ type RepoEdge {
   cursor: String!
 }
 
-type Repo implements Node @internal(method: "EntityID() int32") {
+type Repo implements Node {
   id: ID!
   entity: Entity!
   displayName: String!
@@ -278,7 +278,7 @@ type OrganizationEdge {
   cursor: String!
 }
 
-type Organization implements Node @internal(method: "OrganizationID() int32") {
+type Organization implements Node {
   id: ID!
   name: String!
   views(first: Int): ViewConnection!
@@ -522,7 +522,7 @@ enum ViewSource {
   WANDB_SDK
 }
 
-type View implements Node @internal(method: "ViewID() int32") {
+type View implements Node {
   createdAt: DateTime!
   updatedAt: DateTime
   updatedBy: User
