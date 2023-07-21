@@ -8,11 +8,6 @@ export const LINE_SHAPE_OPTIONS = [
   'dot-dashed' as const,
 ];
 
-export const DIM_NAME_MAP = {
-  ...v2.DIM_NAME_MAP,
-  lineShape: 'Style',
-};
-
 export type LineShapeOption = (typeof LINE_SHAPE_OPTIONS)[number];
 
 export type SeriesConfig = v3.SeriesConfig & {

@@ -24,19 +24,6 @@ export const PLOT_DIMS_UI = [
   'mark' as const,
 ];
 
-export const DIM_NAME_MAP: {
-  [K in keyof SeriesConfig['dims'] | 'mark']: string;
-} = {
-  pointSize: 'Size',
-  pointShape: 'Shape',
-  x: 'X Dim',
-  y: 'Y Dim',
-  label: 'Label',
-  color: 'Color',
-  mark: 'Mark',
-  tooltip: 'Tooltip',
-};
-
 export interface SeriesConfig {
   dims: {
     x: TableState.ColumnId;
