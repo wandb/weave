@@ -141,12 +141,12 @@ class _StreamTableSync:
         elif table_name is None or table_name == "":
             raise ValueError(f"Must specify table_name")
 
-        job_type = "wb_stream_table"
         self._lite_run = InMemoryLazyLiteRun(
             entity_name,
             project_name,
             table_name,
-            job_type,
+            group="weave_stream_tables",
+            _hide_in_wb=True,
             _use_async_file_stream=not _disable_async_file_stream,
         )
         self._table_name = self._lite_run._run_name
@@ -165,13 +165,12 @@ class _StreamTableSync:
                 project_name=self._project_name,
                 entity_name=self._entity_name,
             )
-            # TODO: this generates a second run to save the artifact. Would
-            # be nice if we could just use the current run.
             self._weave_stream_table_ref = storage._direct_publish(
                 self._weave_stream_table,
                 name=self._table_name,
                 wb_project_name=self._project_name,
                 wb_entity_name=self._entity_name,
+                _lite_run=self._lite_run,
             )
         if not hasattr(self, "_artifact"):
             uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(

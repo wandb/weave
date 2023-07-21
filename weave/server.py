@@ -238,8 +238,14 @@ def capture_weave_server_logs(log_level: int = logging.INFO):
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
 
+    console_log_settings: typing.Optional[logs.LogSettings] = None
+    if not util.is_notebook() or util.parse_boolean_env_var(
+        "WEAVE_SERVER_FORCE_HTTP_SERVER_CONSOLE_LOGS"
+    ):
+        console_log_settings = logs.LogSettings(logs.LogFormat.PRETTY, level=None)
+
     logs.enable_stream_logging(
         root_logger,
-        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, level=None),
+        wsgi_stream_settings=console_log_settings,
         pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, logging.INFO),
     )
