@@ -45,8 +45,10 @@ def is_public() -> bool:
     return wandb_production()
 
 
-def weave_log_format(default: "logs.LogFormat") -> str:
-    return os.getenv("WEAVE_LOG_FORMAT", default)
+def weave_log_format(default: "logs.LogFormat") -> "logs.LogFormat":
+    from .logs import LogFormat
+
+    return LogFormat(os.getenv("WEAVE_LOG_FORMAT", default))
 
 
 def weave_server_url() -> str:

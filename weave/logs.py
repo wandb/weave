@@ -21,6 +21,7 @@ from . import environment
 class LogFormat(enum.Enum):
     PRETTY = "pretty"
     DATADOG = "datadog"
+    JSON = "json"
 
 
 @dataclasses.dataclass
@@ -162,6 +163,12 @@ def setup_handler(handler: logging.Handler, settings: LogSettings) -> None:
         formatter = jsonlogger.JsonFormatter(
             "%(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
             "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] %(message)s",
+            timestamp=True,
+            json_encoder=WeaveJSONEncoder,
+        )  # type: ignore[no-untyped-call]
+    elif settings.format == LogFormat.JSON:
+        formatter = jsonlogger.JsonFormatter(
+            "%(levelname)s [%(name)s] [%(filename)s:%(lineno)d] %(message)s",
             timestamp=True,
             json_encoder=WeaveJSONEncoder,
         )  # type: ignore[no-untyped-call]
