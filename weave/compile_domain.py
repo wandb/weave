@@ -34,11 +34,18 @@ class InputAndStitchProvider(InputProvider):
     stitched_obj: stitch.ObjectRecorder
 
 
+KeyFn = typing.Callable[[dict[str, types.Type]], types.Type]
+
+
 @dataclass
 class GqlOpPlugin:
     query_fn: typing.Callable[[InputAndStitchProvider, str], str]
     is_root: bool = False
     root_resolver: typing.Optional["op_def.OpDef"] = None
+
+    # given the input types to the op, return a new output type with the input types'
+    # keys propagated appropriately
+    key_fn: typing.Optional[KeyFn] = None
 
 
 def fragment_to_query(fragment: str) -> str:
@@ -57,8 +64,9 @@ def wb_gql_op_plugin(
     query_fn: typing.Callable[[InputAndStitchProvider, str], str],
     is_root: bool = False,
     root_resolver: typing.Optional["op_def.OpDef"] = None,
+    key_fn: typing.Optional[KeyFn] = None,
 ) -> dict[str, GqlOpPlugin]:
-    return {"wb_domain_gql": GqlOpPlugin(query_fn, is_root, root_resolver)}
+    return {"wb_domain_gql": GqlOpPlugin(query_fn, is_root, root_resolver, key_fn)}
 
 
 # This is the primary exposed function of this module and is called in `compile.py`. It's primary role
@@ -125,7 +133,29 @@ def apply_domain_op_gql_translation(
     # now propagate the gql payload type through the graph
     query_root_node.type = gql_to_weave.get_query_weave_type(query_str)
 
-    return res
+    def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
+        if not isinstance(node, graph.OutputNode):
+            return node
+
+        if node.from_op.name == "gqlroot-wbgqlquery":
+            return node
+
+        fq_opname = node.from_op.full_name
+        opdef = registry_mem.memory_registry.get_op(fq_opname)
+        plugin = _get_gql_plugin(opdef)
+        if plugin is None:
+            return node
+
+        if plugin.key_fn is None:
+            return node
+
+        input_types = node.from_op.input_types
+        new_output_type = plugin.key_fn(input_types)
+        return graph.OutputNode(new_output_type, node.from_op.name, node.from_op.inputs)
+
+    # We have the correct type for the GQL root node now, so now we re-calcaulte all
+    # the downstream types to propagate the correct type to the rest of the graph.
+    return graph.map_nodes_full(res, _propagate_new_gql_keys, on_error)
 
 
 ### Everything below are helpers for the above function ###

@@ -695,11 +695,6 @@ def _compile(
             _track_errors(compile_domain.apply_domain_op_gql_translation)
         )
 
-    with tracer.trace("compile:propagate_gql_types"):
-        # We have the correct type for the GQL root node now, so now we re-calcaulte all
-        # the downstream types to propagate the correct type to the rest of the graph.
-        results = results.batch_map(_track_errors(compile_recompute_types))
-
     with tracer.trace("compile:column_pushdown"):
         results = results.batch_map(_track_errors(compile_apply_column_pushdown))
 
