@@ -12,10 +12,18 @@ import pathlib
 import typing
 from . import weave_types as types
 
-with open(pathlib.Path(__file__).parent / "schema.gql") as f:
-    schema_str = f.read()
 
-GQL_SCHEMA = graphql.build_schema(schema_str)
+_GQL_SCHEMA: typing.Optional[graphql.GraphQLSchema] = None
+
+
+def get_gql_schema() -> graphql.GraphQLSchema:
+    global _GQL_SCHEMA
+    if _GQL_SCHEMA is None:
+        with open(pathlib.Path(__file__).parent / "schema.gql") as f:
+            schema_str = f.read()
+
+        _GQL_SCHEMA = graphql.build_schema(schema_str)
+    return _GQL_SCHEMA
 
 
 def gql_type_to_weave_type(
@@ -72,6 +80,7 @@ def get_query_weave_type(query: str) -> types.Type:
     document = parse(query)
     for definition in document.definitions:
         if isinstance(definition, OperationDefinitionNode):
-            root_operation_type = get_operation_root_type(GQL_SCHEMA, definition)
+            schema = get_gql_schema()
+            root_operation_type = get_operation_root_type(schema, definition)
             return gql_type_to_weave_type(root_operation_type, definition.selection_set)
     raise ValueError("No operation found in query")
