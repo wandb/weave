@@ -37,15 +37,14 @@ def gql_type_to_weave_type(
                 raise ValueError(
                     f"Selections must be fields, got {selection.__class__.__name__}"
                 )
-            property_types[selection.name.value] = gql_type_to_weave_type(
+            key = selection.alias.value if selection.alias else selection.name.value
+            property_types[key] = gql_type_to_weave_type(
                 gql_type.fields[selection.name.value].type, selection.selection_set
             )
         return types.TypedDict(property_types)
 
     elif isinstance(gql_type, GraphQLList):
-        return types.List(
-            gql_type_to_weave_type(gql_type.of_type, None)
-        )  # None because list items don't have a selection set
+        return types.List(gql_type_to_weave_type(gql_type.of_type, selection_set))
     elif isinstance(gql_type, GraphQLNonNull):
         return types.non_none(gql_type_to_weave_type(gql_type.of_type, selection_set))
     elif isinstance(gql_type, graphql.GraphQLScalarType):
