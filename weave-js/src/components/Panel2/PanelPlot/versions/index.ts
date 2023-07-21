@@ -19,7 +19,6 @@ export type {Signals} from './v12';
 export const PLOT_DIMS_UI = v2.PLOT_DIMS_UI;
 export const MARK_OPTIONS = v7.MARK_OPTIONS;
 export const DEFAULT_POINT_SIZE = v2.DEFAULT_POINT_SIZE;
-export const DIM_NAME_MAP = v7.DIM_NAME_MAP;
 export const POINT_SHAPES = v6.POINT_SHAPES;
 export const LINE_SHAPES = v9.LINE_SHAPE_OPTIONS;
 export const SCALE_TYPES = v10.SCALE_TYPES;

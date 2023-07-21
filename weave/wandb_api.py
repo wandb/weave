@@ -2,8 +2,6 @@
 # Weave interactions with the Weave API should go through this
 # module.
 
-import dataclasses
-import os
 import typing
 import graphql
 import gql
@@ -19,28 +17,10 @@ from . import engine_trace
 from . import environment as weave_env
 from . import wandb_client_api
 
+# Importing at the top-level namespace so other files can import from here.
+from .context_state import WandbApiContext, _wandb_api_context
 
 tracer = engine_trace.tracer()  # type: ignore
-
-
-@dataclasses.dataclass
-class WandbApiContext:
-    user_id: typing.Optional[str] = None
-    api_key: typing.Optional[str] = None
-    headers: typing.Optional[dict[str, str]] = None
-    cookies: typing.Optional[dict[str, str]] = None
-
-    @classmethod
-    def from_json(cls, json: typing.Any) -> "WandbApiContext":
-        return cls(**json)
-
-    def to_json(self) -> typing.Any:
-        return dataclasses.asdict(self)
-
-
-_wandb_api_context: contextvars.ContextVar[
-    typing.Optional[WandbApiContext]
-] = contextvars.ContextVar("_weave_api_context", default=None)
 
 
 def set_wandb_api_context(

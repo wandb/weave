@@ -11,6 +11,9 @@ from . import errors
 from urllib.parse import urlparse
 import netrc
 
+if typing.TYPE_CHECKING:
+    from . import logs
+
 
 # There are currently two cache modes:
 # - full: cache all cacheable intermediate results
@@ -40,6 +43,12 @@ def wandb_production() -> bool:
 
 def is_public() -> bool:
     return wandb_production()
+
+
+def weave_log_format(default: "logs.LogFormat") -> "logs.LogFormat":
+    from .logs import LogFormat
+
+    return LogFormat(os.getenv("WEAVE_LOG_FORMAT", default))
 
 
 def weave_server_url() -> str:
