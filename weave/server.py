@@ -86,7 +86,7 @@ def handle_request(
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
 
-    logging.info("FINAL STATS\n%s" % pprint.pformat(stats.op_summary()))
+    logging.info("FINAL STATS", stats.op_summary())
 
     # Forces output to be untagged
     with tracer.trace("serialize_response"):

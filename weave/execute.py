@@ -223,7 +223,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                         # TODO: Get errors from here
                         stats = execute_forward(fg, no_cache=no_cache)
                         summary = stats.op_summary()
-                        logging.info("Execution summary\n%s" % pprint.pformat(summary))
+                        logging.info("Execution summary", summary)
                         if PRINT_DEBUG:
                             for compile_result, err in compile_results.iter_items():
                                 if err != None:
