@@ -801,7 +801,9 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           <ConfigSection label={`Properties`}>
             {dashboardConfigOptions}
             <VariableView newVars={cellFrame} />
-            {advancedPropertiesDom}
+            {xScaleConfigEnabled &&
+              yScaleConfigEnabled &&
+              advancedPropertiesDom}
           </ConfigSection>
           {newSeriesConfigDom}
           {addNewSeriesDom}
@@ -819,11 +821,12 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       cellFrame,
       seriesConfigDom,
       labelConfigDom,
-      scaleConfigDom,
       configTabs,
       activeTabIndex,
       seriesButtons,
       showAdvancedProperties,
+      xScaleConfigEnabled,
+      yScaleConfigEnabled,
     ]
   );
 };
@@ -1319,6 +1322,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           />
         )}
         {config.series.length > 1 &&
+          indentation === 0 &&
           (isShared ? (
             <Tooltip
               position="top right"
