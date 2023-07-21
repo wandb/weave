@@ -95,7 +95,6 @@ import {useTableStatesWithRefinedExpressions} from '../PanelTable/tableStateReac
 import * as TableType from '../PanelTable/tableType';
 import * as PlotState from './plotState';
 import {
-  defaultPlot,
   DimensionLike,
   ExpressionDimName,
   isValidConfig,
@@ -178,6 +177,20 @@ function useIsDashboard() {
   return isOrgDashboard || isRepoInsightsDashboard;
 }
 
+function defaultPlot(
+  inputNode: Node,
+  stack: Stack,
+  enableDashUi: boolean
+): PlotConfig {
+  return produce(PlotState.defaultPlot(inputNode, stack), draft => {
+    if (enableDashUi) {
+      draft.series.forEach((s, i) => {
+        s.seriesName = `Series ${i + 1}`;
+      });
+    }
+  });
+}
+
 const useConfig = (
   inputNode: Node,
   propsConfig?: AnyPlotConfig
@@ -186,7 +199,17 @@ const useConfig = (
   const weave = useWeaveContext();
 
   const newConfig = useMemo(
-    () => PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
+    () =>
+      produce(
+        PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
+        draft => {
+          draft.series.forEach((s, i) => {
+            if (s.seriesName == null) {
+              s.seriesName = `Series ${i + 1}`;
+            }
+          });
+        }
+      ),
     [propsConfig, inputNode, stack]
   );
 
@@ -368,6 +391,7 @@ const useConcreteConfig = (
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
+  const enableDashUi = useWeaveDashUiEnable();
   const inputNode = input;
 
   const weave = useWeaveContext();
@@ -380,7 +404,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     (newConfig?: Partial<PlotConfig>) => {
       if (!newConfig) {
         // if config is undefined, just use the default plot
-        propsUpdateConfig(defaultPlot(input, stack));
+        propsUpdateConfig(defaultPlot(input, stack, !!enableDashUi));
       } else {
         propsUpdateConfig({
           ...config,
@@ -388,7 +412,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         });
       }
     },
-    [config, propsUpdateConfig, input, stack]
+    [config, propsUpdateConfig, input, stack, enableDashUi]
   );
 
   const resetConfig = useCallback(() => {
@@ -612,7 +636,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       </>
     );
   }, [config, weave, input, updateConfig]);
-  const enableDashUi = useWeaveDashUiEnable();
 
   const vegaReadyTables = useVegaReadyTables(config.series, frame);
 
@@ -776,11 +799,18 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         <S.AddNewSeriesContainer
           onClick={() => {
             if (config.series.length > 0) {
-              const newConfig = PlotState.addSeriesFromSeries(
-                config,
-                config.series[config.series.length - 1],
-                'y',
-                weave
+              const newConfig = produce(
+                PlotState.addSeriesFromSeries(
+                  config,
+                  config.series[config.series.length - 1],
+                  'y',
+                  weave
+                ),
+                draft => {
+                  draft.series[
+                    draft.series.length - 1
+                  ].seriesName = `Series ${draft.series.length}`;
+                }
               );
               updateConfig(newConfig);
             }
@@ -1890,6 +1920,7 @@ const useLatestData = (
 */
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
+  const isDash = useWeaveDashUiEnable();
   const weave = useWeaveContext();
   const {
     input,
@@ -1925,7 +1956,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     (newConfig?: Partial<PlotConfig>) => {
       if (!newConfig) {
         // if config is undefined, just use the default plot
-        propsUpdateConfig(defaultPlot(input, stack));
+        propsUpdateConfig(defaultPlot(input, stack, !!isDash));
       } else {
         propsUpdateConfig({
           ...config,
@@ -1933,7 +1964,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         });
       }
     },
-    [config, propsUpdateConfig, input, stack]
+    [config, propsUpdateConfig, input, stack, isDash]
   );
 
   const inputNode = input;
@@ -1987,8 +2018,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       })
     );
   }, [vegaReadyTables, inputNode, weave]);
-
-  const isDash = useWeaveDashUiEnable();
 
   const flatResultNode = useMemo(() => {
     const arrayArg: {

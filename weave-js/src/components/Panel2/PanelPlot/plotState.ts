@@ -652,11 +652,8 @@ export function addSeriesFromSeries(
   const dimConstructor = dimConstructors[blankDimName];
   const dim = dimConstructor(series, weave);
   const newSeries = dim.imputeThisSeriesWithDefaultState();
-  const namedSeries = produce(newSeries, draft => {
-    draft.seriesName = `Series ${config.series.length + 1}`;
-  });
   return produce(config, draft => {
-    draft.series.push(namedSeries);
+    draft.series.push(newSeries);
     draft.configOptionsExpanded[blankDimName] = true;
   });
 }
@@ -1303,7 +1300,7 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
   const v1config = defaultPlotCommon(inputNode, stack);
   const migrated = migrate(v1config);
   return produce(migrated, draft => {
-    draft.series.forEach(s => {
+    draft.series.forEach((s, i) => {
       s.uiState.pointShape = 'dropdown';
     });
   });
