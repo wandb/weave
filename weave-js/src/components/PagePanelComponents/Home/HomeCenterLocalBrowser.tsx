@@ -1,6 +1,10 @@
 import {opGet, constString} from '@wandb/weave/core';
 import React, {useMemo, useState} from 'react';
-import {IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
+import {
+  IconDelete,
+  IconInfo,
+  IconOpenNewTab,
+} from '@wandb/weave/components/Icon';
 import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
 import {SetPreviewNodeType, NavigateToExpressionType} from './common';
 import * as query from './query';
@@ -21,6 +25,9 @@ const rowToExpression = (row: any) => {
 export const CenterLocalBrowser: React.FC<
   CenterLocalBrowserPropsType
 > = props => {
+  const [deletingId, setDeletingId] = useState<string | undefined>();
+  const [isModalActing, setIsModalActing] = useState(false);
+
   const localDashboards = query.useLocalDashboards();
   const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
@@ -71,6 +78,16 @@ export const CenterLocalBrowser: React.FC<
           },
         },
       ],
+      [
+        {
+          icon: IconDelete,
+          label: 'Delete board',
+          onClick: row => {
+            const uri = `local-artifact:///${row._id}:latest/obj`;
+            setDeletingId(uri);
+          },
+        },
+      ],
     ];
   }, [props]);
 
@@ -79,11 +96,17 @@ export const CenterLocalBrowser: React.FC<
       allowSearch
       title={'Local Boards'}
       selectedRowId={selectedRowId}
+      setSelectedRowId={setSelectedRowId}
+      setPreviewNode={props.setPreviewNode}
       noDataCTA={`No Local Weave boards found.`}
       loading={localDashboards.loading}
       columns={['name', 'latest version id', 'updated at']}
       data={browserData}
       actions={browserActions}
+      deletingId={deletingId}
+      setDeletingId={setDeletingId}
+      isModalActing={isModalActing}
+      setIsModalActing={setIsModalActing}
     />
   );
 };
