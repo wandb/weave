@@ -322,6 +322,7 @@ def _map_nodes(
                 result_node = ConstNode(curr_node.type, already_mapped[curr_node.val])
 
         to_consider.pop()
+        print(result_node)
         mapped_node = map_fn(result_node)
         if mapped_node is None:
             mapped_node = result_node

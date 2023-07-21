@@ -6,6 +6,7 @@ from . import stitch
 from . import registry_mem
 from . import errors
 from . import op_args
+from . import gql_to_weave
 from dataclasses import dataclass, field
 import graphql
 
@@ -92,6 +93,7 @@ def apply_domain_op_gql_translation(
         alias = _get_outermost_alias(inner_fragment)
         aliases.append(alias)
         custom_resolver = _custom_root_resolver(node)
+
         if custom_resolver is not None:
             return custom_resolver(query_root_node, **node.from_op.inputs)
         else:
@@ -114,6 +116,9 @@ def apply_domain_op_gql_translation(
         query_str = _normalize_query_str(query_str)
     query_str_const_node.val = query_str
     alias_list_const_node.val = aliases
+
+    # now propagate the gql payload type through the graph
+    query_root_node.type = gql_to_weave.get_query_weave_type(query_str)
 
     return res
 

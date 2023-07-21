@@ -133,6 +133,29 @@ def _remove_optional(t: types.Type) -> types.Type:
     return t
 
 
+N = typing.TypeVar("N", bound=graph.Node)
+
+
+def _recompute_output_types_map_fn_no_refine(node: N) -> N:
+    if not isinstance(node, graph.OutputNode):
+        return node
+
+    if node.from_op.name == "gqlroot-wbgqlquery":
+        return typing.cast(N, node)
+
+    from_op = node.from_op
+    op = registry_mem.memory_registry.get_op(from_op.full_name)
+    inputs = from_op.inputs
+
+    if isinstance(op.input_type, op_args.OpNamedArgs):
+        inputs = {
+            k: n for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
+        }
+
+    new_type = op.unrefined_output_type_for_params(inputs)
+    return typing.cast(N, graph.OutputNode(new_type, op.uri, inputs))
+
+
 def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "tag-indexCheckpoint":
@@ -379,6 +402,15 @@ def compile_apply_column_pushdown(
         return node
 
     return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown, on_error)
+
+
+def compile_recompute_types(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(
+        nodes, _recompute_output_types_map_fn_no_refine, on_error
+    )
 
 
 def compile_fix_calls(
@@ -662,6 +694,11 @@ def _compile(
         results = results.batch_map(
             _track_errors(compile_domain.apply_domain_op_gql_translation)
         )
+
+    with tracer.trace("compile:propagate_gql_types"):
+        # We have the correct type for the GQL root node now, so now we re-calcaulte all
+        # the downstream types to propagate the correct type to the rest of the graph.
+        results = results.batch_map(_track_errors(compile_recompute_types))
 
     with tracer.trace("compile:column_pushdown"):
         results = results.batch_map(_track_errors(compile_apply_column_pushdown))
