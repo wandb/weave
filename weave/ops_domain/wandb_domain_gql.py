@@ -152,7 +152,7 @@ def _alias(
     alias = ""
     param_str = _param_str(inputs, param_str_fn)
     if param_str_fn:
-        alias = f"{_make_alias(param_str, prefix=prop_name)}:"
+        alias = f"{_make_alias(param_str, prefix=prop_name)}"
     return alias
 
 
@@ -178,7 +178,7 @@ def gql_direct_edge_op(
         alias = _alias(inputs, param_str_fn, prop_name)
         param_str = _param_str(inputs, param_str_fn)
         return f"""
-            {alias()} {prop_name}{param_str} {{
+            {alias}: {prop_name}{param_str} {{
                 {_get_required_fragment(output_type)}
                 {inner}
             }}
@@ -283,14 +283,10 @@ def gql_connection_op(
         )
 
     def query_fn(inputs, inner):
-        alias = ""
-        param_str = ""
-        if param_str_fn:
-            param_str = param_str_fn(inputs)
-            alias = f"{_make_alias(param_str, prefix=prop_name)}:"
-            param_str = f"({param_str})"
+        alias = _alias(inputs, param_str_fn, prop_name)
+        param_str = _param_str(inputs, param_str_fn)
         return f"""
-            {alias} {prop_name}{param_str} {{
+            {alias}: {prop_name}{param_str} {{
                 edges {{
                     node {{
                         {_get_required_fragment(output_type)}
@@ -315,9 +311,12 @@ def gql_connection_op(
                 weave_types.TypedDict,
                 typing.cast(
                     weave_types.TypedDict,
-                    typing.cast(weave_types.TypedDict, keys[key]).property_types[
-                        "edges"
-                    ],
+                    typing.cast(
+                        weave_types.List,
+                        typing.cast(weave_types.TypedDict, keys[key]).property_types[
+                            "edges"
+                        ],
+                    ).object_type,
                 ).property_types["node"],
             )
             return weave_types.List(output_type.with_keys(new_keys.property_types))

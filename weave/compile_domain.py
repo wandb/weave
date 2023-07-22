@@ -7,6 +7,7 @@ from . import registry_mem
 from . import errors
 from . import op_args
 from . import gql_to_weave
+from . import gql_with_keys
 from dataclasses import dataclass, field
 import graphql
 
@@ -125,6 +126,16 @@ def apply_domain_op_gql_translation(
             return custom_resolver(query_root_node, **node.from_op.inputs)
         else:
             output_type = _get_plugin_output_type(node)
+            key_type = typing.cast(
+                types.TypedDict,
+                gql_to_weave.get_query_weave_type(fragment_to_query(inner_fragment)),
+            )
+            assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
+
+            key = gql_to_weave.get_outermost_alias(inner_fragment)
+            subtype = typing.cast(types.TypedDict, key_type.property_types[key])
+            output_type = output_type.with_keys(subtype.property_types)
+
             return graph.OutputNode(
                 output_type,
                 "gqlroot-querytoobj",
@@ -148,6 +159,9 @@ def apply_domain_op_gql_translation(
     # now propagate the gql payload type through the graph
     query_root_node.type = gql_to_weave.get_query_weave_type(query_str)
 
+    # have to restitch because the node map has changed
+    p = stitch.stitch(res, on_error=on_error)
+
     def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
         from .language_features.tagging import tagged_value_type
 
@@ -160,6 +174,7 @@ def apply_domain_op_gql_translation(
         fq_opname = node.from_op.full_name
         opdef = registry_mem.memory_registry.get_op(fq_opname)
         plugin = _get_gql_plugin(opdef)
+
         if plugin is None:
             return node
 
@@ -167,6 +182,7 @@ def apply_domain_op_gql_translation(
             return node
 
         input_types = node.from_op.input_types
+
         ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
 
         # unwrap and rewrap tags
@@ -185,7 +201,11 @@ def apply_domain_op_gql_translation(
         else:
             new_output_type = plugin.key_fn(ip, input_types)
 
-        return graph.OutputNode(new_output_type, node.from_op.name, node.from_op.inputs)
+        node.type = new_output_type
+
+        return node
+
+        # return graph.OutputNode(new_output_type, node.from_op.name, node.from_op.inputs)
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all
     # the downstream types to propagate the correct type to the rest of the graph.
