@@ -165,8 +165,8 @@ def apply_domain_op_gql_translation(
 
     def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
         from .language_features.tagging import (
-            tagged_value_type,
             tagged_value_type_helpers,
+            tagged_value_type,
         )
 
         if not isinstance(node, graph.OutputNode):
@@ -179,35 +179,35 @@ def apply_domain_op_gql_translation(
         opdef = registry_mem.memory_registry.get_op(fq_opname)
         plugin = _get_gql_plugin(opdef)
 
-        if plugin is None:
+        if plugin is None or plugin.key_fn is None:
+            new_output_type = opdef.unrefined_output_type_for_params(
+                node.from_op.inputs
+            )
+            node.type = new_output_type
             return node
+        else:
+            input_types = node.from_op.input_types
 
-        if plugin.key_fn is None:
-            return node
+            ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
 
-        input_types = node.from_op.input_types
+            # unwrap and rewrap tags
+            first_arg_name = plugin.key_fn.first_arg_name
+            original_input_type = input_types[first_arg_name]
 
-        ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
+            unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
+                original_input_type
+            )
 
-        # unwrap and rewrap tags
-        first_arg_name = plugin.key_fn.first_arg_name
-        original_output_type = node.type
-        original_input_type = input_types[first_arg_name]
+            # g = opdef.unrefined_output_type_for_params(node.from_op.inputs)
 
-        _, rewrap_output_type = tagged_value_type_helpers.unwrap_tags(
-            original_output_type
-        )
+            # key fn operates on untagged types
+            new_output_type = plugin.key_fn(ip, unwrapped_input_type)
 
-        unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
-            original_input_type
-        )
-
-        # key fn operates on untagged types
-        new_output_type = plugin.key_fn(ip, unwrapped_input_type)
-
-        # now we rewrap the types to propagate the tags
-        new_output_type = rewrap_output_type(new_output_type)
-        node.type = new_output_type
+            # now we rewrap the types to propagate the tags
+            new_output_type = tagged_value_type.TaggedValueType(
+                types.TypedDict({first_arg_name: original_input_type}), new_output_type
+            )
+            node.type = new_output_type
 
         return node
 

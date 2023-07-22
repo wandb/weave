@@ -1822,6 +1822,8 @@ def test_non_const_input_node(fake_wandb):
 
 def test_gql_compilation_with_keys(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_empty_workspace)
-    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).id()
+    project_node = ops.project("stacey", "mendeleev")
+    runs_node = project_node.runs()
+    cell_node = runs_node.limit(1).id()
     compiled_node = compile.compile([cell_node])[0]
     print("here")
