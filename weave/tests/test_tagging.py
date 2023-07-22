@@ -321,7 +321,8 @@ def test_unwrap_rewrap_tags():
     t3 = tagged_value_type.TaggedValueType(
         types.TypedDict({"a": types.Int()}),
         tagged_value_type.TaggedValueType(
-            types.TypedDict({"c": 1}), types.TypedDict({"b": types.Int()})
+            types.TypedDict({"c": types.TypeType()}),
+            types.TypedDict({"b": types.Int()}),
         ),
     )
 
@@ -333,6 +334,24 @@ def test_unwrap_rewrap_tags():
     assert rewrap(t4) == tagged_value_type.TaggedValueType(
         types.TypedDict({"a": types.Int()}),
         tagged_value_type.TaggedValueType(
-            types.TypedDict({"c": 1}), types.TypedDict({"d": types.Int()})
+            types.TypedDict({"c": types.TypeType()}),
+            types.TypedDict({"d": types.Int()}),
         ),
     )
+
+    t5 = tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Int()}),
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"c": types.TypeType()}),
+            types.TypedDict({"d": types.List(types.String())}),
+        ),
+    )
+
+    unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t5)
+    assert unwrapped == types.TypedDict({"d": types.List(types.String())})
+    assert rewrap(unwrapped) == t5
+
+    t6 = types.Int()
+    unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t6)
+    assert unwrapped == t6
+    assert rewrap(unwrapped) == t6
