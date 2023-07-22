@@ -76,7 +76,13 @@ import React, {
 } from 'react';
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
-import {Button, Checkbox, MenuItemProps, Tab} from 'semantic-ui-react';
+import {
+  Button,
+  Checkbox,
+  DropdownItemProps,
+  MenuItemProps,
+  Tab,
+} from 'semantic-ui-react';
 import {calculatePosition} from 'vega-tooltip';
 
 import {useWeaveContext, useWeaveDashUiEnable} from '../../../context';
@@ -378,6 +384,20 @@ const useConcreteConfig = (
   }, [concreteConfigEvaluationResult, concreteConfigLoading, config, stack]);
 };
 
+const extractWeaveExpressionDims = (dim: PlotState.DimensionLike) => {
+  // console.log('dimension.name', dim.name);
+  if (PlotState.isWeaveExpression(dim)) {
+    return [dim];
+  } else if (PlotState.isDropdownWithExpression(dim)) {
+    const newDim =
+      dim.mode() === 'expression' ? dim.expressionDim : dim.dropdownDim;
+    return [newDim];
+  } else if (PlotState.isGroup(dim)) {
+    return dim.activeDimensions();
+  }
+  return [];
+};
+
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
@@ -519,10 +539,58 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     [config.series]
   );
 
+  const updateGroupBy = useCallback(
+    (
+      enabled: boolean,
+      seriesIndex: number,
+      dimName: keyof SeriesConfig['dims'],
+      value: string
+    ) => {
+      const fn = enabled
+        ? TableState.enableGroupByCol
+        : TableState.disableGroupByCol;
+      let newTable = fn(
+        config.series[seriesIndex].table,
+        value
+        // config.series[seriesIndex].dims[dimension.name as keyof SeriesConfig['dims']]
+      );
+      if (dimName === 'label') {
+        newTable = fn(newTable, config.series[seriesIndex].dims.color);
+      }
+      const newConfig = produce(config, draft => {
+        draft.series[seriesIndex].table = newTable;
+      });
+      updateConfig(newConfig);
+    },
+    [config, updateConfig]
+  );
+
   const newSeriesConfigDom = useMemo(() => {
     return (
       <>
         {config.series.map((s, i) => {
+          console.log(`Series ${i} - dims: ${Object.keys(s.dims)}`);
+          const groupByDropdownOptions: DropdownItemProps[] = [];
+          PLOT_DIMS_UI.map(dimName => {
+            const dimObject = PlotState.dimConstructors[dimName](s, weave);
+            extractWeaveExpressionDims(dimObject).map(dim => {
+              // TODO: 'mark' is not present in series.dims dict keys so it has no value/column.
+              if (dim.name != 'mark') {
+                groupByDropdownOptions.push({
+                  key: dim.name,
+                  text: dim.name,
+                  value: s.dims[dim.name as keyof SeriesConfig['dims']],
+                });
+              }
+            });
+          });
+          console.log(
+            `Series ${i} - dims in dropdown: ${JSON.stringify(
+              groupByDropdownOptions,
+              null,
+              2
+            )}`
+          );
           return (
             <ConfigSection
               label={`Series ${i + 1}`}
@@ -546,6 +614,55 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                   />
                 </ConfigPanel.ConfigOption>
               }
+              {/* {Group by dom}
+              series.table.groupBy contains the columns that are currently grouped by
+              series.dims I think contains the map between ^^ columns and the names that we're familiar with
+              updateGroupBy is pretty straightforward to transfer over I believe
+              ok so onChange we receive ALL the values from the dropdown as a list 
+
+              for the options, I'm going to iterate over PLOT_DIMS_UI, create a dim object, extractWeaveExpressions
+              and for each one push it into . Ultimately I need an array of [{key: ..., text: ..., value: ...}] where
+              key and text are going to be dim names (keyof PLOT_DIMS_UI) and the value is going to be the corresponding
+              column name in the table. series.dims[dimName]
+              And then the value is going to series.table.groupBy
+              And then the onChange is going to be calling updateGroupBy.
+
+               */}
+              <ConfigPanel.ConfigOption label="Group by">
+                <ConfigPanel.ModifiedDropdownConfigField
+                  multiple
+                  options={groupByDropdownOptions}
+                  value={s.table.groupBy}
+                  onChange={(event, {value}) => {
+                    // I have a list of values in value
+                    // and I have my current state which is s.table.groupBy
+                    //
+                    const values = value as string[];
+                    const valueToAdd = values.filter(
+                      x => !s.table.groupBy.includes(x)
+                    );
+                    const valueToRemove = s.table.groupBy.filter(
+                      x => !values.includes(x)
+                    );
+                    let dimName = '';
+                    if (valueToAdd.length > 0) {
+                      dimName = groupByDropdownOptions.find(
+                        o => o.value === valueToAdd[0]
+                      )?.text as keyof SeriesConfig['dims'];
+                    } else if (valueToRemove.length > 0) {
+                      dimName = groupByDropdownOptions.find(
+                        o => o.value === valueToRemove[0]
+                      )?.text as keyof SeriesConfig['dims'];
+                    }
+                    if (valueToAdd.length > 0) {
+                      updateGroupBy(true, i, dimName, valueToAdd[0]);
+                    }
+                    if (valueToRemove.length > 0) {
+                      updateGroupBy(false, i, dimName, valueToRemove[0]);
+                    }
+                  }}
+                />
+              </ConfigPanel.ConfigOption>
               {PLOT_DIMS_UI.map(dimName => {
                 const dimIsShared = PlotState.isDimShared(
                   config.series,
@@ -1420,26 +1537,6 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       }
     }
   }, [dimOptions, enableDashUi]);
-
-  const updateGroupBy = useCallback(
-    (enabled: boolean) => {
-      const fn = enabled
-        ? TableState.enableGroupByCol
-        : TableState.disableGroupByCol;
-      let newTable = fn(
-        config.series[0].table,
-        config.series[0].dims[dimension.name as keyof SeriesConfig['dims']]
-      );
-      if (dimension.name === 'label') {
-        newTable = fn(newTable, config.series[0].dims.color);
-      }
-      const newConfig = produce(config, draft => {
-        draft.series[0].table = newTable;
-      });
-      updateConfig(newConfig);
-    },
-    [config, dimension.name, updateConfig]
-  );
 
   if (PlotState.isDropdownWithExpression(dimension)) {
     return (
