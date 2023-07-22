@@ -35,7 +35,7 @@ class InputAndStitchProvider(InputProvider):
     stitched_obj: stitch.ObjectRecorder
 
 
-KeyFnType = typing.Callable[[InputProvider, dict[str, types.Type]], types.Type]
+KeyFnType = typing.Callable[[InputProvider, types.Type], types.Type]
 
 
 # This is a class so we can access first_arg_name in compile to handle tags
@@ -48,9 +48,11 @@ class KeyFn:
         self.key_fn = key_fn
 
     def __call__(
-        self, input_provider: InputProvider, input_types: dict[str, types.Type]
+        self,
+        input_provider: InputProvider,
+        input_type: types.Type,
     ) -> types.Type:
-        return self.key_fn(input_provider, input_types)
+        return self.key_fn(input_provider, input_type)
 
 
 @dataclass
@@ -143,7 +145,6 @@ def apply_domain_op_gql_translation(
                     "result_dict": query_root_node,
                     "result_key": graph.ConstNode(types.String(), alias),
                     "output_type": graph.ConstNode(types.TypeType(), output_type),
-                    "obj_gql_query": graph.ConstNode(types.String(), inner_fragment),
                 },
             )
 
@@ -163,7 +164,10 @@ def apply_domain_op_gql_translation(
     p = stitch.stitch(res, on_error=on_error)
 
     def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
-        from .language_features.tagging import tagged_value_type
+        from .language_features.tagging import (
+            tagged_value_type,
+            tagged_value_type_helpers,
+        )
 
         if not isinstance(node, graph.OutputNode):
             return node
@@ -187,25 +191,25 @@ def apply_domain_op_gql_translation(
 
         # unwrap and rewrap tags
         first_arg_name = plugin.key_fn.first_arg_name
-        first_arg_type = input_types[first_arg_name]
+        original_output_type = node.type
+        original_input_type = input_types[first_arg_name]
 
-        tag_type: types.TypedDict
-        if isinstance(first_arg_type, tagged_value_type.TaggedValueType):
-            tag_type = first_arg_type.tag
-            input_types[first_arg_name] = first_arg_type.value
-            new_output_type = plugin.key_fn(ip, input_types)
-            new_output_type = tagged_value_type.TaggedValueType(
-                tag_type, new_output_type
-            )
-            input_types[first_arg_name] = first_arg_type
-        else:
-            new_output_type = plugin.key_fn(ip, input_types)
+        _, rewrap_output_type = tagged_value_type_helpers.unwrap_tags(
+            original_output_type
+        )
 
+        unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
+            original_input_type
+        )
+
+        # key fn operates on untagged types
+        new_output_type = plugin.key_fn(ip, unwrapped_input_type)
+
+        # now we rewrap the types to propagate the tags
+        new_output_type = rewrap_output_type(new_output_type)
         node.type = new_output_type
 
         return node
-
-        # return graph.OutputNode(new_output_type, node.from_op.name, node.from_op.inputs)
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all
     # the downstream types to propagate the correct type to the rest of the graph.

@@ -185,10 +185,8 @@ def gql_direct_edge_op(
         """
 
     def _key_fn(
-        input_provider: InputProvider, input_types: dict[str, weave_types.Type]
+        input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
-        self_type = input_types[first_arg_name]
-
         alias = _alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
@@ -297,10 +295,8 @@ def gql_connection_op(
         """
 
     def _key_fn(
-        input_provider: InputProvider, input_types: dict[str, weave_types.Type]
+        input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
-        self_type = input_types[first_arg_name]
-
         alias = _alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
