@@ -1,6 +1,6 @@
 import typing
 from ..api import op
-from ..compile_domain import InputProvider, wb_gql_op_plugin
+from ..compile_domain import InputProvider, wb_gql_op_plugin, KeyFn
 from .. import weave_types
 from inspect import signature, Parameter
 from . import wb_domain_types
@@ -184,7 +184,7 @@ def gql_direct_edge_op(
             }}
         """
 
-    def key_fn(
+    def _key_fn(
         input_provider: InputProvider, input_types: dict[str, weave_types.Type]
     ) -> weave_types.Type:
         self_type = input_types[first_arg_name]
@@ -199,6 +199,8 @@ def gql_direct_edge_op(
             return output_type.with_keys(new_keys.property_types)
 
         return output_type
+
+    key_fn = KeyFn(first_arg_name, _key_fn)
 
     additional_inputs_types = additional_inputs_types or {}
     if is_root:
@@ -298,7 +300,7 @@ def gql_connection_op(
             }}
         """
 
-    def key_fn(
+    def _key_fn(
         input_provider: InputProvider, input_types: dict[str, weave_types.Type]
     ) -> weave_types.Type:
         self_type = input_types[first_arg_name]
@@ -321,6 +323,8 @@ def gql_connection_op(
             return weave_types.List(output_type.with_keys(new_keys.property_types))
 
         return output_type
+
+    key_fn = KeyFn(first_arg_name, _key_fn)
 
     additional_inputs_types = additional_inputs_types or {}
 

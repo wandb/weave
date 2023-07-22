@@ -34,7 +34,22 @@ class InputAndStitchProvider(InputProvider):
     stitched_obj: stitch.ObjectRecorder
 
 
-KeyFn = typing.Callable[[InputProvider, dict[str, types.Type]], types.Type]
+KeyFnType = typing.Callable[[InputProvider, dict[str, types.Type]], types.Type]
+
+
+# This is a class so we can access first_arg_name in compile to handle tags
+class KeyFn:
+    first_arg_name: str
+    key_fn: KeyFnType
+
+    def __init__(self, first_arg_name: str, key_fn: KeyFnType):
+        self.first_arg_name = first_arg_name
+        self.key_fn = key_fn
+
+    def __call__(
+        self, input_provider: InputProvider, input_types: dict[str, types.Type]
+    ) -> types.Type:
+        return self.key_fn(input_provider, input_types)
 
 
 @dataclass
@@ -134,6 +149,8 @@ def apply_domain_op_gql_translation(
     query_root_node.type = gql_to_weave.get_query_weave_type(query_str)
 
     def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
+        from .language_features.tagging import tagged_value_type
+
         if not isinstance(node, graph.OutputNode):
             return node
 
@@ -151,7 +168,23 @@ def apply_domain_op_gql_translation(
 
         input_types = node.from_op.input_types
         ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
-        new_output_type = plugin.key_fn(ip, input_types)
+
+        # unwrap and rewrap tags
+        first_arg_name = plugin.key_fn.first_arg_name
+        first_arg_type = input_types[first_arg_name]
+
+        tag_type: types.TypedDict
+        if isinstance(first_arg_type, tagged_value_type.TaggedValueType):
+            tag_type = first_arg_type.tag
+            input_types[first_arg_name] = first_arg_type.value
+            new_output_type = plugin.key_fn(ip, input_types)
+            new_output_type = tagged_value_type.TaggedValueType(
+                tag_type, new_output_type
+            )
+            input_types[first_arg_name] = first_arg_type
+        else:
+            new_output_type = plugin.key_fn(ip, input_types)
+
         return graph.OutputNode(new_output_type, node.from_op.name, node.from_op.inputs)
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all
