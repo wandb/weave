@@ -17,7 +17,7 @@ from . import val_const
 from . import artifact_fs
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
-from .gql_with_keys import GQLClassWithKeysType, GQLTypeMixin
+from .gql_with_keys import GQLHasKeysType, GQLTypeMixin
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -372,7 +372,7 @@ def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return TypeToPyType(type, mapper, artifact, path)
-    elif isinstance(type, GQLClassWithKeysType):
+    elif isinstance(type, GQLHasKeysType):
         return GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
         return TypedDictToPyDict(type, mapper, artifact, path)
@@ -419,7 +419,7 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
-    elif isinstance(type, GQLClassWithKeysType):
+    elif isinstance(type, GQLHasKeysType):
         return PyDictToGQLClassWithKeys(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)

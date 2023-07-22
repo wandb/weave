@@ -133,13 +133,36 @@ def gql_root_op(
     )
 
 
+ParamStrFn = typing.Callable[[InputProvider], str]
+
+
+def _param_str(inputs: InputProvider, param_str_fn: typing.Optional[ParamStrFn]) -> str:
+    param_str = ""
+    if param_str_fn:
+        param_str = param_str_fn(inputs)
+        param_str = f"({param_str})"
+    return param_str
+
+
+def _alias(
+    inputs: InputProvider,
+    param_str_fn: typing.Optional[ParamStrFn],
+    prop_name: str,
+) -> str:
+    alias = ""
+    param_str = _param_str(inputs, param_str_fn)
+    if param_str_fn:
+        alias = f"{_make_alias(param_str, prefix=prop_name)}:"
+    return alias
+
+
 def gql_direct_edge_op(
     op_name: str,
     input_type: typing.Optional[weave_types.Type],
     prop_name: str,
     output_type: weave_types.Type,
     additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
-    param_str_fn: typing.Optional[typing.Callable[[InputProvider], str]] = None,
+    param_str_fn: typing.Optional[ParamStrFn] = None,
     is_many: bool = False,
 ):
     is_root = input_type is None
@@ -152,18 +175,30 @@ def gql_direct_edge_op(
         )
 
     def query_fn(inputs, inner):
-        alias = ""
-        param_str = ""
-        if param_str_fn:
-            param_str = param_str_fn(inputs)
-            alias = f"{_make_alias(param_str, prefix=prop_name)}:"
-            param_str = f"({param_str})"
+        alias = _alias(inputs, param_str_fn, prop_name)
+        param_str = _param_str(inputs, param_str_fn)
         return f"""
-            {alias} {prop_name}{param_str} {{
+            {alias()} {prop_name}{param_str} {{
                 {_get_required_fragment(output_type)}
                 {inner}
             }}
         """
+
+    def key_fn(
+        input_provider: InputProvider, input_types: dict[str, weave_types.Type]
+    ) -> weave_types.Type:
+        self_type = input_types[first_arg_name]
+
+        alias = _alias(input_provider, param_str_fn, prop_name)
+        key = alias if alias != "" else prop_name
+
+        if isinstance(self_type, gql_with_keys.GQLHasKeysType):
+            keys = self_type.keys
+            assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
+            new_keys = typing.cast(weave_types.TypedDict, keys[key])
+            return output_type.with_keys(new_keys.property_types)
+
+        return output_type
 
     additional_inputs_types = additional_inputs_types or {}
     if is_root:
@@ -221,7 +256,7 @@ def gql_direct_edge_op(
         _output_type = weave_types.List(output_type)
     gql_relationship_getter_op = op(
         name=op_name,
-        plugins=wb_gql_op_plugin(query_fn, is_root),
+        plugins=wb_gql_op_plugin(query_fn, is_root, None, key_fn),
         input_type={**base_input_type, **additional_inputs_types},
         output_type=_output_type,
     )(gql_relationship_getter_op)
@@ -263,6 +298,30 @@ def gql_connection_op(
             }}
         """
 
+    def key_fn(
+        input_provider: InputProvider, input_types: dict[str, weave_types.Type]
+    ) -> weave_types.Type:
+        self_type = input_types[first_arg_name]
+
+        alias = _alias(input_provider, param_str_fn, prop_name)
+        key = alias if alias != "" else prop_name
+
+        if isinstance(self_type, gql_with_keys.GQLHasKeysType):
+            keys = self_type.keys
+            assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
+            new_keys = typing.cast(
+                weave_types.TypedDict,
+                typing.cast(
+                    weave_types.TypedDict,
+                    typing.cast(weave_types.TypedDict, keys[key]).property_types[
+                        "edges"
+                    ],
+                ).property_types["node"],
+            )
+            return weave_types.List(output_type.with_keys(new_keys.property_types))
+
+        return output_type
+
     additional_inputs_types = additional_inputs_types or {}
 
     def gql_connection_walker_op(**inputs):
@@ -297,7 +356,7 @@ def gql_connection_op(
     gql_connection_walker_op.sig = sig  # type: ignore
     gql_connection_walker_op = op(
         name=op_name,
-        plugins=wb_gql_op_plugin(query_fn),
+        plugins=wb_gql_op_plugin(query_fn, False, None, key_fn),
         input_type={first_arg_name: input_type, **additional_inputs_types},
         output_type=weave_types.List(output_type),
     )(gql_connection_walker_op)

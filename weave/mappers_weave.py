@@ -2,7 +2,7 @@ import typing
 
 from . import mappers
 from . import weave_types as types
-from .gql_with_keys import GQLClassWithKeysType
+from .gql_with_keys import GQLHasKeysType
 
 
 class TypedDictMapper(mappers.Mapper):
@@ -20,7 +20,7 @@ class TypedDictMapper(mappers.Mapper):
 
 class GQLMapper(mappers.Mapper):
     def __init__(self, type_: types.Type, mapper, artifact, path):
-        self.type = typing.cast(GQLClassWithKeysType, type_)
+        self.type = typing.cast(GQLHasKeysType, type_)
         self._artifact = artifact
         prop_serializers = {}
         for property_key, property_type in self.type.keys.items():

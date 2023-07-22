@@ -34,7 +34,7 @@ class InputAndStitchProvider(InputProvider):
     stitched_obj: stitch.ObjectRecorder
 
 
-KeyFn = typing.Callable[[dict[str, types.Type]], types.Type]
+KeyFn = typing.Callable[[InputProvider, dict[str, types.Type]], types.Type]
 
 
 @dataclass
@@ -150,7 +150,8 @@ def apply_domain_op_gql_translation(
             return node
 
         input_types = node.from_op.input_types
-        new_output_type = plugin.key_fn(input_types)
+        ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
+        new_output_type = plugin.key_fn(ip, input_types)
         return graph.OutputNode(new_output_type, node.from_op.name, node.from_op.inputs)
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all

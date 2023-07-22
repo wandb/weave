@@ -47,7 +47,7 @@ def _querytoobj_output_type(input_types: dict[str, types.Type]) -> types.Type:
     result_dict_type = typing.cast(types.TypedDict, input_types["result_dict"])
     if (
         isinstance(ot, types.Const)
-        and isinstance(ot.val, gql_with_keys.WithKeysMixin)
+        and isinstance(ot.val, gql_with_keys.GQLHasWithKeysType)
         and isinstance(original_query, types.Const)
         and isinstance(original_query.val, str)
     ):

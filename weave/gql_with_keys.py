@@ -11,15 +11,15 @@ from .decorator_type import type as weave_type
 T = typing.TypeVar("T", bound="GQLTypeMixin")
 
 
-class WithKeysMixin(types.Type):
+class GQLHasWithKeysType(types.Type):
     @classmethod
-    def with_keys(cls, keys: dict[str, types.Type]) -> "GQLClassWithKeysType":
+    def with_keys(cls, keys: dict[str, types.Type]) -> "GQLHasKeysType":
         """Creates a new Weave Type that is assignable to the original Weave Type, but
         also has the specified keys. This is used during the compile pass for creating a Weave Type
         to represent the exact output type of a specific GQL query, and for communicating the
         data shape to arrow."""
 
-        return GQLClassWithKeysType(cls, keys)
+        return GQLHasKeysType(cls, keys)
 
     @classmethod
     def type_of_instance(cls, obj: "GQLTypeMixin") -> types.Type:
@@ -40,7 +40,7 @@ def gql_weave_type(
             name,
             True,
             None,
-            [WithKeysMixin],
+            [GQLHasWithKeysType],
         )
         return decorator(_instance_class)
 
@@ -56,7 +56,7 @@ class GQLTypeMixin:
         return cls(gql=gql_dict)
 
 
-class GQLClassWithKeysType(types.Type):
+class GQLHasKeysType(types.Type):
     # Has no instance classes or instance class - type of is performed in
     # original weave type
 
@@ -74,7 +74,7 @@ class GQLClassWithKeysType(types.Type):
     def _assign_type_inner(self, other_type: types.Type) -> bool:
         # TODO: think more about how this will work with tags - might need to be modified
         return (
-            isinstance(other_type, GQLClassWithKeysType)
+            isinstance(other_type, GQLHasKeysType)
             and self.keyless_weave_type_class == other_type.keyless_weave_type_class
             and self.keys == other_type.keys
         )
@@ -83,7 +83,7 @@ class GQLClassWithKeysType(types.Type):
         if other_type.__class__ is self.keyless_weave_type_class:
             return True
 
-        if isinstance(other_type, GQLClassWithKeysType):
+        if isinstance(other_type, GQLHasKeysType):
             if self.__class__ == other_type.__class__:
                 other_td = types.TypedDict(other_type.keys)
                 self_td = types.TypedDict(self.keys)
@@ -109,7 +109,7 @@ class GQLClassWithKeysType(types.Type):
         return result
 
     @classmethod
-    def from_dict(cls, d: dict) -> "GQLClassWithKeysType":
+    def from_dict(cls, d: dict) -> "GQLHasKeysType":
         property_types = {}
         for key, type_ in d["keys"].items():
             property_types[key] = types.TypeRegistry.type_from_dict(type_)
