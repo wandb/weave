@@ -20,10 +20,6 @@ export type PlotConfig = Omit<v4.PlotConfig, 'series' | 'configVersion'> & {
   series: SeriesConfig[];
 };
 
-export const DIM_NAME_MAP: Omit<typeof v4.DIM_NAME_MAP, 'lineShape'> & {
-  lineStyle: string;
-} = {...v4.DIM_NAME_MAP, lineStyle: 'Style' as const};
-
 export function migrate(config: v4.PlotConfig): PlotConfig {
   return {
     ...config,

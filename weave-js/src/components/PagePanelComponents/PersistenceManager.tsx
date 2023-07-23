@@ -11,7 +11,15 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {useMutation, useNodeWithServerType} from '@wandb/weave/react';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
 
 import {Popover} from '@material-ui/core';
@@ -65,6 +73,7 @@ import {getFullChildPanel} from '../Panel2/ChildPanel';
 import _ from 'lodash';
 import {mapPanels} from '../Panel2/panelTree';
 import {DeleteActionModal} from './DeleteActionModal';
+import {PublishModal} from './PublishModal';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -216,9 +225,12 @@ export const PersistenceManager: React.FC<{
   updateNode: (node: NodeOrVoidNode) => void;
   goHome?: () => void;
 }> = props => {
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+
   const maybeURI = uriFromNode(props.inputNode);
   const branchPoint = useBranchPointFromURIString(maybeURI);
   const hasRemote = branchPointIsRemote(branchPoint);
+  const {name: currName} = determineURIIdentifier(maybeURI);
 
   const {nodeState, takeAction, acting} = useStateMachine(
     props.inputNode,
@@ -235,6 +247,14 @@ export const PersistenceManager: React.FC<{
   const headerRef = useRef<HTMLDivElement>(null);
   return (
     <MainHeaderWrapper ref={headerRef}>
+      <PublishModal
+        defaultName={currName}
+        open={isPublishModalOpen}
+        acting={acting}
+        takeAction={takeAction}
+        onClose={() => setIsPublishModalOpen(false)}
+      />
+
       <HeaderLogoControls
         inputNode={props.inputNode}
         inputConfig={props.inputConfig}
@@ -262,6 +282,7 @@ export const PersistenceManager: React.FC<{
         acting={acting}
         takeAction={takeAction}
         nodeState={nodeState}
+        setIsPublishModalOpen={setIsPublishModalOpen}
       />
     </MainHeaderWrapper>
   );
@@ -280,10 +301,10 @@ const persistenceStateToLabel: {[state in PersistenceState]: string} = {
 
 const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
-  commit: 'Commit',
+  commit: 'Publish changes',
   rename_local: 'Rename',
   publish_as: 'Publish As',
-  publish_new: 'Publish',
+  publish_new: 'Publish board',
   rename_remote: 'Rename',
   delete_local: 'Delete board',
   delete_remote: 'Delete board',
@@ -294,11 +315,12 @@ const HeaderPersistenceControls: React.FC<{
   acting: boolean;
   nodeState: PersistenceState;
   takeAction: TakeActionType;
-}> = ({storeAction, acting, takeAction, nodeState}) => {
+  setIsPublishModalOpen: Dispatch<SetStateAction<boolean>>;
+}> = ({storeAction, acting, takeAction, nodeState, setIsPublishModalOpen}) => {
   return (
     <PersistenceControlsWrapper>
       {acting ? (
-        <WBButton loading variant={`confirm`}>
+        <WBButton loading variant="confirm">
           Working
         </WBButton>
       ) : storeAction ? (
@@ -307,9 +329,13 @@ const HeaderPersistenceControls: React.FC<{
             {persistenceStateToLabel[nodeState]}
           </PersistenceLabel>
           <WBButton
-            variant={`confirm`}
+            variant="confirm"
             onClick={() => {
-              takeAction(storeAction);
+              if (storeAction === 'publish_new') {
+                setIsPublishModalOpen(true);
+              } else {
+                takeAction(storeAction);
+              }
             }}>
             {persistenceActionToLabel[storeAction]}
           </WBButton>

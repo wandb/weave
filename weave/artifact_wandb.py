@@ -10,6 +10,7 @@ from wandb.apis import public as wb_public
 from wandb.sdk.artifacts.local_artifact import Artifact as LocalArtifact
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
+
 from . import uris
 from . import util
 from . import errors
@@ -23,6 +24,10 @@ from . import filesystem
 from .wandb_interface import wandb_artifact_pusher
 
 from urllib import parse
+
+if typing.TYPE_CHECKING:
+    from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+
 
 quote_slashes = functools.partial(parse.quote, safe="")
 
@@ -552,10 +557,16 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         project: str = DEFAULT_WEAVE_OBJ_PROJECT,
         entity_name: typing.Optional[str] = None,
         branch: typing.Optional[str] = None,
+        *,
+        _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
-            self._writeable_artifact, project, entity_name, additional_aliases
+            self._writeable_artifact,
+            project,
+            entity_name,
+            additional_aliases,
+            _lite_run=_lite_run,
         )
         version = res.version_str if branch is None else branch
         self._set_read_artifact_uri(

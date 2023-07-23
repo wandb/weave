@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 
+WANDB_HIDDEN_JOB_TYPE = "sweep-controller"
+
 
 class InMemoryLazyLiteRun:
     # ID
@@ -30,6 +32,7 @@ class InMemoryLazyLiteRun:
     # Optional
     _display_name: typing.Optional[str] = None
     _job_type: typing.Optional[str] = None
+    _group: typing.Optional[str] = None
 
     # Property Cache
     _i_api: typing.Optional[InternalApi] = None
@@ -43,7 +46,10 @@ class InMemoryLazyLiteRun:
         entity_name: str,
         project_name: str,
         run_name: typing.Optional[str] = None,
+        *,
         job_type: typing.Optional[str] = None,
+        group: typing.Optional[str] = None,
+        _hide_in_wb: bool = False,
         _use_async_file_stream: bool = False,
     ):
         wandb_client_api.assert_wandb_authenticated()
@@ -60,7 +66,10 @@ class InMemoryLazyLiteRun:
         self._project_name = project_name
         self._display_name = run_name
         self._run_name = run_name or runid.generate_id()
-        self._job_type = job_type
+        self._job_type = job_type if not _hide_in_wb else WANDB_HIDDEN_JOB_TYPE
+        if _hide_in_wb and group is None:
+            group = "weave_hidden_runs"
+        self._group = group
 
         self._use_async_file_stream = (
             _use_async_file_stream
@@ -92,6 +101,7 @@ class InMemoryLazyLiteRun:
                     name=self._run_name,
                     display_name=self._display_name,
                     job_type=self._job_type,
+                    group=self._group,
                     project=self._project_name,
                     entity=self._entity_name,
                 )

@@ -26,6 +26,8 @@ def write_artifact_to_wandb(
     project_name: str,
     entity_name: typing.Optional[str] = None,
     additional_aliases: list = [],
+    *,
+    _lite_run: typing.Optional[InMemoryLazyLiteRun] = None,
 ) -> WeaveWBArtifactURIComponents:
     # Extract Artifact Attributes
     artifact_name = artifact.name
@@ -42,7 +44,12 @@ def write_artifact_to_wandb(
     # must provide an entity name.
     entity_name = entity_name or wandb_client_api.wandb_public_api().default_entity
 
-    lite_run = InMemoryLazyLiteRun(entity_name, project_name)
+    if _lite_run is None:
+        lite_run = InMemoryLazyLiteRun(
+            entity_name, project_name, group="weave_artifact_pushers", _hide_in_wb=True
+        )
+    else:
+        lite_run = _lite_run
 
     # Ensure the artifact type exists
     lite_run.i_api.create_artifact_type(
