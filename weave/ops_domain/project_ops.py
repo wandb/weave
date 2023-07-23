@@ -208,6 +208,7 @@ def link(project: wdt.Project) -> wdt.Link:
 
 @op(
     name="project-artifacts",
+    output_type=lambda input_types: types.List(wdt.ArtifactCollectionType),
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
             artifactTypes_100: artifactTypes(first: 100) {{
@@ -230,7 +231,7 @@ def link(project: wdt.Project) -> wdt.Link:
 )
 def artifacts(
     project: wdt.Project,
-) -> list[wdt.ArtifactCollection]:
+):
     return [
         wdt.ArtifactCollection.from_gql(edge["node"])
         for typeEdge in project.gql["artifactTypes_100"]["edges"]

@@ -184,7 +184,7 @@ def gql_direct_edge_op(
             }}
         """
 
-    def _key_fn(
+    def key_fn(
         input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
         alias = _alias(input_provider, param_str_fn, prop_name)
@@ -197,8 +197,6 @@ def gql_direct_edge_op(
             return output_type.with_keys(new_keys.property_types)
 
         return output_type
-
-    key_fn = KeyFn(first_arg_name, _key_fn)
 
     additional_inputs_types = additional_inputs_types or {}
     if is_root:
@@ -294,7 +292,7 @@ def gql_connection_op(
             }}
         """
 
-    def _key_fn(
+    def key_fn(
         input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
         alias = _alias(input_provider, param_str_fn, prop_name)
@@ -318,8 +316,6 @@ def gql_connection_op(
             return weave_types.List(output_type.with_keys(new_keys.property_types))
 
         return output_type
-
-    key_fn = KeyFn(first_arg_name, _key_fn)
 
     additional_inputs_types = additional_inputs_types or {}
 

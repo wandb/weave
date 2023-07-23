@@ -35,24 +35,8 @@ class InputAndStitchProvider(InputProvider):
     stitched_obj: stitch.ObjectRecorder
 
 
-KeyFnType = typing.Callable[[InputProvider, types.Type], types.Type]
-
-
 # This is a class so we can access first_arg_name in compile to handle tags
-class KeyFn:
-    first_arg_name: str
-    key_fn: KeyFnType
-
-    def __init__(self, first_arg_name: str, key_fn: KeyFnType):
-        self.first_arg_name = first_arg_name
-        self.key_fn = key_fn
-
-    def __call__(
-        self,
-        input_provider: InputProvider,
-        input_type: types.Type,
-    ) -> types.Type:
-        return self.key_fn(input_provider, input_type)
+KeyFn = typing.Callable[[InputProvider, types.Type], types.Type]
 
 
 @dataclass
@@ -189,9 +173,11 @@ def apply_domain_op_gql_translation(
             input_types = node.from_op.input_types
 
             ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
+            assert isinstance(opdef.input_type, op_args.OpNamedArgs)
+
+            first_arg_name = next(iter(opdef.input_type.arg_types.keys()))
 
             # unwrap and rewrap tags
-            first_arg_name = plugin.key_fn.first_arg_name
             original_input_type = input_types[first_arg_name]
 
             unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
