@@ -53,4 +53,4 @@ def test_gql_compilation_with_keys():
 def test_gql_compilation_root_op_custom_key_fn():
     root = root_all_artifacts().limit(1).id()
     compiled_node = compile.compile([root])[0]
-    assert compiled_node.type == 1
+    assert compiled_node.type == types.List(types.String())

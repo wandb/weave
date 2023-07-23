@@ -99,6 +99,7 @@ def apply_domain_op_gql_translation(
     )
     fragments = []
     aliases = []
+    replacement_node_to_original_opdef_map: dict[graph.Node, "op_def.OpDef"] = {}
 
     def _replace_with_merged_gql(node: graph.Node) -> graph.Node:
         if not _is_root_node(node):
@@ -111,7 +112,13 @@ def apply_domain_op_gql_translation(
         custom_resolver = _custom_root_resolver(node)
 
         if custom_resolver is not None:
-            return custom_resolver(query_root_node, **node.from_op.inputs)
+            new_node = custom_resolver(query_root_node, **node.from_op.inputs)
+            key_fn = _custom_key_fn(node)
+            if key_fn is not None:
+                replacement_node_to_original_opdef_map[
+                    new_node
+                ] = registry_mem.memory_registry.get_op(node.from_op.full_name)
+            return new_node
         else:
             output_type = _get_plugin_output_type(node)
             key_type = typing.cast(
@@ -149,12 +156,42 @@ def apply_domain_op_gql_translation(
     # have to restitch because the node map has changed
     p = stitch.stitch(res, on_error=on_error)
 
-    def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
+    def _propagate_gql_keys(
+        opdef: "op_def.OpDef", node: graph.OutputNode, key_fn: GQLKeyPropFn
+    ) -> None:
+        # Mutates node
+        # TODO: see if this can be done without mutations
         from .language_features.tagging import (
             tagged_value_type_helpers,
             tagged_value_type,
+            opdef_util,
         )
 
+        input_types = node.from_op.input_types
+
+        ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
+        assert isinstance(opdef.input_type, op_args.OpNamedArgs)
+
+        first_arg_name = next(iter(opdef.input_type.arg_types.keys()))
+
+        # unwrap and rewrap tags
+        original_input_type = input_types[first_arg_name]
+
+        unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
+            original_input_type
+        )
+
+        # key fn operates on untagged types
+        new_output_type = key_fn(ip, unwrapped_input_type)
+
+        # now we rewrap the types to propagate the tags
+        if opdef_util.should_tag_op_def_outputs(opdef):
+            new_output_type = tagged_value_type.TaggedValueType(
+                types.TypedDict({first_arg_name: original_input_type}), new_output_type
+            )
+        node.type = new_output_type
+
+    def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
         if not isinstance(node, graph.OutputNode):
             return node
 
@@ -166,33 +203,26 @@ def apply_domain_op_gql_translation(
         plugin = _get_gql_plugin(opdef)
 
         if plugin is None or plugin.gql_key_prop_fn is None:
-            new_output_type = opdef.unrefined_output_type_for_params(
-                node.from_op.inputs
-            )
-            node.type = new_output_type
+            if node in replacement_node_to_original_opdef_map:
+                original_opdef = replacement_node_to_original_opdef_map[node]
+                original_plugin = _get_gql_plugin(original_opdef)
+                assert (
+                    original_plugin is not None
+                    and original_plugin.gql_key_prop_fn is not None
+                )
+
+                key_fn = original_plugin.gql_key_prop_fn
+
+                # mutates node
+                _propagate_gql_keys(opdef, node, key_fn)
+            else:
+                new_output_type = opdef.unrefined_output_type_for_params(
+                    node.from_op.inputs
+                )
+                node.type = new_output_type
         else:
-            input_types = node.from_op.input_types
-
-            ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
-            assert isinstance(opdef.input_type, op_args.OpNamedArgs)
-
-            first_arg_name = next(iter(opdef.input_type.arg_types.keys()))
-
-            # unwrap and rewrap tags
-            original_input_type = input_types[first_arg_name]
-
-            unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
-                original_input_type
-            )
-
-            # key fn operates on untagged types
-            new_output_type = plugin.gql_key_prop_fn(ip, unwrapped_input_type)
-
-            # now we rewrap the types to propagate the tags
-            new_output_type = tagged_value_type.TaggedValueType(
-                types.TypedDict({first_arg_name: original_input_type}), new_output_type
-            )
-            node.type = new_output_type
+            # mutates node
+            _propagate_gql_keys(opdef, node, plugin.gql_key_prop_fn)
 
         return node
 
@@ -476,6 +506,17 @@ def _custom_root_resolver(node: graph.Node) -> typing.Optional["op_def.OpDef"]:
     wb_domain_gql = _get_gql_plugin(op_def)
     if wb_domain_gql is not None:
         return wb_domain_gql.root_resolver
+    return None
+
+
+def _custom_key_fn(node: graph.Node) -> typing.Optional[GQLKeyPropFn]:
+    if not isinstance(node, graph.OutputNode):
+        return None
+
+    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+    wb_domain_gql = _get_gql_plugin(op_def)
+    if wb_domain_gql is not None:
+        return wb_domain_gql.gql_key_prop_fn
     return None
 
 
