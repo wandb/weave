@@ -1,6 +1,6 @@
 import typing
 from ..api import op
-from ..compile_domain import InputProvider, wb_gql_op_plugin, KeyFn
+from ..compile_domain import InputProvider, wb_gql_op_plugin, GQLKeyPropFn
 from .. import weave_types
 from inspect import signature, Parameter
 from . import wb_domain_types

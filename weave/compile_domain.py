@@ -35,8 +35,7 @@ class InputAndStitchProvider(InputProvider):
     stitched_obj: stitch.ObjectRecorder
 
 
-# This is a class so we can access first_arg_name in compile to handle tags
-KeyFn = typing.Callable[[InputProvider, types.Type], types.Type]
+GQLKeyPropFn = typing.Callable[[InputProvider, types.Type], types.Type]
 
 
 @dataclass
@@ -48,7 +47,7 @@ class GqlOpPlugin:
     # given the input types to the op, return a new output type with the input types'
     # gql keys propagated appropriately. this is not a part of output_type to avoid
     # the UI needing to make additional network requests to get the output type
-    key_fn: typing.Optional[KeyFn] = None
+    gql_key_prop_fn: typing.Optional[GQLKeyPropFn] = None
 
 
 def fragment_to_query(fragment: str) -> str:
@@ -67,7 +66,7 @@ def wb_gql_op_plugin(
     query_fn: typing.Callable[[InputAndStitchProvider, str], str],
     is_root: bool = False,
     root_resolver: typing.Optional["op_def.OpDef"] = None,
-    key_fn: typing.Optional[KeyFn] = None,
+    key_fn: typing.Optional[GQLKeyPropFn] = None,
 ) -> dict[str, GqlOpPlugin]:
     return {"wb_domain_gql": GqlOpPlugin(query_fn, is_root, root_resolver, key_fn)}
 
@@ -164,7 +163,7 @@ def apply_domain_op_gql_translation(
         opdef = registry_mem.memory_registry.get_op(fq_opname)
         plugin = _get_gql_plugin(opdef)
 
-        if plugin is None or plugin.key_fn is None:
+        if plugin is None or plugin.gql_key_prop_fn is None:
             new_output_type = opdef.unrefined_output_type_for_params(
                 node.from_op.inputs
             )
@@ -185,7 +184,7 @@ def apply_domain_op_gql_translation(
             )
 
             # key fn operates on untagged types
-            new_output_type = plugin.key_fn(ip, unwrapped_input_type)
+            new_output_type = plugin.gql_key_prop_fn(ip, unwrapped_input_type)
 
             # now we rewrap the types to propagate the tags
             new_output_type = tagged_value_type.TaggedValueType(
