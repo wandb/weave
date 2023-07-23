@@ -184,7 +184,6 @@ def apply_domain_op_gql_translation(
                 node.from_op.inputs
             )
             node.type = new_output_type
-            return node
         else:
             input_types = node.from_op.input_types
 

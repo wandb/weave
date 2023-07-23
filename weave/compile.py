@@ -90,6 +90,7 @@ def _quote_node(node: graph.Node) -> graph.Node:
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         from_op = node.from_op
+
         try:
             op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
             params = from_op.inputs
@@ -98,7 +99,20 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                     k: n
                     for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
                 }
+
             res = op.lazy_call(**params)
+
+            # ensure GQL types are correctly propagated
+            if (
+                op.plugins is not None
+                and any(
+                    isinstance(plugin, compile_domain.GqlOpPlugin)
+                    for _, plugin in op.plugins.items()
+                )
+                and op.refine_output_type is None
+            ):
+                res.type = node.type
+
             # logging.info("Dispatched (refine): %s -> %s", node, res.type)
             return res
         except errors.WeaveDispatchError:
@@ -131,29 +145,6 @@ def _remove_optional(t: types.Type) -> types.Type:
     if types.is_optional(t):
         return types.non_none(t)
     return t
-
-
-N = typing.TypeVar("N", bound=graph.Node)
-
-
-def _recompute_output_types_map_fn_no_refine(node: N) -> N:
-    if not isinstance(node, graph.OutputNode):
-        return node
-
-    if node.from_op.name == "gqlroot-wbgqlquery":
-        return typing.cast(N, node)
-
-    from_op = node.from_op
-    op = registry_mem.memory_registry.get_op(from_op.full_name)
-    inputs = from_op.inputs
-
-    if isinstance(op.input_type, op_args.OpNamedArgs):
-        inputs = {
-            k: n for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
-        }
-
-    new_type = op.unrefined_output_type_for_params(inputs)
-    return typing.cast(N, graph.OutputNode(new_type, op.uri, inputs))
 
 
 def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.OutputNode]:
@@ -402,15 +393,6 @@ def compile_apply_column_pushdown(
         return node
 
     return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown, on_error)
-
-
-def compile_recompute_types(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(
-        nodes, _recompute_output_types_map_fn_no_refine, on_error
-    )
 
 
 def compile_fix_calls(
