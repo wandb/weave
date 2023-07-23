@@ -2,7 +2,7 @@ import typing
 from .. import weave_types as types
 from ..decorator_type import type as weave_type
 
-from ..gql_with_keys import gql_weave_type, GQLTypeMixin
+from ..gql_with_keys import gql_weave_type, GQLTypeMixin, GQLHasWithKeysType
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -44,7 +44,7 @@ class Org(GQLTypeMixin):
 
 
 OrgType = Org.WeaveType()  # type: ignore
-OrgType = typing.cast(types.Type, OrgType)
+OrgType = typing.cast(GQLHasWithKeysType, OrgType)
 
 
 @gql_weave_type("entity")
@@ -56,7 +56,7 @@ class Entity(GQLTypeMixin):
 
 
 EntityType = Entity.WeaveType()  # type: ignore
-EntityType = typing.cast(types.Type, EntityType)
+EntityType = typing.cast(GQLHasWithKeysType, EntityType)
 
 
 @gql_weave_type("user")
@@ -68,7 +68,7 @@ class User(GQLTypeMixin):
 
 
 UserType = User.WeaveType()  # type: ignore
-UserType = typing.cast(types.Type, UserType)
+UserType = typing.cast(GQLHasWithKeysType, UserType)
 
 
 @gql_weave_type("project")
@@ -80,7 +80,7 @@ class Project(GQLTypeMixin):
 
 
 ProjectType = Project.WeaveType()  # type: ignore
-ProjectType = typing.cast(types.Type, ProjectType)
+ProjectType = typing.cast(GQLHasWithKeysType, ProjectType)
 
 
 @gql_weave_type("run")
@@ -92,7 +92,7 @@ class Run(GQLTypeMixin):
 
 
 RunType = Run.WeaveType()  # type: ignore
-RunType = typing.cast(types.Type, RunType)
+RunType = typing.cast(GQLHasWithKeysType, RunType)
 
 
 @gql_weave_type("artifactType")
@@ -104,7 +104,7 @@ class ArtifactType(GQLTypeMixin):
 
 
 ArtifactTypeType = ArtifactType.WeaveType()  # type: ignore
-ArtifactTypeType = typing.cast(types.Type, ArtifactTypeType)
+ArtifactTypeType = typing.cast(GQLHasWithKeysType, ArtifactTypeType)
 
 
 @gql_weave_type("artifact")  # Name and Class mismatch intention due to weave0
@@ -116,7 +116,7 @@ class ArtifactCollection(GQLTypeMixin):
 
 
 ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
-ArtifactCollectionType = typing.cast(types.Type, ArtifactCollectionType)
+ArtifactCollectionType = typing.cast(GQLHasWithKeysType, ArtifactCollectionType)
 
 
 @gql_weave_type("artifactVersion")
@@ -127,7 +127,7 @@ class ArtifactVersion(GQLTypeMixin):
 
 
 ArtifactVersionType = ArtifactVersion.WeaveType()  # type: ignore
-ArtifactVersionType = typing.cast(types.Type, ArtifactVersionType)
+ArtifactVersionType = typing.cast(GQLHasWithKeysType, ArtifactVersionType)
 
 
 @gql_weave_type("artifactMembership")  # Name and Class mismatch intention due to weave0
@@ -139,7 +139,7 @@ class ArtifactCollectionMembership(GQLTypeMixin):
 
 ArtifactCollectionMembershipType = ArtifactCollectionMembership.WeaveType()  # type: ignore
 ArtifactCollectionMembershipType = typing.cast(
-    types.Type, ArtifactCollectionMembershipType
+    GQLHasWithKeysType, ArtifactCollectionMembershipType
 )
 
 
@@ -151,7 +151,7 @@ class ArtifactAlias(GQLTypeMixin):
 
 
 ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
-ArtifactAliasType = typing.cast(types.Type, ArtifactAliasType)
+ArtifactAliasType = typing.cast(GQLHasWithKeysType, ArtifactAliasType)
 
 
 @gql_weave_type("report")
@@ -162,7 +162,7 @@ class Report(GQLTypeMixin):
 
 
 ReportType = Report.WeaveType()  # type: ignore
-ReportType = typing.cast(types.Type, ReportType)
+ReportType = typing.cast(GQLHasWithKeysType, ReportType)
 
 
 @gql_weave_type("runQueue")
@@ -173,7 +173,7 @@ class RunQueue(GQLTypeMixin):
 
 
 RunQueueType = RunQueue.WeaveType()  # type: ignore
-RunQueueType = typing.cast(types.Type, RunQueueType)
+RunQueueType = typing.cast(GQLHasWithKeysType, RunQueueType)
 
 
 # Simple types (maybe should be put into primitives?)
