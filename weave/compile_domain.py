@@ -62,7 +62,8 @@ class GqlOpPlugin:
     root_resolver: typing.Optional["op_def.OpDef"] = None
 
     # given the input types to the op, return a new output type with the input types'
-    # keys propagated appropriately
+    # gql keys propagated appropriately. this is not a part of output_type to avoid
+    # the UI needing to make additional network requests to get the output type
     key_fn: typing.Optional[KeyFn] = None
 
 
@@ -196,8 +197,6 @@ def apply_domain_op_gql_translation(
             unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
                 original_input_type
             )
-
-            # g = opdef.unrefined_output_type_for_params(node.from_op.inputs)
 
             # key fn operates on untagged types
             new_output_type = plugin.key_fn(ip, unwrapped_input_type)
