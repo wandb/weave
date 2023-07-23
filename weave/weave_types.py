@@ -836,6 +836,9 @@ class TypedDict(Type):
             for k, v in self.property_types.items()
         )
 
+    def __getitem__(self, key: str) -> Type:
+        return self.property_types[key]
+
     def _assign_type_inner(self, other_type):
         if isinstance(other_type, Dict):
             for ptype in self.property_types.values():
