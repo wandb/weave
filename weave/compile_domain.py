@@ -8,34 +8,14 @@ from . import errors
 from . import op_args
 from . import gql_to_weave
 from . import gql_with_keys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import graphql
+
+from .input_provider import InputProvider, InputAndStitchProvider
+from .gql_with_keys import GQLKeyPropFn
 
 if typing.TYPE_CHECKING:
     from . import op_def
-
-
-@dataclass
-class InputProvider:
-    raw: dict[str, typing.Any]
-    _dumps_cache: dict[str, str] = field(init=False, repr=False, default_factory=dict)
-
-    def __getitem__(self, key: str) -> typing.Any:
-        if key not in self.raw:
-            raise KeyError(f"Input {key} not found")
-        if key not in self._dumps_cache:
-            self._dumps_cache[key] = json.dumps(
-                self.raw[key] if self.raw[key] != None else ""
-            )
-        return self._dumps_cache[key]
-
-
-@dataclass
-class InputAndStitchProvider(InputProvider):
-    stitched_obj: stitch.ObjectRecorder
-
-
-GQLKeyPropFn = typing.Callable[[InputProvider, types.Type], types.Type]
 
 
 @dataclass

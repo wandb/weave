@@ -6,6 +6,7 @@ from . import weave_types as types
 from . import artifact_fs
 
 from .decorator_type import type as weave_type
+from .input_provider import InputProvider
 
 
 T = typing.TypeVar("T", bound="GQLTypeMixin")
@@ -45,6 +46,14 @@ def gql_weave_type(
         return decorator(_instance_class)
 
     return _gql_weave_type
+
+
+GQLKeyPropFn = typing.Callable[[InputProvider, types.Type], types.Type]
+
+"""
+def make_root_op_gql_key_prop_fn() -> GQLKeyPropFn:
+    pass
+"""
 
 
 @dataclass
