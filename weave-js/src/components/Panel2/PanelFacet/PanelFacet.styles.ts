@@ -1,4 +1,4 @@
-import {MOON_450, MOON_800} from '@wandb/weave/common/css/globals.styles';
+import {MOON_450} from '@wandb/weave/common/css/globals.styles';
 
 import styled from 'styled-components';
 
