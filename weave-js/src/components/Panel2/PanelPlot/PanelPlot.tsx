@@ -384,20 +384,6 @@ const useConcreteConfig = (
   }, [concreteConfigEvaluationResult, concreteConfigLoading, config, stack]);
 };
 
-const extractWeaveExpressionDims = (dim: PlotState.DimensionLike) => {
-  // console.log('dimension.name', dim.name);
-  if (PlotState.isWeaveExpression(dim)) {
-    return [dim];
-  } else if (PlotState.isDropdownWithExpression(dim)) {
-    const newDim =
-      dim.mode() === 'expression' ? dim.expressionDim : dim.dropdownDim;
-    return [newDim];
-  } else if (PlotState.isGroup(dim)) {
-    return dim.activeDimensions();
-  }
-  return [];
-};
-
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
@@ -574,25 +560,14 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           console.log(`Series ${i} - dims: ${Object.keys(s.dims)}`);
           const groupByDropdownOptions: DropdownItemProps[] = [];
           PLOT_DIMS_UI.map(dimName => {
-            const dimObject = PlotState.dimConstructors[dimName](s, weave);
-            extractWeaveExpressionDims(dimObject).map(dim => {
-              // TODO: 'mark' is not present in series.dims dict keys so it has no value/column.
-              if (dim.name != 'mark') {
-                groupByDropdownOptions.push({
-                  key: dim.name,
-                  text: dim.name,
-                  value: s.dims[dim.name as keyof SeriesConfig['dims']],
-                });
-              }
-            });
+            if (dimName != 'mark') {
+              groupByDropdownOptions.push({
+                key: dimName,
+                text: dimName,
+                value: s.dims[dimName as keyof SeriesConfig['dims']],
+              });
+            }
           });
-          // console.log(
-          //   `Series ${i} - dims in dropdown: ${JSON.stringify(
-          //     groupByDropdownOptions,
-          //     null,
-          //     2
-          //   )}`
-          // );
           return (
             <ConfigSection
               label={`Series ${i + 1}`}
