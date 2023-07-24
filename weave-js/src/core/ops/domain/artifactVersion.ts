@@ -29,6 +29,7 @@ import {
   wandbJsonWithArtifacts,
 } from './run';
 import {connectionToNodes} from './util';
+import moment from 'moment';
 
 const makeArtifactVersionOp = makeStandardOp;
 
@@ -128,6 +129,29 @@ export const opArtifactVersionTTLDurationSeconds = makeArtifactVersionOp({
   )}`,
   returnType: inputTypes => 'number',
   resolver: ({artifactVersion}) => artifactVersion.ttlDurationSeconds,
+});
+
+export const opArtifactVersionTTLDaysLeft = makeArtifactVersionOp({
+  name: 'artifactVersion-ttlDaysLeft',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns the time to live(ttl) days left that ${docType('artifactVersion')} has before its deleted`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `The ttl days left in string form for UI for ${docType('artifactVersion')}`,
+  returnType: inputTypes => 'string',
+  resolver: ({artifactVersion}) => {
+    if (artifactVersion.ttlDurationSeconds != null) {
+      const daysLeft = Math.ceil(moment.duration(artifactVersion.ttlDurationSeconds, 'seconds').asDays() - moment.duration(moment().diff(moment.utc(artifactVersion.createdAt)), 'milliseconds').asDays());
+      if (daysLeft == 1) {
+        return daysLeft + " day"
+      }
+      else {
+        return daysLeft + " days"
+      }
+    }
+    return null;
+  }
 });
 
 export const opArtifactVersionCreatedAt = makeArtifactVersionOp({
