@@ -21,7 +21,10 @@ def async_disabled():
 def test_monitoring(user_by_api_key_in_env):
     with async_disabled():
 
-        @monitoring.monitor()
+        @monitoring.monitor(
+            entity_name=user_by_api_key_in_env.username,
+            project_name="test",
+        )
         def example(a, b):
             return a + b
 
@@ -35,7 +38,7 @@ def test_monitoring(user_by_api_key_in_env):
 
         # These underscore accesses are not public API. This is just for testing.
         example._stream_table.finish()
-        node = example._stream_table._stream_table.rows()
+        node = example.rows()
         inputs_node = node["inputs"]
         output_node = node["output"]
         input_results, output_results = weave.use([inputs_node, output_node])
@@ -47,7 +50,11 @@ def test_monitoring(user_by_api_key_in_env):
 def test_monitoring_auto_false(user_by_api_key_in_env):
     with async_disabled():
 
-        @monitoring.monitor(auto_log=False)
+        @monitoring.monitor(
+            entity_name=user_by_api_key_in_env.username,
+            project_name="test",
+            auto_log=False,
+        )
         def example(a, b):
             return a + b
 
@@ -66,7 +73,7 @@ def test_monitoring_auto_false(user_by_api_key_in_env):
 
         # These underscore accesses are not public API. This is just for testing.
         example._stream_table.finish()
-        node = example._stream_table._stream_table.rows()["c"]
+        node = example.rows()["c"]
 
         assert weave.use(node).to_pylist_tagged() == rows[::-1]
 
@@ -74,7 +81,11 @@ def test_monitoring_auto_false(user_by_api_key_in_env):
 def test_monitoring_capture_errors(user_by_api_key_in_env):
     with async_disabled():
 
-        @monitoring.monitor(raise_on_error=False)
+        @monitoring.monitor(
+            entity_name=user_by_api_key_in_env.username,
+            project_name="test",
+            raise_on_error=False,
+        )
         def example(a, b):
             if b == 5:
                 raise ValueError("5 is bad")
@@ -96,7 +107,7 @@ def test_monitoring_capture_errors(user_by_api_key_in_env):
 
         # These underscore accesses are not public API. This is just for testing.
         example._stream_table.finish()
-        node = example._stream_table._stream_table.rows()
+        node = example.rows()
 
         input_results, output_results, exception_results = weave.use(
             [node["inputs"], node["output"], node["exception"]]
@@ -111,6 +122,8 @@ def test_monitoring_processors(user_by_api_key_in_env):
     with async_disabled():
 
         @monitoring.monitor(
+            entity_name=user_by_api_key_in_env.username,
+            project_name="test",
             input_preprocessor=lambda a, b: {"val": f"{a} + {b}"},
             output_postprocessor=lambda res: {"val": res},
         )
@@ -127,7 +140,7 @@ def test_monitoring_processors(user_by_api_key_in_env):
 
         # These underscore accesses are not public API. This is just for testing.
         example._stream_table.finish()
-        node = example._stream_table._stream_table.rows()
+        node = example.rows()
 
         input_results, output_results = weave.use([node["inputs"], node["output"]])
 

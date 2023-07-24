@@ -2,8 +2,8 @@
 
 # TODO: Notebook Walkthrough
 
-from ..wandb_interface.wandb_stream_table import StreamTable, StreamTableAsync
+from ..wandb_interface.wandb_stream_table import StreamTable
 from .monitor_decorator import monitor
 
 
-__all__ = ["StreamTable", "StreamTableAsync", "monitor"]
+__all__ = ["StreamTable", "monitor"]

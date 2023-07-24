@@ -2,6 +2,7 @@
 
 # TODO: we should put all other env vars here to keep them organized.
 
+import configparser
 import enum
 import os
 import pathlib
@@ -10,6 +11,40 @@ from . import util
 from . import errors
 from urllib.parse import urlparse
 import netrc
+
+if typing.TYPE_CHECKING:
+    from . import logs
+
+
+class Settings:
+    """A minimal readonly implementation of wandb/old/settings.py for reading settings"""
+
+    DEFAULT_SECTION = "default"
+    DEFAULT_BASE_URL = "https://api.wandb.ai"
+
+    def __init__(self) -> None:
+        self._settings = configparser.ConfigParser()
+        if not self._settings.has_section(self.DEFAULT_SECTION):
+            self._settings.add_section(self.DEFAULT_SECTION)
+        self._settings.read([Settings._global_path(), Settings._local_path()])
+
+    @property
+    def base_url(self) -> str:
+        try:
+            return self._settings.get(self.DEFAULT_SECTION, "base_url")
+        except configparser.NoOptionError:
+            return self.DEFAULT_BASE_URL
+
+    @staticmethod
+    def _local_path() -> str:
+        return os.path.join(os.getcwd(), "wandb", "settings")
+
+    @staticmethod
+    def _global_path() -> str:
+        default_config_dir = os.path.join(os.path.expanduser("~"), ".config", "wandb")
+        config_dir = os.environ.get("WANDB_CONFIG_DIR", default_config_dir)
+        return os.path.join(config_dir, "settings")
+
 
 # There are currently two cache modes:
 # - full: cache all cacheable intermediate results
@@ -41,12 +76,23 @@ def is_public() -> bool:
     return wandb_production()
 
 
+def weave_log_format(default: "logs.LogFormat") -> "logs.LogFormat":
+    from .logs import LogFormat
+
+    return LogFormat(os.getenv("WEAVE_LOG_FORMAT", default))
+
+
 def weave_server_url() -> str:
-    return os.getenv("WEAVE_SERVER_URL", "")
+    base_url = wandb_base_url()
+    default = "https://weave.wandb.ai"
+    if base_url != "https://api.wandb.ai":
+        default = base_url
+    return os.getenv("WEAVE_SERVER_URL", default)
 
 
 def wandb_base_url() -> str:
-    return os.environ.get("WANDB_BASE_URL", "https://api.wandb.ai")
+    settings = Settings()
+    return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
 
 
 def weave_filesystem_dir() -> str:
@@ -61,6 +107,10 @@ def enable_touch_on_read() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_TOUCH_ON_READ")
 
 
+def memdump_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_MEMDUMP_SIGHANDLER")
+
+
 def weave_wandb_cookie() -> typing.Optional[str]:
     cookie = os.environ.get("WEAVE_WANDB_COOKIE")
     if cookie:
@@ -73,6 +123,10 @@ def weave_wandb_cookie() -> typing.Optional[str]:
                 "Please delete ~/.netrc while using WEAVE_WANDB_COOKIE to avoid using your credentials"
             )
     return cookie
+
+
+def stack_dump_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_STACK_DUMP_SIGHANDLER")
 
 
 def _wandb_api_key_via_env() -> typing.Optional[str]:
@@ -108,3 +162,7 @@ def weave_wandb_api_key() -> typing.Optional[str]:
             "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
         )
     return env_api_key or netrc_api_key
+
+
+def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
+    return util.parse_number_env_var("WEAVE_PROJECTION_TIMEOUT_SEC")

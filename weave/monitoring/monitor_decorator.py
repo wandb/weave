@@ -9,8 +9,9 @@ import uuid
 import logging
 
 
-from ..wandb_interface.wandb_stream_table import StreamTableAsync
-from ..wandb_interface.wandb_lite_run import WeaveWandbRunException
+from ..wandb_interface.wandb_stream_table import StreamTable
+from .. import errors
+from .. import graph
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +99,8 @@ class MonitorRecord:
 def monitor(
     stream_name: typing.Optional[str] = None,
     *,
-    project_name: typing.Optional[str] = None,
-    entity_name: typing.Optional[str] = None,
+    project_name: str,
+    entity_name: str,
     input_preprocessor: typing.Optional[
         typing.Callable[..., dict[str, typing.Any]]
     ] = None,
@@ -114,12 +115,10 @@ def monitor(
     callbable should return a dictionary with scalar values or wandb Media objects.
 
     Arguments:
-        stream_name (typing.Optional[str]):  The name of the stream to log to.  If None, the stream name will be
+        stream_name (typing.Optional[str]): The name of the stream to log to. If None, the stream name will be
             inferred from the function name.
-        project_name (typing.Optional[str]):  The name of the project to log to.  If None, the project name will be
-            inferred from the environment variable WANDB_PROJECT and fallback to "monitoring".
-        entity_name (typing.Optional[str]):  The name of the entity to log to.  If None, the entity name will be
-            inferred from the current authenticated user.
+        project_name str:  The name of the W&B Project to log to.
+        entity_name str:  The name of the W&B Entity to log to.
         input_preprocessor (typing.Callable[..., typing.Any]):  A function that takes the kwargs of the decorated function and
             returns a dictionary of key value pairs to log.
         output_postprocessor (typing.Callable[..., typing.Any]):  A function that takes the return value of the decorated function
@@ -134,8 +133,8 @@ def monitor(
         fn: typing.Callable[..., typing.Any]
     ) -> typing.Callable[..., MonitorRecord]:
         return MonitoredFunction(
-            fn,
-            stream_name=stream_name,
+            fn=fn,
+            stream_name=stream_name or _get_default_fn_name(fn),
             project_name=project_name,
             entity_name=entity_name,
             input_preprocessor=input_preprocessor,
@@ -150,7 +149,7 @@ def monitor(
 class MonitoredFunction:
     _fn: typing.Callable[..., typing.Any]
     _tracked_fn: typing.Callable[..., ExecutionResult]
-    _stream_table: StreamTableAsync
+    _stream_table: StreamTable
     _input_preprocessor: typing.Callable[..., dict[str, typing.Any]]
     _output_preprocessor: typing.Callable[..., dict[str, typing.Any]]
     _auto_log: bool
@@ -159,11 +158,11 @@ class MonitoredFunction:
 
     def __init__(
         self,
-        fn: typing.Callable[..., typing.Any],
         *,
-        stream_name: typing.Optional[str] = None,
-        project_name: typing.Optional[str] = None,
-        entity_name: typing.Optional[str] = None,
+        fn: typing.Callable[..., typing.Any],
+        stream_name: str,
+        project_name: str,
+        entity_name: str,
         input_preprocessor: typing.Optional[
             typing.Callable[..., dict[str, typing.Any]]
         ] = None,
@@ -180,12 +179,12 @@ class MonitoredFunction:
         self._raise_on_error = raise_on_error
 
         try:
-            self._stream_table = StreamTableAsync(
-                stream_name or _get_default_fn_name(fn),
-                project_name or os.environ.get("WANDB_PROJECT", "monitoring"),
-                entity_name,
+            self._stream_table = StreamTable(
+                table_name=stream_name,
+                project_name=project_name,
+                entity_name=entity_name,
             )
-        except WeaveWandbRunException:
+        except errors.WeaveWandbAuthenticationException:
             self._disabled = True
             logger.error("Monitoring disabled because WANDB_API_KEY is not set.")
             print("Couldn't find W&B API key, disabling monitoring.", file=sys.stderr)
@@ -220,13 +219,16 @@ class MonitoredFunction:
             return self
 
     def _direct_log(self, record: MonitorRecord) -> None:
-        self._stream_table.log(lambda: record.as_dict())
+        self._stream_table.log(record.as_dict())
 
     def _default_input_processor(self, *args: typing.Any, **kwargs: typing.Any) -> dict:
         arg_dict = _arguments_to_dict(self._fn, args, kwargs)
         if "self" in arg_dict:
             del arg_dict["self"]
         return arg_dict
+
+    def rows(self) -> graph.Node:
+        return self._stream_table.rows()
 
 
 def _arguments_to_dict(
@@ -247,6 +249,8 @@ def _sanitize_name(name: str) -> str:
 
 def _get_default_fn_name(fn: typing.Callable) -> str:
     fn_file_name = _sanitize_name(os.path.basename(inspect.getfile(fn)))
+    if fn_file_name.endswith(".py"):
+        fn_file_name = fn_file_name[:-3]
     fn_name = _sanitize_name(fn.__name__)
 
     return f"{fn_file_name}-{fn_name}"

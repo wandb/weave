@@ -14,6 +14,7 @@ import {
   Node,
   callOpVeryUnsafe,
   constString,
+  list,
   opArtifactMembershipArtifactVersion,
   opArtifactMembershipForAlias,
   opArtifactVersionFile,
@@ -23,18 +24,22 @@ import {
   opProjectArtifact,
   opRootProject,
   opTableRows,
+  typedDict,
   varNode,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
-import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
-import {getFullChildPanel} from '../../Panel2/ChildPanel';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
   HomePreviewSidebarTemplate,
   HomeBoardPreview,
   HomeExpressionPreviewParts,
 } from './HomePreviewSidebar';
+import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import WandbLoader from '@wandb/weave/common/components/WandbLoader';
+import {IconMagicWandStar} from '../../Icon';
+import {getFullChildPanel} from '../../Panel2/ChildPanel';
+import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -100,7 +105,7 @@ export const CenterEntityBrowserInner: React.FC<
         (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
           ? meta.num_stream_tables + meta.num_logged_tables
           : null,
-      'updated at': moment.utc(meta.updatedAt).calendar(),
+      'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
   }, [projectsMeta.result]);
 
@@ -308,8 +313,8 @@ const CenterProjectBoardsBrowser: React.FC<
     return boards.result.map(b => ({
       _id: b.name,
       name: b.name,
-      'updated at': moment.utc(b.updatedAt).calendar(),
-      'created at': moment.utc(b.createdAt).calendar(),
+      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
     }));
   }, [boards]);
@@ -397,9 +402,13 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     const node = opGet({uri: constString(uri)});
     node.type = {type: 'stream_table'} as any;
-    newExpr = callOpVeryUnsafe('stream_table-rows', {
-      self: node,
-    }) as any;
+    newExpr = callOpVeryUnsafe(
+      'stream_table-rows',
+      {
+        self: node,
+      },
+      list(typedDict({}))
+    ) as any;
   } else {
     // This is a  hacky here. Would be nice to have better mapping
     const artNameParts = artName.split('-', 3);
@@ -452,8 +461,8 @@ const CenterProjectTablesBrowser: React.FC<
       _updatedAt: b.updatedAt,
       name: b.name,
       kind: 'Stream Table',
-      'updated at': moment.utc(b.updatedAt).calendar(),
-      'created at': moment.utc(b.createdAt).calendar(),
+      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
     }));
     const logged = loggedTables.result.map(b => ({
@@ -461,8 +470,8 @@ const CenterProjectTablesBrowser: React.FC<
       _updatedAt: b.updatedAt,
       name: b.name,
       kind: 'Logged Table',
-      'updated at': moment.utc(b.updatedAt).calendar(),
-      'created at': moment.utc(b.createdAt).calendar(),
+      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
     }));
     const combined = [...streams, ...logged];
@@ -470,7 +479,10 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
+  const [seedingBoard, setSeedingBoard] = useState(false);
   const makeNewDashboard = useNewDashFromItems();
+
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
@@ -534,15 +546,28 @@ const CenterProjectTablesBrowser: React.FC<
               props.projectName,
               row._id
             );
-            const name = 'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
-            makeNewDashboard(
-              name,
-              {panel0: getFullChildPanel(varNode(node.type, 'var0'))},
-              {var0: node},
-              newDashExpr => {
-                props.navigateToExpression(newDashExpr);
-              }
+            setSeedingBoard(true);
+            makeBoardFromNode('py_board-seed_board', node, newDashExpr => {
+              setSeedingBoard(false);
+              props.navigateToExpression(newDashExpr);
+            });
+          },
+        },
+        {
+          icon: IconMagicWandStar,
+          label: 'Seed auto board',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
             );
+            setSeedingBoard(true);
+            makeBoardFromNode('py_board-seed_autoboard', node, newDashExpr => {
+              setSeedingBoard(false);
+              props.navigateToExpression(newDashExpr);
+            });
           },
         },
         {
@@ -559,6 +584,8 @@ const CenterProjectTablesBrowser: React.FC<
             );
           },
         },
+      ],
+      [
         {
           icon: IconCopy,
           label: 'Copy Weave expression',
@@ -577,36 +604,39 @@ const CenterProjectTablesBrowser: React.FC<
         },
       ],
     ];
-  }, [makeNewDashboard, props, weave]);
+  }, [makeBoardFromNode, makeNewDashboard, props, weave]);
 
   return (
-    <CenterBrowser
-      allowSearch
-      title={browserTitle}
-      selectedRowId={selectedRowId}
-      noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
-      breadcrumbs={[
-        {
-          key: 'entity',
-          text: props.entityName,
-          onClick: () => {
-            props.setSelectedProjectName(undefined);
-            props.setSelectedAssetType(undefined);
+    <>
+      {seedingBoard && <WandbLoader />}
+      <CenterBrowser
+        allowSearch
+        title={browserTitle}
+        selectedRowId={selectedRowId}
+        noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
+        breadcrumbs={[
+          {
+            key: 'entity',
+            text: props.entityName,
+            onClick: () => {
+              props.setSelectedProjectName(undefined);
+              props.setSelectedAssetType(undefined);
+            },
           },
-        },
-        {
-          key: 'project',
-          text: props.projectName,
-          onClick: () => {
-            props.setSelectedAssetType(undefined);
+          {
+            key: 'project',
+            text: props.projectName,
+            onClick: () => {
+              props.setSelectedAssetType(undefined);
+            },
           },
-        },
-      ]}
-      loading={isLoading}
-      filters={{kind: {placeholder: 'All table kinds'}}}
-      columns={['name', 'kind', 'updated at', 'created at', 'created by']}
-      data={browserData}
-      actions={browserActions}
-    />
+        ]}
+        loading={isLoading}
+        filters={{kind: {placeholder: 'All table kinds'}}}
+        columns={['name', 'kind', 'updated at', 'created at', 'created by']}
+        data={browserData}
+        actions={browserActions}
+      />
+    </>
   );
 };
