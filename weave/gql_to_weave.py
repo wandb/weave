@@ -4,6 +4,7 @@ from graphql import (
     GraphQLObjectType,
     GraphQLList,
     GraphQLNonNull,
+    GraphQLInterfaceType,
     FieldNode,
     OperationDefinitionNode,
 )
@@ -49,7 +50,10 @@ def gql_type_to_weave_type(
     gql_type: graphql.GraphQLType,
     selection_set: typing.Optional[graphql.SelectionSetNode],
 ) -> types.Type:
-    if isinstance(gql_type, GraphQLObjectType) and selection_set:
+    if (
+        isinstance(gql_type, (GraphQLObjectType, GraphQLInterfaceType))
+        and selection_set
+    ):
         property_types: dict[str, types.Type] = {}
         for selection in selection_set.selections:
             if not isinstance(selection, FieldNode):

@@ -79,3 +79,54 @@ def test_gql_compilation_root_op_custom_key_fn():
     )
 
     assert compiled_node.type == expected
+
+
+def test_project_artifacts():
+    node = ops.project("stacey", "mendeleev").artifacts().id()
+    compiled_node = compile.compile([node])[0]
+    expected = TaggedValueType(
+        types.TypedDict(
+            {
+                "project": wdt.ProjectType.with_keys(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                        "artifactTypes_100": types.TypedDict(
+                            {
+                                "edges": types.List(
+                                    types.TypedDict(
+                                        {
+                                            "node": types.TypedDict(
+                                                {
+                                                    "id": types.String(),
+                                                    "artifactCollections_100": types.TypedDict(
+                                                        {
+                                                            "edges": types.List(
+                                                                types.TypedDict(
+                                                                    {
+                                                                        "node": types.TypedDict(
+                                                                            {
+                                                                                "id": types.String(),
+                                                                                "name": types.String(),
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                )
+                                                            )
+                                                        }
+                                                    ),
+                                                }
+                                            )
+                                        }
+                                    )
+                                )
+                            }
+                        ),
+                    }
+                )
+            }
+        ),
+        types.List(types.String()),
+    )
+
+    assert compiled_node.type == expected

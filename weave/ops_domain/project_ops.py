@@ -1,3 +1,4 @@
+import typing
 import json
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
@@ -12,6 +13,7 @@ from .wandb_domain_gql import (
 from .. import gql_with_keys
 from .. import weave_types as types
 from .. import errors
+from .. import input_provider
 
 # Section 1/6: Tag Getters
 get_project_tag = make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
@@ -210,6 +212,20 @@ def link(project: wdt.Project) -> wdt.Link:
     )
 
 
+def _project_artifacts_gql_key_propagation_fn(
+    inputs: input_provider.InputProvider, input_type: types.Type
+) -> types.Type:
+    return types.List(
+        wdt.ArtifactCollectionType.with_keys(
+            typing.cast(typing.Any, input_type)
+            .keys["artifactTypes_100"]["edges"]
+            .object_type["node"]["artifactCollections_100"]["edges"]
+            .object_type["node"]
+            .property_types
+        )
+    )
+
+
 @op(
     name="project-artifacts",
     output_type=lambda input_types: types.List(wdt.ArtifactCollectionType),
@@ -231,6 +247,7 @@ def link(project: wdt.Project) -> wdt.Link:
                 }}
             }}
         """,
+        gql_key_prop_fn=_project_artifacts_gql_key_propagation_fn,
     ),
 )
 def artifacts(
