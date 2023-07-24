@@ -143,7 +143,9 @@ gql_connection_op(
 # Section 6/6: Non Standard Business Logic Ops
 @op(
     name="artifact-isPortfolio",
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "__typename"),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: "__typename",
+    ),
 )
 def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
     return artifact.gql["__typename"] == "ArtifactPortfolio"

@@ -61,9 +61,14 @@ def gql_type_to_weave_type(
                     f"Selections must be fields, got {selection.__class__.__name__}"
                 )
             key = selection.alias.value if selection.alias else selection.name.value
-            property_types[key] = gql_type_to_weave_type(
-                gql_type.fields[selection.name.value].type, selection.selection_set
-            )
+            if key == "__typename":
+                # __typename does not appear explicitly in the schema, but all types have it
+                # it just returns a string, so treat that case here.
+                property_types[key] = types.String()
+            else:
+                property_types[key] = gql_type_to_weave_type(
+                    gql_type.fields[selection.name.value].type, selection.selection_set
+                )
         return types.TypedDict(property_types)
 
     elif isinstance(gql_type, GraphQLList):

@@ -130,3 +130,55 @@ def test_project_artifacts():
     )
 
     assert compiled_node.type == expected
+
+
+def test_typename():
+    node = ops.project("stacey", "mendeleev").artifacts()[0].isPortfolio()
+    compiled_node = compile.compile([node])[0]
+    expected = TaggedValueType(
+        types.TypedDict(
+            {
+                "project": wdt.ProjectType.with_keys(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                        "artifactTypes_100": types.TypedDict(
+                            {
+                                "edges": types.List(
+                                    types.TypedDict(
+                                        {
+                                            "node": types.TypedDict(
+                                                {
+                                                    "id": types.String(),
+                                                    "artifactCollections_100": types.TypedDict(
+                                                        {
+                                                            "edges": types.List(
+                                                                types.TypedDict(
+                                                                    {
+                                                                        "node": types.TypedDict(
+                                                                            {
+                                                                                "__typename": types.String(),
+                                                                                "id": types.String(),
+                                                                                "name": types.String(),
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                )
+                                                            )
+                                                        }
+                                                    ),
+                                                }
+                                            )
+                                        }
+                                    )
+                                )
+                            }
+                        ),
+                    }
+                )
+            }
+        ),
+        types.Boolean(),
+    )
+
+    assert compiled_node.type == expected
