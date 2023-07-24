@@ -15,6 +15,8 @@ export const inputType = {type: 'list' as const, objectType: 'any' as const};
 interface FacetConfig {
   table: TableState.TableState;
   dims: {
+    xAxisLabel: string;
+    yAxisLabel: string;
     x: TableState.ColumnId;
     y: TableState.ColumnId;
     select: TableState.ColumnId;
@@ -55,6 +57,8 @@ export function defaultFacet(): FacetConfig {
   return {
     table: tableState,
     dims: {
+      xAxisLabel: '',
+      yAxisLabel: '',
       x: xColId,
       y: yColId,
       select: selectColId,
@@ -63,8 +67,8 @@ export function defaultFacet(): FacetConfig {
     padding: 0,
     manualSize: false,
     cellSize: {
-      w: 200,
-      h: 20,
+      w: 40,
+      h: 40,
     },
   };
 }
@@ -149,6 +153,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   const config = useConfig(props.config);
   const updateConfig = useCallback(
     (newConfig: Partial<FacetConfig>) => {
+      console.log('UPDATE CONFIG', newConfig)
       propsUpdateConfig({
         ...config,
         ...newConfig,
@@ -162,6 +167,17 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
     (newTableConfig: TableState.TableState) =>
       updateConfig({
         table: newTableConfig,
+      }),
+    [updateConfig]
+  );
+
+  const updateAxisLabel = useCallback(
+    (newAxisLabel: {xAxisLabel?: string; yAxisLabel?:string;}) =>
+      updateConfig({
+        dims: {
+          ...config.dims,
+          ...newAxisLabel,
+        }
       }),
     [updateConfig]
   );
@@ -191,6 +207,14 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   return (
     <ConfigPanel.ConfigSection label={`Properties`}>
       {dashboardConfigOptions}
+      <ConfigPanel.ConfigOption label={'x-axis-label'}>
+        <ConfigPanel.TextInputConfigField
+          dataTest='x-axis-label-input'
+          label='x-axis label'
+          value={config.dims.xAxisLabel || ""}
+          onChange={({target}) => {updateAxisLabel({xAxisLabel: (target as HTMLInputElement).value})}}
+        />
+      </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label={'x'}>
         <DimConfig
           dimName="x"
@@ -200,10 +224,18 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
           updateTableConfig={updateTableConfig}
         />
       </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label={'y-axis-label'}>
+        <ConfigPanel.TextInputConfigField
+          dataTest='y-axis-label-input'
+          label='y-axis label'
+          value={config.dims.yAxisLabel || ""}
+          onChange={({target}) => {updateAxisLabel({yAxisLabel: (target as HTMLInputElement).value})}}
+        />
+      </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label={'y'}>
         <DimConfig
           dimName="y"
-          colId={config.dims.y}
+          colId={config.dims.y || ""}
           input={input}
           tableConfig={tableConfig}
           updateTableConfig={updateTableConfig}

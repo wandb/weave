@@ -1,4 +1,4 @@
-import {linkHoverBlue} from '@wandb/weave/common/css/globals.styles';
+import {MOON_800} from '@wandb/weave/common/css/globals.styles';
 import {
   compareItems,
   constFunction,
@@ -25,6 +25,7 @@ import {PanelString} from '../PanelString';
 import * as TableState from '../PanelTable/tableState';
 import {PanelType} from '../PanelType';
 import {defaultFacet, PanelFacetProps, useConfig} from './common';
+import * as S from './PanelFacet.styles';
 
 export {PanelFacetConfig} from './common';
 
@@ -223,9 +224,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
         : props.config,
     [props.config]
   );
-  const {table, dims, cellSize} = config;
-  const [resizingSize, setResizingSize] = useState(cellSize);
-
+  const {table, dims} = config;
   const cellFunction = table.columnSelectFunctions[dims.select];
 
   const {
@@ -326,51 +325,49 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
     [cellNodesUse.loading, cellNodesUse.result]
   );
 
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const columnWidth = wrapperRef.current ? (wrapperRef.current.clientWidth - 80) / (Object.keys(xPos).length): 40;
+  const rowHeight = wrapperRef.current ? (wrapperRef.current.clientHeight - 80) / (Object.keys(yPos).length): 40;
+
   // TODO: make this handle only visible nodes! we can make an infinite scroll
   // facet panel easily. E.g. same way as we do paging on the table.
   return useGatedValue(
     <div
+      ref={wrapperRef}
       style={{
         display: 'inline-block',
         marginLeft: 'auto',
         marginRight: 'auto',
+        width: '100%',
+        height: '100%',
       }}>
-      <div
+      <S.FacetGridWrapper
         // TODO: I'm just putting this in
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 140,
-          gridTemplateRows: 24,
-          gridAutoColumns: config.cellSize.w,
-          gridAutoRows: config.cellSize.h,
-        }}>
+        columnWidth={columnWidth}
+        rowHeight={rowHeight}
+        >
+        <S.xAxisLabel key={"x-axis-label-" + (dims.xAxisLabel || xColName)} columnCount={Object.keys(xPos).length + 3} gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
+          {dims.xAxisLabel || xColName}
+        </S.xAxisLabel>
+        <S.yAxisLabel key={"y-axis-label-" + (dims.yAxisLabel || yColName)} rowCount={Object.keys(yPos).length + 3} gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
+          {dims.yAxisLabel || yColName}
+        </S.yAxisLabel>
         {Object.keys(xPos).map(xKey => (
-          <div
+          <S.FacetHeaderCell
             key={'col-' + xKey}
-            style={{
-              gridColumnStart: xPos[xKey] + 2,
-              gridRowStart: 1,
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              fontSize: 10,
-            }}>
+            style={{height:'24px'}}
+            gridColumnStart={xPos[xKey] + 3}
+            gridRowStart={2}>
             {xKey}
-          </div>
+          </S.FacetHeaderCell>
         ))}
         {Object.keys(yPos).map(yKey => (
-          <div
+          <S.FacetHeaderCell
             key={'row-' + yKey}
-            style={{
-              gridRowStart: yPos[yKey] + 2,
-              gridColumnStart: 1,
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              fontSize: 12,
-            }}>
-            {yKey}
-          </div>
+            gridColumnStart={2}
+            gridRowStart={yPos[yKey] + 3}>
+             {yKey}
+          </S.FacetHeaderCell>
         ))}
         {cellNodes.map((cellNode, i) => {
           const groupKey = groupKeys[i];
@@ -384,50 +381,40 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
           const selected =
             xKey === config.selectedCell?.x && config.selectedCell?.y === yKey;
           return (
-            <Resizable
+            <div
               key={'cell-' + xPos[xKey] + '-' + yPos[yKey]}
-              width={cellSize.w}
-              height={cellSize.h}
-              onResize={(e, data) => {
-                setResizingSize({w: data.size.width, h: data.size.height});
+              style={{
+                gridColumnStart: xPos[xKey] + 3,
+                gridRowStart: yPos[yKey] + 3,
+                border: selected ? `2px solid ${MOON_800}` : undefined,
               }}
-              onResizeStop={() => props.updateConfig({cellSize: resizingSize})}>
-              <div
-                style={{
-                  width: config.cellSize.w,
-                  height: config.cellSize.h,
-                  gridColumnStart: xPos[xKey] + 2,
-                  gridRowStart: yPos[yKey] + 2,
-                  border: selected ? `1px solid ${linkHoverBlue}` : undefined,
-                }}
-                onClick={() =>
-                  props.updateConfig({selectedCell: {x: xKey, y: yKey}})
-                }>
-                <PanelContextProvider newVars={cellVars}>
-                  <SelectPanel
-                    inputNode={cellNode}
-                    selectFunction={cellFunction}
-                    vars={table.columns[dims.select].panelVars ?? {}}
-                    panelId={table.columns[dims.select].panelId}
-                    config={table.columns[dims.select].panelConfig}
-                    panelContext={props.context}
-                    updateConfig={newConfig =>
-                      props.updateConfig({
-                        table: TableState.updateColumnPanelConfig(
-                          table,
-                          dims.select,
-                          newConfig
-                        ),
-                      })
-                    }
-                    updatePanelContext={props.updateContext}
-                  />
-                </PanelContextProvider>
-              </div>
-            </Resizable>
+              onClick={() =>
+                props.updateConfig({selectedCell: {x: xKey, y: yKey}})
+              }>
+              <PanelContextProvider newVars={cellVars}>
+                <SelectPanel
+                  inputNode={cellNode}
+                  selectFunction={cellFunction}
+                  vars={table.columns[dims.select].panelVars ?? {}}
+                  panelId={table.columns[dims.select].panelId}
+                  config={table.columns[dims.select].panelConfig}
+                  panelContext={props.context}
+                  updateConfig={newConfig =>
+                    props.updateConfig({
+                      table: TableState.updateColumnPanelConfig(
+                        table,
+                        dims.select,
+                        newConfig
+                      ),
+                    })
+                  }
+                  updatePanelContext={props.updateContext}
+                />
+              </PanelContextProvider>
+            </div>
           );
         })}
-      </div>
+      </S.FacetGridWrapper>
     </div>,
     o => !cellNodesUse.loading
   );
@@ -437,6 +424,7 @@ const PanelFacet: React.FC<PanelFacetProps> = props => {
   const config = useConfig(props.config);
   const {table, dims} = config;
 
+  if (dims.xAxisLabel == null) {return <div>x must be configured</div>};
   const xEnabled = table.columnSelectFunctions[dims.x].type !== 'invalid';
 
   // TODO: Combine into a childPanelIsRenderable function

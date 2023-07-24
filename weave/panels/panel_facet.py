@@ -14,6 +14,8 @@ class FacetDimsConfig:
     y: str
     select: str
     detail: str
+    xAxisLabel: str = ""
+    yAxisLabel: str = ""
 
 
 @weave.type()
@@ -56,6 +58,8 @@ class Facet(panel.Panel):
                     y=table.add_column(lambda row: graph.VoidNode()),
                     select=table.add_column(lambda row: graph.VoidNode()),
                     detail=table.add_column(lambda row: graph.VoidNode()),
+                    xAxisLabel="",
+                    yAxisLabel="",
                 ),
                 cellSize=FacetCellSize(w=50, h=50),
                 padding=0,
