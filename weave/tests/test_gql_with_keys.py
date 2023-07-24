@@ -60,12 +60,18 @@ def test_gql_compilation_root_op_custom_key_fn():
             "id": types.String(),
             "name": types.String(),
             "runs_2057dcd339ea3515a695d28f63f4e288": types.TypedDict(
-                {"edges": types.List(types.TypedDict({"node": run_type}))}
+                {
+                    "edges": types.List(
+                        types.TypedDict({"node": types.TypedDict(run_type.keys)})
+                    )
+                }
             ),
         }
     )
 
-    assert compiled_node.type == TaggedValueType(
+    expected = TaggedValueType(
         types.TypedDict({"project": project_type}),
         types.List(TaggedValueType(types.TypedDict({"run": run_type}), types.String())),
     )
+
+    assert compiled_node.type == expected

@@ -180,6 +180,14 @@ class GQLHasKeysType(types.Type):
         }
         return result
 
+    def __eq__(self, other: typing.Any) -> bool:
+        if isinstance(other, GQLHasKeysType):
+            return (
+                self.keyless_weave_type_class == other.keyless_weave_type_class
+                and self.keys == other.keys
+            )
+        return False
+
     @classmethod
     def from_dict(cls, d: dict) -> "GQLHasKeysType":
         property_types = {}
