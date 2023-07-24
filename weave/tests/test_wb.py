@@ -65,63 +65,77 @@ artifact_browser_response = {
 }
 
 
-workspace_response = {
-    "project_518fa79465d8ffaeb91015dce87e092f": {
-        **fwb.project_payload,  # type: ignore
-        "runs_c1233b7003317090ab5e2a75db4ad965": {
-            "edges": [
-                {
-                    "node": {
-                        **fwb.run_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                },
-                                "legacy_table": {
-                                    "_type": "table-file",
-                                    "path": "media/tables/legacy_table.table.json",
-                                },
-                                "image": {
-                                    "height": 64,
-                                    "sha256": "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025",
-                                    "path": "media/images/random_image_9_440fab0d6f537b4557a1.png",
-                                    "size": 4228,
-                                    "_type": "image-file",
-                                    "width": 64,
-                                    "format": "png",
-                                },
-                            }
-                        ),
-                        "displayName": "amber-glade-100",
+def workspace_response(include_display_name=True):
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_c1233b7003317090ab5e2a75db4ad965": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.run_payload,  # type: ignore
+                            "summaryMetricsSubset": json.dumps(
+                                {
+                                    "table": {
+                                        "_type": "table-file",
+                                        "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+                                    },
+                                    "legacy_table": {
+                                        "_type": "table-file",
+                                        "path": "media/tables/legacy_table.table.json",
+                                    },
+                                    "image": {
+                                        "height": 64,
+                                        "sha256": "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025",
+                                        "path": "media/images/random_image_9_440fab0d6f537b4557a1.png",
+                                        "size": 4228,
+                                        "_type": "image-file",
+                                        "width": 64,
+                                        "format": "png",
+                                    },
+                                }
+                            ),
+                            **(
+                                {"displayName": "amber-glade-100"}
+                                if include_display_name
+                                else {}
+                            ),
+                        },
                     },
-                },
-                {
-                    "node": {
-                        **fwb.run2_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps({}),
-                        "displayName": "run2-display_name",
+                    {
+                        "node": {
+                            **fwb.run2_payload,  # type: ignore
+                            "summaryMetricsSubset": json.dumps({}),
+                            **(
+                                {"displayName": "run2-display_name"}
+                                if include_display_name
+                                else {}
+                            ),
+                        },
                     },
-                },
-                {
-                    "node": {
-                        **fwb.run3_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
-                                },
-                            }
-                        ),
-                        "displayName": "run3-display_name",
+                    {
+                        "node": {
+                            **fwb.run3_payload,  # type: ignore
+                            "summaryMetricsSubset": json.dumps(
+                                {
+                                    "table": {
+                                        "_type": "table-file",
+                                        "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
+                                    },
+                                }
+                            ),
+                            **(
+                                {"displayName": "run3-display_name"}
+                                if include_display_name
+                                else {}
+                            ),
+                        },
                     },
-                },
-            ]
-        },
+                ]
+            },
+        }
     }
-}
+
 
 workspace_response_no_run_displayname = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -321,14 +335,21 @@ def test_missing_file(fake_wandb):
 
 def table_mock1(q, ndx):
     if q["gql"].definitions[0].name.value == "WeavePythonCG":
-        return workspace_response
+        return workspace_response()
+    else:
+        return artifact_version_sdk_response
+
+
+def table_mock1_no_display_name(q, ndx):
+    if q["gql"].definitions[0].name.value == "WeavePythonCG":
+        return workspace_response(False)
     else:
         return artifact_version_sdk_response
 
 
 def table_mock2(q, ndx):
     if q["gql"].definitions[0].name.value == "WeavePythonCG":
-        return workspace_response
+        return workspace_response()
     else:
         return artifact_version_sdk_response
 
@@ -584,7 +605,7 @@ def test_domain_gql_fragments(fake_wandb):
 
 
 def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project_name_node = project_node.name()
     entity_node = project_node.entity()
@@ -617,7 +638,7 @@ def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
 
 
 def test_domain_gql_around_fn_nodes(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     runs_node = project_node.runs()
     sorted_runs = runs_node.sort(lambda row: ops.make_list(a=row.createdAt()), ["asc"])

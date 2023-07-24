@@ -7,6 +7,10 @@ from ..ops_domain.project_ops import root_all_projects
 from .. import compile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 
+from .. import api as weave
+
+from .test_wb import table_mock1_no_display_name
+
 
 def test_gql_compilation_with_keys():
     project_node = ops.project("stacey", "mendeleev")
@@ -248,5 +252,168 @@ def test_last_membership():
             wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()})
         ),
     )
+
+    assert compiled_node.type == expected
+
+
+def test_op_with_refiner(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock1_no_display_name)
+    node = ops.project("stacey", "mendeleev").runs()[0].summary()["legacy_table"]
+    compiled_node = compile.compile([node])[0]
+
+    # it was hard to manually construct the type here in python, so i dumped it to
+    # a dict in the debugger and re-created the type from that below :).
+    compiled_type_from_dict = {
+        "type": "tagged",
+        "tag": {
+            "type": "typedDict",
+            "propertyTypes": {
+                "run": {
+                    "type": "tagged",
+                    "tag": {
+                        "type": "typedDict",
+                        "propertyTypes": {
+                            "project": {
+                                "type": "GQLHasKeys",
+                                "keys": {
+                                    "id": "string",
+                                    "name": "string",
+                                    "entity": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "id": "string",
+                                            "name": "string",
+                                        },
+                                    },
+                                    "runs_c1233b7003317090ab5e2a75db4ad965": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "edges": {
+                                                "type": "list",
+                                                "objectType": {
+                                                    "type": "typedDict",
+                                                    "propertyTypes": {
+                                                        "node": {
+                                                            "type": "typedDict",
+                                                            "propertyTypes": {
+                                                                "id": "string",
+                                                                "name": "string",
+                                                                "project": {
+                                                                    "type": "typedDict",
+                                                                    "propertyTypes": {
+                                                                        "id": "string",
+                                                                        "name": "string",
+                                                                        "entity": {
+                                                                            "type": "typedDict",
+                                                                            "propertyTypes": {
+                                                                                "id": "string",
+                                                                                "name": "string",
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                },
+                                                                "summaryMetricsSubset": "string",
+                                                            },
+                                                        }
+                                                    },
+                                                },
+                                            }
+                                        },
+                                    },
+                                },
+                                "keyless_weave_type_class": "project",
+                            }
+                        },
+                    },
+                    "value": {
+                        "type": "GQLHasKeys",
+                        "keys": {
+                            "id": "string",
+                            "name": "string",
+                            "project": {
+                                "type": "typedDict",
+                                "propertyTypes": {
+                                    "id": "string",
+                                    "name": "string",
+                                    "entity": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "id": "string",
+                                            "name": "string",
+                                        },
+                                    },
+                                },
+                            },
+                            "summaryMetricsSubset": "string",
+                        },
+                        "keyless_weave_type_class": "run",
+                    },
+                },
+                "project": {
+                    "type": "GQLHasKeys",
+                    "keys": {
+                        "id": "string",
+                        "name": "string",
+                        "runs_c1233b7003317090ab5e2a75db4ad965": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "edges": {
+                                    "type": "list",
+                                    "objectType": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "node": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "id": "string",
+                                                    "name": "string",
+                                                    "summaryMetricsSubset": {
+                                                        "type": "union",
+                                                        "members": ["none", "string"],
+                                                    },
+                                                    "project": {
+                                                        "type": "typedDict",
+                                                        "propertyTypes": {
+                                                            "id": "string",
+                                                            "name": "string",
+                                                            "entity": {
+                                                                "type": "typedDict",
+                                                                "propertyTypes": {
+                                                                    "id": "string",
+                                                                    "name": "string",
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            }
+                                        },
+                                    },
+                                }
+                            },
+                        },
+                    },
+                    "keyless_weave_type_class": "project",
+                },
+            },
+        },
+        "value": {
+            "type": "file",
+            "_base_type": {"type": "FileBase"},
+            "extension": "json",
+            "wbObjectType": {
+                "type": "table",
+                "_base_type": {"type": "Object"},
+                "_is_object": True,
+                "_rows": {
+                    "type": "ArrowWeaveList",
+                    "_base_type": {"type": "list"},
+                    "objectType": {"type": "typedDict", "propertyTypes": {}},
+                },
+            },
+        },
+    }
+
+    expected = types.TypeRegistry.type_from_dict(compiled_type_from_dict)
 
     assert compiled_node.type == expected

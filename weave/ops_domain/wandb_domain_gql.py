@@ -151,7 +151,7 @@ def gql_direct_edge_op(
         alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
         param_str = gql_with_keys._param_str(inputs, param_str_fn)
         return f"""
-            {alias}: {prop_name}{param_str} {{
+            {alias}: {prop_name}({param_str}) {{
                 {_get_required_fragment(output_type)}
                 {inner}
             }}
@@ -255,7 +255,7 @@ def gql_connection_op(
         alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
         param_str = gql_with_keys._param_str(inputs, param_str_fn)
         return f"""
-            {alias}: {prop_name}{param_str} {{
+            {alias}: {prop_name}({param_str}) {{
                 edges {{
                     node {{
                         {_get_required_fragment(output_type)}

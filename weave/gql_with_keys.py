@@ -64,7 +64,6 @@ def _param_str(inputs: InputProvider, param_str_fn: typing.Optional[ParamStrFn])
     param_str = ""
     if param_str_fn:
         param_str = param_str_fn(inputs)
-        param_str = f"({param_str})"
     return param_str
 
 

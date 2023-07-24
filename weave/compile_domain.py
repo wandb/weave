@@ -133,11 +133,12 @@ def apply_domain_op_gql_translation(
     # now propagate the gql payload type through the graph
     query_root_node.type = gql_to_weave.get_query_weave_type(query_str)
 
-    # have to restitch because the node map has changed
     p = stitch.stitch(res, on_error=on_error)
 
-    def _propagate_gql_keys(
-        opdef: "op_def.OpDef", node: graph.OutputNode, key_fn: GQLKeyPropFn
+    def _propagate_gql_keys_for_node(
+        opdef: "op_def.OpDef",
+        node: graph.OutputNode,
+        key_fn: GQLKeyPropFn,
     ) -> None:
         # Mutates node
         # TODO: see if this can be done without mutations
@@ -174,44 +175,51 @@ def apply_domain_op_gql_translation(
 
         node.type = new_output_type
 
-    def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
-        if not isinstance(node, graph.OutputNode):
-            return node
+    def _propagate_gql_keys_map_fn(node: graph.Node) -> graph.Node:
+        if (
+            isinstance(node, graph.OutputNode)
+            and not node.from_op.name == "gqlroot-wbgqlquery"
+        ):
+            fq_opname = node.from_op.full_name
+            opdef = registry_mem.memory_registry.get_op(fq_opname)
+            plugin = _get_gql_plugin(opdef)
 
-        if node.from_op.name == "gqlroot-wbgqlquery":
-            return node
+            if plugin is None or plugin.gql_key_prop_fn is None:
+                if node in replacement_node_to_original_opdef_map:
+                    original_opdef = replacement_node_to_original_opdef_map[node]
+                    original_plugin = _get_gql_plugin(original_opdef)
+                    assert (
+                        original_plugin is not None
+                        and original_plugin.gql_key_prop_fn is not None
+                    )
 
-        fq_opname = node.from_op.full_name
-        opdef = registry_mem.memory_registry.get_op(fq_opname)
-        plugin = _get_gql_plugin(opdef)
+                    key_fn = original_plugin.gql_key_prop_fn
 
-        if plugin is None or plugin.gql_key_prop_fn is None:
-            if node in replacement_node_to_original_opdef_map:
-                original_opdef = replacement_node_to_original_opdef_map[node]
-                original_plugin = _get_gql_plugin(original_opdef)
-                assert (
-                    original_plugin is not None
-                    and original_plugin.gql_key_prop_fn is not None
-                )
-
-                key_fn = original_plugin.gql_key_prop_fn
-
-                # mutates node
-                _propagate_gql_keys(opdef, node, key_fn)
+                    # mutates node
+                    _propagate_gql_keys_for_node(
+                        opdef,
+                        node,
+                        key_fn,
+                    )
+                else:
+                    new_output_type = opdef.unrefined_output_type_for_params(
+                        node.from_op.inputs
+                    )
+                    node.type = new_output_type
             else:
-                new_output_type = opdef.unrefined_output_type_for_params(
-                    node.from_op.inputs
+                # mutates node
+                _propagate_gql_keys_for_node(
+                    opdef,
+                    node,
+                    plugin.gql_key_prop_fn,
                 )
-                node.type = new_output_type
-        else:
-            # mutates node
-            _propagate_gql_keys(opdef, node, plugin.gql_key_prop_fn)
 
+        print(node, node.type)
         return node
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all
     # the downstream types to propagate the correct type to the rest of the graph.
-    return graph.map_nodes_full(res, _propagate_new_gql_keys, on_error)
+    return graph.map_nodes_full(res, _propagate_gql_keys_map_fn, on_error)
 
 
 ### Everything below are helpers for the above function ###
