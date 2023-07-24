@@ -27,6 +27,7 @@ Before you can contribute to Weave, you'll need to fork the repository and clone
 First, setup your python environment:
 
 ```
+pyenv install 3.9.7
 pyenv virtualenv 3.9.7 weave_dev
 pyenv local weave_dev
 pip install -e .
