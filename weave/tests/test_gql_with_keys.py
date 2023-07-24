@@ -29,7 +29,7 @@ def test_gql_compilation_with_keys():
         }
     )
 
-    assert compiled_node.type == TaggedValueType(
+    expected = TaggedValueType(
         types.TypedDict(
             {
                 "project": wdt.ProjectType.with_keys(
@@ -43,11 +43,15 @@ def test_gql_compilation_with_keys():
         ),
         types.List(
             TaggedValueType(
-                types.TypedDict({"run": wdt.RunType.with_keys(run_type_keys)}),
+                types.TypedDict(
+                    {"run": wdt.RunType.with_keys(run_type_keys.property_types)}
+                ),
                 types.String(),
             )
         ),
     )
+
+    assert compiled_node.type == expected
 
 
 def test_gql_compilation_root_op_custom_key_fn():
