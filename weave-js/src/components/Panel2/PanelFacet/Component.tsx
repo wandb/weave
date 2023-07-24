@@ -373,7 +373,8 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
           const groupKey = groupKeys[i];
 
           if (groupKey == null) {
-            return <div>-</div>;
+            // adding the key gets rid of the key warning
+            return <div key={'null-cell-' + i}>-</div>;
           }
 
           const xKey = groupKey[xColName];
