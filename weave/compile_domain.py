@@ -152,7 +152,12 @@ def apply_domain_op_gql_translation(
 
         input_types = node.from_op.input_types
 
-        ip = InputAndStitchProvider(node.from_op.inputs, p.get_result(node))
+        const_node_input_vals = {
+            key: value.val
+            for key, value in node.from_op.inputs.items()
+            if isinstance(value, graph.ConstNode)
+        }
+        ip = InputAndStitchProvider(const_node_input_vals, p.get_result(node))
         assert isinstance(opdef.input_type, op_args.OpNamedArgs)
 
         first_arg_name = next(iter(opdef.input_type.arg_types.keys()))
