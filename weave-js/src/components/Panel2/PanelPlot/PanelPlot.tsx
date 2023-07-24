@@ -614,29 +614,12 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                   />
                 </ConfigPanel.ConfigOption>
               }
-              {/* {Group by dom}
-              series.table.groupBy contains the columns that are currently grouped by
-              series.dims I think contains the map between ^^ columns and the names that we're familiar with
-              updateGroupBy is pretty straightforward to transfer over I believe
-              ok so onChange we receive ALL the values from the dropdown as a list 
-
-              for the options, I'm going to iterate over PLOT_DIMS_UI, create a dim object, extractWeaveExpressions
-              and for each one push it into . Ultimately I need an array of [{key: ..., text: ..., value: ...}] where
-              key and text are going to be dim names (keyof PLOT_DIMS_UI) and the value is going to be the corresponding
-              column name in the table. series.dims[dimName]
-              And then the value is going to series.table.groupBy
-              And then the onChange is going to be calling updateGroupBy.
-
-               */}
               <ConfigPanel.ConfigOption label="Group by">
                 <ConfigPanel.ModifiedDropdownConfigField
                   multiple
                   options={groupByDropdownOptions}
                   value={s.table.groupBy}
                   onChange={(event, {value}) => {
-                    // I have a list of values in value
-                    // and I have my current state which is s.table.groupBy
-                    //
                     const values = value as string[];
                     const valueToAdd = values.filter(
                       x => !s.table.groupBy.includes(x)
