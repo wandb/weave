@@ -525,8 +525,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     [config.series]
   );
 
-  console.log('config.series', config.series);
-
   const updateGroupBy = useCallback(
     (
       enabled: boolean,
@@ -557,7 +555,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     return (
       <>
         {config.series.map((s, i) => {
-          console.log(`Series ${i} - dims: ${Object.keys(s.dims)}`);
           const groupByDropdownOptions: DropdownItemProps[] = [];
           PLOT_DIMS_UI.map(dimName => {
             if (dimName != 'mark') {
@@ -604,8 +601,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                   )}
                   onChange={(event, {value}) => {
                     const values = value as string[];
-                    console.log('values', values);
-                    console.log('s.table.groupBy', s.table.groupBy);
                     const valueToAdd = values.filter(
                       x => !s.table.groupBy.includes(x)
                     );
@@ -622,9 +617,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                         o => o.value === valueToRemove[0]
                       )?.text as keyof SeriesConfig['dims'];
                     }
-                    console.log('valueToAdd', valueToAdd);
-                    console.log('valueToRemove', valueToRemove);
-                    console.log('dimName', dimName);
                     if (valueToAdd.length > 0) {
                       updateGroupBy(true, i, dimName, valueToAdd[0]);
                     }
