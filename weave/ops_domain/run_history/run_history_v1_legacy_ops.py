@@ -4,9 +4,7 @@ from ...compile_domain import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
-from ..wandb_domain_gql import (
-    _make_alias,
-)
+from ...gql_with_keys import _make_alias
 from .. import wb_util
 from ... import engine_trace
 

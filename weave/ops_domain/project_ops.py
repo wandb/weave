@@ -9,6 +9,7 @@ from .wandb_domain_gql import (
     gql_connection_op,
     gql_root_op,
 )
+from .. import gql_with_keys
 from .. import weave_types as types
 from .. import errors
 
@@ -62,6 +63,9 @@ def root_all_projects_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_projects_gql_resolver,
+        gql_key_prop_fn=gql_with_keys.make_root_op_gql_key_prop_fn(
+            "projects_500", lambda inputs: "", wdt.ProjectType
+        ),
     ),
 )
 def root_all_projects():

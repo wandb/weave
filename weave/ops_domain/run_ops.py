@@ -48,8 +48,10 @@ from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
-    _make_alias,
 )
+
+from ..gql_with_keys import _make_alias
+
 from . import wb_util
 from .. import engine_trace
 from .run_history import history_op_common

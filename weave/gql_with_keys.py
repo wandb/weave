@@ -1,9 +1,11 @@
 import json
 import typing
+import hashlib
 
 from dataclasses import dataclass
 from . import weave_types as types
 from . import artifact_fs
+
 
 from .decorator_type import type as weave_type
 from .input_provider import InputProvider
@@ -49,11 +51,72 @@ def gql_weave_type(
 
 
 GQLKeyPropFn = typing.Callable[[InputProvider, types.Type], types.Type]
+ParamStrFn = typing.Callable[[InputProvider], str]
 
-"""
-def make_root_op_gql_key_prop_fn() -> GQLKeyPropFn:
-    pass
-"""
+
+def _make_alias(*args: str, prefix: str = "alias") -> str:
+    inputs = "_".join([str(arg) for arg in args])
+    digest = hashlib.md5(inputs.encode()).hexdigest()
+    return f"{prefix}_{digest}"
+
+
+def _param_str(inputs: InputProvider, param_str_fn: typing.Optional[ParamStrFn]) -> str:
+    param_str = ""
+    if param_str_fn:
+        param_str = param_str_fn(inputs)
+        param_str = f"({param_str})"
+    return param_str
+
+
+def _alias(
+    inputs: InputProvider,
+    param_str_fn: typing.Optional[ParamStrFn],
+    prop_name: str,
+) -> str:
+    alias = ""
+    param_str = _param_str(inputs, param_str_fn)
+    if param_str_fn:
+        alias = f"{_make_alias(param_str, prefix=prop_name)}"
+    return alias
+
+
+def make_root_op_gql_key_prop_fn(
+    prop_name: str,
+    param_str_fn: ParamStrFn,
+    output_type: GQLHasWithKeysType,
+    use_alias: bool = False,
+) -> GQLKeyPropFn:
+    """Creates a GQLKeyPropFn for a root op that returns a list of objects with keys."""
+
+    def _root_op_gql_key_prop_fn(
+        inputs: InputProvider, input_type: types.Type
+    ) -> types.Type:
+        from .ops_domain import wb_domain_types as wdt
+
+        key = (
+            prop_name
+            if not use_alias
+            else _alias(
+                inputs,
+                param_str_fn,
+                prop_name,
+            )
+        )
+
+        key_type: types.Type = typing.cast(types.TypedDict, input_type)
+        keys = ["instance", key, "edges", "node"]
+        for key in keys:
+            if isinstance(key_type, types.List):
+                key_type = key_type.object_type
+            if isinstance(key_type, types.TypedDict):
+                key_type = key_type.property_types[key]
+
+        object_type = output_type.with_keys(
+            typing.cast(types.TypedDict, key_type).property_types
+        )
+        return types.List(object_type)
+
+    return _root_op_gql_key_prop_fn
 
 
 @dataclass

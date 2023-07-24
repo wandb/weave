@@ -1,6 +1,6 @@
 import typing
 from ..api import op
-from ..compile_domain import InputProvider, wb_gql_op_plugin, GQLKeyPropFn
+from ..compile_domain import InputProvider, wb_gql_op_plugin
 from .. import weave_types
 from inspect import signature, Parameter
 from . import wb_domain_types
@@ -10,6 +10,8 @@ from ..ops_arrow import ArrowWeaveListType
 from ..decorator_arrow_op import arrow_op
 from .. import op_def
 from .. import gql_with_keys
+
+from ..gql_with_keys import _make_alias
 
 """
 This file contains utilities for constructing GQL ops (used by all the ops in
@@ -33,12 +35,6 @@ logic - these are just wrappers since these cases are so common.
 
 Please see `project_ops.py` for examples of all the above cases.
 """
-
-
-def _make_alias(*args: str, prefix: str = "alias") -> str:
-    inputs = "_".join([str(arg) for arg in args])
-    digest = hashlib.md5(inputs.encode()).hexdigest()
-    return f"{prefix}_{digest}"
 
 
 def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef) -> None:
@@ -133,36 +129,13 @@ def gql_root_op(
     )
 
 
-ParamStrFn = typing.Callable[[InputProvider], str]
-
-
-def _param_str(inputs: InputProvider, param_str_fn: typing.Optional[ParamStrFn]) -> str:
-    param_str = ""
-    if param_str_fn:
-        param_str = param_str_fn(inputs)
-        param_str = f"({param_str})"
-    return param_str
-
-
-def _alias(
-    inputs: InputProvider,
-    param_str_fn: typing.Optional[ParamStrFn],
-    prop_name: str,
-) -> str:
-    alias = ""
-    param_str = _param_str(inputs, param_str_fn)
-    if param_str_fn:
-        alias = f"{_make_alias(param_str, prefix=prop_name)}"
-    return alias
-
-
 def gql_direct_edge_op(
     op_name: str,
     input_type: typing.Optional[weave_types.Type],
     prop_name: str,
     output_type: weave_types.Type,
     additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
-    param_str_fn: typing.Optional[ParamStrFn] = None,
+    param_str_fn: typing.Optional[gql_with_keys.ParamStrFn] = None,
     is_many: bool = False,
 ):
     is_root = input_type is None
@@ -175,8 +148,8 @@ def gql_direct_edge_op(
         )
 
     def query_fn(inputs, inner):
-        alias = _alias(inputs, param_str_fn, prop_name)
-        param_str = _param_str(inputs, param_str_fn)
+        alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
+        param_str = gql_with_keys._param_str(inputs, param_str_fn)
         return f"""
             {alias}: {prop_name}{param_str} {{
                 {_get_required_fragment(output_type)}
@@ -187,7 +160,7 @@ def gql_direct_edge_op(
     def key_fn(
         input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
-        alias = _alias(input_provider, param_str_fn, prop_name)
+        alias = gql_with_keys._alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
         if isinstance(self_type, gql_with_keys.GQLHasKeysType):
@@ -216,7 +189,7 @@ def gql_direct_edge_op(
             name = prop_name
             if param_str_fn:
                 param_str = param_str_fn(InputProvider(additional_inputs))
-                name = _make_alias(param_str, prefix=prop_name)
+                name = gql_with_keys._make_alias(param_str, prefix=prop_name)
             if is_many:
                 return [
                     output_type.instance_class.from_gql(item)
@@ -279,8 +252,8 @@ def gql_connection_op(
         )
 
     def query_fn(inputs, inner):
-        alias = _alias(inputs, param_str_fn, prop_name)
-        param_str = _param_str(inputs, param_str_fn)
+        alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
+        param_str = gql_with_keys._param_str(inputs, param_str_fn)
         return f"""
             {alias}: {prop_name}{param_str} {{
                 edges {{
@@ -295,7 +268,7 @@ def gql_connection_op(
     def key_fn(
         input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
-        alias = _alias(input_provider, param_str_fn, prop_name)
+        alias = gql_with_keys._alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
         if isinstance(self_type, gql_with_keys.GQLHasKeysType):
@@ -327,7 +300,7 @@ def gql_connection_op(
         name = prop_name
         if param_str_fn:
             param_str = param_str_fn(InputProvider(additional_inputs))
-            name = _make_alias(param_str, prefix=prop_name)
+            name = gql_with_keys._make_alias(param_str, prefix=prop_name)
         # If we have a None argument, return an empty list.
         if (
             gql_obj.gql is None

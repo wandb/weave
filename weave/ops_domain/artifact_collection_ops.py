@@ -34,23 +34,6 @@ def root_all_artifacts_gql_resolver(gql_result):
     ]
 
 
-def _all_artifacts_gql_key_prop_fn(
-    inputs: compile_domain.InputProvider, input_type: types.Type
-):
-    key_type: types.Type = typing.cast(types.TypedDict, input_type)
-    keys = ["instance", "artifacts_500", "edges", "node"]
-    for key in keys:
-        if isinstance(key_type, types.List):
-            key_type = key_type.object_type
-        if isinstance(key_type, types.TypedDict):
-            key_type = key_type.property_types[key]
-
-    object_type = wdt.ArtifactCollectionType.with_keys(
-        typing.cast(types.TypedDict, key_type).property_types
-    )
-    return types.List(object_type)
-
-
 @op(
     name="root-allArtifacts",
     input_type={},
@@ -70,7 +53,9 @@ def _all_artifacts_gql_key_prop_fn(
     """,
         is_root=True,
         root_resolver=root_all_artifacts_gql_resolver,
-        gql_key_prop_fn=_all_artifacts_gql_key_prop_fn,
+        gql_key_prop_fn=gql_with_keys.make_root_op_gql_key_prop_fn(
+            "artifacts_500", lambda inputs: "", wdt.ArtifactCollectionType
+        ),
     ),
 )
 def root_all_artifacts():
