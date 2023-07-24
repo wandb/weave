@@ -326,8 +326,12 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
   );
 
   const wrapperRef = React.useRef<HTMLDivElement>(null);
-  const columnWidth = wrapperRef.current ? (wrapperRef.current.clientWidth - 80) / (Object.keys(xPos).length): 40;
-  const rowHeight = wrapperRef.current ? (wrapperRef.current.clientHeight - 80) / (Object.keys(yPos).length): 40;
+  const columnWidth = wrapperRef.current
+    ? (wrapperRef.current.clientWidth - 80) / Object.keys(xPos).length
+    : 40;
+  const rowHeight = wrapperRef.current
+    ? (wrapperRef.current.clientHeight - 80) / Object.keys(yPos).length
+    : 40;
 
   // TODO: make this handle only visible nodes! we can make an infinite scroll
   // facet panel easily. E.g. same way as we do paging on the table.
@@ -344,18 +348,23 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
       <S.FacetGridWrapper
         // TODO: I'm just putting this in
         columnWidth={columnWidth}
-        rowHeight={rowHeight}
-        >
-        <S.xAxisLabel key={"x-axis-label-" + (dims.xAxisLabel || xColName)} columnCount={Object.keys(xPos).length + 3} gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
+        rowHeight={rowHeight}>
+        <S.xAxisLabel
+          key={'x-axis-label-' + (dims.xAxisLabel || xColName)}
+          columnCount={Object.keys(xPos).length + 3}
+          gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
           {dims.xAxisLabel || xColName}
         </S.xAxisLabel>
-        <S.yAxisLabel key={"y-axis-label-" + (dims.yAxisLabel || yColName)} rowCount={Object.keys(yPos).length + 3} gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
+        <S.yAxisLabel
+          key={'y-axis-label-' + (dims.yAxisLabel || yColName)}
+          rowCount={Object.keys(yPos).length + 3}
+          gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
           {dims.yAxisLabel || yColName}
         </S.yAxisLabel>
         {Object.keys(xPos).map(xKey => (
           <S.FacetHeaderCell
             key={'col-' + xKey}
-            style={{height:'24px'}}
+            style={{height: '24px'}}
             gridColumnStart={xPos[xKey] + 3}
             gridRowStart={2}>
             {xKey}
@@ -366,7 +375,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
             key={'row-' + yKey}
             gridColumnStart={2}
             gridRowStart={yPos[yKey] + 3}>
-             {yKey}
+            {yKey}
           </S.FacetHeaderCell>
         ))}
         {cellNodes.map((cellNode, i) => {
@@ -425,7 +434,9 @@ const PanelFacet: React.FC<PanelFacetProps> = props => {
   const config = useConfig(props.config);
   const {table, dims} = config;
 
-  if (dims.xAxisLabel == null) {return <div>x must be configured</div>};
+  if (dims.xAxisLabel == null) {
+    return <div>x must be configured</div>;
+  }
   const xEnabled = table.columnSelectFunctions[dims.x].type !== 'invalid';
 
   // TODO: Combine into a childPanelIsRenderable function
