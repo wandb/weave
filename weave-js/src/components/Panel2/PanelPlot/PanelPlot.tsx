@@ -62,7 +62,7 @@ import {
   opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
-import _, {groupBy} from 'lodash';
+import _ from 'lodash';
 import React, {
   FC,
   memo,

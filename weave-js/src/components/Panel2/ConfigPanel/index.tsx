@@ -286,12 +286,12 @@ const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
   &&& {
     width: 100%;
     display: inline-flex;
-    justify-content: space-between;
     align-items: center;
     line-height: 20px;
 
     input {
       height: 100%;
+      width: 100% !important;
     }
 
     &.active svg {
