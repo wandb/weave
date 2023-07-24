@@ -299,6 +299,7 @@ type ArtifactTypeEdge {
 type ArtifactType {
   id: ID!
   name: String!
+  project: Project!
   artifactCollections(first: Int): ArtifactCollectionConnection
 }
 
