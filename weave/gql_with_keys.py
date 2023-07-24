@@ -137,9 +137,11 @@ class GQLHasKeysType(types.Type):
     def __init__(
         self,
         keyless_weave_type_class: typing.Type[types.Type],
-        keys: dict[str, types.Type],
+        keys: typing.Union[dict[str, types.Type], types.TypedDict],
     ):
         self.keyless_weave_type_class = keyless_weave_type_class
+        if isinstance(keys, types.TypedDict):
+            keys = keys.property_types
         self.keys = keys
 
     def _assign_type_inner(self, other_type: types.Type) -> bool:

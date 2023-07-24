@@ -148,10 +148,15 @@ def gql_direct_edge_op(
         )
 
     def query_fn(inputs, inner):
-        alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
-        param_str = gql_with_keys._param_str(inputs, param_str_fn)
+        alias = ""
+        param_str = ""
+        if param_str_fn is not None:
+            param_str = gql_with_keys._param_str(inputs, param_str_fn)
+            alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
+            param_str = f"({param_str})"
+            alias = f"{alias}:"
         return f"""
-            {alias}: {prop_name}({param_str}) {{
+            {alias} {prop_name}{param_str} {{
                 {_get_required_fragment(output_type)}
                 {inner}
             }}
@@ -252,10 +257,16 @@ def gql_connection_op(
         )
 
     def query_fn(inputs, inner):
-        alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
-        param_str = gql_with_keys._param_str(inputs, param_str_fn)
+        alias = ""
+        param_str = ""
+        if param_str_fn:
+            alias = gql_with_keys._alias(inputs, param_str_fn, prop_name)
+            param_str = gql_with_keys._param_str(inputs, param_str_fn)
+            param_str = f"({param_str})"
+            alias = alias + ":"
+
         return f"""
-            {alias}: {prop_name}({param_str}) {{
+            {alias} {prop_name}{param_str} {{
                 edges {{
                     node {{
                         {_get_required_fragment(output_type)}

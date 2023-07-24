@@ -263,7 +263,7 @@ def test_op_with_refiner(fake_wandb):
 
     # it was hard to manually construct the type here in python, so i dumped it to
     # a dict in the debugger and re-created the type from that below :).
-    compiled_type_from_dict = {
+    expected_compiled_type_dict = {
         "type": "tagged",
         "tag": {
             "type": "typedDict",
@@ -414,6 +414,94 @@ def test_op_with_refiner(fake_wandb):
         },
     }
 
-    expected = types.TypeRegistry.type_from_dict(compiled_type_from_dict)
+    expected = types.TypeRegistry.type_from_dict(expected_compiled_type_dict)
+
+    assert compiled_node.type == expected
+
+
+def test_gql_connection_op():
+    node = ops.project("stacey", "mendeleev").artifactTypes()[0].artifactVersions()
+    compiled_node = compile.compile([node])[0]
+
+    expected_compiled_type_dict = {
+        "type": "tagged",
+        "tag": {
+            "type": "typedDict",
+            "propertyTypes": {
+                "project": {
+                    "type": "GQLHasKeys",
+                    "keys": {
+                        "id": "string",
+                        "name": "string",
+                        "artifactTypes": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "edges": {
+                                    "type": "list",
+                                    "objectType": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "node": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "id": "string",
+                                                    "name": "string",
+                                                    "artifactCollections_c1233b7003317090ab5e2a75db4ad965": {
+                                                        "type": "typedDict",
+                                                        "propertyTypes": {
+                                                            "edges": {
+                                                                "type": "list",
+                                                                "objectType": {
+                                                                    "type": "typedDict",
+                                                                    "propertyTypes": {
+                                                                        "node": {
+                                                                            "type": "typedDict",
+                                                                            "propertyTypes": {
+                                                                                "artifacts_c1233b7003317090ab5e2a75db4ad965": {
+                                                                                    "type": "typedDict",
+                                                                                    "propertyTypes": {
+                                                                                        "edges": {
+                                                                                            "type": "list",
+                                                                                            "objectType": {
+                                                                                                "type": "typedDict",
+                                                                                                "propertyTypes": {
+                                                                                                    "node": {
+                                                                                                        "type": "typedDict",
+                                                                                                        "propertyTypes": {
+                                                                                                            "id": "string"
+                                                                                                        },
+                                                                                                    }
+                                                                                                },
+                                                                                            },
+                                                                                        }
+                                                                                    },
+                                                                                }
+                                                                            },
+                                                                        }
+                                                                    },
+                                                                },
+                                                            }
+                                                        },
+                                                    },
+                                                },
+                                            }
+                                        },
+                                    },
+                                }
+                            },
+                        },
+                    },
+                    "keyless_weave_type_class": "project",
+                }
+            },
+        },
+        "value": {
+            "type": "GQLHasKeys",
+            "keys": {"id": "string"},
+            "keyless_weave_type_class": "artifactVersion",
+        },
+    }
+
+    expected = types.TypeRegistry.type_from_dict(expected_compiled_type_dict)
 
     assert compiled_node.type == expected

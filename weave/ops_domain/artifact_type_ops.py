@@ -1,3 +1,5 @@
+import typing
+
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
@@ -11,11 +13,14 @@ from .wandb_domain_gql import (
     gql_root_op,
 )
 
+from .. import input_provider
+
 # Section 1/6: Tag Getters
 # None
 
 # Section 2/6: Root Ops
 # None
+
 
 # Section 3/6: Attribute Getters
 # op_artifact_type_name is written in the plain style
@@ -61,7 +66,14 @@ first_100_artifacts_alias = _make_alias("first: 100", prefix="artifacts")
                 }}
             }}
         }}
-    }}"""
+    }}""",
+        gql_key_prop_fn=lambda inputs, input_type: wdt.ArtifactVersionType.with_keys(
+            typing.cast(typing.Any, input_type)
+            .keys[first_100_collections_alias]["edges"]
+            .object_type["node"][first_100_artifacts_alias]["edges"]
+            .object_type["node"]
+            .property_types
+        ),
     ),
 )
 def artifact_versions(
