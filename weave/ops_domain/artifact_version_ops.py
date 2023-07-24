@@ -12,11 +12,14 @@ from .wandb_domain_gql import (
     gql_connection_op,
 )
 
+from .. import gql_with_keys
+
 import typing
 from . import wb_util
 from urllib.parse import quote
 from .. import artifact_fs
 from .. import artifact_wandb
+from .. import input_provider
 
 
 static_art_file_gql = """
@@ -105,6 +108,24 @@ def _root_artifact_version_plugin(inputs, inner):
     """
 
 
+def _gql_key_propagation_fn_for_root_artifact_version(
+    inputs: input_provider.InputProvider, input_type: types.Type
+) -> types.Type:
+
+    project_alias = _make_alias(
+        inputs.raw["entityName"], inputs.raw["projectName"], prefix="project"
+    )
+    artifact_type_alias = _make_alias(
+        inputs.raw["artifactTypeName"], prefix="artifactType"
+    )
+    artifact_alias = _make_alias(inputs.raw["artifactVersionName"], prefix="artifact")
+    return types.optional(
+        typing.cast(typing.Any, input_type)[project_alias][artifact_type_alias][
+            artifact_alias
+        ]
+    )
+
+
 @op(
     name="root-artifactVersion",
     input_type={
@@ -118,6 +139,7 @@ def _root_artifact_version_plugin(inputs, inner):
         _root_artifact_version_plugin,
         is_root=True,
         root_resolver=root_artifact_version_gql_resolver,
+        gql_key_propagation_fn=_gql_key_propagation_fn_for_root_artifact_version,
     ),
 )
 def root_artifact_version(

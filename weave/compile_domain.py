@@ -46,10 +46,12 @@ def wb_gql_op_plugin(
     query_fn: typing.Callable[[InputAndStitchProvider, str], str],
     is_root: bool = False,
     root_resolver: typing.Optional["op_def.OpDef"] = None,
-    gql_key_prop_fn: typing.Optional[GQLKeyPropFn] = None,
+    gql_key_propagation_fn: typing.Optional[GQLKeyPropFn] = None,
 ) -> dict[str, GqlOpPlugin]:
     return {
-        "wb_domain_gql": GqlOpPlugin(query_fn, is_root, root_resolver, gql_key_prop_fn)
+        "wb_domain_gql": GqlOpPlugin(
+            query_fn, is_root, root_resolver, gql_key_propagation_fn
+        )
     }
 
 
