@@ -164,6 +164,14 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
                 }}
             }}
         """,
+        gql_key_prop_fn=lambda inputs, input_type: types.optional(
+            wdt.ArtifactCollectionMembershipType.with_keys(
+                typing.cast(typing.Any, input_type)
+                .keys["artifactMemberships_first_1"]["edges"]
+                .object_type["node"]
+                .property_types
+            )
+        ),
     ),
 )
 def last_membership(

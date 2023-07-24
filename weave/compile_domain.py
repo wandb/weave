@@ -157,7 +157,7 @@ def apply_domain_op_gql_translation(
         # unwrap and rewrap tags
         original_input_type = input_types[first_arg_name]
 
-        unwrapped_input_type, _ = tagged_value_type_helpers.unwrap_tags(
+        unwrapped_input_type, wrap = tagged_value_type_helpers.unwrap_tags(
             original_input_type
         )
 
@@ -169,6 +169,9 @@ def apply_domain_op_gql_translation(
             new_output_type = tagged_value_type.TaggedValueType(
                 types.TypedDict({first_arg_name: original_input_type}), new_output_type
             )
+        elif opdef_util.should_flow_tags(opdef):
+            new_output_type = wrap(new_output_type)
+
         node.type = new_output_type
 
     def _propagate_new_gql_keys(node: graph.Node) -> graph.Node:
