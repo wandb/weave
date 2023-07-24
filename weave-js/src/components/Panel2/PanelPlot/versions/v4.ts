@@ -1,4 +1,3 @@
-import * as v2 from './v2';
 import * as v3 from './v3';
 
 export const LINE_SHAPE_OPTIONS = [
@@ -7,11 +6,6 @@ export const LINE_SHAPE_OPTIONS = [
   'dotted' as const,
   'dot-dashed' as const,
 ];
-
-export const DIM_NAME_MAP = {
-  ...v2.DIM_NAME_MAP,
-  lineShape: 'Style',
-};
 
 export type LineShapeOption = (typeof LINE_SHAPE_OPTIONS)[number];
 
