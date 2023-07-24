@@ -288,6 +288,7 @@ const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
     display: inline-flex;
     align-items: center;
     line-height: 20px;
+    padding: 0;
 
     input {
       height: 100%;
