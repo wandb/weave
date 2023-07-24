@@ -8,6 +8,7 @@ import {Node} from '@wandb/weave/core';
 import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
 import {PreviewNode} from './PreviewNode';
 import {useWeaveContext} from '@wandb/weave/context';
+import {IconCategoryMultimodal} from '../../Icon';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -23,6 +24,18 @@ const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
   border-radius: 4px;
   &:hover {
     background-color: #a9edf252;
+    color: #038194;
+  }
+`;
+
+const DashboardTemplateItem = styled(LayoutElements.HStack)`
+  padding: 8px 12px;
+  border: 1px solid #dadee3;
+  border-radius: 4px;
+  cursor: pointer;
+  &:hover {
+    border: 1px solid #a9edf2;
+    background-color: #a9edf212;
     color: #038194;
   }
 `;
@@ -138,7 +151,6 @@ export const HomeExpressionPreviewParts: React.FC<{
       <LayoutElements.VBlock style={{gap: '8px'}}>
         <span style={{color: '#2B3038', fontWeight: 600}}>Expression</span>
         <LayoutElements.Block>
-          {/* <Unclickable style={{}}> */}
           <WeaveExpression
             expr={expr}
             onMount={() => {}}
@@ -149,7 +161,76 @@ export const HomeExpressionPreviewParts: React.FC<{
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
+      <LayoutElements.VBlock style={{gap: '8px'}}>
+        <span style={{color: '#2B3038', fontWeight: 600}}>
+          Dashboard Templates
+        </span>
+        <LayoutElements.VStack
+          style={{
+            gap: '8px',
+          }}>
+          <DashboardTemplate
+            title={`Confusion Matrix`}
+            subtitle={`Classification`}
+            onClick={() => {}}
+          />
+          <DashboardTemplate
+            title={'OpenAI Request Log'}
+            subtitle={`Monitoring`}
+            onClick={() => {}}
+          />
+          <DashboardTemplate
+            title={`Trace Analysis`}
+            subtitle={`LLMs and Prompts`}
+            onClick={() => {}}
+          />
+        </LayoutElements.VStack>
+      </LayoutElements.VBlock>
     </LayoutElements.VStack>
+  );
+};
+
+const DashboardTemplate: React.FC<{
+  title: string;
+  onClick: () => void;
+  subtitle?: string;
+}> = props => {
+  return (
+    <DashboardTemplateItem onClick={props.onClick}>
+      <LayoutElements.VStack
+        style={{
+          overflow: 'hidden',
+        }}>
+        <LayoutElements.Block
+          style={{
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+          {props.title}
+        </LayoutElements.Block>
+        <LayoutElements.Block
+          style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+          {props.subtitle}
+        </LayoutElements.Block>
+      </LayoutElements.VStack>
+      <LayoutElements.VBlock
+        style={{
+          justifyContent: 'space-evenly',
+        }}>
+        <IconCategoryMultimodal
+          style={{
+            height: '60%',
+            width: '100%',
+          }}
+        />
+      </LayoutElements.VBlock>
+    </DashboardTemplateItem>
   );
 };
 
