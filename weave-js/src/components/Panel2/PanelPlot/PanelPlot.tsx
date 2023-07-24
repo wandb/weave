@@ -62,7 +62,7 @@ import {
   opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
-import _ from 'lodash';
+import _, {groupBy} from 'lodash';
 import React, {
   FC,
   memo,
@@ -539,6 +539,8 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     [config.series]
   );
 
+  console.log('config.series', config.series);
+
   const updateGroupBy = useCallback(
     (
       enabled: boolean,
@@ -584,13 +586,13 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
               }
             });
           });
-          console.log(
-            `Series ${i} - dims in dropdown: ${JSON.stringify(
-              groupByDropdownOptions,
-              null,
-              2
-            )}`
-          );
+          // console.log(
+          //   `Series ${i} - dims in dropdown: ${JSON.stringify(
+          //     groupByDropdownOptions,
+          //     null,
+          //     2
+          //   )}`
+          // );
           return (
             <ConfigSection
               label={`Series ${i + 1}`}
@@ -614,13 +616,21 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                   />
                 </ConfigPanel.ConfigOption>
               }
-              <ConfigPanel.ConfigOption label="Group by">
+              <ConfigPanel.ConfigOption multiline={true} label="Group by">
                 <ConfigPanel.ModifiedDropdownConfigField
                   multiple
                   options={groupByDropdownOptions}
-                  value={s.table.groupBy}
+                  value={s.table.groupBy.filter(value =>
+                    // In updateGroupBy above, if the dim is label, color also gets added
+                    // as another dimension to group by. It's confusing to the user
+                    // so we hide the automatic color grouping in the UI
+                    // TODO: need to discuss with shawn on grouping logic
+                    groupByDropdownOptions.some(o => o.value === value)
+                  )}
                   onChange={(event, {value}) => {
                     const values = value as string[];
+                    console.log('values', values);
+                    console.log('s.table.groupBy', s.table.groupBy);
                     const valueToAdd = values.filter(
                       x => !s.table.groupBy.includes(x)
                     );
@@ -637,6 +647,9 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                         o => o.value === valueToRemove[0]
                       )?.text as keyof SeriesConfig['dims'];
                     }
+                    console.log('valueToAdd', valueToAdd);
+                    console.log('valueToRemove', valueToRemove);
+                    console.log('dimName', dimName);
                     if (valueToAdd.length > 0) {
                       updateGroupBy(true, i, dimName, valueToAdd[0]);
                     }
