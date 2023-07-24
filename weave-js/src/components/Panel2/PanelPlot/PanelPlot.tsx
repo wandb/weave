@@ -76,7 +76,7 @@ import React, {
 } from 'react';
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
-import {Button, Checkbox, MenuItemProps, Tab} from 'semantic-ui-react';
+import {Button, MenuItemProps, Tab} from 'semantic-ui-react';
 import {calculatePosition} from 'vega-tooltip';
 
 import {useWeaveContext, useWeaveDashUiEnable} from '../../../context';
@@ -516,7 +516,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         },
       ];
     },
-    [config.series]
+    [config, updateConfig]
   );
 
   const newSeriesConfigDom = useMemo(() => {
@@ -573,7 +573,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         })}
       </>
     );
-  }, [config, weave, input, updateConfig]);
+  }, [seriesMenuItems, config, weave, input, updateConfig]);
 
   const seriesConfigDom = useMemo(() => {
     const firstSeries = config.series[0];
@@ -669,9 +669,9 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
 
   const [showAdvancedProperties, setShowAdvancedProperties] =
     useState<boolean>(false);
-  const toggleAdvancedProperties = () => {
-    setShowAdvancedProperties(!showAdvancedProperties);
-  };
+  const toggleAdvancedProperties = useCallback(() => {
+    setShowAdvancedProperties(prev => !prev);
+  }, []);
   const advancedPropertiesDom = useMemo(() => {
     return (
       <>
@@ -689,7 +689,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         )}
       </>
     );
-  }, [showAdvancedProperties, scaleConfigDom]);
+  }, [showAdvancedProperties, toggleAdvancedProperties, scaleConfigDom]);
 
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const configTabs = useMemo(() => {
@@ -812,7 +812,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         </S.AddNewSeriesContainer>
       </>
     );
-  }, [config, config.series, updateConfig, weave]);
+  }, [config, updateConfig, weave]);
 
   return useMemo(
     () =>
@@ -839,14 +839,15 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       enableDashUi,
       dashboardConfigOptions,
       cellFrame,
-      seriesConfigDom,
       labelConfigDom,
       configTabs,
       activeTabIndex,
       seriesButtons,
-      showAdvancedProperties,
       xScaleConfigEnabled,
       yScaleConfigEnabled,
+      addNewSeriesDom,
+      advancedPropertiesDom,
+      newSeriesConfigDom,
     ]
   );
 };
@@ -1132,9 +1133,10 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             removeSeriesDropdownOption,
             addSeriesDropdownOption,
             collapseDimDropdownOption,
+            enableDashUi,
           ];
     },
-    [config, updateConfig, weave]
+    [config, updateConfig, weave, enableDashUi]
   );
 
   const makeSharedDimDropdownOptions = useCallback(
@@ -1155,7 +1157,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
 
       return enableDashUi ? [] : [expandDim];
     },
-    [config, updateConfig]
+    [config, updateConfig, enableDashUi]
   );
 
   const uiStateOptions = useMemo(() => {
@@ -1419,27 +1421,19 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           return <IconWeave />;
       }
     }
-  }, [dimOptions, enableDashUi]);
-
-  const updateGroupBy = useCallback(
-    (enabled: boolean) => {
-      const fn = enabled
-        ? TableState.enableGroupByCol
-        : TableState.disableGroupByCol;
-      let newTable = fn(
-        config.series[0].table,
-        config.series[0].dims[dimension.name as keyof SeriesConfig['dims']]
-      );
-      if (dimension.name === 'label') {
-        newTable = fn(newTable, config.series[0].dims.color);
-      }
-      const newConfig = produce(config, draft => {
-        draft.series[0].table = newTable;
-      });
-      updateConfig(newConfig);
-    },
-    [config, dimension.name, updateConfig]
-  );
+  }, [
+    dimOptions,
+    enableDashUi,
+    config,
+    dimension.name,
+    dimension.series,
+    extraOptions,
+    indentation,
+    isShared,
+    uiStateOptions,
+    updateConfig,
+    weave,
+  ]);
 
   if (PlotState.isDropdownWithExpression(dimension)) {
     return (
@@ -1515,16 +1509,6 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             series={isShared ? config.series : [dimension.series]}
           />
         </ConfigDimLabel>
-        {/* {enableDashUi && (
-          <ConfigPanel.ConfigOption label={`Group by ${dimension.name}`}>
-            <Checkbox
-              checked={config.series[0].table.groupBy.includes(
-                config.series[0].dims[dimension.name]
-              )}
-              onChange={(e, {checked}) => updateGroupBy(checked ?? false)}
-            />
-          </ConfigPanel.ConfigOption>
-        )} */}
       </>
     );
   }
