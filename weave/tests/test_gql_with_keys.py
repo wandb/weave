@@ -40,7 +40,7 @@ def test_gql_compilation_with_keys():
                     {
                         "id": types.String(),
                         "name": types.String(),
-                        "runs_2057dcd339ea3515a695d28f63f4e288": run_edges_type,
+                        "runs_c1233b7003317090ab5e2a75db4ad965": run_edges_type,
                     }
                 )
             }
@@ -67,7 +67,7 @@ def test_gql_compilation_root_op_custom_key_fn():
         {
             "id": types.String(),
             "name": types.String(),
-            "runs_2057dcd339ea3515a695d28f63f4e288": types.TypedDict(
+            "runs_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
                 {
                     "edges": types.List(
                         types.TypedDict({"node": types.TypedDict(run_type.keys)})
