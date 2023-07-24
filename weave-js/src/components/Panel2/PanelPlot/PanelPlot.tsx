@@ -551,7 +551,8 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         {config.series.map((s, i) => {
           const groupByDropdownOptions: DropdownItemProps[] = [];
           PLOT_DIMS_UI.map(dimName => {
-            if (dimName != 'mark') {
+            // TODO: 'mark' isn't present in series dims
+            if (dimName !== 'mark') {
               groupByDropdownOptions.push({
                 key: dimName,
                 text: dimName,
@@ -647,7 +648,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         })}
       </>
     );
-  }, [seriesMenuItems, config, weave, input, updateConfig]);
+  }, [seriesMenuItems, config, weave, input, updateConfig, updateGroupBy]);
 
   const seriesConfigDom = useMemo(() => {
     const firstSeries = config.series[0];
