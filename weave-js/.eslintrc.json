@@ -11,6 +11,7 @@
     "wandb/no-a-tags": "error",
     "wandb/no-unprefixed-urls": "error",
     "wandb/no-relative-imports-of-files-outside-workspace-root": "error",
+    "react-hooks/exhaustive-deps": "error",  
     "no-restricted-imports": [
       "error",
       {
