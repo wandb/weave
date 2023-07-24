@@ -4,7 +4,6 @@ import * as v5 from './v5';
 
 export const POINT_SHAPES = [...v2.POINT_SHAPES, 'series' as const];
 export const LINE_SHAPE_OPTIONS = [...v4.LINE_SHAPE_OPTIONS, 'series' as const];
-export const DIM_NAME_MAP = {...v5.DIM_NAME_MAP, label: 'Color'};
 
 export type SeriesConfig = Omit<v5.SeriesConfig, 'uiState' | 'constants'> & {
   uiState: v5.SeriesConfig['uiState'] & {

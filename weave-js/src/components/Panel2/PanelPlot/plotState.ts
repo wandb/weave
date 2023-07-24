@@ -42,7 +42,6 @@ import {
   ContinuousSelection,
   DEFAULT_LAZY_PATH_VALUES,
   DEFAULT_POINT_SIZE,
-  DIM_NAME_MAP,
   DiscreteSelection,
   LAZY_PATHS,
   LINE_SHAPES,
@@ -55,6 +54,36 @@ import {
   SeriesConfig,
 } from './versions';
 import * as v1 from './versions/v1';
+
+export const DASHBOARD_DIM_NAME_MAP: {
+  [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
+} = {
+  pointSize: 'Size',
+  pointShape: 'Shape',
+  x: 'X',
+  y: 'Y',
+  label: 'Color',
+  color: 'Color',
+  mark: 'Mark',
+  tooltip: 'Tooltip',
+  y2: 'Y2',
+  lineStyle: 'Style',
+};
+
+export const DIM_NAME_MAP: {
+  [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
+} = {
+  pointSize: 'Size',
+  pointShape: 'Shape',
+  x: 'X Dim',
+  y: 'Y Dim',
+  label: 'Color',
+  color: 'Color',
+  mark: 'Mark',
+  tooltip: 'Tooltip',
+  y2: 'Y2 Dim',
+  lineStyle: 'Style',
+};
 
 export type DimType =
   | 'optionSelect'
@@ -613,6 +642,21 @@ export const dimConstructors: Record<
   mark: (series: SeriesConfig, weave: WeaveInterface) =>
     new MarkDimensionGroup(series, weave),
 };
+
+export function setDefaultSeriesNames(
+  config: PlotConfig,
+  enableDashUi: boolean
+): PlotConfig {
+  return produce(config, draft => {
+    if (enableDashUi) {
+      draft.series.forEach((s, i) => {
+        if (s.seriesName == null) {
+          s.seriesName = `Series ${i + 1}`;
+        }
+      });
+    }
+  });
+}
 
 export function addSeriesFromSeries(
   config: PlotConfig,
@@ -1271,7 +1315,7 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
   const v1config = defaultPlotCommon(inputNode, stack);
   const migrated = migrate(v1config);
   return produce(migrated, draft => {
-    draft.series.forEach(s => {
+    draft.series.forEach((s, i) => {
       s.uiState.pointShape = 'dropdown';
     });
   });
