@@ -6,7 +6,7 @@ from inspect import signature, Parameter
 from . import wb_domain_types
 import hashlib
 from .. import errors
-from ..ops_arrow import ArrowWeaveListType
+from ..ops_arrow import ArrowWeaveListType, ArrowWeaveList
 from ..decorator_arrow_op import arrow_op
 from .. import op_def
 from .. import gql_with_keys
@@ -37,13 +37,14 @@ Please see `project_ops.py` for examples of all the above cases.
 """
 
 
-def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef) -> None:
+def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef, prop_name: str) -> None:
     op_args = scalar_op.input_type
 
     first_arg_name: str
     scalar_input_type: weave_types.Type
     scalar_op_name = scalar_op.name
-    first_arg_name, scalar_input_type = next(iter(op_args.to_dict().items()))
+    first_arg_name = next(iter(op_args.to_dict()))
+    scalar_input_type = op_args.initial_arg_types[first_arg_name]
 
     # we can make this assumption because the GQL prop ops do not have output types dependent
     # on input types
@@ -54,7 +55,13 @@ def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef) -> None:
     arrow_output_type = ArrowWeaveListType(scalar_output_type)
 
     def vectorized_gql_property_getter_op_fn(**inputs):
-        pass
+        self = typing.cast(ArrowWeaveList, inputs[first_arg_name])
+        object_type = typing.cast(gql_with_keys.GQLHasKeysType, self.object_type)
+        return ArrowWeaveList(
+            self._arrow_data.dictionary.field(prop_name).take(self._arrow_data.indices),
+            object_type.keys[prop_name],
+            self._artifact,
+        )
 
     vectorized_gql_property_getter_op_fn.__signature__ = (  # type: ignore
         scalar_op.raw_resolve_fn.__signature__  # type: ignore
@@ -99,7 +106,7 @@ def gql_prop_op(
     )(gql_property_getter_op_fn)
 
     # side effect: register an arrow-vectorized version of the op
-    # register_vectorized_gql_prop_op(scalar_op)
+    register_vectorized_gql_prop_op(scalar_op, prop_name)
     return scalar_op
 
 
