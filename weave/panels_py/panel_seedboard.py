@@ -12,6 +12,7 @@ class PyBoardSeedBoardConfig:
 
 @weave.op(  # type: ignore
     name="py_board-seed_board",
+    hidden=True,
 )
 def seed_board(
     input_node: weave.Node[list[dict]],

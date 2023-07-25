@@ -14,6 +14,7 @@ import {
   useMakeLocalBoardFromNode,
 } from '../../Panel2/pyBoardGen';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
+import {useNodeWithServerType} from '@wandb/weave/react';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -146,7 +147,9 @@ export const HomeExpressionPreviewParts: React.FC<{
 }> = ({expr, navigateToExpression}) => {
   const weave = useWeaveContext();
   const inputExpr = weave.expToString(expr);
-  const templates = useBoardGeneratorsForNode(expr);
+  const refinedExpression = useNodeWithServerType(expr);
+  const generators = useBoardGeneratorsForNode(expr);
+  const [isGenerating, setIsGenerating] = React.useState(false);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
@@ -169,7 +172,7 @@ export const HomeExpressionPreviewParts: React.FC<{
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
-      {templates.loading ? (
+      {generators.loading || refinedExpression.loading || isGenerating ? (
         <LayoutElements.VStack
           style={{
             alignItems: 'center',
@@ -180,24 +183,30 @@ export const HomeExpressionPreviewParts: React.FC<{
           <WeaveAnimatedLoader style={{height: '64px', width: '64px'}} />
         </LayoutElements.VStack>
       ) : (
-        templates.result.length > 0 && (
+        generators.result.length > 0 && (
           <LayoutElements.VBlock style={{gap: '8px'}}>
             <span style={{color: '#2B3038', fontWeight: 600}}>
-              Dashboard Templates
+              Dashboard generators
             </span>
             <LayoutElements.VStack
               style={{
                 gap: '8px',
               }}>
-              {templates.result.map(template => (
+              {generators.result.map(template => (
                 <DashboardTemplate
                   key={template.op_name}
                   title={template.display_name}
                   subtitle={template.description}
                   onClick={() => {
-                    makeBoardFromNode(template.op_name, expr, newDashExpr => {
-                      navigateToExpression(newDashExpr);
-                    });
+                    setIsGenerating(true);
+                    makeBoardFromNode(
+                      template.op_name,
+                      refinedExpression.result as any,
+                      newDashExpr => {
+                        navigateToExpression(newDashExpr);
+                        setIsGenerating(false);
+                      }
+                    );
                   }}
                 />
               ))}

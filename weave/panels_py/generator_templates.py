@@ -3,9 +3,18 @@ Contains the TemplateRegistry class, which is used to register
 templates for the PyBoard generator. I think we might want to make
 this even more generic and all any panel to be a generator, but for 
 now this is a simple abstraction that will work for basic use cases.
+
+# TODO: Generalize this to work with panels like /weave/ecosystem/wandb/panel_time_series.py
+# Proper panels have the following advantageous patterns:
+1. They can create default configs from inputs
+2. They can declare their own config editor rendering function
+3. Their render function is pre-defined
+4. If we make it work with the panel pattern, presumably it will be more general
+   and lend itself to ui-driven generation of panels.
+
+However, this current implementation is simple and easy to refactor.
 """
 
-# TODO: Generalize this to work with panels like /Users/timothysweeney/Workspace/github/wandb/core/services/weave-python/weave-public/weave/ecosystem/wandb/panel_time_series.py
 
 import dataclasses
 import typing

@@ -354,6 +354,7 @@ class AutoBoard(weave.Panel):
 
 @weave.op(  # type: ignore
     name="py_board-seed_autoboard",
+    hidden=True,
 )
 def seed_autoboard(
     input_node: weave.Node[typing.Any],
