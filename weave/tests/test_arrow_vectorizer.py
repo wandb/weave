@@ -15,10 +15,6 @@ from .. import ops_arrow as arrow
 from ..ops_arrow import arraylist_ops
 from ..ops_arrow import convert_ops
 
-from ..ops_domain import wb_domain_types as wdt
-
-from ..ops_domain import run_ops
-
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),
@@ -1289,18 +1285,3 @@ def test_list_numbers_equal_notequal():
     assert weave.use(l4 == l5).to_pylist_notags() == [False, True, True]
     assert weave.use(l6 == l2).to_pylist_notags() == [True, False, True]
     assert weave.use(l6 == l7).to_pylist_notags() == [False, True, True]
-
-
-def test_vectorized_prop_op_gql_pick():
-    runs = [wdt.Run({"id": "A"}), wdt.Run({"id": "B"}), wdt.Run({"id": "C"})]
-    for run in runs:
-        tag_store.add_tags(run, {"mytag": "test" + run.gql["id"]})
-    awl = arrow.to_arrow(runs)
-    l = weave.save(awl)
-
-    fn = weave_internal.define_fn(
-        {"x": awl.object_type}, lambda x: run_ops.run_id(x)
-    ).val
-    vec_fn = arrow.vectorize(fn)
-    called = weave_internal.call_fn(vec_fn, {"x": l})
-    assert weave.use(called).to_pylist_notags() == ["A", "B", "C"]

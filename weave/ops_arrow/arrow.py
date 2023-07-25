@@ -186,16 +186,11 @@ class ArrowWeaveListType(types.Type):
         from . import convert
 
         parquet_friendly = convert.to_parquet_friendly(obj)
-
-        for path, data in parquet_friendly.items():
-            table = pa.table({"arr": data._arrow_data})
-            file_name_key = ".".join([name, *(str(p) for p in path)])
-            with artifact.new_file(
-                f"{file_name_key}.ArrowWeaveList.parquet", binary=True
-            ) as f:
-                pq.write_table(table, f)
-            with artifact.new_file(f"{file_name_key}.ArrowWeaveList.type.json") as f:
-                json.dump(data.object_type.to_dict(), f)
+        table = pa.table({"arr": parquet_friendly._arrow_data})
+        with artifact.new_file(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
+            pq.write_table(table, f)
+        with artifact.new_file(f"{name}.ArrowWeaveList.type.json") as f:
+            json.dump(obj.object_type.to_dict(), f)
 
     def load_instance(
         self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None
@@ -212,7 +207,7 @@ class ArrowWeaveListType(types.Type):
             l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
             from . import convert
 
-            res = convert.from_parquet_friendly(l, artifact, name)
+            res = convert.from_parquet_friendly(l)
         res.validate()
         return res
 

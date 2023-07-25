@@ -95,7 +95,7 @@ run_name = gql_prop_op(
     types.String(),
 )
 
-run_id = gql_prop_op(
+gql_prop_op(
     "run-internalId",
     wdt.RunType,
     "id",

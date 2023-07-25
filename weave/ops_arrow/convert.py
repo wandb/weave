@@ -1,8 +1,5 @@
 import pyarrow as pa
 import typing
-import json
-
-from pyarrow import parquet as pq
 
 from .. import artifact_base
 from .. import weave_types as types
@@ -13,8 +10,6 @@ from .. import artifact_mem
 from .. import errors
 from .. import arrow_util
 from .. import api
-from .. import gql_with_keys
-from .. import artifact_fs
 
 from .arrow import ArrowWeaveListType
 from .list_ import ArrowWeaveList, PathType, unsafe_awl_construction
@@ -388,13 +383,10 @@ def to_weave_arrow(v: typing.Any):
     return api.weave(awl)
 
 
-def to_parquet_friendly(l: ArrowWeaveList) -> dict[PathType, ArrowWeaveList]:
-    bundle: dict[PathType, ArrowWeaveList] = {}
-
+def to_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
     def _convert_col_to_parquet_friendly(
         col: ArrowWeaveList, path: PathType
     ) -> typing.Optional[ArrowWeaveList]:
-        print(path)
         _, non_none_type = types.split_none(col.object_type)
         if isinstance(non_none_type, types.UnionType):
             full_length_fields = []
@@ -426,52 +418,19 @@ def to_parquet_friendly(l: ArrowWeaveList) -> dict[PathType, ArrowWeaveList]:
                     col.object_type,
                     col._artifact,
                 )
-        elif isinstance(col.object_type, gql_with_keys.GQLHasKeysType):
-            assert pa.types.is_dictionary(col._arrow_data.type)
-            bundle[path] = ArrowWeaveList(
-                col._arrow_data.dictionary,
-                col.object_type,
-                col._artifact,
-            )
-            return ArrowWeaveList(
-                col._arrow_data.indices,
-                col.object_type,
-                col._artifact,
-            )
-
         return None
 
     with unsafe_awl_construction("to_parquet_friendly"):
-        bundle[()] = l.map_column(_convert_col_to_parquet_friendly)
-
-    return bundle
+        return l.map_column(_convert_col_to_parquet_friendly)
 
 
-def from_parquet_friendly(
-    l: ArrowWeaveList, artifact: artifact_fs.FilesystemArtifact, name: str
-) -> ArrowWeaveList:
+def from_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
     def _ident(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         return None
 
     def _convert_col_from_parquet_friendly(
         col: ArrowWeaveList, path: PathType
     ) -> typing.Optional[ArrowWeaveList]:
-        file_name_key = ".".join([name, *(str(p) for p in path)])
-        pq_filename = f"{file_name_key}.ArrowWeaveList.parquet"
-        type_filename = f"{file_name_key}.ArrowWeaveList.type.json"
-        if file_name_key != "obj" and artifact.path_info(pq_filename) is not None:
-            with artifact.open(pq_filename, binary=True) as f:
-                table = pq.read_table(f)
-            arr = table["arr"].combine_chunks()
-            with artifact.open(type_filename) as f:
-                object_type = json.load(f)
-                object_type = types.TypeRegistry.type_from_dict(object_type)
-            return ArrowWeaveList(
-                pa.DictionaryArray.from_arrays(col._arrow_data, arr),
-                object_type,
-                col._artifact,
-            )
-
         _, non_none_type = types.split_none(col.object_type)
         if isinstance(non_none_type, types.UnionType):
             struct = col._arrow_data
