@@ -85,7 +85,7 @@ jobs:
           set -e
           cd weave-js
           yarn install --frozen-lockfile
-          yarn eslint
+          yarn eslint --max-warnings=0
           yarn tslint
           yarn prettier-fix
           git config --local user.email "action@github.com"
