@@ -30,7 +30,7 @@ export const useBoardGeneratorsForNode = (
   }>;
 } => {
   const genBoardsNode = callOpVeryUnsafe(
-    'py_board-get_no_config_generators_for_node',
+    'py_board-get_board_templates_for_node',
     {
       input_node: node,
     }

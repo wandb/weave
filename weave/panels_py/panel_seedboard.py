@@ -2,6 +2,7 @@ import typing
 
 import weave
 from .. import weave_internal
+from .generator_templates import template_registry
 
 
 @weave.type()
@@ -13,7 +14,7 @@ class PyBoardSeedBoardConfig:
     name="py_board-seed_board",
 )
 def seed_board(
-    input_node: weave.Node[typing.Any],
+    input_node: weave.Node[list[dict]],
     config: typing.Optional[PyBoardSeedBoardConfig] = None,
 ) -> weave.panels.Group:
     control_items = [
@@ -33,6 +34,8 @@ def seed_board(
     return weave.panels.Board(vars=control_items, panels=panels)
 
 
-@weave.type()
-class PyBoardSeedBoardConfig:
-    pass
+template_registry.register(
+    "py_board-seed_board",
+    "Simple Board",
+    "Dashboard featuring data",
+)

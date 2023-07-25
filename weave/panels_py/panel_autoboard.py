@@ -27,6 +27,8 @@ import typing
 import weave
 from .. import weave_internal
 
+from .generator_templates import template_registry
+
 
 @weave.type()
 class AutoBoardConfig:
@@ -358,3 +360,11 @@ def seed_autoboard(
     config: typing.Optional[AutoBoardConfig] = None,
 ) -> weave.panels.Group:
     return auto_panels(input_node, config)  # type: ignore
+
+
+template_registry.register(
+    "py_board-seed_autoboard",
+    "Timeseries Auto-Board",
+    "Column-level analysis of timeseries data",
+    input_node_predicate=node_qualifies_for_autoboard,
+)
