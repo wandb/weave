@@ -478,7 +478,7 @@ def execute_forward_node(
         return {"cache_used": False}
 
     # This is expensive!
-    logging.info(
+    logging.debug(
         "Executing op: %s"  # expr: %s"
         % (node.from_op.name)  # , graph_debug.node_expr_str_full(node))
     )
