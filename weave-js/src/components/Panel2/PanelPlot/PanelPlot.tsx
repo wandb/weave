@@ -76,7 +76,7 @@ import React, {
 } from 'react';
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
-import {Button, DropdownItemProps, MenuItemProps, Tab} from 'semantic-ui-react';
+import {Button, MenuItemProps, Tab} from 'semantic-ui-react';
 import {calculatePosition} from 'vega-tooltip';
 
 import {useWeaveContext, useWeaveDashUiEnable} from '../../../context';
@@ -560,6 +560,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                 value: s.dims[dimName as keyof SeriesConfig['dims']],
               });
             }
+            return null;
           });
           return (
             <ConfigSection
