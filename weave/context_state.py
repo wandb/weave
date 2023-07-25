@@ -31,11 +31,13 @@ if patch_context:
         for k, v in _context.items():
             var = glbs.get("_" + k)
             if var is not None:
+                print("setting", k, v)
                 var.set(v)
 
     def weave_post_run():
         _context.clear()
         for k, v in contextvars.copy_context().items():
+            print("saving", k, v)
             _context[k.name] = v
 
     ipython = get_ipython()
