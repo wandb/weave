@@ -528,7 +528,10 @@ const CenterProjectTablesBrowser: React.FC<
                     props.navigateToExpression(expr);
                   },
                 }}>
-                <HomeExpressionPreviewParts expr={expr} />
+                <HomeExpressionPreviewParts
+                  expr={expr}
+                  navigateToExpression={props.navigateToExpression}
+                />
               </HomePreviewSidebarTemplate>
             );
             props.setPreviewNode(node);
