@@ -217,4 +217,4 @@ class WandbApiContext:
 ## wandb_api.py context
 _wandb_api_context: contextvars.ContextVar[
     typing.Optional[WandbApiContext]
-] = contextvars.ContextVar("_weave_api_context", default=None)
+] = contextvars.ContextVar("__weave_api_context", default=None)
