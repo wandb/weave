@@ -186,7 +186,7 @@ export const HomeExpressionPreviewParts: React.FC<{
         generators.result.length > 0 && (
           <LayoutElements.VBlock style={{gap: '8px'}}>
             <span style={{color: '#2B3038', fontWeight: 600}}>
-              Dashboard generators
+              Available Templates
             </span>
             <LayoutElements.VStack
               style={{
