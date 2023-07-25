@@ -14,13 +14,14 @@ import {
   useNodeValue,
   useRefreshAllNodes,
 } from '@wandb/weave/react';
-import {useCallback} from 'react';
+import {useCallback, useMemo} from 'react';
 
 import {usePanelContext} from './PanelContext';
 import moment from 'moment';
 
 export const useBoardGeneratorsForNode = (
-  node: Node
+  node: Node,
+  allowConfig: boolean = false
 ): {
   loading: boolean;
   result: Array<{
@@ -35,7 +36,17 @@ export const useBoardGeneratorsForNode = (
       input_node: node,
     }
   );
-  return useNodeValue(genBoardsNode as any);
+  const res = useNodeValue(genBoardsNode as any);
+  return useMemo(() => {
+    if (res.loading) {
+      return {loading: true, result: []};
+    } else {
+      return {
+        loading: false,
+        result: res.result.filter((x: any) => allowConfig || !x.config),
+      };
+    }
+  }, [allowConfig, res.loading, res.result]);
 };
 
 export const useMakeLocalBoardFromNode = () => {

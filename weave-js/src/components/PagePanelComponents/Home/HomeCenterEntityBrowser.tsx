@@ -1,12 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
-import {
-  IconAddNew,
-  IconCopy,
-  IconDown,
-  IconInfo,
-  IconOpenNewTab,
-} from '../../Panel2/Icons';
+import {IconCopy, IconDown, IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import moment from 'moment';
@@ -25,7 +19,6 @@ import {
   opRootProject,
   opTableRows,
   typedDict,
-  varNode,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
@@ -37,8 +30,6 @@ import {
 } from './HomePreviewSidebar';
 import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
 import WandbLoader from '@wandb/weave/common/components/WandbLoader';
-import {IconMagicWandStar} from '../../Icon';
-import {getFullChildPanel} from '../../Panel2/ChildPanel';
 import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
 
 type CenterEntityBrowserPropsType = {
@@ -504,24 +495,7 @@ const CenterProjectTablesBrowser: React.FC<
               <HomePreviewSidebarTemplate
                 title={row.name}
                 setPreviewNode={props.setPreviewNode}
-                // TODO: These actions are literally copy/paste from below - rework this pattern to be more generic
                 primaryAction={{
-                  icon: IconAddNew,
-                  label: 'Seed new board',
-                  onClick: () => {
-                    const name =
-                      'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
-                    makeNewDashboard(
-                      name,
-                      {panel0: getFullChildPanel(varNode(expr.type, 'var0'))},
-                      {var0: expr},
-                      newDashExpr => {
-                        props.navigateToExpression(newDashExpr);
-                      }
-                    );
-                  },
-                }}
-                secondaryAction={{
                   icon: IconOpenNewTab,
                   label: 'Open Table',
                   onClick: () => {
@@ -539,40 +513,6 @@ const CenterProjectTablesBrowser: React.FC<
         },
       ],
       [
-        {
-          icon: IconAddNew,
-          label: 'Seed new board',
-          onClick: row => {
-            const node = tableRowToNode(
-              row.kind,
-              props.entityName,
-              props.projectName,
-              row._id
-            );
-            setSeedingBoard(true);
-            makeBoardFromNode('py_board-seed_board', node, newDashExpr => {
-              setSeedingBoard(false);
-              props.navigateToExpression(newDashExpr);
-            });
-          },
-        },
-        {
-          icon: IconMagicWandStar,
-          label: 'Seed auto board',
-          onClick: row => {
-            const node = tableRowToNode(
-              row.kind,
-              props.entityName,
-              props.projectName,
-              row._id
-            );
-            setSeedingBoard(true);
-            makeBoardFromNode('py_board-seed_autoboard', node, newDashExpr => {
-              setSeedingBoard(false);
-              props.navigateToExpression(newDashExpr);
-            });
-          },
-        },
         {
           icon: IconOpenNewTab,
           label: 'Open Table',

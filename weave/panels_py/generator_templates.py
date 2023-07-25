@@ -1,3 +1,12 @@
+"""
+Contains the TemplateRegistry class, which is used to register
+templates for the PyBoard generator. I think we might want to make
+this even more generic and all any panel to be a generator, but for 
+now this is a simple abstraction that will work for basic use cases.
+"""
+
+# TODO: Generalize this to work with panels like /Users/timothysweeney/Workspace/github/wandb/core/services/weave-python/weave-public/weave/ecosystem/wandb/panel_time_series.py
+
 import dataclasses
 import typing
 
@@ -60,6 +69,7 @@ class PyBoardGeneratorSpec(typing.TypedDict):
     display_name: str
     description: str
     op_name: str
+    config_type: typing.Optional[weave_types.Type]
 
 
 # Processes have a singleton TemplateRegistry
@@ -81,6 +91,7 @@ def get_board_templates_for_node(
                         display_name=spec.display_name,
                         description=spec.description,
                         op_name=spec.op_name,
+                        config_type=spec.config_type,
                     )
                 )
     return final_specs
