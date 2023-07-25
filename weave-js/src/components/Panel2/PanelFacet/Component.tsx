@@ -333,83 +333,89 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
   // TODO: make this handle only visible nodes! we can make an infinite scroll
   // facet panel easily. E.g. same way as we do paging on the table.
   return useGatedValue(
-      <S.FacetGridWrapper hasXAxisLabel={hasXAxisLabel} hasYAxisLabel={hasYAxisLabel}>
-        {hasXAxisLabel && <S.xAxisLabel
-          key={'x-axis-label-' + (dims.xAxisLabel)}
+    <S.FacetGridWrapper
+      hasXAxisLabel={hasXAxisLabel}
+      hasYAxisLabel={hasYAxisLabel}>
+      {hasXAxisLabel && (
+        <S.xAxisLabel
+          key={'x-axis-label-' + dims.xAxisLabel}
           columnCount={Object.keys(xPos).length + columnOffset + 1}
           hasYAxisLabel={hasYAxisLabel}>
           {dims.xAxisLabel}
-        </S.xAxisLabel>}
-        {hasYAxisLabel && <S.yAxisLabel
-          key={'y-axis-label-' + (dims.yAxisLabel)}
+        </S.xAxisLabel>
+      )}
+      {hasYAxisLabel && (
+        <S.yAxisLabel
+          key={'y-axis-label-' + dims.yAxisLabel}
           rowCount={Object.keys(yPos).length + rowOffset + 1}
           hasXAxisLabel={hasXAxisLabel}>
           {dims.yAxisLabel}
-        </S.yAxisLabel>}
-        {Object.keys(xPos).map(xKey => (
-          <S.FacetHeaderCell
-            key={'col-' + xKey}
-            style={{height: '24px'}}
-            gridColumnStart={xPos[xKey] + columnOffset + 1}
-            gridRowStart={rowOffset}>
-            {xKey}
-          </S.FacetHeaderCell>
-        ))}
-        {Object.keys(yPos).map(yKey => (
-          <S.FacetHeaderCell
-            key={'row-' + yKey}
-            gridColumnStart={columnOffset}
-            gridRowStart={yPos[yKey] + rowOffset + 1}>
-            {yKey}
-          </S.FacetHeaderCell>
-        ))}
-        {cellNodes.map((cellNode, i) => {
-          const groupKey = groupKeys[i];
+        </S.yAxisLabel>
+      )}
+      {Object.keys(xPos).map(xKey => (
+        <S.FacetHeaderCell
+          key={'col-' + xKey}
+          style={{height: '24px'}}
+          gridColumnStart={xPos[xKey] + columnOffset + 1}
+          gridRowStart={rowOffset}>
+          {xKey}
+        </S.FacetHeaderCell>
+      ))}
+      {Object.keys(yPos).map(yKey => (
+        <S.FacetHeaderCell
+          key={'row-' + yKey}
+          gridColumnStart={columnOffset}
+          gridRowStart={yPos[yKey] + rowOffset + 1}>
+          {yKey}
+        </S.FacetHeaderCell>
+      ))}
+      {cellNodes.map((cellNode, i) => {
+        const groupKey = groupKeys[i];
 
-          if (groupKey == null) {
-            // adding the key gets rid of the key warning
-            return <div key={'null-cell-' + i}>-</div>;
-          }
+        if (groupKey == null) {
+          // adding the key gets rid of the key warning
+          return <div key={'null-cell-' + i}>-</div>;
+        }
 
-          const xKey = groupKey[xColName];
-          const yKey = groupKey[yColName];
-          const selected =
-            xKey === config.selectedCell?.x && config.selectedCell?.y === yKey;
-          return (
-            <div
-              key={'cell-' + xPos[xKey] + '-' + yPos[yKey]}
-              style={{
-                gridColumnStart: xPos[xKey] + columnOffset + 1,
-                gridRowStart: yPos[yKey] + rowOffset + 1,
-                border: selected ? `2px solid ${MOON_800}` : undefined,
-              }}
-              onClick={() =>
-                props.updateConfig({selectedCell: {x: xKey, y: yKey}})
-              }>
-              <PanelContextProvider newVars={cellVars}>
-                <SelectPanel
-                  inputNode={cellNode}
-                  selectFunction={cellFunction}
-                  vars={table.columns[dims.select].panelVars ?? {}}
-                  panelId={table.columns[dims.select].panelId}
-                  config={table.columns[dims.select].panelConfig}
-                  panelContext={props.context}
-                  updateConfig={newConfig =>
-                    props.updateConfig({
-                      table: TableState.updateColumnPanelConfig(
-                        table,
-                        dims.select,
-                        newConfig
-                      ),
-                    })
-                  }
-                  updatePanelContext={props.updateContext}
-                />
-              </PanelContextProvider>
-            </div>
-          );
-        })}
-      </S.FacetGridWrapper>,
+        const xKey = groupKey[xColName];
+        const yKey = groupKey[yColName];
+        const selected =
+          xKey === config.selectedCell?.x && config.selectedCell?.y === yKey;
+        return (
+          <div
+            key={'cell-' + xPos[xKey] + '-' + yPos[yKey]}
+            style={{
+              gridColumnStart: xPos[xKey] + columnOffset + 1,
+              gridRowStart: yPos[yKey] + rowOffset + 1,
+              border: selected ? `2px solid ${MOON_800}` : undefined,
+            }}
+            onClick={() =>
+              props.updateConfig({selectedCell: {x: xKey, y: yKey}})
+            }>
+            <PanelContextProvider newVars={cellVars}>
+              <SelectPanel
+                inputNode={cellNode}
+                selectFunction={cellFunction}
+                vars={table.columns[dims.select].panelVars ?? {}}
+                panelId={table.columns[dims.select].panelId}
+                config={table.columns[dims.select].panelConfig}
+                panelContext={props.context}
+                updateConfig={newConfig =>
+                  props.updateConfig({
+                    table: TableState.updateColumnPanelConfig(
+                      table,
+                      dims.select,
+                      newConfig
+                    ),
+                  })
+                }
+                updatePanelContext={props.updateContext}
+              />
+            </PanelContextProvider>
+          </div>
+        );
+      })}
+    </S.FacetGridWrapper>,
     o => !cellNodesUse.loading
   );
 };
