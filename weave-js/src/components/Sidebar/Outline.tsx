@@ -119,7 +119,6 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     updateConfig,
     updateConfig2,
     level = 0,
-    setInspectingRoot,
   } = props;
 
   const panelIsHovered = usePanelIsHoveredByPath(path);
@@ -146,8 +145,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
         level={level}
         panelIsHovered={panelIsHovered}
         onClick={() => {
-          const isRoot = _.isEqual(path, []);
-          isRoot ? setInspectingRoot(true) : setSelected(path);
+          setSelected(path);
           setPanelIsHoveredInOutline(path, false);
         }}
         onMouseEnter={() => {
@@ -203,7 +201,6 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
             setSelected={setSelected}
             path={[...path, key]}
             level={level + 1}
-            setInspectingRoot={setInspectingRoot}
           />
         ))}
     </OutlineItem>
@@ -218,7 +215,6 @@ export interface OutlineProps {
   ) => void;
   selected: string[];
   setSelected: (path: string[]) => void;
-  setInspectingRoot: (inspectingRoot: boolean) => void;
 }
 
 export const Outline: React.FC<OutlineProps> = props => {
@@ -234,7 +230,6 @@ export const Outline: React.FC<OutlineProps> = props => {
         selected={props.selected}
         setSelected={props.setSelected}
         path={[]}
-        setInspectingRoot={props.setInspectingRoot}
       />
     </OutlineContainer>
   );

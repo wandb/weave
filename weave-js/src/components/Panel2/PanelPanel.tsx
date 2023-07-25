@@ -206,7 +206,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     onMouseMove: onBodyMouseMove,
   } = useScrollbarVisibility();
 
-  const [inspectingRoot, setInspectingRoot] = useState(false);
   const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
   const selectedIsRoot = useMemo(
     () => selectedPanel.filter(s => s).length === 0,
@@ -217,13 +216,12 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     [selectedPanel]
   );
   const showOutline = useMemo(
-    () => selectedIsRoot && !inspectingRoot,
-    [selectedIsRoot, inspectingRoot]
+    () => selectedIsRoot || selectedIsSidebarOrMain,
+    [selectedIsRoot, selectedIsSidebarOrMain]
   );
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
-    setInspectingRoot(false);
   }, [setSelectedPanel]);
 
   if (loading) {
@@ -254,7 +252,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
           updateConfig2={panelUpdateConfig2}
           setSelected={setSelectedPanel}
           selected={selectedPanel}
-          setInspectingRoot={setInspectingRoot}
         />
       </SidebarConfig.Container>
     );
