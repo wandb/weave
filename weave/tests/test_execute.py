@@ -120,7 +120,7 @@ def table_mock_respecting_run_name(q, ndx):
         display_name_selected = any(f.name.value == "displayName" for f in node_fields)
 
         if display_name_selected:
-            return test_wb.workspace_response
+            return test_wb.workspace_response()
         else:
             return test_wb.workspace_response_no_run_displayname
     else:

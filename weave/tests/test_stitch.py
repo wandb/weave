@@ -276,10 +276,7 @@ def test_refine_history_type_included_in_gql():
     pick_node = index_node["variant"]
     refine_history_node = pick_node.refine_history_type()
     sg = stitch.stitch([refine_history_node])
-    assert (
-        "historyKeys"
-        in compile_domain._get_fragment_and_gql_root_type(project_node, sg)[0]
-    )
+    assert "historyKeys" in compile_domain._get_fragment(project_node, sg)
 
 
 def test_stitch_missing_key():

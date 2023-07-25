@@ -2,7 +2,7 @@ import json
 import typing
 import hashlib
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from . import weave_types as types
 from . import artifact_fs
 
@@ -52,7 +52,7 @@ def gql_weave_type(
 
 @dataclass
 class GQLTypeMixin:
-    gql: dict
+    gql: dict = field(default_factory=dict)
 
     @classmethod
     def from_gql(cls: typing.Type[T], gql_dict: dict) -> T:
@@ -153,7 +153,7 @@ class GQLHasKeysType(types.Type):
         from . import mappers_python
 
         with artifact.open(
-            f"{name}.{self.keyless_weave_type_class.__class__.__name__}WithKeys.json"
+            f"{name}.{self.keyless_weave_type_class.__name__}WithKeys.json"
         ) as f:
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
