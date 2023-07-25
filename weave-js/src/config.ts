@@ -4,6 +4,7 @@ interface Config {
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;
   backendWeaveOpsUrl(): string;
+  backendWeaveVersionUrl(): string;
 }
 
 const WEAVE_BACKEND_HOST = (window as any).CONFIG?.WEAVE_BACKEND_HOST ?? '';
@@ -13,6 +14,10 @@ const backendWeaveExecutionUrl = (shadow: boolean = false) => {
     return WEAVE_BACKEND_HOST + '/shadow_execute';
   }
   return WEAVE_BACKEND_HOST + '/execute';
+};
+
+const backendWeaveVersionUrl = () => {
+  return WEAVE_BACKEND_HOST + '/version';
 };
 
 const backendWeaveOpsUrl = () => {
@@ -28,6 +33,7 @@ const DEFAULT_CONFIG: Config = {
   backendWeaveExecutionUrl,
   backendWeaveOpsUrl,
   backendWeaveViewerUrl,
+  backendWeaveVersionUrl,
   ENABLE_DEBUG_FEATURES: false,
 } as const;
 

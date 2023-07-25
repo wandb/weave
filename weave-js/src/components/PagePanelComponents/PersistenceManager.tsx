@@ -74,6 +74,8 @@ import _ from 'lodash';
 import {mapPanels} from '../Panel2/panelTree';
 import {DeleteActionModal} from './DeleteActionModal';
 import {PublishModal} from './PublishModal';
+import {useConfig} from '../Panel2/panel';
+import getConfig from '@wandb/weave/config';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -617,6 +619,32 @@ const HeaderFileControls: React.FC<{
   );
 };
 
+function useFetchWeaveVersion(url: string) {
+  const [data, setData] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.text();
+          setData(data);
+        } else {
+          setData('');
+        }
+      } catch (error) {
+        console.error(error);
+      }
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [url]);
+
+  return {loading, data};
+}
+
 const HeaderLogoControls: React.FC<{
   inputNode: NodeOrVoidNode;
   inputConfig: any;
@@ -713,6 +741,9 @@ const HeaderLogoControls: React.FC<{
     }
   }, [makeNewDashboard, name, processedSeedItems, vars, updateNode]);
 
+  const {loading: weaveVersionLoading, data: weaveVersion} =
+    useFetchWeaveVersion(getConfig().backendWeaveVersionUrl());
+
   return (
     <>
       <HeaderLeftControls
@@ -770,7 +801,7 @@ const HeaderLogoControls: React.FC<{
           <MenuDivider />
           <MenuItem disabled>
             <MenuText>
-              Weave 0.0.6
+              Weave {!weaveVersionLoading && weaveVersion}
               <br />
               by Weights & Biases
             </MenuText>
