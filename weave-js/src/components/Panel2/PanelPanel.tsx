@@ -207,17 +207,9 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   } = useScrollbarVisibility();
 
   const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
-  const selectedIsRoot = useMemo(
-    () => selectedPanel.filter(s => s).length === 0,
-    [selectedPanel]
-  );
-  const selectedIsSidebarOrMain = useMemo(
+  const selectedIsRootLevel = useMemo(
     () => selectedPanel.filter(s => s).length < 2,
     [selectedPanel]
-  );
-  const showOutline = useMemo(
-    () => selectedIsRoot || selectedIsSidebarOrMain,
-    [selectedIsRoot, selectedIsSidebarOrMain]
   );
 
   const goBackToOutline = useCallback(() => {
@@ -231,7 +223,8 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     throw new Error('Panel config is null after loading');
   }
 
-  if (showOutline) {
+  // show outline instead of config panel if root, main, or varbar
+  if (selectedIsRootLevel) {
     return (
       <SidebarConfig.Container>
         <SidebarConfig.Header>
@@ -268,7 +261,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            {!selectedIsRoot && !selectedIsSidebarOrMain && (
+            {!selectedIsRootLevel && (
               <OutlineItemPopupMenu
                 config={panelConfig}
                 localConfig={getConfigForPath(panelConfig, selectedPanel)}
@@ -291,11 +284,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             </IconButton>
           </SidebarConfig.HeaderTopRight>
         </SidebarConfig.HeaderTop>
-        {!selectedIsRoot && (
-          <SidebarConfig.HeaderTitle>
-            {_.last(selectedPanel)}
-          </SidebarConfig.HeaderTitle>
-        )}
       </SidebarConfig.Header>
       <SidebarConfig.Body
         scrollbarVisible={bodyScrollbarVisible}
