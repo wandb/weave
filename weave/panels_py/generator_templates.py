@@ -33,7 +33,7 @@ class _TemplateRegistry:
             typing.Callable[[graph.Node[typing.Any]], bool]
         ] = None,
         config_type: typing.Optional[weave_types.Type] = None,
-    ):
+    ) -> None:
         return self.register_spec(
             TemplateRegistrySpec(
                 display_name=display_name,
@@ -44,7 +44,7 @@ class _TemplateRegistry:
             )
         )
 
-    def register_spec(self, spec: TemplateRegistrySpec):
+    def register_spec(self, spec: TemplateRegistrySpec) -> None:
         if spec.op_name in self._specs:
             raise ValueError(f"Template {spec.op_name} already registered")
         self._specs[spec.op_name] = spec
@@ -52,7 +52,7 @@ class _TemplateRegistry:
     def get_spec(self, name: str) -> typing.Any:
         return self._specs[name]
 
-    def get_specs(self) -> typing.List[typing.Any]:
+    def get_specs(self) -> typing.Dict[str, TemplateRegistrySpec]:
         return {**self._specs}
 
 
@@ -66,12 +66,12 @@ class PyBoardGeneratorSpec(typing.TypedDict):
 template_registry = _TemplateRegistry()
 
 
-@decorator_op.op(name="py_board-get_board_templates_for_node", hidden=True)
+@decorator_op.op(name="py_board-get_board_templates_for_node", hidden=True)  # type: ignore
 def get_board_templates_for_node(
     input_node: graph.Node[typing.Any],
 ) -> list[PyBoardGeneratorSpec]:
     final_specs = []
-    for op_name, spec in template_registry.get_specs():
+    for op_name, spec in template_registry.get_specs().items():
         op = registry_mem.memory_registry._ops[op_name]
         if op.input_type.first_param_valid(input_node.type):
             predicate = spec.input_node_predicate
