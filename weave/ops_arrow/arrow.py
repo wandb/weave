@@ -191,24 +191,20 @@ class ArrowWeaveListType(types.Type):
         from . import convert
 
         parquet_friendly = convert.to_parquet_friendly(obj)
-        file_hash_map: dict[str, str] = {}
 
-        with artifact.new_file(f"{name}.dictionary.json") as df:
-            for path, data in parquet_friendly.items():
-                if path != ():
-                    strpath = str(path)
-                    file_hash_map[strpath] = hashlib.md5(strpath).hexdigest()
+        for path, data in parquet_friendly.items():
+            table = pa.table({"arr": data._arrow_data})
+            file_name_key = ".".join([name, *(str(p) for p in path)])
 
-                table = pa.table({"arr": data._arrow_data})
-                file_name_key = ".".join([name, *(str(p) for p in path)])
-                with artifact.new_file(
-                    f"{file_name_key}.ArrowWeaveList.parquet", binary=True
-                ) as f:
-                    pq.write_table(table, f)
-                with artifact.new_file(
-                    f"{file_name_key}.ArrowWeaveList.type.json"
-                ) as f:
-                    json.dump(data.object_type.to_dict(), f)
+            if len(path) > 0:
+                file_name_key = hashlib.md5(file_name_key.encode()).hexdigest()
+
+            with artifact.new_file(
+                f"{file_name_key}.ArrowWeaveList.parquet", binary=True
+            ) as f:
+                pq.write_table(table, f)
+            with artifact.new_file(f"{file_name_key}.ArrowWeaveList.type.json") as f:
+                json.dump(data.object_type.to_dict(), f)
 
     def load_instance(
         self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None

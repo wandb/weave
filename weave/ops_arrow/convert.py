@@ -1,3 +1,4 @@
+import hashlib
 import pyarrow as pa
 import typing
 import json
@@ -457,9 +458,12 @@ def from_parquet_friendly(
         col: ArrowWeaveList, path: PathType
     ) -> typing.Optional[ArrowWeaveList]:
         file_name_key = ".".join([name, *(str(p) for p in path)])
+        if len(path) > 0:
+            file_name_key = hashlib.md5(file_name_key.encode()).hexdigest()
+
         pq_filename = f"{file_name_key}.ArrowWeaveList.parquet"
         type_filename = f"{file_name_key}.ArrowWeaveList.type.json"
-        if file_name_key != "obj" and artifact.path_info(pq_filename) is not None:
+        if len(path) > 0 and artifact.path_info(pq_filename) is not None:
             with artifact.open(pq_filename, binary=True) as f:
                 table = pq.read_table(f)
             arr = table["arr"].combine_chunks()
