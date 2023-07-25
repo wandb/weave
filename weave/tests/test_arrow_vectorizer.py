@@ -1301,6 +1301,11 @@ def test_vectorized_prop_op_gql_pick():
     fn = weave_internal.define_fn(
         {"x": awl.object_type}, lambda x: run_ops.run_id(x)
     ).val
-    vec_fn = arrow.vectorize(fn)
+    vec_fn = arrow.vectorize(fn, strict=True)
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist_notags() == ["A", "B", "C"]
+    assert weave.use(called).to_pylist_raw() == [
+        {"_tag": {"mytag": "testA"}, "_value": "A"},
+        {"_tag": {"mytag": "testB"}, "_value": "B"},
+        {"_tag": {"mytag": "testC"}, "_value": "C"},
+    ]
