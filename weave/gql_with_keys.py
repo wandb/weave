@@ -162,6 +162,15 @@ class GQLHasKeysType(types.Type):
             return mapped_result[extra[0]]
         return typing.cast(GQLTypeMixin, mapped_result)
 
+    def instance_to_dict(self, obj: GQLTypeMixin) -> dict[str, typing.Any]:
+        return obj.gql
+
+    def instance_from_dict(self, d: dict[str, typing.Any]) -> GQLTypeMixin:
+        instance_class = typing.cast(
+            typing.Type[GQLTypeMixin], self.keyless_weave_type_class.instance_class
+        )
+        return instance_class.from_gql(d)
+
 
 GQLKeyPropFn = typing.Callable[[InputProvider, types.Type], types.Type]
 ParamStrFn = typing.Callable[[InputProvider], str]

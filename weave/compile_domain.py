@@ -172,6 +172,9 @@ def apply_domain_op_gql_translation(
         # key fn operates on untagged types
         new_output_type = key_fn(ip, unwrapped_input_type)
 
+        if isinstance(new_output_type, types.Invalid):
+            raise ValueError('GQL key function returned "Invalid" type')
+
         # now we rewrap the types to propagate the tags
         if opdef_util.should_tag_op_def_outputs(opdef):
             new_output_type = tagged_value_type.TaggedValueType(
@@ -183,6 +186,7 @@ def apply_domain_op_gql_translation(
         node.type = new_output_type
 
     def _propagate_gql_keys_map_fn(node: graph.Node) -> graph.Node:
+        original_output_type = node.type
         if (
             isinstance(node, graph.OutputNode)
             and not node.from_op.name == "gqlroot-wbgqlquery"
@@ -208,7 +212,9 @@ def apply_domain_op_gql_translation(
                         node,
                         key_fn,
                     )
-                else:
+                elif opdef.refine_output_type is None:
+                    # if we have a refiner, we don't need to do anything
+                    # we can use its type later on, during the next step
                     new_output_type = opdef.unrefined_output_type_for_params(
                         node.from_op.inputs
                     )
@@ -220,8 +226,9 @@ def apply_domain_op_gql_translation(
                     node,
                     plugin.gql_key_prop_fn,
                 )
+        new_output_type = node.type
 
-        print(node, node.type)
+        print(node, new_output_type, original_output_type)
         return node
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all

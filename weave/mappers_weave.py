@@ -9,6 +9,7 @@ class TypedDictMapper(mappers.Mapper):
     def __init__(self, type_: types.TypedDict, mapper, artifact, path=[]):
         self.type = type_
         self._artifact = artifact
+        self.path = path
         prop_serializers = {}
         for property_key, property_type in type_.property_types.items():
             prop_serializer = mapper(
@@ -22,13 +23,15 @@ class GQLMapper(mappers.Mapper):
     def __init__(self, type_: types.Type, mapper, artifact, path):
         self.type = typing.cast(GQLHasKeysType, type_)
         self._artifact = artifact
+        self.path = path
+        self.mapper = mapper
         prop_serializers = {}
         for property_key, property_type in self.type.keys.items():
             prop_serializer = mapper(
                 property_type, artifact, path=path + [property_key]
             )
             prop_serializers[property_key] = prop_serializer
-        self._property_serializers = prop_serializers
+        self._property_serializers: dict[str, mappers.Mapper] = prop_serializers
 
 
 class DictMapper(mappers.Mapper):

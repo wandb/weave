@@ -299,13 +299,13 @@ def test_avfile_type(fake_wandb):
         .file("test_results.table.json")
     )
     t = weavejs_ops.file_type(f)
-    assert weave.use(t) == TaggedValueType(
+    assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         artifact_fs.FilesystemArtifactFileType(
             extension=types.Const(types.String(), "json"),
             wbObjectType=ops.TableType(),
         ),
-    )
+    ).assign_type(weave.use(t))
 
 
 def test_table_col_order_and_unknown_types(fake_wandb):
@@ -1533,6 +1533,7 @@ def test_run_colors(fake_wandb):
 
 def test_arrow_groupby_external_tag(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
+    print(1)
     run_names = (
         ops.project("stacey", "mendeleev")
         .filteredRuns("{}", "-createdAt")

@@ -17,6 +17,9 @@ from .language_features.tagging import tagged_value_type
 from .ops_domain import wbmedia
 import contextvars
 
+from . import gql_with_keys
+
+
 _in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
 
 
@@ -299,8 +302,6 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             return pa.string()
         elif self.type.name == "ndarray":
             return pa.null()
-        elif self.type.name == "UntypedOpaqueDict":
-            return
 
         raise errors.WeaveInternalError(
             "Type not yet handled by mappers_arrow: %s" % self.type
@@ -335,6 +336,22 @@ class ArrowToArrowWeaveListOrPylist(mappers_python.ListToPyList):
         return super().apply(obj)
 
 
+class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
+    def result_type(self):
+        return pa.struct(
+            [
+                pa.field(key, self._property_serializers[key].result_type())
+                for key in self.type.keys
+            ]
+        )
+
+    def as_typeddict_mapper(self):
+        typed_dict_type = types.TypedDict(self.type.keys)
+        return TypedDictToArrowStruct(
+            typed_dict_type, self.mapper, self._artifact, self.path
+        )
+
+
 def map_to_arrow_(
     type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
 ):
@@ -348,6 +365,8 @@ def map_to_arrow_(
         return ListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return UnionToArrowUnion(type, mapper, artifact, path)
+    elif isinstance(type, gql_with_keys.GQLHasKeysType):
+        return GQLHasKeysToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):
@@ -381,6 +400,8 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
         return ArrowToArrowWeaveListOrPylist(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return ArrowUnionToUnion(type, mapper, artifact, path)
+    elif isinstance(type, gql_with_keys.GQLHasKeysType):
+        return mappers_python.GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return mappers_python.ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):

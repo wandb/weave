@@ -418,6 +418,8 @@ def test_op_with_refiner(fake_wandb):
 
     assert compiled_node.type == expected
 
+    weave.use(node)
+
 
 def test_gql_connection_op():
     node = ops.project("stacey", "mendeleev").artifactTypes()[0].artifactVersions()

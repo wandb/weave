@@ -75,6 +75,10 @@ def gql_type_to_weave_type(
         return types.List(gql_type_to_weave_type(gql_type.of_type, selection_set))
     elif isinstance(gql_type, GraphQLNonNull):
         return types.non_none(gql_type_to_weave_type(gql_type.of_type, selection_set))
+    elif isinstance(gql_type, graphql.GraphQLUnionType):
+        return types.union(
+            *[gql_type_to_weave_type(t, selection_set) for t in gql_type.types]
+        )
     elif isinstance(gql_type, graphql.GraphQLScalarType):
         t: types.Type
         if gql_type.name in [
