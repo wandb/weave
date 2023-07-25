@@ -134,6 +134,40 @@ def categorical_dist(
     )
 
 
+def node_qualifies_for_autoboard(input_node: weave.Node[typing.Any]) -> bool:
+    input_type = input_node.type
+    if not weave.types.is_list_like(input_type):
+        return False
+
+    object_type = input_type.object_type  # type: ignore
+    if not weave.types.TypedDict().assign_type(object_type):
+        return False
+    property_types = typing.cast(
+        dict[str, weave.types.Type], object_type.property_types
+    )
+    x_axis = None
+
+    for k, prop_type in property_types.items():
+        if not weave.types.NoneType().assign_type(prop_type) and weave.types.optional(
+            weave.types.Timestamp()
+        ).assign_type(prop_type):
+            x_axis = k
+            x_axis_type = prop_type
+            break
+    if x_axis is None:
+        for step_key in ["_step", "step"]:
+            if step_key in property_types and weave.types.optional(
+                weave.types.Int()
+            ).assign_type(property_types[step_key]):
+                x_axis = step_key
+                x_axis_type = property_types[step_key]
+
+    if x_axis is None:
+        return False
+
+    return True
+
+
 def auto_panels(
     input_node: weave.Node[list[typing.Any]],
     config: typing.Optional[AutoBoardConfig] = None,
