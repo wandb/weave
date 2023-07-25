@@ -1,7 +1,7 @@
 import dataclasses
 import typing
 import pyarrow as pa
-from . import errors
+from .. import errors
 
 
 @dataclasses.dataclass(frozen=True)
