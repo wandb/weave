@@ -1,4 +1,5 @@
 import dataclasses
+import hashlib
 import json
 import pyarrow as pa
 import numpy as np
@@ -9,7 +10,7 @@ import textwrap
 
 py_type = type
 
-from .. import mappers_python
+from . import path as arrow_path
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
@@ -148,6 +149,10 @@ def offsets_starting_at_zero(arr: pa.ListArray) -> pa.IntegerArray:
         return pc.subtract(raw_offsets, first_value)
 
 
+def dictionary_filename_for_path():
+    pass
+
+
 @dataclasses.dataclass(frozen=True)
 class ArrowWeaveListType(types.Type):
     _base_type = types.List
@@ -186,16 +191,24 @@ class ArrowWeaveListType(types.Type):
         from . import convert
 
         parquet_friendly = convert.to_parquet_friendly(obj)
+        file_hash_map: dict[str, str] = {}
 
-        for path, data in parquet_friendly.items():
-            table = pa.table({"arr": data._arrow_data})
-            file_name_key = ".".join([name, *(str(p) for p in path)])
-            with artifact.new_file(
-                f"{file_name_key}.ArrowWeaveList.parquet", binary=True
-            ) as f:
-                pq.write_table(table, f)
-            with artifact.new_file(f"{file_name_key}.ArrowWeaveList.type.json") as f:
-                json.dump(data.object_type.to_dict(), f)
+        with artifact.new_file(f"{name}.dictionary.json") as df:
+            for path, data in parquet_friendly.items():
+                if path != ():
+                    strpath = str(path)
+                    file_hash_map[strpath] = hashlib.md5(strpath).hexdigest()
+
+                table = pa.table({"arr": data._arrow_data})
+                file_name_key = ".".join([name, *(str(p) for p in path)])
+                with artifact.new_file(
+                    f"{file_name_key}.ArrowWeaveList.parquet", binary=True
+                ) as f:
+                    pq.write_table(table, f)
+                with artifact.new_file(
+                    f"{file_name_key}.ArrowWeaveList.type.json"
+                ) as f:
+                    json.dump(data.object_type.to_dict(), f)
 
     def load_instance(
         self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None

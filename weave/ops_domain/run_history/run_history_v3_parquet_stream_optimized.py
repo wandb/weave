@@ -20,11 +20,8 @@ from ...wandb_interface import wandb_stream_table
 from . import history_op_common
 from ... import artifact_base, io_service
 from .. import wbmedia
-from ...ops_arrow.list_ import (
-    PathItemType,
-    PathType,
-    weave_arrow_type_check,
-)
+from ...ops_arrow.list_ import weave_arrow_type_check
+from ...ops_arrow.path import PathType, PathItemType
 
 tracer = engine_trace.tracer()
 
