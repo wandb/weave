@@ -325,56 +325,41 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
     [cellNodesUse.loading, cellNodesUse.result]
   );
 
-  const wrapperRef = React.useRef<HTMLDivElement>(null);
-  const columnWidth = wrapperRef.current
-    ? (wrapperRef.current.clientWidth - 80) / Object.keys(xPos).length
-    : 40;
-  const rowHeight = wrapperRef.current
-    ? (wrapperRef.current.clientHeight - 80) / Object.keys(yPos).length
-    : 40;
+  const hasXAxisLabel = dims.xAxisLabel.length > 0;
+  const hasYAxisLabel = dims.yAxisLabel.length > 0;
 
+  const columnOffset = hasYAxisLabel ? 2 : 1;
+  const rowOffset = hasXAxisLabel ? 2 : 1;
   // TODO: make this handle only visible nodes! we can make an infinite scroll
   // facet panel easily. E.g. same way as we do paging on the table.
   return useGatedValue(
-    <div
-      ref={wrapperRef}
-      style={{
-        display: 'inline-block',
-        marginLeft: 'auto',
-        marginRight: 'auto',
-        width: '100%',
-        height: '100%',
-      }}>
-      <S.FacetGridWrapper
-        // TODO: I'm just putting this in
-        columnWidth={columnWidth}
-        rowHeight={rowHeight}>
-        <S.xAxisLabel
-          key={'x-axis-label-' + (dims.xAxisLabel || xColName)}
-          columnCount={Object.keys(xPos).length + 3}
-          gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
-          {dims.xAxisLabel || xColName}
-        </S.xAxisLabel>
-        <S.yAxisLabel
-          key={'y-axis-label-' + (dims.yAxisLabel || yColName)}
-          rowCount={Object.keys(yPos).length + 3}
-          gridRowStart={Math.floor(Object.keys(yPos).length / 2) + 2}>
-          {dims.yAxisLabel || yColName}
-        </S.yAxisLabel>
+      <S.FacetGridWrapper hasXAxisLabel={hasXAxisLabel} hasYAxisLabel={hasYAxisLabel}>
+        {hasXAxisLabel && <S.xAxisLabel
+          key={'x-axis-label-' + (dims.xAxisLabel)}
+          columnCount={Object.keys(xPos).length + columnOffset + 1}
+          hasYAxisLabel={hasYAxisLabel}>
+          {dims.xAxisLabel}
+        </S.xAxisLabel>}
+        {hasYAxisLabel && <S.yAxisLabel
+          key={'y-axis-label-' + (dims.yAxisLabel)}
+          rowCount={Object.keys(yPos).length + rowOffset + 1}
+          hasXAxisLabel={hasXAxisLabel}>
+          {dims.yAxisLabel}
+        </S.yAxisLabel>}
         {Object.keys(xPos).map(xKey => (
           <S.FacetHeaderCell
             key={'col-' + xKey}
             style={{height: '24px'}}
-            gridColumnStart={xPos[xKey] + 3}
-            gridRowStart={2}>
+            gridColumnStart={xPos[xKey] + columnOffset + 1}
+            gridRowStart={rowOffset}>
             {xKey}
           </S.FacetHeaderCell>
         ))}
         {Object.keys(yPos).map(yKey => (
           <S.FacetHeaderCell
             key={'row-' + yKey}
-            gridColumnStart={2}
-            gridRowStart={yPos[yKey] + 3}>
+            gridColumnStart={columnOffset}
+            gridRowStart={yPos[yKey] + rowOffset + 1}>
             {yKey}
           </S.FacetHeaderCell>
         ))}
@@ -394,8 +379,8 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
             <div
               key={'cell-' + xPos[xKey] + '-' + yPos[yKey]}
               style={{
-                gridColumnStart: xPos[xKey] + 3,
-                gridRowStart: yPos[yKey] + 3,
+                gridColumnStart: xPos[xKey] + columnOffset + 1,
+                gridRowStart: yPos[yKey] + rowOffset + 1,
                 border: selected ? `2px solid ${MOON_800}` : undefined,
               }}
               onClick={() =>
@@ -424,8 +409,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
             </div>
           );
         })}
-      </S.FacetGridWrapper>
-    </div>,
+      </S.FacetGridWrapper>,
     o => !cellNodesUse.loading
   );
 };

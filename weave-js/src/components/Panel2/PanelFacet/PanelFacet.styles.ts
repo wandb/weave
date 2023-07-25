@@ -14,33 +14,27 @@ export const PanelSettings = styled.div`
   // max-height: 300px;
 `;
 
-export const FacetGridWrapper = styled.div<{
-  rowHeight: number;
-  columnWidth: number;
-}>`
+export const FacetGridWrapper = styled.div<{hasXAxisLabel: boolean, hasYAxisLabel: boolean}>`
   display: grid;
-  grid-template-columns: 24px 40px;
-  grid-template-rows: 24px 40px;
-  grid-auto-columns: ${({columnWidth}) => columnWidth}px;
-  grid-auto-rows: ${({rowHeight}) => rowHeight}px;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: ${({hasYAxisLabel}) => hasYAxisLabel ?  '24px' : ''} 40px repeat(auto-fit, minmax(0, 1fr));
+  grid-template-rows: ${({hasXAxisLabel}) => hasXAxisLabel ?  '24px' : ''} 40px repeat(auto-fit, minmax(0, 1fr));
   padding: 8px;
 `;
 
-export const xAxisLabel = styled.div<{
-  gridRowStart: number;
-  columnCount: number;
-}>`
+export const xAxisLabel = styled.div<{columnCount: number; hasYAxisLabel: boolean;}>`
   grid-column-end: ${({columnCount}) => columnCount};
   grid-row-start: 1;
-  grid-column-start: 3;
+  grid-column-start: ${({hasYAxisLabel}) => hasYAxisLabel ? 3 : 2};
   display: flex;
   justify-content: center;
   height: 24px;
 `;
 
-export const yAxisLabel = styled.div<{gridRowStart: number; rowCount: number}>`
+export const yAxisLabel = styled.div<{rowCount: number; hasXAxisLabel: boolean}>`
   grid-row-end: ${({rowCount}) => rowCount};
-  grid-row-start: 3;
+  grid-row-start: ${({hasXAxisLabel}) => hasXAxisLabel ? 3 : 2};
   grid-column-start: 1;
   height: 100%;
   display: flex;
