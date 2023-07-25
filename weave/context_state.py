@@ -31,13 +31,11 @@ if patch_context:
         for k, v in _context.items():
             var = glbs.get("_" + k)
             if var is not None:
-                print("setting", k, v)
                 var.set(v)
 
     def weave_post_run():
         _context.clear()
         for k, v in contextvars.copy_context().items():
-            print("saving", k, v)
             _context[k.name] = v
 
     ipython = get_ipython()
@@ -152,7 +150,7 @@ def set_frontend_url(url: str):
 
 
 _eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_eager_mode", default=False
+    "eager_mode", default=False
 )
 
 
@@ -217,4 +215,4 @@ class WandbApiContext:
 ## wandb_api.py context
 _wandb_api_context: contextvars.ContextVar[
     typing.Optional[WandbApiContext]
-] = contextvars.ContextVar("__weave_api_context", default=None)
+] = contextvars.ContextVar("wandb_api_context", default=None)
