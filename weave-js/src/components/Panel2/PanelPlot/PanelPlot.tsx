@@ -550,17 +550,14 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     return (
       <>
         {config.series.map((s, i) => {
-          const groupByDropdownOptions: Option[] = [];
-          PLOT_DIMS_UI.map(dimName => {
-            // TODO: 'mark' isn't present in series dims
-            if (dimName !== 'mark') {
-              groupByDropdownOptions.push({
-                key: dimName,
-                text: dimName,
-                value: s.dims[dimName as keyof SeriesConfig['dims']],
-              });
-            }
-            return null;
+          const groupByDropdownOptions: Option[] = PLOT_DIMS_UI.filter(
+            dimName => dimName !== 'mark'
+          ).map(dimName => {
+            return {
+              key: dimName,
+              text: dimName,
+              value: s.dims[dimName as keyof SeriesConfig['dims']],
+            };
           });
           return (
             <ConfigSection
