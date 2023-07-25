@@ -136,6 +136,7 @@ import {
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
+import {Option} from '@wandb/weave/common/util/uihelpers';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -549,7 +550,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     return (
       <>
         {config.series.map((s, i) => {
-          const groupByDropdownOptions: DropdownItemProps[] = [];
+          const groupByDropdownOptions: Option[] = [];
           PLOT_DIMS_UI.map(dimName => {
             // TODO: 'mark' isn't present in series dims
             if (dimName !== 'mark') {
@@ -602,20 +603,15 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                     const valueToRemove = s.table.groupBy.filter(
                       x => !values.includes(x)
                     );
-                    let dimName = '';
                     if (valueToAdd.length > 0) {
-                      dimName = groupByDropdownOptions.find(
+                      const dimName = groupByDropdownOptions.find(
                         o => o.value === valueToAdd[0]
                       )?.text as keyof SeriesConfig['dims'];
+                      updateGroupBy(true, i, dimName, valueToAdd[0]);
                     } else if (valueToRemove.length > 0) {
-                      dimName = groupByDropdownOptions.find(
+                      const dimName = groupByDropdownOptions.find(
                         o => o.value === valueToRemove[0]
                       )?.text as keyof SeriesConfig['dims'];
-                    }
-                    if (valueToAdd.length > 0) {
-                      updateGroupBy(true, i, dimName, valueToAdd[0]);
-                    }
-                    if (valueToRemove.length > 0) {
                       updateGroupBy(false, i, dimName, valueToRemove[0]);
                     }
                   }}
