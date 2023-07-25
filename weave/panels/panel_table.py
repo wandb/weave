@@ -210,11 +210,13 @@ def _get_rows_node(self: Table) -> Node:
         group_ids = set(self.config.tableState.groupBy)
         data_node = weave.ops.List.groupby(
             data_node,
-            lambda row, index: weave.ops.dict_(
+            lambda row: weave.ops.dict_(
                 **{
                     columns[col_id]["columnName"]: weave_internal.call_fn(
                         columns[col_id]["columnSelectFunction"],
-                        {"row": row, "index": index},
+                        {
+                            "row": row,
+                        },
                     )
                     for col_id in self.config.tableState.groupBy
                 }

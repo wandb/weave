@@ -34,6 +34,10 @@ export const WeaveEditable = styled(Editable)<{$truncate?: boolean}>`
   font-family: Inconsolata;
   cursor: text;
 
+  &:focus {
+    outline: 0;
+  }
+
   // Req'd to make editor selectable in Safari
   user-select: text;
 

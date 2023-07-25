@@ -1,6 +1,16 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled, {css} from 'styled-components';
 
+export const PostfixContainerWrap = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+`;
+
+export const PostfixContainer = styled.div`
+  display: flex;
+`;
+
 export const ConfigOptionLabel = styled.div`
   width: 92px;
   margin-right: 8px;

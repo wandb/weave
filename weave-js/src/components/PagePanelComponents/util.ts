@@ -104,7 +104,7 @@ export const weaveTypeIsPanelGroup = (weaveType?: Type) => {
 };
 
 export const toArtifactSafeName = (name: string) =>
-  name.replace(/[^a-zA-Z0-9]/g, '_');
+  name.replace(/[^a-zA-Z0-9-.]/g, '_');
 
 const entityNameFromRemoteURI = (uri: RemoteURIType) => {
   const parts = uri.split(REMOTE_URI_PREFIX)[1].split('/');

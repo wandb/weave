@@ -146,3 +146,7 @@ class WeaveMissingVariableError(WeaveBaseError):
 
 class WeaveWBHistoryTranslationError(WeaveBaseError):
     pass
+
+
+class WeaveWandbAuthenticationException(Exception):
+    pass
