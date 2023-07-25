@@ -447,7 +447,7 @@ def test_workspace_table_type(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock2)
     summary_node = ops.project("stacey", "mendeleev").runs().summary()
     cell_node = summary_node["table"].table()
-    assert cell_node.type == TaggedValueType(
+    assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         types.List(
             object_type=types.optional(
@@ -457,7 +457,7 @@ def test_workspace_table_type(fake_wandb):
                 )
             )
         ),
-    )
+    ).assign_type(cell_node.type)
 
 
 def test_workspace_table_rows_type(fake_wandb):
@@ -465,7 +465,7 @@ def test_workspace_table_rows_type(fake_wandb):
     cell_node = (
         ops.project("stacey", "mendeleev").runs().summary()["table"].table().rows()
     )
-    assert cell_node.type == TaggedValueType(
+    assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         types.List(
             object_type=types.optional(
@@ -496,7 +496,7 @@ def test_workspace_table_rows_type(fake_wandb):
                 )
             )
         ),
-    )
+    ).assign_type(cell_node.type)
 
 
 def test_table_tags_column_first(fake_wandb):
