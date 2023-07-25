@@ -68,7 +68,7 @@ class PyBoardGeneratorSpec(typing.TypedDict):
     op_name: str
 
 
-generator_specs = [
+no_config_generator_specs = [
     PyBoardGeneratorSpec(
         display_name="Simple Board",
         description="Create a dashboard for any data",
@@ -87,9 +87,9 @@ generator_specs = [
 ]
 
 
-@weave.op(name="py_board-get_generators_for_node")
-def get_boards_for_node(
+@weave.op(name="py_board-get_no_config_generators_for_node")
+def get_no_config_generators_for_node(
     input_node: weave.Node[typing.Any],
 ) -> list[PyBoardGeneratorSpec]:
     # TODO: Filter this down
-    return generator_specs
+    return no_config_generator_specs

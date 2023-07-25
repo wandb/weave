@@ -14,7 +14,7 @@ import {
   useNodeValue,
   useRefreshAllNodes,
 } from '@wandb/weave/react';
-import {useCallback, useMemo} from 'react';
+import {useCallback} from 'react';
 
 import {usePanelContext} from './PanelContext';
 import moment from 'moment';
@@ -29,9 +29,12 @@ export const useBoardGeneratorsForNode = (
     op_name: string;
   }>;
 } => {
-  const genBoardsNode = callOpVeryUnsafe('py_board-get_generators_for_node', {
-    input_node: node,
-  });
+  const genBoardsNode = callOpVeryUnsafe(
+    'py_board-get_no_config_generators_for_node',
+    {
+      input_node: node,
+    }
+  );
   return useNodeValue(genBoardsNode as any);
 };
 

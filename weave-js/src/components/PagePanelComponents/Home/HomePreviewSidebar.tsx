@@ -9,7 +9,10 @@ import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
 import {PreviewNode} from './PreviewNode';
 import {useWeaveContext} from '@wandb/weave/context';
 import {IconCategoryMultimodal} from '../../Icon';
-import {useBoardGeneratorsForNode} from '../../Panel2/pyBoardGen';
+import {
+  useBoardGeneratorsForNode,
+  useMakeLocalBoardFromNode,
+} from '../../Panel2/pyBoardGen';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
@@ -139,11 +142,12 @@ export const HomePreviewSidebarTemplate: React.FC<{
 
 export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
-}> = ({expr}) => {
+  navigateToExpression: NavigateToExpressionType;
+}> = ({expr, navigateToExpression}) => {
   const weave = useWeaveContext();
   const inputExpr = weave.expToString(expr);
   const templates = useBoardGeneratorsForNode(expr);
-
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
@@ -190,7 +194,11 @@ export const HomeExpressionPreviewParts: React.FC<{
                   key={template.op_name}
                   title={template.display_name}
                   subtitle={template.description}
-                  onClick={() => {}}
+                  onClick={() => {
+                    makeBoardFromNode(template.op_name, expr, newDashExpr => {
+                      navigateToExpression(newDashExpr);
+                    });
+                  }}
                 />
               ))}
             </LayoutElements.VStack>
@@ -262,7 +270,10 @@ export const HomeBoardPreview: React.FC<{
           navigateToExpression(expr);
         },
       }}>
-      <HomeExpressionPreviewParts expr={expr} />
+      <HomeExpressionPreviewParts
+        expr={expr}
+        navigateToExpression={navigateToExpression}
+      />
     </HomePreviewSidebarTemplate>
   );
 };
