@@ -5,6 +5,7 @@ schema {
 type Query {
   user(id: ID, userName: String): User
   entity(name: String, login: Boolean): Entity
+  viewer(entityName: String): User
   users(
     query: String
     before: String
