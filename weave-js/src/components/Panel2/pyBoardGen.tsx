@@ -11,18 +11,28 @@ import {
   absoluteTargetMutation,
   makeMutation,
   useClientContext,
-  useNodeWithServerType,
+  useNodeValue,
   useRefreshAllNodes,
 } from '@wandb/weave/react';
-import {useCallback} from 'react';
+import {useCallback, useMemo} from 'react';
 
 import {usePanelContext} from './PanelContext';
 import moment from 'moment';
 
-export const useBoardGeneratorsForNode = (node: Node) => {
-  const refinedNode = useNodeWithServerType(node);
-  console.log('useBoardGeneratorsForNode', refinedNode.result);
-  return ['py_board-seed_board'];
+export const useBoardGeneratorsForNode = (
+  node: Node
+): {
+  loading: boolean;
+  result: Array<{
+    display_name: string;
+    description: string;
+    op_name: string;
+  }>;
+} => {
+  const genBoardsNode = callOpVeryUnsafe('py_board-get_generators_for_node', {
+    input_node: node,
+  });
+  return useNodeValue(genBoardsNode as any);
 };
 
 export const useMakeLocalBoardFromNode = () => {

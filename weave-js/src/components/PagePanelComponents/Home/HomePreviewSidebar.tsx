@@ -9,6 +9,8 @@ import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
 import {PreviewNode} from './PreviewNode';
 import {useWeaveContext} from '@wandb/weave/context';
 import {IconCategoryMultimodal} from '../../Icon';
+import {useBoardGeneratorsForNode} from '../../Panel2/pyBoardGen';
+import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -140,6 +142,8 @@ export const HomeExpressionPreviewParts: React.FC<{
 }> = ({expr}) => {
   const weave = useWeaveContext();
   const inputExpr = weave.expToString(expr);
+  const templates = useBoardGeneratorsForNode(expr);
+
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
@@ -161,31 +165,38 @@ export const HomeExpressionPreviewParts: React.FC<{
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
-      <LayoutElements.VBlock style={{gap: '8px'}}>
-        <span style={{color: '#2B3038', fontWeight: 600}}>
-          Dashboard Templates
-        </span>
+      {templates.loading ? (
         <LayoutElements.VStack
           style={{
-            gap: '8px',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            color: '#8e949e',
           }}>
-          <DashboardTemplate
-            title={`Confusion Matrix`}
-            subtitle={`Classification`}
-            onClick={() => {}}
-          />
-          <DashboardTemplate
-            title={'OpenAI Request Log'}
-            subtitle={`Monitoring`}
-            onClick={() => {}}
-          />
-          <DashboardTemplate
-            title={`Trace Analysis`}
-            subtitle={`LLMs and Prompts`}
-            onClick={() => {}}
-          />
+          <WeaveAnimatedLoader style={{height: '64px', width: '64px'}} />
         </LayoutElements.VStack>
-      </LayoutElements.VBlock>
+      ) : (
+        templates.result.length > 0 && (
+          <LayoutElements.VBlock style={{gap: '8px'}}>
+            <span style={{color: '#2B3038', fontWeight: 600}}>
+              Dashboard Templates
+            </span>
+            <LayoutElements.VStack
+              style={{
+                gap: '8px',
+              }}>
+              {templates.result.map(template => (
+                <DashboardTemplate
+                  key={template.op_name}
+                  title={template.display_name}
+                  subtitle={template.description}
+                  onClick={() => {}}
+                />
+              ))}
+            </LayoutElements.VStack>
+          </LayoutElements.VBlock>
+        )
+      )}
     </LayoutElements.VStack>
   );
 };
