@@ -86,7 +86,7 @@ def weave_server_url() -> str:
     base_url = wandb_base_url()
     default = "https://weave.wandb.ai"
     if base_url != "https://api.wandb.ai":
-        default = base_url
+        default = base_url + "/weave"
     return os.getenv("WEAVE_SERVER_URL", default)
 
 
