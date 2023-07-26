@@ -28,9 +28,6 @@ import {
   HomeBoardPreview,
   HomeExpressionPreviewParts,
 } from './HomePreviewSidebar';
-import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
-import WandbLoader from '@wandb/weave/common/components/WandbLoader';
-import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -470,9 +467,6 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
-  const makeNewDashboard = useNewDashFromItems();
-
-  const makeBoardFromNode = useMakeLocalBoardFromNode();
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
