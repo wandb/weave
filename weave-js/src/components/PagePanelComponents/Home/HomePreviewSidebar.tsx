@@ -15,9 +15,10 @@ import {
 } from '../../Panel2/pyBoardGen';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 import {useNodeWithServerType} from '@wandb/weave/react';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
-  border: 1px solid #dadee3;
+  border: 1px solid ${MOON_250};
   box-shadow: 0px 8px 16px 0px #0e10140a;
   border-top-left-radius: 12px;
 `;
@@ -38,7 +39,7 @@ CenterTableActionCellIcon.displayName = 'S.CenterTableActionCellIcon';
 
 const DashboardTemplateItem = styled(LayoutElements.HStack)`
   padding: 8px 12px;
-  border: 1px solid #dadee3;
+  border: 1px solid ${MOON_250};
   border-radius: 4px;
   cursor: pointer;
   &:hover {
@@ -105,7 +106,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
         <LayoutElements.HBlock
           style={{
             // height: '72px',
-            borderTop: '1px solid #dadee3',
+            borderTop: `1px solid ${MOON_250}`,
             padding: '12px',
             gap: '12px',
           }}>
