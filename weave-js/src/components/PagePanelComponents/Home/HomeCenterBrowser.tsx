@@ -6,6 +6,7 @@ import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
 import * as LayoutElements from './LayoutElements';
 import _ from 'lodash';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 
 const TableRow = styled.tr<{$highlighted?: boolean}>`
   background-color: ${props => (props.$highlighted ? '#f8f9fa' : '')};
@@ -28,7 +29,7 @@ const CenterTable = styled.table`
   }
 
   tr {
-    border-bottom: 1px solid #dadee3;
+    border-bottom: 1px solid ${MOON_250};
     color: #2b3038;
   }
 
@@ -50,7 +51,7 @@ const CenterTable = styled.table`
     }
     &:after {
       bottom: 0;
-      border-bottom: 1px solid #dadee3;
+      border-bottom: 1px solid ${MOON_250};
     }
   }
   /*End sticky with border fix  */
@@ -135,7 +136,7 @@ CenterSpaceTitle.displayName = 'S.CenterSpaceTitle';
 const CenterSpaceHeader = styled(LayoutElements.VBlock)`
   padding: 12px 16px;
   gap: 12px;
-  border-bottom: 1px solid #dadee3;
+  border-bottom: 1px solid ${MOON_250};
 `;
 CenterSpaceHeader.displayName = 'S.CenterSpaceHeader';
 
