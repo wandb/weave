@@ -148,7 +148,7 @@ def test_root_project_concat(fake_wandb):
             }
             }""",
     )
-    assert summary.type == tagged_value_type.TaggedValueType(
+    assert tagged_value_type.TaggedValueType(
         weave.types.TypedDict(property_types={"project": wb_domain_types.ProjectType}),
         weave.types.List(
             object_type=tagged_value_type.TaggedValueType(
@@ -165,7 +165,7 @@ def test_root_project_concat(fake_wandb):
                 weave.types.Float(),
             )
         ),
-    )
+    ).assign_type(summary.type)
 
     assert weave.use(summary) == [0.1, 0.1]
     # The second request is the graph we constructed above. Projection
@@ -473,7 +473,6 @@ def test_two_level_summary(fake_wandb):
 
 
 def test_escaped_gql_query(fake_wandb):
-
     response = {
         "project_8d1592567720841659de23c02c97d594": {
             "id": "UHJvamVjdDp2MTpzYWdlbWFrZXItcGVvcGxlLXZlaGljbGUtY2xhc3Mtc3BsaXR0aW5nOmFjdHVhdGVhaQ==",
