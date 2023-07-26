@@ -6,7 +6,7 @@ from .generator_templates import template_registry
 
 # IMPORTANT: To enable this (or any template), it must be imported in
 # weave/panels_py/__init__.py This example is explicitly commented out since it
-# is not intended to be in production. however, you are encourage to uncomment
+# is not intended to be in production. however, you are encouraged to uncomment
 # it and play around with it.
 
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.

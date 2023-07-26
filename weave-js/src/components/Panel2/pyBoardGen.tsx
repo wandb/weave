@@ -6,6 +6,7 @@ import {
   dereferenceAllVars,
   Node,
   opGet,
+  Type,
 } from '@wandb/weave/core';
 import {
   absoluteTargetMutation,
@@ -36,14 +37,22 @@ export const useBoardGeneratorsForNode = (
       input_node: node,
     }
   );
-  const res = useNodeValue(genBoardsNode as any);
+  const res: {
+    loading: boolean;
+    result: Array<{
+      display_name: string;
+      description: string;
+      op_name: string;
+      config: Type;
+    }>;
+  } = useNodeValue(genBoardsNode as any);
   return useMemo(() => {
     if (res.loading) {
       return {loading: true, result: []};
     } else {
       return {
         loading: false,
-        result: res.result.filter((x: any) => allowConfig || !x.config),
+        result: res.result.filter(x => allowConfig || !x.config),
       };
     }
   }, [allowConfig, res.loading, res.result]);
