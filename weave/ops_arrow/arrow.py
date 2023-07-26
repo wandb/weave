@@ -16,6 +16,9 @@ from .. import errors
 from .. import artifact_fs
 from .. import gql_with_keys
 
+if typing.TYPE_CHECKING:
+    from .list_ import ArrowWeaveList
+
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
     if pa_type == pa.null():
@@ -149,8 +152,35 @@ def offsets_starting_at_zero(arr: pa.ListArray) -> pa.IntegerArray:
         return pc.subtract(raw_offsets, first_value)
 
 
-def dictionary_filename_for_path():
-    pass
+def file_name_for_dictionary(name: str, path: arrow_path.PathType) -> str:
+    file_name_key = ".".join([name, *(str(p) for p in path)])
+    return hashlib.md5(file_name_key.encode()).hexdigest()
+
+
+def dump_array_and_type_to_parquet(
+    awl: "ArrowWeaveList", artifact: artifact_fs.FilesystemArtifact, name: str
+) -> None:
+    table = pa.table({"arr": awl._arrow_data})
+    with artifact.new_file(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
+        pq.write_table(table, f)
+    with artifact.new_file(f"{name}.ArrowWeaveList.type.json") as f:
+        json.dump(awl.object_type.to_dict(), f)
+
+
+def load_array_and_type_from_parquet(
+    type: "ArrowWeaveListType", artifact: artifact_fs.FilesystemArtifact, name: str
+) -> "ArrowWeaveList":
+    from . import list_
+
+    with artifact.open(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
+        deserialized = pq.read_table(f)
+        deserialized = deserialized["arr"].combine_chunks()
+    with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
+        object_type = types.TypeRegistry.type_from_dict(json.load(f))
+
+    with list_.unsafe_awl_construction("load_from_parquet"):
+        l = type.instance_class(deserialized, object_type=object_type, artifact=artifact)  # type: ignore
+    return l
 
 
 @dataclasses.dataclass(frozen=True)
@@ -190,38 +220,20 @@ class ArrowWeaveListType(types.Type):
 
         from . import convert
 
-        parquet_friendly = convert.to_parquet_friendly(obj)
+        parquet_friendly, dictionaries = convert.to_parquet_friendly(obj)
+        dump_array_and_type_to_parquet(parquet_friendly, artifact, name)
 
-        for path, data in parquet_friendly.items():
-            table = pa.table({"arr": data._arrow_data})
-            file_name_key = ".".join([name, *(str(p) for p in path)])
-
-            if len(path) > 0:
-                file_name_key = hashlib.md5(file_name_key.encode()).hexdigest()
-
-            with artifact.new_file(
-                f"{file_name_key}.ArrowWeaveList.parquet", binary=True
-            ) as f:
-                pq.write_table(table, f)
-            with artifact.new_file(f"{file_name_key}.ArrowWeaveList.type.json") as f:
-                json.dump(data.object_type.to_dict(), f)
+        for path, data in dictionaries.items():
+            file_name_key = file_name_for_dictionary(name, path)
+            dump_array_and_type_to_parquet(data, artifact, file_name_key)
 
     def load_instance(
         self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None
     ):
-        with artifact.open(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
-            table = pq.read_table(f)
-        arr = table["arr"].combine_chunks()
-        with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
-            object_type = json.load(f)
-            object_type = types.TypeRegistry.type_from_dict(object_type)
-        from . import list_
+        from . import convert
 
-        with list_.unsafe_awl_construction("load_from_parquet"):
-            l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
-            from . import convert
-
-            res = convert.from_parquet_friendly(l, artifact, name)
+        l = load_array_and_type_from_parquet(self, artifact, name)
+        res = convert.from_parquet_friendly(l, artifact, name, self)
         res.validate()
         return res
 
