@@ -55,7 +55,19 @@ def gql_type_to_weave_type(
         and selection_set
     ):
         property_types: dict[str, types.Type] = {}
+        selections: list[graphql.SelectionNode] = []
+
+        # Handle inline fragments (i.e., ... on Foo)
         for selection in selection_set.selections:
+            if (
+                isinstance(selection, graphql.InlineFragmentNode)
+                and selection.type_condition.name.value == gql_type.name
+            ):
+                selections.extend(selection.selection_set.selections)
+            elif isinstance(selection, FieldNode):
+                selections.append(selection)
+
+        for selection in selections:
             if not isinstance(selection, FieldNode):
                 raise ValueError(
                     f"Selections must be fields, got {selection.__class__.__name__}"

@@ -192,3 +192,116 @@ def test_multi_root_query():
             ),
         }
     )
+
+
+def test_inline_fragments():
+    query = """query WeavePythonCG {
+  project_518fa79465d8ffaeb91015dce87e092f: project(
+    name: "mendeleev"
+    entityName: "stacey"
+  ) {
+    id
+    name
+    artifactType_46d22fef09db004187bb8da4b5e98c58: artifactType(
+      name: "test_results"
+    ) {
+      id
+      name
+      artifactCollections_c1233b7003317090ab5e2a75db4ad965: artifactCollections(
+        first: 100
+      ) {
+        edges {
+          node {
+            id
+            name
+
+            artifacts_c1233b7003317090ab5e2a75db4ad965: artifacts(first: 100) {
+              edges {
+                node {
+                  id
+                  createdBy {
+                    __typename
+                    ... on Run {
+                      id
+                      name
+                      displayName
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+    """
+
+    return_type = gql_to_weave.get_query_weave_type(query)
+    expected = types.TypedDict(
+        {
+            "project_518fa79465d8ffaeb91015dce87e092f": types.TypedDict(
+                {
+                    "id": types.String(),
+                    "name": types.String(),
+                    "artifactType_46d22fef09db004187bb8da4b5e98c58": types.TypedDict(
+                        {
+                            "id": types.String(),
+                            "name": types.String(),
+                            "artifactCollections_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
+                                {
+                                    "edges": types.List(
+                                        types.TypedDict(
+                                            {
+                                                "node": types.TypedDict(
+                                                    {
+                                                        "id": types.String(),
+                                                        "name": types.String(),
+                                                        "artifacts_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
+                                                            {
+                                                                "edges": types.List(
+                                                                    types.TypedDict(
+                                                                        {
+                                                                            "node": types.TypedDict(
+                                                                                {
+                                                                                    "id": types.String(),
+                                                                                    "createdBy": types.UnionType(
+                                                                                        types.TypedDict(
+                                                                                            {
+                                                                                                "__typename": types.String(),
+                                                                                                "id": types.String(),
+                                                                                                "name": types.String(),
+                                                                                                "displayName": types.optional(
+                                                                                                    types.String()
+                                                                                                ),
+                                                                                            }
+                                                                                        ),
+                                                                                        types.TypedDict(
+                                                                                            {
+                                                                                                "__typename": types.String(),
+                                                                                            }
+                                                                                        ),
+                                                                                    ),
+                                                                                }
+                                                                            )
+                                                                        }
+                                                                    )
+                                                                )
+                                                            }
+                                                        ),
+                                                    }
+                                                )
+                                            }
+                                        )
+                                    )
+                                }
+                            ),
+                        }
+                    ),
+                }
+            )
+        }
+    )
+
+    assert return_type == expected
