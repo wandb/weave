@@ -5,7 +5,7 @@
 
 import {css} from 'styled-components';
 import {MOONBEAM, OBLIVION, WHITE} from './color.styles';
-import {SEARCH_NAV_HEIGHT, TRANSPARENT} from './globals.styles';
+import {BLACK, SEARCH_NAV_HEIGHT, TRANSPARENT} from './globals.styles';
 import {hexToRGB} from './utils';
 
 /* Colors */
@@ -364,6 +364,7 @@ export const BLUES = {
  */
 export const Colors = {
   WHITE,
+  BLACK,
   MOONBEAM,
   OBLIVION,
   TRANSPARENT,
