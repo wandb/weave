@@ -24,7 +24,8 @@ from . import compile_table
 from . import weave_internal
 from . import engine_trace
 from . import errors
-
+from . import propagate_gql_keys
+from . import input_provider
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -85,60 +86,6 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
 
 def _quote_node(node: graph.Node) -> graph.Node:
     return weave_internal.const(node)
-
-
-def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
-    if isinstance(node, graph.OutputNode):
-        from_op = node.from_op
-
-        try:
-            op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
-            params = from_op.inputs
-            if isinstance(op.input_type, op_args.OpNamedArgs):
-                params = {
-                    k: n
-                    for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
-                }
-
-            res = op.lazy_call(**params)
-
-            # ensure GQL types are correctly propagated
-            if (
-                op.plugins is not None
-                and any(
-                    isinstance(plugin, compile_domain.GqlOpPlugin)
-                    for _, plugin in op.plugins.items()
-                )
-                and op.refine_output_type is None
-            ):
-                res.type = node.type
-
-            # logging.info("Dispatched (refine): %s -> %s", node, res.type)
-            return res
-        except errors.WeaveDispatchError:
-            logging.error(
-                "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
-                from_op.name,
-                from_op.input_types,
-                re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
-            )
-            if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
-                raise errors.WeaveBadRequest(
-                    "Error while dispatching: %s. This is most likely a client error"
-                    % from_op.name
-                )
-            else:
-                raise
-        except:
-            logging.error(
-                "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
-                from_op.name,
-                from_op.input_types,
-                re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
-            )
-            raise
-
-    return None
 
 
 def _remove_optional(t: types.Type) -> types.Type:
@@ -495,6 +442,93 @@ def compile_refine(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
+    # hack to let us use the old stitch provider for new nodes
+
+    use_stitch = (
+        len(
+            graph.filter_nodes_full(
+                nodes,
+                lambda n: isinstance(n, graph.OutputNode)
+                and n.from_op.name == "gqlroot-wbgqlquery",
+            )
+        )
+        > 0
+    )
+
+    p = stitch.stitch(nodes) if use_stitch else None
+
+    node_array: list[graph.Node] = []
+
+    def _ident(node: graph.Node) -> graph.Node:
+        node_array.append(node)
+        return node
+
+    graph.map_nodes_full(nodes, _ident, on_error)
+
+    i = -1
+
+    def _dispatch_map_fn_refining(
+        node: graph.Node,
+    ) -> typing.Optional[graph.OutputNode]:
+        nonlocal i
+        i += 1
+
+        if isinstance(node, graph.OutputNode):
+            from_op = node.from_op
+
+            try:
+                op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
+                params = from_op.inputs
+                if isinstance(op.input_type, op_args.OpNamedArgs):
+                    params = {
+                        k: n
+                        for k, n in zip(
+                            op.input_type.arg_types, from_op.inputs.values()
+                        )
+                    }
+
+                res = op.lazy_call(**params)
+
+                if use_stitch and p is not None:
+                    const_node_input_vals = {
+                        key: value.val
+                        for key, value in node.from_op.inputs.items()
+                        if isinstance(value, graph.ConstNode)
+                    }
+                    ip = input_provider.InputAndStitchProvider(
+                        const_node_input_vals, p.get_result(node_array[i])
+                    )
+
+                    # Propagate GQL types
+                    res.type = propagate_gql_keys.propagate_gql_keys(res, node, ip)
+
+                # logging.info("Dispatched (refine): %s -> %s", node, res.type)
+                return res
+            except errors.WeaveDispatchError:
+                logging.error(
+                    "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
+                    from_op.name,
+                    from_op.input_types,
+                    re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
+                )
+                if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
+                    raise errors.WeaveBadRequest(
+                        "Error while dispatching: %s. This is most likely a client error"
+                        % from_op.name
+                    )
+                else:
+                    raise
+            except:
+                logging.error(
+                    "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
+                    from_op.name,
+                    from_op.input_types,
+                    re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
+                )
+                raise
+
+        return None
+
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 

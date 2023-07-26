@@ -8,26 +8,14 @@ from . import errors
 from . import op_args
 from . import gql_to_weave
 from . import gql_with_keys
-from dataclasses import dataclass
 import graphql
 
-from .input_provider import InputProvider, InputAndStitchProvider
+from .input_provider import InputAndStitchProvider
 from .gql_with_keys import GQLKeyPropFn
+from .propagate_gql_keys import GqlOpPlugin, _get_gql_plugin
 
 if typing.TYPE_CHECKING:
     from . import op_def
-
-
-@dataclass
-class GqlOpPlugin:
-    query_fn: typing.Callable[[InputAndStitchProvider, str], str]
-    is_root: bool = False
-    root_resolver: typing.Optional["op_def.OpDef"] = None
-
-    # given the input types to the op, return a new output type with the input types'
-    # gql keys propagated appropriately. this is not a part of output_type to avoid
-    # the UI needing to make additional network requests to get the output type
-    gql_key_prop_fn: typing.Optional[GQLKeyPropFn] = None
 
 
 def fragment_to_query(fragment: str) -> str:
@@ -137,112 +125,10 @@ def apply_domain_op_gql_translation(
     # now propagate the gql payload type through the graph
     query_root_node.type = gql_to_weave.get_query_weave_type(query_str)
 
-    p = stitch.stitch(res, on_error=on_error)
-
-    def _propagate_gql_keys_for_node(
-        opdef: "op_def.OpDef",
-        node: graph.OutputNode,
-        key_fn: GQLKeyPropFn,
-    ) -> None:
-        # Mutates node
-        # TODO: see if this can be done without mutations
-        from .language_features.tagging import (
-            tagged_value_type_helpers,
-            tagged_value_type,
-            opdef_util,
-        )
-
-        input_types = node.from_op.input_types
-
-        const_node_input_vals = {
-            key: value.val
-            for key, value in node.from_op.inputs.items()
-            if isinstance(value, graph.ConstNode)
-        }
-        ip = InputAndStitchProvider(const_node_input_vals, p.get_result(node))
-        assert isinstance(opdef.input_type, op_args.OpNamedArgs)
-
-        first_arg_name = next(iter(opdef.input_type.arg_types.keys()))
-
-        # unwrap and rewrap tags
-        original_input_type = input_types[first_arg_name]
-
-        unwrapped_input_type, wrap = tagged_value_type_helpers.unwrap_tags(
-            original_input_type
-        )
-
-        # key fn operates on untagged types
-        new_output_type = key_fn(ip, unwrapped_input_type)
-
-        if isinstance(new_output_type, types.Invalid):
-            raise ValueError('GQL key function returned "Invalid" type')
-
-        # now we rewrap the types to propagate the tags
-        if opdef_util.should_tag_op_def_outputs(opdef):
-            new_output_type = tagged_value_type.TaggedValueType(
-                types.TypedDict({first_arg_name: original_input_type}), new_output_type
-            )
-        elif opdef_util.should_flow_tags(opdef):
-            new_output_type = wrap(new_output_type)
-
-        node.type = new_output_type
-
-    def _propagate_gql_keys_map_fn(node: graph.Node) -> graph.Node:
-
-        if (
-            isinstance(node, graph.OutputNode)
-            and not node.from_op.name == "gqlroot-wbgqlquery"
-        ):
-            fq_opname = node.from_op.full_name
-            opdef = registry_mem.memory_registry.get_op(fq_opname)
-            plugin = _get_gql_plugin(opdef)
-
-            if plugin is None or plugin.gql_key_prop_fn is None:
-                if node in replacement_node_to_original_opdef_map:
-                    original_opdef = replacement_node_to_original_opdef_map[node]
-                    original_plugin = _get_gql_plugin(original_opdef)
-                    assert (
-                        original_plugin is not None
-                        and original_plugin.gql_key_prop_fn is not None
-                    )
-
-                    key_fn = original_plugin.gql_key_prop_fn
-
-                    # mutates node
-                    _propagate_gql_keys_for_node(
-                        opdef,
-                        node,
-                        key_fn,
-                    )
-                elif opdef.refine_output_type is None:
-                    # if we have a refiner, we don't need to do anything
-                    # we can use its type later on, during the next step
-                    new_output_type = opdef.unrefined_output_type_for_params(
-                        node.from_op.inputs
-                    )
-                    node.type = new_output_type
-            else:
-                # mutates node
-                _propagate_gql_keys_for_node(
-                    opdef,
-                    node,
-                    plugin.gql_key_prop_fn,
-                )
-        new_output_type = node.type
-        return node
-
-    # We have the correct type for the GQL root node now, so now we re-calcaulte all
-    # the downstream types to propagate the correct type to the rest of the graph.
-    return graph.map_nodes_full(res, _propagate_gql_keys_map_fn, on_error)
+    return res
 
 
 ### Everything below are helpers for the above function ###
-
-
-def _get_gql_plugin(op_def: "op_def.OpDef") -> typing.Optional[GqlOpPlugin]:
-    if op_def.plugins is not None and "wb_domain_gql" in op_def.plugins:
-        return op_def.plugins["wb_domain_gql"]
-    return None
 
 
 def _get_plugin_output_type(node: graph.OutputNode) -> types.Type:
