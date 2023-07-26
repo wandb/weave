@@ -369,7 +369,7 @@ const pointCloudScene = (
         }
         break;
     }
-});
+  });
 
   /**** End of Camera Code ****/
 
