@@ -4,6 +4,7 @@ module.exports = {
   darkMode: ['class', '[data-mode="dark"]'],
   theme: {
     /**
+     * This overrides Tailwind's default spacing system.
      * Inherited by padding, margin, width, height, maxHeight, gap,
      * inset, space, translate, scrollMargin, and scrollPadding
      */
@@ -34,7 +35,14 @@ module.exports = {
       36: '2.25rem',
       38: '2.375rem',
       40: '2.5rem',
+      44: '2.75rem',
       48: '3rem',
+      56: '3.5rem',
+      60: '3.75rem',
+      64: '4rem',
+      72: '4.5rem',
+      80: '5rem',
+      96: '6rem',
     },
     /**
      * Keep these colors in sync with what is in color.styles.ts
