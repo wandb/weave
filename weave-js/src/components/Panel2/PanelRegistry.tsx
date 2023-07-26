@@ -53,7 +53,7 @@ import {Spec as MultiTableSpec2} from './PanelTableMerge';
 import {Spec as TraceSpec} from './PanelTrace';
 import {Spec as TraceTreeModelSpec} from './PanelTraceTree/PanelTraceTreeModel';
 import {Spec as PanelTraceTreeTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer';
-import {Spec as PanelTraceTreeTraceTableViewerSpec2} from './PanelTraceTree/PanelTraceTreeTableViewer2';
+import {Spec as PanelTraceTreeFromHistoryTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer2';
 import {Spec as TraceTreeTraceSpec} from './PanelTraceTree/PanelTraceTreeTrace';
 import {Spec as PanelTraceSpec} from './PanelTraceTree/PanelTrace';
 import {Spec as TypeSpec} from './PanelType';
@@ -153,7 +153,7 @@ const initSpecs = () => {
       PanelArtifactVersionAliasesSpec,
 
       PanelTraceTreeTraceTableViewerSpec,
-      PanelTraceTreeTraceTableViewerSpec2,
+      PanelTraceTreeFromHistoryTraceTableViewerSpec,
       TraceTreeTraceSpec,
       TraceTreeModelSpec,
       PanelTraceSpec,

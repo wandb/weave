@@ -41,11 +41,11 @@ const inputType = {
   },
 };
 
-type PanelTraceTreeTraceTableViewerConfigType = {};
+type PanelTraceTreeFromHistoryTraceTableViewerConfigType = {};
 
-type PanelTraceTreeTraceTableViewerProps = Panel2.PanelProps<
+type PanelTraceTreeFromHistoryTraceTableViewerProps = Panel2.PanelProps<
   typeof inputType,
-  PanelTraceTreeTraceTableViewerConfigType
+  PanelTraceTreeFromHistoryTraceTableViewerConfigType
 >;
 
 const stripType = (rowType: Type) => {
@@ -112,8 +112,8 @@ const makeTableState = (inputArrayNode: Node, weave: WeaveInterface) => {
   return {ts, columnWidths};
 };
 
-export const PanelTraceTreeTraceTableViewer: React.FC<
-  PanelTraceTreeTraceTableViewerProps
+export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
+  PanelTraceTreeFromHistoryTraceTableViewerProps
 > = props => {
   const weave = useWeaveContext();
   const tableNode = props.input;
@@ -138,6 +138,6 @@ export const PanelTraceTreeTraceTableViewer: React.FC<
 export const Spec: Panel2.PanelSpec = {
   id: 'wb_trace_tree-traceDebuggerFromRunHistory',
   displayName: 'LLM Trace Debugger',
-  Component: PanelTraceTreeTraceTableViewer,
+  Component: PanelTraceTreeFromHistoryTraceTableViewer,
   inputType,
 };
