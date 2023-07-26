@@ -188,7 +188,7 @@ def apply_domain_op_gql_translation(
         node.type = new_output_type
 
     def _propagate_gql_keys_map_fn(node: graph.Node) -> graph.Node:
-        original_output_type = node.type
+
         if (
             isinstance(node, graph.OutputNode)
             and not node.from_op.name == "gqlroot-wbgqlquery"
@@ -229,21 +229,6 @@ def apply_domain_op_gql_translation(
                     plugin.gql_key_prop_fn,
                 )
         new_output_type = node.type
-
-        has_artifact_collections = (
-            "artifactCollections_c96697489c051b1be46673088f743964"
-            in str(new_output_type.to_dict())
-        )
-        print(
-            "node",
-            node,
-            "new_output_type",
-            new_output_type,
-            "has_artifacft_collections",
-            has_artifact_collections,
-        )
-
-        # print(node, new_output_type, original_output_type)
         return node
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all
