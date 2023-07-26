@@ -3,6 +3,10 @@ module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
   darkMode: ['class', '[data-mode="dark"]'],
   theme: {
+    /**
+     * Inherited by padding, margin, width, height, maxHeight, gap,
+     * inset, space, translate, scrollMargin, and scrollPadding
+     */
     spacing: {
       0: '0px',
       1: '1px',
