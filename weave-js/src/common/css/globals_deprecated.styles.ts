@@ -5,8 +5,14 @@
 
 import {css} from 'styled-components';
 import {MOONBEAM, OBLIVION, WHITE} from './color.styles';
-import {BLACK, SEARCH_NAV_HEIGHT, TRANSPARENT} from './globals.styles';
 import {hexToRGB} from './utils';
+
+/* Hardcoded values */
+export const SEARCH_NAV_HEIGHT = '60px';
+
+// TODO - need to talk to designers before making changes to black and transparent
+export const BLACK = '#000000';
+export const TRANSPARENT = 'rgba(255, 255, 255, 0)';
 
 /* Colors */
 
