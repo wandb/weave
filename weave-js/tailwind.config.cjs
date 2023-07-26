@@ -8,14 +8,14 @@ module.exports = {
      * inset, space, translate, scrollMargin, and scrollPadding
      */
     spacing: {
-      0: '0px',
-      1: '1px',
-      2: '2px',
-      3: '3px',
-      4: '4px',
-      5: '5px',
-      6: '6px',
-      7: '7px',
+      0: '0rem',
+      1: '0.063rem',
+      2: '0.125rem',
+      3: '0.188rem',
+      4: '0.25rem',
+      5: '0.313rem',
+      6: '0.375rem',
+      7: '0.438rem',
       8: '0.5rem',
       10: '0.625rem',
       12: '0.75rem',
