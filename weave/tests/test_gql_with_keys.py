@@ -415,10 +415,7 @@ def test_op_with_refiner(fake_wandb):
     }
 
     expected = types.TypeRegistry.type_from_dict(expected_compiled_type_dict)
-
     assert compiled_node.type == expected
-
-    weave.use(node)
 
 
 def test_gql_connection_op():
