@@ -9,6 +9,7 @@ module.exports = {
      */
     spacing: {
       0: '0rem',
+      px: '0.063rem',
       1: '0.063rem',
       2: '0.125rem',
       3: '0.188rem',
@@ -33,6 +34,7 @@ module.exports = {
       36: '2.25rem',
       38: '2.375rem',
       40: '2.5rem',
+      48: '3rem',
     },
     /**
      * Keep these colors in sync with what is in color.styles.ts
