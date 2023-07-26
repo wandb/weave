@@ -120,7 +120,6 @@ def gql_type_to_weave_type(
 
 
 def get_query_weave_type(query: str) -> types.Type:
-    print(query)
     document = parse(query)
     for definition in document.definitions:
         if isinstance(definition, OperationDefinitionNode):

@@ -179,10 +179,7 @@ def gql_direct_edge_op(
         if isinstance(self_type, gql_with_keys.GQLHasKeysType):
             keys = self_type.keys
             assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
-            new_keys = keys[key]
-            if is_many:
-                new_keys = typing.cast(weave_types.List, new_keys).object_type
-            new_keys = typing.cast(weave_types.TypedDict, new_keys)
+            new_keys = typing.cast(weave_types.TypedDict, keys[key])
             ret_type = output_type.with_keys(new_keys.property_types)
 
         if is_many:

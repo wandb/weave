@@ -453,8 +453,6 @@ type ArtifactAlias {
   id: ID!
   artifact: Artifact
   alias: String!
-  artifactCollection: ArtifactCollection
-  artifactCollectionName: String!
 }
 
 type Artifact {
