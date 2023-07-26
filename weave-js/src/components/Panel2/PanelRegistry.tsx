@@ -53,7 +53,7 @@ import {Spec as MultiTableSpec2} from './PanelTableMerge';
 import {Spec as TraceSpec} from './PanelTrace';
 import {Spec as TraceTreeModelSpec} from './PanelTraceTree/PanelTraceTreeModel';
 import {Spec as PanelTraceTreeTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer';
-import {Spec as PanelTraceTreeFromHistoryTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer2';
+import {Spec as PanelTraceTreeFromHistoryTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeFromHistoryTableViewer';
 import {Spec as TraceTreeTraceSpec} from './PanelTraceTree/PanelTraceTreeTrace';
 import {Spec as PanelTraceSpec} from './PanelTraceTree/PanelTrace';
 import {Spec as TypeSpec} from './PanelType';
