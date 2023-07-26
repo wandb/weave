@@ -21,6 +21,7 @@ const CenterSpace = styled(LayoutElements.VSpace)`
   box-shadow: 0px 8px 16px 0px #0e10140a;
   border-top-left-radius: 12px;
 `;
+CenterSpace.displayName = 'S.CenterSpace';
 
 const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
   align-items: center;
@@ -33,6 +34,7 @@ const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
     color: #038194;
   }
 `;
+CenterTableActionCellIcon.displayName = 'S.CenterTableActionCellIcon';
 
 const DashboardTemplateItem = styled(LayoutElements.HStack)`
   padding: 8px 12px;
@@ -45,6 +47,7 @@ const DashboardTemplateItem = styled(LayoutElements.HStack)`
     color: #038194;
   }
 `;
+DashboardTemplateItem.displayName = 'S.DashboardTemplateItem';
 
 export const HomePreviewSidebarTemplate: React.FC<{
   title: string;

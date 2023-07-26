@@ -1,6 +1,11 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
-import {IconCopy, IconDown, IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
+import {
+  IconCopy,
+  IconChevronDown,
+  IconInfo,
+  IconOpenNewTab,
+} from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import moment from 'moment';
@@ -103,7 +108,7 @@ export const CenterEntityBrowserInner: React.FC<
     return [
       [
         {
-          icon: IconDown,
+          icon: IconChevronDown,
           label: 'Browse project',
           onClick: row => {
             props.setSelectedProjectName(row._id);
@@ -251,7 +256,7 @@ const CenterProjectBrowserInner: React.FC<
     return [
       [
         {
-          icon: IconDown,
+          icon: IconChevronDown,
           label: 'Browse asset type',
           onClick: row => {
             props.setSelectedAssetType(row._id);
