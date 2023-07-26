@@ -175,13 +175,17 @@ def gql_direct_edge_op(
         alias = gql_with_keys._alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
+        ret_type = output_type
         if isinstance(self_type, gql_with_keys.GQLHasKeysType):
             keys = self_type.keys
             assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
             new_keys = typing.cast(weave_types.TypedDict, keys[key])
-            return output_type.with_keys(new_keys.property_types)
+            ret_type = output_type.with_keys(new_keys.property_types)
 
-        return output_type
+        if is_many:
+            ret_type = weave_types.List(ret_type)
+
+        return ret_type
 
     additional_inputs_types = additional_inputs_types or {}
     if is_root:
@@ -306,7 +310,7 @@ def gql_connection_op(
             )
             return weave_types.List(output_type.with_keys(new_keys.property_types))
 
-        return output_type
+        return weave_types.List(output_type)
 
     additional_inputs_types = additional_inputs_types or {}
 

@@ -105,7 +105,9 @@ def apply_domain_op_gql_translation(
             output_type = _get_plugin_output_type(node)
             key_type = typing.cast(
                 types.TypedDict,
-                gql_to_weave.get_query_weave_type(fragment_to_query(inner_fragment)),
+                gql_to_weave.get_query_weave_type(
+                    _normalize_query_str(fragment_to_query(inner_fragment))
+                ),
             )
             assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
 
@@ -228,7 +230,20 @@ def apply_domain_op_gql_translation(
                 )
         new_output_type = node.type
 
-        print(node, new_output_type, original_output_type)
+        has_artifact_collections = (
+            "artifactCollections_c96697489c051b1be46673088f743964"
+            in str(new_output_type.to_dict())
+        )
+        print(
+            "node",
+            node,
+            "new_output_type",
+            new_output_type,
+            "has_artifacft_collections",
+            has_artifact_collections,
+        )
+
+        # print(node, new_output_type, original_output_type)
         return node
 
     # We have the correct type for the GQL root node now, so now we re-calcaulte all
