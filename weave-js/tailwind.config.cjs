@@ -3,6 +3,22 @@ module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
   darkMode: ['class', '[data-mode="dark"]'],
   theme: {
+    spacing: {
+      0: '0px',
+      1: '1px',
+      2: '2px',
+      3: '3px',
+      4: '4px',
+      5: '5px',
+      6: '6px',
+      7: '7px',
+      8: '0.5rem',
+      12: '0.75rem',
+      16: '1rem',
+      24: '1.5rem',
+      32: '2rem',
+      40: '2.5rem',
+    },
     /**
      * Keep these colors in sync with what is in color.styles.ts
      */
