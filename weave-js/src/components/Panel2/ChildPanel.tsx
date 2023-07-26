@@ -747,20 +747,6 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
 
   const dashboardConfigOptions = curPanelSelected ? (
     <>
-      <ConfigPanel.ConfigOption label={`Type`}>
-        <ConfigPanel.ModifiedDropdownConfigField
-          value={curPanelId}
-          options={panelOptions}
-          onChange={(e, {value}) => {
-            if (typeof value === `string` && value) {
-              handlePanelChange(value);
-            }
-          }}
-        />
-      </ConfigPanel.ConfigOption>
-
-      <VariableEditor config={config} updateConfig={updatePanelConfig} />
-
       {curPanelId !== 'Group' && (
         <ConfigPanel.ConfigOption label="Input" multiline>
           <PanelContextProvider
@@ -773,6 +759,20 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
           </PanelContextProvider>
         </ConfigPanel.ConfigOption>
       )}
+
+      <ConfigPanel.ConfigOption label="Panel type">
+        <ConfigPanel.ModifiedDropdownConfigField
+          value={curPanelId}
+          options={panelOptions}
+          onChange={(e, {value}) => {
+            if (typeof value === `string` && value) {
+              handlePanelChange(value);
+            }
+          }}
+        />
+      </ConfigPanel.ConfigOption>
+
+      <VariableEditor config={config} updateConfig={updatePanelConfig} />
     </>
   ) : null;
 
@@ -833,6 +833,9 @@ export const VariableEditor: React.FC<{
 }> = ({config, updateConfig}) => {
   const frame: {[key: string]: NodeOrVoidNode} = {};
   const nextFrame = {...frame};
+  if (_.isEmpty(config.vars)) {
+    return null;
+  }
   return (
     <ConfigPanel.ConfigOption label="variables">
       <div>

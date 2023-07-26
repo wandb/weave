@@ -146,12 +146,12 @@ def _without_tags(type_: types.Type) -> types.Type:
     return type_
 
 
-def _node_type_has_keys(type_: types.Type) -> bool:
-    return (
-        hasattr(type_, "object_type")
-        and hasattr(type_.object_type, "property_types")
-        and len(type_.object_type.property_types) > 0
-    )
+def _is_list_like(type_: types.Type) -> bool:
+    return hasattr(type_, "object_type")
+
+
+def _is_dict_like(type_: types.Type) -> bool:
+    return hasattr(type_, "property_types")
 
 
 def _get_key_typed_node(node: graph.Node) -> graph.Node:
@@ -189,6 +189,33 @@ def _filter_known_paths_to_requested_paths(
     return history_cols
 
 
+def _history_node_known_keys(node: graph.Node) -> list[str]:
+    node_type = node.type
+
+    # First, we expect the type to be list like
+    if not _is_list_like(node_type):
+        return []
+
+    node_type = typing.cast(types.List, node_type)
+    node_type = node_type.object_type
+
+    # Next, it is possible we have one more layer of list (if the
+    # node was mapped)
+    if _is_list_like(node_type):
+        node_type = typing.cast(types.List, node_type)
+        node_type = node_type.object_type
+
+    # Finally, we would expect the node to be dict like and have
+    # at least one property.
+    if _is_dict_like(node_type):
+        node_type = typing.cast(types.TypedDict, node_type)
+        if len(node_type.property_types) > 0:
+            node_type = typing.cast(types.TypedDict, _without_tags(node_type))
+            return flatten_typed_dicts(node_type)
+
+    return []
+
+
 def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
     # I moved the column pushdown before the gql step, so we actually have the
@@ -205,16 +232,27 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
         # If no keys, then we cowardly refuse to blindly fetch entire history table
         return "historyKeys"
 
-    top_level_keys = get_full_columns(top_level_keys)
+    # We need to figure out the known history keys. In the vast majority of
+    # situations, the node's type will contain this information (by virtue of
+    # the refinement step during compilation. There is an edge case with nested
+    # lambdas where this will not be the case, and we need to explicitly call
+    # `_get_key_typed_node` to get the correctly typed node. Moreover, we need
+    # to properly handle mapping here. The fallback is to just use the `_step`
+    # key.
+    all_known_paths = ["_step"]
+
     node = inputs.stitched_obj.node
-    if not _node_type_has_keys(node.type):
+    paths_from_node = _history_node_known_keys(inputs.stitched_obj.node)
+
+    # If we don't have any paths from the node, then we need to refine it.
+    if len(paths_from_node) == 0:
         node = _get_key_typed_node(node)
-    if not hasattr(node.type, "object_type"):
-        all_known_paths = ["_step"]
-    else:
-        all_known_paths = flatten_typed_dicts(_without_tags(node.type.object_type))  # type: ignore
+        paths_from_node = _history_node_known_keys(node)
+
+    all_known_paths += paths_from_node
+
     history_cols = _filter_known_paths_to_requested_paths(
-        all_known_paths, top_level_keys
+        list(set(all_known_paths)), get_full_columns(top_level_keys)
     )
 
     project_fragment = """

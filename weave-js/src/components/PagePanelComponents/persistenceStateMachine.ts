@@ -272,15 +272,22 @@ export const useStateMachine = (
             artifact_name:
               actionOptions.name != null
                 ? constString(toArtifactSafeName(actionOptions.name))
-                : constNone(), // TODO: Allow user to specify name
-            project_name: constString('weave'), // TODO: Allow user to specify name
+                : constNone(),
+            project_name:
+              actionOptions.projectName != null
+                ? constString(actionOptions.projectName)
+                : constString('weave'),
+            entity_name:
+              actionOptions.entityName != null
+                ? constString(actionOptions.entityName)
+                : constNone(),
           },
           newRoot => {
             updateNode(newRoot);
           }
         );
       } else if (action === 'commit') {
-        await makeMutation(inputNode, 'merge', {}, newRoot => {
+        await makeMutation(inputNode, 'merge_artifact', {}, newRoot => {
           updateNode(newRoot);
         });
       } else if (action === 'delete_local' || action === 'delete_remote') {

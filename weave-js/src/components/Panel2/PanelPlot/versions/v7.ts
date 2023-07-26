@@ -3,10 +3,6 @@ import * as v1 from './v1';
 import * as v6 from './v6';
 
 export const MARK_OPTIONS = [...v1.MARK_OPTIONS, 'area' as const];
-export const DIM_NAME_MAP = {
-  ...v6.DIM_NAME_MAP,
-  y2: 'Y2 Dim',
-};
 
 export type SeriesConfig = Omit<v6.SeriesConfig, 'constants' | 'dims'> & {
   constants: Omit<v6.SeriesConfig['constants'], 'mark'> & {
