@@ -541,6 +541,8 @@ def unnest(self):
     if not list_cols:
         return self
 
+    self = self._decode_gql_types()
+
     if isinstance(self._arrow_data, pa.StructArray):
         rb = pa.RecordBatch.from_struct_array(
             self._arrow_data
@@ -575,6 +577,7 @@ def unnest(self):
     # This requires us a hack in our AWL.validate function to allow float64 when
     # the weave type is int.
     # TODO: write an arrow based implementation, and remove the hack in validate.
+
     exploded_table = pa.Table.from_pandas(
         df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
     )
