@@ -470,7 +470,6 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
-  const [seedingBoard, setSeedingBoard] = useState(false);
   const makeNewDashboard = useNewDashFromItems();
 
   const makeBoardFromNode = useMakeLocalBoardFromNode();
@@ -547,11 +546,10 @@ const CenterProjectTablesBrowser: React.FC<
         },
       ],
     ];
-  }, [makeBoardFromNode, makeNewDashboard, props, weave]);
+  }, [props, weave]);
 
   return (
     <>
-      {seedingBoard && <WandbLoader />}
       <CenterBrowser
         allowSearch
         title={browserTitle}
