@@ -1,3 +1,8 @@
+# This file contains a set of routines for converting the return type of a GQL query to a weave type.
+# It works by parsing the GQL query and then recursively walking the AST, converting each node to a weave type.
+# This depends on having a GraphQL schema available, which is currently loaded from a file. The load
+# happens when this file is imported and used throughout the duration of the program.
+
 from graphql import (
     parse,
     get_operation_root_type,
@@ -120,7 +125,24 @@ def gql_type_to_weave_type(
 
 
 def get_query_weave_type(query: str) -> types.Type:
-    print(query)
+    """
+    Converts a given GraphQL query to a corresponding Weave type.
+
+    This function parses the provided query, determines its root operation type from the schema,
+    and then converts that root operation type into a Weave type using the gql_type_to_weave_type() function.
+
+    Parameters:
+    query (str): The GraphQL query string to be converted.
+
+    Returns:
+    types.Type: The corresponding Weave type.
+
+    Raises:
+    ValueError: If no operation is found in the query.
+
+    Note:
+    It prints the query string to the console. In a production setting, consider using logging for this instead.
+    """
     document = parse(query)
     for definition in document.definitions:
         if isinstance(definition, OperationDefinitionNode):
