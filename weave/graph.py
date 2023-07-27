@@ -84,7 +84,9 @@ class Op(typing.Generic[OpInputNodeT]):
     def full_name(self) -> str:
         return opuri_full_name(self.name)
 
-    def _input_types(self) -> dict[str, weave_types.Type]:
+    # Called frequently and expensive, so cache it.
+    @functools.cached_property
+    def input_types(self) -> dict[str, weave_types.Type]:
         its: dict[str, weave_types.Type] = {}
         for k, v in self.inputs.items():
             if isinstance(v, ConstNode):
@@ -92,11 +94,6 @@ class Op(typing.Generic[OpInputNodeT]):
             else:
                 its[k] = v.type
         return its
-
-    # Called frequently and expensive, so cache it.
-    @functools.cached_property
-    def input_types(self) -> dict[str, weave_types.Type]:
-        return self._input_types()
 
     def to_json(self) -> dict:
         json_inputs = {}
