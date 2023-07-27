@@ -1,4 +1,4 @@
-import {Node} from '@wandb/weave/core';
+import {EditingNode, Node, voidNode} from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveContext} from '../../../context';
@@ -15,8 +15,8 @@ export const inputType = {type: 'list' as const, objectType: 'any' as const};
 interface FacetConfig {
   table: TableState.TableState;
   dims: {
-    xAxisLabel: string;
-    yAxisLabel: string;
+    xAxisLabel: EditingNode;
+    yAxisLabel: EditingNode;
     x: TableState.ColumnId;
     y: TableState.ColumnId;
     select: TableState.ColumnId;
@@ -57,8 +57,8 @@ export function defaultFacet(): FacetConfig {
   return {
     table: tableState,
     dims: {
-      xAxisLabel: '',
-      yAxisLabel: '',
+      xAxisLabel: voidNode(),
+      yAxisLabel: voidNode(),
       x: xColId,
       y: yColId,
       select: selectColId,
@@ -172,13 +172,13 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   );
 
   const updateAxisLabel = useCallback(
-    (newAxisLabel: {xAxisLabel?: string; yAxisLabel?: string}) =>
+    (newAxisLabel: {xAxisLabel?: EditingNode; yAxisLabel?: EditingNode}) =>
       updateConfig({
-        dims: {
-          ...config.dims,
-          ...newAxisLabel,
-        },
-      }),
+      dims: {
+        ...config.dims,
+        ...newAxisLabel,
+      },
+    }),
     [updateConfig, config.dims]
   );
 
@@ -208,13 +208,9 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
     <ConfigPanel.ConfigSection label={`Properties`}>
       {dashboardConfigOptions}
       <ConfigPanel.ConfigOption label={'x-axis-label'}>
-        <ConfigPanel.TextInputConfigField
-          dataTest="x-axis-label-input"
-          label="x-axis label"
-          value={config.dims.xAxisLabel || ''}
-          onChange={({target}) => {
-            updateAxisLabel({xAxisLabel: (target as HTMLInputElement).value});
-          }}
+        <ConfigPanel.ExpressionConfigField
+          expr={config.dims.xAxisLabel}
+          setExpression={(exp) => updateAxisLabel({xAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label={'x'}>
@@ -226,14 +222,10 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
           updateTableConfig={updateTableConfig}
         />
       </ConfigPanel.ConfigOption>
-      <ConfigPanel.ConfigOption label={'y-axis-label'}>
-        <ConfigPanel.TextInputConfigField
-          dataTest="y-axis-label-input"
-          label="y-axis label"
-          value={config.dims.yAxisLabel || ''}
-          onChange={({target}) => {
-            updateAxisLabel({yAxisLabel: (target as HTMLInputElement).value});
-          }}
+      <ConfigPanel.ConfigOption label={'y-axis label'}>
+        <ConfigPanel.ExpressionConfigField
+          expr={config.dims.yAxisLabel}
+          setExpression={(exp) => updateAxisLabel({yAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label={'y'}>
