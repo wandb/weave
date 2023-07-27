@@ -327,6 +327,25 @@ interface ArtifactCollection {
   aliases(first: Int): ArtifactAliasConnection!
   artifactMemberships(first: Int): ArtifactCollectionMembershipConnection!
   artifactMembership(aliasName: String!): ArtifactCollectionMembership
+
+  tags: TagConnection!
+}
+
+type TagConnection {
+  pageInfo: PageInfo!
+  edges: [TagEdge!]!
+}
+
+type TagEdge {
+  node: Tag!
+  cursor: String!
+}
+
+type Tag {
+  id: ID!
+  name: String!
+  attributes: JSONString!
+  tagCategoryName: String!
 }
 
 type ArtifactSequenceConnection {
