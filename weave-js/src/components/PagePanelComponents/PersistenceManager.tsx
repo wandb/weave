@@ -620,32 +620,6 @@ const HeaderFileControls: React.FC<{
   );
 };
 
-function useFetchWeaveVersion(url: string) {
-  const [data, setData] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.text();
-          setData(data);
-        } else {
-          setData('');
-        }
-      } catch (error) {
-        console.error(error);
-      }
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [url]);
-
-  return {loading, data};
-}
-
 const HeaderLogoControls: React.FC<{
   inputNode: NodeOrVoidNode;
   inputConfig: any;
