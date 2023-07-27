@@ -145,7 +145,6 @@ export const useSignedUrlWithExpiration = (
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const directUrlNode = useDirectUrlNodeWithExpiration(fileNode, ttl);
   const directUrl = CGReact.useNodeValue(directUrlNode);
-  console.log({directUrl});
   useEffect(() => {
     const resolveSignedUrl = async () => {
       if (directUrl.result != null) {
