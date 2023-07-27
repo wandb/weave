@@ -93,12 +93,11 @@ def propagate_gql_keys(
                     fq_opname.replace("GQLResolver", "")
                 )
                 original_plugin = _get_gql_plugin(original_opdef)
-                assert (
+                if (
                     original_plugin is not None
                     and original_plugin.gql_key_prop_fn is not None
-                )
-
-                key_fn = original_plugin.gql_key_prop_fn
+                ):
+                    key_fn = original_plugin.gql_key_prop_fn
         else:
             key_fn = plugin.gql_key_prop_fn
 

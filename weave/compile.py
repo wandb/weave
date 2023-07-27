@@ -442,8 +442,6 @@ def compile_refine(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    # hack to let us use the old stitch provider for new nodes
-
     use_stitch = (
         len(
             graph.filter_nodes_full(
@@ -455,8 +453,8 @@ def compile_refine(
         > 0
     )
 
+    # hack to let us use the old stitch provider for new nodes
     p = stitch.stitch(nodes) if use_stitch else None
-
     node_array: list[graph.Node] = []
 
     def _ident(node: graph.Node) -> graph.Node:
@@ -474,6 +472,11 @@ def compile_refine(
         i += 1
 
         if isinstance(node, graph.OutputNode):
+
+            if node.from_op.name == "gqlroot-wbgqlquery":
+                # dont refine this one
+                return node
+
             from_op = node.from_op
 
             try:
