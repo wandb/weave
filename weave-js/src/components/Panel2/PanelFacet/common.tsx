@@ -174,11 +174,11 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   const updateAxisLabel = useCallback(
     (newAxisLabel: {xAxisLabel?: EditingNode; yAxisLabel?: EditingNode}) =>
       updateConfig({
-      dims: {
-        ...config.dims,
-        ...newAxisLabel,
-      },
-    }),
+        dims: {
+          ...config.dims,
+          ...newAxisLabel,
+        },
+      }),
     [updateConfig, config.dims]
   );
 
@@ -210,7 +210,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
       <ConfigPanel.ConfigOption label={'x-axis-label'}>
         <ConfigPanel.ExpressionConfigField
           expr={config.dims.xAxisLabel}
-          setExpression={(exp) => updateAxisLabel({xAxisLabel: exp})}
+          setExpression={exp => updateAxisLabel({xAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label={'x'}>
@@ -225,7 +225,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
       <ConfigPanel.ConfigOption label={'y-axis label'}>
         <ConfigPanel.ExpressionConfigField
           expr={config.dims.yAxisLabel}
-          setExpression={(exp) => updateAxisLabel({yAxisLabel: exp})}
+          setExpression={exp => updateAxisLabel({yAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label={'y'}>

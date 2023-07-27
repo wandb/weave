@@ -325,7 +325,6 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
     [cellNodesUse.loading, cellNodesUse.result]
   );
 
-  
   const xAxisLabelValue = LLReact.useNodeValue(dims.xAxisLabel as any);
   const yAxisLabelValue = LLReact.useNodeValue(dims.yAxisLabel as any);
   const xAxisLabel = xAxisLabelValue.loading ? '' : xAxisLabelValue.result;
