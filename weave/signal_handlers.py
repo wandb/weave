@@ -132,4 +132,5 @@ def install_signal_handlers() -> None:
         def sigterm_handler(signal: int, frame: typing.Optional[FrameType]) -> None:
             sys.exit(0)
 
-        signal.signal(signal.SIGTERM, sigterm_handler)
+        if environment.sigterm_sighandler_enabled():
+            signal.signal(signal.SIGTERM, sigterm_handler)
