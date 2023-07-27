@@ -136,6 +136,7 @@ import {
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
+import {Option} from '@wandb/weave/common/util/uihelpers';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -519,10 +520,45 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     [config, updateConfig]
   );
 
+  const updateGroupBy = useCallback(
+    (
+      enabled: boolean,
+      seriesIndex: number,
+      dimName: keyof SeriesConfig['dims'],
+      value: string
+    ) => {
+      const fn = enabled
+        ? TableState.enableGroupByCol
+        : TableState.disableGroupByCol;
+      let newTable = fn(
+        config.series[seriesIndex].table,
+        value
+        // config.series[seriesIndex].dims[dimension.name as keyof SeriesConfig['dims']]
+      );
+      if (dimName === 'label') {
+        newTable = fn(newTable, config.series[seriesIndex].dims.color);
+      }
+      const newConfig = produce(config, draft => {
+        draft.series[seriesIndex].table = newTable;
+      });
+      updateConfig(newConfig);
+    },
+    [config, updateConfig]
+  );
+
   const newSeriesConfigDom = useMemo(() => {
     return (
       <>
         {config.series.map((s, i) => {
+          const groupByDropdownOptions: Option[] = PLOT_DIMS_UI.filter(
+            dimName => dimName !== 'mark'
+          ).map(dimName => {
+            return {
+              key: dimName,
+              text: dimName,
+              value: s.dims[dimName as keyof SeriesConfig['dims']],
+            };
+          });
           return (
             <ConfigSection
               label={`Series ${i + 1}`}
@@ -546,6 +582,39 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                   />
                 </ConfigPanel.ConfigOption>
               }
+              <ConfigPanel.ConfigOption multiline={true} label="Group by">
+                <ConfigPanel.ModifiedDropdownConfigField
+                  multiple
+                  options={groupByDropdownOptions}
+                  value={s.table.groupBy.filter(value =>
+                    // In updateGroupBy above, if the dim is label, color also gets added
+                    // as another dimension to group by. It's confusing to the user
+                    // so we hide the automatic color grouping in the UI
+                    // TODO: need to discuss with shawn on grouping logic
+                    groupByDropdownOptions.some(o => o.value === value)
+                  )}
+                  onChange={(event, {value}) => {
+                    const values = value as string[];
+                    const valueToAdd = values.filter(
+                      x => !s.table.groupBy.includes(x)
+                    );
+                    const valueToRemove = s.table.groupBy.filter(
+                      x => !values.includes(x)
+                    );
+                    if (valueToAdd.length > 0) {
+                      const dimName = groupByDropdownOptions.find(
+                        o => o.value === valueToAdd[0]
+                      )?.text as keyof SeriesConfig['dims'];
+                      updateGroupBy(true, i, dimName, valueToAdd[0]);
+                    } else if (valueToRemove.length > 0) {
+                      const dimName = groupByDropdownOptions.find(
+                        o => o.value === valueToRemove[0]
+                      )?.text as keyof SeriesConfig['dims'];
+                      updateGroupBy(false, i, dimName, valueToRemove[0]);
+                    }
+                  }}
+                />
+              </ConfigPanel.ConfigOption>
               {PLOT_DIMS_UI.map(dimName => {
                 const dimIsShared = PlotState.isDimShared(
                   config.series,
@@ -573,7 +642,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         })}
       </>
     );
-  }, [seriesMenuItems, config, weave, input, updateConfig]);
+  }, [seriesMenuItems, config, weave, input, updateConfig, updateGroupBy]);
 
   const seriesConfigDom = useMemo(() => {
     const firstSeries = config.series[0];

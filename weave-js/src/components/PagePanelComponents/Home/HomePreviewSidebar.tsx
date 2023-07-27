@@ -8,12 +8,21 @@ import {Node} from '@wandb/weave/core';
 import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
 import {PreviewNode} from './PreviewNode';
 import {useWeaveContext} from '@wandb/weave/context';
+import {IconCategoryMultimodal} from '../../Icon';
+import {
+  useBoardGeneratorsForNode,
+  useMakeLocalBoardFromNode,
+} from '../../Panel2/pyBoardGen';
+import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
+import {useNodeWithServerType} from '@wandb/weave/react';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
-  border: 1px solid #dadee3;
+  border: 1px solid ${MOON_250};
   box-shadow: 0px 8px 16px 0px #0e10140a;
   border-top-left-radius: 12px;
 `;
+CenterSpace.displayName = 'S.CenterSpace';
 
 const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
   align-items: center;
@@ -26,6 +35,20 @@ const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
     color: #038194;
   }
 `;
+CenterTableActionCellIcon.displayName = 'S.CenterTableActionCellIcon';
+
+const DashboardTemplateItem = styled(LayoutElements.HStack)`
+  padding: 8px 12px;
+  border: 1px solid ${MOON_250};
+  border-radius: 4px;
+  cursor: pointer;
+  &:hover {
+    border: 1px solid #a9edf2;
+    background-color: #a9edf212;
+    color: #038194;
+  }
+`;
+DashboardTemplateItem.displayName = 'S.DashboardTemplateItem';
 
 export const HomePreviewSidebarTemplate: React.FC<{
   title: string;
@@ -83,7 +106,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
         <LayoutElements.HBlock
           style={{
             // height: '72px',
-            borderTop: '1px solid #dadee3',
+            borderTop: `1px solid ${MOON_250}`,
             padding: '12px',
             gap: '12px',
           }}>
@@ -124,9 +147,14 @@ export const HomePreviewSidebarTemplate: React.FC<{
 
 export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
-}> = ({expr}) => {
+  navigateToExpression: NavigateToExpressionType;
+}> = ({expr, navigateToExpression}) => {
   const weave = useWeaveContext();
   const inputExpr = weave.expToString(expr);
+  const refinedExpression = useNodeWithServerType(expr);
+  const generators = useBoardGeneratorsForNode(expr);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
@@ -138,7 +166,6 @@ export const HomeExpressionPreviewParts: React.FC<{
       <LayoutElements.VBlock style={{gap: '8px'}}>
         <span style={{color: '#2B3038', fontWeight: 600}}>Expression</span>
         <LayoutElements.Block>
-          {/* <Unclickable style={{}}> */}
           <WeaveExpression
             expr={expr}
             onMount={() => {}}
@@ -149,7 +176,93 @@ export const HomeExpressionPreviewParts: React.FC<{
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
+      {generators.loading || refinedExpression.loading || isGenerating ? (
+        <LayoutElements.VStack
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            color: '#8e949e',
+          }}>
+          <WeaveAnimatedLoader style={{height: '64px', width: '64px'}} />
+        </LayoutElements.VStack>
+      ) : (
+        generators.result.length > 0 && (
+          <LayoutElements.VBlock style={{gap: '8px'}}>
+            <span style={{color: '#2B3038', fontWeight: 600}}>
+              Available Templates
+            </span>
+            <LayoutElements.VStack
+              style={{
+                gap: '8px',
+              }}>
+              {generators.result.map(template => (
+                <DashboardTemplate
+                  key={template.op_name}
+                  title={template.display_name}
+                  subtitle={template.description}
+                  onClick={() => {
+                    setIsGenerating(true);
+                    makeBoardFromNode(
+                      template.op_name,
+                      refinedExpression.result as any,
+                      newDashExpr => {
+                        navigateToExpression(newDashExpr);
+                        setIsGenerating(false);
+                      }
+                    );
+                  }}
+                />
+              ))}
+            </LayoutElements.VStack>
+          </LayoutElements.VBlock>
+        )
+      )}
     </LayoutElements.VStack>
+  );
+};
+
+const DashboardTemplate: React.FC<{
+  title: string;
+  onClick: () => void;
+  subtitle?: string;
+}> = props => {
+  return (
+    <DashboardTemplateItem onClick={props.onClick}>
+      <LayoutElements.VStack
+        style={{
+          overflow: 'hidden',
+        }}>
+        <LayoutElements.Block
+          style={{
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+          {props.title}
+        </LayoutElements.Block>
+        <LayoutElements.Block
+          style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+          {props.subtitle}
+        </LayoutElements.Block>
+      </LayoutElements.VStack>
+      <LayoutElements.VBlock
+        style={{
+          justifyContent: 'space-evenly',
+        }}>
+        <IconCategoryMultimodal
+          style={{
+            height: '60%',
+            width: '100%',
+          }}
+        />
+      </LayoutElements.VBlock>
+    </DashboardTemplateItem>
   );
 };
 
@@ -170,7 +283,10 @@ export const HomeBoardPreview: React.FC<{
           navigateToExpression(expr);
         },
       }}>
-      <HomeExpressionPreviewParts expr={expr} />
+      <HomeExpressionPreviewParts
+        expr={expr}
+        navigateToExpression={navigateToExpression}
+      />
     </HomePreviewSidebarTemplate>
   );
 };
