@@ -312,20 +312,13 @@ def check_server_up(
             f"{FIXTURE_SERVICE_PORT}:{FIXTURE_SERVICE_PORT}",
             "-e",
             "WANDB_ENABLE_TEST_CONTAINER=true",
-            *(
-                ["-e", "PARQUET_ENABLED=true"]
-                if os.environ.get("PARQUET_ENABLED")
-                else []
-            ),
+            "-e",
+            "PARQUET_ENABLED=true",
             "--name",
             "wandb-local",
             "--platform",
             "linux/amd64",
-            (
-                f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:tim-franken_branch_parquet"
-                if os.environ.get("PARQUET_ENABLED")
-                else f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:{wandb_server_tag}"
-            ),
+            f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:{wandb_server_tag}",
         ]
         subprocess.Popen(command)
         # wait for the server to start

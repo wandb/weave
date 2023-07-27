@@ -204,17 +204,16 @@ def do_batch_test(username, rows, do_assertion):
     do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
     st.finish()
 
-    if os.environ.get("PARQUET_ENABLED"):
-        # Second assertion is with parquet files
-        wait_for_x_times(
-            lambda: history_moved_to_parquet(
-                st._entity_name,
-                st._project_name,
-                st._table_name,
-            )
+    # Second assertion is with parquet files
+    wait_for_x_times(
+        lambda: history_moved_to_parquet(
+            st._entity_name,
+            st._project_name,
+            st._table_name,
         )
-        history_node = run_node._get_op(HISTORY_OP_NAME)()
-        do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
+    )
+    history_node = run_node._get_op(HISTORY_OP_NAME)()
+    do_assertion(history_node, row_type, row_accumulator, user_logged_keys)
 
 
 def do_logging(username, rows, finish=False):
