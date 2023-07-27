@@ -36,7 +36,10 @@ def _first_arg_name(
 ) -> typing.Optional[str]:
     if not isinstance(opdef.input_type, op_args.OpNamedArgs):
         return None
-    return next(iter(opdef.input_type.arg_types.keys()))
+    try:
+        return next(iter(opdef.input_type.arg_types.keys()))
+    except StopIteration:
+        return None
 
 
 def _propagate_gql_keys_for_node(
