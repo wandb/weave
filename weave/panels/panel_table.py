@@ -361,7 +361,7 @@ def pinned_rows(self: Table):
     # output_type=lambda inputs: inputs['self'].input_node.output_type.object_type,
     refine_output_type=data_single_refine,
 )
-def active_data(self: Table) -> typing.Optional[typing.Any]:
+def active_data(self: Table) -> typing.Optional[dict]:
     data_node = _get_active_node(self, self.input_node)
     return data_node
 

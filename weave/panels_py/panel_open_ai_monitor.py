@@ -249,6 +249,14 @@ def board(
             id="execution",
             layout=weave.panels.BoardPanelLayout(x=0, y=height * 4 + 6, w=24, h=6),
         ),
+        # panels.BoardPanel(
+        #     lambda table: panels.Table(
+        #         ops.none_coalesce(table.active_data()["messages"], [])
+        #     ),
+        #     # lambda table: panels.Table(table.active_data()["messages"], columns=[lambda row: row["role"], lambda row: row["content"]]),
+        #     id="messages",
+        #     layout=weave.panels.BoardPanelLayout(x=0, y=height * 4 + 6, w=24, h=6),
+        # ),
     ]
     return panels.Board(vars=control_items, panels=board_panels)
 
