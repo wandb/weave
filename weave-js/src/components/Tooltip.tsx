@@ -1,6 +1,12 @@
+import {
+  hexToRGB,
+  MOON_650,
+  MOON_800,
+  OBLIVION,
+  WHITE,
+} from '@wandb/weave/common/css/globals.styles';
 import {Popup} from 'semantic-ui-react';
 import styled from 'styled-components';
-import {Colors, hexToRGB} from '../common/css/globals.styles';
 
 export const Tooltip = styled(Popup).attrs({
   basic: true, // This removes the pointing arrow.
@@ -15,10 +21,10 @@ export const Tooltip = styled(Popup).attrs({
   },
 })`
   && {
-    color: ${Colors.WHITE};
-    background: ${Colors.GRAY_800};
-    border-color: ${Colors.GRAY_700};
-    box-shadow: 0px 4px 6px ${hexToRGB(Colors.BLACK, 0.2)};
+    color: ${WHITE};
+    background: ${MOON_800};
+    border-color: ${MOON_650};
+    box-shadow: 0px 4px 6px ${hexToRGB(OBLIVION, 0.2)};
     font-size: 14px;
     line-height: 140%;
     max-width: 300px;
