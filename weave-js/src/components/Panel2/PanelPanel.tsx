@@ -206,10 +206,28 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   } = useScrollbarVisibility();
 
   const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
-  const selectedIsRootLevel = useMemo(
-    () => selectedPanel.filter(s => s).length < 2,
+  const selectedIsRoot = useMemo(
+    () => selectedPanel.filter(s => s).length == 0,
     [selectedPanel]
   );
+
+  const shouldShowOutline = useMemo(() => {
+    // This exclusion below was added July 2023
+    // all future dashboards will have the enableDeletePanel flag set to false for root, main, and sidebar to not need the below
+    // we can remove the 3 lines below in like 6 months
+    if (selectedPanel.length === 1 &&  ['main', 'sidebar'].includes(selectedPanel[0])) {
+      console.log(selectedPanel)
+      return true;
+    }
+
+    if (panelConfig) {
+      const config = getConfigForPath(panelConfig, selectedPanel);
+      if (config && config.id === "Group") {
+        return !config.config.enableDeletePanel;
+      }
+    }
+    return false;
+  }, [panelConfig, selectedPanel, getConfigForPath]);
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
@@ -221,9 +239,9 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   if (panelConfig == null) {
     throw new Error('Panel config is null after loading');
   }
-
+  
   // show outline instead of config panel if root, main, or varbar
-  if (selectedIsRootLevel) {
+  if (selectedIsRoot || shouldShowOutline) {
     return (
       <SidebarConfig.Container>
         <SidebarConfig.Header>
@@ -260,7 +278,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            {!selectedIsRootLevel && (
+            {!selectedIsRoot || !shouldShowOutline && (
               <OutlineItemPopupMenu
                 config={panelConfig}
                 localConfig={getConfigForPath(panelConfig, selectedPanel)}

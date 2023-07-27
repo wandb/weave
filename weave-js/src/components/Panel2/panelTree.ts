@@ -380,6 +380,7 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
     layoutMode: 'grid',
     showExpressions: true,
     enableAddPanel: true,
+    enableDeletePanel: false,
     gridConfig: {
       panels: [
         {
@@ -428,12 +429,13 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
             'DateRange',
           ],
           enableAddPanel: true,
+          enableDeletePanel: false,
           childNameBase: 'var',
         }
       ),
       main,
     },
-    {layoutMode: 'horizontal'}
+    {layoutMode: 'horizontal', enableDeletePanel: false}
   );
 };
 
@@ -445,6 +447,7 @@ export const ensureDashboardFromItems = (
     layoutMode: 'grid',
     showExpressions: true,
     enableAddPanel: true,
+    enableDeletePanel: false,
     gridConfig: {
       panels: Object.entries(seedItems).map(([name, item], ndx) => ({
         id: name,
@@ -485,11 +488,12 @@ export const ensureDashboardFromItems = (
           'DateRange',
         ],
         enableAddPanel: true,
+        enableDeletePanel: false,
         childNameBase: 'var',
       }),
       main,
     },
-    {layoutMode: 'horizontal'}
+    {layoutMode: 'horizontal', enableDeletePanel: false}
   );
 };
 
@@ -502,6 +506,7 @@ export const ensureSimpleDashboard = (
       layoutMode: 'vertical',
       showExpressions: true,
       enableAddPanel: true,
+      enabledDeletePanel: false,
     }
   );
 };
