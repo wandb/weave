@@ -50,18 +50,6 @@ const DashboardTemplateItem = styled(LayoutElements.HStack)`
 `;
 DashboardTemplateItem.displayName = 'S.DashboardTemplateItem';
 
-const DashboardTemplateItem = styled(LayoutElements.HStack)`
-  padding: 8px 12px;
-  border: 1px solid #dadee3;
-  border-radius: 4px;
-  cursor: pointer;
-  &:hover {
-    border: 1px solid #a9edf2;
-    background-color: #a9edf212;
-    color: #038194;
-  }
-`;
-
 export const HomePreviewSidebarTemplate: React.FC<{
   title: string;
   setPreviewNode: SetPreviewNodeType;

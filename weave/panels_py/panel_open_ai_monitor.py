@@ -1,3 +1,5 @@
+import typing
+
 import weave
 from .. import weave_internal as internal
 from .. import weave_types as types
@@ -128,10 +130,37 @@ def board(
             completion=row["output"]["choices"][0]["message"],
             finish_reason=row["output"]["choices"][0]["finish_reason"],
             timestamp=row["timestamp"],
+            latency_ms=row["latency_ms"],
         )
     )
-    control_items.append(panels.GroupPanel(clean_data, id="clean_data"))
     clean_data_var = internal.make_var_node(clean_data.type, "clean_data")
+    control_items.append(panels.GroupPanel(clean_data, id="clean_data"))
+
+    control_items.append(
+        panels.GroupPanel(
+            ops.make_list(
+                a=clean_data_var["timestamp"].min(), b=clean_data_var["timestamp"].max()  # type: ignore
+            ),
+            id="data_range",
+            hidden=True,
+        )
+    )
+    control_items.append(panels.GroupPanel(None, id="zoom_range", hidden=True))
+    control_items.append(
+        panels.GroupPanel(
+            lambda zoom_range, data_range: zoom_range.coalesce(data_range),
+            id="bin_range",
+            hidden=True,
+        )
+    )
+    control_items.append(
+        panels.GroupPanel(
+            lambda clean_data, zoom_range: panels.DateRange(
+                zoom_range, domain=clean_data["timestamp"]
+            ),
+            id="date_picker",
+        )
+    )
 
     # Create a table from the query
     table = panels.Table(clean_data_var)  # type: ignore
@@ -144,12 +173,60 @@ def board(
         lambda row: row["usage"]["completion_tokens"], "Completion Tokens"
     )
     table_state.add_column(lambda row: row["usage"]["total_tokens"], "Total Tokens")
+    table_state.add_column(lambda row: row["latency_ms"], "Latency")
     table_state.add_column(lambda row: row["timestamp"], "Timestamp")
     table_panel = panels.BoardPanel(
         table, layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6), id="table"
     )
 
+    def make_timeseries_for_field(y_fn: typing.Callable) -> panels.Plot:
+        return panels.Plot(
+            clean_data_var,
+            x=lambda item: item["timestamp"].bin(
+                ops.timestamp_bins_nice(
+                    internal.make_var_node(types.List(types.Timestamp()), "bin_range"),
+                    100,
+                )
+            ),
+            y=y_fn,
+            groupby_dims=["x"],
+            # domain_x=zoom_range,
+            mark="bar",
+        )
+
     board_panels = [
+        panels.BoardPanel(clean_data_var["latency_ms"].avg(), "latency_avg"),  # type: ignore
+        panels.BoardPanel(
+            make_timeseries_for_field(lambda preds: preds["latency_ms"].avg()),
+            id="latency_over_time",
+        ),
+        panels.BoardPanel(
+            clean_data_var["usage"]["prompt_tokens"].sum(), "prompt_tokens_sum"  # type: ignore
+        ),
+        panels.BoardPanel(
+            make_timeseries_for_field(
+                lambda preds: preds["usage"]["prompt_tokens"].sum()
+            ),
+            id="prompt_tokens_over_time",
+        ),
+        panels.BoardPanel(
+            clean_data_var["usage"]["completion_tokens"].sum(), "completion_tokens_sum"  # type: ignore
+        ),
+        panels.BoardPanel(
+            make_timeseries_for_field(
+                lambda preds: preds["usage"]["completion_tokens"].sum()
+            ),
+            id="completion_tokens_over_time",
+        ),
+        panels.BoardPanel(
+            clean_data_var["usage"]["total_tokens"].sum(), "total_tokens_sum"  # type: ignore
+        ),
+        panels.BoardPanel(
+            make_timeseries_for_field(
+                lambda preds: preds["usage"]["total_tokens"].sum()
+            ),
+            id="total_tokens_over_time",
+        ),
         table_panel,
     ]
     return panels.Board(vars=control_items, panels=board_panels)
