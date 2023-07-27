@@ -442,6 +442,7 @@ def compile_quote(
 
 
 def _needs_gql_propagation(node: graph.OutputNode) -> bool:
+    """Determines if a node needs to propagate the GQL keys of its inputs."""
     fq_opname = node.from_op.full_name
     opdef = registry_mem.memory_registry.get_op(fq_opname)
     plugin = propagate_gql_keys._get_gql_plugin(opdef)
@@ -469,6 +470,7 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
 def _call_gql_propagate_keys(
     res: graph.OutputNode, p: stitch.StitchedGraph, original_node: graph.Node
 ) -> types.Type:
+    """Calls the GQL key propagation function for a node."""
     const_node_input_vals = {
         key: value.val
         for key, value in res.from_op.inputs.items()
@@ -486,6 +488,10 @@ def compile_refine(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
+    # Stitch is needed for gql key propagation only. If we try to stitch
+    # a graph that does not have gqlroot-wbgqlquery, it may fail completely.
+    # So we only stitch if we have a gqlroot-wbgqlquery node.
+
     use_stitch = (
         len(
             graph.filter_nodes_full(
@@ -497,7 +503,11 @@ def compile_refine(
         > 0
     )
 
-    # hack to let us use the old stitch provider for new nodes
+    # This lets us maintain a reverse mapping from the new nodes that are created
+    # in the graph.map_nodes call to _dispatch_map_fn_refining to the original
+    # nodes that were used in stitch. It's a bit hacky, but it allows us to store
+    # the original nodes in the pre-dispatch graph as a list, then use a nonlocal
+    # index to access them in _dispatch_map_fn_refining.
     p = stitch.stitch(nodes) if use_stitch else None
     node_array: list[graph.Node] = []
 
@@ -512,12 +522,13 @@ def compile_refine(
     def _dispatch_map_fn_refining(
         node: graph.Node,
     ) -> typing.Optional[graph.OutputNode]:
+        # give us access to the index variable declared above
         nonlocal i
         i += 1
 
         if isinstance(node, graph.OutputNode):
             if node.from_op.name == "gqlroot-wbgqlquery":
-                # dont refine this one
+                # dont refine this one - it's already refined.
                 return node
 
             from_op = node.from_op
@@ -536,7 +547,7 @@ def compile_refine(
                 res = op.lazy_call(**params)
 
                 # only the last condition is really needed here, but the type checker
-                # also wants the first two
+                # also wants the first one
                 if p is not None and _needs_gql_propagation(res):
                     res.type = _call_gql_propagate_keys(res, p, node_array[i])
 

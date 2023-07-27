@@ -69,7 +69,6 @@ def apply_domain_op_gql_translation(
     )
     fragments = []
     aliases = []
-    replacement_node_to_original_opdef_map: dict[graph.Node, "op_def.OpDef"] = {}
 
     def _replace_with_merged_gql(node: graph.Node) -> graph.Node:
         if not _is_root_node(node):
@@ -82,13 +81,7 @@ def apply_domain_op_gql_translation(
         custom_resolver = _custom_root_resolver(node)
 
         if custom_resolver is not None:
-            new_node = custom_resolver(query_root_node, **node.from_op.inputs)
-            key_fn = _custom_key_fn(node)
-            if key_fn is not None:
-                replacement_node_to_original_opdef_map[
-                    new_node
-                ] = registry_mem.memory_registry.get_op(node.from_op.full_name)
-            return new_node
+            return custom_resolver(query_root_node, **node.from_op.inputs)
         else:
             output_type = _get_plugin_output_type(node)
             key_type = typing.cast(
