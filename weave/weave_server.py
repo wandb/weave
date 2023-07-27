@@ -25,7 +25,6 @@ from weave import registry_mem
 from weave import errors
 from weave import weavejs_fixes
 from weave import util
-from weave import __version__
 from weave import engine_trace
 from weave import environment
 from weave import logs
@@ -346,11 +345,6 @@ def root_frontend(path):
 @blueprint.route("/__weave/hello")
 def hello():
     return "hello"
-
-
-@blueprint.route("/__weave/version")
-def version():
-    return __version__
 
 
 @blueprint.route("/__weave/wb_viewer", methods=["POST"])
