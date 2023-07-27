@@ -48,6 +48,8 @@ def unwrap_tags(
     # return the untagged type and return a function that rewraps it or
     # another type in the original tag tree.
 
+    # see test_tagging.py::test_unwrap_rewrap_tags for examples.
+
     def wrap_outer(unwrapped: types.Type) -> types.Type:
         if isinstance(t, tagged_value_type.TaggedValueType):
             return tagged_value_type.TaggedValueType(t.tag, unwrapped)
