@@ -15,6 +15,19 @@ T = typing.TypeVar("T", bound="GQLTypeMixin")
 
 
 class GQLHasWithKeysType(types.Type):
+    """Base class for types like projectType(), runType(), etc. Instances of this class do not have keys,
+    but they have a method called with_keys() that allows them to generate instances of the type with
+    keys. E.g.,
+
+    projectType().with_keys({"name": String()}) -> projectTypeWithKeys({"name": String()})
+
+    Assignability rules:
+    --------------------
+
+    projectType() <- projectTypeWithKeys({"name": String()})  VALID
+    projectTypeWithKeys({"name": Int()}) <- projectType()     INVALID
+    """
+
     @classmethod
     def with_keys(cls, keys: dict[str, types.Type]) -> "GQLHasKeysType":
         """Creates a new Weave Type that is assignable to the original Weave Type, but
@@ -36,7 +49,16 @@ class GQLHasWithKeysType(types.Type):
 def gql_weave_type(
     name: str,
 ) -> typing.Callable[[typing.Type[T]], typing.Type[T]]:
-    """Decorator that emits a Weave Type for the decorated GQL instance type."""
+    """Decorator that emits a Weave Type for the decorated GQL instance type. Classes decorated
+    with this decorator also emit a keyless weavetype. E.g.,
+
+    @gql_weave_type("project")
+    class Project(GQLTypeMixin):
+        ...
+
+    will emit a Weave Type for projectType(). Instances of projectType() have a method called
+    with_keys() that allows them to generate instances of projectTypeWithKeys({...}).
+    """
 
     def _gql_weave_type(_instance_class: typing.Type[T]) -> typing.Type[T]:
         decorator = weave_type(
@@ -60,11 +82,18 @@ class GQLTypeMixin:
 
 
 class GQLHasKeysType(types.Type):
-    # Has no instance classes or instance class - type of is performed in
-    # original weave type
+    """Base class for types like projectTypeWithKeys({...}), runTypeWithKeys({...}), etc.
 
+    Assignability rules:
+    --------------------
+
+    projectType() <- projectTypeWithKeys({"name": String()})  VALID
+    projectTypeWithKeys({"name": Int()}) <- projectType()     INVALID
+    """
+
+    # e.g., Project.WeaveType. Note: this property is the class itself, not an instance of the class.
     keyless_weave_type_class: typing.Type[types.Type]
-    keys: dict[str, types.Type]
+    keys: dict[str, types.Type]  # e.g., {"name": String()}
 
     def __init__(
         self,
@@ -172,6 +201,8 @@ class GQLHasKeysType(types.Type):
         return instance_class.from_gql(d)
 
 
+# A GQLKeyPropFn is a function that is called during the refinement phase of the compile pass
+# to propagate the GQL keys of a node's input types to its output type.
 GQLKeyPropFn = typing.Callable[[InputProvider, types.Type], types.Type]
 ParamStrFn = typing.Callable[[InputProvider], str]
 
