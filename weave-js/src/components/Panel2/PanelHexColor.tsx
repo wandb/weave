@@ -1,5 +1,5 @@
 import Color from 'color';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import * as CGReact from '../../react';
 import * as Panel2 from './panel';
@@ -12,7 +12,21 @@ type PanelHexColorProps = Panel2.PanelProps<typeof inputType>;
 
 export const PanelHexColor: React.FC<PanelHexColorProps> = props => {
   const nodeValueQuery = CGReact.useNodeValue(props.input);
-  const color = Color(nodeValueQuery.result ?? 'white');
+  const color = useMemo(() => {
+    if (!nodeValueQuery.loading && nodeValueQuery.result != null) {
+      let colorString = nodeValueQuery.result;
+      if (!colorString.startsWith('#')) {
+        colorString = '#' + colorString;
+      }
+      try {
+        return Color(colorString);
+      } catch (e) {
+        console.error(e);
+        return Color('white');
+      }
+    }
+    return Color('white');
+  }, [nodeValueQuery.loading, nodeValueQuery.result]);
   return (
     <div
       data-test-weave-id="Color"
