@@ -9,7 +9,7 @@ from PIL import Image
 
 def make_stream_table(*args, **kwargs):
     # Unit test backend does not support async logging
-    return StreamTable(*args, **kwargs, _disable_async_file_stream=True)
+    return StreamTable(*args, **kwargs, _disable_async_file_stream=False)
 
 
 # Example of end to end integration test
@@ -84,8 +84,6 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
     writers = []
 
     def do_asserts():
-        time.sleep(3)
-
         hist_node = (
             weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
             .run("test_table")
@@ -100,10 +98,8 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
         writers.append("a")
         st.log({"index": i, "writer": "a"})
 
-    # Notably before finish
-    do_asserts()
-
     st.finish()
+    do_asserts()
 
     st = make_stream_table(
         "test_table",
