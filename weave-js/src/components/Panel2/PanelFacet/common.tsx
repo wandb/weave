@@ -153,7 +153,6 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   const config = useConfig(props.config);
   const updateConfig = useCallback(
     (newConfig: Partial<FacetConfig>) => {
-      console.log('UPDATE CONFIG', newConfig);
       propsUpdateConfig({
         ...config,
         ...newConfig,
@@ -231,7 +230,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
       <ConfigPanel.ConfigOption label={'Y'}>
         <DimConfig
           dimName="y"
-          colId={config.dims.y || ''}
+          colId={config.dims.y}
           input={input}
           tableConfig={tableConfig}
           updateTableConfig={updateTableConfig}
