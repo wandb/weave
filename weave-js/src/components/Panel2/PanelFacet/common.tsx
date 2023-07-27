@@ -207,13 +207,13 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   return (
     <ConfigPanel.ConfigSection label={`Properties`}>
       {dashboardConfigOptions}
-      <ConfigPanel.ConfigOption label={'x-axis-label'}>
+      <ConfigPanel.ConfigOption label={'X-axis-label'}>
         <ConfigPanel.ExpressionConfigField
           expr={config.dims.xAxisLabel}
           setExpression={exp => updateAxisLabel({xAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
-      <ConfigPanel.ConfigOption label={'x'}>
+      <ConfigPanel.ConfigOption label={'X'}>
         <DimConfig
           dimName="x"
           colId={config.dims.x}
@@ -222,13 +222,13 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
           updateTableConfig={updateTableConfig}
         />
       </ConfigPanel.ConfigOption>
-      <ConfigPanel.ConfigOption label={'y-axis label'}>
+      <ConfigPanel.ConfigOption label={'Y-axis label'}>
         <ConfigPanel.ExpressionConfigField
           expr={config.dims.yAxisLabel}
           setExpression={exp => updateAxisLabel({yAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
-      <ConfigPanel.ConfigOption label={'y'}>
+      <ConfigPanel.ConfigOption label={'Y'}>
         <DimConfig
           dimName="y"
           colId={config.dims.y || ''}
