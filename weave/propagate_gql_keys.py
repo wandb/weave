@@ -31,10 +31,17 @@ def _get_gql_plugin(
     return None
 
 
+def _first_arg_name(
+    opdef: "op_def.OpDef",
+) -> typing.Optional[str]:
+    if not isinstance(opdef.input_type, op_args.OpNamedArgs):
+        return None
+    return next(iter(opdef.input_type.arg_types.keys()))
+
+
 def _propagate_gql_keys_for_node(
     opdef: "op_def.OpDef",
     node: graph.OutputNode,
-    unrefined_node: graph.OutputNode,
     key_fn: gql_with_keys.GQLKeyPropFn,
     ip: input_provider.InputProvider,
 ) -> types.Type:
@@ -47,9 +54,10 @@ def _propagate_gql_keys_for_node(
     )
 
     input_types = node.from_op.input_types
-    assert isinstance(opdef.input_type, op_args.OpNamedArgs)
 
-    first_arg_name = next(iter(opdef.input_type.arg_types.keys()))
+    first_arg_name = _first_arg_name(opdef)
+    if first_arg_name is None:
+        raise ValueError("OpDef does not have named args, cannot propagate GQL keys")
 
     # unwrap and rewrap tags
     original_input_type = input_types[first_arg_name]
@@ -58,11 +66,18 @@ def _propagate_gql_keys_for_node(
         original_input_type
     )
 
+    is_mapped = opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef
+    if is_mapped:
+        unwrapped_input_type = typing.cast(types.List, unwrapped_input_type).object_type
+
     # key fn operates on untagged types
     new_output_type = key_fn(ip, unwrapped_input_type)
 
     if isinstance(new_output_type, types.Invalid):
         raise ValueError('GQL key function returned "Invalid" type')
+
+    if is_mapped:
+        new_output_type = types.List(new_output_type)
 
     # now we rewrap the types to propagate the tags
     if opdef_util.should_tag_op_def_outputs(opdef):
@@ -77,7 +92,6 @@ def _propagate_gql_keys_for_node(
 
 def propagate_gql_keys(
     maybe_refined_node: graph.OutputNode,
-    unrefined_node: graph.OutputNode,
     ip: input_provider.InputProvider,
 ) -> types.Type:
     if not maybe_refined_node.from_op.name == "gqlroot-wbgqlquery":
@@ -98,12 +112,14 @@ def propagate_gql_keys(
                     and original_plugin.gql_key_prop_fn is not None
                 ):
                     key_fn = original_plugin.gql_key_prop_fn
+            if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
+                scalar_plugin = _get_gql_plugin(opdef.derived_from)
+                if scalar_plugin is not None:
+                    key_fn = scalar_plugin.gql_key_prop_fn
         else:
             key_fn = plugin.gql_key_prop_fn
 
         if key_fn is not None:
-            return _propagate_gql_keys_for_node(
-                opdef, maybe_refined_node, unrefined_node, key_fn, ip
-            )
+            return _propagate_gql_keys_for_node(opdef, maybe_refined_node, key_fn, ip)
 
     return maybe_refined_node.type

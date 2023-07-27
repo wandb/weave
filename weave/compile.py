@@ -26,6 +26,9 @@ from . import engine_trace
 from . import errors
 from . import propagate_gql_keys
 from . import input_provider
+from . import gql_with_keys
+
+from .language_features.tagging import tagged_value_type_helpers
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -438,6 +441,47 @@ def compile_quote(
     return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
 
 
+def _needs_gql_propagation(node: graph.OutputNode) -> bool:
+    fq_opname = node.from_op.full_name
+    opdef = registry_mem.memory_registry.get_op(fq_opname)
+    plugin = propagate_gql_keys._get_gql_plugin(opdef)
+    first_arg_name = propagate_gql_keys._first_arg_name(opdef)
+
+    if first_arg_name is None:
+        return False
+
+    first_arg_type: types.Type = node.from_op.inputs[first_arg_name].type
+    unwrapped_first_arg_type, _ = tagged_value_type_helpers.unwrap_tags(first_arg_type)
+
+    if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
+        plugin = propagate_gql_keys._get_gql_plugin(opdef.derived_from)
+        unwrapped_first_arg_type = typing.cast(
+            types.List, unwrapped_first_arg_type
+        ).object_type
+
+    return fq_opname.endswith("GQLResolver") or (
+        plugin is not None
+        and plugin.gql_key_prop_fn is not None
+        and isinstance(unwrapped_first_arg_type, gql_with_keys.GQLHasKeysType)
+    )
+
+
+def _call_gql_propagate_keys(
+    res: graph.OutputNode, p: stitch.StitchedGraph, original_node: graph.Node
+) -> types.Type:
+    const_node_input_vals = {
+        key: value.val
+        for key, value in res.from_op.inputs.items()
+        if isinstance(value, graph.ConstNode)
+    }
+    ip = input_provider.InputAndStitchProvider(
+        const_node_input_vals, p.get_result(original_node)
+    )
+
+    # Propagate GQL types
+    return propagate_gql_keys.propagate_gql_keys(res, ip)
+
+
 def compile_refine(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
@@ -491,18 +535,10 @@ def compile_refine(
 
                 res = op.lazy_call(**params)
 
-                if use_stitch and p is not None:
-                    const_node_input_vals = {
-                        key: value.val
-                        for key, value in node.from_op.inputs.items()
-                        if isinstance(value, graph.ConstNode)
-                    }
-                    ip = input_provider.InputAndStitchProvider(
-                        const_node_input_vals, p.get_result(node_array[i])
-                    )
-
-                    # Propagate GQL types
-                    res.type = propagate_gql_keys.propagate_gql_keys(res, node, ip)
+                # only the last condition is really needed here, but the type checker
+                # also wants the first two
+                if p is not None and _needs_gql_propagation(res):
+                    res.type = _call_gql_propagate_keys(res, p, node_array[i])
 
                 # logging.info("Dispatched (refine): %s -> %s", node, res.type)
                 return res

@@ -256,6 +256,76 @@ def test_last_membership():
     assert compiled_node.type == expected
 
 
+def test_mapped_last_membership():
+    node = ops.project("stacey", "mendeleev").artifacts().lastMembership()
+    compiled_node = compile.compile([node])[0]
+    expected = TaggedValueType(
+        types.TypedDict(
+            {
+                "project": wdt.ProjectType.with_keys(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                        "artifactTypes_100": types.TypedDict(
+                            {
+                                "edges": types.List(
+                                    types.TypedDict(
+                                        {
+                                            "node": types.TypedDict(
+                                                {
+                                                    "id": types.String(),
+                                                    "artifactCollections_100": types.TypedDict(
+                                                        {
+                                                            "edges": types.List(
+                                                                types.TypedDict(
+                                                                    {
+                                                                        "node": types.TypedDict(
+                                                                            {
+                                                                                "id": types.String(),
+                                                                                "name": types.String(),
+                                                                                "artifactMemberships_first_1": types.TypedDict(
+                                                                                    {
+                                                                                        "edges": types.List(
+                                                                                            types.TypedDict(
+                                                                                                {
+                                                                                                    "node": types.TypedDict(
+                                                                                                        {
+                                                                                                            "id": types.String(),
+                                                                                                        }
+                                                                                                    )
+                                                                                                }
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                ),
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                )
+                                                            )
+                                                        }
+                                                    ),
+                                                }
+                                            )
+                                        }
+                                    )
+                                )
+                            }
+                        ),
+                    }
+                )
+            }
+        ),
+        types.List(
+            types.optional(
+                wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()})
+            )
+        ),
+    )
+
+    assert compiled_node.type == expected
+
+
 def test_op_with_refiner(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock1_no_display_name)
     node = ops.project("stacey", "mendeleev").runs()[0].summary()["legacy_table"]
