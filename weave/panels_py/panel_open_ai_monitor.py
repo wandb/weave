@@ -118,7 +118,7 @@ def board(
     ]
     data_var = internal.make_var_node(input_node.type, "data")
 
-    clean_data = data_var.map(
+    clean_data = data_var.map(  # type: ignore
         lambda row: ops.dict_(
             id=row["output"]["id"],
             object=row["output"]["object"],
@@ -134,8 +134,8 @@ def board(
     clean_data_var = internal.make_var_node(clean_data.type, "clean_data")
 
     # Create a table from the query
-    table = panels.Table(clean_data_var)
-    table_state = table.config.tableState
+    table = panels.Table(clean_data_var)  # type: ignore
+    table_state = table.config.tableState  # type: ignore
     table_state.add_column(lambda row: row["model"], "Model")
     table_state.add_column(lambda row: row["messages"][-1]["content"], "Message")
     table_state.add_column(lambda row: row["completion"]["content"], "Completion")

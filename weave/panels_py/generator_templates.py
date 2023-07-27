@@ -1,7 +1,7 @@
 """
 Contains the TemplateRegistry class, which is used to register
 templates for the PyBoard generator. I think we might want to make
-this even more generic and all any panel to be a generator, but for 
+this even more generic and allow any panel to be a generator, but for 
 now this is a simple abstraction that will work for basic use cases.
 
 # TODO: Generalize this to work with panels like /weave/ecosystem/wandb/panel_time_series.py
@@ -67,7 +67,7 @@ class _TemplateRegistry:
             raise ValueError(f"Template {spec.op_name} already registered")
         self._specs[spec.op_name] = spec
 
-    def get_spec(self, name: str) -> typing.Any:
+    def get_spec(self, name: str) -> TemplateRegistrySpec:
         return self._specs[name]
 
     def get_specs(self) -> typing.Dict[str, TemplateRegistrySpec]:
