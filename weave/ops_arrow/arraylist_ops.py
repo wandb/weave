@@ -48,7 +48,8 @@ def listindex(self, index):
             self._artifact,
         )
     if isinstance(index, int):
-        assert index >= 0
+        if index < 0:
+            raise ValueError("Negative index not supported, got: " + str(index))
     else:
         index = arrow_as_array(index._arrow_data)
         assert pa.compute.all(pa.compute.greater_equal(index, 0))

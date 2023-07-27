@@ -175,6 +175,8 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
         active_index = 0
     else:
         active_index = self.config.activeRowForGrouping.get(composite_group_key, 0)
+    if active_index < 0:
+        active_index = 0
 
     return OutputNode(
         data_or_rows_node.type,
@@ -374,4 +376,4 @@ def active_data(self: Table) -> typing.Optional[typing.Any]:
 def active_row(self: Table):
     rows_node = _get_rows_node(self)
     data_node = _get_active_node(self, rows_node)
-    return weave.use(data_node)
+    return data_node
