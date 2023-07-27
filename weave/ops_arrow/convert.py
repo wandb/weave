@@ -401,7 +401,6 @@ def to_parquet_friendly(
     def _convert_col_to_parquet_friendly(
         col: ArrowWeaveList, path: PathType
     ) -> typing.Optional[ArrowWeaveList]:
-        print(path)
         _, non_none_type = types.split_none(col.object_type)
         if isinstance(non_none_type, types.UnionType):
             full_length_fields = []
