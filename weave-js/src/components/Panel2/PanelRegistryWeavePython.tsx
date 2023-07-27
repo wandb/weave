@@ -4,6 +4,7 @@
 import {Spec as PanelAnyObj} from './PanelAnyObj';
 import {Spec as PanelCard} from './PanelCard';
 import {Spec as PanelColor} from './PanelColor';
+import {Spec as PanelHexColor} from './PanelHexColor';
 import {Spec as PanelEachColumn} from './PanelEachColumn';
 import {Spec as PanelFacetTabs} from './PanelFacetTabs';
 import {Spec as PanelFunctionEditor} from './PanelFunctionEditor';
@@ -55,6 +56,7 @@ export const weavePythonPanelSpecs = () => {
     PanelWeaveLink,
     PanelPlotly,
     PanelColor,
+    PanelHexColor,
     PanelLayoutFlow,
     PanelFacetTabs,
     PanelSections,
