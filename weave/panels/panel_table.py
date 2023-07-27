@@ -175,8 +175,6 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
         active_index = 0
     else:
         active_index = self.config.activeRowForGrouping.get(composite_group_key, 0)
-    if active_index < 0:
-        active_index = 0
 
     return OutputNode(
         data_or_rows_node.type,

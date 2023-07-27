@@ -175,9 +175,6 @@ def board(
     table_state.add_column(lambda row: row["usage"]["total_tokens"], "Total Tokens")
     table_state.add_column(lambda row: row["latency_ms"], "Latency")
     table_state.add_column(lambda row: row["timestamp"], "Timestamp")
-    table_panel = panels.BoardPanel(
-        table, layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6), id="table"
-    )
 
     def make_timeseries_for_field(y_fn: typing.Callable) -> panels.Plot:
         return panels.Plot(
@@ -194,40 +191,64 @@ def board(
             mark="bar",
         )
 
+    height = 5
     board_panels = [
-        panels.BoardPanel(clean_data_var["latency_ms"].avg(), "latency_avg"),  # type: ignore
+        panels.BoardPanel(
+            clean_data_var["latency_ms"].avg(),  # type: ignore
+            id="latency_avg",
+            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=6, h=height),
+        ),
         panels.BoardPanel(
             make_timeseries_for_field(lambda preds: preds["latency_ms"].avg()),
             id="latency_over_time",
+            layout=weave.panels.BoardPanelLayout(x=6, y=0, w=18, h=height),
         ),
         panels.BoardPanel(
-            clean_data_var["usage"]["prompt_tokens"].sum(), "prompt_tokens_sum"  # type: ignore
+            clean_data_var["usage"]["prompt_tokens"].sum(),  # type: ignore
+            id="prompt_tokens_sum",
+            layout=weave.panels.BoardPanelLayout(x=0, y=height, w=6, h=height),
         ),
         panels.BoardPanel(
             make_timeseries_for_field(
                 lambda preds: preds["usage"]["prompt_tokens"].sum()
             ),
             id="prompt_tokens_over_time",
+            layout=weave.panels.BoardPanelLayout(x=6, y=height, w=18, h=height),
         ),
         panels.BoardPanel(
-            clean_data_var["usage"]["completion_tokens"].sum(), "completion_tokens_sum"  # type: ignore
+            clean_data_var["usage"]["completion_tokens"].sum(),  # type: ignore
+            id="completion_tokens_sum",
+            layout=weave.panels.BoardPanelLayout(x=0, y=height * 2, w=6, h=height),
         ),
         panels.BoardPanel(
             make_timeseries_for_field(
                 lambda preds: preds["usage"]["completion_tokens"].sum()
             ),
             id="completion_tokens_over_time",
+            layout=weave.panels.BoardPanelLayout(x=6, y=height * 2, w=18, h=height),
         ),
         panels.BoardPanel(
-            clean_data_var["usage"]["total_tokens"].sum(), "total_tokens_sum"  # type: ignore
+            clean_data_var["usage"]["total_tokens"].sum(),  # type: ignore
+            id="total_tokens_sum",
+            layout=weave.panels.BoardPanelLayout(x=0, y=height * 3, w=6, h=height),
         ),
         panels.BoardPanel(
             make_timeseries_for_field(
                 lambda preds: preds["usage"]["total_tokens"].sum()
             ),
             id="total_tokens_over_time",
+            layout=weave.panels.BoardPanelLayout(x=6, y=height * 3, w=18, h=height),
         ),
-        table_panel,
+        panels.BoardPanel(
+            table,
+            layout=weave.panels.BoardPanelLayout(x=0, y=height * 4, w=24, h=6),
+            id="table",
+        ),
+        panels.BoardPanel(
+            lambda table: table.active_row(),
+            id="execution",
+            layout=weave.panels.BoardPanelLayout(x=0, y=height * 4 + 6, w=24, h=6),
+        ),
     ]
     return panels.Board(vars=control_items, panels=board_panels)
 
