@@ -472,7 +472,6 @@ def compile_refine(
         i += 1
 
         if isinstance(node, graph.OutputNode):
-
             if node.from_op.name == "gqlroot-wbgqlquery":
                 # dont refine this one
                 return node
