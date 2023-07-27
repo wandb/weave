@@ -1,4 +1,4 @@
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
@@ -64,6 +64,7 @@ gql_connection_op(
     {},
     # lambda inputs: f"first: 100",
 )
+
 
 # Section 6/6: Non Standard Business Logic Ops
 @op(name="entity-link")

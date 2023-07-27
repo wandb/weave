@@ -5,6 +5,7 @@ import hashlib
 from dataclasses import dataclass, field
 from . import weave_types as types
 from . import artifact_fs
+from . import gql_op_plugin
 
 
 from .decorator_type import type as weave_type
@@ -201,9 +202,6 @@ class GQLHasKeysType(types.Type):
         return instance_class.from_gql(d)
 
 
-# A GQLKeyPropFn is a function that is called during the refinement phase of the compile pass
-# to propagate the GQL keys of a node's input types to its output type.
-GQLKeyPropFn = typing.Callable[[InputProvider, types.Type], types.Type]
 ParamStrFn = typing.Callable[[InputProvider], str]
 
 
@@ -237,7 +235,7 @@ def make_root_op_gql_key_prop_fn(
     param_str_fn: ParamStrFn,
     output_type: GQLHasWithKeysType,
     use_alias: bool = False,
-) -> GQLKeyPropFn:
+) -> gql_op_plugin.GQLKeyPropFn:
     """Creates a GQLKeyPropFn for a root op that returns a list of objects with keys."""
 
     def _root_op_gql_key_prop_fn(

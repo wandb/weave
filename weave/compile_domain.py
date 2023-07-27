@@ -1,4 +1,3 @@
-import json
 import typing
 from . import graph
 from . import weave_types as types
@@ -8,11 +7,11 @@ from . import errors
 from . import op_args
 from . import gql_to_weave
 from . import gql_with_keys
+from . import gql_op_plugin
 import graphql
 
 from .input_provider import InputAndStitchProvider
-from .gql_with_keys import GQLKeyPropFn
-from .propagate_gql_keys import GqlOpPlugin, _get_gql_plugin
+
 
 if typing.TYPE_CHECKING:
     from . import op_def
@@ -20,27 +19,6 @@ if typing.TYPE_CHECKING:
 
 def fragment_to_query(fragment: str) -> str:
     return f"query WeavePythonCG {{ {fragment} }}"
-
-
-# Ops in `domain_ops` can add this plugin to their op definition to indicate
-# that they need data to be fetched from the GQL API. At it's core, the plugin
-# allows the user to specify a `query_fn` that takes in the inputs to the op and
-# returns a GQL query fragment that is needed by the calling op. The plugin also
-# allows the user to specify whether the op is a root op which indicates it is
-# the "top" of the GQL query tree. Note, while ops can use this directly (eg.
-# see `project_ops.py::artifacts`), most ops use the higher level helpers
-# defined in `wb_domain_gql.py`
-def wb_gql_op_plugin(
-    query_fn: typing.Callable[[InputAndStitchProvider, str], str],
-    is_root: bool = False,
-    root_resolver: typing.Optional["op_def.OpDef"] = None,
-    gql_key_propagation_fn: typing.Optional[GQLKeyPropFn] = None,
-) -> dict[str, GqlOpPlugin]:
-    return {
-        "wb_domain_gql": GqlOpPlugin(
-            query_fn, is_root, root_resolver, gql_key_propagation_fn
-        )
-    }
 
 
 # This is the primary exposed function of this module and is called in `compile.py`. It's primary role
@@ -151,7 +129,7 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         or op_def.name == "list-createIndexCheckpointTag"
     )
 
-    wb_domain_gql = _get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
     if wb_domain_gql is None and not is_passthrough:
         return ""
 
@@ -167,7 +145,7 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
 
     if is_passthrough:
         return child_fragment
-    wb_domain_gql = typing.cast(GqlOpPlugin, wb_domain_gql)
+    wb_domain_gql = typing.cast(gql_op_plugin.GqlOpPlugin, wb_domain_gql)
 
     const_node_input_vals = {
         key: value.val
@@ -378,7 +356,7 @@ def _is_root_node(node: graph.Node) -> bool:
         return False
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = _get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
     return wb_domain_gql is not None and wb_domain_gql.is_root
 
 
@@ -387,18 +365,18 @@ def _custom_root_resolver(node: graph.Node) -> typing.Optional["op_def.OpDef"]:
         return None
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = _get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
     if wb_domain_gql is not None:
         return wb_domain_gql.root_resolver
     return None
 
 
-def _custom_key_fn(node: graph.Node) -> typing.Optional[GQLKeyPropFn]:
+def _custom_key_fn(node: graph.Node) -> typing.Optional[gql_op_plugin.GQLKeyPropFn]:
     if not isinstance(node, graph.OutputNode):
         return None
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = _get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
     if wb_domain_gql is not None:
         return wb_domain_gql.gql_key_prop_fn
     return None
@@ -409,7 +387,7 @@ def required_const_input_names(node: graph.Node) -> typing.Optional[list[str]]:
         return None
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = _get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
     if wb_domain_gql is None:
         return None
     if not isinstance(op_def.input_type, op_args.OpNamedArgs):

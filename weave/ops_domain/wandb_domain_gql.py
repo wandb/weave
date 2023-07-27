@@ -1,6 +1,6 @@
 import typing
 from ..api import op
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from .. import weave_types
 from inspect import signature, Parameter
 from . import wb_domain_types
@@ -10,8 +10,6 @@ from ..decorator_arrow_op import arrow_op
 from .. import op_def
 from .. import gql_with_keys
 from ..input_provider import InputProvider
-
-from ..gql_with_keys import _make_alias
 
 """
 This file contains utilities for constructing GQL ops (used by all the ops in

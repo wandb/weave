@@ -1,51 +1,18 @@
 from . import op_def
-from . import stitch
 from . import graph
-from . import op_args
 from . import weave_types as types
 from . import registry_mem
 from . import gql_with_keys
 from . import input_provider
+from . import gql_op_plugin
 
 import typing
-from dataclasses import dataclass
-
-
-@dataclass
-class GqlOpPlugin:
-    query_fn: typing.Callable[[input_provider.InputAndStitchProvider, str], str]
-    is_root: bool = False
-    root_resolver: typing.Optional["op_def.OpDef"] = None
-
-    # given the input types to the op, return a new output type with the input types'
-    # gql keys propagated appropriately. this is not a part of output_type to avoid
-    # the UI needing to make additional network requests to get the output type
-    gql_key_prop_fn: typing.Optional[gql_with_keys.GQLKeyPropFn] = None
-
-
-def _get_gql_plugin(
-    op_def: "op_def.OpDef",
-) -> typing.Optional[GqlOpPlugin]:
-    if op_def.plugins is not None and "wb_domain_gql" in op_def.plugins:
-        return op_def.plugins["wb_domain_gql"]
-    return None
-
-
-def _first_arg_name(
-    opdef: "op_def.OpDef",
-) -> typing.Optional[str]:
-    if not isinstance(opdef.input_type, op_args.OpNamedArgs):
-        return None
-    try:
-        return next(iter(opdef.input_type.arg_types.keys()))
-    except StopIteration:
-        return None
 
 
 def _propagate_gql_keys_for_node(
     opdef: "op_def.OpDef",
     node: graph.OutputNode,
-    key_fn: gql_with_keys.GQLKeyPropFn,
+    key_fn: gql_op_plugin.GQLKeyPropFn,
     ip: input_provider.InputProvider,
 ) -> types.Type:
     # Mutates node
@@ -58,7 +25,7 @@ def _propagate_gql_keys_for_node(
 
     input_types = node.from_op.input_types
 
-    first_arg_name = _first_arg_name(opdef)
+    first_arg_name = gql_op_plugin._first_arg_name(opdef)
     if first_arg_name is None:
         raise ValueError("OpDef does not have named args, cannot propagate GQL keys")
 
@@ -100,23 +67,23 @@ def propagate_gql_keys(
     if not maybe_refined_node.from_op.name == "gqlroot-wbgqlquery":
         fq_opname = maybe_refined_node.from_op.full_name
         opdef = registry_mem.memory_registry.get_op(fq_opname)
-        plugin = _get_gql_plugin(opdef)
+        plugin = gql_op_plugin._get_gql_plugin(opdef)
 
-        key_fn: typing.Optional[gql_with_keys.GQLKeyPropFn] = None
+        key_fn: typing.Optional[gql_op_plugin.GQLKeyPropFn] = None
 
         if plugin is None or plugin.gql_key_prop_fn is None:
             if fq_opname.endswith("GQLResolver"):
                 original_opdef = registry_mem.memory_registry.get_op(
                     fq_opname.replace("GQLResolver", "")
                 )
-                original_plugin = _get_gql_plugin(original_opdef)
+                original_plugin = gql_op_plugin._get_gql_plugin(original_opdef)
                 if (
                     original_plugin is not None
                     and original_plugin.gql_key_prop_fn is not None
                 ):
                     key_fn = original_plugin.gql_key_prop_fn
             if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
-                scalar_plugin = _get_gql_plugin(opdef.derived_from)
+                scalar_plugin = gql_op_plugin._get_gql_plugin(opdef.derived_from)
                 if scalar_plugin is not None:
                     key_fn = scalar_plugin.gql_key_prop_fn
         else:

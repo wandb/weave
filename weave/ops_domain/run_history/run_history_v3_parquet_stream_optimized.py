@@ -6,7 +6,7 @@ import pyarrow as pa
 
 
 from .context import get_error_on_non_vectorized_history_transform
-from ...compile_domain import wb_gql_op_plugin
+from ...gql_op_plugin import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
 from .. import trace_tree, wb_domain_types as wdt

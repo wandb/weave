@@ -1,7 +1,7 @@
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,

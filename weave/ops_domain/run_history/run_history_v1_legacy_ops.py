@@ -1,10 +1,8 @@
 import json
-import typing
-from ...compile_domain import wb_gql_op_plugin
+from ...gql_op_plugin import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
-from ...gql_with_keys import _make_alias
 from .. import wb_util
 from ... import engine_trace
 

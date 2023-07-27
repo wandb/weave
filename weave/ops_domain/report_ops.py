@@ -1,6 +1,6 @@
 import re
 import typing
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from . import wb_domain_types as wdt
 from .wandb_domain_gql import (
@@ -13,6 +13,7 @@ from .. import errors
 
 # Section 1/6: Tag Getters
 #
+
 
 # Section 2/6: Root Ops
 @op(
@@ -89,6 +90,7 @@ gql_direct_edge_op(
 #
 
 # Section 6/6: Non Standard Business Logic Ops
+
 
 # Logic taken exactly from Weave0 / frontend
 def make_name_and_id(id: str, name: typing.Optional[str]) -> str:

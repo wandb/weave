@@ -1,5 +1,5 @@
 import json
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from . import wb_domain_types as wdt
 from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op

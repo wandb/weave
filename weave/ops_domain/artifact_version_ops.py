@@ -1,18 +1,17 @@
 import json
 
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .. import errors
 from .. import weave_types as types
 from . import wb_domain_types as wdt
+from ..gql_with_keys import _make_alias
 from .wandb_domain_gql import (
-    _make_alias,
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
 )
 
-from .. import gql_with_keys
 
 import typing
 from . import wb_util
@@ -111,7 +110,6 @@ def _root_artifact_version_plugin(inputs, inner):
 def _gql_key_propagation_fn_for_root_artifact_version(
     inputs: input_provider.InputProvider, input_type: types.Type
 ) -> types.Type:
-
     project_alias = _make_alias(
         inputs.raw["entityName"], inputs.raw["projectName"], prefix="project"
     )

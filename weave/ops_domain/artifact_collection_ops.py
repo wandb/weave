@@ -1,7 +1,7 @@
 import typing
 import urllib
 
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
@@ -11,9 +11,6 @@ from .wandb_domain_gql import (
     gql_connection_op,
 )
 from .. import gql_with_keys
-
-from .. import compile_domain
-
 from .. import errors
 
 # Section 1/6: Tag Getters

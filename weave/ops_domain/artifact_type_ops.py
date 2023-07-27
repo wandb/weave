@@ -1,19 +1,15 @@
 import typing
 
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
-from .. import weave_types as types
 from . import wb_domain_types as wdt
-from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
+from ..gql_with_keys import _make_alias
 from .wandb_domain_gql import (
-    _make_alias,
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
     gql_root_op,
 )
-
-from .. import input_provider
 
 # Section 1/6: Tag Getters
 # None
