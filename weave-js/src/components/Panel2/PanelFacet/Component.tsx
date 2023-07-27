@@ -330,8 +330,8 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
   const yAxisLabelValue = LLReact.useNodeValue(dims.yAxisLabel as any);
   const xAxisLabel = xAxisLabelValue.loading ? '' : xAxisLabelValue.result;
   const yAxisLabel = yAxisLabelValue.loading ? '' : yAxisLabelValue.result;
-  const hasXAxisLabel = xAxisLabel != '';
-  const hasYAxisLabel = yAxisLabel != '';
+  const hasXAxisLabel = xAxisLabel !== '';
+  const hasYAxisLabel = yAxisLabel !== '';
 
   const columnOffset = hasYAxisLabel ? 2 : 1;
   const rowOffset = hasXAxisLabel ? 2 : 1;

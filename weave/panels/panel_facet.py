@@ -14,8 +14,12 @@ class FacetDimsConfig:
     y: str
     select: str
     detail: str
-    xAxisLabel: weave.Node[str]
-    yAxisLabel: weave.Node[str]
+    xAxisLabel: weave.Node[str] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    yAxisLabel: weave.Node[str] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
 
 
 @weave.type()
