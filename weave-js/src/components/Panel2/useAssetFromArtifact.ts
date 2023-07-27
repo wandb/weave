@@ -145,6 +145,7 @@ export const useSignedUrlWithExpiration = (
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const directUrlNode = useDirectUrlNodeWithExpiration(fileNode, ttl);
   const directUrl = CGReact.useNodeValue(directUrlNode);
+  console.log({directUrl});
   useEffect(() => {
     const resolveSignedUrl = async () => {
       if (directUrl.result != null) {
@@ -155,16 +156,19 @@ export const useSignedUrlWithExpiration = (
         }
 
         // eslint-disable-next-line wandb/no-unprefixed-urls
-        const response = await fetch(directUrl.result + '?redirect=false', {
-          credentials: 'include',
-          method: 'GET',
-          mode: 'cors',
-          // TODO(np): This can and should be sent via cookie, but it's not
-          // being correctly set, breaking this code in devprod and integration tests.
-          headers: {
-            'use-admin-privileges': 'true',
-          },
-        });
+        const response = await fetch(
+          directUrl.result + '?redirect=false&content-disposition=inline',
+          {
+            credentials: 'include',
+            method: 'GET',
+            mode: 'cors',
+            // TODO(np): This can and should be sent via cookie, but it's not
+            // being correctly set, breaking this code in devprod and integration tests.
+            headers: {
+              'use-admin-privileges': 'true',
+            },
+          }
+        );
         const json = await response.json();
         if (json.url != null) {
           setSignedUrl(json.url);
