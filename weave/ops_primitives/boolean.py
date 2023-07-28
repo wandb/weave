@@ -39,5 +39,5 @@ def none_coalesce_output_type(input_types):
 def none_coalesce(lhs: typing.Any, rhs: typing.Any):
     # TODO: This logic is really complicated in Weave0.
     if isinstance(lhs, list) and isinstance(rhs, list):
-        return [l or h for l, h in zip(lhs, rhs)]
+        return [l or r for l, r in zip(lhs, rhs)]
     return lhs or rhs
