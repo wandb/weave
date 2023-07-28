@@ -52,7 +52,6 @@ export const opArtifactVersionName = makeArtifactVersionOp({
 });
 
 export const opArtifactVersionState = makeArtifactVersionOp({
-  hidden: true,
   name: 'artifactVersion-state',
   argTypes: artifactVersionArgTypes,
   returnType: inputTypes => 'string',
@@ -60,7 +59,6 @@ export const opArtifactVersionState = makeArtifactVersionOp({
 });
 
 export const opArtifactVersionDigest = makeArtifactVersionOp({
-  hidden: true,
   name: 'artifactVersion-digest',
   argTypes: artifactVersionArgTypes,
   returnType: inputTypes => 'string',
@@ -90,7 +88,6 @@ export const opArtifactVersionVersionId = makeArtifactVersionOp({
 // Do not make this public, ID ops shouldn't be public! They are
 // useful for debugging, but users shouldn't need our gqlIds.
 export const opArtifactVersionId = makeArtifactVersionOp({
-  hidden: true,
   name: 'artifactVersion-id',
   argTypes: artifactVersionArgTypes,
   description: `Returns the id of the ${docType('artifactVersion')}`,
@@ -360,7 +357,6 @@ export const opArtifactVersionUsedBy = makeArtifactVersionOp({
 // and run, and then make meaningful ops downstream. We need to
 // switch on the type somehow.
 export const opArtifactVersionCreatedBy = makeArtifactVersionOp({
-  hidden: true,
   name: 'artifactVersion-createdBy',
   argTypes: artifactVersionArgTypes,
   description: `Returns the ${docType('run')} that created the ${docType(
@@ -383,7 +379,6 @@ export const opArtifactVersionCreatedBy = makeArtifactVersionOp({
 });
 
 export const opArtifactVersionCreatedByUser = makeArtifactVersionOp({
-  hidden: true,
   name: 'artifactVersion-createdByUser',
   argTypes: artifactVersionArgTypes,
   description: `Returns the ${docType('user')} that created the ${docType(
@@ -518,7 +513,6 @@ export const opArtifactVersionArtifactSequence = makeArtifactVersionOp({
 });
 
 export const opArtifactVersionArtifactType = makeArtifactVersionOp({
-  hidden: true,
   name: 'artifactVersion-artifactType',
   argTypes: artifactVersionArgTypes,
   description: `Returns the type for a ${docType('artifactVersion')}`,
