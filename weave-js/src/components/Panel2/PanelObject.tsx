@@ -112,7 +112,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
     [props.input.type]
   );
 
-  // This is needed because dicts(str, Any) is assignable to the input type
+  // This is needed because dict(str, Any) is assignable to the input type
   // of this panel, but we cant render that with a PanelObject at the moment
   // so we have this more restrictive type checker to ensure we do not try to
   // render nodes of that type the same way that we would render true typedDicts.
