@@ -1,5 +1,3 @@
-import {MOON_500} from '@wandb/weave/common/css/color.styles';
-
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
