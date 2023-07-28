@@ -225,7 +225,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   if (panelConfig == null) {
     throw new Error('Panel config is null after loading');
   }
-  
+
   // show outline instead of config panel if root, main, or varbar
   if (selectedIsRoot || shouldShowOutline) {
     return (

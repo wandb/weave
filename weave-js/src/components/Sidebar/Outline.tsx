@@ -116,7 +116,6 @@ export const shouldAllowDelete = (config: ChildPanelFullConfig, path: string[]) 
     || path.length === 0
     || (path.length === 1 && ['main', 'sidebar'].includes(path[0]));
 
-
 const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   const {
     name,
