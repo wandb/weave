@@ -194,69 +194,73 @@ def board(
     height = 5
     board_panels = [
         panels.BoardPanel(
+            table,
+            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=8),
+            id="table",
+        ),
+        panels.BoardPanel(
+            lambda table: table.active_row(),
+            id="execution",
+            layout=weave.panels.BoardPanelLayout(x=0, y=8, w=12, h=8),
+        ),
+        panels.BoardPanel(
+            lambda table: panels.Table(
+                table.active_data()["messages"],
+                columns=[lambda row: row["role"], lambda row: row["content"]],
+            ),
+            id="messages",
+            layout=weave.panels.BoardPanelLayout(x=12, y=8, w=12, h=8),
+        ),
+        panels.BoardPanel(
             clean_data_var["latency_ms"].avg(),  # type: ignore
             id="latency_avg",
-            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=6, h=height),
+            layout=weave.panels.BoardPanelLayout(x=0, y=14 + 0, w=6, h=height),
         ),
         panels.BoardPanel(
             make_timeseries_for_field(lambda preds: preds["latency_ms"].avg()),
             id="latency_over_time",
-            layout=weave.panels.BoardPanelLayout(x=6, y=0, w=18, h=height),
+            layout=weave.panels.BoardPanelLayout(x=6, y=14 + 0, w=18, h=height),
         ),
         panels.BoardPanel(
             clean_data_var["usage"]["prompt_tokens"].sum(),  # type: ignore
             id="prompt_tokens_sum",
-            layout=weave.panels.BoardPanelLayout(x=0, y=height, w=6, h=height),
+            layout=weave.panels.BoardPanelLayout(x=0, y=14 + height, w=6, h=height),
         ),
         panels.BoardPanel(
             make_timeseries_for_field(
                 lambda preds: preds["usage"]["prompt_tokens"].sum()
             ),
             id="prompt_tokens_over_time",
-            layout=weave.panels.BoardPanelLayout(x=6, y=height, w=18, h=height),
+            layout=weave.panels.BoardPanelLayout(x=6, y=14 + height, w=18, h=height),
         ),
         panels.BoardPanel(
             clean_data_var["usage"]["completion_tokens"].sum(),  # type: ignore
             id="completion_tokens_sum",
-            layout=weave.panels.BoardPanelLayout(x=0, y=height * 2, w=6, h=height),
+            layout=weave.panels.BoardPanelLayout(x=0, y=14 + height * 2, w=6, h=height),
         ),
         panels.BoardPanel(
             make_timeseries_for_field(
                 lambda preds: preds["usage"]["completion_tokens"].sum()
             ),
             id="completion_tokens_over_time",
-            layout=weave.panels.BoardPanelLayout(x=6, y=height * 2, w=18, h=height),
+            layout=weave.panels.BoardPanelLayout(
+                x=6, y=14 + height * 2, w=18, h=height
+            ),
         ),
         panels.BoardPanel(
             clean_data_var["usage"]["total_tokens"].sum(),  # type: ignore
             id="total_tokens_sum",
-            layout=weave.panels.BoardPanelLayout(x=0, y=height * 3, w=6, h=height),
+            layout=weave.panels.BoardPanelLayout(x=0, y=14 + height * 3, w=6, h=height),
         ),
         panels.BoardPanel(
             make_timeseries_for_field(
                 lambda preds: preds["usage"]["total_tokens"].sum()
             ),
             id="total_tokens_over_time",
-            layout=weave.panels.BoardPanelLayout(x=6, y=height * 3, w=18, h=height),
+            layout=weave.panels.BoardPanelLayout(
+                x=6, y=14 + height * 3, w=18, h=height
+            ),
         ),
-        panels.BoardPanel(
-            table,
-            layout=weave.panels.BoardPanelLayout(x=0, y=height * 4, w=24, h=6),
-            id="table",
-        ),
-        panels.BoardPanel(
-            lambda table: table.active_row(),
-            id="execution",
-            layout=weave.panels.BoardPanelLayout(x=0, y=height * 4 + 6, w=24, h=6),
-        ),
-        # panels.BoardPanel(
-        #     lambda table: panels.Table(
-        #         ops.none_coalesce(table.active_data()["messages"], [])
-        #     ),
-        #     # lambda table: panels.Table(table.active_data()["messages"], columns=[lambda row: row["role"], lambda row: row["content"]]),
-        #     id="messages",
-        #     layout=weave.panels.BoardPanelLayout(x=0, y=height * 4 + 6, w=24, h=6),
-        # ),
     ]
     return panels.Board(vars=control_items, panels=board_panels)
 

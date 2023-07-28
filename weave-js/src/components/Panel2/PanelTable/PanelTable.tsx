@@ -84,6 +84,7 @@ import {
   useUpdateConfigKey,
 } from './util';
 import {Link} from './Link';
+import {MaybeWrapper} from '../PanelMaybe';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -530,42 +531,47 @@ const PanelTableInner: React.FC<
       const rowNode = rowData.rowNode;
       const columnDef = columnDefinitions[colId];
       if (columnDef.isGrouped) {
+        const valueNode = opPick({
+          obj: opGroupGroupKey({
+            obj: rowNode as any,
+          }),
+          key: constString(escapeDots(columnDef.name)),
+        });
         return (
           <GrowToParent>
-            <Value
-              table={tableState}
-              colId={colId}
-              // Warning: not memoized
-              valueNode={opPick({
-                obj: opGroupGroupKey({
-                  obj: rowNode as any,
-                }),
-                key: constString(escapeDots(columnDef.name)),
-              })}
-              config={{}}
-              updateTableState={updateTableState}
-              panelContext={props.context}
-              updatePanelContext={updateContext}
-            />
+            <MaybeWrapper>
+              <Value
+                table={tableState}
+                colId={colId}
+                // Warning: not memoized
+                valueNode={valueNode}
+                config={{}}
+                updateTableState={updateTableState}
+                panelContext={props.context}
+                updatePanelContext={updateContext}
+              />
+            </MaybeWrapper>
           </GrowToParent>
         );
       } else {
         return (
           <GrowToParent>
-            <Cell
-              table={tableState}
-              colId={colId}
-              inputNode={input}
-              rowNode={rowNode}
-              selectFunction={columnDef.selectFn}
-              panelId={columnDef.panelId}
-              config={columnDef.panelConfig}
-              panelContext={props.context}
-              updateTableState={updateTableState}
-              updatePanelContext={updateContext}
-              updateInput={props.updateInput}
-              simpleTable={props.config.simpleTable}
-            />
+            <MaybeWrapper>
+              <Cell
+                table={tableState}
+                colId={colId}
+                inputNode={input}
+                rowNode={rowNode}
+                selectFunction={columnDef.selectFn}
+                panelId={columnDef.panelId}
+                config={columnDef.panelConfig}
+                panelContext={props.context}
+                updateTableState={updateTableState}
+                updatePanelContext={updateContext}
+                updateInput={props.updateInput}
+                simpleTable={props.config.simpleTable}
+              />
+            </MaybeWrapper>
           </GrowToParent>
         );
       }
@@ -643,21 +649,23 @@ const PanelTableInner: React.FC<
           );
         }
         return (
-          <IndexCell
-            runNode={runNode}
-            rowNode={rowData.rowNode}
-            setRowAsPinned={(index: number) => {
-              if (!props.config.simpleTable) {
-                if (shiftIsPressed) {
-                  setRowAsPinned(index, !rowData.isPinned);
-                } else {
-                  setRowAsActive(index);
+          <MaybeWrapper>
+            <IndexCell
+              runNode={runNode}
+              rowNode={rowData.rowNode}
+              setRowAsPinned={(index: number) => {
+                if (!props.config.simpleTable) {
+                  if (shiftIsPressed) {
+                    setRowAsPinned(index, !rowData.isPinned);
+                  } else {
+                    setRowAsActive(index);
+                  }
                 }
-              }
-            }}
-            activeRowIndex={activeRowIndex}
-            simpleTable={props.config.simpleTable}
-          />
+              }}
+              activeRowIndex={activeRowIndex}
+              simpleTable={props.config.simpleTable}
+            />
+          </MaybeWrapper>
         );
       },
       headerRenderer: ({headerIndex}) => {

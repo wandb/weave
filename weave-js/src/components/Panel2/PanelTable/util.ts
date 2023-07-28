@@ -9,6 +9,7 @@ import {
   MemoizedHasher,
   Node,
   NodeOrVoidNode,
+  nonNullableDeep,
   opIndex,
   opIndexCheckpoint,
   OpStore,
@@ -58,12 +59,16 @@ export const typeShapesMatch = (type: Type, toType: Type): boolean => {
 export const nodeIsValidList = (
   node: NodeOrVoidNode | undefined
 ): node is Node<ListType<'any'>> => {
+  if (
+    node == null ||
+    node.nodeType === 'void'){
+      return false;
+    }
+  const nonMaybeType = nonNullableDeep(node.type);
   return (
-    node != null &&
-    node.nodeType !== 'void' &&
-    isListLike(node.type) &&
-    listObjectType(node.type) !== 'invalid'
-  );
+    isListLike(nonMaybeType) &&
+    listObjectType(nonMaybeType) !== 'invalid'
+  ) 
 };
 
 // useLoadOnce returns true only for the first loading state, and false thereafter
