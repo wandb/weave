@@ -207,7 +207,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
 
   const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
   const selectedIsRoot = useMemo(
-    () => selectedPanel.filter(s => s).length == 0,
+    () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
   );
 
@@ -216,7 +216,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     // all future dashboards will have the enableDeletePanel flag set to false for root, main, and sidebar to not need the below
     // we can remove the 3 lines below in like 6 months
     if (selectedPanel.length === 1 &&  ['main', 'sidebar'].includes(selectedPanel[0])) {
-      console.log(selectedPanel)
       return true;
     }
 
@@ -227,7 +226,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
       }
     }
     return false;
-  }, [panelConfig, selectedPanel, getConfigForPath]);
+  }, [panelConfig, selectedPanel]);
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
@@ -278,7 +277,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            {!selectedIsRoot || !shouldShowOutline && (
+            {(!selectedIsRoot || !shouldShowOutline) && (
               <OutlineItemPopupMenu
                 config={panelConfig}
                 localConfig={getConfigForPath(panelConfig, selectedPanel)}
