@@ -480,7 +480,6 @@ export const ColumnHeader: React.FC<{
             columnSettingsOpen && (
               <div>
                 <S.ColumnEditorSection>
-                  {/* <S.CloseIcon name="close" onClick={() => setColumnSettingsOpen(false)} /> */}
                   <S.ColumnEditorSectionLabel>
                     Cell expression
                   </S.ColumnEditorSectionLabel>
