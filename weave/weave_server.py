@@ -381,5 +381,10 @@ if os.getenv("WEAVE_SERVER_DEBUG"):
         return response
 
 
+@app.cli.command("list-cache")
+def list_cache():
+    print("yo")
+
+
 if __name__ == "__main__":
     app.run(port=9994)
