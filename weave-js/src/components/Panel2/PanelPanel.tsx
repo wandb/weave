@@ -6,13 +6,14 @@ import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
 import {consoleLog} from '../../util';
-import {Outline} from '../Sidebar/Outline';
+import {Outline, shouldAllowDelete} from '../Sidebar/Outline';
 import {
   ChildPanel,
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
+  CHILD_PANEL_DEFAULT_CONFIG
 } from './ChildPanel';
 import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
@@ -211,22 +212,8 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     [selectedPanel]
   );
 
-  const shouldShowOutline = useMemo(() => {
-    // This exclusion below was added July 2023
-    // all future dashboards will have the enableDeletePanel flag set to false for root, main, and sidebar to not need the below
-    // we can remove the 3 lines below in like 6 months
-    if (selectedPanel.length === 1 &&  ['main', 'sidebar'].includes(selectedPanel[0])) {
-      return true;
-    }
-
-    if (panelConfig) {
-      const config = getConfigForPath(panelConfig, selectedPanel);
-      if (config && config.id === "Group") {
-        return !config.config.enableDeletePanel;
-      }
-    }
-    return false;
-  }, [panelConfig, selectedPanel]);
+  const localConfig = getConfigForPath(panelConfig || CHILD_PANEL_DEFAULT_CONFIG, selectedPanel);
+  const shouldShowOutline = shouldAllowDelete(localConfig, selectedPanel);
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
@@ -280,7 +267,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             {(!selectedIsRoot || !shouldShowOutline) && (
               <OutlineItemPopupMenu
                 config={panelConfig}
-                localConfig={getConfigForPath(panelConfig, selectedPanel)}
+                localConfig={localConfig}
                 path={selectedPanel}
                 updateConfig={panelUpdateConfig}
                 updateConfig2={panelUpdateConfig2}
