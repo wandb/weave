@@ -108,13 +108,16 @@ export type OutlinePanelProps = OutlineProps & {
   level?: number;
 };
 
-export const shouldAllowDelete = (config: ChildPanelFullConfig, path: string[]) => 
-  (config?.id === 'Group' && !config?.config.enableDeletePanel) 
-    // This exclusion below was added July 2023
-    // all future dashboards should have the enableDeletePanel flag set to false for root, main, and sidebar to not need the below
-    // we can remove the 2 lines below in like 6 months
-    || path.length === 0
-    || (path.length === 1 && ['main', 'sidebar'].includes(path[0]));
+export const shouldAllowDelete = (
+  config: ChildPanelFullConfig,
+  path: string[]
+) =>
+  (config?.id === 'Group' && !config?.config.enableDeletePanel) ||
+  // This exclusion below was added July 2023
+  // all future dashboards should have the enableDeletePanel flag set to false for root, main, and sidebar to not need the below
+  // we can remove the 2 lines below in like 6 months
+  path.length === 0 ||
+  (path.length === 1 && ['main', 'sidebar'].includes(path[0]));
 
 const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   const {

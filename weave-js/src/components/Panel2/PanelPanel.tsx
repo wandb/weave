@@ -13,7 +13,7 @@ import {
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
-  CHILD_PANEL_DEFAULT_CONFIG
+  CHILD_PANEL_DEFAULT_CONFIG,
 } from './ChildPanel';
 import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
@@ -212,7 +212,10 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     [selectedPanel]
   );
 
-  const localConfig = getConfigForPath(panelConfig || CHILD_PANEL_DEFAULT_CONFIG, selectedPanel);
+  const localConfig = getConfigForPath(
+    panelConfig || CHILD_PANEL_DEFAULT_CONFIG,
+    selectedPanel
+  );
   const shouldShowOutline = shouldAllowDelete(localConfig, selectedPanel);
 
   const goBackToOutline = useCallback(() => {
