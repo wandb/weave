@@ -39,7 +39,6 @@ import {
 } from '../Panel2/Icons';
 import {
   useBranchPointFromURIString,
-  useCopyCodeFromURI,
   usePreviousVersionFromURIString,
 } from './hooks';
 import {
