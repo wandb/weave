@@ -479,6 +479,7 @@ export const ColumnHeader: React.FC<{
           content={
             columnSettingsOpen && (
               <div>
+                <S.CloseIcon onClick={() => setColumnSettingsOpen(false)} width={20}/>
                 <S.ColumnEditorSection>
                   <S.ColumnEditorSectionLabel>
                     Cell expression

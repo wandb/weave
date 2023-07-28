@@ -1,6 +1,9 @@
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
+
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
+import { IconClose } from './Icons';
 
 export const ColumnHeader = styled.div`
   display: flex;
@@ -212,3 +215,11 @@ export const CellWrapper = styled.div`
   width: 100%;
   height: 100%;
 `;
+
+export const CloseIcon = styled(IconClose)`
+  color: ${MOON_500};
+  cursor: pointer;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+`
