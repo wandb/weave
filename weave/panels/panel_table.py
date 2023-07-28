@@ -363,7 +363,7 @@ def pinned_rows(self: Table):
 )
 def active_data(self: Table) -> typing.Optional[dict]:
     data_node = _get_active_node(self, self.input_node)
-    return data_node
+    return data_node # type: ignore
 
 
 @weave.op(
