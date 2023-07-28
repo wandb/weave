@@ -428,9 +428,6 @@ const PanelFacet: React.FC<PanelFacetProps> = props => {
   const config = useConfig(props.config);
   const {table, dims} = config;
 
-  if (dims.xAxisLabel == null) {
-    return <div>x must be configured</div>;
-  }
   const xEnabled = table.columnSelectFunctions[dims.x].type !== 'invalid';
 
   // TODO: Combine into a childPanelIsRenderable function
