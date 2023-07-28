@@ -1,7 +1,7 @@
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
-import { IconButton } from '../IconButton';
+import {IconButton} from '../IconButton';
 
 export const ColumnHeader = styled.div`
   display: flex;
@@ -218,4 +218,4 @@ export const CloseIconButton = styled(IconButton)`
   position: absolute;
   right: 8px;
   top: 12px;
-`
+`;
