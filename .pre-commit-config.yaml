@@ -12,7 +12,7 @@ repos:
     rev: "v1.0.0"
     hooks:
       - id: mypy
-        additional_dependencies: [types-all, wandb>=0.15.4]
+        additional_dependencies: [types-all, wandb>=0.15.5]
         exclude: .*pyi$
   - repo: local
     hooks:
