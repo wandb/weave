@@ -236,6 +236,14 @@ const PanelTableInnerConfigSetter: React.FC<
   );
 };
 
+const GrowingMaybeWrapper = ({children}: {children: React.ReactNode}) => {
+  return (
+    <GrowToParent>
+      <MaybeWrapper>{children}</MaybeWrapper>
+    </GrowToParent>
+  );
+};
+
 const PanelTableInner: React.FC<
   Panel2.PanelProps<typeof inputType, PanelTableConfig> & {
     height: number;
@@ -530,49 +538,49 @@ const PanelTableInner: React.FC<
     ) => {
       const rowNode = rowData.rowNode;
       const columnDef = columnDefinitions[colId];
+      // MaybeWrappers are needed because the table will eagerly ask for enough
+      // rows to fill the screen, before we know if that many rows exist. This
+      // means that the true value of every cell is possibly nullable, even if
+      // the type doesn't say so. This is sort of a hard-coded way to ensure we
+      // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
-        const valueNode = opPick({
-          obj: opGroupGroupKey({
-            obj: rowNode as any,
-          }),
-          key: constString(escapeDots(columnDef.name)),
-        });
         return (
-          <GrowToParent>
-            <MaybeWrapper>
-              <Value
-                table={tableState}
-                colId={colId}
-                // Warning: not memoized
-                valueNode={valueNode}
-                config={{}}
-                updateTableState={updateTableState}
-                panelContext={props.context}
-                updatePanelContext={updateContext}
-              />
-            </MaybeWrapper>
-          </GrowToParent>
+          <GrowingMaybeWrapper>
+            <Value
+              table={tableState}
+              colId={colId}
+              // Warning: not memoized
+              valueNode={opPick({
+                obj: opGroupGroupKey({
+                  obj: rowNode as any,
+                }),
+                key: constString(escapeDots(columnDef.name)),
+              })}
+              config={{}}
+              updateTableState={updateTableState}
+              panelContext={props.context}
+              updatePanelContext={updateContext}
+            />
+          </GrowingMaybeWrapper>
         );
       } else {
         return (
-          <GrowToParent>
-            <MaybeWrapper>
-              <Cell
-                table={tableState}
-                colId={colId}
-                inputNode={input}
-                rowNode={rowNode}
-                selectFunction={columnDef.selectFn}
-                panelId={columnDef.panelId}
-                config={columnDef.panelConfig}
-                panelContext={props.context}
-                updateTableState={updateTableState}
-                updatePanelContext={updateContext}
-                updateInput={props.updateInput}
-                simpleTable={props.config.simpleTable}
-              />
-            </MaybeWrapper>
-          </GrowToParent>
+          <GrowingMaybeWrapper>
+            <Cell
+              table={tableState}
+              colId={colId}
+              inputNode={input}
+              rowNode={rowNode}
+              selectFunction={columnDef.selectFn}
+              panelId={columnDef.panelId}
+              config={columnDef.panelConfig}
+              panelContext={props.context}
+              updateTableState={updateTableState}
+              updatePanelContext={updateContext}
+              updateInput={props.updateInput}
+              simpleTable={props.config.simpleTable}
+            />
+          </GrowingMaybeWrapper>
         );
       }
     },
@@ -648,6 +656,11 @@ const PanelTableInner: React.FC<
             </S.IndexColumnVal>
           );
         }
+        // MaybeWrappers are needed because the table will eagerly ask for enough
+        // rows to fill the screen, before we know if that many rows exist. This
+        // means that the true value of every cell is possibly nullable, even if
+        // the type doesn't say so. This is sort of a hard-coded way to ensure we
+        // don't error when we get nulls back for small tables
         return (
           <MaybeWrapper>
             <IndexCell

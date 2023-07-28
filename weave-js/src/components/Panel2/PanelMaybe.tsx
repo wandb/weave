@@ -204,7 +204,6 @@ export const Spec: Panel2.PanelConvertSpec = {
     if (!isUnion(inputType) || !isAssignableTo('none', inputType)) {
       return null;
     }
-    console.log({returnType: taggedValue(tags, nonNullableDeep(inputType))});
     return taggedValue(tags, nonNullableDeep(inputType));
   },
   defaultFixedSize: childDims => childDims,
