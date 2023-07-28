@@ -10,13 +10,8 @@ panels = weave.panels
 ops = weave.ops
 
 
-# IMPORTANT: To enable this (or any template), it must be imported in
-# weave/panels_py/__init__.py This example is explicitly commented out since it
-# is not intended to be in production. however, you are encourage to uncomment
-# it and play around with it.
-
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.
-BOARD_ID = "open_ai_monitor"
+BOARD_ID = "open_ai_completions_monitor"
 
 # BOARD_DISPLAY_NAME is the name that will be displayed in the UI
 BOARD_DISPLAY_NAME = "OpenAI Monitor Board"
@@ -115,86 +110,131 @@ board_name = "py_board-" + BOARD_ID
 def board(
     input_node,
 ) -> panels.Group:
-    control_items = [
-        panels.GroupPanel(input_node, id="data"),
-    ]
-    data_var = internal.make_var_node(input_node.type, "data")
+    timestamp_col_name = "timestamp"
+    control_items = []
 
-    clean_data = data_var.map(  # type: ignore
-        lambda row: ops.dict_(
-            id=row["output"]["id"],
-            object=row["output"]["object"],
-            model=row["output"]["model"],
-            messages=row["inputs"]["kwargs"]["messages"],
-            usage=row["output"]["usage"],
-            completion=row["output"]["choices"][0]["message"],
-            finish_reason=row["output"]["choices"][0]["finish_reason"],
-            timestamp=row["timestamp"],
-            latency_ms=row["latency_ms"],
-        )
-    )
-    clean_data_var = internal.make_var_node(clean_data.type, "clean_data")
-    control_items.append(panels.GroupPanel(clean_data, id="clean_data"))
+    # Add the input node as raw data
+    control_items.append(panels.GroupPanel(input_node, id="raw_data"))
+    data_var = internal.make_var_node(input_node.type, "raw_data")
 
+    # Setup date range variables:
+    ## 1. raw_data_range is derived from raw_data
     control_items.append(
-        panels.GroupPanel(
-            ops.make_list(
-                a=clean_data_var["timestamp"].min(), b=clean_data_var["timestamp"].max()  # type: ignore
+        weave.panels.GroupPanel(
+            lambda raw_data: weave.ops.make_list(
+                a=raw_data[timestamp_col_name].min(),
+                b=raw_data[timestamp_col_name].max(),
             ),
-            id="data_range",
+            id="raw_data_range",
             hidden=True,
         )
     )
-    control_items.append(panels.GroupPanel(None, id="zoom_range", hidden=True))
+    ## 2. user_zoom_range is used to store the user's zoom range
     control_items.append(
-        panels.GroupPanel(
-            lambda zoom_range, data_range: zoom_range.coalesce(data_range),
+        weave.panels.GroupPanel(None, id="user_zoom_range", hidden=True)
+    )
+    ## 2.b: Setup a date picker to set the user_zoom_range
+    control_items.append(
+        weave.panels.GroupPanel(
+            lambda raw_data, user_zoom_range: weave.panels.DateRange(
+                user_zoom_range, domain=raw_data[timestamp_col_name]
+            ),
+            id="date_picker",
+        ),
+    )
+    ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
+    ##    the range of data that will be displayed in the charts.
+    control_items.append(
+        weave.panels.GroupPanel(
+            lambda user_zoom_range, raw_data_range: user_zoom_range.coalesce(
+                raw_data_range
+            ),
             id="bin_range",
             hidden=True,
         )
     )
+
     control_items.append(
         panels.GroupPanel(
-            lambda clean_data, zoom_range: panels.DateRange(
-                zoom_range, domain=clean_data["timestamp"]
-            ),
-            id="date_picker",
-        )
-    )
-
-    # Create a table from the query
-    table = panels.Table(clean_data_var)  # type: ignore
-    table_state = table.config.tableState  # type: ignore
-    table_state.add_column(lambda row: row["model"], "Model")
-    table_state.add_column(lambda row: row["messages"][-1]["content"], "Message")
-    table_state.add_column(lambda row: row["completion"]["content"], "Completion")
-    table_state.add_column(lambda row: row["usage"]["prompt_tokens"], "Prompt Tokens")
-    table_state.add_column(
-        lambda row: row["usage"]["completion_tokens"], "Completion Tokens"
-    )
-    table_state.add_column(lambda row: row["usage"]["total_tokens"], "Total Tokens")
-    table_state.add_column(lambda row: row["latency_ms"], "Latency")
-    table_state.add_column(lambda row: row["timestamp"], "Timestamp")
-
-    def make_timeseries_for_field(y_fn: typing.Callable) -> panels.Plot:
-        return panels.Plot(
-            clean_data_var,
-            x=lambda item: item["timestamp"].bin(
-                ops.timestamp_bins_nice(
-                    internal.make_var_node(types.List(types.Timestamp()), "bin_range"),
-                    100,
+            lambda raw_data: raw_data.map(
+                lambda row: ops.dict_(
+                    id=row["output"]["id"],
+                    object=row["output"]["object"],
+                    model=row["output"]["model"],
+                    messages=row["inputs"]["kwargs"]["messages"],
+                    usage=row["output"]["usage"],
+                    completion=row["output"]["choices"][0]["message"],
+                    finish_reason=row["output"]["choices"][0]["finish_reason"],
+                    timestamp=row["timestamp"],
+                    latency_ms=row["latency_ms"],
                 )
             ),
-            y=y_fn,
-            groupby_dims=["x"],
-            # domain_x=zoom_range,
-            mark="bar",
+            id="clean_data",
+            hidden=True,
         )
+    )
+
+    # Derive the windowed data to use in the plots as a function of bin_range
+    control_items.append(
+        weave.panels.GroupPanel(
+            lambda clean_data, bin_range: clean_data.filter(
+                lambda row: weave.ops.Boolean.bool_and(
+                    row[timestamp_col_name] >= bin_range[0],
+                    row[timestamp_col_name] < bin_range[1],
+                )
+            ),
+            id="window_data",
+            hidden=True,
+        )
+    )
+
+    def make_table() -> typing.Callable:
+        def maker(window_data: typing.Any) -> panels.Table:
+            table = panels.Table(window_data)  # type: ignore
+            table_state = table.config.tableState  # type: ignore
+            table_state.add_column(lambda row: row["model"], "Model")
+            table_state.add_column(
+                lambda row: row["messages"][-1]["content"], "Message"
+            )
+            table_state.add_column(
+                lambda row: row["completion"]["content"], "Completion"
+            )
+            table_state.add_column(
+                lambda row: row["usage"]["prompt_tokens"], "Prompt Tokens"
+            )
+            table_state.add_column(
+                lambda row: row["usage"]["completion_tokens"], "Completion Tokens"
+            )
+            table_state.add_column(
+                lambda row: row["usage"]["total_tokens"], "Total Tokens"
+            )
+            table_state.add_column(lambda row: row["latency_ms"], "Latency")
+            table_state.add_column(lambda row: row["timestamp"], "Timestamp")
+            return table
+
+        return maker
+
+    def make_timeseries_for_field(y_fn: typing.Callable) -> typing.Callable:
+        def maker(
+            clean_data: typing.Any, bin_range: typing.Any, user_zoom_range: typing.Any
+        ) -> panels.Plot:
+            return panels.Plot(
+                clean_data,
+                x=lambda item: item["timestamp"].bin(
+                    ops.timestamp_bins_nice(bin_range, 50)
+                ),
+                y=y_fn,
+                groupby_dims=["x"],
+                domain_x=user_zoom_range,
+                mark="bar",
+            )
+
+        return maker
 
     height = 5
     board_panels = [
         panels.BoardPanel(
-            table,
+            make_table(),
             layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=8),
             id="table",
         ),
@@ -204,7 +244,7 @@ def board(
             layout=weave.panels.BoardPanelLayout(x=0, y=8, w=12, h=8),
         ),
         panels.BoardPanel(
-            lambda table: panels.Table(
+            lambda table: panels.Table(  # type: ignore
                 table.active_data()["messages"],
                 columns=[lambda row: row["role"], lambda row: row["content"]],
             ),
@@ -212,7 +252,7 @@ def board(
             layout=weave.panels.BoardPanelLayout(x=12, y=8, w=12, h=8),
         ),
         panels.BoardPanel(
-            clean_data_var["latency_ms"].avg(),  # type: ignore
+            lambda window_data: window_data["latency_ms"].avg(),  # type: ignore
             id="latency_avg",
             layout=weave.panels.BoardPanelLayout(x=0, y=14 + 0, w=6, h=height),
         ),
@@ -222,7 +262,7 @@ def board(
             layout=weave.panels.BoardPanelLayout(x=6, y=14 + 0, w=18, h=height),
         ),
         panels.BoardPanel(
-            clean_data_var["usage"]["prompt_tokens"].sum(),  # type: ignore
+            lambda window_data: window_data["usage"]["prompt_tokens"].sum(),  # type: ignore
             id="prompt_tokens_sum",
             layout=weave.panels.BoardPanelLayout(x=0, y=14 + height, w=6, h=height),
         ),
@@ -234,7 +274,7 @@ def board(
             layout=weave.panels.BoardPanelLayout(x=6, y=14 + height, w=18, h=height),
         ),
         panels.BoardPanel(
-            clean_data_var["usage"]["completion_tokens"].sum(),  # type: ignore
+            lambda window_data: window_data["usage"]["completion_tokens"].sum(),  # type: ignore
             id="completion_tokens_sum",
             layout=weave.panels.BoardPanelLayout(x=0, y=14 + height * 2, w=6, h=height),
         ),
@@ -248,7 +288,7 @@ def board(
             ),
         ),
         panels.BoardPanel(
-            clean_data_var["usage"]["total_tokens"].sum(),  # type: ignore
+            lambda window_data: window_data["usage"]["total_tokens"].sum(),  # type: ignore
             id="total_tokens_sum",
             layout=weave.panels.BoardPanelLayout(x=0, y=14 + height * 3, w=6, h=height),
         ),
