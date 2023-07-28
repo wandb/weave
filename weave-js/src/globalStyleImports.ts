@@ -7,6 +7,8 @@
  * move them into this file, which is always imported immediately at app load.
  */
 
+import '@wandb/weave/css/wandbTailwindPreflight.css';
+import '@wandb/weave/css/index.css';
 import '@wandb/weave/common/assets/careyfont/css/careyfont-embedded.css';
 import '@wandb/weave/common/components/JupyterViewer.css';
 import '@wandb/weave/common/components/Tags/Tags.less';
