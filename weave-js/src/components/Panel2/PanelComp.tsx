@@ -186,6 +186,10 @@ export function useUpdateConfig2<C>(props: {
   updateConfig2?(change: (oldConfig: C) => Partial<C>): void;
 }) {
   const {config, updateConfig} = props;
+  const workingConfig = useRef(config);
+  workingConfig.current = config;
+  // console.log({configReceivedInPanelComp: config});
+  // console.log({configRefInPanelComp: workingConfig.current});
   let {updateConfig2} = props;
   if (updateConfig2 == null) {
     // We selectively add this hook. This is safe to do since updateConfig2 will
@@ -196,7 +200,10 @@ export function useUpdateConfig2<C>(props: {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     updateConfig2 = useCallback(
       (change: (oldConfig: any) => any) => {
-        updateConfig(change(config));
+        // updateConfig(change(config));
+        const newConfig = change(workingConfig.current);
+        workingConfig.current = newConfig;
+        updateConfig(newConfig);
       },
       [config, updateConfig]
     );
@@ -208,6 +215,11 @@ export function useUpdateConfig2<C>(props: {
 export const PanelComp2Inner = (props: PanelComp2Props) => {
   const dashUiEnabled = useWeaveDashUiEnable();
   const {panelSpec, configMode} = props;
+  let rootWhichDefinesUpdateConfig2 = false;
+  if (props.updateConfig2 == null) {
+    rootWhichDefinesUpdateConfig2 = true;
+    console.log({RootPanelCompWhichDefinesUpdateConfig2: props.config});
+  }
   const updateConfig2 = useUpdateConfig2(props);
   let unboundedContent = useMemo(() => {
     if (panelSpec == null) {
@@ -219,10 +231,12 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
       !PanelLib.isWithChild<Panel2.PanelContext, any, Type>(panelSpec)
     ) {
       if (!configMode) {
+        console.log('boom 4', rootWhichDefinesUpdateConfig2, panelSpec.id);
         return (
           <panelSpec.Component {...props} updateConfig2={updateConfig2!} />
         );
       } else if (panelSpec.ConfigComponent != null) {
+        console.log('boom 5', rootWhichDefinesUpdateConfig2, panelSpec.id);
         return (
           <panelSpec.ConfigComponent
             {...props}
@@ -236,16 +250,19 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
       PanelLib.isTransform<Panel2.PanelContext, any, Type>(panelSpec)
     ) {
       if (!configMode) {
+        console.log('boom 6', rootWhichDefinesUpdateConfig2, panelSpec.id);
         return (
           <RenderTransformerComp {...(props as PanelTransformerCompProps)} />
         );
       } else {
+        console.log('boom 7');
         return (
           <ConfigTransformerComp {...(props as PanelTransformerCompProps)} />
         );
       }
     } else {
       if (!configMode) {
+        console.log('booyah 1');
         return (
           <panelSpec.Component
             {...props}
@@ -254,6 +271,7 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
           />
         );
       } else if (panelSpec.ConfigComponent != null) {
+        console.log('booyah 2');
         return (
           <panelSpec.ConfigComponent
             {...props}
@@ -262,6 +280,7 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
           />
         );
       } else {
+        console.log('booyah 3');
         return <PanelComp2 {...props} panelSpec={panelSpec.child} />;
       }
     }
@@ -404,6 +423,14 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
     panelSpec,
     baseConfig
   );
+  const updateChildConfig2 = useCallback(
+    (change: (oldConfig: any) => any) => {
+      // updateConfig(change(config));
+      updateChildConfig(change(childConfig));
+    },
+    [childConfig, updateChildConfig]
+  );
+
   return (
     <PanelComp2
       {...props}
@@ -412,6 +439,7 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
       inputType={childInputNode.type}
       config={childConfig}
       updateConfig={updateChildConfig}
+      updateConfig2={updateChildConfig2}
       panelSpec={childPanelSpec}
     />
   );

@@ -35,6 +35,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
     updateRenderPanelConfig,
     updateRenderPanelConfig2,
   } = state;
+  console.log({renderPanelConfig});
   const weave = useWeaveContext();
   const enableFullScreen = useWeaveFeaturesContext().fullscreenMode;
 
