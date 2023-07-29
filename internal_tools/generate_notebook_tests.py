@@ -40,6 +40,10 @@ def main():
             if "ipynb_checkpoints" in root:
                 continue
             if file.endswith(".ipynb"):
+                # keep location of Embeddings.ipynb for ProdMon demos
+                # TODO: replace with tested demo notebook
+                if file.startswith("Embedding"):
+                    continue
                 notebook_path = os.path.join(root, file)
                 test_path = os.path.join(
                     test_dir,
