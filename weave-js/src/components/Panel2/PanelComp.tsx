@@ -186,6 +186,13 @@ export function useUpdateConfig2<C>(props: {
   updateConfig2?(change: (oldConfig: C) => Partial<C>): void;
 }) {
   const {config, updateConfig} = props;
+
+  // By using a ref, we can ensure that downstream components can call
+  // updateConfig2 multiple times between re-renders, and the config will
+  // always be the latest.
+
+  const workingConfig = useRef(config);
+  workingConfig.current = config;
   let {updateConfig2} = props;
   if (updateConfig2 == null) {
     // We selectively add this hook. This is safe to do since updateConfig2 will
@@ -196,9 +203,11 @@ export function useUpdateConfig2<C>(props: {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     updateConfig2 = useCallback(
       (change: (oldConfig: any) => any) => {
-        updateConfig(change(config));
+        const newConfig = change(workingConfig.current);
+        workingConfig.current = newConfig;
+        updateConfig(newConfig);
       },
-      [config, updateConfig]
+      [updateConfig]
     );
   }
   return updateConfig2!;
