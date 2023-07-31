@@ -1989,7 +1989,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const {frame, stack} = usePanelContext();
   const {config, isRefining} = useConfig(input, props.config);
-  console.log({config});
 
   const panelId = LLReact.useId();
 
