@@ -421,7 +421,7 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
       workingChildConfig.current = newChildConfig;
       updateChildConfig(newChildConfig);
     },
-    [childConfig, updateChildConfig]
+    [updateChildConfig]
   );
 
   return (
