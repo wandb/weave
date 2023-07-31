@@ -423,10 +423,13 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
     panelSpec,
     baseConfig
   );
+  const workingChildConfig = useRef(childConfig);
+  workingChildConfig.current = childConfig;
   const updateChildConfig2 = useCallback(
     (change: (oldConfig: any) => any) => {
-      // updateConfig(change(config));
-      updateChildConfig(change(childConfig));
+      const newChildConfig = change(workingChildConfig.current);
+      workingChildConfig.current = newChildConfig;
+      updateChildConfig(newChildConfig);
     },
     [childConfig, updateChildConfig]
   );
@@ -437,7 +440,7 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
       input={childInputNode}
       loading={loading}
       inputType={childInputNode.type}
-      config={childConfig}
+      config={workingChildConfig.current}
       updateConfig={updateChildConfig}
       updateConfig2={updateChildConfig2}
       panelSpec={childPanelSpec}
