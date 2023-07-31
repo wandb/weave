@@ -217,11 +217,6 @@ export function useUpdateConfig2<C>(props: {
 export const PanelComp2Inner = (props: PanelComp2Props) => {
   const dashUiEnabled = useWeaveDashUiEnable();
   const {panelSpec, configMode} = props;
-  let rootWhichDefinesUpdateConfig2 = false;
-  if (props.updateConfig2 == null) {
-    rootWhichDefinesUpdateConfig2 = true;
-    console.log({RootPanelCompWhichDefinesUpdateConfig2: props.config});
-  }
   const updateConfig2 = useUpdateConfig2(props);
   let unboundedContent = useMemo(() => {
     if (panelSpec == null) {
@@ -233,12 +228,10 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
       !PanelLib.isWithChild<Panel2.PanelContext, any, Type>(panelSpec)
     ) {
       if (!configMode) {
-        console.log('boom 4', rootWhichDefinesUpdateConfig2, panelSpec.id);
         return (
           <panelSpec.Component {...props} updateConfig2={updateConfig2!} />
         );
       } else if (panelSpec.ConfigComponent != null) {
-        console.log('boom 5', rootWhichDefinesUpdateConfig2, panelSpec.id);
         return (
           <panelSpec.ConfigComponent
             {...props}
@@ -252,19 +245,16 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
       PanelLib.isTransform<Panel2.PanelContext, any, Type>(panelSpec)
     ) {
       if (!configMode) {
-        console.log('boom 6', rootWhichDefinesUpdateConfig2, panelSpec.id);
         return (
           <RenderTransformerComp {...(props as PanelTransformerCompProps)} />
         );
       } else {
-        console.log('boom 7');
         return (
           <ConfigTransformerComp {...(props as PanelTransformerCompProps)} />
         );
       }
     } else {
       if (!configMode) {
-        console.log('booyah 1');
         return (
           <panelSpec.Component
             {...props}
@@ -273,7 +263,6 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
           />
         );
       } else if (panelSpec.ConfigComponent != null) {
-        console.log('booyah 2');
         return (
           <panelSpec.ConfigComponent
             {...props}
@@ -282,7 +271,6 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
           />
         );
       } else {
-        console.log('booyah 3');
         return <PanelComp2 {...props} panelSpec={panelSpec.child} />;
       }
     }
