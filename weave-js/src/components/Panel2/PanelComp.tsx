@@ -339,7 +339,18 @@ const useSplitTransformerConfigs = (
       }),
     [updateConfig, config, childConfig]
   );
-  return {baseConfig, updateBaseConfig, childConfig, updateChildConfig};
+
+  const updateChildConfig2 = useUpdateConfig2({
+    config: childConfig,
+    updateConfig: updateChildConfig,
+  });
+  return {
+    baseConfig,
+    updateBaseConfig,
+    childConfig,
+    updateChildConfig,
+    updateChildConfig2,
+  };
 };
 
 const useTransformerChild = (
@@ -406,22 +417,12 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
 
 export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
   const {panelSpec, updateConfig, config} = props;
-  const {baseConfig, childConfig, updateChildConfig} =
+  const {baseConfig, childConfig, updateChildConfig, updateChildConfig2} =
     useSplitTransformerConfigs(config, updateConfig);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
     props.input,
     panelSpec,
     baseConfig
-  );
-  const workingChildConfig = useRef(childConfig);
-  workingChildConfig.current = childConfig;
-  const updateChildConfig2 = useCallback(
-    (change: (oldConfig: any) => any) => {
-      const newChildConfig = change(workingChildConfig.current);
-      workingChildConfig.current = newChildConfig;
-      updateChildConfig(newChildConfig);
-    },
-    [updateChildConfig]
   );
 
   return (
@@ -430,7 +431,7 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
       input={childInputNode}
       loading={loading}
       inputType={childInputNode.type}
-      config={workingChildConfig.current}
+      config={childConfig}
       updateConfig={updateChildConfig}
       updateConfig2={updateChildConfig2}
       panelSpec={childPanelSpec}
