@@ -517,6 +517,7 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     if node.from_op.name not in [
         "RunChain-history",
         "panel_table-active_data",
+        "panel_table-active_row",
         "Query-selected",
         "panel_plot-selected_data",
         "panel_table-all_rows",

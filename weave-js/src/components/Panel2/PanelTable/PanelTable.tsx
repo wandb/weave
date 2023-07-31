@@ -84,6 +84,7 @@ import {
   useUpdateConfigKey,
 } from './util';
 import {Link} from './Link';
+import {MaybeWrapper} from '../PanelMaybe';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -232,6 +233,14 @@ const PanelTableInnerConfigSetter: React.FC<
       showColumnSelect={showColumnSelect}
       setShowColumnSelect={setShowColumnSelect}
     />
+  );
+};
+
+const GrowingMaybeWrapper = ({children}: {children: React.ReactNode}) => {
+  return (
+    <GrowToParent>
+      <MaybeWrapper>{children}</MaybeWrapper>
+    </GrowToParent>
   );
 };
 
@@ -529,9 +538,14 @@ const PanelTableInner: React.FC<
     ) => {
       const rowNode = rowData.rowNode;
       const columnDef = columnDefinitions[colId];
+      // MaybeWrappers are needed because the table will eagerly ask for enough
+      // rows to fill the screen, before we know if that many rows exist. This
+      // means that the true value of every cell is possibly nullable, even if
+      // the type doesn't say so. This is sort of a hard-coded way to ensure we
+      // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
         return (
-          <GrowToParent>
+          <GrowingMaybeWrapper>
             <Value
               table={tableState}
               colId={colId}
@@ -547,11 +561,11 @@ const PanelTableInner: React.FC<
               panelContext={props.context}
               updatePanelContext={updateContext}
             />
-          </GrowToParent>
+          </GrowingMaybeWrapper>
         );
       } else {
         return (
-          <GrowToParent>
+          <GrowingMaybeWrapper>
             <Cell
               table={tableState}
               colId={colId}
@@ -566,7 +580,7 @@ const PanelTableInner: React.FC<
               updateInput={props.updateInput}
               simpleTable={props.config.simpleTable}
             />
-          </GrowToParent>
+          </GrowingMaybeWrapper>
         );
       }
     },
@@ -642,22 +656,29 @@ const PanelTableInner: React.FC<
             </S.IndexColumnVal>
           );
         }
+        // MaybeWrappers are needed because the table will eagerly ask for enough
+        // rows to fill the screen, before we know if that many rows exist. This
+        // means that the true value of every cell is possibly nullable, even if
+        // the type doesn't say so. This is sort of a hard-coded way to ensure we
+        // don't error when we get nulls back for small tables
         return (
-          <IndexCell
-            runNode={runNode}
-            rowNode={rowData.rowNode}
-            setRowAsPinned={(index: number) => {
-              if (!props.config.simpleTable) {
-                if (shiftIsPressed) {
-                  setRowAsPinned(index, !rowData.isPinned);
-                } else {
-                  setRowAsActive(index);
+          <MaybeWrapper>
+            <IndexCell
+              runNode={runNode}
+              rowNode={rowData.rowNode}
+              setRowAsPinned={(index: number) => {
+                if (!props.config.simpleTable) {
+                  if (shiftIsPressed) {
+                    setRowAsPinned(index, !rowData.isPinned);
+                  } else {
+                    setRowAsActive(index);
+                  }
                 }
-              }
-            }}
-            activeRowIndex={activeRowIndex}
-            simpleTable={props.config.simpleTable}
-          />
+              }}
+              activeRowIndex={activeRowIndex}
+              simpleTable={props.config.simpleTable}
+            />
+          </MaybeWrapper>
         );
       },
       headerRenderer: ({headerIndex}) => {

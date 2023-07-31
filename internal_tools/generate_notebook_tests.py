@@ -33,12 +33,17 @@ def main():
     integration_dir = os.path.join(git_root, "integration_test")
     test_dir = os.path.join(integration_dir, "cypress", "e2e", "notebooks")
     for root, dirs, files in os.walk(examples_dir):
-        if root.split("/")[-1] == "skip_test":
+        subdir = root.split("/")[-1]
+        if subdir == "skip_test" or subdir == "ProductionMonitoring":
             continue
         for file in files:
             if "ipynb_checkpoints" in root:
                 continue
             if file.endswith(".ipynb"):
+                # keep location of Embeddings.ipynb for ProdMon demos
+                # TODO: replace with tested demo notebook
+                if file.startswith("Embedding"):
+                    continue
                 notebook_path = os.path.join(root, file)
                 test_path = os.path.join(
                     test_dir,

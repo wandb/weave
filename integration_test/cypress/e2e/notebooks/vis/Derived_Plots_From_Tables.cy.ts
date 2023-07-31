@@ -1,7 +1,7 @@
 import {checkWeaveNotebookOutputs} from '../notebooks';
 
-describe('../examples/vis/Derived_Plots_From_Tables.ipynb notebook test', () => {
+describe('../examples/vis/derived_plots_from_tables.ipynb notebook test', () => {
     it('passes', () =>
-        checkWeaveNotebookOutputs('../examples/vis/Derived_Plots_From_Tables.ipynb')
+        checkWeaveNotebookOutputs('../examples/vis/derived_plots_from_tables.ipynb')
     );
 });

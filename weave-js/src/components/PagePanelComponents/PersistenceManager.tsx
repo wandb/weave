@@ -40,7 +40,6 @@ import {
 } from '../Panel2/Icons';
 import {
   useBranchPointFromURIString,
-  useCopyCodeFromURI,
   usePreviousVersionFromURIString,
 } from './hooks';
 import {
@@ -435,7 +434,8 @@ const HeaderFileControls: React.FC<{
   const canDuplicateDashboard = false;
   const duplicateDashboard = useCallback(() => {}, []);
 
-  const {onCopy} = useCopyCodeFromURI(maybeURI);
+  // TODO: Hiding code export temporarily as it is partially broken */
+  // const {onCopy} = useCopyCodeFromURI(maybeURI);
 
   return (
     <>
@@ -532,7 +532,8 @@ const HeaderFileControls: React.FC<{
 
           <MenuDivider />
 
-          {maybeURI && (
+          {/* TODO: Hiding code export temporarily as it is partially broken */}
+          {/* {maybeURI && (
             <MenuItem
               onClick={() => {
                 onCopy().finally(() => setAnchorFileEl(null));
@@ -544,7 +545,7 @@ const HeaderFileControls: React.FC<{
             </MenuItem>
           )}
 
-          <MenuDivider />
+          <MenuDivider /> */}
 
           <MenuItem
             onClick={() => {
