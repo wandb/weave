@@ -81,6 +81,8 @@ export interface PanelSpec<X, C, T extends Type> {
 
   defaultFixedSize?: Dimensions | ((config: C) => Dimensions);
   isValid?: (config: any) => boolean;
+
+  shouldSuggest?: (inputType: T) => boolean;
 }
 
 export type PanelConverterProps<X, C, T extends Type> = PanelPropsInternal<
