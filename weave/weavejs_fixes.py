@@ -49,6 +49,10 @@ def _convert_specific_opname_to_generic_opname(
         return "numbers-min", {"numbers": inputs["self"]}
     elif name == "ArrowWeaveListNumber-max":
         return "numbers-max", {"numbers": inputs["self"]}
+    elif name == "ArrowWeaveListNumber-sum":
+        return "numbers-sum", {"numbers": inputs["self"]}
+    elif name == "ArrowWeaveListNumber-avg":
+        return "numbers-avg", {"numbers": inputs["self"]}
     elif name == "ArrowWeaveListDate-min":
         return "dates-min", {"dates": inputs["self"]}
     elif name == "ArrowWeaveListDate-max":

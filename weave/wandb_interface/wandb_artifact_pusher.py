@@ -1,8 +1,8 @@
 import dataclasses
 import typing
 import wandb
+from wandb import Artifact
 from wandb.sdk.artifacts.artifact_saver import ArtifactSaver
-from wandb.sdk.artifacts.public_artifact import Artifact
 from wandb.sdk.internal.sender import _manifest_json_from_proto
 
 # from wandb.sdk.internal.artifact_saver import ArtifactSaver # This symbol moved after our pinned version
@@ -86,7 +86,7 @@ def write_artifact_to_wandb(
     lite_run.finish()
 
     if res is not None:
-        art = Artifact.from_id(res["id"], wandb_client_api.wandb_public_api().client)
+        art = Artifact._from_id(res["id"], wandb_client_api.wandb_public_api().client)
         if art is not None:
             commit_hash = art.commit_hash
 

@@ -25,9 +25,10 @@ import {HomeTopBar} from './HomeTopBar';
 import {NavigateToExpressionType} from './common';
 import {isServedLocally, useIsAuthenticated} from '../util';
 import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
-  border: 1px solid #dadee3;
+  border: 1px solid ${MOON_250};
   box-shadow: 0px 8px 16px 0px #0e10140a;
   border-top-right-radius: 12px;
   border-top-left-radius: 12px;

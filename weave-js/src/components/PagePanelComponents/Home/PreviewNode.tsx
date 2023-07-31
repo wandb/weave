@@ -1,3 +1,4 @@
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import React, {useMemo} from 'react';
 
 export const Scaler: React.FC<{
@@ -73,7 +74,7 @@ export const PreviewNode: React.FC<{
       style={{
         width: '100%',
         height: '200px',
-        border: '2px solid #DADEE3',
+        border: `2px solid ${MOON_250}`,
         borderRadius: '6px',
         overflow: 'hidden',
       }}>

@@ -30,11 +30,8 @@ import {
 import {themes} from './Panel2/Editor.styles';
 import {
   IconAddNew,
-  IconCheckmark,
   IconClose,
-  IconCopy,
   IconHome,
-  IconLoading,
   IconOpenNewTab,
   IconPencilEdit,
 } from './Panel2/Icons';
@@ -498,7 +495,8 @@ const JupyterPageControls: React.FC<
   }
 > = props => {
   const [hoverText, setHoverText] = useState('');
-  const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
+  // TODO(fix): Hiding code export temporarily as it is partially broken
+  // const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
   const setInspectingPanel = useSetInspectingPanel();
   const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
@@ -614,7 +612,8 @@ const JupyterPageControls: React.FC<
           <IconPencilEdit />
         </JupyterControlsIcon>
       )}
-      <JupyterControlsIcon
+      {/* TODO: Hiding code export temporarily as it is partially broken */}
+      {/* <JupyterControlsIcon
         onClick={onCopy}
         onMouseEnter={e => {
           setHoverText('Copy code');
@@ -629,7 +628,7 @@ const JupyterPageControls: React.FC<
         ) : (
           <IconCopy />
         )}
-      </JupyterControlsIcon>
+      </JupyterControlsIcon> */}
       <JupyterControlsIcon
         onClick={props.openNewTab}
         onMouseEnter={e => {

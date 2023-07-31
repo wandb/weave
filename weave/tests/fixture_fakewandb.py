@@ -352,7 +352,7 @@ class SetupResponse:
 class PatchedSDKArtifact(wandb.Artifact):
     @property
     def commit_hash(self) -> str:
-        if not hasattr(self, "_commit_hash"):
+        if self._commit_hash is None:
             self._commit_hash = uuid.uuid4().hex[:20]
         return typing.cast(str, self._commit_hash)
 
