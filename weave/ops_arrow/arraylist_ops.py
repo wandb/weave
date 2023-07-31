@@ -40,22 +40,23 @@ def _arrowweavelistlist_listindex_output_type(input_types):
 )
 def listindex(self, index):
     a = arrow_as_array(self._arrow_data)
-    # Not handling negative indexes at the moment
     if index == None:
         return ArrowWeaveList(
             pa.nulls(len(a)),
             types.NoneType(),
             self._artifact,
         )
-    if isinstance(index, int):
-        assert index >= 0
-    else:
+    if not isinstance(index, int):
         index = arrow_as_array(index._arrow_data)
+        # Not handling negative indexes at the moment
         assert pa.compute.all(pa.compute.greater_equal(index, 0))
 
     start_indexes = a.offsets[:-1]
     end_indexes = a.offsets[1:]
-    take_indexes = pa.compute.add(start_indexes, index)
+    if isinstance(index, int) and index < 0:
+        take_indexes = pa.compute.add(end_indexes, index)
+    else:
+        take_indexes = pa.compute.add(start_indexes, index)
     oob = pa.compute.greater_equal(take_indexes, end_indexes)
     take_indexes = pa.compute.if_else(oob, None, take_indexes)
     result = a.flatten().take(take_indexes)
