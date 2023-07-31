@@ -65,7 +65,10 @@ export function _getTypeHandlerStacks<
       }
     }
 
-    return isAssignableTo(currentType, ps.inputType) && ps.shouldSuggest?.(currentType) !== false;
+    return (
+      isAssignableTo(currentType, ps.inputType) &&
+      ps.shouldSuggest?.(currentType) !== false
+    );
   });
 
   for (const converter of converters) {

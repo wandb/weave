@@ -32,7 +32,6 @@ import {
   emptyTable,
   getRowExampleNode,
 } from '../PanelTable/tableState';
-import {use} from 'cytoscape';
 
 const inputType = {
   type: 'list' as const,
@@ -226,16 +225,16 @@ export const PanelTraceTreeFromHistoryTraceTableViewerConfigComponent: React.FC<
   );
 };
 
-const getAllTracerKeysFromType = (inputType: Type): string[] => {
+const getAllTracerKeysFromType = (nodeInputType: Type): string[] => {
   const keys: string[] = [];
-  if (!isListLike(inputType)) {
+  if (!isListLike(nodeInputType)) {
     return keys;
   }
-  inputType = listObjectType(inputType);
-  if (!isTypedDictLike(inputType)) {
+  nodeInputType = listObjectType(nodeInputType);
+  if (!isTypedDictLike(nodeInputType)) {
     return keys;
   }
-  const propTypes = typedDictPropertyTypes(inputType);
+  const propTypes = typedDictPropertyTypes(nodeInputType);
   for (const [propKey, propType] of Object.entries(propTypes)) {
     if (isTraceColumnType(propType)) {
       keys.push(propKey);
@@ -250,7 +249,7 @@ export const Spec: Panel2.PanelSpec = {
   Component: PanelTraceTreeFromHistoryTraceTableViewer,
   ConfigComponent: PanelTraceTreeFromHistoryTraceTableViewerConfigComponent,
   inputType,
-  shouldSuggest: inputType => {
-    return getAllTracerKeysFromType(inputType).length > 0;
+  shouldSuggest: nodeInputType => {
+    return getAllTracerKeysFromType(nodeInputType).length > 0;
   },
 };
