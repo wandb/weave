@@ -128,3 +128,9 @@ def install_signal_handlers() -> None:
             install_signal_handler_to_be_called_after_existing(
                 signal.SIGUSR2, objgraph_showgrowth
             )
+
+        def sigterm_handler(signal: int, frame: typing.Optional[FrameType]) -> None:
+            sys.exit(0)
+
+        if environment.sigterm_sighandler_enabled():
+            signal.signal(signal.SIGTERM, sigterm_handler)
