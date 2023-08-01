@@ -55,7 +55,7 @@ def Board(vars, panels: list[BoardPanel], editable=True):
         config=panel_group.GroupConfig(
             layoutMode="horizontal",
             showExpressions=False,
-            enableDeletePanel=False,
+            disableDeletePanel=True,
         ),
         items={
             "sidebar": panel_group.Group(
@@ -74,7 +74,7 @@ def Board(vars, panels: list[BoardPanel], editable=True):
                     ],
                     enableAddPanel=True,
                     childNameBase="var",
-                    enableDeletePanel=False,
+                    disableDeletePanel=True,
                 ),
                 items=vars,
             ),
@@ -83,7 +83,7 @@ def Board(vars, panels: list[BoardPanel], editable=True):
                     layoutMode="grid",
                     showExpressions=showExpressions,  # type: ignore
                     enableAddPanel=True,
-                    enableDeletePanel=False,
+                    disableDeletePanel=True,
                     gridConfig=panel_group.PanelBankSectionConfig(
                         id="grid0",
                         name="Section 0",
