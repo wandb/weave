@@ -506,7 +506,7 @@ export const ensureSimpleDashboard = (
       layoutMode: 'vertical',
       showExpressions: true,
       enableAddPanel: true,
-      enabledDeletePanel: false,
+      disableDeletePanel: true,
     }
   );
 };
