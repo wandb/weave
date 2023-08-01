@@ -310,7 +310,8 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
 
 const useSplitTransformerConfigs = (
   config: PanelTransformerCompProps['config'],
-  updateConfig: PanelTransformerCompProps['updateConfig']
+  updateConfig: PanelTransformerCompProps['updateConfig'],
+  updateConfig2: PanelTransformerCompProps['updateConfig2']
 ) => {
   config = useMemo(() => config ?? {}, [config]);
   const baseConfig = useDeepMemo(_.omit(config, 'childConfig'));
@@ -339,7 +340,34 @@ const useSplitTransformerConfigs = (
       }),
     [updateConfig, config, childConfig]
   );
-  return {baseConfig, updateBaseConfig, childConfig, updateChildConfig};
+
+  const incomingUpdateConfig2 = useMemo(() => {
+    if (updateConfig2 == null) {
+      return undefined;
+    }
+    return (childChangeFunction: (oldChildConfig: any) => Partial<any>) => {
+      const parentChangeFunction = (oldParentConfig: any) => {
+        return {
+          ...oldParentConfig,
+          childConfig: childChangeFunction(oldParentConfig.childConfig),
+        };
+      };
+      updateConfig2(parentChangeFunction);
+    };
+  }, [updateConfig2]);
+
+  const updateChildConfig2 = useUpdateConfig2({
+    config: childConfig,
+    updateConfig: updateChildConfig,
+    updateConfig2: incomingUpdateConfig2,
+  });
+  return {
+    baseConfig,
+    updateBaseConfig,
+    childConfig,
+    updateChildConfig,
+    updateChildConfig2,
+  };
 };
 
 const useTransformerChild = (
@@ -373,7 +401,7 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
   const {panelSpec, updateConfig, config} = props;
   const updateConfig2 = useUpdateConfig2(props);
   const {baseConfig, updateBaseConfig, childConfig, updateChildConfig} =
-    useSplitTransformerConfigs(config, updateConfig);
+    useSplitTransformerConfigs(config, updateConfig, updateConfig2);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
     props.input,
     panelSpec,
@@ -405,14 +433,15 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
 };
 
 export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
-  const {panelSpec, updateConfig, config} = props;
-  const {baseConfig, childConfig, updateChildConfig} =
-    useSplitTransformerConfigs(config, updateConfig);
+  const {panelSpec, updateConfig, config, updateConfig2} = props;
+  const {baseConfig, childConfig, updateChildConfig, updateChildConfig2} =
+    useSplitTransformerConfigs(config, updateConfig, updateConfig2);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
     props.input,
     panelSpec,
     baseConfig
   );
+
   return (
     <PanelComp2
       {...props}
@@ -421,6 +450,7 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
       inputType={childInputNode.type}
       config={childConfig}
       updateConfig={updateChildConfig}
+      updateConfig2={updateChildConfig2}
       panelSpec={childPanelSpec}
     />
   );
