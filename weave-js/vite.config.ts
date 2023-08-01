@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import * as path from 'path';
 
 import {defineConfig} from 'vite';
@@ -152,5 +153,15 @@ export default defineConfig(({mode, command}) => {
     envPrefix: 'REACT_APP_',
     cacheDir: path.join(__dirname, '.vite_cache'),
     assetsInclude: ['**/tree-sitter-weave.wasm', '**/tree-sitter.wasm'],
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      alias: [
+        {
+          find: /.*\.wasm$/,
+          replacement: `${__dirname}/mockTreeSitterForTest.js`,
+        },
+      ],
+    },
   };
 });

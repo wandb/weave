@@ -9,7 +9,7 @@
     "dev": "NODE_OPTIONS='--max-http-header-size=10248012' PORT=3000 vite",
     "build": "rm -rf build && NODE_OPTIONS=--max-old-space-size=16384 vite build",
     "preview": "vite preview",
-    "test": "jest",
+    "test": "vitest",
     "testci": "CI=true JEST_JUNIT_OUTPUT_DIR=./test-results/junit jest --reporters=default --reporters=jest-junit",
     "test:watch": "jest --watch",
     "eslint": "eslint --ext .js,.jsx,.ts,.tsx src",
@@ -150,7 +150,7 @@
     "@types/zen-observable": "^0.8.3",
     "@typescript-eslint/eslint-plugin": "5.35.1",
     "@typescript-eslint/parser": "5.35.1",
-    "@vitejs/plugin-react": "^2.1.0",
+    "@vitejs/plugin-react": "^4.0.4",
     "ast-types": "^0.14.2",
     "autoprefixer": "^10.4.13",
     "babel-eslint": "^10.1.0",
@@ -176,6 +176,7 @@
     "jest-environment-jsdom": "^28.0.1",
     "jest-junit": "^14.0.1",
     "jest-watch-typeahead": "^2.2.2",
+    "jsdom": "^22.1.0",
     "json-schema-to-typescript": "^11.0.2",
     "less": "^2.7.3",
     "lodash.defaults": "^4.2.0",
@@ -192,7 +193,8 @@
     "tslint-plugin-prettier": "^2.3.0",
     "typescript": "4.7.4",
     "uuid": "^9.0.0",
-    "vite": "3.1.3"
+    "vite": "3.1.3",
+    "vitest": "^0.34.1"
   },
   "resolutions": {
     "@types/react": "^17.0.26",
@@ -200,34 +202,5 @@
     "handlebars": "^4.7.7",
     "lodash": "^4.17.21",
     "react": "^17.0.2"
-  },
-  "jest": {
-    "roots": [
-      "<rootDir>/src"
-    ],
-    "setupFiles": [
-      "react-app-polyfill/jsdom"
-    ],
-    "testEnvironment": "jsdom",
-    "transformIgnorePatterns": [
-      "^.+\\.module\\.(css|sass|scss)$"
-    ],
-    "moduleNameMapper": {
-      "^@wandb/weave/(.*)$": "<rootDir>/src/$1",
-      "\\.(wasm)$": "<rootDir>/mockTreeSitterForTest.js",
-      "\\.(css|less|svg)$": "identity-obj-proxy"
-    },
-    "moduleFileExtensions": [
-      "js",
-      "ts",
-      "tsx",
-      "json",
-      "jsx",
-      "node"
-    ],
-    "watchPlugins": [
-      "jest-watch-typeahead/filename",
-      "jest-watch-typeahead/testname"
-    ]
   }
 }
