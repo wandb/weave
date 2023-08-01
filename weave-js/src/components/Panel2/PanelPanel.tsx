@@ -2,6 +2,7 @@ import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import _ from 'lodash';
 import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
@@ -293,6 +294,11 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             </IconButton>
           </SidebarConfig.HeaderTopRight>
         </SidebarConfig.HeaderTop>
+        {!selectedIsRoot && (
+          <SidebarConfig.HeaderTitle>
+            {_.last(selectedPanel)}
+          </SidebarConfig.HeaderTitle>
+        )}
       </SidebarConfig.Header>
       <SidebarConfig.Body
         scrollbarVisible={bodyScrollbarVisible}
