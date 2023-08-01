@@ -108,7 +108,7 @@ export type OutlinePanelProps = OutlineProps & {
   level?: number;
 };
 
-export const shouldAllowDelete = (
+export const shouldDisablePanelDelete = (
   config: ChildPanelFullConfig,
   path: string[]
 ) =>
@@ -150,7 +150,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     }
   }, [children]);
 
-  const shouldHideMenu = shouldAllowDelete(localConfig, path);
+  const shouldHideMenu = shouldDisablePanelDelete(localConfig, path);
 
   return (
     <OutlineItem>

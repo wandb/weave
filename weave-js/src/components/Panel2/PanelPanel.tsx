@@ -6,7 +6,7 @@ import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
 import {consoleLog} from '../../util';
-import {Outline, shouldAllowDelete} from '../Sidebar/Outline';
+import {Outline, shouldDisablePanelDelete} from '../Sidebar/Outline';
 import {
   ChildPanel,
   ChildPanelConfig,
@@ -216,7 +216,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     panelConfig || CHILD_PANEL_DEFAULT_CONFIG,
     selectedPanel
   );
-  const shouldShowOutline = shouldAllowDelete(localConfig, selectedPanel);
+  const shouldShowOutline = shouldDisablePanelDelete(localConfig, selectedPanel);
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
