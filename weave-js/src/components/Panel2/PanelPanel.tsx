@@ -216,7 +216,10 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     panelConfig || CHILD_PANEL_DEFAULT_CONFIG,
     selectedPanel
   );
-  const shouldShowOutline = shouldDisablePanelDelete(localConfig, selectedPanel);
+  const shouldShowOutline = shouldDisablePanelDelete(
+    localConfig,
+    selectedPanel
+  );
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
