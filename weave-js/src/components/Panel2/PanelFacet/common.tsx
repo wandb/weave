@@ -175,7 +175,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
       updateConfig({
           ...newAxisLabel,
       }),
-    [updateConfig, config.dims]
+    [updateConfig]
   );
 
   const cellSelectFunction =
