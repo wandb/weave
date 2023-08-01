@@ -224,7 +224,12 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
         : props.config,
     [props.config]
   );
-  const {table, dims, xAxisLabel: xAxisLabelNode, yAxisLabel: yAxisLabelNode} = config;
+  const {
+    table,
+    dims,
+    xAxisLabel: xAxisLabelNode,
+    yAxisLabel: yAxisLabelNode,
+  } = config;
   const cellFunction = table.columnSelectFunctions[dims.select];
 
   const {

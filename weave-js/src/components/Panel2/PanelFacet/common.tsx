@@ -173,7 +173,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   const updateAxisLabel = useCallback(
     (newAxisLabel: {xAxisLabel?: EditingNode; yAxisLabel?: EditingNode}) =>
       updateConfig({
-          ...newAxisLabel,
+        ...newAxisLabel,
       }),
     [updateConfig]
   );
