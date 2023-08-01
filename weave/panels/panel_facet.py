@@ -14,12 +14,6 @@ class FacetDimsConfig:
     y: str
     select: str
     detail: str
-    xAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
-    yAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
 
 
 @weave.type()
@@ -42,6 +36,12 @@ class FacetConfig:
     selectedCell: typing.Optional[FacetCell] = dataclasses.field(
         default_factory=lambda: None
     )
+    xAxisLabel: weave.Node[str] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    yAxisLabel: weave.Node[str] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
 
 
 @weave.type()
@@ -62,12 +62,12 @@ class Facet(panel.Panel):
                     y=table.add_column(lambda row: graph.VoidNode()),
                     select=table.add_column(lambda row: graph.VoidNode()),
                     detail=table.add_column(lambda row: graph.VoidNode()),
-                    xAxisLabel=graph.VoidNode(),
-                    yAxisLabel=graph.VoidNode(),
                 ),
                 cellSize=FacetCellSize(w=50, h=50),
                 padding=0,
                 selectedCell=None,
+                xAxisLabel=graph.VoidNode(),
+                yAxisLabel=graph.VoidNode(),
             )
             self.set_x(options["x"])
             self.set_y(options["y"])

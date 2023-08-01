@@ -224,7 +224,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
         : props.config,
     [props.config]
   );
-  const {table, dims} = config;
+  const {table, dims, xAxisLabel: xAxisLabelNode, yAxisLabel: yAxisLabelNode} = config;
   const cellFunction = table.columnSelectFunctions[dims.select];
 
   const {
@@ -325,8 +325,8 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
     [cellNodesUse.loading, cellNodesUse.result]
   );
 
-  const xAxisLabelValue = LLReact.useNodeValue(dims.xAxisLabel as any);
-  const yAxisLabelValue = LLReact.useNodeValue(dims.yAxisLabel as any);
+  const xAxisLabelValue = LLReact.useNodeValue(xAxisLabelNode as any);
+  const yAxisLabelValue = LLReact.useNodeValue(yAxisLabelNode as any);
   const xAxisLabel = xAxisLabelValue.loading ? '' : xAxisLabelValue.result;
   const yAxisLabel = yAxisLabelValue.loading ? '' : yAxisLabelValue.result;
   const hasXAxisLabel = xAxisLabel !== '';
@@ -342,7 +342,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
       hasYAxisLabel={hasYAxisLabel}>
       {hasXAxisLabel && (
         <S.xAxisLabel
-          key={'x-axis-label-' + dims.xAxisLabel}
+          key={'x-axis-label-' + xAxisLabel}
           columnCount={Object.keys(xPos).length + columnOffset + 1}
           hasYAxisLabel={hasYAxisLabel}>
           {xAxisLabel}
@@ -350,7 +350,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
       )}
       {hasYAxisLabel && (
         <S.yAxisLabel
-          key={'y-axis-label-' + dims.yAxisLabel}
+          key={'y-axis-label-' + yAxisLabel}
           rowCount={Object.keys(yPos).length + rowOffset + 1}
           hasXAxisLabel={hasXAxisLabel}>
           {yAxisLabel}

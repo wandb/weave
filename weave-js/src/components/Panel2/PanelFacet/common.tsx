@@ -15,8 +15,6 @@ export const inputType = {type: 'list' as const, objectType: 'any' as const};
 interface FacetConfig {
   table: TableState.TableState;
   dims: {
-    xAxisLabel: EditingNode;
-    yAxisLabel: EditingNode;
     x: TableState.ColumnId;
     y: TableState.ColumnId;
     select: TableState.ColumnId;
@@ -32,6 +30,8 @@ interface FacetConfig {
     x: string;
     y: string;
   };
+  xAxisLabel: EditingNode;
+  yAxisLabel: EditingNode;
 }
 
 export function defaultFacet(): FacetConfig {
@@ -57,8 +57,6 @@ export function defaultFacet(): FacetConfig {
   return {
     table: tableState,
     dims: {
-      xAxisLabel: voidNode(),
-      yAxisLabel: voidNode(),
       x: xColId,
       y: yColId,
       select: selectColId,
@@ -67,9 +65,11 @@ export function defaultFacet(): FacetConfig {
     padding: 0,
     manualSize: false,
     cellSize: {
-      w: 40,
-      h: 40,
+      w: 200,
+      h: 20,
     },
+    xAxisLabel: voidNode(),
+    yAxisLabel: voidNode(),
   };
 }
 
@@ -173,10 +173,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   const updateAxisLabel = useCallback(
     (newAxisLabel: {xAxisLabel?: EditingNode; yAxisLabel?: EditingNode}) =>
       updateConfig({
-        dims: {
-          ...config.dims,
           ...newAxisLabel,
-        },
       }),
     [updateConfig, config.dims]
   );
@@ -208,7 +205,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
       {dashboardConfigOptions}
       <ConfigPanel.ConfigOption label={'X-axis-label'}>
         <ConfigPanel.ExpressionConfigField
-          expr={config.dims.xAxisLabel}
+          expr={config.xAxisLabel}
           setExpression={exp => updateAxisLabel({xAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
@@ -223,7 +220,7 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
       </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label={'Y-axis label'}>
         <ConfigPanel.ExpressionConfigField
-          expr={config.dims.yAxisLabel}
+          expr={config.yAxisLabel}
           setExpression={exp => updateAxisLabel({yAxisLabel: exp})}
         />
       </ConfigPanel.ConfigOption>
