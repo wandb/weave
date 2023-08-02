@@ -13,6 +13,9 @@ from . import weave_types as types
 GQLKeyPropFn = typing.Callable[[input_provider.InputProvider, types.Type], types.Type]
 
 
+_ROOT_RESOLVERS: set[op_def.OpDef] = set()
+
+
 @dataclass
 class GqlOpPlugin:
     query_fn: typing.Callable[[input_provider.InputAndStitchProvider, str], str]
@@ -23,6 +26,10 @@ class GqlOpPlugin:
     # gql keys propagated appropriately. this is not a part of output_type to avoid
     # the UI needing to make additional network requests to get the output type
     gql_key_prop_fn: typing.Optional[GQLKeyPropFn] = None
+
+    def __post_init__(self) -> None:
+        if self.root_resolver is not None:
+            _ROOT_RESOLVERS.add(self.root_resolver)
 
 
 # Ops in `domain_ops` can add this plugin to their op definition to indicate

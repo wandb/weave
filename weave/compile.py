@@ -461,7 +461,7 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
             types.List, unwrapped_first_arg_type
         ).object_type
 
-    return fq_opname.endswith("GQLResolver") or (
+    return opdef.is_gql_root_resolver() or (
         plugin is not None
         and plugin.gql_key_prop_fn is not None
         and isinstance(unwrapped_first_arg_type, gql_with_keys.GQLHasKeysType)
