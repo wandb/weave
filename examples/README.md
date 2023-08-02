@@ -6,7 +6,7 @@ The `examples/` folder contains:
 * `getting_started`: Learn how to build interactive data applications
 * `reference`: Syntax and usage for Weave types, ops, and panels
 * `experimental`:  Everything else, ranging from focused proofs-of-concept to very experimental works-in-progress—we hope these inspire your exploration and welcome PRs for improvement!
-* `apps (future)`: Example applications
+* `gallery (future)`: Example applications
 * `guides (future)`: Guides to use specific features for advanced users
 
 
