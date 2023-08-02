@@ -6,7 +6,6 @@ TODO: this file is not complete. We should try to put all compability fixes here
 import typing
 import copy
 import math
-import datetime
 
 from . import weave_types
 from . import graph
