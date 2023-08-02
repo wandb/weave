@@ -55,9 +55,15 @@ const BokehViewerInner = (props: BokehViewerProps) => {
       if (bokehDivRef.current) {
         bokehDivRef.current.innerHTML = '';
       }
+      let root_id = 0;
+      // TODO: Why is this check necessary? Seems like it is with our test
+      // bokeh files
+      if (props.bokehJson.roots.root_ids != null) {
+        root_id = props.bokehJson.roots.root_ids[0];
+      }
       (window as any).Bokeh.embed.embed_item({
         doc: props.bokehJson,
-        root_id: props.bokehJson.roots.root_ids[0],
+        root_id: root_id,
         target_id: bokehDivId,
       });
     }

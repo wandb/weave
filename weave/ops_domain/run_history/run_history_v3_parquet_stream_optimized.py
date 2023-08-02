@@ -13,13 +13,13 @@ from .. import trace_tree, wb_domain_types as wdt
 from ... import artifact_mem
 from .. import wb_util
 from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
-from ...op_def import map_type
 from ... import engine_trace
 from ... import errors
 from ...wandb_interface import wandb_stream_table
 from . import history_op_common
 from ... import artifact_base, io_service
 from .. import wbmedia
+from ... import artifact_fs
 from ...ops_arrow.list_ import (
     PathItemType,
     PathType,
@@ -115,7 +115,6 @@ def _get_history3(run: wdt.Run, columns=None):
 
     # 1. Get the flattened Weave-Type given HistoryKeys
     flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
-    _verify_supported_types(flattened_object_type)
     final_type = _unflatten_history_object_type(flattened_object_type)
 
     # 2. Read in the live set
@@ -314,34 +313,6 @@ def _process_all_columns(
                 )
 
     return live_columns, live_columns_already_mapped, processed_history_pa_tables
-
-
-unsupported_types = (
-    wbmedia.ImageArtifactFileRefType,  # type: ignore
-    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.LegacyTableNDArrayType,
-    wb_util.WbHistogram,
-)
-
-
-def _verify_supported_type_mapper(type_: types.Type) -> types.Type:
-    from .. import artifact_fs
-
-    type_ = types.non_none(type_)
-    if isinstance(type_, unsupported_types + (artifact_fs.FilesystemArtifactFileType,)):
-        raise errors.WeaveWBHistoryTranslationError(
-            f"Unsupported type in history3: {type_}"
-        )
-    return type_
-
-
-def _verify_supported_types(type_: types.Type) -> None:
-    map_type(type_, _verify_supported_type_mapper)
 
 
 def _non_vectorized_warning(message: str):
@@ -607,17 +578,20 @@ def _is_directly_convertible_type(col_type: types.Type):
 
 
 _weave_types_requiring_in_memory_transformation = (
-    # wbmedia.ImageArtifactFileRefType,  # type: ignore
-    # wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.LegacyTableNDArrayType,
-    # wb_util.WbHistogram,
+    # TODO: We should at a minimum get ImageArtifactFileRefType working
+    # in the vectorized way. I think we can get the others working as well
+    wbmedia.ImageArtifactFileRefType,  # type: ignore
+    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.LegacyTableNDArrayType,
+    wb_util.WbHistogram,
     trace_tree.WBTraceTree.WeaveType,  # type: ignore
     types.UnknownType,
+    artifact_fs.FilesystemArtifactFileType,  # Tables
 )
 
 
