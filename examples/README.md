@@ -3,10 +3,12 @@
 ## Examples structure 
 
 The `examples/` folder contains:
-* `apps`: the most polished demos--best place for a quick overview
-* `tutorial`: more detailed walkthroughs for a growing set of use cases 
-* `reference`: syntax and usage for Weave types, ops, and panels
-* `experimental` and other paths:  everything else, ranging from focused proofs-of-concept to very experimental works-in-progress—-we hope these inspire your exploration and welcome PRs for improvement :) 
+* `getting_started`: Learn how to build interactive data applications
+* `reference`: Syntax and usage for Weave types, ops, and panels
+* `experimental`:  Everything else, ranging from focused proofs-of-concept to very experimental works-in-progress—-we hope these inspire your exploration and welcome PRs for improvement!
+* `apps (future)`: Example applications
+* `guides (future)`: Guides to use specific features for advanced users
+
 
 
 ## Running examples
