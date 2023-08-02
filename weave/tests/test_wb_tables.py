@@ -380,6 +380,7 @@ def test_symbols_in_name(fake_wandb):
         dict(zip(columns, row)) for row in data
     ]
 
+
 def test_column_sort(fake_wandb):
     columns = ["name", "number", "float", "timestamp"]
     row1 = ["a", 0, 0.124122143123, time.time()]
@@ -407,6 +408,21 @@ def test_column_sort(fake_wandb):
             dict(zip(columns, row)) for row in data
         ]
 
+    sorted = rows.sort(
+        lambda row: weave.ops.make_list(label=row["timestamp"].toTimestamp()), ["desc"]
+    )
+    assert weave.use(sorted).to_pylist_notags() == [
+        dict(zip(columns, row)) for row in [row3, row2, row1]
+    ]
+
+    sorted = sorted.sort(
+        lambda row: weave.ops.make_list(label=row["timestamp"].toTimestamp()), ["asc"]
+    )
+    assert weave.use(sorted).to_pylist_notags() == [
+        dict(zip(columns, row)) for row in data
+    ]
+
+
 def test_group_avg_sort_combo(fake_wandb):
     columns = ["id", "label", "score"]
     data = [
@@ -428,5 +444,7 @@ def test_group_avg_sort_combo(fake_wandb):
     rows = art_1_node.file("table_1.table.json").table().rows()
 
     grouped = rows.groupby(lambda row: weave.ops.dict_(label=row["label"]))
-    sorted = grouped.sort(lambda row: weave.ops.make_list(label=row["score"].avg()), ["asc"])
+    sorted = grouped.sort(
+        lambda row: weave.ops.make_list(label=row["score"].avg()), ["asc"]
+    )
     assert weave.use(sorted[2].groupkey()["label"]) == "C"
