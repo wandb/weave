@@ -1533,7 +1533,6 @@ def test_run_colors(fake_wandb):
 
 def test_arrow_groupby_external_tag(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
-    print(1)
     run_names = (
         ops.project("stacey", "mendeleev")
         .filteredRuns("{}", "-createdAt")
