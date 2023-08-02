@@ -189,16 +189,6 @@ def remove_nan_and_inf(obj):
     return obj
 
 
-def convert_timestamps_to_epoch_ms(obj: typing.Any) -> typing.Any:
-    if isinstance(obj, list):
-        return [convert_timestamps_to_epoch_ms(o) for o in obj]
-    if isinstance(obj, dict):
-        return {k: convert_timestamps_to_epoch_ms(v) for k, v in obj.items()}
-    if isinstance(obj, datetime.datetime):
-        return obj.timestamp() * 1000
-    return obj
-
-
 def fixup_data(data):
     data = recursively_unwrap_unions(data)
     data = remove_opcall_versions_data(data)
@@ -206,5 +196,4 @@ def fixup_data(data):
     # response right now.
     # TODO: fix. Encode as string and then interpret in js side.
     data = remove_nan_and_inf(data)
-    data = convert_timestamps_to_epoch_ms(data)
     return convert_specific_ops_to_generic_ops_data(data)
