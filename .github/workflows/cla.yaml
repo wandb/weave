@@ -25,7 +25,7 @@ jobs:
           path-to-signatures: 'cla/signatures/version1/cla.json'
           path-to-document: 'https://github.com/wandb/weave/blob/master/cla/cla.md' # e.g. a CLA or a DCO document
           # branch should not be protected
-          branch: 'master'
+          branch: 'cla'
           allowlist: dannygoldstein, jamie-rasmussen, tssweeney, vanpelt
 
          # the followings are the optional inputs - If the optional inputs are not given, then default values will be taken
