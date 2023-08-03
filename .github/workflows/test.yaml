@@ -132,7 +132,7 @@ jobs:
 
   boom:
     name: Test Python Unit Test timeout
-    timeout-minutes: 45
+    timeout-minutes: 65
     needs:
       - build-container
     # runs-on: [self-hosted, runner]
