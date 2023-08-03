@@ -9,7 +9,7 @@ def without_keys(d, keys):
     return {k: v for k, v in d.items() if k not in keys}
 
 
-def test_artifact_metadata(user_by_api_key_in_env):
+def test_artifact_metadata(user_by_api_key_netrc):
     # Write some metadata to a local artifact
     local_art = artifact_local.LocalArtifact("test_artifact")
     local_art.set("obj", weave.types.Number(), 1)
