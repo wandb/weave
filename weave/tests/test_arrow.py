@@ -1871,7 +1871,7 @@ def test_to_compare_safe():
     assert safe.to_pylist_notags() == ["__t_13-__list_-", "__t_13-a", "__t_9-5"]
 
 
-def test_arrow_op_decorator_handling_of_optional_tagged_type():
+def test_arrow_op_decorator_handles_optional_tagged_type():
     obj = [None, 1, 2, None]
     obj[1] = box.box(obj[1])
     obj[2] = box.box(obj[2])
