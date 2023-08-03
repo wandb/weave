@@ -1,4 +1,4 @@
-Contribution License Agreement
+# Contribution License Agreement
 
 This Contribution License Agreement ("Agreement") is agreed to by the party signing below ("You"), and conveys certain license rights to Weights and Biases, Inc. ("W&B"), for Your contributions to W&B open source projects. This Agreement is effective as of the latest signature date below ("Effective Date").
 
