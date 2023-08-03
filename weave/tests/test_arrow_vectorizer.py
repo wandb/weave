@@ -1008,7 +1008,9 @@ def test_arrow_dict():
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
-@pytest.mark.skip("Temporarily skipping due to Python unit tests hanging and getting canceled.")
+@pytest.mark.skip(
+    "Temporarily skipping due to Python unit tests hanging and getting canceled."
+)
 def test_vectorize_works_recursively_on_weavifiable_op():
     # this op is weavifiable because it just calls add
     @weave.op()
