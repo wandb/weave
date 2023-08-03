@@ -26,7 +26,7 @@ import weave
 weave.show(pandas_df)
 ```
 
-For a hands-on example of this in action, check out our [Weave Quickstart Notebook](../examples/weave_quickstart.ipynb).
+For a hands-on example of this in action, check out our [Getting Started with Weave Notebook](../examples/get_started.ipynb).
 
 ## Dive Deeper into Data
 
