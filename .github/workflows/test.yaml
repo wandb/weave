@@ -140,7 +140,7 @@ jobs:
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     services:
       wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer@sha256:b8c3e08fb6970b52cef56ba00066ad2e8e6ce95ff9367e97b1b1b08c7e618ee8
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer@sha256:e2423f29d10371bec4c9ba77625a8449ac08f24706df982ee7ee75f373257b1f
         credentials:
           username: _json_key
           password: ${{ secrets.gcp_wb_sa_key }}
