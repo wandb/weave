@@ -1,4 +1,4 @@
-name: "Weave CLA"
+name: "cla"
 on:
   issue_comment:
     types: [created]
@@ -16,7 +16,7 @@ jobs:
   CLAAssistant:
     runs-on: ubuntu-latest
     steps:
-      - name: "CLA Assistant"
+      - name: "check-signature"
         if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
         uses: contributor-assistant/github-action@v2.3.0
         env:
@@ -26,7 +26,7 @@ jobs:
           path-to-document: 'https://github.com/wandb/weave/blob/master/cla/cla.md' # e.g. a CLA or a DCO document
           # branch should not be protected
           branch: 'cla'
-          allowlist: dannygoldstein, jamie-rasmussen, tssweeney, vanpelt
+          allowlist:
 
          # the followings are the optional inputs - If the optional inputs are not given, then default values will be taken
           #remote-organization-name: enter the remote organization name where the signatures should be stored (Default is storing the signatures in the same repository)
