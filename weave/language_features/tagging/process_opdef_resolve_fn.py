@@ -6,6 +6,7 @@ the result of the op_def's resolve_fn.
 """
 
 import typing
+import typing_extensions
 import pyarrow as pa
 from pyarrow import compute as pc
 
@@ -23,18 +24,14 @@ if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
 
 
-def _is_tagged_value(val: types.Type) -> typing.TypeGuard[TaggedValueType]:
+def _is_tagged_value(val: types.Type) -> typing_extensions.TypeGuard[TaggedValueType]:
     return isinstance(val, TaggedValueType)
 
 
-def _is_optional_tagged_value(val: types.Type) -> typing.TypeGuard[types.UnionType]:
+def _is_optional_tagged_value(
+    val: types.Type,
+) -> typing_extensions.TypeGuard[types.UnionType]:
     return types.is_optional(val) and isinstance(types.non_none(val), TaggedValueType)
-
-
-def _invert_tag_and_union(type: TaggedValueType) -> types.Type:
-    value = types.non_none(type.value)
-    tag = type.tag
-    return types.optional(TaggedValueType(tag, value))
 
 
 def _strip_tags(val: typing.Any) -> typing.Any:
