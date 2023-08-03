@@ -1,4 +1,5 @@
-# We use self-hosted runners for performance: we can rely on docker caching
+
+0;276;0c# We use self-hosted runners for performance: we can rely on docker caching
 # on the runner machines for 0s startup times for our tests.
 # There is an issue with self-hosted runners where if you use a mix of
 # host and container jobs, the host jobs will fail to start
@@ -132,7 +133,7 @@ jobs:
 
   boom:
     name: Test Python Unit Test timeout
-    timeout-minutes: 90
+    timeout-minutes: 1000
     needs:
       - build-container
     runs-on: [self-hosted, runner]
