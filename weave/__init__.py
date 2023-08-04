@@ -26,6 +26,7 @@ from . import wandb_api as _wandb_api
 from .core_types import *
 
 from .panels_py import *
+from . import version
 
 _wandb_api.init()
 
@@ -39,4 +40,4 @@ _context.clear_loading_built_ins(_loading_builtins_token)
 # def _ipython_display_():
 #     return show(ecosystem())
 
-__version__ = "0.24.1"
+__version__ = version.VERSION
