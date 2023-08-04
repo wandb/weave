@@ -58,7 +58,7 @@ In order to develop against Weave, you will want 3 terminal sessions:
 
 ### Testing & Style
 
-Style and lint is enforced using pre-commit hooks.
+Style and lint is enforced using pre-commit hooks, including on example notebooks.
 
 All tests can be run via `cd weave && pytest`
 
