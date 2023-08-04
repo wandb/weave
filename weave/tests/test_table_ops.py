@@ -247,12 +247,13 @@ def test_rows_type_null():
     type_node = table_ops.Table.rows_type(box.box(None))
     assert weave.use(type_node) == types.NoneType()
 
+
 def test_sort_timestamp():
-    data = [time.time()*1000 + x for x in range(10)]
+    data = [time.time() * 1000 + x for x in range(10)]
     times = weave.save(data)
     timestamps = times.toTimestamp()
-    sorted_ts = timestamps.sort(lambda ts: ops.make_list(label = ts), ["asc"])
+    sorted_ts = timestamps.sort(lambda ts: ops.make_list(label=ts), ["asc"])
     assert weave.use(sorted_ts)[0] == weave.use(timestamps[0])
 
-    sorted_ts = sorted_ts.sort(lambda ts: ops.make_list(label = ts), ["desc"])
+    sorted_ts = sorted_ts.sort(lambda ts: ops.make_list(label=ts), ["desc"])
     assert weave.use(sorted_ts)[0] == weave.use(timestamps[-1])

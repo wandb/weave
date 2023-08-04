@@ -449,4 +449,3 @@ def test_group_avg_sort_combo(fake_wandb):
         lambda row: weave.ops.make_list(label=row["score"].avg()), ["asc"]
     )
     assert weave.use(sorted[2].groupkey()["label"]) == "C"
-    
