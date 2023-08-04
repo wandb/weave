@@ -1,4 +1,4 @@
-import {Node} from '@wandb/weave/core';
+import {EditingNode, Node, voidNode} from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveContext} from '../../../context';
@@ -30,6 +30,8 @@ interface FacetConfig {
     x: string;
     y: string;
   };
+  xAxisLabel: EditingNode;
+  yAxisLabel: EditingNode;
 }
 
 export function defaultFacet(): FacetConfig {
@@ -66,6 +68,8 @@ export function defaultFacet(): FacetConfig {
       w: 200,
       h: 20,
     },
+    xAxisLabel: voidNode(),
+    yAxisLabel: voidNode(),
   };
 }
 
@@ -166,6 +170,14 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
     [updateConfig]
   );
 
+  const updateAxisLabel = useCallback(
+    (newAxisLabel: {xAxisLabel?: EditingNode; yAxisLabel?: EditingNode}) =>
+      updateConfig({
+        ...newAxisLabel,
+      }),
+    [updateConfig]
+  );
+
   const cellSelectFunction =
     tableConfig.columnSelectFunctions[config.dims.select];
   const columnVars = useMemo(() => {
@@ -191,7 +203,13 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   return (
     <ConfigPanel.ConfigSection label={`Properties`}>
       {dashboardConfigOptions}
-      <ConfigPanel.ConfigOption label={'x'}>
+      <ConfigPanel.ConfigOption label={'X-axis-label'}>
+        <ConfigPanel.ExpressionConfigField
+          expr={config.xAxisLabel}
+          setExpression={exp => updateAxisLabel({xAxisLabel: exp})}
+        />
+      </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label={'X'}>
         <DimConfig
           dimName="x"
           colId={config.dims.x}
@@ -200,7 +218,13 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
           updateTableConfig={updateTableConfig}
         />
       </ConfigPanel.ConfigOption>
-      <ConfigPanel.ConfigOption label={'y'}>
+      <ConfigPanel.ConfigOption label={'Y-axis label'}>
+        <ConfigPanel.ExpressionConfigField
+          expr={config.yAxisLabel}
+          setExpression={exp => updateAxisLabel({yAxisLabel: exp})}
+        />
+      </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label={'Y'}>
         <DimConfig
           dimName="y"
           colId={config.dims.y}

@@ -54,8 +54,6 @@ TRACE_LOCAL = trace_local.TraceLocal()
 # Set this to true when debugging for costly, but detailed storyline of execution
 PRINT_DEBUG = False
 
-USE_EXECUTION_TIME_NODE_EXPANSION = True
-
 
 class OpExecuteStats(typing.TypedDict):
     cache_used: int
@@ -566,9 +564,6 @@ def execute_forward_node(
                     )
             else:
                 result = execute_sync_op(op_def, inputs)
-                if USE_EXECUTION_TIME_NODE_EXPANSION:
-                    if _should_expand_result(op_def, result):
-                        result = _expand_node_result(result, forward_node, fg)
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)
@@ -603,55 +598,3 @@ def execute_forward_node(
                 logging.debug("Saving run")
                 TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
     return {"cache_used": False, "already_executed": False}
-
-
-def _should_expand_result(op_def: op_def.OpDef, result: typing.Any) -> bool:
-    return op_def.returns_expansion_node
-
-
-def _expand_node_result(
-    result_node: graph.Node,
-    forward_node: forward_graph.ForwardNode,
-    fg: forward_graph.ForwardGraph,
-) -> typing.Any:
-    leaves = _get_leaves(forward_node, fg)
-
-    def _map_fn(node: graph.Node) -> graph.Node:
-        if node is forward_node.node:
-            return result_node
-        else:
-            return node
-
-    replaced_leaves = graph.map_nodes_top_level([l.node for l in leaves], _map_fn)
-    all_compiled_nodes = compile.compile([result_node, *replaced_leaves]).unwrap()
-    compiled_result_node = all_compiled_nodes[0]
-
-    inner_fg = forward_graph.ForwardGraph()
-    inner_fg.add_node(compiled_result_node)
-
-    with context.execution_client():
-        execute_forward(inner_fg)
-        res = inner_fg.get_result(compiled_result_node)  # type: ignore
-
-    return res
-
-
-def _get_leaves(
-    forward_node: forward_graph.ForwardNode, fg: forward_graph.ForwardGraph
-) -> typing.Set[forward_graph.ForwardNode]:
-    visited = set()
-    leaves = set()
-    queue = [forward_node]
-
-    while len(queue) > 0:
-        node = queue.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-        if len(node.input_to) == 0:
-            leaves.add(node)
-        else:
-            for next_node in node.input_to:
-                queue.append(next_node)
-
-    return leaves
