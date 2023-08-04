@@ -49,7 +49,7 @@ Weave has example notebooks demonstrating common usage patterns. To use the note
 pip install '.[examples]'
 ```
 
-then run through the notebooks in [examples](./examples/EXAMPLES.md)
+then run through the notebooks in [examples](./examples/README.md)
 
 ## 🎉 Why Weave?
 
@@ -64,7 +64,7 @@ then run through the notebooks in [examples](./examples/EXAMPLES.md)
 
 Before you dive in, make sure you have the required software installed. You'll find all the details in our [Installation Guide](./docs/INSTALLATION.md).
 
-After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./examples/EXAMPLES.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
+After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./examples/README.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
 
 ---
 
