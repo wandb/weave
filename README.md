@@ -13,7 +13,7 @@ Whether you are a seasoned data scientist, an aspiring ML practitioner, or just 
 
 ## Weave Quickstart
 
-[Run in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
+[Run in a Jupyter notebook ->](./examples/apps/weave_demo_quickstart.ipynb)
 
 Install via `pip install weave`, `import weave` in your notebook, and explore your data  with one line of code!
 
