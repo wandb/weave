@@ -129,9 +129,10 @@ export const Group = styled.div<{
         border-top: none;
       }
     `}
-          
+
   ${props => props.compStyle}
 `;
+Group.displayName = 'S.Group';
 
 export const GroupItem = styled.div<{
   width?: string;
@@ -176,6 +177,7 @@ export const GroupItem = styled.div<{
           margin-bottom: 12px;
         `}
 `;
+GroupItem.displayName = 'S.GroupItem';
 
 export const fixChildData = (
   fullItem: ChildPanelFullConfig
@@ -879,8 +881,10 @@ const AddVarButton = styled.div`
     height: 18px;
   }
 `;
+AddVarButton.displayName = 'S.AddVarButton';
 
 const IconAddNew = styled(IconAddNewUnstyled)`
   width: 18px;
   height: 18px;
 `;
+IconAddNew.displayName = 'S.IconAddNew';

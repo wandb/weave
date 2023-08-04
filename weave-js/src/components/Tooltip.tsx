@@ -4,7 +4,7 @@ import {
   MOON_800,
   OBLIVION,
   WHITE,
-} from '@wandb/weave/common/css/globals.styles';
+} from '../common/css/globals.styles';
 import {Popup} from 'semantic-ui-react';
 import styled from 'styled-components';
 

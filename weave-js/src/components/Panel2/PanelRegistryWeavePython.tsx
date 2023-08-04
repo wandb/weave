@@ -33,7 +33,7 @@ export const weavePythonPanelSpecs = () => {
   return [
     RunSpec,
     PanelAnyObj,
-    // PanelAuto doens't route config updates correctly and breaks stuff.
+    // PanelAuto doesn't route config updates correctly and breaks stuff.
     // Don't need it yet anyway
     // PanelAuto,
     PanelGpt3Model,
