@@ -11,9 +11,9 @@ Our mission is to equip Machine Learning practitioners with the best tools to tu
 
 Whether you are a seasoned data scientist, an aspiring ML practitioner, or just a tech enthusiast eager to play with data, Weave is for you.
 
-## Weave Quickstart
+## Getting Started with Weave
 
-[Run in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
+[Run in a Jupyter notebook ->](./examples/get_started.ipynb)
 
 Install via `pip install weave`, `import weave` in your notebook, and explore your data  with one line of code!
 
