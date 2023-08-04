@@ -5,10 +5,9 @@
 The `examples/` folder contains:
 * `getting_started`: Learn how to build interactive data applications
 * `reference`: Syntax and usage for Weave types, ops, and panels
-* `experimental`:  Everything else, ranging from focused proofs-of-concept to very experimental works-in-progress—-we hope these inspire your exploration and welcome PRs for improvement!
+* `experimental`:  Everything else, ranging from focused proofs-of-concept to very experimental works-in-progress—we hope these inspire your exploration and welcome PRs for improvement!
 * `apps (future)`: Example applications
 * `guides (future)`: Guides to use specific features for advanced users
-
 
 
 ## Running examples
@@ -29,25 +28,25 @@ Colabs to get started:
 
 ### Get started
 
-- [Weave quickstart](../examples/apps/weave_demo_quickstart.ipynb)
-- [View and transform images](../examples/tutorial/images_gen.ipynb)
-- [Train MNIST and visualize predictions](../examples/tutorial/mnist_train.ipynb)
+- [Weave quickstart](../examples/getting_started/0_weave_demo_quickstart.ipynb)
+- [View and transform images](../examples/getting_started/2_images_gen.ipynb)
+- [Train MNIST and visualize predictions](../examples/experimental/mnist_train.ipynb)
 
 ### Weave fundamentals
 
-- [End-to-end walkthrough](../examples/tutorial/weave_demo.ipynb)
+- [End-to-end walkthrough](../examples/getting_started/1_weave_demo.ipynb)
 - [Create Weave Ops](../examples/reference/create_ops.ipynb)
-- [Organize Weave Panels](../examples/tutorial/layout_panels.ipynb)
+- [Organize Weave Panels](../examples/experimental/layout_panels.ipynb)
 
 ### Build interactive Weave Boards
 
 - in Google Colab: [Weave Board Quickstart: Generative AI Playground](https://colab.research.google.com/drive/1gcR-ucIgjDbDEBFykEpJ3kkBoBQ84Ipr)
-- [Monitor time-series data](../examples/app/Monitor.ipynb)
+- [Monitor time-series data](../examples/experimental/app/Monitor.ipynb)
 - [Visual storytelling](../examples/experimental/skip_test/Diffusion%20explore.ipynb)
-- [Remix art](../examples/app/art_explore.ipynb)
+- [Remix art](../examples/experimental/app/art_explore.ipynb)
 
 ### Explore the Ecosystem
 
-- [Browse HuggingFace datasets](../examples/tutorial/huggingface_datasets.ipynb)
-- [Generate images with Craiyon](../examples/tutorial/image_gen_craiyon.ipynb)
+- [Browse HuggingFace datasets](../examples/experimental/huggingface_datasets.ipynb)
+- [Generate images with Craiyon](../examples/experimental/image_gen_craiyon.ipynb)
 - [Generate images with Replicate](../examples/experimental/skip_test/image_gen_replicate.ipynb)
