@@ -1,3 +1,5 @@
+# Uncomment these to run tests of our test reporting plugin that shows test durations.
+# Dont run by default as these include tests that error and fail by design.
 """
 import pytest
 
