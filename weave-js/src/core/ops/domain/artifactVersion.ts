@@ -142,11 +142,12 @@ export const opArtifactVersionTTLDaysLeft = makeArtifactVersionOp({
   returnType: inputTypes => 'string',
   resolver: ({artifactVersion}) => {
     if (artifactVersion.ttlDurationSeconds != null) {
-      const daysLeft = Math.ceil(moment.duration(artifactVersion.ttlDurationSeconds, 'seconds').asDays() - moment.duration(moment().diff(moment.utc(artifactVersion.createdAt)), 'milliseconds').asDays());
+      const daysLeft = Math.floor(moment.duration(artifactVersion.ttlDurationSeconds, 'seconds').asDays() - moment.duration(moment().diff(moment.utc(artifactVersion.createdAt)), 'milliseconds').asDays());
       if (daysLeft == 1) {
         return daysLeft + " day"
-      }
-      else {
+      } else if (daysLeft <= 0) {
+        return "less than a day left"
+      } else {
         return daysLeft + " days"
       }
     }
