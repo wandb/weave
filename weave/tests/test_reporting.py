@@ -1,3 +1,4 @@
+"""
 import pytest
 
 
@@ -29,3 +30,4 @@ def test_xfail():
 @pytest.mark.flaky(reruns=1)
 def test_rerun():
     assert False
+"""
