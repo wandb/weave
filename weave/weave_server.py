@@ -103,17 +103,11 @@ def import_ecosystem():
             from weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
-            # logging.warning(
-            #     'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
-            #     'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
-            #     "To disable this message, set WEAVE_SERVER_DISABLE_ECOSYSTEM=1."
-            # )
 
 
 def make_app():
-    import_ecosystem()
-
     logs.configure_logger()
+    import_ecosystem()
 
     app = Flask(__name__)
     app.register_blueprint(blueprint)
