@@ -9,7 +9,7 @@ interface BokehViewerProps {
 }
 
 // This injects a bokeh library fetch based on the version of the bokeh content. a bit hacky,
-// but i think the only way to ensure compatibility the the user's python bokeh version and the
+// but I think the only way to ensure compatibility with the user's python bokeh version and the
 // JS version.
 const loadBokehLibrary = (
   version: string = '2.2.3',

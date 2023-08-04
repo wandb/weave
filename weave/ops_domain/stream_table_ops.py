@@ -4,14 +4,16 @@ from ..core_types import StreamTableType
 from ..api import op
 from .project_ops import project
 from .. import compile
+from .. import op_def
 
 
 def _get_history_node(steam_table: StreamTableType):
-    return (
-        project(steam_table.entity_name, steam_table.project_name)
-        .run(steam_table.table_name)
-        .history3()
-    )
+    with op_def.no_refine():
+        return (
+            project(steam_table.entity_name, steam_table.project_name)
+            .run(steam_table.table_name)
+            .history3()
+        )
 
 
 @op()
@@ -24,7 +26,6 @@ def _rows_type(steam_table: StreamTableType) -> weave_types.Type:
     name="stream_table-rows",
     output_type=ArrowWeaveListType(weave_types.TypedDict({})),
     refine_output_type=_rows_type,
-    returns_expansion_node=True,
 )
 def rows(steam_table: StreamTableType):
     return _get_history_node(steam_table)
