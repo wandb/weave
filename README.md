@@ -49,7 +49,7 @@ Weave has example notebooks demonstrating common usage patterns. To use the note
 pip install '.[examples]'
 ```
 
-then run through the notebooks in [examples](./examples/README.md)
+then run through the notebooks in the [examples directory](./examples)
 
 ## 🎉 Why Weave?
 
