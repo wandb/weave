@@ -51,7 +51,5 @@ try:
         modules = ", ".join(LOAD_RESULTS[result]) or "None"
         logger.info(f"  {result}: {modules}")
 
-except Exception as e:
-    print(e)
 finally:
     context_state.clear_loading_built_ins(loading_builtins_token)
