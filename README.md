@@ -13,6 +13,7 @@ Whether you are a seasoned data scientist, an aspiring ML practitioner, or just 
 
 ## Getting Started with Weave
 
+[Run in a Google Colab ->](https://colab.research.google.com/drive/1TwlhvvoWIHKDtRUu6eW0NMRq0GzGZ9oX)
 [Run in a Jupyter notebook ->](./examples/get_started.ipynb)
 
 Install via `pip install weave`, `import weave` in your notebook, and explore your data  with one line of code!
@@ -48,7 +49,7 @@ Weave has example notebooks demonstrating common usage patterns. To use the note
 pip install '.[examples]'
 ```
 
-then run through the notebooks in `./examples`.
+then run through the notebooks in the [examples directory](./examples)
 
 ## 🎉 Why Weave?
 
@@ -63,7 +64,7 @@ then run through the notebooks in `./examples`.
 
 Before you dive in, make sure you have the required software installed. You'll find all the details in our [Installation Guide](./docs/INSTALLATION.md).
 
-After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./docs/EXAMPLES.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
+After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./examples/README.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
 
 ---
 
