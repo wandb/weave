@@ -356,12 +356,15 @@ const pointCloudScene = (
       case Babylon.KeyboardEventTypes.KEYDOWN:
         const key = kbInfo.event.key;
 
-        if (key === "-" || key === "=" || key === "+") {
+        if (key === '-' || key === '=' || key === '+') {
           scene.meshes.forEach((mesh: Babylon.AbstractMesh) => {
-            if (mesh.material && "pointSize" in mesh.material) {
-              if (key === "-") {
-                mesh.material.pointSize = Math.max(1, mesh.material.pointSize - incrementBy);
-              } else if (key === "+" || key === "=") {
+            if (mesh.material && 'pointSize' in mesh.material) {
+              if (key === '-') {
+                mesh.material.pointSize = Math.max(
+                  1,
+                  mesh.material.pointSize - incrementBy
+                );
+              } else if (key === '+' || key === '=') {
                 mesh.material.pointSize += incrementBy;
               }
             }
