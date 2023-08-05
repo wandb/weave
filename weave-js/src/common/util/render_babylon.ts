@@ -350,6 +350,27 @@ const pointCloudScene = (
     }
   };
 
+  scene.onKeyboardObservable.add((kbInfo: Babylon.KeyboardInfo) => {
+    const incrementBy = 2;
+    switch (kbInfo.type) {
+      case Babylon.KeyboardEventTypes.KEYDOWN:
+        const key = kbInfo.event.key;
+
+        if (key === "-" || key === "=" || key === "+") {
+          scene.meshes.forEach((mesh: Babylon.AbstractMesh) => {
+            if (mesh.material && "pointSize" in mesh.material) {
+              if (key === "-") {
+                mesh.material.pointSize = Math.max(1, mesh.material.pointSize - incrementBy);
+              } else if (key === "+" || key === "=") {
+                mesh.material.pointSize += incrementBy;
+              }
+            }
+          });
+        }
+        break;
+    }
+  });
+
   /**** End of Camera Code ****/
 
   // Create a custom mesh
