@@ -251,6 +251,10 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
                 # work!
                 # TODO: fix
                 self._type = ot
+            elif ot.name == "ArrowWeaveList":
+                # Hack here... just need to do this for now
+                # TODO
+                self._type = ot
             else:
                 print(
                     "SELF TYPE",

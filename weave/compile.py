@@ -12,6 +12,7 @@ from . import debug_compile
 
 
 from . import serialize
+from . import uris
 from . import compile_domain
 from . import op_args
 from . import weave_types as types
@@ -327,13 +328,9 @@ _quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
 
 
 def compile_apply_column_pushdown(
-    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
-) -> list[graph.Node]:
-    # This is specific to project-runs2 (not yet used in W&B production) for now. But it
-    # is a general pattern that will work for all arrow tables.
-
-    op_names = [
-        "project-runs2",
+    leaf_nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    history_op_names = [
         "run-history2",
         "mapped_run-history2",
         "run-history",
@@ -342,81 +339,105 @@ def compile_apply_column_pushdown(
         "mapped_run-history3",
     ]
 
+    non_error_nodes = [n for n in leaf_nodes if not isinstance(n, Exception)]
     if not graph.filter_nodes_full(
-        leaf_nodes,
-        lambda n: isinstance(n, graph.OutputNode) and n.from_op.name in op_names,
+        non_error_nodes,
+        lambda n: isinstance(n, graph.OutputNode)
+        and (
+            n.from_op.name == "project-runs2"
+            or n.from_op.name in history_op_names
+            or (n.from_op.name == "get" and n.type.name == "ArrowWeaveList")
+        ),
     ):
         return leaf_nodes
 
-    p = stitch.stitch(leaf_nodes, on_error=on_error)
+    try:
+        stitched, leaf_nodes = stitch.stitch_and_catch(leaf_nodes)
+    except errors.WeaveStitchError as e:
+        logging.warning(
+            "Failed to stitch nodes for column pushdown (with error '%s'). We will read entire tables, which is a major performance concern.",
+            str(e),
+            exc_info=e,
+        )
+        return leaf_nodes
 
     def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
-        if isinstance(node, graph.OutputNode) and node.from_op.name in op_names:
-            forward_obj = p.get_result(node)
-            run_cols = compile_table.get_projection(forward_obj)
-            if node.from_op.name == "project-runs2":
-                config_cols = list(run_cols.get("config", {}).keys())
-                summary_cols = list(run_cols.get("summary", {}).keys())
+        if not isinstance(node, graph.OutputNode):
+            return node
+        if node.from_op.name == "project-runs2":
+            forward_obj = stitched.get_result(node)
+            projection_cols = compile_table.get_projection(forward_obj)
+            config_cols = list(projection_cols.get("config", {}).keys())
+            summary_cols = list(projection_cols.get("summary", {}).keys())
+            return graph.OutputNode(
+                node.type,
+                "project-runs2_with_columns",
+                {
+                    "project": node.from_op.inputs["project"],
+                    "config_cols": weave_internal.const(config_cols),
+                    "summary_cols": weave_internal.const(summary_cols),
+                },
+            )
+        elif node.from_op.name in history_op_names:
+            forward_obj = stitched.get_result(node)
+            projection_cols = compile_table.get_projection(forward_obj)
+            history_cols = list(projection_cols.keys())
+
+            if len(history_cols) > 0:
                 return graph.OutputNode(
                     node.type,
-                    "project-runs2_with_columns",
+                    node.from_op.name + "_with_columns",
                     {
-                        "project": node.from_op.inputs["project"],
-                        "config_cols": weave_internal.const(config_cols),
-                        "summary_cols": weave_internal.const(summary_cols),
+                        "run": node.from_op.inputs["run"],
+                        "history_cols": weave_internal.const(
+                            list(set([*history_cols, "_step"]))
+                        ),
                     },
                 )
-            if "run-history" in node.from_op.name:
-                history_cols = list(run_cols.keys())
-
-                if len(history_cols) > 0:
-                    return graph.OutputNode(
-                        node.type,
-                        node.from_op.name + "_with_columns",
-                        {
-                            "run": node.from_op.inputs["run"],
-                            "history_cols": weave_internal.const(
-                                list(set([*history_cols, "_step"]))
-                            ),
-                        },
-                    )
+        elif node.from_op.name == "get" and node.type.name == "ArrowWeaveList":
+            forward_obj = stitched.get_result(node)
+            projection_cols = compile_table.get_projection(forward_obj)
+            top_level_cols = list(projection_cols.keys())
+            if top_level_cols:
+                uri = uris.WeaveURI.parse(node.from_op.inputs["uri"].val)
+                uri.extra = ["pick", ",".join(top_level_cols)]
+                return graph.OutputNode(
+                    node.type,
+                    "get",
+                    {"uri": weave_internal.const(str(uri))},
+                )
         return node
 
-    return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown, on_error)
+    return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown)
 
 
 def compile_fix_calls(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _dispatch_map_fn_no_refine, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _dispatch_map_fn_no_refine)
 
 
 def compile_simple_optimizations(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _simple_optimizations, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _simple_optimizations)
 
 
 def compile_resolve_required_consts(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _resolve_required_consts, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _resolve_required_consts)
 
 
 def compile_await(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _await_run_outputs_map_fn, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _await_run_outputs_map_fn)
 
 
 def compile_execute(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
     # Actually does the execution here in compile phase.
     # I made this change to handle cases where we need to pass mutations through
     # execute calls, which happens when we have Nodes stored in Const nodes (panels)
@@ -424,7 +445,7 @@ def compile_execute(
     # However I think I later solved this with client-side execution and it can maybe
     # be removed.
     # I'm leaving this for now as it doesn't affect W&B prod (which never calls execute).
-    with_execute_ops = graph.map_nodes_full(nodes, _execute_nodes_map_fn, on_error)
+    with_execute_ops = graph.map_nodes_and_catch_full(nodes, _execute_nodes_map_fn)
     return with_execute_ops
 
     def _replace_execute(node: graph.Node) -> typing.Optional[graph.Node]:
@@ -464,30 +485,26 @@ def _resolve_function_calls(node: graph.Node) -> typing.Optional[graph.Node]:
 
 
 def compile_function_calls(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _resolve_function_calls, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _resolve_function_calls)
 
 
 def compile_quote(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _quote_nodes_map_fn)
 
 
 def compile_refine(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _dispatch_map_fn_refining)
 
 
 def compile_merge_by_node_id(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
     seen_nodes: dict[str, graph.Node] = {}
 
     def _merge_by_node_id(node: graph.Node) -> graph.Node:
@@ -508,7 +525,7 @@ def compile_merge_by_node_id(
         seen_nodes[nid] = node
         return node
 
-    return graph.map_nodes_full(nodes, _merge_by_node_id, on_error)
+    return graph.map_nodes_and_catch_full(nodes, _merge_by_node_id)
 
 
 def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
@@ -536,25 +553,31 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     # There is still some duplication left in Weave execution...
     new_node_merged = compile_merge_by_node_id([new_node_fixed_calls])[0]
 
+    # If we returned an exception, we need to throw it.
+    if isinstance(new_node_merged, Exception):
+        raise new_node_merged
+
     # Do it again to handle nested calls
-    return compile_node_ops([new_node_merged])[0]
+    new_node_expanded = compile_node_ops([new_node_merged])[0]
+    if isinstance(new_node_expanded, Exception):
+        raise new_node_expanded
+
+    return new_node_expanded
 
 
 def compile_node_ops(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _node_ops, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_full(nodes, _node_ops)
 
 
 # This compile pass using the `top_level` mapper since we recurse manually. We can't use
 # the full mapper, because we need to traverse when encountering the lambda op itself,
 # rather than the const node since we need uniqueness based on the lambda op.
 def compile_lambda_uniqueness(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_top_level(nodes, _compile_lambda_uniqueness, on_error)
+    nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    return graph.map_nodes_and_catch_top_level(nodes, _compile_lambda_uniqueness)
 
 
 def _compile_lambda_uniqueness(node: graph.Node) -> typing.Optional[graph.Node]:
@@ -594,83 +617,53 @@ def _compile_lambda_uniqueness(node: graph.Node) -> typing.Optional[graph.Node]:
     return node
 
 
-const_node = weave_internal.make_const_node(types.NoneType(), None)
-
-
-def _track_errors(fn):
-    def final(
-        nodes: typing.List[graph.Node],
-    ) -> value_or_error.ValueOrErrors[graph.Node]:
-        compile_errors = []
-
-        def on_error(ndx: int, e: Exception):
-            compile_errors.append((ndx, e))
-            return const_node
-
-        inner_res = fn(nodes, on_error)
-
-        results: list[value_or_error.ValueOrError[graph.Node]] = [
-            value_or_error.Value(node) for node in inner_res
-        ]
-        for ndx, e in compile_errors:
-            results[ndx] = value_or_error.Error(e)
-
-        return value_or_error.ValueOrErrors(results)
-
-    return final
-
-
 def _compile(
     nodes: typing.List[graph.Node],
 ) -> value_or_error.ValueOrErrors[graph.Node]:
     tracer = engine_trace.tracer()
     # logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
 
-    results = value_or_error.ValueOrErrors.from_values(nodes)
-
     # If we're being called from WeaveJS, we need to use dispatch to determine
     # which ops to use. Critically, this first phase does not actually refine
     # op output types, so after this, the types in the graph are not yet correct.
     with tracer.trace("compile:fix_calls"):
-        results = results.batch_map(_track_errors(compile_fix_calls))
+        results = compile_fix_calls(nodes)
 
     with tracer.trace("compile:simple_optimizations"):
-        results = results.batch_map(_track_errors(compile_simple_optimizations))
+        results = compile_simple_optimizations(results)
 
     with tracer.trace("compile:lambda_uniqueness"):
-        results = results.batch_map(_track_errors(compile_lambda_uniqueness))
+        results = compile_lambda_uniqueness(results)
 
     # Auto-transforms, where we insert operations to convert between types
     # as needed.
     # TODO: is it ok to have this before final refine?
     with tracer.trace("compile:await"):
-        results = results.batch_map(_track_errors(compile_await))
+        results = compile_await(results)
     with tracer.trace("compile:execute"):
-        results = results.batch_map(_track_errors(compile_execute))
+        results = compile_execute(results)
     with tracer.trace("compile:function_calls"):
-        results = results.batch_map(_track_errors(compile_function_calls))
+        results = compile_function_calls(results)
     with tracer.trace("compile:quote"):
-        results = results.batch_map(_track_errors(compile_quote))
+        results = compile_quote(results)
 
     # Some ops require const input nodes. This pass executes any branches necessary
     # to ensure that requirement holds.
     # Only gql ops require this for now.
     with tracer.trace("compile:resolve_required_consts"):
-        results = results.batch_map(_track_errors(compile_resolve_required_consts))
+        results = compile_resolve_required_consts(results)
 
     with tracer.trace("compile:node_ops"):
-        results = results.batch_map(_track_errors(compile_node_ops))
+        results = compile_node_ops(results)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
 
     with tracer.trace("compile:gql"):
-        results = results.batch_map(
-            _track_errors(compile_domain.apply_domain_op_gql_translation)
-        )
+        results = compile_domain.apply_domain_op_gql_translation(results)
 
     with tracer.trace("compile:column_pushdown"):
-        results = results.batch_map(_track_errors(compile_apply_column_pushdown))
+        results = compile_apply_column_pushdown(results)
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important
@@ -678,7 +671,7 @@ def _compile(
     # graph, we reuse any results produced in this phase, instead of re-executing
     # those nodes.
     with tracer.trace("compile:refine"):
-        results = results.batch_map(_track_errors(compile_refine))
+        results = compile_refine(results)
 
     # This is very expensive!
     # loggable_nodes = graph_debug.combine_common_nodes(n)
@@ -690,10 +683,20 @@ def _compile(
     if DEBUG_COMPILE:
         debug_compile.check_weave0_compile_result(
             nodes,
-            [item if err == None else const_node for item, err in results.iter_items()],
+            [
+                item
+                if not isinstance(item, Exception)
+                else weave_internal.make_const_node(types.NoneType(), None)
+                for item in results
+            ],
         )
 
-    return results
+    value_or_errors: list[value_or_error.ValueOrError[graph.Node]] = [
+        value_or_error.Error(n) if isinstance(n, Exception) else value_or_error.Value(n)
+        for n in results
+    ]
+
+    return value_or_error.ValueOrErrors(value_or_errors)
 
 
 _compile_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(

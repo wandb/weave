@@ -525,46 +525,6 @@ def make_list(**l):
     return list(l.values())
 
 
-def _join_output_type(input_types):
-    arr1_prop_types = input_types["arr1"].object_type.property_types
-    arr2_prop_types = input_types["arr2"].object_type.property_types
-    prop_types = {}
-    for k in set(arr1_prop_types.keys()).union(arr2_prop_types.keys()):
-        prop_types[k] = types.List(types.union(arr1_prop_types[k], arr2_prop_types[k]))
-    return types.List(types.TypedDict(prop_types))
-
-
-@op(
-    input_type={
-        "arr1": types.List(types.TypedDict({})),
-        "arr2": types.List(types.TypedDict({})),
-        "keyFn1": lambda input_types: types.Function(
-            {"row": input_types["arr1"].object_type}, types.Any()
-        ),
-        "keyFn2": lambda input_types: types.Function(
-            {"row": input_types["arr2"].object_type}, types.Any()
-        ),
-    },
-    output_type=_join_output_type,
-)
-def join2(arr1, arr2, keyFn1, keyFn2):  # type: ignore
-    arr1_keys = execute_fast.fast_map_fn(arr1, keyFn1)
-    arr2_keys = execute_fast.fast_map_fn(arr2, keyFn2)
-    all_keys = set(arr1_keys).union(arr2_keys)
-    arr1_lookup = dict(zip(arr1_keys, arr1))
-    arr2_lookup = dict(zip(arr2_keys, arr2))
-    results = []
-    for k in all_keys:
-        arr1_row = arr1_lookup[k]
-        arr2_row = arr2_lookup[k]
-        row_keys = set(arr1_row.keys()).union(arr2_row.keys())
-        row = {}
-        for rk in row_keys:
-            row[rk] = [arr1_row.get(rk), arr2_row.get(rk)]
-        results.append(row)
-    return results
-
-
 def _join_2_output_row_type(input_types):
     both_aliases_are_consts = isinstance(
         input_types["alias1"], types.Const
@@ -628,11 +588,11 @@ def join_2(arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter):
     jk_to_idx: dict[str, typing.Tuple[list[int], list[int], typing.Any]] = {}
     for i, jk in enumerate(table1_join_keys):
         if jk != None:
-            safe_jk = json.dumps(box.unbox(jk))
+            safe_jk = json.dumps(box.unbox(jk), sort_keys=True)
             jk_to_idx.setdefault(safe_jk, ([], [], jk))[0].append(i)
     for i, jk in enumerate(table2_join_keys):
         if jk != None:
-            safe_jk = json.dumps(box.unbox(jk))
+            safe_jk = json.dumps(box.unbox(jk), sort_keys=True)
             jk_to_idx.setdefault(safe_jk, ([], [], jk))[1].append(i)
 
     rows = []

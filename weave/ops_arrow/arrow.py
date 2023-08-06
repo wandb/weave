@@ -258,6 +258,52 @@ class ArrowWeaveListType(types.Type):
         res.validate()
         return res
 
+    # def load_instance_with_cols(
+    #     self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None
+    # ):
+    #     columns = None
+    #     if (
+    #         extra
+    #         and extra[0] == "pick"
+    #         and isinstance(self.object_type, types.TypedDict)
+    #     ):
+    #         self_keys = set(self.object_type.property_types.keys())
+    #         columns = list(set(extra[1].split(",")) & self_keys)
+    #         if not columns and self_keys:
+    #             # if there was no intersection, but there are keys, just
+    #             # pick the first one, to ensure we get a valid table
+    #             columns = [list(self_keys)[0]]
+    #     with artifact.open(f"{name}.ArrowWeaveList.feather", binary=True) as f:
+    #         table = pf.read_table(f, columns=columns)
+    #     if isinstance(self.object_type, types.TypedDict):
+    #         arr = pa.StructArray.from_arrays(
+    #             [table[i].combine_chunks() for i in range(len(table.schema))],
+    #             names=[f.name for f in table.schema],
+    #         )
+    #     else:
+    #         arr = table["arr"].combine_chunks()
+
+    #     with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
+    #         object_type = json.load(f)
+    #         object_type = types.TypeRegistry.type_from_dict(object_type)
+    #         if columns is not None:
+    #             object_type = types.TypedDict(
+    #                 {
+    #                     k: v
+    #                     for k, v in object_type.property_types.items()
+    #                     if k in columns
+    #                 }
+    #             )
+    #     from . import list_
+
+    #     with list_.unsafe_awl_construction("load_from_parquet"):
+    #         l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
+    #         from . import convert
+
+    #         res = convert.from_parquet_friendly(l)
+    #     res.validate()
+    #     return res
+
 
 def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_artifact):
     if _object_type_has_props(object_type):

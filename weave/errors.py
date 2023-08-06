@@ -103,10 +103,6 @@ class WeaveTableDeserializationError(WeaveBaseError):
     pass
 
 
-class WeaveStitchGraphMergeError(WeaveBaseError):
-    pass
-
-
 class WeaveHashConstTypeError(WeaveBaseError):
     """Raised if __hash__ is called on a Const Type.
 
@@ -149,4 +145,8 @@ class WeaveWBHistoryTranslationError(WeaveBaseError):
 
 
 class WeaveWandbAuthenticationException(Exception):
+    pass
+
+
+class WeaveStitchError(WeaveBaseError):
     pass

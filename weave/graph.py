@@ -335,39 +335,55 @@ OnErrorFnType = typing.Optional[typing.Callable[[int, Exception], Node]]
 def map_nodes_top_level(
     leaf_nodes: list[Node],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
-    on_error: OnErrorFnType = None,
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, but not sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
-    results: list[Node] = []
-    for node_ndx, node in enumerate(leaf_nodes):
-        try:
-            results.append(_map_nodes(node, map_fn, already_mapped, False))
-        except Exception as e:
-            if on_error:
-                results.append(on_error(node_ndx, e))
-            else:
-                raise e
-
-    return results
+    return [_map_nodes(n, map_fn, already_mapped, False) for n in leaf_nodes]
 
 
 def map_nodes_full(
     leaf_nodes: list[Node],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
-    on_error: OnErrorFnType = None,
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
-    results: list[Node] = []
-    for node_ndx, node in enumerate(leaf_nodes):
-        try:
-            results.append(_map_nodes(node, map_fn, already_mapped, True))
-        except Exception as e:
-            if on_error:
-                results.append(on_error(node_ndx, e))
-            else:
-                raise e
+    return [_map_nodes(n, map_fn, already_mapped, True) for n in leaf_nodes]
+
+
+def map_nodes_and_catch_top_level(
+    leaf_nodes: typing.Sequence[typing.Union[Node, Exception]],
+    map_fn: typing.Callable[[Node], typing.Optional[Node]],
+) -> list[typing.Union[Node, Exception]]:
+    """Map nodes in dag represented by leaf nodes, but not sub-lambdas"""
+    already_mapped: dict[Node, Node] = {}
+    results: list[typing.Union[Node, Exception]] = []
+    for node in leaf_nodes:
+        if isinstance(node, Exception):
+            results.append(node)
+        else:
+            try:
+                results.append(_map_nodes(node, map_fn, already_mapped, False))
+            except Exception as e:
+                results.append(e)
+
+    return results
+
+
+def map_nodes_and_catch_full(
+    leaf_nodes: typing.Sequence[typing.Union[Node, Exception]],
+    map_fn: typing.Callable[[Node], typing.Optional[Node]],
+) -> list[typing.Union[Node, Exception]]:
+    """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
+    already_mapped: dict[Node, Node] = {}
+    results: list[typing.Union[Node, Exception]] = []
+    for node in leaf_nodes:
+        if isinstance(node, Exception):
+            results.append(node)
+        else:
+            try:
+                results.append(_map_nodes(node, map_fn, already_mapped, True))
+            except Exception as e:
+                results.append(e)
 
     return results
 
