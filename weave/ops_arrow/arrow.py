@@ -199,9 +199,9 @@ class ArrowWeaveListType(types.Type):
         #   to/from parquet conversion with unions. They can be triggered by using
         #   v1 format with the hypothesis tests.
         artifact.metadata["_weave_awl_format"] = 2
-        if isinstance(self.object_type, types.TypedDict):
+        if isinstance(obj.object_type, types.TypedDict):
             arrow_data = obj._arrow_data
-            if not self.object_type.property_types:
+            if not obj.object_type.property_types:
                 arrow_data = pa.StructArray.from_arrays(
                     [pa.nulls(len(arrow_data))], names=["_dummy"]
                 )
@@ -239,8 +239,8 @@ class ArrowWeaveListType(types.Type):
             # v2 AWL format
             with artifact.open(f"{name}.ArrowWeaveList.feather", binary=True) as f:
                 table = pf.read_table(f)
-            if isinstance(self.object_type, types.TypedDict):
-                if not self.object_type.property_types:
+            if isinstance(object_type, types.TypedDict):
+                if not object_type.property_types:
                     arr = pa.repeat({}, len(table))
                 else:
                     arr = pa.StructArray.from_arrays(
