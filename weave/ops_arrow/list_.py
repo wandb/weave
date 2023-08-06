@@ -306,14 +306,18 @@ def weave_arrow_type_check(
         elif none_member_count == 1:
             # Nullable case
             # TODO: Actually must check nullable!
+            reason = None
             if len(non_none_members) == 0:
-                reasons.append("NoneType not allowed in Union with no other members")
-            elif len(non_none_members) == 1:
-                reason = weave_arrow_type_check(non_none_members[0], arr, optional=True)
-            else:
-                reason = weave_arrow_type_check(
-                    types.UnionType(*non_none_members), arr, optional=True
-                )
+                reason = "NoneType not allowed in Union with no other members"
+            if at != pa.null():
+                if len(non_none_members) == 1:
+                    reason = weave_arrow_type_check(
+                        non_none_members[0], arr, optional=True
+                    )
+                else:
+                    reason = weave_arrow_type_check(
+                        types.UnionType(*non_none_members), arr, optional=True
+                    )
             if reason is not None:
                 reasons.append(f"Nullable member: {reason}")
         else:
@@ -601,6 +605,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             with_mapped_children = ArrowWeaveList(
                 self._arrow_data, self.object_type.val_type, self._artifact
             )._map_column(fn, pre_fn, path)
+        if self._arrow_data.type == pa.null():
+            # we can have a null array at any type. We stop
+            # mapping when we hit one. The caller should specifically handle
+            # null arrays in pre or post map functions
+            pass
         elif isinstance(self.object_type, types.TypedDict):
             arr = self._arrow_data
             properties: dict[str, ArrowWeaveList] = {
@@ -707,7 +716,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 )
             elif len(non_none_members) > 1:
                 arr = self._arrow_data
-                members: list[ArrowWeaveList] = [
+                members: list[typing.Optional[ArrowWeaveList]] = [
                     ArrowWeaveList(
                         arr.field(i),
                         types.optional(member_type) if nullable else member_type,
@@ -715,41 +724,86 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     )._map_column(fn, pre_fn, path + (PathItemUnionEntry(i),))
                     for i, member_type in enumerate(non_none_members)
                 ]
-                new_type_members = [m.object_type for m in members]
-                if nullable:
-                    new_type_members.append(types.NoneType())
 
-                # I believe there is a bug here. We should merge the new members,
-                # because they may have been re-written with new types, becoming
-                # mergable. We don't seem to be hitting this problem in fuzz-testing
-                # areas that make use of this function, I think because they either
-                #   1. don't rewrite the types in a way that make them mergeable
-                #      (e.g. to_pylists_tagged)
-                #   2. do type rewriting but then don't rely on the weave types
-                #      (e.g. to_compare_safe)
-                #
-                # However, I bet this will bite us!
-                #
-                # TODO: fix, by:
-                # We'll need a "merge union" function that cleans up unions that
-                # can be merged. The strategy is to try to merge pairs of types
-                # using merge_types first. And in cases where that doesn't produce
-                # a union, concat underlying member arrays together (using concat.py).
+                # Types of some of the members may have changed. We need to maintain
+                # the invariant that types within a union are not mergeable via
+                # merge_types. So we walk through the new members looking for
+                # mergeable types, and concatenating them, while computing
+                # new type_codes and offsets arrays
 
-                # set invalid_reason to the first non-None invalid reason found in
-                # properties
-                invalid_reason = first_non_none(m._invalid_reason for m in members)
-                with_mapped_children = ArrowWeaveList(
-                    pa.UnionArray.from_dense(
-                        self._arrow_data.type_codes,
-                        self._arrow_data.offsets,
-                        [m._arrow_data for m in members],
-                    ),
-                    # types.UnionType(*new_type_members),
-                    types.union(*new_type_members),
-                    self._artifact,
-                    invalid_reason=invalid_reason,
-                )
+                type_codes = self._arrow_data.type_codes
+                offsets = self._arrow_data.offsets
+                for i in range(len(members)):
+                    if members[i] is None:
+                        # We've already merged this member into another, so
+                        # find the first non-None member to start from.
+                        for j in range(i + 1, len(members)):
+                            if members[j] is not None:
+                                members[i] = members[j]
+                                members[j] = None
+                                type_codes = pc.choose(
+                                    pc.equal(type_codes, j),
+                                    type_codes,
+                                    pa.scalar(i, pa.int8()),
+                                )
+                                break
+                    for j in range(i + 1, len(members)):
+                        member_i = members[i]
+                        member_j = members[j]
+                        if (
+                            member_i is not None
+                            and member_j is not None
+                            and not isinstance(
+                                types.merge_types(
+                                    member_i.object_type, member_j.object_type
+                                ),
+                                types.UnionType,
+                            )
+                        ):
+                            merged = True
+                            offsets = pc.choose(
+                                pc.equal(type_codes, j),
+                                offsets,
+                                pc.add(offsets, len(member_i)),
+                            ).cast(pa.int32())
+                            type_codes = pc.choose(
+                                pc.equal(type_codes, j),
+                                type_codes,
+                                pa.scalar(i, pa.int8()),
+                            )
+                            from . import concat
+
+                            members[i] = concat.concatenate(member_i, member_j)
+                            members[j] = None
+
+                final_members: list[ArrowWeaveList] = [
+                    m for m in members if m is not None
+                ]
+                if len(final_members) == 1:
+                    with_mapped_children = ArrowWeaveList(
+                        final_members[0]._arrow_data.take(offsets),
+                        final_members[0].object_type,
+                        final_members[0]._artifact,
+                    )
+                else:
+                    new_type_members = [m.object_type for m in final_members]
+                    if nullable:
+                        new_type_members.append(types.NoneType())
+
+                    invalid_reason = first_non_none(
+                        m._invalid_reason for m in final_members
+                    )
+                    with_mapped_children = ArrowWeaveList(
+                        pa.UnionArray.from_dense(
+                            type_codes,
+                            offsets,
+                            [m._arrow_data for m in final_members],
+                        ),
+                        types.UnionType(*new_type_members),
+                        # types.union(*new_type_members),
+                        self._artifact,
+                        invalid_reason=invalid_reason,
+                    )
             else:
                 raise errors.WeaveInternalError(
                     "Union must have at least one non-none member"
