@@ -19,6 +19,7 @@ from flask import request
 from flask import abort
 from flask_cors import CORS
 from flask import send_from_directory
+from apscheduler.schedulers.background import BackgroundScheduler
 import wandb
 
 from weave import graph, server, value_or_error
@@ -419,5 +420,12 @@ def reset_cache():
     print("Data deleted.")
 
 
+def start_scheduler():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(reset_cache, "interval", hours=1)
+    scheduler.start()
+
+
 if __name__ == "__main__":
+    start_scheduler()
     app.run(port=9994)
