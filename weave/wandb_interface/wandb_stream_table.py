@@ -216,10 +216,10 @@ class _StreamTableSync:
         self._lite_run.log(payload)
 
     def finish(self) -> None:
-        if self._artifact:
-            self._artifact.cleanup()
         if self._lite_run:
             self._lite_run.finish()
+        if self._artifact:
+            self._artifact.cleanup()
 
     def __del__(self) -> None:
         self.finish()
