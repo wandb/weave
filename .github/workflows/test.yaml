@@ -53,7 +53,7 @@ jobs:
 
   lint:
     name: Python lint
-    timeout-minutes: 5
+    timeout-minutes: 7
     needs:
       - build-container
     # runs-on: [self-hosted, runner]
