@@ -8,10 +8,12 @@ repos:
     rev: 22.3.0
     hooks:
       - id: black
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.320
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.0.0"
     hooks:
-    - id: pyright      
+      - id: mypy
+        additional_dependencies: [types-all, wandb>=0.15.5]
+        exclude: .*pyi$
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output
