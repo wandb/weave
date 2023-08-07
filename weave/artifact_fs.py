@@ -252,8 +252,9 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
                 # TODO: fix
                 self._type = ot
             elif ot.name == "ArrowWeaveList":
-                # Hack here... just need to do this for now
-                # TODO
+                # Necessary when using extra, which we use for column pushdown to get->AWL ops.
+                # (get column pushdown is behind a feature flag currently)
+                # This is basically a no-op and we need to refactor to remove this whole ifblock.
                 self._type = ot
             else:
                 print(

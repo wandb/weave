@@ -17,6 +17,7 @@ from .language_features.tagging.tag_store import isolated_tagging_context
 from . import logs
 from . import io_service
 from . import logs
+from . import feature_flags
 import logging
 
 from flask.testing import FlaskClient
@@ -86,6 +87,11 @@ def guard(*args, **kwargs):
 
 def pytest_sessionstart(session):
     context_state.disable_analytics()
+
+    # Don't turn this on yet, there are still the following failures:
+    # - ops_primitives/test_typeddict.py has two flaky tests (fail sometimes but not all)
+    # - "tests/test_list_arrow_compat.py::test_join_all[ArrowNode]" fails
+    # feature_flags.GET_AWL_PROJECTION_PUSHDOWN = True
 
 
 @pytest.fixture()

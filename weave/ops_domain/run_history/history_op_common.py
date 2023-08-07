@@ -244,7 +244,7 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     node = inputs.stitched_obj.node
     if node is None:
         raise errors.WeaveInternalError('unexpected, node is None for "run_history"')
-    paths_from_node = _history_node_known_keys(inputs.stitched_obj.node)
+    paths_from_node = _history_node_known_keys(node)
 
     # If we don't have any paths from the node, then we need to refine it.
     if len(paths_from_node) == 0:

@@ -25,6 +25,7 @@ from . import compile_table
 from . import weave_internal
 from . import engine_trace
 from . import errors
+from . import feature_flags
 
 
 # These call_* functions must match the actual op implementations.
@@ -343,23 +344,11 @@ def compile_apply_column_pushdown(
     if not graph.filter_nodes_full(
         non_error_nodes,
         lambda n: isinstance(n, graph.OutputNode)
-        and (
-            n.from_op.name == "project-runs2"
-            or n.from_op.name in history_op_names
-            or (n.from_op.name == "get" and n.type.name == "ArrowWeaveList")
-        ),
+        and (n.from_op.name == "project-runs2" or n.from_op.name in history_op_names),
     ):
         return leaf_nodes
 
-    try:
-        stitched, leaf_nodes = stitch.stitch_and_catch(leaf_nodes)
-    except errors.WeaveStitchError as e:
-        logging.warning(
-            "Failed to stitch nodes for column pushdown (with error '%s'). We will read entire tables, which is a major performance concern.",
-            str(e),
-            exc_info=e,
-        )
-        return leaf_nodes
+    stitched, leaf_nodes = stitch.stitch_and_catch(leaf_nodes)
 
     def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
         if not isinstance(node, graph.OutputNode):
@@ -394,13 +383,47 @@ def compile_apply_column_pushdown(
                         ),
                     },
                 )
+        return node
+
+    return graph.map_nodes_and_catch_full(leaf_nodes, _replace_with_column_pushdown)
+
+
+def compile_apply_get_awl_column_pushdown(
+    leaf_nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
+    non_error_nodes = [n for n in leaf_nodes if not isinstance(n, Exception)]
+    if not graph.filter_nodes_full(
+        non_error_nodes,
+        lambda n: isinstance(n, graph.OutputNode)
+        and (n.from_op.name == "get" and n.type.name == "ArrowWeaveList"),
+    ):
+        return leaf_nodes
+
+    stitched, new_leaf_nodes = stitch.stitch_and_catch(leaf_nodes)
+    for ln_or_exception in new_leaf_nodes:
+        if isinstance(ln_or_exception, errors.WeaveStitchError):
+            logging.warning(
+                "Failed to stitch nodes for column pushdown (with error '%s'). We will read entire tables, which is a major performance concern.",
+                str(ln_or_exception),
+                exc_info=ln_or_exception,
+            )
+            # Return original nodes and carry on without actually doing pushdown
+            return leaf_nodes
+    leaf_nodes = new_leaf_nodes
+
+    def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
+        if not isinstance(node, graph.OutputNode):
+            return node
         elif node.from_op.name == "get" and node.type.name == "ArrowWeaveList":
+            # We only execute this if feature_flags.GET_AWL_PROJECT_PUSHDOWN is True
+            # because of the check above in this function.
             forward_obj = stitched.get_result(node)
             projection_cols = compile_table.get_projection(forward_obj)
             top_level_cols = list(projection_cols.keys())
             if top_level_cols:
                 uri = uris.WeaveURI.parse(node.from_op.inputs["uri"].val)
                 if hasattr(uri, "extra"):
+                    # TODO: This extra format is not finalized yet.
                     uri.extra = ["pick", ",".join(top_level_cols)]
                     return graph.OutputNode(
                         node.type,
@@ -665,6 +688,10 @@ def _compile(
 
     with tracer.trace("compile:column_pushdown"):
         results = compile_apply_column_pushdown(results)
+
+    if feature_flags.GET_AWL_PROJECTION_PUSHDOWN:
+        with tracer.trace("compile:get_awl_column_pushdown"):
+            results = compile_apply_get_awl_column_pushdown(results)
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important
