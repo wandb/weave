@@ -1,4 +1,5 @@
 import pyarrow as pa
+import pyarrow.compute as pc
 import typing
 
 from .. import artifact_base
@@ -468,9 +469,16 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                     "Unexpected dictionary type for non-string type"
                 )
             return ArrowWeaveList(col._arrow_data, types.String(), None)
-        elif pa.types.is_floating(col._arrow_data.type) or pa.types.is_integer(
-            col._arrow_data.type
-        ):
+        elif pa.types.is_floating(col._arrow_data.type):
+            # Ensure that -0.0 is 0. If we end up converting to a string
+            # later (which happens if we have non-numeric types within a union)
+            # then -0.0 will be converted to "-0.0" which is not equal to "0.0"
+            return ArrowWeaveList(
+                pc.choose(pc.equal(col._arrow_data, 0), col._arrow_data, 0),
+                types.Number(),
+                None,
+            )
+        elif pa.types.is_integer(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Number(), None)
         elif pa.types.is_timestamp(col._arrow_data.type):
             # Cast to int64 and then string. Leaving this as timestamp
