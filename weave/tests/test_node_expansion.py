@@ -17,7 +17,7 @@ def lazy_add(a: int, b: int) -> int:
     returns_expansion_node=True,
 )
 def lazy_history(entity_name: str, project_name: str, run_name: str) -> list[dict]:
-    return weave.ops.project(entity_name, project_name).run(run_name).history2()
+    return weave.ops.project(entity_name, project_name).run(run_name).history()
 
 
 _context.clear_loading_built_ins(_loading_builtins_token)

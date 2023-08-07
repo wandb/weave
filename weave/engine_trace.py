@@ -187,7 +187,7 @@ class WeaveTrace:
 
 
 def dd_span_to_weave_span(dd_span):
-    # Use '' for None, currently history2 doesn't read None columns from
+    # Use '' for None, currently history doesn't read None columns from
     # the liveset correctly.
     parent_id = ""
     if dd_span.parent_id is not None:
@@ -247,7 +247,6 @@ class WeaveWriter:
 
 
 def tracer():
-
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 

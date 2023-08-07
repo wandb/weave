@@ -1327,7 +1327,7 @@ def test_run_history(fake_wandb):
 
 def test_run_history_2(fake_wandb):
     fake_wandb.fake_api.add_mock(run_history_mocker)
-    node = ops.project("stacey", "mendeleev").runs()[0].history2()
+    node = ops.project("stacey", "mendeleev").runs()[0].history()
     assert isinstance(node.type, TaggedValueType)
     assert ArrowWeaveListType(
         types.TypedDict(
@@ -1386,11 +1386,11 @@ def test_run_history_2(fake_wandb):
     )
 
 
-def test_run_history2_media_types(fake_wandb, cache_mode_minimal):
+def test_run_history_media_types(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(run_history_mocker_with_pq_media)
 
     # this is actually from the launch-test/prodmon project, but mocked here as stacey/mendeleev
-    node = ops.project("stacey", "mendeleev").runs()[0].history2()
+    node = ops.project("stacey", "mendeleev").runs()[0].history()
     image_node = node["img"]
     metric2_node = node["metric2"]
 

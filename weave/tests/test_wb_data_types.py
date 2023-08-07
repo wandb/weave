@@ -810,7 +810,6 @@ def test_html_encoding_decoding(fake_wandb):
     assert HTML_STRING in result
 
 
-# TODO: Replace all history with history3
 def test_media_logging_to_history(user_by_api_key_in_env):
     # TODO: Make this test exercise both the parquet and liveset
     # paths. Also test for values.
@@ -840,20 +839,12 @@ def test_media_logging_to_history(user_by_api_key_in_env):
     run.log(log_dict)
     run.finish()
 
-    for history_op_name in ["history3"]:
-        history_node = (
-            weave.ops.project(run.entity, run.project)
-            .run(run.id)
-            ._get_op(history_op_name)()
-            .map(
-                lambda row: weave.ops.dict_(
-                    **{key: row[key] for key in log_dict.keys()}
-                )
-            )
-        )
+    history_node = (
+        weave.ops.project(run.entity, run.project)
+        .run(run.id)
+        .history()
+        .map(lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()}))
+    )
 
-        if history_op_name == "history":
-            history = weave.use(history_node)
-        else:
-            history = weave.use(history_node).to_pylist_notags()
-        assert len(history) == 1
+    history = weave.use(history_node).to_pylist_notags()
+    assert len(history) == 1

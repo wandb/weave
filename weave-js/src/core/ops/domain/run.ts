@@ -415,7 +415,7 @@ export const opRunHistoryType = OpKinds.makeBasicOp({
 
 export const opRunHistoryType2 = OpKinds.makeBasicOp({
   hidden: true,
-  name: 'refine_history2_type',
+  name: 'refine_history_type',
   argTypes: {
     run: TypeHelpers.nullableOneOrMany('run'),
   },
@@ -509,24 +509,6 @@ export const opRunHistory = makeRunOp({
 
   resolveOutputType: async (inputTypes, node, executableNode, client) => {
     return opRunHistoryResolveOutputType(executableNode, client, 1);
-  },
-});
-
-// TODO: missing test
-export const opRunHistory2 = makeRunOp({
-  name: 'run-history2',
-  argTypes: runArgTypes,
-  description: `Returns the log history of the ${docType('run')}`,
-  argDescriptions: {run: runArgDescriptions},
-  returnValueDescription: `The log history of the ${docType('run')}`,
-  returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
-  hidden: true,
-  resolver: ({run}) => opRunHistoryResolver(run),
-  // TODO: resolveOutputType does not perform all the correct
-  // unwrapping!
-
-  resolveOutputType: async (inputTypes, node, executableNode, client) => {
-    return opRunHistoryResolveOutputType(executableNode, client, 2);
   },
 });
 

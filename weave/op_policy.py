@@ -41,7 +41,7 @@ CACHE_OP_NAMES = [
 
 
 # history ops are parallelized by derive_op only, in a custom way
-# PARALLEL_OP_NAMES = ["run-history", "run-history2"] + CACHE_AND_PARALLEL_OP_NAMES
+# PARALLEL_OP_NAMES = ["run-history"] + CACHE_AND_PARALLEL_OP_NAMES
 PARALLEL_OP_NAMES = CACHE_AND_PARALLEL_OP_NAMES
 
 

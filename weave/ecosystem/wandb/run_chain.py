@@ -26,7 +26,7 @@ class RunChain:
             proj = weave.ops.project(self.entity_name, self.project_name)
             history_nodes = []
             for seg in self.segments:
-                hist_node = proj.run(seg.run_name).history2()
+                hist_node = proj.run(seg.run_name).history()
                 if seg.final_step != None:
                     hist_node = hist_node.limit(seg.final_step)
 

@@ -30,11 +30,12 @@ tracer = engine_trace.tracer()
 
 
 @op(
+    name="run-refine_history_type",
     render_info={"type": "function"},
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
     hidden=True,
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
 )
-def refine_history3_type(run: wdt.Run) -> types.Type:
+def refine_history_type(run: wdt.Run) -> types.Type:
     # TODO: Consider merging `_unflatten_history_object_type` into the main path
     return ArrowWeaveListType(
         _unflatten_history_object_type(history_op_common.refine_history_type(run))
@@ -42,11 +43,22 @@ def refine_history3_type(run: wdt.Run) -> types.Type:
 
 
 @op(
+    name="run-history",
+    refine_output_type=refine_history_type,
+    plugins=wb_gql_op_plugin(history_op_common.make_run_history_gql_field),
+    output_type=types.List(types.TypedDict({})),
+)
+def history(run: wdt.Run):
+    # TODO: This is now equivalent to hist2
+    return history_op_common.mock_history_rows(run)
+
+
+@op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
     hidden=True,
 )
-def refine_history3_with_columns_type(
+def refine_history_with_columns_type(
     run: wdt.Run, history_cols: list[str]
 ) -> types.Type:
     # TODO: Consider merging `_unflatten_history_object_type` into the main path
@@ -61,28 +73,16 @@ def refine_history3_with_columns_type(
 
 
 @op(
-    name="run-history3_with_columns",
-    refine_output_type=refine_history3_with_columns_type,
+    name="run-history_with_columns",
+    refine_output_type=refine_history_with_columns_type,
     plugins=wb_gql_op_plugin(history_op_common.make_run_history_gql_field),
-    output_type=ArrowWeaveListType(types.TypedDict({})),
+    output_type=types.List(types.TypedDict({})),
     hidden=True,
 )
-def history3_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history3(
+def history_with_columns(run: wdt.Run, history_cols: list[str]):
+    return _get_history(
         run, history_op_common.get_full_columns_prefixed(run, history_cols)
     )
-
-
-@op(
-    name="run-history3",
-    refine_output_type=refine_history3_type,
-    plugins=wb_gql_op_plugin(history_op_common.make_run_history_gql_field),
-    output_type=ArrowWeaveListType(types.TypedDict({})),
-    hidden=True,
-)
-def history3(run: wdt.Run):
-    # TODO: This is now equivalent to hist2
-    return history_op_common.mock_history_rows(run)
 
 
 @dataclasses.dataclass
@@ -93,7 +93,7 @@ class PathTree:
     data: typing.Optional[typing.Any] = None
 
 
-def _get_history3(run: wdt.Run, columns=None):
+def _get_history(run: wdt.Run, columns=None):
     # 1. Get the flattened Weave-Type given HistoryKeys
     # 2. Read in the live set
     # 3. Raw-load each parquet file
