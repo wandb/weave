@@ -8,11 +8,10 @@ repos:
     rev: 22.3.0
     hooks:
       - id: black
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.0.0"
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.320
     hooks:
-      - id: mypy
-        exclude: .*pyi$
+    - id: pyright      
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output
