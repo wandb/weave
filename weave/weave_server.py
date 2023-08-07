@@ -399,10 +399,7 @@ def reset_cache():
         return
 
     # Check the size of the directory
-    directory_size = 0
-    for f in os.scandir(directory_path):
-        if os.path.isfile(f):
-            directory_size += os.path.getsize(f)
+    directory_size = shutil.disk_usage(directory_path).used
     print(f"Directory size: {directory_size} bytes.")
 
     if directory_size <= threshold:
