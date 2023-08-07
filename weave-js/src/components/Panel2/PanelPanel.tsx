@@ -271,7 +271,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            {(!selectedIsRoot || !shouldShowOutline) && (
+            {(!selectedIsRoot && !shouldShowOutline) && (
               <OutlineItemPopupMenu
                 config={panelConfig}
                 localConfig={localConfig}
