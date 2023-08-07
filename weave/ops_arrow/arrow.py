@@ -4,6 +4,7 @@ import pyarrow as pa
 import numpy as np
 from pyarrow import compute as pc
 import pyarrow.parquet as pq
+import pyarrow.feather as pf
 import typing
 import textwrap
 
@@ -182,31 +183,78 @@ class ArrowWeaveListType(types.Type):
                 obj._arrow_data, obj.object_type, obj._artifact, artifact
             )
 
-        from . import convert
+        # v1 AWL format
+        # from . import convert
 
-        parquet_friendly = convert.to_parquet_friendly(obj)
-        table = pa.table({"arr": parquet_friendly._arrow_data})
-        with artifact.new_file(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
-            pq.write_table(table, f)
+        # parquet_friendly = convert.to_parquet_friendly(obj)
+        # table = pa.table({"arr": parquet_friendly._arrow_data})
+        # with artifact.new_file(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
+        #     pq.write_table(table, f)
+
+        # v2 AWL format
+        # - if it's a top-level typeddict we don't save in nested sub-array.
+        #   reading specific columns from a parquet or feather file only gives a perf
+        #   improvement for top-level columns.
+        # - saved as feather file instead of parquet. There are some issues in our
+        #   to/from parquet conversion with unions. They can be triggered by using
+        #   v1 format with the hypothesis tests.
+        artifact.metadata["_weave_awl_format"] = 2
+        if isinstance(obj.object_type, types.TypedDict):
+            arrow_data = obj._arrow_data
+            if not obj.object_type.property_types:
+                arrow_data = pa.StructArray.from_arrays(
+                    [pa.nulls(len(arrow_data))], names=["_dummy"]
+                )
+            table = pa.Table.from_arrays(
+                [arrow_data.field(i) for i in range(len(arrow_data.type))],
+                names=[f.name for f in arrow_data.type],
+            )
+        else:
+            table = pa.table({"arr": obj._arrow_data})
+        with artifact.new_file(f"{name}.ArrowWeaveList.feather", binary=True) as f:
+            pf.write_feather(table, f)
+
         with artifact.new_file(f"{name}.ArrowWeaveList.type.json") as f:
             json.dump(obj.object_type.to_dict(), f)
 
     def load_instance(
         self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None
     ):
-        with artifact.open(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
-            table = pq.read_table(f)
-        arr = table["arr"].combine_chunks()
         with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
             object_type = json.load(f)
             object_type = types.TypeRegistry.type_from_dict(object_type)
         from . import list_
 
-        with list_.unsafe_awl_construction("load_from_parquet"):
-            l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
-            from . import convert
+        if "_weave_awl_format" not in artifact.metadata:
+            # v1 AWL format
+            with artifact.open(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
+                table = pq.read_table(f)
+            arr = table["arr"].combine_chunks()
+            with list_.unsafe_awl_construction("load_from_parquet"):
+                l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
+                from . import convert
 
-            res = convert.from_parquet_friendly(l)
+                res = convert.from_parquet_friendly(l)
+        elif artifact.metadata["_weave_awl_format"] == 2:
+            # v2 AWL format
+            with artifact.open(f"{name}.ArrowWeaveList.feather", binary=True) as f:
+                table = pf.read_table(f)
+            if isinstance(object_type, types.TypedDict):
+                if not object_type.property_types:
+                    arr = pa.repeat({}, len(table))
+                else:
+                    arr = pa.StructArray.from_arrays(
+                        [table[i].combine_chunks() for i in range(len(table.schema))],
+                        names=[f.name for f in table.schema],
+                    )
+            else:
+                arr = table["arr"].combine_chunks()
+            res = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
+        else:
+            raise ValueError(
+                f"Unknown _weave_awl_format {artifact.metadata['_weave_awl_format']}"
+            )
+
         res.validate()
         return res
 

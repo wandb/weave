@@ -32,13 +32,13 @@ def test_artifact():
 
     art_dir_files = art_dir.files
     exp_art_file1_type = artifact_fs.FilesystemArtifactFileType(
-        extension=weave.types.Const(weave.types.String(), "parquet"),
+        extension=weave.types.Const(weave.types.String(), "feather"),
         wbObjectType=weave.types.NoneType(),
     )
     assert weave.type_of(art_dir_files) == weave.types.TypedDict(
         {
-            "obj.ArrowWeaveList.parquet": artifact_fs.FilesystemArtifactFileType(
-                extension=weave.types.Const(weave.types.String(), "parquet"),
+            "obj.ArrowWeaveList.feather": artifact_fs.FilesystemArtifactFileType(
+                extension=weave.types.Const(weave.types.String(), "feather"),
                 wbObjectType=weave.types.NoneType(),
             ),
             "obj.ArrowWeaveList.type.json": artifact_fs.FilesystemArtifactFileType(
@@ -53,16 +53,16 @@ def test_artifact():
     )
     assert len(art_dir.files) == 3
 
-    art_file1 = art_dir_files["obj.ArrowWeaveList.parquet"]
+    art_file1 = art_dir_files["obj.ArrowWeaveList.feather"]
     assert art_file1 == artifact_fs.FilesystemArtifactFile(
-        art, "obj.ArrowWeaveList.parquet"
+        art, "obj.ArrowWeaveList.feather"
     )
 
     # Here we don't create a new object
     art_file1_ref = storage.save(art_file1)
     assert (
         art_file1_ref.artifact == art
-        and art_file1_ref.path == "obj.ArrowWeaveList.parquet"
+        and art_file1_ref.path == "obj.ArrowWeaveList.feather"
     )
     assert art_file1_ref.type == exp_art_file1_type
 
