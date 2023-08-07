@@ -61,7 +61,7 @@ class PanelCompErrorBoundary extends React.Component<
       this.props.onInvalidGraph?.(error.node);
       return;
     }
-    // You can also log the error to an error reportikkng service
+    // You can also log the error to an error reporting service
     // logErrorToMyService(error, errorInfo);
     // onAppError(
     //   'Error: ' +
