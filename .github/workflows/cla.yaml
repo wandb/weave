@@ -26,15 +26,5 @@ jobs:
           path-to-document: 'https://github.com/wandb/weave/blob/master/cla/cla.md' # e.g. a CLA or a DCO document
           # branch should not be protected
           branch: 'cla'
-          allowlist:
-
-         # the followings are the optional inputs - If the optional inputs are not given, then default values will be taken
-          #remote-organization-name: enter the remote organization name where the signatures should be stored (Default is storing the signatures in the same repository)
-          #remote-repository-name: enter the  remote repository name where the signatures should be stored (Default is storing the signatures in the same repository)
-          #create-file-commit-message: 'For example: Creating file for storing CLA Signatures'
-          #signed-commit-message: 'For example: $contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
-          #custom-notsigned-prcomment: 'pull request comment with Introductory message to ask new contributors to sign'
-          #custom-pr-sign-comment: 'The signature to be committed in order to sign the CLA'
-          #custom-allsigned-prcomment: 'pull request comment when all contributors has signed, defaults to **CLA Assistant Lite bot** All Contributors have signed the CLA.'
-          #lock-pullrequest-aftermerge: false - if you don't want this bot to automatically lock the pull request after merging (default - true)
-          #use-dco-flag: true - If you are using DCO instead of CLA
+          # cannot use teams due to: https://github.com/contributor-assistant/github-action/issues/100
+          allowlist: actions-user, altay, dannygoldstein, davidwallacejackson, jamie-rasmussen, jlzhao27, jwlee64, laxels, nickpenaranda, scottire, shawnlewis, staceysv, vanpelt, vwrj
