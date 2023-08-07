@@ -106,9 +106,12 @@ def default_log_filename() -> typing.Optional[str]:
 def env_log_level() -> int:
     level_str_from_env = os.environ.get("WEAVE_LOG_LEVEL")
     if level_str_from_env:
-        level_int_from_env = logging.getLevelName(level_str_from_env)
+        level_int_from_env = logging.getLevelName(level_str_from_env.upper())
         if isinstance(level_int_from_env, int):
             return level_int_from_env
+        print(
+            f'WEAVE_LOG_LEVEL environment variable value "{level_str_from_env}" is invalid.'
+        )
 
     if os.environ.get("WEAVE_SERVER_ENABLE_LOGGING"):
         return logging.INFO
