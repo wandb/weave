@@ -9,6 +9,8 @@ import base64
 import typing
 import zlib
 import urllib.parse
+import datetime
+import shutil
 from flask import json
 from werkzeug.exceptions import HTTPException
 
@@ -373,6 +375,51 @@ if os.getenv("WEAVE_SERVER_DEBUG"):
         )
         response.content_type = "application/json"
         return response
+
+
+@app.cli.command("reset-cache")
+def reset_cache():
+    # Read the directory address and threshold from the environment variable
+    directory_path = os.environ.get("WEAVE_PYTHON_CACHE")
+    threshold_gb = os.environ.get("WEAVE_CACHE_SIZE_THRESHOLD_GB")
+
+    # Validate the directory path
+    if not directory_path:
+        print("WEAVE_PYTHON_CACHE is not set.")
+        return
+    if not os.path.isdir(directory_path):
+        print(f"{directory_path} is not a valid directory.")
+        return
+
+    # Validate the threshold
+    try:
+        threshold = float(threshold_gb) * (1024**3)  # Convert GB to bytes
+    except (TypeError, ValueError):
+        print(f"WEAVE_CACHE_SIZE_THRESHOLD_GB not set or invalid: {threshold_gb}")
+        return
+
+    # Check the size of the directory
+    directory_size = 0
+    for f in os.scandir(directory_path):
+        if os.path.isfile(f):
+            directory_size += os.path.getsize(f)
+    print(f"Directory size: {directory_size} bytes.")
+
+    if directory_size <= threshold:
+        print(f"Cached size under threshold: {threshold}")
+        return
+
+    # Move and delete if the size is greater than the given threshold
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    new_path = os.path.join(directory_path, f"archive_{timestamp}")
+
+    # Move the data to the new path
+    shutil.move(directory_path, new_path)
+    print(f"Data moved to {new_path}.")
+
+    # Delete the data
+    shutil.rmtree(new_path)
+    print("Data deleted.")
 
 
 if __name__ == "__main__":
