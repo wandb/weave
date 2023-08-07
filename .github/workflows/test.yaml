@@ -96,7 +96,7 @@ jobs:
 
   test:
     name: Python unit tests
-    timeout-minutes: 25
+    timeout-minutes: 10 # do not lower! running longer than this indicates an issue with the tests. fix there.
     needs:
       - build-container
     # runs-on: [self-hosted, runner]
