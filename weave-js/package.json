@@ -72,6 +72,7 @@
     "react-redux": "^7.1.1",
     "react-resizable": "^3.0.5",
     "react-router-dom": "^5.1.2",
+    "react-select": "^5.4.0",
     "react-table": "^6.8.6",
     "react-textarea-autosize": "8.3.4",
     "react-timeago": "^4.1.9",
@@ -110,6 +111,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.21.8",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@babel/preset-env": "^7.20.2",
     "@babel/preset-react": "^7.16.7",
     "@babel/preset-typescript": "^7.21.5",

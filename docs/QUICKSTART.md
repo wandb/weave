@@ -2,7 +2,7 @@
 
 ---
 
-Hello there, data explorer! 🚀
+Hello there data explorer! 🚀
 
 This quickstart guide will help you hit the ground running with Weave. We'll guide you through the installation process and then demonstrate how you can start exploring your existing datasets with just one line of code!
 
@@ -26,7 +26,7 @@ import weave
 weave.show(pandas_df)
 ```
 
-For a hands-on example of this in action, check out our [Weave Quickstart Notebook](../examples/weave_quickstart.ipynb).
+For a hands-on example of this in action, check out our [Getting Started with Weave Notebook](../examples/get_started.ipynb).
 
 ## Dive Deeper into Data
 
