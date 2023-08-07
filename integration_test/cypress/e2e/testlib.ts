@@ -25,6 +25,8 @@ export function checkAllPanelsRendered() {
       cy.wrap(panel).find('canvas').should('exist');
     } else if (panelId == 'html-file') {
       // pass, this is rendered as an iframe, we don't reach in for now.
+    } else if (panelId == 'boolean') {
+      // pass for now, boolean just renders its value
     } else if (panelId == 'Card') {
       // pass for now.
       // TODO: But we should click each tab and recursively check its content!

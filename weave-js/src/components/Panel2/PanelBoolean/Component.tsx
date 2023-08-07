@@ -23,6 +23,7 @@ const PanelBoolean: React.FC<PanelBooleanProps> = props => {
   // return a pill that is centered in the panel
   return (
     <div
+      data-test-weave-id="boolean"
       style={{
         display: 'flex',
         justifyContent: 'center',
