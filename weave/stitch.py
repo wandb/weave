@@ -46,7 +46,10 @@ class OpCall:
 
 @dataclasses.dataclass()
 class ObjectRecorder:
-    node: graph.Node
+    # If node is None, it means this is a Recorder for a value that doesn't have
+    # an associated node in the graph (used to make ObjectRecorders for tag
+    # fields found within get() results).
+    node: typing.Optional[graph.Node]
     tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
     val: typing.Optional[typing.Any] = None
     calls: list[OpCall] = dataclasses.field(default_factory=list)
@@ -116,7 +119,7 @@ class StitchedGraph:
             if recorder.tags:
                 res += (
                     "\n"
-                    + f"    tags: {','.join([str((tag_name, node_names[tag_recorder.node])) for tag_name, tag_recorder in recorder.tags.items()])}"
+                    + f"    tags: {','.join([str((tag_name, (node_names[tag_recorder.node] if tag_recorder.node is not None else '<None>'))) for tag_name, tag_recorder in recorder.tags.items()])}"
                 )
         print(res)
 
@@ -173,7 +176,7 @@ def stitch_and_catch(
             raise errors.WeaveInternalError("Unexpected node type")
         return node
 
-    nodes_or_errors = graph.map_nodes_top_level(leaf_nodes, handle_node)
+    nodes_or_errors = graph.map_nodes_and_catch_top_level(leaf_nodes, handle_node)
     return sg, nodes_or_errors
 
 
@@ -227,6 +230,7 @@ def get_tag_name_from_mapped_tag_getter_op(op: op_def.OpDef) -> str:
 
 
 def _all_dim_tag_names(t: types.Type) -> set[str]:
+    # produce tag names for all dimensions within a type.
     if isinstance(t, tagged_value_type.TaggedValueType):
         return set(t.tag.property_types.keys()).union(_all_dim_tag_names(t.value))
     elif isinstance(t, types.UnionType):
@@ -235,10 +239,11 @@ def _all_dim_tag_names(t: types.Type) -> set[str]:
             member_tags.update(_all_dim_tag_names(member_t))
         return member_tags
     elif types.List().assign_type(t):
-        return _all_dim_tag_names(t.object_type)
+        list_t = typing.cast(types.List, t)
+        return _all_dim_tag_names(list_t.object_type)
     elif isinstance(t, types.TypedDict):
         # Just merge all property tags together.
-        # TODO: totally wrong
+        # TODO: this is fuzzy, and can be incorrect!
         prop_tags: set[str] = set()
         for prop_t in t.property_types.values():
             prop_tags.update(_all_dim_tag_names(prop_t))

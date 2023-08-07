@@ -400,15 +400,16 @@ def compile_apply_column_pushdown(
             top_level_cols = list(projection_cols.keys())
             if top_level_cols:
                 uri = uris.WeaveURI.parse(node.from_op.inputs["uri"].val)
-                uri.extra = ["pick", ",".join(top_level_cols)]
-                return graph.OutputNode(
-                    node.type,
-                    "get",
-                    {"uri": weave_internal.const(str(uri))},
-                )
+                if hasattr(uri, "extra"):
+                    uri.extra = ["pick", ",".join(top_level_cols)]
+                    return graph.OutputNode(
+                        node.type,
+                        "get",
+                        {"uri": weave_internal.const(str(uri))},
+                    )
         return node
 
-    return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown)
+    return graph.map_nodes_and_catch_full(leaf_nodes, _replace_with_column_pushdown)
 
 
 def compile_fix_calls(
