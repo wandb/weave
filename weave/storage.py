@@ -1,6 +1,7 @@
 import os
 import re
 import typing
+import datetime
 import pathlib
 import functools
 
@@ -16,6 +17,7 @@ from . import mappers_python
 from . import box
 from . import errors
 from . import graph
+from . import timestamp
 
 Ref = ref_base.Ref
 
@@ -373,6 +375,16 @@ def make_js_serializer():
     return functools.partial(to_weavejs, artifact=artifact)
 
 
+def convert_timestamps_to_epoch_ms(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, list):
+        return [convert_timestamps_to_epoch_ms(o) for o in obj]
+    if isinstance(obj, dict):
+        return {k: convert_timestamps_to_epoch_ms(v) for k, v in obj.items()}
+    if isinstance(obj, datetime.datetime):
+        return timestamp.python_datetime_to_ms(obj)
+    return obj
+
+
 def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     from .ops_arrow import list_ as arrow_list
 
@@ -384,7 +396,8 @@ def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     elif isinstance(obj, list):
         return [to_weavejs(item, artifact=artifact) for item in obj]
     elif isinstance(obj, arrow_list.ArrowWeaveList):
-        return obj.to_pylist_notags()
+        return convert_timestamps_to_epoch_ms(obj.to_pylist_notags())
+
     wb_type = types.TypeRegistry.type_of(obj)
 
     if artifact is None:
