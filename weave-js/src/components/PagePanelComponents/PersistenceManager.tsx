@@ -393,9 +393,6 @@ const HeaderFileControls: React.FC<{
   const canRedo = false;
   const redo = useCallback(() => {}, []);
 
-  const inputType = useNodeWithServerType(inputNode).result?.type;
-  const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
-
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if ((isMac && !e.metaKey) || (!isMac && !e.ctrlKey)) {
@@ -416,19 +413,6 @@ const HeaderFileControls: React.FC<{
       document.removeEventListener(`keydown`, onKeyDown);
     };
   }, [canUndo, undo, canRedo, redo]);
-
-  const name =
-    (isPanel ? 'dashboard' : 'object') +
-    '-' +
-    moment().format('YY_MM_DD_hh_mm_ss');
-  const makeNewDashboard = useNewPanelFromRootQueryCallback();
-  const newDashboard = useCallback(() => {
-    const node = isPanel ? voidNode() : inputNode;
-
-    makeNewDashboard(name, node, true, newDashExpr => {
-      updateNode(newDashExpr);
-    });
-  }, [inputNode, isPanel, makeNewDashboard, name, updateNode]);
 
   // TODO: Implement dashboard duplication
   const canDuplicateDashboard = false;
@@ -530,8 +514,6 @@ const HeaderFileControls: React.FC<{
             </MenuItem>
           )}
 
-          <MenuDivider />
-
           {/* TODO: Hiding code export temporarily as it is partially broken */}
           {/* {maybeURI && (
             <MenuItem
@@ -547,16 +529,6 @@ const HeaderFileControls: React.FC<{
 
           <MenuDivider /> */}
 
-          <MenuItem
-            onClick={() => {
-              setAnchorFileEl(null);
-              newDashboard();
-            }}>
-            <MenuIcon>
-              <IconAddNew />
-            </MenuIcon>
-            <MenuText>New board</MenuText>
-          </MenuItem>
           {canDuplicateDashboard && (
             <MenuItem
               onClick={() => {
@@ -708,14 +680,21 @@ const HeaderLogoControls: React.FC<{
   }, [seedItems]);
 
   const name = 'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
-  const makeNewDashboard = useNewDashFromItems();
-  const newDashboard = useCallback(() => {
+  const makeNewDashboardFromItems = useNewDashFromItems();
+  const newSeededDashboard = useCallback(() => {
     if (processedSeedItems) {
-      makeNewDashboard(name, processedSeedItems, vars, newDashExpr => {
+      makeNewDashboardFromItems(name, processedSeedItems, vars, newDashExpr => {
         updateNode(newDashExpr);
       });
     }
-  }, [makeNewDashboard, name, processedSeedItems, vars, updateNode]);
+  }, [makeNewDashboardFromItems, name, processedSeedItems, vars, updateNode]);
+
+  const makeNewDashboard = useNewPanelFromRootQueryCallback();
+  const newBlankDashboard = useCallback(() => {
+    makeNewDashboard(name, voidNode(), true, newDashExpr => {
+      updateNode(newDashExpr);
+    });
+  }, [makeNewDashboard, name, updateNode]);
 
   const versionNode = opWeaveServerVersion({}) as OutputNode<'string'>;
   const versionValue = useNodeValue(versionNode);
@@ -742,18 +721,6 @@ const HeaderLogoControls: React.FC<{
           horizontal: 'center',
         }}>
         <CustomMenu>
-          {seedItems != null && (
-            <MenuItem
-              onClick={() => {
-                setAnchorHomeEl(null);
-                newDashboard();
-              }}>
-              <MenuIcon>
-                <IconAddNew />
-              </MenuIcon>
-              <MenuText>Seed new board</MenuText>
-            </MenuItem>
-          )}
           <MenuItem
             onClick={() => {
               setAnchorHomeEl(null);
@@ -763,6 +730,29 @@ const HeaderLogoControls: React.FC<{
               <IconBack />
             </MenuIcon>
             <MenuText>Back to home</MenuText>
+          </MenuItem>
+          {seedItems != null && (
+            <MenuItem
+              onClick={() => {
+                setAnchorHomeEl(null);
+                newSeededDashboard();
+              }}>
+              <MenuIcon>
+                <IconAddNew />
+              </MenuIcon>
+              <MenuText>Seed new board</MenuText>
+            </MenuItem>
+          )}
+          <MenuItem
+            onClick={() => {
+              newBlankDashboard();
+            }}>
+            <MenuIcon>
+              <IconAddNew />
+            </MenuIcon>
+            <MenuText>
+              {seedItems != null ? 'New blank board' : 'New board'}
+            </MenuText>
           </MenuItem>
           <MenuItem
             onClick={() => {
