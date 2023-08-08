@@ -2,8 +2,17 @@
  * Keep these colors in sync with what is in tailwind.config.js
  */
 export const WHITE = '#FFFFFF';
+/**
+ * @deprecated Check with designer to use NEW_MOONBEAM instead
+ */
 export const MOONBEAM = '#EDE8FF';
+/**
+ * @deprecated Check with designer to use NEW_OBLIVION instead
+ */
 export const OBLIVION = '#15181F';
+
+export const NEW_MOONBEAM = '#EDE8FF';
+export const NEW_OBLIVION = '#15181F';
 
 export const MOON_50 = '#FAFAFA';
 export const MOON_100 = '#F5F6F7';
