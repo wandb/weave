@@ -60,23 +60,9 @@ def determine_scope(fixture_name, config):
     return config.getoption("--user-scope")
 
 
-@pytest.fixture()
-def netrc_isolation():
-    """Isolate netrc file from other tests"""
-    netrc_path = os.path.expanduser("~/.netrc")
-    netrc_bak_path = netrc_path + ".bak"
-    if os.path.exists(netrc_path):
-        os.rename(netrc_path, netrc_bak_path)
-    try:
-        yield
-    finally:
-        if os.path.exists(netrc_bak_path):
-            os.rename(netrc_bak_path, netrc_path)
-
-
 @pytest.fixture(scope=determine_scope)
 def bootstrap_user(
-    worker_id: str, fixture_fn, base_url, wandb_debug, netrc_isolation
+    worker_id: str, fixture_fn, base_url, wandb_debug
 ) -> Generator[LocalBackendFixturePayload, None, None]:
     username = f"user-{worker_id}-{random_string()}"
     command = UserFixtureCommand(command="up", username=username)
@@ -210,7 +196,7 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--wandb-server-tag",
-        default="master",
+        default="b41090e67cfdf6ceef94f996073a145f34e7adc3",  # master
         help="Image tag to use for the wandb server",
     )
     parser.addoption(

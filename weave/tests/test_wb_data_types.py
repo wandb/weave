@@ -1,3 +1,4 @@
+import time
 import pytest
 import wandb
 from wandb import data_types as wb_data_types
@@ -825,7 +826,7 @@ def test_media_logging_to_history(user_by_api_key_in_env):
         "molecule": make_molecule(False),
         "table": make_table(),
         "simple_image_table": make_simple_image_table(),
-        "all_types_table": [
+        "all_types_list": [
             make_image(),
             make_audio(),
             make_html(),
@@ -841,19 +842,11 @@ def test_media_logging_to_history(user_by_api_key_in_env):
     run.log(log_dict)
     run.finish()
 
-    os.remove("video.mp4")
-    os.remove("test_mol.pdb")
+    run_node = weave.ops.project(run.entity, run.project).run(run.id)
 
-    for history_op_name in ["history3", "history"]:
-        history_node = (
-            weave.ops.project(run.entity, run.project)
-            .run(run.id)
-            ._get_op(history_op_name)()
-            .map(
-                lambda row: weave.ops.dict_(
-                    **{key: row[key] for key in log_dict.keys()}
-                )
-            )
+    for history_op_name in ["history", "history3"]:
+        history_node = run_node._get_op(history_op_name)().map(
+            lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()})
         )
 
         if history_op_name == "history":
@@ -861,3 +854,6 @@ def test_media_logging_to_history(user_by_api_key_in_env):
         else:
             history = weave.use(history_node).to_pylist_notags()
         assert len(history) == 1
+
+    os.remove("video.mp4")
+    os.remove("test_mol.pdb")
