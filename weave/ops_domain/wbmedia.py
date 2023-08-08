@@ -177,6 +177,7 @@ class ImageArtifactFileRefType(types.ObjectType):
                 # needed.
                 key: []
                 for key in obj.masks.keys()
+                if obj.masks[key] is not None
             }
         else:
             maskLayers = {}
