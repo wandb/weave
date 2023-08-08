@@ -7,13 +7,14 @@ import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
 import {consoleLog} from '../../util';
-import {Outline} from '../Sidebar/Outline';
+import {Outline, shouldDisablePanelDelete} from '../Sidebar/Outline';
 import {
   ChildPanel,
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
+  CHILD_PANEL_DEFAULT_CONFIG,
 } from './ChildPanel';
 import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
@@ -206,20 +207,23 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     onMouseMove: onBodyMouseMove,
   } = useScrollbarVisibility();
 
-  const [inspectingRoot, setInspectingRoot] = useState(false);
   const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
   const selectedIsRoot = useMemo(
     () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
   );
-  const showOutline = useMemo(
-    () => selectedIsRoot && !inspectingRoot,
-    [selectedIsRoot, inspectingRoot]
+
+  const localConfig = getConfigForPath(
+    panelConfig || CHILD_PANEL_DEFAULT_CONFIG,
+    selectedPanel
+  );
+  const shouldShowOutline = shouldDisablePanelDelete(
+    localConfig,
+    selectedPanel
   );
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
-    setInspectingRoot(false);
   }, [setSelectedPanel]);
 
   if (loading) {
@@ -229,7 +233,8 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     throw new Error('Panel config is null after loading');
   }
 
-  if (showOutline) {
+  // show outline instead of config panel if root, main, or varbar
+  if (selectedIsRoot || shouldShowOutline) {
     return (
       <SidebarConfig.Container>
         <SidebarConfig.Header>
@@ -250,7 +255,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
           updateConfig2={panelUpdateConfig2}
           setSelected={setSelectedPanel}
           selected={selectedPanel}
-          setInspectingRoot={setInspectingRoot}
         />
       </SidebarConfig.Container>
     );
@@ -267,10 +271,10 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            {!selectedIsRoot && (
+            {!selectedIsRoot && !shouldShowOutline && (
               <OutlineItemPopupMenu
                 config={panelConfig}
-                localConfig={getConfigForPath(panelConfig, selectedPanel)}
+                localConfig={localConfig}
                 path={selectedPanel}
                 updateConfig={panelUpdateConfig}
                 updateConfig2={panelUpdateConfig2}

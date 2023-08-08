@@ -142,6 +142,35 @@ const PanelMaybe: React.FC<PanelMaybeProps> = props => {
     };
   }, [input]);
 
+  return (
+    <MaybeWrapper
+      deps={[
+        nodeWithConvertedType,
+        props.child,
+        props.config,
+        props.context,
+        props.loading,
+        props.updateConfig,
+        props.updateContext,
+        props.updateInput,
+      ]}>
+      <PanelComp2
+        input={nodeWithConvertedType}
+        inputType={nodeWithConvertedType.type}
+        loading={props.loading}
+        panelSpec={props.child}
+        configMode={false}
+        config={props.config}
+        context={props.context}
+        updateInput={props.updateInput}
+        updateConfig={props.updateConfig}
+        updateContext={props.updateContext}
+      />
+    </MaybeWrapper>
+  );
+};
+
+export const MaybeWrapper: React.FC<{deps?: any[]}> = props => {
   // We always render our child, so that its useNodeValue calls can be merged
   // with other active components. Ie, we don't want to waterfall here.
 
@@ -150,33 +179,13 @@ const PanelMaybe: React.FC<PanelMaybeProps> = props => {
   // panels do not need to handle null values!
 
   const {value: boundaryKey, openLatch} = useLatchingState(
-    useIdFromDeps([
-      nodeWithConvertedType,
-      props.child,
-      props.config,
-      props.context,
-      props.loading,
-      props.updateConfig,
-      props.updateContext,
-      props.updateInput,
-    ])
+    useIdFromDeps(props.deps ?? [])
   );
 
   return (
     <PanelContextProvider inPanelMaybe={true}>
       <NullResultErrorBoundary key={boundaryKey} onErrorCapture={openLatch}>
-        <PanelComp2
-          input={nodeWithConvertedType}
-          inputType={nodeWithConvertedType.type}
-          loading={props.loading}
-          panelSpec={props.child}
-          configMode={false}
-          config={props.config}
-          context={props.context}
-          updateInput={props.updateInput}
-          updateConfig={props.updateConfig}
-          updateContext={props.updateContext}
-        />
+        {props.children}
       </NullResultErrorBoundary>
     </PanelContextProvider>
   );

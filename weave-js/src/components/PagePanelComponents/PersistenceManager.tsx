@@ -4,6 +4,7 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isMac} from '@wandb/weave/common/util/browser';
 import {
   NodeOrVoidNode,
+  OutputNode,
   isConstNode,
   isOutputNode,
   mapNodes,
@@ -39,7 +40,6 @@ import {
 } from '../Panel2/Icons';
 import {
   useBranchPointFromURIString,
-  useCopyCodeFromURI,
   usePreviousVersionFromURIString,
 } from './hooks';
 import {
@@ -70,10 +70,12 @@ import {
 } from '../Panel2/PanelRootBrowser/util';
 import {PanelGroupConfig} from '../Panel2/PanelGroup';
 import {getFullChildPanel} from '../Panel2/ChildPanel';
+import {useNodeValue} from '@wandb/weave/react';
 import _ from 'lodash';
 import {mapPanels} from '../Panel2/panelTree';
 import {DeleteActionModal} from './DeleteActionModal';
 import {PublishModal} from './PublishModal';
+import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -432,7 +434,8 @@ const HeaderFileControls: React.FC<{
   const canDuplicateDashboard = false;
   const duplicateDashboard = useCallback(() => {}, []);
 
-  const {onCopy} = useCopyCodeFromURI(maybeURI);
+  // TODO: Hiding code export temporarily as it is partially broken */
+  // const {onCopy} = useCopyCodeFromURI(maybeURI);
 
   return (
     <>
@@ -529,7 +532,8 @@ const HeaderFileControls: React.FC<{
 
           <MenuDivider />
 
-          {maybeURI && (
+          {/* TODO: Hiding code export temporarily as it is partially broken */}
+          {/* {maybeURI && (
             <MenuItem
               onClick={() => {
                 onCopy().finally(() => setAnchorFileEl(null));
@@ -541,7 +545,7 @@ const HeaderFileControls: React.FC<{
             </MenuItem>
           )}
 
-          <MenuDivider />
+          <MenuDivider /> */}
 
           <MenuItem
             onClick={() => {
@@ -713,6 +717,9 @@ const HeaderLogoControls: React.FC<{
     }
   }, [makeNewDashboard, name, processedSeedItems, vars, updateNode]);
 
+  const versionNode = opWeaveServerVersion({}) as OutputNode<'string'>;
+  const versionValue = useNodeValue(versionNode);
+
   return (
     <>
       <HeaderLeftControls
@@ -770,7 +777,7 @@ const HeaderLogoControls: React.FC<{
           <MenuDivider />
           <MenuItem disabled>
             <MenuText>
-              Weave 0.0.6
+              Weave {versionValue.result}
               <br />
               by Weights & Biases
             </MenuText>

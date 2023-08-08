@@ -38,6 +38,7 @@ export const ChildConfigContainer = styled.div`
     background-color: ${globals.GRAY_350};
   }
 `;
+ChildConfigContainer.displayName = 'S.ChildConfigContainer';
 
 export const ConfigSectionContainer = styled.div`
   padding: 12px;
@@ -45,6 +46,7 @@ export const ConfigSectionContainer = styled.div`
     border-top: 1px solid ${globals.GRAY_350};
   }
 `;
+ConfigSectionContainer.displayName = 'S.ConfigSectionContainer';
 
 export const ConfigSectionHeader = styled.div`
   margin-bottom: 12px;
@@ -54,17 +56,20 @@ export const ConfigSectionHeader = styled.div`
   font-weight: 600;
   cursor: pointer;
 `;
+ConfigSectionHeader.displayName = 'S.ConfigSectionHeader';
 
 export const ConfigSectionHeaderButton = styled.div<{expanded: boolean}>`
   display: flex;
   transform: rotate(${p => (p.expanded ? 0 : 180)}deg);
   margin-left: 12px;
 `;
+ConfigSectionHeaderButton.displayName = 'S.ConfigSectionHeaderButton';
 
 export const ConfigSectionOptions = styled.div`
   display: flex;
   flex-direction: column;
 `;
+ConfigSectionOptions.displayName = 'S.ConfigSectionOptions';
 
 type ConfigSectionProps = {
   label?: string;
@@ -120,7 +125,7 @@ export const ConfigSection: FC<ConfigSectionProps> = ({
 export const ConfigOption: React.FC<
   {
     label: string;
-    // component to append after the the config component, on the same line, such as
+    // component to append after the config component, on the same line, such as
     // "add new y" buttons or "delete option" buttons. see panelplot config y for
     // an example.
     postfixComponent?: React.ReactElement;
@@ -151,7 +156,7 @@ const ConfigOptionNew: React.FC<
     label: string;
     actions?: ReactNode;
     multiline?: boolean;
-    // component to append after the the config component, on the same line, such as
+    // component to append after the config component, on the same line, such as
     // "add new y" buttons or "delete option" buttons. see panelplot config y for
     // an example.
     postfixComponent?: React.ReactElement;
@@ -286,12 +291,14 @@ const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
   &&& {
     width: 100%;
     display: inline-flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     line-height: 20px;
+    padding: 0;
 
     input {
       height: 100%;
+      width: 100% !important;
     }
 
     &.active svg {

@@ -119,10 +119,15 @@ def join_all_impl(
 
     new_arrs: list[ArrowWeaveList] = []
     for index_col, arr in zip(index_cols, arrs):
+        object_type = types.optional(arr.object_type)
+        if object_type == types.UnknownType():
+            # it was an empty list, so we'll get a column
+            # of None after join.
+            object_type = types.NoneType()
         new_arrs.append(
             ArrowWeaveList(
                 arr._arrow_data.take(index_col),
-                types.optional(arr.object_type),
+                object_type,
                 arr._artifact,
             )
         )

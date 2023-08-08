@@ -20,3 +20,4 @@ gha-creds-*.json
 .mypy_cache
 .hypothesis
 .env
+yarn-error.log*

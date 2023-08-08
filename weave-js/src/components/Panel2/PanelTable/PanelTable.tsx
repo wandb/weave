@@ -529,6 +529,11 @@ const PanelTableInner: React.FC<
     ) => {
       const rowNode = rowData.rowNode;
       const columnDef = columnDefinitions[colId];
+      // MaybeWrappers are needed because the table will eagerly ask for enough
+      // rows to fill the screen, before we know if that many rows exist. This
+      // means that the true value of every cell is possibly nullable, even if
+      // the type doesn't say so. This is sort of a hard-coded way to ensure we
+      // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
         return (
           <GrowToParent>
@@ -642,6 +647,11 @@ const PanelTableInner: React.FC<
             </S.IndexColumnVal>
           );
         }
+        // MaybeWrappers are needed because the table will eagerly ask for enough
+        // rows to fill the screen, before we know if that many rows exist. This
+        // means that the true value of every cell is possibly nullable, even if
+        // the type doesn't say so. This is sort of a hard-coded way to ensure we
+        // don't error when we get nulls back for small tables
         return (
           <IndexCell
             runNode={runNode}

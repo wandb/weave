@@ -61,7 +61,7 @@ class PanelCompErrorBoundary extends React.Component<
       this.props.onInvalidGraph?.(error.node);
       return;
     }
-    // You can also log the error to an error reportikkng service
+    // You can also log the error to an error reporting service
     // logErrorToMyService(error, errorInfo);
     // onAppError(
     //   'Error: ' +
@@ -186,6 +186,13 @@ export function useUpdateConfig2<C>(props: {
   updateConfig2?(change: (oldConfig: C) => Partial<C>): void;
 }) {
   const {config, updateConfig} = props;
+
+  // By using a ref, we can ensure that downstream components can call
+  // updateConfig2 multiple times between re-renders, and the config will
+  // always be the latest.
+
+  const workingConfig = useRef(config);
+  workingConfig.current = config;
   let {updateConfig2} = props;
   if (updateConfig2 == null) {
     // We selectively add this hook. This is safe to do since updateConfig2 will
@@ -196,9 +203,11 @@ export function useUpdateConfig2<C>(props: {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     updateConfig2 = useCallback(
       (change: (oldConfig: any) => any) => {
-        updateConfig(change(config));
+        const newConfig = change(workingConfig.current);
+        workingConfig.current = newConfig;
+        updateConfig(newConfig);
       },
-      [config, updateConfig]
+      [updateConfig]
     );
   }
   return updateConfig2!;
@@ -301,7 +310,8 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
 
 const useSplitTransformerConfigs = (
   config: PanelTransformerCompProps['config'],
-  updateConfig: PanelTransformerCompProps['updateConfig']
+  updateConfig: PanelTransformerCompProps['updateConfig'],
+  updateConfig2: PanelTransformerCompProps['updateConfig2']
 ) => {
   config = useMemo(() => config ?? {}, [config]);
   const baseConfig = useDeepMemo(_.omit(config, 'childConfig'));
@@ -330,7 +340,34 @@ const useSplitTransformerConfigs = (
       }),
     [updateConfig, config, childConfig]
   );
-  return {baseConfig, updateBaseConfig, childConfig, updateChildConfig};
+
+  const incomingUpdateConfig2 = useMemo(() => {
+    if (updateConfig2 == null) {
+      return undefined;
+    }
+    return (childChangeFunction: (oldChildConfig: any) => Partial<any>) => {
+      const parentChangeFunction = (oldParentConfig: any) => {
+        return {
+          ...oldParentConfig,
+          childConfig: childChangeFunction(oldParentConfig.childConfig),
+        };
+      };
+      updateConfig2(parentChangeFunction);
+    };
+  }, [updateConfig2]);
+
+  const updateChildConfig2 = useUpdateConfig2({
+    config: childConfig,
+    updateConfig: updateChildConfig,
+    updateConfig2: incomingUpdateConfig2,
+  });
+  return {
+    baseConfig,
+    updateBaseConfig,
+    childConfig,
+    updateChildConfig,
+    updateChildConfig2,
+  };
 };
 
 const useTransformerChild = (
@@ -364,7 +401,7 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
   const {panelSpec, updateConfig, config} = props;
   const updateConfig2 = useUpdateConfig2(props);
   const {baseConfig, updateBaseConfig, childConfig, updateChildConfig} =
-    useSplitTransformerConfigs(config, updateConfig);
+    useSplitTransformerConfigs(config, updateConfig, updateConfig2);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
     props.input,
     panelSpec,
@@ -396,14 +433,15 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
 };
 
 export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
-  const {panelSpec, updateConfig, config} = props;
-  const {baseConfig, childConfig, updateChildConfig} =
-    useSplitTransformerConfigs(config, updateConfig);
+  const {panelSpec, updateConfig, config, updateConfig2} = props;
+  const {baseConfig, childConfig, updateChildConfig, updateChildConfig2} =
+    useSplitTransformerConfigs(config, updateConfig, updateConfig2);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
     props.input,
     panelSpec,
     baseConfig
   );
+
   return (
     <PanelComp2
       {...props}
@@ -412,6 +450,7 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
       inputType={childInputNode.type}
       config={childConfig}
       updateConfig={updateChildConfig}
+      updateConfig2={updateChildConfig2}
       panelSpec={childPanelSpec}
     />
   );

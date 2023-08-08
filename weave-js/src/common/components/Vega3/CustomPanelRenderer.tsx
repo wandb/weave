@@ -354,7 +354,7 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
       }}
       onResize={contentRect => {
         // Performance hack. Opening the semantic modal may add or remove a
-        // scrollbar to the document body. This causes a re-layout, and and
+        // scrollbar to the document body. This causes a re-layout, and
         // all panels to resize. Vega panels can be very expensive to resize,
         // so we skip the resize if we're in the background when a modal is
         // open.

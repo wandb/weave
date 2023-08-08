@@ -17,7 +17,6 @@ def op(
     render_info=None,
     hidden=False,
     pure=True,
-    returns_expansion_node=False,
     _op_def_class=op_def.OpDef,
     *,  # Marks the rest of the arguments as keyword-only.
     plugins=None,
@@ -62,7 +61,6 @@ def op(
             pure=pure,
             plugins=plugins,
             mutation=mutation,
-            returns_expansion_node=returns_expansion_node,
             _decl_locals=inspect.currentframe().f_back.f_locals,
         )
 

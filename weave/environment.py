@@ -86,7 +86,7 @@ def weave_server_url() -> str:
     base_url = wandb_base_url()
     default = "https://weave.wandb.ai"
     if base_url != "https://api.wandb.ai":
-        default = base_url
+        default = base_url + "/weave"
     return os.getenv("WEAVE_SERVER_URL", default)
 
 
@@ -109,6 +109,10 @@ def enable_touch_on_read() -> bool:
 
 def memdump_sighandler_enabled() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_MEMDUMP_SIGHANDLER")
+
+
+def sigterm_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_SIGTERM_SIGHANDLER")
 
 
 def weave_wandb_cookie() -> typing.Optional[str]:

@@ -21,7 +21,8 @@ import datetime
 from bokeh.plotting import figure
 import os
 
-from wandb.sdk.artifacts.public_artifact import Artifact as PublicArtifact
+from wandb import Artifact
+from wandb.sdk.artifacts.artifact_state import ArtifactState
 
 
 class RandomClass:
@@ -156,25 +157,13 @@ def make_molecule():
 def test_image(sdk_obj, expected_type, fake_wandb):
     art = wandb.Artifact("test", "test")
     obj_json = SDKTypeRegistry.type_of(sdk_obj).to_json(art)
-
     # Create an artifact that looks like it was loaded remotely so we can use it without mocking backend
-    api = FakeApi()
-    logged_artifact = PublicArtifact(
-        api.client,
-        "test",
-        "test",
-        "test",
-        {
-            "id": "1234567890",
-            "artifactSequence": {
-                "name": "test",
-            },
-            "digest": art.digest,
-            "aliases": [],
-        },
-    )
-    logged_artifact._manifest = art.manifest
-    art._logged_artifact = logged_artifact
+    art._id = "1234567890"
+    art._entity = "test"
+    art._project = "test"
+    art._name = "test:v0"
+    art._version = "v0"
+    art._state = ArtifactState.COMMITTED
 
     assert weave0_type_json_to_weave1_type(obj_json) == expected_type
 
