@@ -654,23 +654,21 @@ const PanelTableInner: React.FC<
         // the type doesn't say so. This is sort of a hard-coded way to ensure we
         // don't error when we get nulls back for small tables
         return (
-          <MaybeWrapper>
-            <IndexCell
-              runNode={runNode}
-              rowNode={rowData.rowNode}
-              setRowAsPinned={(index: number) => {
-                if (!props.config.simpleTable) {
-                  if (shiftIsPressed) {
-                    setRowAsPinned(index, !rowData.isPinned);
-                  } else {
-                    setRowAsActive(index);
-                  }
+          <IndexCell
+            runNode={runNode}
+            rowNode={rowData.rowNode}
+            setRowAsPinned={(index: number) => {
+              if (!props.config.simpleTable) {
+                if (shiftIsPressed) {
+                  setRowAsPinned(index, !rowData.isPinned);
+                } else {
+                  setRowAsActive(index);
                 }
-              }}
-              activeRowIndex={activeRowIndex}
-              simpleTable={props.config.simpleTable}
-            />
-          </MaybeWrapper>
+              }
+            }}
+            activeRowIndex={activeRowIndex}
+            simpleTable={props.config.simpleTable}
+          />
         );
       },
       headerRenderer: ({headerIndex}) => {
