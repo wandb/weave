@@ -6,6 +6,7 @@ from . import errors
 from . import weave_types
 from . import uris
 from . import storage
+from . import environment
 
 T = typing.TypeVar("T")
 
@@ -353,8 +354,13 @@ def map_nodes_full(
 def map_nodes_and_catch_top_level(
     leaf_nodes: typing.Sequence[typing.Union[Node, Exception]],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
-) -> list[typing.Union[Node, Exception]]:
+) -> typing.Sequence[typing.Union[Node, Exception]]:
     """Map nodes in dag represented by leaf nodes, but not sub-lambdas"""
+    if environment.value_or_error_debug():
+        # cast is safe because when debug is enabled, leaf_nodes is a list of Nodes
+        nodes = typing.cast(list[Node], leaf_nodes)
+        return map_nodes_top_level(nodes, map_fn)
+
     already_mapped: dict[Node, Node] = {}
     results: list[typing.Union[Node, Exception]] = []
     for node in leaf_nodes:
@@ -372,8 +378,13 @@ def map_nodes_and_catch_top_level(
 def map_nodes_and_catch_full(
     leaf_nodes: typing.Sequence[typing.Union[Node, Exception]],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
-) -> list[typing.Union[Node, Exception]]:
+) -> typing.Sequence[typing.Union[Node, Exception]]:
     """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
+    if not environment.value_or_error_debug():
+        # cast is safe because when debug is enabled, leaf_nodes is a list of Nodes
+        nodes = typing.cast(list[Node], leaf_nodes)
+        return map_nodes_full(nodes, map_fn)
+
     already_mapped: dict[Node, Node] = {}
     results: list[typing.Union[Node, Exception]] = []
     for node in leaf_nodes:

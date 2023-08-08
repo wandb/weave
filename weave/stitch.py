@@ -128,7 +128,7 @@ def stitch_and_catch(
     leaf_nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
     var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
     stitched_graph: typing.Optional[StitchedGraph] = None,
-) -> tuple[StitchedGraph, typing.List[typing.Union[graph.Node, Exception]]]:
+) -> tuple[StitchedGraph, typing.Sequence[typing.Union[graph.Node, Exception]]]:
     """Given a list of leaf nodes, stitch the graph together."""
 
     if stitched_graph is None:
