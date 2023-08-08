@@ -17,8 +17,6 @@ from . import val_const
 from . import artifact_fs
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
-from . import artifact_mem
-from . import runfiles_wandb
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -280,12 +278,6 @@ class DefaultToPy(mappers.Mapper):
         # If the ref exists elsewhere, just return its uri.
         # TODO: This doesn't deal with MemArtifactRef!
         existing_ref = storage._get_ref(obj)
-
-        # TODO: This seems totally wrong
-        if isinstance(existing_ref, artifact_mem.MemArtifactRef):
-            obj = existing_ref.get()
-        if isinstance(obj, runfiles_wandb.WandbRunFiles):
-            return str(obj.uri)
 
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
             if existing_ref.is_saved:

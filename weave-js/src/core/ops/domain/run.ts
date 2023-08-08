@@ -540,9 +540,6 @@ export const opRunHistory3 = makeRunOp({
   returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
   hidden: true,
   resolver: ({run}) => opRunHistoryResolver(run),
-  // TODO: resolveOutputType does not perform all the correct
-  // unwrapping!
-
   resolveOutputType: async (inputTypes, node, executableNode, client) => {
     return opRunHistoryResolveOutputType(executableNode, client, 2);
   },
