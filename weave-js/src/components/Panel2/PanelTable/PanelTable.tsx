@@ -236,14 +236,6 @@ const PanelTableInnerConfigSetter: React.FC<
   );
 };
 
-const GrowingMaybeWrapper = ({children}: {children: React.ReactNode}) => {
-  return (
-    <GrowToParent>
-      <MaybeWrapper>{children}</MaybeWrapper>
-    </GrowToParent>
-  );
-};
-
 const PanelTableInner: React.FC<
   Panel2.PanelProps<typeof inputType, PanelTableConfig> & {
     height: number;
@@ -545,7 +537,7 @@ const PanelTableInner: React.FC<
       // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
         return (
-          <GrowingMaybeWrapper>
+          <GrowToParent>
             <Value
               table={tableState}
               colId={colId}
@@ -561,11 +553,11 @@ const PanelTableInner: React.FC<
               panelContext={props.context}
               updatePanelContext={updateContext}
             />
-          </GrowingMaybeWrapper>
+          </GrowToParent>
         );
       } else {
         return (
-          <GrowingMaybeWrapper>
+          <GrowToParent>
             <Cell
               table={tableState}
               colId={colId}
@@ -580,7 +572,7 @@ const PanelTableInner: React.FC<
               updateInput={props.updateInput}
               simpleTable={props.config.simpleTable}
             />
-          </GrowingMaybeWrapper>
+          </GrowToParent>
         );
       }
     },
