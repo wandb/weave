@@ -278,7 +278,6 @@ class DefaultToPy(mappers.Mapper):
         # If the ref exists elsewhere, just return its uri.
         # TODO: This doesn't deal with MemArtifactRef!
         existing_ref = storage._get_ref(obj)
-
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
             if existing_ref.is_saved:
                 if self._use_stable_refs:
