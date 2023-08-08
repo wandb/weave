@@ -52,11 +52,12 @@ def make_bokeh():
     return wb_data_types.Bokeh(p)
 
 
-def make_video():
+def make_video(clean_up=True):
     with open("video.mp4", "w") as f:
         f.write("00000")
     vid = wandb.Video("video.mp4")
-    os.remove("video.mp4")
+    if clean_up:
+        os.remove("video.mp4")
     return vid
 
 
@@ -73,11 +74,12 @@ def make_object3d():
     )
 
 
-def make_molecule():
+def make_molecule(clean_up=True):
     with open("test_mol.pdb", "w") as f:
         f.write("00000")
     mol = wandb.Molecule("test_mol.pdb")
-    os.remove("test_mol.pdb")
+    if clean_up:
+        os.remove("test_mol.pdb")
     return mol
 
 
@@ -818,9 +820,9 @@ def test_media_logging_to_history(user_by_api_key_in_env):
         "audio": make_audio(),
         "html": make_html(),
         "bokeh": make_bokeh(),
-        "video": make_video(),
+        "video": make_video(False),
         "object3d": make_object3d(),
-        "molecule": make_molecule(),
+        "molecule": make_molecule(False),
         "table": make_table(),
         "simple_image_table": make_simple_image_table(),
         "all_types_table": [
@@ -828,9 +830,9 @@ def test_media_logging_to_history(user_by_api_key_in_env):
             make_audio(),
             make_html(),
             make_bokeh(),
-            make_video(),
+            make_video(False),
             make_object3d(),
-            make_molecule(),
+            make_molecule(False),
             make_table(),
             make_simple_image_table(),
         ],
@@ -839,12 +841,23 @@ def test_media_logging_to_history(user_by_api_key_in_env):
     run.log(log_dict)
     run.finish()
 
-    history_node = (
-        weave.ops.project(run.entity, run.project)
-        .run(run.id)
-        .history()
-        .map(lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()}))
-    )
+    os.remove("video.mp4")
+    os.remove("test_mol.pdb")
 
-    history = weave.use(history_node).to_pylist_notags()
-    assert len(history) == 1
+    for history_op_name in ["history3", "history"]:
+        history_node = (
+            weave.ops.project(run.entity, run.project)
+            .run(run.id)
+            ._get_op(history_op_name)()
+            .map(
+                lambda row: weave.ops.dict_(
+                    **{key: row[key] for key in log_dict.keys()}
+                )
+            )
+        )
+
+        if history_op_name == "history":
+            history = weave.use(history_node)
+        else:
+            history = weave.use(history_node).to_pylist_notags()
+        assert len(history) == 1
