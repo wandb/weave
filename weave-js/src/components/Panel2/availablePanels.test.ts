@@ -368,7 +368,6 @@ describe('panel chaining', () => {
       excludePlot: true,
     }).stackIds.map(s => s.id);
 
-    expect(stacks.length).toEqual(1);
-    expect(stacks[0]).toBe('maybe.object-file.object');
+    expect(stacks).toEqual(['maybe.object-file.object']);
   });
 });
