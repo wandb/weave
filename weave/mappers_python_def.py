@@ -284,8 +284,8 @@ class DefaultToPy(mappers.Mapper):
         # TODO: This seems totally wrong
         if isinstance(existing_ref, artifact_mem.MemArtifactRef):
             obj = existing_ref.get()
-            if isinstance(obj, runfiles_wandb.WandbRunFiles):
-                return str(obj.uri)
+        if isinstance(obj, runfiles_wandb.WandbRunFiles):
+            return str(obj.uri)
 
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
             if existing_ref.is_saved:
