@@ -196,7 +196,7 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--wandb-server-tag",
-        default="b41090e67cfdf6ceef94f996073a145f34e7adc3",  # master
+        default="master",
         help="Image tag to use for the wandb server",
     )
     parser.addoption(

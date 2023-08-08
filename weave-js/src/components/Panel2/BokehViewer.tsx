@@ -55,9 +55,10 @@ const BokehViewerInner = (props: BokehViewerProps) => {
       if (bokehDivRef.current) {
         bokehDivRef.current.innerHTML = '';
       }
+      // Simple Bokeh objects will not have multiple roots. So
+      // we can just use the first root_id. This was discovered
+      // by unit tests creating simple Bokeh objects.
       let rootId = 0;
-      // TODO: Why is this check necessary? Seems like it is with our test
-      // bokeh files
       if (props.bokehJson.roots.root_ids != null) {
         rootId = props.bokehJson.roots.root_ids[0];
       }
