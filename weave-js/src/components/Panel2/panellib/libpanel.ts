@@ -81,6 +81,12 @@ export interface PanelSpec<X, C, T extends Type> {
 
   defaultFixedSize?: Dimensions | ((config: C) => Dimensions);
   isValid?: (config: any) => boolean;
+
+  // `shouldSuggest` is a function that returns true if the panel should be
+  // suggested. If `shouldSuggest` is not provided, the panel will be suggested
+  // if it is not hidden. This should only be used in very rare edge cases where
+  // the type system is insufficient
+  shouldSuggest?: (inputType: T) => boolean;
 }
 
 export type PanelConverterProps<X, C, T extends Type> = PanelPropsInternal<
