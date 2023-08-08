@@ -1669,3 +1669,38 @@ def test_empty_dict():
     awl2 = storage.get(str(ref))
     assert len(awl2) == 1
     assert awl._arrow_data == awl2._arrow_data
+
+
+def test_arrow_op_decorator_handles_optional_tagged_type():
+    obj = [None, 1, 2, None]
+    obj[1] = box.box(obj[1])
+    obj[2] = box.box(obj[2])
+    tag_store.add_tags(obj[1], {"mytag": "a"})
+    tag_store.add_tags(obj[2], {"mytag": "b"})
+    awl = arrow.to_arrow(obj)
+    assert awl.object_type == types.optional(
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"mytag": types.String()}), types.Int()
+        )
+    )
+
+    node = weave.save(awl)
+    toTimestamp = node.toTimestamp()
+
+    expected = [
+        None,
+        datetime.datetime(1970, 1, 1, 0, 0, 0, 1000, tzinfo=datetime.timezone.utc),
+        datetime.datetime(1970, 1, 1, 0, 0, 0, 2000, tzinfo=datetime.timezone.utc),
+        None,
+    ]
+
+    expected[1] = box.box(expected[1])
+    expected[2] = box.box(expected[2])
+
+    tag_store.add_tags(expected[1], {"mytag": "a"})
+    tag_store.add_tags(expected[2], {"mytag": "b"})
+
+    expected = arrow.to_arrow(expected)
+    actual = weave.use(toTimestamp)
+
+    assert actual.to_pylist_raw() == expected.to_pylist_raw()
