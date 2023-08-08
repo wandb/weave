@@ -1,6 +1,9 @@
 import {
   constString,
+  isAssignableTo,
+  isListLike,
   isTypedDict,
+  isTypedDictLike,
   listObjectType,
   Node,
   nullableTaggable,
@@ -8,10 +11,12 @@ import {
   opWBTraceTreeSummary,
   Type,
   typedDict,
+  typedDictPropertyTypes,
   varNode,
   WeaveInterface,
 } from '@wandb/weave/core';
-import React, {useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
+import * as ConfigPanel from '../ConfigPanel';
 
 import {useWeaveContext} from '../../../context';
 import * as Panel2 from '../panel';
@@ -33,20 +38,35 @@ const inputType = {
   objectType: {
     type: 'typedDict' as const,
     propertyTypes: {
-      langchain_trace: {
-        type: 'union' as const,
-        members: [{type: 'wb_trace_tree' as const}, 'none' as const],
-      },
+      // Unfortunately, we don't have a concept of "has at least one key
+      // with a certain type" in our type system, so we use a more loosely
+      // typed dict here and include a runtime shouldSuggest check.
+      // [any_key]: {
+      //   type: 'union' as const,
+      //   members: [{type: 'wb_trace_tree' as const}, 'none' as const],
+      // },
     },
   },
 };
 
-type PanelTraceTreeFromHistoryTraceTableViewerConfigType = {};
+type PanelTraceTreeFromHistoryTraceTableViewerConfigType = {
+  traceKey: string;
+};
 
 type PanelTraceTreeFromHistoryTraceTableViewerProps = Panel2.PanelProps<
   typeof inputType,
   PanelTraceTreeFromHistoryTraceTableViewerConfigType
 >;
+
+const isTraceColumnType = (type: Type) => {
+  const targetType = {
+    type: 'union' as const,
+    members: [{type: 'wb_trace_tree' as const}, 'none' as const],
+  };
+  return (
+    !isAssignableTo(type, 'none' as const) && isAssignableTo(type, targetType)
+  );
+};
 
 const stripType = (rowType: Type) => {
   return nullableTaggable(rowType, innerType => {
@@ -55,10 +75,11 @@ const stripType = (rowType: Type) => {
       // Filter out underscore keys
       const filteredPropTypes = Object.fromEntries(
         Object.entries(propTypes).filter(
-          ([key, _]) =>
+          ([key, keyType]) =>
             !key.startsWith('_') &&
-            key !== 'langchain_trace' &&
-            !key.startsWith('system/')
+            !key.startsWith('system/') &&
+            keyType != null &&
+            !isTraceColumnType(keyType)
         )
       );
       return typedDict(filteredPropTypes as any);
@@ -67,7 +88,11 @@ const stripType = (rowType: Type) => {
   });
 };
 
-const makeTableState = (inputArrayNode: Node, weave: WeaveInterface) => {
+const makeTableState = (
+  inputArrayNode: Node,
+  weave: WeaveInterface,
+  traceKey: string
+) => {
   let ts = emptyTable();
   let columnWidths: {[key: string]: number} = {};
   const exNode = getRowExampleNode(
@@ -83,7 +108,7 @@ const makeTableState = (inputArrayNode: Node, weave: WeaveInterface) => {
   const modelTraceNode = opWBTraceTreeSummary({
     trace_tree: opPick({
       obj: varNode(exNode.type, 'row'),
-      key: constString('langchain_trace'),
+      key: constString(traceKey),
     }),
   });
   const {ts: newTs, columnWidths: newColWidth} = updateTableState(
@@ -116,14 +141,43 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
   PanelTraceTreeFromHistoryTraceTableViewerProps
 > = props => {
   const weave = useWeaveContext();
+  const config = props.config;
+  const traceKey = config?.traceKey ?? '';
   const tableNode = props.input;
   const {ts, columnWidths} = useMemo(() => {
-    return makeTableState(tableNode, weave);
-  }, [tableNode, weave]);
+    return makeTableState(tableNode, weave, traceKey);
+  }, [tableNode, traceKey, weave]);
   const traceArrayNode = useMemo(
-    () => opPick({obj: props.input, key: constString('langchain_trace')}),
-    [props.input]
+    () => opPick({obj: props.input, key: constString(traceKey)}),
+    [props.input, traceKey]
   );
+  const allTracerKeys = useMemo(
+    () => getAllTracerKeysFromType(props.input.type),
+    [props.input.type]
+  );
+
+  useEffect(() => {
+    if (config?.traceKey == null && allTracerKeys.length > 0) {
+      props.updateConfig({
+        traceKey: allTracerKeys[0],
+      });
+    }
+  }, [allTracerKeys, config?.traceKey, props]);
+
+  if (config?.traceKey == null) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        Please select a Trace column in the panel's configuration.
+      </div>
+    );
+  }
 
   return (
     <PanelTraceTreeTraceTableViewerCommon
@@ -135,9 +189,67 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
   );
 };
 
+export const PanelTraceTreeFromHistoryTraceTableViewerConfigComponent: React.FC<
+  PanelTraceTreeFromHistoryTraceTableViewerProps
+> = props => {
+  const currentSelection = props.config?.traceKey ?? '';
+  const allTracerKeys = useMemo(
+    () => getAllTracerKeysFromType(props.input.type),
+    [props.input.type]
+  );
+  const setTraceKey = useCallback(
+    (traceKey: string) => {
+      props.updateConfig({traceKey});
+    },
+    [props]
+  );
+
+  return (
+    <ConfigPanel.ConfigOption label="Trace Key">
+      <ConfigPanel.ModifiedDropdownConfigField
+        selection
+        data-test="compare_method"
+        scrolling
+        multiple={false}
+        options={allTracerKeys.map(key => ({
+          key,
+          text: key,
+          value: key,
+        }))}
+        value={currentSelection}
+        onChange={(e, data) => {
+          setTraceKey(data.value as any);
+        }}
+      />
+    </ConfigPanel.ConfigOption>
+  );
+};
+
+const getAllTracerKeysFromType = (nodeInputType: Type): string[] => {
+  const keys: string[] = [];
+  if (!isListLike(nodeInputType)) {
+    return keys;
+  }
+  nodeInputType = listObjectType(nodeInputType);
+  if (!isTypedDictLike(nodeInputType)) {
+    return keys;
+  }
+  const propTypes = typedDictPropertyTypes(nodeInputType);
+  for (const [propKey, propType] of Object.entries(propTypes)) {
+    if (isTraceColumnType(propType)) {
+      keys.push(propKey);
+    }
+  }
+  return keys;
+};
+
 export const Spec: Panel2.PanelSpec = {
   id: 'wb_trace_tree-traceDebuggerFromRunHistory',
   displayName: 'LLM Trace Debugger',
   Component: PanelTraceTreeFromHistoryTraceTableViewer,
+  ConfigComponent: PanelTraceTreeFromHistoryTraceTableViewerConfigComponent,
   inputType,
+  shouldSuggest: nodeInputType => {
+    return getAllTracerKeysFromType(nodeInputType).length > 0;
+  },
 };
