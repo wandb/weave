@@ -813,7 +813,7 @@ def test_html_encoding_decoding(fake_wandb):
     assert HTML_STRING in result
 
 
-def test_media_logging_to_history(user_by_api_key_in_env):
+def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
     # TODO: Make this test exercise both the parquet and liveset
     # paths. Also test for values.
     log_dict = {
@@ -845,15 +845,28 @@ def test_media_logging_to_history(user_by_api_key_in_env):
     run_node = weave.ops.project(run.entity, run.project).run(run.id)
 
     for history_op_name in ["history", "history3"]:
-        history_node = run_node._get_op(history_op_name)().map(
+        history_node = run_node._get_op(history_op_name)()
+        mapped_node = history_node.map(
             lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()})
         )
 
-        if history_op_name == "history":
-            history = weave.use(history_node)
-        else:
-            history = weave.use(history_node).to_pylist_notags()
+        history = weave.use(mapped_node)
+        if history_op_name == "history3":
+            history = history.to_pylist_notags()
+
         assert len(history) == 1
+
+        audio_node = history_node["audio"]
+        audio_use = weave.use(audio_node)
+        if history_op_name == "history3":
+            audio_use = audio_use.to_pylist_notags()
+            path = audio_use[0]["path"]
+        else:
+            path = audio_use[0].path
+
+        file_node = audio_node[0].artifactVersion().file(path)
+        file_use = weave.use(file_node)
+        assert file_use != None
 
     os.remove("video.mp4")
     os.remove("test_mol.pdb")
