@@ -405,10 +405,15 @@ def _rewrite_ref_for_save(entry: str, object_type, source_artifact, target_artif
         # Our source is an artifact, construct a full URI.
         return str(source_artifact.ref_from_local_str(entry, object_type).uri)
 
+    # TODO: This feels hacky. I am not really sure why we need to do this.
+    obj = source_artifact.get(entry, object_type)
+    if isinstance(object_type, artifact_fs.FilesystemArtifactType) and isinstance(
+        obj, artifact_fs.FilesystemArtifact
+    ):
+        return str(obj.uri)
+
     # Source is ObjLookupMem, save to the artifact
-    return target_artifact.set(
-        entry, object_type, source_artifact.get(entry, object_type)
-    ).local_ref_str()
+    return target_artifact.set(entry, object_type, obj).local_ref_str()
 
 
 def pretty_print_arrow_type(t: typing.Union[pa.Schema, pa.DataType, pa.Field]) -> str:

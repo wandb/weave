@@ -808,3 +808,43 @@ def test_html_encoding_decoding(fake_wandb):
     contents = file.file_contents(file_node)
     result = weave.use(contents)
     assert HTML_STRING in result
+
+
+def test_media_logging_to_history(user_by_api_key_in_env):
+    # TODO: Make this test exercise both the parquet and liveset
+    # paths. Also test for values.
+    log_dict = {
+        "image": make_image(),
+        "audio": make_audio(),
+        "html": make_html(),
+        "bokeh": make_bokeh(),
+        "video": make_video(),
+        "object3d": make_object3d(),
+        "molecule": make_molecule(),
+        "table": make_table(),
+        "simple_image_table": make_simple_image_table(),
+        "all_types_table": [
+            make_image(),
+            make_audio(),
+            make_html(),
+            make_bokeh(),
+            make_video(),
+            make_object3d(),
+            make_molecule(),
+            make_table(),
+            make_simple_image_table(),
+        ],
+    }
+    run = wandb.init(project="test_media_logging_to_history")
+    run.log(log_dict)
+    run.finish()
+
+    history_node = (
+        weave.ops.project(run.entity, run.project)
+        .run(run.id)
+        .history()
+        .map(lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()}))
+    )
+
+    history = weave.use(history_node).to_pylist_notags()
+    assert len(history) == 1
