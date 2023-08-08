@@ -84,7 +84,6 @@ import {
   useUpdateConfigKey,
 } from './util';
 import {Link} from './Link';
-import {MaybeWrapper} from '../PanelMaybe';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
