@@ -532,7 +532,7 @@ def _read_raw_history_awl_tables(
             awl = history_op_common.awl_from_local_parquet_path(
                 path, None, columns=columns, artifact=artifact
             )
-            awl.map_column(_parse_bytes_mapper)
+            awl = awl.map_column(_parse_bytes_mapper)
             tables.append(awl)
     return tables
 

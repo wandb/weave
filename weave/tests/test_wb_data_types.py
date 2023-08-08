@@ -856,6 +856,7 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
 
         assert len(history) == 1
 
+        # Test file path access
         audio_node = history_node["audio"]
         audio_use = weave.use(audio_node)
         if history_op_name == "history3":
@@ -867,6 +868,11 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
         file_node = audio_node[0].artifactVersion().file(path)
         file_use = weave.use(file_node)
         assert file_use != None
+
+        # Table is a special case because it has a rowsType
+        table_type_node = history_node["table"].table().rowsType()
+        table_use = weave.use(table_type_node)
+        assert table_use != None
 
     os.remove("video.mp4")
     os.remove("test_mol.pdb")
