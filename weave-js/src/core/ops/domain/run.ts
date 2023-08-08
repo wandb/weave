@@ -530,6 +530,24 @@ export const opRunHistory2 = makeRunOp({
   },
 });
 
+// This is just here so we can type history3 in the EE outside of weave.wandb.ai for testing
+export const opRunHistory3 = makeRunOp({
+  name: 'run-history3',
+  argTypes: runArgTypes,
+  description: `Returns the log history of the ${docType('run')}`,
+  argDescriptions: {run: runArgDescriptions},
+  returnValueDescription: `The log history of the ${docType('run')}`,
+  returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
+  hidden: true,
+  resolver: ({run}) => opRunHistoryResolver(run),
+  // TODO: resolveOutputType does not perform all the correct
+  // unwrapping!
+
+  resolveOutputType: async (inputTypes, node, executableNode, client) => {
+    return opRunHistoryResolveOutputType(executableNode, client, 2);
+  },
+});
+
 export const opRunHistoryAsOfStep = makeRunOp({
   hidden: true,
   name: 'run-historyAsOf',
