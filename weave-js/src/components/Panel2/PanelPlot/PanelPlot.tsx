@@ -2364,7 +2364,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     );
   }, [concattedLineTable, vegaCols]);
 
-  let tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
+  const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
     // concatenate all plot tables into one and group by x value
     const showSeries = concreteConfig.series.length > 1;
     return _.mapValues(
@@ -2550,18 +2550,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
     return brushTypesResult;
   }, [listOfTableNodes, config.series, weave]);
-
-  // If we have temporal x, tooltip line data keys are date strings,
-  // but the signal we get back from Vega for lookup is milliseconds
-  // since epoch. So convert it.
-  tooltipLineData = useMemo(() => {
-    if (brushableAxes.x !== 'temporal') {
-      return tooltipLineData;
-    }
-    return _.mapKeys(tooltipLineData, (value, key) => {
-      return Date.parse(key);
-    });
-  }, [brushableAxes.x, tooltipLineData]);
 
   const xScaleAndDomain = useMemo(
     () =>
