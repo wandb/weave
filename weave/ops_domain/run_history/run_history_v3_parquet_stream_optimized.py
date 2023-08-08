@@ -579,8 +579,10 @@ def _is_directly_convertible_type(col_type: types.Type):
 
 
 _weave_types_requiring_in_memory_transformation = (
-    # TODO: We should at a minimum get ImageArtifactFileRefType working
-    # in the vectorized way. I think we can get the others working as well
+    # TODO: We should be able to move some (or all?) of these to
+    # a vectorized approach. At a minimum we should be able to do
+    # this for ImageArtifactFileRefType - similar to how we do it
+    # in history2.
     wbmedia.ImageArtifactFileRefType,  # type: ignore
     wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
     wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
