@@ -1,0 +1,25 @@
+name: publish-pypi-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_test_pypi:
+        description: 'Use the Test Pypi instead of prod'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  build-release:
+    name: Build release distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "16.x"
+      - run: |
+          echo "Building dist"
+          ./build_dist.py
