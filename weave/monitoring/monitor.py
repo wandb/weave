@@ -21,13 +21,12 @@ with mon.span('a_span') as s:
 
 """
 
+from abc import abstractmethod
 import contextlib
 import contextvars
 import dataclasses
 import datetime
 import inspect
-import os
-import re
 import sys
 import typing
 import uuid
@@ -38,6 +37,15 @@ from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
 
 logger = logging.getLogger(__name__)
+
+
+_current_span: contextvars.ContextVar[typing.Optional["Span"]] = contextvars.ContextVar(
+    "_current_span", default=None
+)
+
+_attributes: contextvars.ContextVar[
+    typing.Dict[str, typing.Any]
+] = contextvars.ContextVar("_attributes", default={})
 
 # Matches OpenTelemetry
 class StatusCode:
@@ -74,6 +82,7 @@ class Span:
     trace_id: str
     span_id: str
     name: str
+    attributes: dict[str, typing.Any]
     status_code: typing.Optional[str] = None
     start_time: datetime.datetime
     end_time: typing.Optional[datetime.datetime]
@@ -81,10 +90,17 @@ class Span:
     output: typing.Optional[typing.Any]
     exception: typing.Optional[Exception]
 
-    def __init__(self, parent_id: typing.Optional[str], trace_id: str, name: str):
+    def __init__(
+        self,
+        parent_id: typing.Optional[str],
+        trace_id: str,
+        name: str,
+        attributes: dict[str, typing.Any],
+    ):
         self.parent_id = parent_id
         self.trace_id = trace_id
         self.name = name
+        self.attributes = attributes
         self.status_code = StatusCode.UNSET
         self.span_id = str(uuid.uuid4())
         self.start_time = datetime.datetime.now()
@@ -93,12 +109,16 @@ class Span:
         self.output = None
         self.exception = None
 
-    def end(self):
+    def end(self) -> None:
         if self.status_code == StatusCode.UNSET:
             self.status_code = StatusCode.SUCCESS
         self.end_time = datetime.datetime.now()
 
-    def asdict(self):
+    def asdict(self) -> dict[str, typing.Any]:
+        if self.end_time is None:
+            raise ValueError(
+                "Cannot log a span that has not been ended.  Call span.end() before logging."
+            )
         return {
             "parent_id": self.parent_id,
             "trace_id": self.trace_id,
@@ -114,21 +134,17 @@ class Span:
                 if self.exception is not None
                 else None
             ),
-            "attributes": {"hello": 5},
+            "attributes": self.attributes,
         }
-
-
-_current_span: contextvars.ContextVar[typing.Optional[Span]] = contextvars.ContextVar(
-    "_current_span", default=None
-)
 
 
 @dataclasses.dataclass
 class Monitor:
-    _streamtable: StreamTable
+    # When this is None, monitor is disabled
+    _streamtable: typing.Optional[StreamTable]
 
     @contextlib.contextmanager
-    def span(self, name: str):
+    def span(self, name: str) -> typing.Iterator[Span]:
         parent_span = _current_span.get()
         if parent_span is not None:
             parent_id = parent_span.span_id
@@ -136,42 +152,48 @@ class Monitor:
         else:
             parent_id = None
             trace_id = str(uuid.uuid4())
-        span = Span(parent_id, trace_id, name)
+        span = Span(parent_id, trace_id, name, _attributes.get())
         token = _current_span.set(span)
         try:
             yield span
         finally:
             span.end()
-            self._streamtable.log(span.asdict())
+            if self._streamtable is not None:
+                self._streamtable.log(span.asdict())
             _current_span.reset(token)
+
+    @contextlib.contextmanager
+    def attributes(self, attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
+        cur_attributes = {**_attributes.get()}
+        cur_attributes.update(attributes)
+
+        token = _attributes.set(cur_attributes)
+        try:
+            yield
+        finally:
+            _attributes.reset(token)
 
     def trace(self) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
         def decorator(fn: typing.Callable[..., typing.Any]) -> typing.Any:
             def wrapped(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-                with self.span(get_function_name(fn)) as span:
-                    span.inputs = _arguments_to_dict(fn, args, kwargs)
-                    try:
-                        span.output = fn(*args, **kwargs)
-                    except Exception as e:
-                        span.status_code = StatusCode.ERROR
-                        span.exception = e
-                        raise
-                    return span.output
+                attributes = kwargs.pop("monitor_attributes", {})
+                with self.attributes(attributes):
+                    with self.span(get_function_name(fn)) as span:
+                        span.inputs = _arguments_to_dict(fn, args, kwargs)
+                        try:
+                            span.output = fn(*args, **kwargs)
+                        except Exception as e:
+                            span.status_code = StatusCode.ERROR
+                            span.exception = e
+                            raise
+                        return span.output
 
             return wrapped
 
         return decorator
 
 
-@dataclasses.dataclass
-class DummyMonitor(Monitor):
-    # TODO: Implement methods
-    pass
-
-
-def monitor(
-    stream_key: typing.Optional[str],
-) -> Monitor:
+def init_monitor(stream_key: str) -> Monitor:
     """Monitor a function.  This is a function decorator for performantely monitoring predictions during inference.
     Specify an input_preprocessor or output_postprocessor to have more control over what gets logged.  Each
     callbable should return a dictionary with scalar values or wandb Media objects.
@@ -194,6 +216,8 @@ def monitor(
         entity_name, project_name, stream_name = stream_key.split("/", 3)
     except ValueError:
         raise ValueError("stream_key must be of the form 'entity/project/stream_name'")
+
+    stream_table = None
     try:
         stream_table = StreamTable(
             table_name=stream_name,
@@ -207,6 +231,5 @@ def monitor(
             "Set the WANDB_API_KEY env variable to enable monitoring.",
             file=sys.stderr,
         )
-        return DummyMonitor()
 
     return Monitor(stream_table)
