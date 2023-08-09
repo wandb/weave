@@ -1,3 +1,26 @@
+"""Monitoring & tracing
+
+Example usage:
+
+```
+mon = monitor_decorator.monitor('shawn/monitor/monitor2')
+
+@mon.trace()
+def my_fn(a, b):
+    time.sleep(0.2)
+    #raise Exception("hello")
+    return a + b
+
+with mon.span('a_span') as s:
+    time.sleep(0.5)
+    with mon.span('b_span') as b:
+        time.sleep(0.5)
+        my_fn(1, 5)
+    time.sleep(0.05)
+```
+
+"""
+
 import contextlib
 import contextvars
 import dataclasses
@@ -142,6 +165,7 @@ class Monitor:
 
 @dataclasses.dataclass
 class DummyMonitor(Monitor):
+    # TODO: Implement methods
     pass
 
 
