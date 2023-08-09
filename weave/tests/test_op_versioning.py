@@ -22,7 +22,7 @@ def test_op_versioning():
     assert weave.use(v0(1, 2)) == 3
 
     # This should refer to v1, even though we just loaded v0
-    v_latest = weave.use(weave.get(f"local-artifact:///op-versioned_op:latest/obj"))
+    v_latest = weave.use(weave.get("local-artifact:///op-versioned_op:latest/obj"))
     assert weave.use(v_latest(4, 20)) == -16
 
     v1_ref = weave.versions(versioned_op)[1]
