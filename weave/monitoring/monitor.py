@@ -35,6 +35,7 @@ import logging
 
 from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
+from .. import graph
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,11 @@ class Monitor:
             return wrapped
 
         return decorator
+
+    def rows(self) -> typing.Optional[graph.Node]:
+        if self._streamtable is None:
+            return None
+        return self._streamtable.rows()
 
 
 def init_monitor(stream_key: str) -> Monitor:

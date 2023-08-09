@@ -363,9 +363,7 @@ class BoundPotentialOpDefs:
 
 def _dispatch_dunder(
     name: str,
-) -> typing.Callable[
-    [graph.Node, list[typing.Any], dict[str, typing.Any]], "RuntimeOutputNode"
-]:
+) -> typing.Callable[..., "RuntimeOutputNode"]:
     def dispatch_dunder_inner(
         self_node: graph.Node, *args: typing.Any, **kwargs: typing.Any
     ) -> "RuntimeOutputNode":
