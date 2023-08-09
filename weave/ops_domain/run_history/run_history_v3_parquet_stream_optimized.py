@@ -273,16 +273,21 @@ def _process_all_columns(
         raw_live_column = _extract_column_from_live_data(raw_live_data, col_name)
         processed_live_column = None
         if _column_contains_legacy_media_image(col_type):
-            # If the column contains an image-file type, then we need to figure out a more
-            # specific type for the column based on the first few rows. This is an unfortunate
-            # side-effect of the fact that we don't store image annotation metadata in the type
-            # system. See `_patch_legacy_image_file_types` for more details. This operation must be
-            # done on the liveset and the history parquet tables, and the underlying type must be updated
-            # accordingly. Not only that, but mask & box data are variadic in type and require reading
-            # more files from disk to understand the type. This is basically a dead end here - unless
-            # we want to literally read the entire history parquet file into memory, and then download
-            # all the image annotation data... We have to then propagate back all the type changes...
-            # This is horribly inefficient and we should probably just move on from legacy image files
+            # If the column contains an image-file type, then we need to figure
+            # out a more specific type for the column based on the first few
+            # rows. This is an unfortunate side-effect of the fact that we don't
+            # store image annotation metadata in the type system. See
+            # `_patch_legacy_image_file_types` for more details on how we handle
+            # this for older tables. This operation must be done on the liveset
+            # and the history parquet tables, and the underlying type must be
+            # updated accordingly. Not only that, but mask & box data are
+            # variadic in type and sometimes require reading more files from
+            # disk to understand the type. This is basically a dead end here -
+            # unless we want to literally read the entire history parquet file
+            # into memory, and then download all the image annotation data... We
+            # have to then propagate back all the type changes... This is
+            # horribly inefficient and we should probably just move on from
+            # legacy image files
             pass
         if _column_type_requires_in_memory_transformation(col_type):
             _non_vectorized_warning(

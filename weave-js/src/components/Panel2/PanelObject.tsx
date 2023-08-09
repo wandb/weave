@@ -16,7 +16,6 @@ import {
   unionObjectTypeAttrTypes,
   isObjectTypeLike,
   Type,
-  nonNullable,
 } from '@wandb/weave/core';
 
 import {Icon} from 'semantic-ui-react';
