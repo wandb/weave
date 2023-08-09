@@ -80,10 +80,11 @@ def _list_op_output_object_type(input_types):
 def list_dim_downresolver(
     self: ArrowWeaveList, arrow_operation_name: str, output_object_type=None
 ):
-    a = arrow_as_array(self._arrow_data)
+    maybe_tagged = self.without_tags() 
+    a = arrow_as_array(maybe_tagged._arrow_data)
     values = a.flatten()
 
-    object_type = typing.cast(types.List, self.object_type)
+    object_type = typing.cast(types.List, maybe_tagged.object_type)
     if isinstance(object_type.object_type, tagged_value_type.TaggedValueType):
         values = values.field("_value")
 
