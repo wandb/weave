@@ -860,8 +860,9 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
         assert len(history) == 1
 
         # Test image annotations
-        # This will never work in W1 See comment in
+        # This will not work in W1 See comment in
         # run_history_v3_parquet_stream_optimized.py
+        #
         # image_node = history_node["image"]
         # image_use = weave.use(image_node)
         # if history_op_name == "history3":
