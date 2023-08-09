@@ -16,7 +16,6 @@ import {
   getFullChildPanel,
   CHILD_PANEL_DEFAULT_CONFIG,
 } from './ChildPanel';
-import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
 import {Panel2Loader, useUpdateConfig2} from './PanelComp';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
@@ -30,10 +29,10 @@ import {
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {getConfigForPath} from './panelTree';
-import {IconButton} from '../IconButton';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {PanelPanelContextProvider} from './PanelPanelContextProvider';
+import {Button} from '../Button';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -243,9 +242,12 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
               <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
             </SidebarConfig.HeaderTopLeft>
             <SidebarConfig.HeaderTopRight>
-              <IconButton onClick={closeEditor}>
-                <IconClose />
-              </IconButton>
+              <Button
+                icon="close"
+                variant="ghost"
+                size="small"
+                onClick={closeEditor}
+              />
             </SidebarConfig.HeaderTopRight>
           </SidebarConfig.HeaderTop>
         </SidebarConfig.Header>
@@ -265,9 +267,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
       <SidebarConfig.Header>
         <SidebarConfig.HeaderTop lessLeftPad>
           <SidebarConfig.HeaderTopLeft canGoBack onClick={goBackToOutline}>
-            <IconButton>
-              <IconBack />
-            </IconButton>
+            <Button icon="back" variant="ghost" size="small" />
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
@@ -280,18 +280,23 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
                 updateConfig2={panelUpdateConfig2}
                 goBackToOutline={goBackToOutline}
                 trigger={
-                  <IconButton>
-                    <IconOverflowHorizontal />
-                  </IconButton>
+                  <Button
+                    icon="overflow-horizontal"
+                    variant="ghost"
+                    size="small"
+                  />
                 }
                 isOpen={isOutlineMenuOpen}
                 onOpen={() => setIsOutlineMenuOpen(true)}
                 onClose={() => setIsOutlineMenuOpen(false)}
               />
             )}
-            <IconButton onClick={closeEditor}>
-              <IconClose />
-            </IconButton>
+            <Button
+              icon="close"
+              variant="ghost"
+              size="small"
+              onClick={closeEditor}
+            />
           </SidebarConfig.HeaderTopRight>
         </SidebarConfig.HeaderTop>
         {!selectedIsRoot && (
