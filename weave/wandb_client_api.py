@@ -19,7 +19,7 @@ def assert_wandb_authenticated() -> None:
     )
     if not authenticated:
         raise errors.WeaveWandbAuthenticationException(
-            f"Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`."
+            "Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`."
         )
 
 

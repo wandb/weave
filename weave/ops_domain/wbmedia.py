@@ -17,24 +17,24 @@ class LegacyImageArtifactFileRefType(types.ObjectType):
 
     def property_types(self) -> dict[str, types.Type]:
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
     @classmethod
     def type_of_instance(cls, obj):
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
     def _to_dict(self) -> dict:
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
     @classmethod
     def from_dict(cls, d):
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
 
