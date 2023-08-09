@@ -820,7 +820,7 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
     # TODO: Make this test exercise both the parquet and liveset
     # paths. Also test for values.
     log_dict = {
-        "image": make_wb_image(),
+        "image": make_image(),  # make_wb_image(),
         "audio": make_audio(),
         "html": make_html(),
         "bokeh": make_bokeh(),
@@ -830,7 +830,7 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
         "table": make_table(),
         "simple_image_table": make_simple_image_table(),
         "all_types_list": [
-            make_wb_image(),
+            make_image(),  # make_wb_image(),
             make_audio(),
             make_html(),
             make_bokeh(),
