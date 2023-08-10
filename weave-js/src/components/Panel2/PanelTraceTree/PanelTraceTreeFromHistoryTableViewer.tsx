@@ -4,6 +4,7 @@ import {
   isListLike,
   isTypedDict,
   isTypedDictLike,
+  isUnion,
   listObjectType,
   Node,
   nullableTaggable,
@@ -12,6 +13,7 @@ import {
   Type,
   typedDict,
   typedDictPropertyTypes,
+  union,
   varNode,
   WeaveInterface,
 } from '@wandb/weave/core';
@@ -70,21 +72,28 @@ const isTraceColumnType = (type: Type) => {
 
 const stripType = (rowType: Type) => {
   return nullableTaggable(rowType, innerType => {
-    if (isTypedDict(innerType)) {
-      const propTypes = innerType.propertyTypes;
-      // Filter out underscore keys
-      const filteredPropTypes = Object.fromEntries(
-        Object.entries(propTypes).filter(
-          ([key, keyType]) =>
-            !key.startsWith('_') &&
-            !key.startsWith('system/') &&
-            keyType != null &&
-            !isTraceColumnType(keyType)
-        )
-      );
-      return typedDict(filteredPropTypes as any);
+    let members = [innerType];
+    if (isUnion(innerType)) {
+      members = innerType.members;
     }
-    return innerType;
+    members = members.map(member => {
+      if (isTypedDict(member)) {
+        const propTypes = member.propertyTypes;
+        // Filter out underscore keys
+        const filteredPropTypes = Object.fromEntries(
+          Object.entries(propTypes).filter(
+            ([key, keyType]) =>
+              !key.startsWith('_') &&
+              !key.startsWith('system/') &&
+              keyType != null &&
+              !isTraceColumnType(keyType)
+          )
+        );
+        return typedDict(filteredPropTypes as any);
+      }
+      return member;
+    });
+    return union(members);
   });
 };
 

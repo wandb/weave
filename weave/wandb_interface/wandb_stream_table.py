@@ -136,11 +136,11 @@ class _StreamTableSync:
         # technically, we could infer the entity from the API key, but
         # that tends to confuse users.
         if entity_name is None or entity_name == "":
-            raise ValueError(f"Must specify entity_name")
+            raise ValueError("Must specify entity_name")
         elif project_name is None or project_name == "":
-            raise ValueError(f"Must specify project_name")
+            raise ValueError("Must specify project_name")
         elif table_name is None or table_name == "":
-            raise ValueError(f"Must specify table_name")
+            raise ValueError("Must specify table_name")
 
         self._lite_run = InMemoryLazyLiteRun(
             entity_name,

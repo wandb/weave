@@ -91,6 +91,7 @@ def Board(
                     layoutMode="grid",
                     showExpressions=showExpressions,  # type: ignore
                     enableAddPanel=True,
+                    disableDeletePanel=True,
                     gridConfig=panel_group.PanelBankSectionConfig(
                         id="grid0",
                         name="Section 0",

@@ -76,6 +76,9 @@ class GroupConfig(typing.Generic[ItemsType]):
     enableAddPanel: typing.Optional[bool] = dataclasses.field(
         default_factory=lambda: None
     )
+    disableDeletePanel: typing.Optional[bool] = dataclasses.field(
+        default_factory=lambda: None
+    )
     childNameBase: typing.Optional[str] = dataclasses.field(
         default_factory=lambda: None
     )

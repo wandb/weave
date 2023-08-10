@@ -398,6 +398,8 @@ def read_history_parquet(run: wdt.Run, columns=None):
             path = io.fs.path(local_path)
             awl = awl_from_local_parquet_path(path, object_type, columns=columns)
             tables.append(awl)
+    if len(tables) == 0:
+        return None
     return process_history_awl_tables(tables)
 
 

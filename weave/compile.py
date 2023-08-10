@@ -544,7 +544,10 @@ def compile_node_ops(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _node_ops, on_error)
+    # Mission critical that we do not map into static lambdas. We do
+    # not want to expand nodes that are meant by the caller to be interpreted
+    # as their exact node.
+    return graph.map_nodes_full(nodes, _node_ops, on_error, True)
 
 
 # This compile pass using the `top_level` mapper since we recurse manually. We can't use
@@ -650,6 +653,27 @@ def _compile(
     with tracer.trace("compile:function_calls"):
         results = results.batch_map(_track_errors(compile_function_calls))
     with tracer.trace("compile:quote"):
+        # Mission critical to call `compile:quote` before and node re-writing
+        # compilers such as compile:node_ops and compile:gql. Why?:
+        #
+        # It is useful to define a "static lambda". A "static lambda" is a const
+        # node of type function with no inputs. This is used in our system to
+        # represent a constant value which is a node. Useful for generating
+        # boards or any sort of op that operates on nodes themselves.
+        #
+        # Moreover, this compile step will automatically "quote" inputs to ops
+        # that expect node inputs - effectively making static lambdas when
+        # called for.
+        #
+        # Furthermore, it is important to know that stream table rows (and many
+        # other ops) now support expansion (meaning they get expanded into a
+        # chain of new nodes in the compile pass).
+        #
+        # Conceptually, this created an issue: Compile passes that mutate nodes
+        # (eg node expansion or gql compile) would modify the quoted node. But,
+        # these functions that consume nodes do not want modified nodes.
+        # Instead, we want the raw node that the caller intended. For this
+        # reason we should always call compile:quote before any node re-writing.
         results = results.batch_map(_track_errors(compile_quote))
 
     # Some ops require const input nodes. This pass executes any branches necessary

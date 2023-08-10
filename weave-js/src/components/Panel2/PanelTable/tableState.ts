@@ -484,8 +484,8 @@ export function equalStates(aTable: TableState, bTable?: TableState) {
   return true;
 }
 
-export function appendEmptyColumn(ts: TableState) {
-  const colId = newColumnId(ts);
+export function appendEmptyColumn(ts: TableState, index?: number) {
+  const colId = index == null ? newColumnId(ts) : `col-${index}`;
   return produce(ts, draft => {
     draft.columns[colId] = {
       panelId: '',
@@ -1501,9 +1501,10 @@ export function addNamedColumnToTable(
   table: TableState,
   name: string,
   selectFn: NodeOrVoidNode<Type>,
-  panelDef?: {panelID: string; panelConfig: any}
+  panelDef?: {panelID: string; panelConfig: any},
+  index?: number
 ): TableState {
-  table = appendEmptyColumn(table);
+  table = appendEmptyColumn(table, index);
   const columnId = table.order[table.order.length - 1];
   table = updateColumnSelect(table, columnId, selectFn);
   table = updateColumnName(table, columnId, name);
