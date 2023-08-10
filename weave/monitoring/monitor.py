@@ -1,28 +1,5 @@
-"""Monitoring & tracing
+"""Monitoring & tracing"""
 
-Example usage:
-
-```
-mon = monitor_decorator.monitor('shawn/monitor/monitor2')
-
-@mon.trace()
-def my_fn(a, b):
-    time.sleep(0.2)
-    #raise Exception("hello")
-    return a + b
-
-with mon.span('a_span') as s:
-    time.sleep(0.5)
-    with mon.span('b_span') as b:
-        time.sleep(0.5)
-        my_fn(1, 5)
-    time.sleep(0.05)
-```
-
-"""
-
-import openai
-from abc import abstractmethod
 import asyncio
 import contextlib
 import contextvars
@@ -41,6 +18,7 @@ from .. import graph
 
 logger = logging.getLogger(__name__)
 
+_global_monitor: typing.Optional["Monitor"] = None
 
 _current_span: contextvars.ContextVar[typing.Optional["Span"]] = contextvars.ContextVar(
     "_current_span", default=None
@@ -49,6 +27,7 @@ _current_span: contextvars.ContextVar[typing.Optional["Span"]] = contextvars.Con
 _attributes: contextvars.ContextVar[
     typing.Dict[str, typing.Any]
 ] = contextvars.ContextVar("_attributes", default={})
+
 
 # Matches OpenTelemetry
 class StatusCode:
@@ -67,7 +46,6 @@ def _arguments_to_dict(
     bound_params = sig.bind(*args, **kwargs)
     bound_params.apply_defaults()
     got_args = dict(bound_params.arguments)
-    print("GOT ARGS", fn, got_args, sig)
     return got_args
 
 
@@ -91,7 +69,7 @@ class Span:
     span_id: str
     name: str
     attributes: dict[str, typing.Any]
-    status_code: typing.Optional[str] = None
+    status_code: str = StatusCode.UNSET
     start_time: datetime.datetime
     end_time: typing.Optional[datetime.datetime]
     inputs: typing.Optional[typing.Dict[str, typing.Any]]
@@ -159,13 +137,31 @@ class Span:
         }
 
 
+# A type used to indicate that inputs is guaranteed to be set, for pre and post process callbacks.
+class SpanWithInputs(Span):
+    inputs: typing.Dict[str, typing.Any]
+
+
+class SpanWithInputsAndOutput(Span):
+    inputs: typing.Dict[str, typing.Any]
+    output: typing.Any
+
+
 @dataclasses.dataclass
 class Monitor:
     # When this is None, monitor is disabled
     _streamtable: typing.Optional[StreamTable]
 
+    _showed_not_logging_warning: bool = False
+
     @contextlib.contextmanager
     def span(self, name: str) -> typing.Iterator[Span]:
+        if not self._showed_not_logging_warning and self._streamtable is None:
+            self._showed_not_logging_warning = True
+            print(
+                "WARNING: Not logging spans.  Call weave.monitor.init_monitor() to enable logging."
+            )
+
         parent_span = _current_span.get()
         if parent_span is not None:
             parent_id = parent_span.span_id
@@ -193,7 +189,9 @@ class Monitor:
             _attributes.reset(token)
 
     def trace(
-        self, preprocess, postprocess
+        self,
+        preprocess: typing.Optional[typing.Callable] = None,
+        postprocess: typing.Optional[typing.Callable] = None,
     ) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
         def decorator(fn: typing.Callable[..., typing.Any]) -> typing.Any:
             if asyncio.iscoroutinefunction(fn):
@@ -246,25 +244,7 @@ class Monitor:
         return self._streamtable.rows()
 
 
-def init_monitor(stream_key: str) -> Monitor:
-    """Monitor a function.  This is a function decorator for performantely monitoring predictions during inference.
-    Specify an input_preprocessor or output_postprocessor to have more control over what gets logged.  Each
-    callbable should return a dictionary with scalar values or wandb Media objects.
-
-    Arguments:
-        stream_name (typing.Optional[str]): The name of the stream to log to. If None, the stream name will be
-            inferred from the function name.
-        project_name str:  The name of the W&B Project to log to.
-        entity_name str:  The name of the W&B Entity to log to.
-        input_preprocessor (typing.Callable[..., typing.Any]):  A function that takes the kwargs of the decorated function and
-            returns a dictionary of key value pairs to log.
-        output_postprocessor (typing.Callable[..., typing.Any]):  A function that takes the return value of the decorated function
-            and returns a dictionary or single value to log.
-        auto_log (bool):  If True, the function will automatically log the inputs and outputs of the function call. Set this
-            to False if you want to add additional data to the log after the function call.
-        raise_on_error (bool):  If True, the function will raise an exception if the function call raises an exception.
-            If False, the function will return a MonitorRecord with the exception set.
-    """
+def _init_monitor_streamtable(stream_key: str) -> typing.Optional[StreamTable]:
     try:
         entity_name, project_name, stream_name = stream_key.split("/", 3)
     except ValueError:
@@ -284,5 +264,28 @@ def init_monitor(stream_key: str) -> Monitor:
             "Set the WANDB_API_KEY env variable to enable monitoring.",
             file=sys.stderr,
         )
+    return stream_table
 
-    return Monitor(stream_table)
+
+def default_monitor() -> Monitor:
+    """Get the global Monitor."""
+    global _global_monitor
+    if _global_monitor is None:
+        _global_monitor = Monitor(None)
+    return _global_monitor
+
+
+def new_monitor(stream_key: str) -> Monitor:
+    """Create a new Monitor"""
+    return Monitor(_init_monitor_streamtable(stream_key))
+
+
+def init_monitor(stream_key: str) -> Monitor:
+    """Initialize the global monitor and return it."""
+    global _global_monitor
+    stream_table = _init_monitor_streamtable(stream_key)
+    if _global_monitor is None:
+        _global_monitor = Monitor(stream_table)
+    else:
+        _global_monitor._streamtable = stream_table
+    return _global_monitor
