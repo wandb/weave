@@ -130,34 +130,6 @@ jobs:
           # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
         run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --timeout=90 ./tests ./ops_arrow --ddtrace --durations=5
 
-  ci-tmate-session:
-    name: CI tmate Session
-    timeout-minutes: 90
-    needs:
-      - build-container
-    runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
-    services:
-      wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-        credentials:
-          username: _json_key
-          password: ${{ secrets.gcp_wb_sa_key }}
-        env:
-          CI: 1
-          WANDB_ENABLE_TEST_CONTAINER: true
-        ports:
-          - "8080:8080"
-          - "8083:8083"
-          - "9015:9015"
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
-    steps:
-      - uses: actions/checkout@v3
-      - name: Verify wandb server is running
-        run: curl -s http://wandbservice:8080/healthz
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
   ecosystem-tests:
     name: Python ecosystem unit tests
     timeout-minutes: 10
