@@ -25,7 +25,7 @@ def _propagate_gql_keys_for_node(
 
     input_types = node.from_op.input_types
 
-    first_arg_name = gql_op_plugin._first_arg_name(opdef)
+    first_arg_name = gql_op_plugin.first_arg_name(opdef)
     if first_arg_name is None:
         raise ValueError("OpDef does not have named args, cannot propagate GQL keys")
 
@@ -67,7 +67,7 @@ def propagate_gql_keys(
     if not maybe_refined_node.from_op.name == "gqlroot-wbgqlquery":
         fq_opname = maybe_refined_node.from_op.full_name
         opdef = registry_mem.memory_registry.get_op(fq_opname)
-        plugin = gql_op_plugin._get_gql_plugin(opdef)
+        plugin = gql_op_plugin.get_gql_plugin(opdef)
 
         key_fn: typing.Optional[gql_op_plugin.GQLKeyPropFn] = None
 
@@ -76,14 +76,14 @@ def propagate_gql_keys(
                 original_opdef = registry_mem.memory_registry.get_op(
                     fq_opname.replace("GQLResolver", "")
                 )
-                original_plugin = gql_op_plugin._get_gql_plugin(original_opdef)
+                original_plugin = gql_op_plugin.get_gql_plugin(original_opdef)
                 if (
                     original_plugin is not None
                     and original_plugin.gql_op_output_type is not None
                 ):
                     key_fn = original_plugin.gql_op_output_type
             if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
-                scalar_plugin = gql_op_plugin._get_gql_plugin(opdef.derived_from)
+                scalar_plugin = gql_op_plugin.get_gql_plugin(opdef.derived_from)
                 if scalar_plugin is not None:
                     key_fn = scalar_plugin.gql_op_output_type
         else:

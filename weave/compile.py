@@ -446,8 +446,8 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
     """Determines if a node needs to propagate the GQL keys of its inputs."""
     fq_opname = node.from_op.full_name
     opdef = registry_mem.memory_registry.get_op(fq_opname)
-    plugin = gql_op_plugin._get_gql_plugin(opdef)
-    first_arg_name = gql_op_plugin._first_arg_name(opdef)
+    plugin = gql_op_plugin.get_gql_plugin(opdef)
+    first_arg_name = gql_op_plugin.first_arg_name(opdef)
 
     if first_arg_name is None:
         return False
@@ -456,7 +456,7 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
     unwrapped_first_arg_type, _ = tagged_value_type_helpers.unwrap_tags(first_arg_type)
 
     if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
-        plugin = gql_op_plugin._get_gql_plugin(opdef.derived_from)
+        plugin = gql_op_plugin.get_gql_plugin(opdef.derived_from)
         unwrapped_first_arg_type = typing.cast(
             types.List, unwrapped_first_arg_type
         ).object_type

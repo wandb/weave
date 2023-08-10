@@ -129,7 +129,7 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         or op_def.name == "list-createIndexCheckpointTag"
     )
 
-    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin.get_gql_plugin(op_def)
     if wb_domain_gql is None and not is_passthrough:
         return ""
 
@@ -356,7 +356,7 @@ def _is_root_node(node: graph.Node) -> bool:
         return False
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin.get_gql_plugin(op_def)
     return wb_domain_gql is not None and wb_domain_gql.is_root
 
 
@@ -365,7 +365,7 @@ def _custom_root_resolver(node: graph.Node) -> typing.Optional["op_def.OpDef"]:
         return None
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin.get_gql_plugin(op_def)
     if wb_domain_gql is not None:
         return wb_domain_gql.root_resolver
     return None
@@ -376,7 +376,7 @@ def _custom_key_fn(node: graph.Node) -> typing.Optional[gql_op_plugin.GQLKeyProp
         return None
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin.get_gql_plugin(op_def)
     if wb_domain_gql is not None:
         return wb_domain_gql.gql_op_output_type
     return None
@@ -387,7 +387,7 @@ def required_const_input_names(node: graph.Node) -> typing.Optional[list[str]]:
         return None
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
+    wb_domain_gql = gql_op_plugin.get_gql_plugin(op_def)
     if wb_domain_gql is None:
         return None
     if not isinstance(op_def.input_type, op_args.OpNamedArgs):

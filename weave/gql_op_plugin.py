@@ -53,7 +53,7 @@ def wb_gql_op_plugin(
     }
 
 
-def _get_gql_plugin(
+def get_gql_plugin(
     op_def: "op_def.OpDef",
 ) -> typing.Optional[GqlOpPlugin]:
     if op_def.plugins is not None and "wb_domain_gql" in op_def.plugins:
@@ -61,7 +61,7 @@ def _get_gql_plugin(
     return None
 
 
-def _first_arg_name(
+def first_arg_name(
     opdef: "op_def.OpDef",
 ) -> typing.Optional[str]:
     if not isinstance(opdef.input_type, op_args.OpNamedArgs):
