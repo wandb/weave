@@ -3,6 +3,7 @@
 
 from wandb.apis import public
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
+import logging
 import typing
 
 from . import errors
@@ -39,9 +40,12 @@ def wandb_gql_query(
                 public.gql(query_str),
                 variable_values=variables,
             )
-        except (exceptions.ReadTimeout, exceptions.ConnectTimeout):
+        except exceptions.Timeout as e:
             if attempt_no == num_timeout_retries:
                 raise
+            logging.warn(
+                f'wandb GQL query timed out: "{e.args[0]}", retrying (num_attempts={attempt_no + 1})'
+            )
 
 
 def set_wandb_thread_local_api_settings(
