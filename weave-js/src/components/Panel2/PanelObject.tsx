@@ -15,6 +15,7 @@ import {
   Node,
   unionObjectTypeAttrTypes,
   isObjectTypeLike,
+  Type,
 } from '@wandb/weave/core';
 
 import {Icon} from 'semantic-ui-react';
@@ -111,6 +112,15 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
     [props.input.type]
   );
 
+  // This is needed because dict(str, Any) is assignable to the input type
+  // of this panel, but we cant render that with a PanelObject at the moment
+  // so we have this more restrictive type checker to ensure we do not try to
+  // render dicts the same way that we would render true typedDicts.
+
+  const typeIsRenderableByPanelObject = (type: Type): boolean => {
+    return isTypedDictLike(type) || isObjectTypeLike(type);
+  };
+
   const {objPropTypes, pickOrGetattr} = useMemo(() => {
     if (isTypedDictLike(props.input.type)) {
       return {
@@ -190,7 +200,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
                 // Get rid of updateConfig
                 updateConfig={() => {}}
               />
-            ) : isAssignableTo(propertyTypes[k]!, Spec.inputType) ? (
+            ) : typeIsRenderableByPanelObject(propertyTypes[k]!) ? (
               <PanelObject
                 input={pickOrGetattr(props.input, k) as any}
                 level={level + 1}

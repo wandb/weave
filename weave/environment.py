@@ -111,6 +111,10 @@ def memdump_sighandler_enabled() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_MEMDUMP_SIGHANDLER")
 
 
+def sigterm_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_SIGTERM_SIGHANDLER")
+
+
 def weave_wandb_cookie() -> typing.Optional[str]:
     cookie = os.environ.get("WEAVE_WANDB_COOKIE")
     if cookie:
@@ -166,3 +170,10 @@ def weave_wandb_api_key() -> typing.Optional[str]:
 
 def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
     return util.parse_number_env_var("WEAVE_PROJECTION_TIMEOUT_SEC")
+
+
+def num_gql_timeout_retries() -> int:
+    raw = util.parse_number_env_var("WEAVE_WANDB_GQL_NUM_TIMEOUT_RETRIES")
+    if raw is None:
+        return 0
+    return int(raw)

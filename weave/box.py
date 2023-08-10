@@ -9,9 +9,16 @@ def make_id() -> int:
     return random.randint(-(2**63), 2**63 - 1)
 
 
+class HasBoxedRepr:
+    val: typing.Any
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} ({self.val})>"
+
+
 # Watch out, can't do "is None" on this!
 # TODO: fix?
-class BoxedNone:
+class BoxedNone(HasBoxedRepr):
     _id: typing.Optional[int] = None
 
     def __init__(self, val):
@@ -28,7 +35,7 @@ def is_none(val):
     return val is None or isinstance(val, BoxedNone)
 
 
-class BoxedBool:
+class BoxedBool(HasBoxedRepr):
     _id: typing.Optional[int] = None
 
     def __init__(self, val):

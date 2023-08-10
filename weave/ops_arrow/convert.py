@@ -1,5 +1,6 @@
 import hashlib
 import pyarrow as pa
+import pyarrow.compute as pc
 import typing
 import json
 
@@ -393,11 +394,7 @@ def to_weave_arrow(v: typing.Any):
     return api.weave(awl)
 
 
-def to_parquet_friendly(
-    l: ArrowWeaveList,
-) -> typing.Tuple[ArrowWeaveList, dict[PathType, ArrowWeaveList]]:
-    bundle: dict[PathType, ArrowWeaveList] = {}
-
+def to_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
     def _convert_col_to_parquet_friendly(
         col: ArrowWeaveList, path: PathType
     ) -> typing.Optional[ArrowWeaveList]:
@@ -432,51 +429,19 @@ def to_parquet_friendly(
                     col.object_type,
                     col._artifact,
                 )
-        elif isinstance(col.object_type, gql_with_keys.GQLHasKeysType):
-            if pa.types.is_dictionary(col._arrow_data.type):
-                bundle[path] = ArrowWeaveList(
-                    col._arrow_data.dictionary,
-                    col.object_type,
-                    col._artifact,
-                )
-                return ArrowWeaveList(
-                    col._arrow_data.indices,
-                    col.object_type,
-                    col._artifact,
-                )
-
         return None
 
     with unsafe_awl_construction("to_parquet_friendly"):
-        root = l.map_column(_convert_col_to_parquet_friendly)
-
-    return root, bundle
+        return l.map_column(_convert_col_to_parquet_friendly)
 
 
-def from_parquet_friendly(
-    l: ArrowWeaveList,
-    artifact: artifact_fs.FilesystemArtifact,
-    name: str,
-    type: ArrowWeaveListType,
-) -> ArrowWeaveList:
+def from_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
     def _ident(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         return None
 
     def _convert_col_from_parquet_friendly(
         col: ArrowWeaveList, path: PathType
     ) -> typing.Optional[ArrowWeaveList]:
-        file_name_key = file_name_for_dictionary(name, path)
-        pq_filename = f"{file_name_key}.ArrowWeaveList.parquet"
-
-        if artifact.path_info(pq_filename) is not None:
-            dictionary = load_array_and_type_from_parquet(type, artifact, file_name_key)
-
-            return ArrowWeaveList(
-                pa.DictionaryArray.from_arrays(col._arrow_data, dictionary._arrow_data),
-                dictionary.object_type,
-                col._artifact,
-            )
-
         _, non_none_type = types.split_none(col.object_type)
         if isinstance(non_none_type, types.UnionType):
             struct = col._arrow_data
@@ -561,9 +526,16 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                     "Unexpected dictionary type for non-string type"
                 )
             return ArrowWeaveList(col._arrow_data, types.String(), None)
-        elif pa.types.is_floating(col._arrow_data.type) or pa.types.is_integer(
-            col._arrow_data.type
-        ):
+        elif pa.types.is_floating(col._arrow_data.type):
+            # Ensure that -0.0 is 0. If we end up converting to a string
+            # later (which happens if we have non-numeric types within a union)
+            # then -0.0 will be converted to "-0.0" which is not equal to "0.0"
+            return ArrowWeaveList(
+                pc.choose(pc.equal(col._arrow_data, 0), col._arrow_data, 0),
+                types.Number(),
+                None,
+            )
+        elif pa.types.is_integer(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Number(), None)
         elif pa.types.is_timestamp(col._arrow_data.type):
             # Cast to int64 and then string. Leaving this as timestamp

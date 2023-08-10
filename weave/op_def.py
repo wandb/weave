@@ -228,8 +228,6 @@ class OpDef:
     # like th GQL ops?
     _gets_tag_by_name: typing.Optional[str] = None
 
-    returns_expansion_node: bool = False
-
     def __init__(
         self,
         name: str,
@@ -247,7 +245,6 @@ class OpDef:
         mutation=False,
         is_builtin: typing.Optional[bool] = None,
         weave_fn: typing.Optional[graph.Node] = None,
-        returns_expansion_node: bool = False,
         *,
         plugins=None,
         _decl_locals=None,  # These are python locals() from the enclosing scope.
@@ -276,7 +273,6 @@ class OpDef:
         self.weave_fn = weave_fn
         self._output_type = None
         self.plugins = plugins
-        self.returns_expansion_node = returns_expansion_node
 
     def __get__(self, instance, owner):
         return BoundOpDef(instance, self)

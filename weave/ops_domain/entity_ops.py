@@ -53,7 +53,7 @@ gql_connection_op(
     "artifactCollections",
     wdt.ArtifactCollectionType,
     {},
-    lambda inputs: f"collectionTypes: [PORTFOLIO]",
+    lambda inputs: "collectionTypes: [PORTFOLIO]",
 )
 
 gql_connection_op(

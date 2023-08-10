@@ -125,7 +125,7 @@ export const ConfigSection: FC<ConfigSectionProps> = ({
 export const ConfigOption: React.FC<
   {
     label: string;
-    // component to append after the the config component, on the same line, such as
+    // component to append after the config component, on the same line, such as
     // "add new y" buttons or "delete option" buttons. see panelplot config y for
     // an example.
     postfixComponent?: React.ReactElement;
@@ -156,7 +156,7 @@ const ConfigOptionNew: React.FC<
     label: string;
     actions?: ReactNode;
     multiline?: boolean;
-    // component to append after the the config component, on the same line, such as
+    // component to append after the config component, on the same line, such as
     // "add new y" buttons or "delete option" buttons. see panelplot config y for
     // an example.
     postfixComponent?: React.ReactElement;
