@@ -1,4 +1,5 @@
 import {
+  constFunction,
   constString,
   isAssignableTo,
   isListLike,
@@ -8,7 +9,13 @@ import {
   listObjectType,
   Node,
   nullableTaggable,
+  opFilter,
+  opIsNone,
+  opNoneCoalesce,
+  opNonNone,
+  opNot,
   opPick,
+  opStringEqual,
   opWBTraceTreeSummary,
   Type,
   typedDict,
@@ -34,6 +41,7 @@ import {
   emptyTable,
   getRowExampleNode,
 } from '../PanelTable/tableState';
+import {useNodeValue} from '@wandb/weave/react';
 
 const inputType = {
   type: 'list' as const,
@@ -153,17 +161,35 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
   const config = props.config;
   const traceKey = config?.traceKey ?? '';
   const tableNode = props.input;
+  const filteredTableNode = useMemo(() => {
+    return opFilter({
+      arr: tableNode,
+      filterFn: constFunction(
+        {
+          row: tableNode.type,
+        },
+        ({row}) => {
+          return opNot({
+            bool: opIsNone({
+              val: opPick({obj: row, key: constString(traceKey)}),
+            }),
+          });
+        }
+      ),
+    });
+  }, [tableNode, traceKey]);
   const {ts, columnWidths} = useMemo(() => {
-    return makeTableState(tableNode, weave, traceKey);
-  }, [tableNode, traceKey, weave]);
+    return makeTableState(filteredTableNode, weave, traceKey);
+  }, [filteredTableNode, traceKey, weave]);
   const traceArrayNode = useMemo(
-    () => opPick({obj: props.input, key: constString(traceKey)}),
-    [props.input, traceKey]
+    () => opPick({obj: filteredTableNode, key: constString(traceKey)}),
+    [filteredTableNode, traceKey]
   );
   const allTracerKeys = useMemo(
-    () => getAllTracerKeysFromType(props.input.type),
-    [props.input.type]
+    () => getAllTracerKeysFromType(filteredTableNode.type),
+    [filteredTableNode.type]
   );
+  console.log(useNodeValue(filteredTableNode));
 
   useEffect(() => {
     if (config?.traceKey == null && allTracerKeys.length > 0) {
@@ -190,7 +216,7 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
 
   return (
     <PanelTraceTreeTraceTableViewerCommon
-      tableNode={tableNode}
+      tableNode={filteredTableNode}
       traceArrayNode={traceArrayNode}
       initialTableState={ts}
       initialColumnWidths={columnWidths}
