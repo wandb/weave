@@ -16,6 +16,7 @@ import {
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 import {useNodeWithServerType} from '@wandb/weave/react';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {useHistory} from 'react-router-dom';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -65,6 +66,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
     onClick: () => void;
   };
 }> = props => {
+  const history = useHistory();
   return (
     <CenterSpace>
       <LayoutElements.HBlock
@@ -89,8 +91,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
               cursor: 'pointer',
             }}
             onClick={e => {
-              e.stopPropagation();
-              props.setPreviewNode(undefined);
+              history.push('.');
             }}
           />
         </CenterTableActionCellIcon>

@@ -11,6 +11,7 @@ import {DeleteActionModal} from '../DeleteActionModal';
 import {constString, opGet} from '@wandb/weave/core';
 import {useMakeMutation} from '@wandb/weave/react';
 import {SetPreviewNodeType} from './common';
+import {useHistory} from 'react-router-dom';
 
 const TableRow = styled.tr<{$highlighted?: boolean}>`
   background-color: ${props => (props.$highlighted ? '#f8f9fa' : '')};
@@ -193,6 +194,7 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
 export const CenterBrowser = <RT extends CenterBrowserDataType>(
   props: CenterBrowserProps<RT>
 ) => {
+  const history = useHistory();
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<{
     [key: string]: string | null | undefined;
@@ -270,13 +272,6 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
         onClose={() => props.setDeletingId?.(undefined)}
         acting={props.isModalActing ?? false}
         onDelete={async () => {
-          // If the user is deleting the selected row, clear the selection
-          if (
-            props.deletingId?.endsWith(`/${props.selectedRowId}:latest/obj`)
-          ) {
-            props.setSelectedRowId?.(undefined);
-            props.setPreviewNode?.(undefined);
-          }
           props.setIsModalActing?.(true);
           const artifactNode = opGet({
             uri: constString(props.deletingId!),
@@ -284,6 +279,12 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
           await makeMutation(artifactNode, 'delete_artifact', {});
           props.setDeletingId?.(undefined);
           props.setIsModalActing?.(false);
+          // If the user is deleting the selected row, navigate up a level
+          if (
+            props.deletingId?.endsWith(`/${props.selectedRowId}:latest/obj`)
+          ) {
+            history.push('.');
+          }
         }}
       />
 
