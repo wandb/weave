@@ -544,7 +544,10 @@ def compile_node_ops(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _node_ops, on_error)
+    # Mission critical that we do not map into static lambdas. We do
+    # not want to expand nodes that are meant by the caller to be interpreted
+    # as their exact node.
+    return graph.map_nodes_full(nodes, _node_ops, on_error, True)
 
 
 # This compile pass using the `top_level` mapper since we recurse manually. We can't use
@@ -659,6 +662,8 @@ def _compile(
         results = results.batch_map(_track_errors(compile_resolve_required_consts))
 
     with tracer.trace("compile:node_ops"):
+        # Mission critical to call `compile_quote` before this so that
+        # we do not expand quoted nodes.
         results = results.batch_map(_track_errors(compile_node_ops))
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
