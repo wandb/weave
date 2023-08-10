@@ -44,7 +44,7 @@ def get_outermost_alias(query_str: str) -> str:
 def get_gql_schema() -> graphql.GraphQLSchema:
     global _GQL_SCHEMA
     if _GQL_SCHEMA is None:
-        with open(pathlib.Path(__file__).parent / "schema.gql") as f:
+        with open(pathlib.Path(__file__).parent / "ops_domain/wb_schema.gql") as f:
             schema_str = f.read()
 
         _GQL_SCHEMA = graphql.build_schema(schema_str)
