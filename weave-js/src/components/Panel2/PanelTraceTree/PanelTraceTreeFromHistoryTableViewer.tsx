@@ -170,6 +170,7 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
         },
         ({row}) => {
           return opNot({
+            // This seems to not work correctly
             bool: opIsNone({
               val: opPick({obj: row, key: constString(traceKey)}),
             }),
