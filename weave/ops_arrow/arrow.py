@@ -14,6 +14,7 @@ from .. import mappers_python
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
+from .. import feature_flags
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
@@ -237,8 +238,29 @@ class ArrowWeaveListType(types.Type):
                 res = convert.from_parquet_friendly(l)
         elif artifact.metadata["_weave_awl_format"] == 2:
             # v2 AWL format
+            columns = None
+            if (
+                feature_flags.GET_AWL_PROJECTION_PUSHDOWN
+                and extra
+                and extra[0] == "pick"
+                and isinstance(self.object_type, types.TypedDict)
+            ):
+                self_keys = set(self.object_type.property_types.keys())
+                columns = list(set(extra[1].split(",")) & self_keys)
+                if not columns and self_keys:
+                    # if there was no intersection, but there are keys, just
+                    # pick the first one, to ensure we get a valid table
+                    columns = [list(self_keys)[0]]
+                object_type = types.TypedDict(
+                    {
+                        k: v
+                        for k, v in object_type.property_types.items()
+                        if k in columns
+                    }
+                )
+
             with artifact.open(f"{name}.ArrowWeaveList.feather", binary=True) as f:
-                table = pf.read_table(f)
+                table = pf.read_table(f, columns=columns)
             if isinstance(object_type, types.TypedDict):
                 if not object_type.property_types:
                     arr = pa.repeat({}, len(table))

@@ -62,13 +62,13 @@ def wb_gql_op_plugin(
 # `stitch` module to do this. Moreover, all GQL is zipped and deduped so that the minimum request
 # is made to the server. See the helper functions below for more details.
 def apply_domain_op_gql_translation(
-    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
-) -> list[graph.Node]:
+    leaf_nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
+) -> typing.Sequence[typing.Union[graph.Node, Exception]]:
     # Only apply this transformation at least one of the leaf nodes is a root node
-    if not graph.filter_nodes_full(leaf_nodes, _is_root_node):
+    non_error_nodes = [n for n in leaf_nodes if not isinstance(n, Exception)]
+    if not graph.filter_nodes_full(non_error_nodes, _is_root_node):
         return leaf_nodes
-
-    p = stitch.stitch(leaf_nodes, on_error=on_error)
+    stitched, leaf_nodes = stitch.stitch_and_catch(leaf_nodes)
 
     query_str_const_node = graph.ConstNode(types.String(), "")
     alias_list_const_node = graph.ConstNode(types.List(types.String()), [])
@@ -87,7 +87,7 @@ def apply_domain_op_gql_translation(
         if not _is_root_node(node):
             return node
         node = typing.cast(graph.OutputNode, node)
-        inner_fragment = _get_fragment(node, p)
+        inner_fragment = _get_fragment(node, stitched)
         fragments.append(inner_fragment)
         alias = _get_outermost_alias(inner_fragment)
         aliases.append(alias)
@@ -106,7 +106,7 @@ def apply_domain_op_gql_translation(
                 },
             )
 
-    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error)
+    res = graph.map_nodes_and_catch_full(leaf_nodes, _replace_with_merged_gql)
 
     combined_query_fragment = "\n".join(fragments)
     query_str = f"query WeavePythonCG {{ {combined_query_fragment} }}"

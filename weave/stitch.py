@@ -28,7 +28,9 @@ from . import graph
 from . import errors
 from . import registry_mem
 from . import op_def
+from . import weave_types as types
 from .language_features.tagging import opdef_util
+from .language_features.tagging import tagged_value_type
 
 
 @dataclasses.dataclass
@@ -44,7 +46,10 @@ class OpCall:
 
 @dataclasses.dataclass()
 class ObjectRecorder:
-    node: graph.Node
+    # If node is None, it means this is a Recorder for a value that doesn't have
+    # an associated node in the graph (used to make ObjectRecorders for tag
+    # fields found within get() results).
+    node: typing.Optional[graph.Node]
     tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
     val: typing.Optional[typing.Any] = None
     calls: list[OpCall] = dataclasses.field(default_factory=list)
@@ -114,17 +119,16 @@ class StitchedGraph:
             if recorder.tags:
                 res += (
                     "\n"
-                    + f"    tags: {','.join([str((tag_name, node_names[tag_recorder.node])) for tag_name, tag_recorder in recorder.tags.items()])}"
+                    + f"    tags: {','.join([str((tag_name, (node_names[tag_recorder.node] if tag_recorder.node is not None else '<None>'))) for tag_name, tag_recorder in recorder.tags.items()])}"
                 )
         print(res)
 
 
-def stitch(
-    leaf_nodes: list[graph.Node],
+def stitch_and_catch(
+    leaf_nodes: typing.Sequence[typing.Union[graph.Node, Exception]],
     var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
     stitched_graph: typing.Optional[StitchedGraph] = None,
-    on_error: graph.OnErrorFnType = None,
-) -> StitchedGraph:
+) -> tuple[StitchedGraph, typing.Sequence[typing.Union[graph.Node, Exception]]]:
     """Given a list of leaf nodes, stitch the graph together."""
 
     if stitched_graph is None:
@@ -139,8 +143,15 @@ def stitch(
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
             sg.add_result(node, stitch_node(node, input_dict, sg))
         elif isinstance(node, graph.ConstNode):
-            sg.add_result(node, ObjectRecorder(node, val=node.val))
+            obj = ObjectRecorder(node, val=node.val)
+            if not isinstance(node.type, types.Function):
+                obj.tags = {
+                    tag_name: ObjectRecorder(None)
+                    for tag_name in _all_dim_tag_names(node.type)
+                }
+            sg.add_result(node, obj)
         elif isinstance(node, graph.VarNode):
+            # print("VAR", node, var_values)
             if var_values and node.name in var_values:
                 sg.add_result(node, var_values[node.name])
             else:
@@ -151,7 +162,13 @@ def stitch(
                 # removed if we stitched the entire graph in 1 pass. For now, we
                 # assign an empty recorder, but this might be able to be
                 # optimized out in the future.
-                sg.add_result(node, ObjectRecorder(node))
+                obj = ObjectRecorder(node)
+                if not isinstance(node.type, types.Function):
+                    obj.tags = {
+                        tag_name: ObjectRecorder(None)
+                        for tag_name in _all_dim_tag_names(node.type)
+                    }
+                sg.add_result(node, obj)
                 # raise errors.WeaveInternalError(
                 #     "Encountered var %s but var_values not provided" % node.name
                 # )
@@ -159,9 +176,16 @@ def stitch(
             raise errors.WeaveInternalError("Unexpected node type")
         return node
 
-    graph.map_nodes_top_level(leaf_nodes, handle_node, on_error)
+    nodes_or_errors = graph.map_nodes_and_catch_top_level(leaf_nodes, handle_node)
+    return sg, nodes_or_errors
 
-    return sg
+
+def stitch(
+    leaf_nodes: list[graph.Node],
+    var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
+    stitched_graph: typing.Optional[StitchedGraph] = None,
+) -> StitchedGraph:
+    return stitch_and_catch(leaf_nodes, var_values, stitched_graph)[0]
 
 
 def subgraph_stitch(
@@ -205,6 +229,29 @@ def get_tag_name_from_mapped_tag_getter_op(op: op_def.OpDef) -> str:
     return get_tag_name_from_tag_getter_op(op.derived_from)  # type: ignore
 
 
+def _all_dim_tag_names(t: types.Type) -> set[str]:
+    # produce tag names for all dimensions within a type.
+    if isinstance(t, tagged_value_type.TaggedValueType):
+        return set(t.tag.property_types.keys()).union(_all_dim_tag_names(t.value))
+    elif isinstance(t, types.UnionType):
+        member_tags: set[str] = set()
+        for member_t in t.members:
+            member_tags.update(_all_dim_tag_names(member_t))
+        return member_tags
+    elif types.List().assign_type(t):
+        list_t = typing.cast(types.List, t)
+        return _all_dim_tag_names(list_t.object_type)
+    elif isinstance(t, types.TypedDict):
+        # Just merge all property tags together.
+        # TODO: this is fuzzy, and can be incorrect!
+        prop_tags: set[str] = set()
+        for prop_t in t.property_types.values():
+            prop_tags.update(_all_dim_tag_names(prop_t))
+        return prop_tags
+
+    return set()
+
+
 def stitch_node_inner(
     node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
@@ -224,18 +271,35 @@ def stitch_node_inner(
     inputs = list(input_dict.values())
     if is_get_tag_op(op):
         tag_name = get_tag_name_from_tag_getter_op(op)
-        return inputs[0].tags[tag_name]
+        try:
+            return inputs[0].tags[tag_name]
+        except KeyError:
+            raise errors.WeaveStitchError(
+                'Tag "%s" not found. This means stitch doesn\'t match the type/resolver implementation.'
+                % tag_name
+            )
     elif is_mapped_get_tag_op(op):
         tag_name = get_tag_name_from_mapped_tag_getter_op(op)
         return inputs[0].tags[tag_name]
+    elif node.from_op.name == "get":
+        inputs[0].tags = {
+            tag_name: ObjectRecorder(None) for tag_name in _all_dim_tag_names(node.type)
+        }
+        return inputs[0]
     elif node.from_op.name.endswith("createIndexCheckpointTag"):
         inputs[0].tags["indexCheckpoint"] = ObjectRecorder(node)
         return inputs[0]
-    elif node.from_op.name == "dict":
+    elif (
+        node.from_op.name == "dict"
+        or node.from_op.name == "ArrowWeaveList-vectorizedDict"
+    ):
         return LiteralDictObjectRecorder(node, val=input_dict)
     elif node.from_op.name.endswith("__getitem__"):
         return inputs[0]
-    elif node.from_op.name == "list":
+    elif (
+        node.from_op.name == "list"
+        or node.from_op.name == "ArrowWeaveList-vectorizedList"
+    ):
         # Merge element tags together and place them on the outer list.
         # This is overly aggressive, but it means we don't need to provide
         # special handling for concat and other structural list ops for
@@ -249,7 +313,10 @@ def stitch_node_inner(
             input.calls.append(op_call)
         return res
     elif node.from_op.name.endswith("pick"):
-        if isinstance(node.from_op.inputs["key"], graph.ConstNode):
+        if (
+            isinstance(node.from_op.inputs["key"], graph.ConstNode)
+            and node.from_op.inputs["key"].val != None
+        ):
             key = _dict_utils.unescape_dots(node.from_op.inputs["key"].val)
             if (
                 isinstance(inputs[0], LiteralDictObjectRecorder)
@@ -272,20 +339,21 @@ def stitch_node_inner(
     elif node.from_op.name.endswith("map"):
         fn = inputs[1].val
         if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
+            raise errors.WeaveStitchError("non-const not yet supported")
         # Return the resulting object from map!
         return subgraph_stitch(fn, {"row": inputs[0]}, sg)
     elif node.from_op.name.endswith("sort") or node.from_op.name.endswith("filter"):
         fn = inputs[1].val
         if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
+            raise errors.WeaveStitchError("non-const not yet supported")
+        # breakpoint()
         subgraph_stitch(fn, {"row": inputs[0]}, sg)
         # # Return the original object
         return inputs[0]
     elif node.from_op.name.endswith("groupby"):
         fn = inputs[1].val
         if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
+            raise errors.WeaveStitchError("non-const not yet supported")
         # The output of the subgraph function is the group key which becomes
         # the groupKey tag.
         groupkey = subgraph_stitch(fn, {"row": inputs[0]}, sg)
@@ -295,7 +363,7 @@ def stitch_node_inner(
     elif node.from_op.name.endswith("joinAll"):
         fn = inputs[1].val
         if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
+            raise errors.WeaveStitchError("non-const not yet supported")
         # The output of the subgraph function is the joinKey which becomes
         # the joinkey tag.
         # TODO: Do we need to do this for each input?
@@ -308,7 +376,9 @@ def stitch_node_inner(
         # We want the results to flow through
         fn_node = inputs[0].val
         if fn_node is None:
-            raise errors.WeaveInternalError("execute function should not be none")
+            raise errors.WeaveStitchError(
+                "non-const execute function not yet supported"
+            )
         return subgraph_stitch(fn_node, {}, sg)
     elif len(inputs) == 0:
         # op does not have any inputs, just track its downstream calls

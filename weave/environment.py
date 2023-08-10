@@ -170,3 +170,9 @@ def weave_wandb_api_key() -> typing.Optional[str]:
 
 def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
     return util.parse_number_env_var("WEAVE_PROJECTION_TIMEOUT_SEC")
+
+
+def value_or_error_debug() -> bool:
+    # Raise errors immediately in compile/execute paths instead of
+    # returning them as data.
+    return util.parse_boolean_env_var("WEAVE_VALUE_OR_ERROR_DEBUG")

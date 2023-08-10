@@ -3,11 +3,11 @@ import os
 import typing
 import logging
 
+from . import environment
+
 
 ValueType = typing.TypeVar("ValueType")
 ValueType2 = typing.TypeVar("ValueType2")
-
-DEBUG = False or os.environ.get("WEAVE_VALUE_OR_ERROR_DEBUG", False)
 
 
 class _ValueOrErrorInterface(typing.Generic[ValueType]):
@@ -55,7 +55,7 @@ class Error(_ValueOrErrorInterface[typing.Any]):
     _error: Exception
 
     def __post_init__(self) -> None:
-        if DEBUG:
+        if environment.value_or_error_debug():
             raise self._error
 
     def unwrap(self) -> typing.Any:
