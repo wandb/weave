@@ -425,7 +425,7 @@ def pretty_print_arrow_type(t: typing.Union[pa.Schema, pa.DataType, pa.Field]) -
         )
 
     elif isinstance(t, pa.ListType):
-        return f"List\n" + textwrap.indent(pretty_print_arrow_type(t.value_type), "  ")
+        return "List\n" + textwrap.indent(pretty_print_arrow_type(t.value_type), "  ")
 
     elif isinstance(t, pa.UnionType):
         return "Union:\n" + textwrap.indent(
