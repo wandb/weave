@@ -528,6 +528,9 @@ def compile_refine(
         i += 1
 
         if isinstance(node, graph.OutputNode):
+
+            # This node is not refined because
+
             if node.from_op.name == "gqlroot-wbgqlquery":
                 # dont refine this one - it's already refined.
                 return node
@@ -548,12 +551,31 @@ def compile_refine(
                 res = op.lazy_call(**params)
 
                 # The GQL key propagation logic needs to happen in the refine pass rather than the GQL
-                # compile pass. This is because the refine pass creates new node types, which would
-                # overwrite any key information added during the GQL compile pass. By doing propagation
-                # after refine, we propagate using the refined types, avoiding this clobbering issue.
+                # compile pass. This is because the gql_key_prop_fns need refined input types or else
+                # they can produce incorrect results. For example, consider this node:
+                #
+                #   root-project(...).filteredRuns(...).limit(1).run-summary()
+                #                            .pick(my_table).file-table()
+                #                            .table-rows().dropna().concat()
+                #
+                # During GQL compilation, the unrefined type of run-summary is:
+                #
+                #   TaggedValueType({...},
+                #     List(object_type=TaggedValueType({['run']}, Dict(key_type=String(), object_type=Any()))))
+                #
+                # If we encounter ops without a gql_key_prop_fn, like pick(), we need to call
+                # unrefined_output_type_for_params(). This can lead to invalid unrefined types propagating.
+                #
+                # In this example, after pick() and dropna() we end up with an invalid list type.
+                # When concat() then calls its unrefined_output_type_for_params(), it errors because
+                # we've passed an invalid list type to it.
+                #
+                # By propagating keys after refine, we avoid these unrefined type issues. Each
+                # node's type has been refined before we propagate keys, so instead of Dict(String(), Any()),
+                # we get the actual refined typedDict type.
 
-                # We can't do GQL key propagation as a separate post-refine step today, because calling
-                # compile_refine triggers a re-execution check that would re-run the whole graph if
+                # We can't do GQL key propagation as a separate post-refine step today, because doing so
+                # would that would re-run the whole graph if
                 # nodes are modified after refine. We avoid this re-execution by doing propagation during
                 # refine. In the future, if we can call compile_refine without triggering re-execution,
                 # we could move this to a separate post-refine step.
@@ -563,9 +585,9 @@ def compile_refine(
                 # aliases. Normal callable output types don't receive this.
 
                 # Overall, propagating GQL keys during refine simplifies the logic by avoiding issues
-                # around unrefined types and triggering re-execution. However, it does couple the key
-                # propagation to the refine pass. Future refactors could aim to decouple this, if we
-                # can avoid clobbering types and triggering re-execution checks.
+                # around unrefined types and triggering re-execution when compared against doing it during the
+                # compile_gql phase. However, it does couple the key propagation to the refine pass. Future
+                # refactors could aim to decouple this, if we can avoid triggering re-execution.
 
                 if p is not None and _needs_gql_propagation(res):
                     res.type = _call_gql_propagate_keys(res, p, node_array[i])
