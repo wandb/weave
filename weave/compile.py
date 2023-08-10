@@ -547,8 +547,26 @@ def compile_refine(
 
                 res = op.lazy_call(**params)
 
-                # only the last condition is really needed here, but the type checker
-                # also wants the first one
+                # The GQL key propagation logic needs to happen in the refine pass rather than the GQL
+                # compile pass. This is because the refine pass creates new node types, which would
+                # overwrite any key information added during the GQL compile pass. By doing propagation
+                # after refine, we propagate using the refined types, avoiding this clobbering issue.
+
+                # We can't do GQL key propagation as a separate post-refine step today, because calling
+                # compile_refine triggers a re-execution check that would re-run the whole graph if
+                # nodes are modified after refine. We avoid this re-execution by doing propagation during
+                # refine. In the future, if we can call compile_refine without triggering re-execution,
+                # we could move this to a separate post-refine step.
+
+                # We need the special gql_key_prop_fn instead of using callable output types because the
+                # gql_key_prop_fn needs access to an InputProvider to traverse key trees and generate
+                # aliases. Normal callable output types don't receive this.
+
+                # Overall, propagating GQL keys during refine simplifies the logic by avoiding issues
+                # around unrefined types and triggering re-execution. However, it does couple the key
+                # propagation to the refine pass. Future refactors could aim to decouple this, if we
+                # can avoid clobbering types and triggering re-execution checks.
+
                 if p is not None and _needs_gql_propagation(res):
                     res.type = _call_gql_propagate_keys(res, p, node_array[i])
 
