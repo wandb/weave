@@ -281,7 +281,9 @@ class StreamTable(_StreamTableSync):
                 join_requested = self._join_event.wait(self.MAX_UNSAVED_SECONDS)
                 self._flush()
             except Exception as e:
-                logging.exception("Unhandled exception during logging, this may result in missing rows")
+                logging.exception(
+                    "Unhandled exception during logging, this may result in missing rows"
+                )
 
     # Override methods of _StreamTableSync
     def finish(self) -> None:
