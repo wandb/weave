@@ -6,6 +6,7 @@ import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.wandb_client_api import wandb_gql_query
 
 from ..ops_primitives import file
 from ..ops_domain.wbmedia import ImageArtifactFileRefType
@@ -845,6 +846,16 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
     run.log(log_dict)
     run.finish()
 
+    # wait for history to be uploaded
+    def wait_for():
+        history = get_raw_gorilla_history(run.entity, run.project, run.id)
+        return (
+            len(history["parquetHistory"]["parquetUrls"]) > 0
+            or len(history["parquetHistory"]["liveData"]) > 0
+        )
+
+    wait_for_x_times(wait_for)
+
     run_node = weave.ops.project(run.entity, run.project).run(run.id)
 
     for history_op_name in ["history3", "history"]:
@@ -894,3 +905,33 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
 
     os.remove("video.mp4")
     os.remove("test_mol.pdb")
+
+
+def get_raw_gorilla_history(entity_name, project_name, run_name):
+    query = """query WeavePythonCG($entityName: String!, $projectName: String!, $runName: String! ) {
+            project(name: $projectName, entityName: $entityName) {
+                run(name: $runName) {
+                    historyKeys
+                    parquetHistory(liveKeys: ["_timestamp"]) {
+                        liveData
+                        parquetUrls
+                    }
+                }
+            }
+    }"""
+    variables = {
+        "entityName": entity_name,
+        "projectName": project_name,
+        "runName": run_name,
+    }
+    res = wandb_gql_query(query, variables)
+    return res.get("project", {}).get("run", {})
+
+
+def wait_for_x_times(for_fn, times=10, wait=1):
+    done = False
+    while times > 0 and not done:
+        times -= 1
+        done = for_fn()
+        time.sleep(wait)
+    assert times > 0
