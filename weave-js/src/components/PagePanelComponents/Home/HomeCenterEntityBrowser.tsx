@@ -5,6 +5,7 @@ import {
   IconChevronDown,
   IconInfo,
   IconOpenNewTab,
+  IconDelete,
 } from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
@@ -299,6 +300,7 @@ const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
   const browserTitle = 'Boards';
+  const [deletingId, setDeletingId] = useState<string | undefined>();
   const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
   const boards = query.useProjectBoards(props.entityName, props.projectName);
@@ -350,6 +352,16 @@ const CenterProjectBoardsBrowser: React.FC<
           },
         },
       ],
+      [
+        {
+          icon: IconDelete,
+          label: 'Delete board',
+          onClick: row => {
+            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            setDeletingId(uri);
+          },
+        },
+      ],
     ];
   }, [props, setSelectedRowId]);
 
@@ -358,6 +370,10 @@ const CenterProjectBoardsBrowser: React.FC<
       allowSearch
       title={browserTitle}
       selectedRowId={selectedRowId}
+      setSelectedRowId={setSelectedRowId}
+      setPreviewNode={props.setPreviewNode}
+      deletingId={deletingId}
+      setDeletingId={setDeletingId}
       noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {

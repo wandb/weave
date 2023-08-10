@@ -105,17 +105,17 @@ def make_name_and_id(id: str, name: typing.Optional[str]) -> str:
 @op(
     name="report-link",
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: f"""
+        lambda inputs, inner: """
     id
     displayName
-    project {{
+    project {
         id
         name 
-        entity {{
+        entity {
             id
             name
-        }}
-    }}
+        }
+    }
 """
     ),
 )

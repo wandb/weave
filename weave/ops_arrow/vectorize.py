@@ -552,8 +552,8 @@ def vectorize(
             vectorized_keys,
         )
         message = f"Encountered non-dispatchable op ({node_name}) during vectorization."
-        message += f"This is likely due to vectorization path of the function not leading to the"
-        message += f"first parameter. Bailing out to manual mapping"
+        message += "This is likely due to vectorization path of the function not leading to the"
+        message += "first parameter. Bailing out to manual mapping"
         logging.warning(message)
         return res
 
@@ -668,15 +668,15 @@ def _ensure_variadic_fn(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    logging.info(f"Vectorizing: %s", fn)
+    logging.info("Vectorizing: %s", fn)
     from .. import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)
-    logging.info(f"Vectorizing. Static branch resolution complete.: %s", fn)
+    logging.info("Vectorizing. Static branch resolution complete.: %s", fn)
     from .. import graph_debug
 
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
-    logging.info(f"Vectorizing. Vectorized: %s", fn)
+    logging.info("Vectorizing. Vectorized: %s", fn)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)
