@@ -7,6 +7,8 @@ import typing
 
 from . import errors
 
+from requests import exceptions
+
 
 def wandb_public_api() -> public.Api:
     return public.Api(timeout=30)
@@ -24,12 +26,22 @@ def assert_wandb_authenticated() -> None:
 
 
 def wandb_gql_query(
-    query_str: str, variables: dict[str, typing.Any] = {}
+    query_str: str,
+    variables: dict[str, typing.Any] = {},
+    num_timeout_retries: int = 0,
 ) -> typing.Any:
-    return wandb_public_api().client.execute(
-        public.gql(query_str),
-        variable_values=variables,
-    )
+    if num_timeout_retries < 0:
+        raise ValueError("num_timeout_retries must be >= 0")
+
+    for attempt_no in range(num_timeout_retries + 1):
+        try:
+            return wandb_public_api().client.execute(
+                public.gql(query_str),
+                variable_values=variables,
+            )
+        except (exceptions.ReadTimeout, exceptions.ConnectTimeout):
+            if attempt_no == num_timeout_retries:
+                raise
 
 
 def set_wandb_thread_local_api_settings(
