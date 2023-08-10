@@ -255,6 +255,7 @@ class StreamTable(_StreamTableSync):
         self._thread.start()
 
     def log(self, row_or_rows: ROW_TYPE) -> None:
+        # weave_types.TypeRegistry.type_of(row_or_rows)
         self.queue.put(row_or_rows)
 
     def _flush(self) -> None:

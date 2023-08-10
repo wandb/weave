@@ -21,7 +21,9 @@ with mon.span('a_span') as s:
 
 """
 
+import openai
 from abc import abstractmethod
+import asyncio
 import contextlib
 import contextvars
 import dataclasses
@@ -64,7 +66,9 @@ def _arguments_to_dict(
     sig = inspect.signature(fn)
     bound_params = sig.bind(*args, **kwargs)
     bound_params.apply_defaults()
-    return dict(bound_params.arguments)
+    got_args = dict(bound_params.arguments)
+    print("GOT ARGS", fn, got_args, sig)
+    return got_args
 
 
 def get_function_name(fn: typing.Callable) -> str:
@@ -79,6 +83,9 @@ def get_function_name(fn: typing.Callable) -> str:
 
 
 class Span:
+    # When this is None, monitor is disabled
+    _streamtable: typing.Optional[StreamTable]
+
     parent_id: typing.Optional[str]
     trace_id: str
     span_id: str
@@ -91,13 +98,17 @@ class Span:
     output: typing.Optional[typing.Any]
     exception: typing.Optional[Exception]
 
+    _autoclose: bool = True
+
     def __init__(
         self,
+        _streamtable: typing.Optional[StreamTable],
         parent_id: typing.Optional[str],
         trace_id: str,
         name: str,
         attributes: dict[str, typing.Any],
     ):
+        self._streamtable = _streamtable
         self.parent_id = parent_id
         self.trace_id = trace_id
         self.name = name
@@ -110,10 +121,19 @@ class Span:
         self.output = None
         self.exception = None
 
-    def end(self) -> None:
+    def close(self) -> None:
         if self.status_code == StatusCode.UNSET:
             self.status_code = StatusCode.SUCCESS
         self.end_time = datetime.datetime.now()
+        if self._streamtable is not None:
+            self._streamtable.log(self.asdict())
+
+    def disable_autoclose(self) -> None:
+        self._autoclose = False
+
+    def autoclose(self) -> None:
+        if self._autoclose:
+            self.close()
 
     def asdict(self) -> dict[str, typing.Any]:
         if self.end_time is None:
@@ -153,14 +173,12 @@ class Monitor:
         else:
             parent_id = None
             trace_id = str(uuid.uuid4())
-        span = Span(parent_id, trace_id, name, _attributes.get())
+        span = Span(self._streamtable, parent_id, trace_id, name, _attributes.get())
         token = _current_span.set(span)
         try:
             yield span
         finally:
-            span.end()
-            if self._streamtable is not None:
-                self._streamtable.log(span.asdict())
+            span.autoclose()
             _current_span.reset(token)
 
     @contextlib.contextmanager
@@ -174,22 +192,51 @@ class Monitor:
         finally:
             _attributes.reset(token)
 
-    def trace(self) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
+    def trace(
+        self, preprocess, postprocess
+    ) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
         def decorator(fn: typing.Callable[..., typing.Any]) -> typing.Any:
-            def wrapped(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-                attributes = kwargs.pop("monitor_attributes", {})
-                with self.attributes(attributes):
-                    with self.span(get_function_name(fn)) as span:
-                        span.inputs = _arguments_to_dict(fn, args, kwargs)
-                        try:
-                            span.output = fn(*args, **kwargs)
-                        except Exception as e:
-                            span.status_code = StatusCode.ERROR
-                            span.exception = e
-                            raise
-                        return span.output
+            if asyncio.iscoroutinefunction(fn):
 
-            return wrapped
+                async def async_wrapper(
+                    *args: typing.Any, **kwargs: typing.Any
+                ) -> typing.Any:
+                    attributes = kwargs.pop("monitor_attributes", {})
+                    with self.attributes(attributes):
+                        with self.span(get_function_name(fn)) as span:
+                            span.inputs = _arguments_to_dict(fn, args, kwargs)
+                            try:
+                                span.output = await fn(*args, **kwargs)
+                            except Exception as e:
+                                span.status_code = StatusCode.ERROR
+                                span.exception = e
+                                raise
+                            return span.output
+
+                return async_wrapper
+
+            else:
+
+                def sync_wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+                    attributes = kwargs.pop("monitor_attributes", {})
+                    with self.attributes(attributes):
+                        with self.span(get_function_name(fn)) as span:
+                            span.inputs = _arguments_to_dict(fn, args, kwargs)
+                            if preprocess:
+                                preprocess(span)
+                            try:
+                                span.output = fn(*args, **kwargs)
+                                if postprocess:
+                                    output = postprocess(span)
+                                else:
+                                    output = span.output
+                            except Exception as e:
+                                span.status_code = StatusCode.ERROR
+                                span.exception = e
+                                raise
+                            return output
+
+                return sync_wrapper
 
         return decorator
 
