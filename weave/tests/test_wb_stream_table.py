@@ -65,7 +65,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
     hist_node = (
         weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table-8")
-        .history2()
+        .history3()
     )
 
     images = weave.use(hist_node["image"]).to_pylist_tagged()
@@ -87,7 +87,7 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
         hist_node = (
             weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
             .run("test_table")
-            .history2()
+            .history3()
         )
         assert weave.use(hist_node["index"]).to_pylist_tagged() == indexes
         assert weave.use(hist_node["writer"]).to_pylist_tagged() == writers
@@ -145,7 +145,7 @@ def test_multi_writers_parallel(user_by_api_key_in_env):
     st_2.finish()
 
     hist_node = (
-        weave.ops.project(entity_name, "stream-tables").run(table_name).history2()
+        weave.ops.project(entity_name, "stream-tables").run(table_name).history3()
     )
     assert weave.use(hist_node["index"]).to_pylist_raw() == indexes
     assert weave.use(hist_node["writer"]).to_pylist_raw() == writers
@@ -172,3 +172,25 @@ def test_stream_authed(user_by_api_key_in_env):
 
     a = weave.use(st.rows()["hello"]).to_pylist_tagged()
     assert a == ["world"]
+
+
+def test_stream_logging_exception(user_by_api_key_in_env):
+    st = make_stream_table(
+        "test_table_exception",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
+    # log something that is invalid
+    st.log("invalid format")
+
+    # log some valid data
+    st.log({"key": 1})
+    st.finish()
+
+    hist_node = (
+        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+        .run("test_table_exception")
+        .history3()
+    )
+
+    assert weave.use(hist_node["key"]).to_pylist_tagged() == [1]
