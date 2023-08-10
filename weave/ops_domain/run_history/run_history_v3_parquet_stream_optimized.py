@@ -118,30 +118,6 @@ def _get_history3(run: wdt.Run, columns=None):
     _verify_supported_types(flattened_object_type)
     final_type = _unflatten_history_object_type(flattened_object_type)
 
-    # If the type is simply Union[None, Type] we should just return the Type
-    # if we're dealing with pyarrow. 
-    def maybe_strip_nones_from_union(t: types.Type):
-        if isinstance(t, types.UnionType):
-            return types.split_none(t)[1]
-        return t
-
-    def map_types_on_typeddict(td: types.TypedDict, fn: typing.Callable[[types.Type], types.Type]):
-        d = {}
-        for k, type_ in td.property_types.items():
-            if isinstance(type_, types.TypedDict):
-                d[k] = map_types_on_typeddict(type_, fn)
-            else:
-                d[k] = fn(type_)
-        return types.TypedDict(d)
-
-    if isinstance(final_type, types.UnionType):
-        final_type = maybe_strip_nones_from_union(final_type)
-    elif isinstance(final_type, types.TypedDict):
-        final_type = map_types_on_typeddict(final_type, maybe_strip_nones_from_union)
-    elif isinstance(final_type, types.List):
-        # TODO: Need to support Lists since they can contain Unions and TypedDicts (I believe) 
-        pass
-
     # 2. Read in the live set
     raw_live_data = _get_live_data_from_run(run, columns=columns)
 
@@ -204,15 +180,10 @@ def _get_history3(run: wdt.Run, columns=None):
     # 6. Finally, unflatten the columns
     final_array = _unflatten_pa_table(sorted_table)
 
-    # import pdb
-    # pdb.set_trace()
-
     # 7. Optionally: verify the AWL
     reason = weave_arrow_type_check(final_type, final_array)
 
     if reason != None:
-        import pdb
-        pdb.set_trace()
         raise errors.WeaveWBHistoryTranslationError(
             f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
         )
