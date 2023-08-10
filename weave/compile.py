@@ -463,7 +463,7 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
 
     return opdef.is_gql_root_resolver() or (
         plugin is not None
-        and plugin.gql_key_prop_fn is not None
+        and plugin.gql_op_output_type is not None
         and isinstance(unwrapped_first_arg_type, gql_with_keys.GQLHasKeysType)
     )
 

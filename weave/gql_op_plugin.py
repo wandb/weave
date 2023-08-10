@@ -25,7 +25,7 @@ class GqlOpPlugin:
     # given the input types to the op, return a new output type with the input types'
     # gql keys propagated appropriately. this is not a part of output_type to avoid
     # the UI needing to make additional network requests to get the output type
-    gql_key_prop_fn: typing.Optional[GQLKeyPropFn] = None
+    gql_op_output_type: typing.Optional[GQLKeyPropFn] = None
 
     def __post_init__(self) -> None:
         if self.root_resolver is not None:

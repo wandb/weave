@@ -71,7 +71,7 @@ def propagate_gql_keys(
 
         key_fn: typing.Optional[gql_op_plugin.GQLKeyPropFn] = None
 
-        if plugin is None or plugin.gql_key_prop_fn is None:
+        if plugin is None or plugin.gql_op_output_type is None:
             if fq_opname.endswith("GQLResolver"):
                 original_opdef = registry_mem.memory_registry.get_op(
                     fq_opname.replace("GQLResolver", "")
@@ -79,15 +79,15 @@ def propagate_gql_keys(
                 original_plugin = gql_op_plugin._get_gql_plugin(original_opdef)
                 if (
                     original_plugin is not None
-                    and original_plugin.gql_key_prop_fn is not None
+                    and original_plugin.gql_op_output_type is not None
                 ):
-                    key_fn = original_plugin.gql_key_prop_fn
+                    key_fn = original_plugin.gql_op_output_type
             if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
                 scalar_plugin = gql_op_plugin._get_gql_plugin(opdef.derived_from)
                 if scalar_plugin is not None:
-                    key_fn = scalar_plugin.gql_key_prop_fn
+                    key_fn = scalar_plugin.gql_op_output_type
         else:
-            key_fn = plugin.gql_key_prop_fn
+            key_fn = plugin.gql_op_output_type
 
         if key_fn is not None:
             return _propagate_gql_keys_for_node(opdef, maybe_refined_node, key_fn, ip)

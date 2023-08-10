@@ -378,7 +378,7 @@ def _custom_key_fn(node: graph.Node) -> typing.Optional[gql_op_plugin.GQLKeyProp
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     wb_domain_gql = gql_op_plugin._get_gql_plugin(op_def)
     if wb_domain_gql is not None:
-        return wb_domain_gql.gql_key_prop_fn
+        return wb_domain_gql.gql_op_output_type
     return None
 
 
