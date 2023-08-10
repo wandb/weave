@@ -3,16 +3,21 @@ name: publish-pypi-release
 on:
   workflow_dispatch:
     inputs:
-      use_test_pypi:
-        description: 'Use the Test Pypi instead of prod'
+      is_test:
+        description: 'Use Test Pypi'
         required: true
         type: boolean
-        default: false
+        default: true
 
 jobs:
   build-release:
-    name: Build release distributions
-    runs-on: ubuntu-latest
+    name: Build and publish to pypi
+    runs-on: ubuntu-8core
+    timeout-minutes: 10
+    environment: 
+      name: release
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v3
         with:
@@ -21,5 +26,18 @@ jobs:
         with:
           node-version: "16.x"
       - run: |
-          echo "Building dist"
+          pip install build twine
           ./build_dist.py
+          if [[ -n "$(git status --porcelain)" ]]
+          then
+            echo "::error cannot publish release, commited SHA does not match build SHA"
+            exit 1
+          fi
+      - name: upload test distribution
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ inputs.is_test }}
+        with:
+          repository-url: https://test.pypi.org/legacy/
+      - name: upload distribution
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ !inputs.is_test }}
