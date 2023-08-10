@@ -295,7 +295,9 @@ def weave_arrow_type_check(
     elif isinstance(wt, types.UnionType):
         for i in range(len(wt.members)):
             for j in range(i + 1, len(wt.members)):
-                if types.types_are_mergeable(wt.members[i], wt.members[j]):
+                if not isinstance(
+                    types.merge_types(wt.members[i], wt.members[j]), types.UnionType
+                ):
                     reasons.append(f"Union members {i} and {j} are mergable")
         non_none_members = [m for m in wt.members if m != types.NoneType()]
         none_member_count = len(wt.members) - len(non_none_members)
