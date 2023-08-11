@@ -15,7 +15,7 @@ jobs:
   build-container:
     name: Build test container
     timeout-minutes: 20
-    runs-on: [self-hosted, builder]
+    runs-on: [self-hosted, gke-runner]
     # runs-on: ubuntu-latest
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
@@ -44,8 +44,8 @@ jobs:
     timeout-minutes: 5
     needs:
       - build-container
-    # runs-on: [self-hosted, runner]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, gke-runner]
+    # runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
@@ -56,8 +56,8 @@ jobs:
     timeout-minutes: 7
     needs:
       - build-container
-    # runs-on: [self-hosted, runner]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, gke-runner]
+    # runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
@@ -72,7 +72,8 @@ jobs:
 
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
-    runs-on: ubuntu-latest
+    # runs-on: ubuntu-latest
+    runs-on: [self-hosted, gke-runner]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -135,8 +136,8 @@ jobs:
     timeout-minutes: 10
     needs:
       - build-container
-    # runs-on: [self-hosted, runner]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, gke-runner]
+    # runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
     steps:
       # - uses: datadog/agent-github-action@v1.3
@@ -173,8 +174,8 @@ jobs:
       # - lint
       # - test
     if: always()
-    # runs-on: [self-hosted, runner]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, gke-runner]
+    # runs-on: ubuntu-latest
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
 
