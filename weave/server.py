@@ -13,6 +13,7 @@ import requests
 import traceback
 import time
 import pprint
+from weave.debug_util import append_json_to_file
 
 
 from weave.language_features.tagging.tag_store import isolated_tagging_context
@@ -70,6 +71,9 @@ def handle_request(
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
     with tracer.trace("request:deserialize"):
         nodes = serialize.deserialize(request["graphs"])
+
+    for ndx, node in enumerate(nodes):
+        append_json_to_file({"node_" + str(ndx): str(node)})
 
     with tracer.trace("request:execute"):
         with execute.top_level_stats() as stats:

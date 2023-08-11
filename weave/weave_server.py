@@ -29,6 +29,7 @@ from weave import engine_trace
 from weave import environment
 from weave import logs
 from weave import filesystem
+from weave.debug_util import append_json_to_file
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 from weave import storage
 from weave import wandb_api
@@ -234,6 +235,7 @@ def execute():
         "Execute request (zlib): %s",
         req_b64,
     )
+    append_json_to_file({"zlib": str(req_b64)})
 
     if not request.json:
         abort(400, "Request body must be JSON.")
