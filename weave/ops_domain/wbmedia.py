@@ -263,6 +263,7 @@ class HtmlArtifactFileRef:
 # "media/serialized_data/498587e8.npz"}, "shape": [10]} However, I suspect we
 # will just use the newer Weave1 NDArray type instead.
 
+
 # 3/22/23: However as of this comment, we just return NoneType() instead of this
 # type when we encounter legacy ndarray, since the table data is None
 class LegacyTableNDArrayType(types.Type):
