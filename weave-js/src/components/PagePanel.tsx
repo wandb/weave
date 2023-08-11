@@ -14,7 +14,6 @@ import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 import {
-  detectInJupyterCell,
   inJupyterCell,
   isServedLocally,
   uriFromNode,
