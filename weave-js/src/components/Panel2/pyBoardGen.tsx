@@ -7,6 +7,7 @@ import {
   Node,
   opGet,
   Type,
+  voidNode,
 } from '@wandb/weave/core';
 import {
   absoluteTargetMutation,
@@ -20,6 +21,24 @@ import {useCallback, useMemo} from 'react';
 import {usePanelContext} from './PanelContext';
 import moment from 'moment';
 
+export const OPENAI_BOARD_OP_NAME = 'py_board-openai_monitor_board';
+
+interface StreamTableObj {
+  entity_name: string;
+  project_name: string;
+  table_name: string;
+  hints?: {
+    integrations: string[];
+  };
+}
+
+export const _getStreamTableObjFromRowsNode = (node: Node) => {
+  if (node.nodeType === 'output' && node.fromOp.name === 'stream_table-rows') {
+    return node.fromOp.inputs.self;
+  }
+  return voidNode();
+};
+
 export const useBoardGeneratorsForNode = (
   node: Node,
   allowConfig: boolean = false
@@ -31,6 +50,10 @@ export const useBoardGeneratorsForNode = (
     op_name: string;
   }>;
 } => {
+  const streamTableObjNode = _getStreamTableObjFromRowsNode(node);
+  const streamTableObjValue = useNodeValue(streamTableObjNode);
+  const streamTableObj = streamTableObjValue.result as StreamTableObj | null;
+
   const genBoardsNode = callOpVeryUnsafe(
     'py_board-get_board_templates_for_node',
     {
@@ -43,19 +66,39 @@ export const useBoardGeneratorsForNode = (
       display_name: string;
       description: string;
       op_name: string;
-      config: Type;
+      config: Type | null;
     }>;
   } = useNodeValue(genBoardsNode as any);
   return useMemo(() => {
-    if (res.loading) {
+    if (res.loading || streamTableObjValue.loading) {
       return {loading: true, result: []};
     } else {
+      const finalResult = res.result.filter(x => allowConfig || !x.config);
+      if (
+        streamTableObj &&
+        streamTableObj.hints?.integrations.includes('openai') &&
+        !finalResult.find(x => x.op_name === OPENAI_BOARD_OP_NAME)
+      ) {
+        finalResult.push({
+          display_name: 'OpenAI Monitor Board',
+          description: 'Monitor OpenAI Completions',
+          op_name: OPENAI_BOARD_OP_NAME,
+          config: null,
+        });
+      }
+      console.log('FINAL RESULT', finalResult);
       return {
         loading: false,
-        result: res.result.filter(x => allowConfig || !x.config),
+        result: finalResult,
       };
     }
-  }, [allowConfig, res.loading, res.result]);
+  }, [
+    allowConfig,
+    res.loading,
+    res.result,
+    streamTableObj,
+    streamTableObjValue.loading,
+  ]);
 };
 
 export const useMakeLocalBoardFromNode = () => {

@@ -1,1 +1,1 @@
-from .stream_table_type import StreamTableType
+from .stream_table_type import StreamTableObj

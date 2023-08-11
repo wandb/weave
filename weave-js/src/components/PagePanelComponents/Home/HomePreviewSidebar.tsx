@@ -1,5 +1,6 @@
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
@@ -10,6 +11,7 @@ import {PreviewNode} from './PreviewNode';
 import {useWeaveContext} from '@wandb/weave/context';
 import {IconCategoryMultimodal} from '../../Icon';
 import {
+  OPENAI_BOARD_OP_NAME,
   useBoardGeneratorsForNode,
   useMakeLocalBoardFromNode,
 } from '../../Panel2/pyBoardGen';
@@ -17,6 +19,7 @@ import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 import {useNodeWithServerType} from '@wandb/weave/react';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
+import HintWrapper from './HintWrapper';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -38,15 +41,21 @@ const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
 `;
 CenterTableActionCellIcon.displayName = 'S.CenterTableActionCellIcon';
 
-const DashboardTemplateItem = styled(LayoutElements.HStack)`
+const DashboardTemplateItem = styled(LayoutElements.HStack)<{
+  primary?: boolean;
+}>`
   padding: 8px 12px;
-  border: 1px solid ${MOON_250};
+  border: 1px solid ${props => (props.primary ? globals.TEAL_LIGHT : MOON_250)};
   border-radius: 4px;
+  background-color: ${props => (props.primary ? globals.TEAL_LIGHT : null)};
+  color: ${props => (props.primary ? '#fff' : null)};
   cursor: pointer;
   &:hover {
-    border: 1px solid #a9edf2;
-    background-color: #a9edf212;
-    color: #038194;
+    border: 1px solid
+      ${props => (props.primary ? globals.TEAL_LIGHT_2 : '#a9edf2')};
+    background-color: ${props =>
+      props.primary ? globals.TEAL_LIGHT_2 : '#a9edf212'};
+    color: ${props => (props.primary ? '#fff' : '#038194')};
   }
 `;
 DashboardTemplateItem.displayName = 'S.DashboardTemplateItem';
@@ -153,9 +162,19 @@ export const HomeExpressionPreviewParts: React.FC<{
   const weave = useWeaveContext();
   const inputExpr = weave.expToString(expr);
   const refinedExpression = useNodeWithServerType(expr);
-  const generators = useBoardGeneratorsForNode(expr);
+  const generatorsQuery = useBoardGeneratorsForNode(expr);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
+  let generators = generatorsQuery.loading ? [] : generatorsQuery.result;
+  const openaiGeneratorIndex = generators.findIndex(
+    g => g.op_name === OPENAI_BOARD_OP_NAME
+  );
+  let recommendedGenerator: (typeof generators)[0] | null = null;
+  if (openaiGeneratorIndex !== -1) {
+    recommendedGenerator = generators[openaiGeneratorIndex];
+    generators = [...generators];
+    generators.splice(openaiGeneratorIndex, 1);
+  }
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
@@ -177,7 +196,7 @@ export const HomeExpressionPreviewParts: React.FC<{
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
-      {generators.loading || refinedExpression.loading || isGenerating ? (
+      {generatorsQuery.loading || refinedExpression.loading || isGenerating ? (
         <LayoutElements.VStack
           style={{
             alignItems: 'center',
@@ -188,35 +207,68 @@ export const HomeExpressionPreviewParts: React.FC<{
           <WeaveAnimatedLoader style={{height: '64px', width: '64px'}} />
         </LayoutElements.VStack>
       ) : (
-        generators.result.length > 0 && (
-          <LayoutElements.VBlock style={{gap: '8px'}}>
-            <span style={{color: '#2B3038', fontWeight: 600}}>
-              Available Templates
-            </span>
-            <LayoutElements.VStack
-              style={{
-                gap: '8px',
-              }}>
-              {generators.result.map(template => (
-                <DashboardTemplate
-                  key={template.op_name}
-                  title={template.display_name}
-                  subtitle={template.description}
-                  onClick={() => {
-                    setIsGenerating(true);
-                    makeBoardFromNode(
-                      template.op_name,
-                      refinedExpression.result as any,
-                      newDashExpr => {
-                        navigateToExpression(newDashExpr);
-                        setIsGenerating(false);
-                      }
-                    );
-                  }}
-                />
-              ))}
-            </LayoutElements.VStack>
-          </LayoutElements.VBlock>
+        (generators.length > 0 || recommendedGenerator) && (
+          <>
+            {recommendedGenerator && (
+              <HintWrapper>
+                <LayoutElements.VBlock style={{gap: '8px'}}>
+                  <span style={{color: '#2B3038', fontWeight: 600}}>
+                    Recommended Template
+                  </span>
+                  <LayoutElements.VStack
+                    style={{
+                      gap: '8px',
+                    }}>
+                    <DashboardTemplate
+                      key={recommendedGenerator.op_name}
+                      title={recommendedGenerator.display_name}
+                      subtitle={recommendedGenerator.description}
+                      primary
+                      onClick={() => {
+                        setIsGenerating(true);
+                        makeBoardFromNode(
+                          recommendedGenerator.op_name,
+                          refinedExpression.result as any,
+                          newDashExpr => {
+                            navigateToExpression(newDashExpr);
+                            setIsGenerating(false);
+                          }
+                        );
+                      }}
+                    />
+                  </LayoutElements.VStack>
+                </LayoutElements.VBlock>
+              </HintWrapper>
+            )}
+            <LayoutElements.VBlock style={{gap: '8px'}}>
+              <span style={{color: '#2B3038', fontWeight: 600}}>
+                Available Templates
+              </span>
+              <LayoutElements.VStack
+                style={{
+                  gap: '8px',
+                }}>
+                {generators.map(template => (
+                  <DashboardTemplate
+                    key={template.op_name}
+                    title={template.display_name}
+                    subtitle={template.description}
+                    onClick={() => {
+                      setIsGenerating(true);
+                      makeBoardFromNode(
+                        template.op_name,
+                        refinedExpression.result as any,
+                        newDashExpr => {
+                          navigateToExpression(newDashExpr);
+                          setIsGenerating(false);
+                        }
+                      );
+                    }}
+                  />
+                ))}
+              </LayoutElements.VStack>
+            </LayoutElements.VBlock>
+          </>
         )
       )}
     </LayoutElements.VStack>
@@ -227,9 +279,10 @@ const DashboardTemplate: React.FC<{
   title: string;
   onClick: () => void;
   subtitle?: string;
+  primary?: boolean;
 }> = props => {
   return (
-    <DashboardTemplateItem onClick={props.onClick}>
+    <DashboardTemplateItem onClick={props.onClick} primary={props.primary}>
       <LayoutElements.VStack
         style={{
           overflow: 'hidden',

@@ -529,13 +529,14 @@ const CenterProjectTablesBrowser: React.FC<
         <HomePreviewSidebarTemplate
           title={row.name}
           setPreviewNode={setPreviewNode}
-          primaryAction={{
-            icon: IconOpenNewTab,
-            label: 'Open Table',
-            onClick: () => {
-              navigateToExpression(expr);
-            },
-          }}>
+          // primaryAction={{
+          //   icon: IconOpenNewTab,
+          //   label: 'Open Table',
+          //   onClick: () => {
+          //     navigateToExpression(expr);
+          //   },
+          // }}
+        >
           <HomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
