@@ -244,7 +244,7 @@ export const useNodeValue = <T extends Type>(
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
   const client = context.client;
-  const {stack, inPanelMaybe} = usePanelContext();
+  const {stack, panelMaybeNode} = usePanelContext();
 
   // consoleLog('USE NODE VALUE PRE CLIENT EVAL', weave.expToString(node), stack);
 
@@ -353,7 +353,11 @@ export const useNodeValue = <T extends Type>(
       result: result.value,
     };
   }, [error, node, result.node, result.value]);
-  if (!finalResult.loading && inPanelMaybe && finalResult.result == null) {
+  if (
+    !finalResult.loading &&
+    panelMaybeNode === node &&
+    finalResult.result == null
+  ) {
     // Throw NullResult for PanelMaybe to catch.
     throw new NullResult(result.node);
   }
