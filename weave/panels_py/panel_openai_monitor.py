@@ -189,7 +189,10 @@ def board(
 
     ### Overview tab
 
-    overview_tab = weave.panels.Group(layoutMode="grid", showExpressions="titleBar")
+    overview_tab = weave.panels.Group(
+        layoutMode="grid",
+        showExpressions=True,
+    )  # , showExpressions="titleBar")
     overview_tab.add(
         "request_count",
         panel_autoboard.timeseries_count_bar(
@@ -262,7 +265,10 @@ def board(
 
     ### Requests tab
 
-    requests_tab = weave.panels.Group(layoutMode="grid", showExpressions="titleBar")
+    requests_tab = weave.panels.Group(
+        layoutMode="grid",
+        showExpressions=True,
+    )  # l, showExpressions="titleBar")
 
     requests_table = panels.Table(window_data)  # type: ignore
     requests_table.add_column(lambda row: row["model"], "Model")
@@ -308,13 +314,13 @@ def board(
         items={
             "Overview": overview_tab,
             "Requests": requests_tab,
-            "Attributes": attributes_tab,
-            "Users": users_tab,
-            "Models": models_tab,
+            # "Attributes": attributes_tab,
+            # "Users": users_tab,
+            # "Models": models_tab,
         },
     )
 
-    return panels.Board(vars=varbar, panels=tabs, editable=False)
+    return panels.Board(vars=varbar, panels=tabs)
 
 
 template_registry.register(
