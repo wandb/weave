@@ -114,6 +114,8 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 width=val["width"],
                 height=val["height"],
                 sha256=val["sha256"],
+                # boxes=val.get("boxes", {}),
+                # masks=val.get("masks", {}),
             )
         if val["_type"] == "audio-file" and run_path is not None:
             from . import AudioArtifactFileRef
