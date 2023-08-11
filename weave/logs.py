@@ -22,6 +22,7 @@ class LogFormat(enum.Enum):
     PRETTY = "pretty"
     DATADOG = "datadog"
     JSON = "json"
+    INTEGRATION_TESTS = "integration_tests"
 
 
 @dataclasses.dataclass
@@ -65,6 +66,7 @@ class IndentFilter(logging.Filter):
 
 
 default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(indent)s%(message)s"
+integration_test_log_format = "[weave] %(asctime)s %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(indent)s%(message)s"
 
 
 def get_logdir() -> typing.Optional[str]:
@@ -175,6 +177,10 @@ def setup_handler(handler: logging.Handler, settings: LogSettings) -> None:
             timestamp=True,
             json_encoder=WeaveJSONEncoder,
         )  # type: ignore[no-untyped-call]
+    elif settings.format == LogFormat.INTEGRATION_TEST:
+        formatter = logging.Formatter(integration_test_log_format)
+        formatter.default_time_format = "%Y-%m-%dT%H:%M:%S"
+
     handler.addFilter(IndentFilter())
     handler.setFormatter(formatter)
     if settings.level is not None:
