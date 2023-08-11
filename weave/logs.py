@@ -177,7 +177,7 @@ def setup_handler(handler: logging.Handler, settings: LogSettings) -> None:
             timestamp=True,
             json_encoder=WeaveJSONEncoder,
         )  # type: ignore[no-untyped-call]
-    elif settings.format == LogFormat.INTEGRATION_TEST:
+    elif settings.format == LogFormat.INTEGRATION_TESTS:
         formatter = logging.Formatter(integration_test_log_format)
         formatter.default_time_format = "%Y-%m-%dT%H:%M:%S"
 
