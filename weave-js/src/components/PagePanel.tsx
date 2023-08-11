@@ -160,15 +160,16 @@ const PagePanel = ({browserType}: PagePanelProps) => {
 
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
+      const pathname = inJupyterCell() ? window.location.pathname : '/';
 
       if (newExpStr.startsWith('get') && expString?.startsWith('get')) {
         // In the specific case that we are updating a get with another get
         // which happens when we transition between published and local states,
         // then don't retain the history. We used to always do a replace and
         // it was super confusing
-        window.history.replaceState(null, '', `/?${searchParams}`);
+        window.history.replaceState(null, '', `${pathname}?${searchParams}`);
       } else {
-        window.history.pushState(null, '', `/?${searchParams}`);
+        window.history.pushState(null, '', `${pathname}?${searchParams}`);
       }
     },
     [expString, weave]
