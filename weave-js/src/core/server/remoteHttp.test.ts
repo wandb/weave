@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import {vi} from 'vitest';
 
 import {
   constBoolean,
@@ -11,7 +12,7 @@ import {RemoteHttpServer} from './remoteHttp';
 
 describe('RemoteHttpServer', () => {
   it('handles simple 1 graph query', () => {
-    const fetch = jest.fn().mockReturnValue({
+    const fetch = vi.fn().mockReturnValue({
       ok: true,
       json: () => Promise.resolve({data: [42]}),
     });
@@ -39,7 +40,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('handles simple 2 graph query', () => {
-    const fetch = jest.fn().mockReturnValue({
+    const fetch = vi.fn().mockReturnValue({
       ok: true,
       json: () => Promise.resolve({data: [42, 'foo']}),
     });
@@ -67,7 +68,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('batches disjoint queries into single request when contiguousBatchesOnly is unset', () => {
-    const fetch = jest.fn().mockReturnValue({
+    const fetch = vi.fn().mockReturnValue({
       ok: true,
       json: () => Promise.resolve({data: [42, 'foo', true]}),
     });
@@ -99,7 +100,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('batches disjoint queries into separate requests when contiguousBatchesOnly is set', () => {
-    const fetch = jest
+    const fetch = vi
       .fn()
       .mockReturnValueOnce({
         ok: true,
@@ -161,7 +162,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('batches contiguous queries into same requests when contiguousBatchesOnly is set', () => {
-    const fetch = jest
+    const fetch = vi
       .fn()
       .mockReturnValueOnce({
         ok: true,
@@ -211,7 +212,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('retries network error', () => {
-    const fetch = jest
+    const fetch = vi
       .fn()
       .mockRejectedValueOnce(new Error('Network error'))
       .mockReturnValueOnce({
@@ -237,7 +238,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('retries failed, retryable requests', () => {
-    const fetch = jest
+    const fetch = vi
       .fn()
       .mockReturnValueOnce({
         ok: false,
@@ -264,7 +265,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('throws exception on failed, non-retryable requests', () => {
-    const fetch = jest.fn().mockReturnValue({
+    const fetch = vi.fn().mockReturnValue({
       ok: false,
       status: 400, // bad request??
       json: () => Promise.reject('An error has occurred'),
@@ -284,7 +285,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('eventually gives up on failed, retryable requests', () => {
-    const fetch = jest.fn().mockReturnValue({
+    const fetch = vi.fn().mockReturnValue({
       ok: false,
       status: 502, // bad gateway
       json: () => Promise.reject('An error has occurred'),
@@ -311,7 +312,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('single-batching crossed wires stress test -- single .query()', () => {
-    const fetch = jest.fn().mockReturnValueOnce({
+    const fetch = vi.fn().mockReturnValueOnce({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -349,7 +350,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('single-batching crossed wires stress test -- multi .query()', () => {
-    const fetch = jest.fn().mockReturnValueOnce({
+    const fetch = vi.fn().mockReturnValueOnce({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -387,7 +388,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('multi-batching crossed wires stress test -- single .query()', () => {
-    const fetch = jest
+    const fetch = vi
       .fn()
       .mockReturnValueOnce({
         ok: true,
@@ -438,7 +439,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('multi-batching crossed wires stress test -- multi .query()', () => {
-    const fetch = jest
+    const fetch = vi
       .fn()
       .mockReturnValueOnce({
         ok: true,
@@ -489,7 +490,7 @@ describe('RemoteHttpServer', () => {
   });
 
   it('multiple rounds of multi-batching crossed wires stress test -- multi .query()', () => {
-    const fetch = jest
+    const fetch = vi
       .fn()
       .mockReturnValueOnce({
         ok: true,

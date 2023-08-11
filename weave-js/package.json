@@ -9,9 +9,8 @@
     "dev": "NODE_OPTIONS='--max-http-header-size=10248012' PORT=3000 vite",
     "build": "rm -rf build && NODE_OPTIONS=--max-old-space-size=16384 vite build",
     "preview": "vite preview",
-    "test": "jest",
-    "testci": "CI=true JEST_JUNIT_OUTPUT_DIR=./test-results/junit jest --reporters=default --reporters=jest-junit",
-    "test:watch": "jest --watch",
+    "test": "vitest",
+    "testci": "CI=true vitest --reporters=default --reporters=junit --outputFile=./test-results/junit",
     "eslint": "eslint --ext .js,.jsx,.ts,.tsx src",
     "eslint-fix": "eslint --fix --ext .js,.jsx,.ts,.tsx src",
     "tslint": "tslint --project .",
@@ -123,7 +122,6 @@
     "@types/diff": "^5.0.3",
     "@types/downloadjs": "^1.4.2",
     "@types/is-buffer": "^2.0.0",
-    "@types/jest": "^27.0.1",
     "@types/js-levenshtein": "^1.1.1",
     "@types/lodash": "^4.14.191",
     "@types/lru-cache": "5.1.1",
@@ -150,7 +148,7 @@
     "@types/zen-observable": "^0.8.3",
     "@typescript-eslint/eslint-plugin": "5.35.1",
     "@typescript-eslint/parser": "5.35.1",
-    "@vitejs/plugin-react": "^2.1.0",
+    "@vitejs/plugin-react": "^4.0.4",
     "ast-types": "^0.14.2",
     "autoprefixer": "^10.4.13",
     "babel-eslint": "^10.1.0",
@@ -158,7 +156,6 @@
     "concurrently": "^7.5.0",
     "detect-browser": "^5.2.1",
     "esbuild": "^0.17.15",
-    "esbuild-jest": "^0.5.0",
     "eslint": "^8.40.0",
     "eslint-config-prettier": "^2.3.0",
     "eslint-config-react-app": "^7.0.1",
@@ -172,10 +169,7 @@
     "eslint-plugin-react-hooks": "4.6.0",
     "eslint-plugin-wandb": "link:./eslint-plugin-wandb",
     "identity-obj-proxy": "^3.0.0",
-    "jest": "^28.0.1",
-    "jest-environment-jsdom": "^28.0.1",
-    "jest-junit": "^14.0.1",
-    "jest-watch-typeahead": "^2.2.2",
+    "jsdom": "^22.1.0",
     "json-schema-to-typescript": "^11.0.2",
     "less": "^2.7.3",
     "lodash.defaults": "^4.2.0",
@@ -192,7 +186,8 @@
     "tslint-plugin-prettier": "^2.3.0",
     "typescript": "4.7.4",
     "uuid": "^9.0.0",
-    "vite": "3.1.3"
+    "vite": "3.1.3",
+    "vitest": "^0.34.1"
   },
   "resolutions": {
     "@types/react": "^17.0.26",
@@ -200,34 +195,5 @@
     "handlebars": "^4.7.7",
     "lodash": "^4.17.21",
     "react": "^17.0.2"
-  },
-  "jest": {
-    "roots": [
-      "<rootDir>/src"
-    ],
-    "setupFiles": [
-      "react-app-polyfill/jsdom"
-    ],
-    "testEnvironment": "jsdom",
-    "transformIgnorePatterns": [
-      "^.+\\.module\\.(css|sass|scss)$"
-    ],
-    "moduleNameMapper": {
-      "^@wandb/weave/(.*)$": "<rootDir>/src/$1",
-      "\\.(wasm)$": "<rootDir>/mockTreeSitterForTest.js",
-      "\\.(css|less|svg)$": "identity-obj-proxy"
-    },
-    "moduleFileExtensions": [
-      "js",
-      "ts",
-      "tsx",
-      "json",
-      "jsx",
-      "node"
-    ],
-    "watchPlugins": [
-      "jest-watch-typeahead/filename",
-      "jest-watch-typeahead/testname"
-    ]
   }
 }
