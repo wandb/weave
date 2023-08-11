@@ -63,7 +63,7 @@ def Board(
     showExpressions = True if editable else "titleBar"
     vb = vars
     if not isinstance(vb, weave.panels.Group):
-        vb = varbar(editable=editable)
+        vb = varbar(editable=editable, items=vars)
 
     main = panels
     if not isinstance(panels, weave.panels.Group):
