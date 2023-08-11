@@ -3,14 +3,15 @@
 import pytest
 
 import weave
+import weave.weave_types as types
 from .concrete_tagged_value import (
     TaggedValue,
     concrete_to_tagstore,
     concrete_from_tagstore,
 )
-from .. import ops_arrow
-from .. import ops_arrow as arrow
-from ..language_features.tagging import tagged_value_type
+from ..ops_arrow.convert import to_arrow
+from .. import ops_arrow, box
+from ..language_features.tagging import tag_store, tagged_value_type
 
 
 def to_awl(l: list) -> ops_arrow.ArrowWeaveList:
@@ -83,3 +84,32 @@ def test_join2_different_types():
         TaggedValue({"joinObj": 7}, {"a1": {"a": 7, "b": 8}, "a2": None}),
         TaggedValue(tag={"joinObj": 10}, value={"a1": None, "a2": {"a": 10, "b": 14}}),
     ]
+
+
+def test_tagged_awl_sum():
+    #  ok so how do I make this
+    # it's a list of lists
+    boom = [[1.4, 0], [3.4, 0], [None, 5]]
+    for i, item in enumerate(boom):
+        tag_store.add_tags(box.box(item[0]), {"mytag": f"{i}-abcd"})
+        
+    import pdb
+    tagtype = tagged_value_type.TaggedValueType(
+        types.TypedDict(property_types={"mytag": types.String()}), 
+        types.UnionType(types.NoneType(), types.Number()))
+    awl = to_arrow(boom, wb_type= types.List(object_type=types.List(object_type=types.UnionType(tagtype, types.Int()))))
+    pdb.set_trace()
+    node = weave.save(awl)
+    value = weave.use(node.listnumbersum())
+    assert 4 == 5
+    # where the first element of the list is a TaggedValueType over a float. 
+    # <ArrowWeaveList: List(object_type=UnionType(
+    #     members=[
+    #         TaggedValueType({['project', 'indexCheckpoint', 'run']}, 
+    #                         UnionType(members=[NoneType(), Number()])
+    #                         ), 
+    #         Int()
+    #     ]
+    # ))>
+    # 
+    # 
