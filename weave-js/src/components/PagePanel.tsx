@@ -237,7 +237,6 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    detectInJupyterCell();
     consoleLog('PAGE PANEL MOUNT', window.location.href);
     setLoading(true);
     if (expString != null) {
