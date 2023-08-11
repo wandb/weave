@@ -29,26 +29,16 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
             "inputs": types.optional(
                 types.TypedDict(
                     {
-                        "kwargs": types.optional(
-                            types.TypedDict(
-                                {
-                                    "messages": types.optional(
-                                        types.List(
-                                            types.TypedDict(
-                                                {
-                                                    "role": types.optional(
-                                                        types.String()
-                                                    ),
-                                                    "content": types.optional(
-                                                        types.String()
-                                                    ),
-                                                }
-                                            )
-                                        )
-                                    ),
-                                }
+                        "messages": types.optional(
+                            types.List(
+                                types.TypedDict(
+                                    {
+                                        "role": types.optional(types.String()),
+                                        "content": types.optional(types.String()),
+                                    }
+                                )
                             )
-                        ),
+                        )
                     }
                 )
             ),
@@ -98,6 +88,23 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
 
 
 board_name = "py_board-" + BOARD_ID
+
+
+# @weave.type()
+# class OpenAITable(weave.Panel):
+#     id = "OpenAITable"
+#     input_node: weave.Node[list[typing.Any]]
+
+#     @weave.op()
+#     def render(self) -> weave.panels.Table:
+#         table = panels.Table(
+#             self.input_node,
+#             columns=[lambda row: row["inputs"]["messages"][-1]["content"]],
+#         )
+#         # table.add_column( lambda row: row["inputs"]["messages"][-1]["content"], "Messages"
+#         # )
+#         # table.add_column(lambda row: row["messages"][-1]["content"], "Message")
+#         return table
 
 
 @weave.op(  # type: ignore
@@ -155,7 +162,7 @@ def board(
                 id=row["output"]["id"],
                 object=row["output"]["object"],
                 model=row["output"]["model"],
-                messages=row["inputs"]["kwargs"]["messages"],
+                messages=row["inputs"]["messages"],
                 usage=row["output"]["usage"],
                 completion=row["output"]["choices"][0]["message"],
                 finish_reason=row["output"]["choices"][0]["finish_reason"],
@@ -277,16 +284,16 @@ def board(
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=8),
     )
     requests_tab.add(
-        "execution",
-        requests_table_var.active_row(),
-        layout=weave.panels.GroupPanelLayout(x=0, y=8, w=12, h=8),
-    )
-    requests_tab.add(
-        "messages",
+        "input",
         panels.Table(  # type: ignore
             requests_table_var.active_data()["messages"],
             columns=[lambda row: row["role"], lambda row: row["content"]],
         ),
+        layout=weave.panels.GroupPanelLayout(x=0, y=8, w=12, h=8),
+    )
+    requests_tab.add(
+        "output",
+        requests_table_var.active_row(),
         layout=weave.panels.GroupPanelLayout(x=12, y=8, w=12, h=8),
     )
 

@@ -64,14 +64,19 @@ class Span:
     # When this is None, monitor is disabled
     _streamtable: typing.Optional[StreamTable]
 
+    # These are OpenTelemetry standard
     parent_id: typing.Optional[str]
     trace_id: str
     span_id: str
     name: str
+    # OpenTelemetry enforces that attributes cannot have dicts or mixed types.
+    # We loosen that restriction and allow any Weave type
     attributes: dict[str, typing.Any]
     status_code: str = StatusCode.UNSET
     start_time: datetime.datetime
     end_time: typing.Optional[datetime.datetime]
+
+    # OpenTelemetry does not support these.
     inputs: typing.Optional[typing.Dict[str, typing.Any]]
     output: typing.Optional[typing.Any]
     exception: typing.Optional[Exception]
