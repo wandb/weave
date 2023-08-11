@@ -4,14 +4,11 @@ import React, {useCallback, useState} from 'react';
 import getConfig from '../../../config';
 
 import styled from 'styled-components';
-import {WBButton} from '../../../common/components/elements/WBButtonNew';
 import {useWeaveContext} from '../../../context';
-import {
-  IconAddNew as IconAddNewUnstyled,
-  IconWeaveLogo,
-} from '../../Panel2/Icons';
+import {IconWeaveLogo} from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {NavigateToExpressionType} from './common';
+import {Button} from '../../Button';
 
 export const HomeTopBar: React.FC<{
   navigateToExpression: NavigateToExpressionType;
@@ -48,10 +45,9 @@ export const HomeTopBar: React.FC<{
         Weave
       </TopBarLeft>
       <TopBarRight>
-        <WBButton variant={`confirm`} onClick={newDashboard}>
-          <IconAddNew />
+        <Button onClick={newDashboard} icon="add-new">
           New board
-        </WBButton>
+        </Button>
       </TopBarRight>
     </TopBar>
   );
@@ -81,10 +77,4 @@ const WeaveLogo = styled(IconWeaveLogo)`
   width: 32px;
   height: 32px;
   margin-right: 12px;
-`;
-
-const IconAddNew = styled(IconAddNewUnstyled)`
-  width: 18px;
-  height: 18px;
-  margin-right: 6px;
 `;

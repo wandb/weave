@@ -322,7 +322,7 @@ def check_server_up(
             "--platform",
             "linux/amd64",
             (
-                f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:tim-franken_branch_parquet"
+                "us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:tim-franken_branch_parquet"
                 if os.environ.get("PARQUET_ENABLED")
                 else f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:{wandb_server_tag}"
             ),

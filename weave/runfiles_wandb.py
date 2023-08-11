@@ -64,6 +64,7 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
         self._run_files_uri = uri
         self._read_run = None
         self._local_path: dict[str, str] = {}
+        self._ref = WandbRunFilesRef(self, None)
 
     @property
     def run(self) -> "WBRun":

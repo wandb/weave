@@ -1,7 +1,7 @@
 import {Modal} from 'semantic-ui-react';
 import React from 'react';
-import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as M from './Modal.styles';
+import {Button} from '../Button';
 
 type DeleteActionModalProps = {
   open: boolean;
@@ -29,12 +29,12 @@ export const DeleteActionModal = ({
           referencing this board.
         </M.Description>
         <M.Buttons>
-          <WBButton variant="confirm" disabled={acting} onClick={onDelete}>
+          <Button disabled={acting} onClick={onDelete}>
             Delete board
-          </WBButton>
-          <WBButton variant="ghost" onClick={onClose}>
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </WBButton>
+          </Button>
         </M.Buttons>
       </Modal.Content>
     </Modal>

@@ -27,4 +27,4 @@ jobs:
           # branch should not be protected
           branch: 'cla'
           # cannot use teams due to: https://github.com/contributor-assistant/github-action/issues/100
-          allowlist: actions-user, altay, dannygoldstein, davidwallacejackson, jamie-rasmussen, jlzhao27, jwlee64, laxels, nickpenaranda, scottire, shawnlewis, staceysv, vanpelt, vwrj
+          allowlist: actions-user, altay, dannygoldstein, davidwallacejackson, jamie-rasmussen, jlzhao27, jo-fang, jwlee64, laxels, nickpenaranda, scottire, shawnlewis, staceysv, tssweeney, vanpelt, vwrj

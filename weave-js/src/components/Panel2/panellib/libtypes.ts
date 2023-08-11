@@ -13,6 +13,7 @@ export interface TypedInputHandler<T> {
   inputType: T;
   id: string;
   isValid?: (config: any) => boolean;
+  shouldSuggest?: (inputType: T) => boolean;
 }
 
 export interface TypedInputConverter<T> {
@@ -64,7 +65,10 @@ export function _getTypeHandlerStacks<
       }
     }
 
-    return isAssignableTo(currentType, ps.inputType);
+    return (
+      isAssignableTo(currentType, ps.inputType) &&
+      ps.shouldSuggest?.(currentType) !== false
+    );
   });
 
   for (const converter of converters) {

@@ -98,7 +98,7 @@ def _extract_code_from_request_lib_request_exception(
         util.capture_exception_with_sentry_if_available(
             e, ("requests.exceptions.ReadTimeout",)
         )
-        logging.warning(f"Converting requests.exceptions.ReadTimeout to 502")
+        logging.warning("Converting requests.exceptions.ReadTimeout to 502")
         return 502
     return None
 

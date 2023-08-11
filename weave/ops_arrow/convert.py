@@ -1,4 +1,5 @@
 import pyarrow as pa
+import pyarrow.compute as pc
 import typing
 
 from .. import artifact_base
@@ -74,11 +75,15 @@ def recursively_merge_union_types_if_they_are_unions_of_structs(
 
 def recursively_build_pyarrow_array(
     py_objs: list[typing.Any],
-    pyarrow_type: pa.DataType,
+    pyarrow_type: typing.Union[pa.DataType, arrow_util.ArrowTypeWithFieldInfo],
     mapper,
     py_objs_already_mapped: bool = False,
 ) -> pa.Array:
     arrays: list[pa.Array] = []
+
+    if isinstance(pyarrow_type, arrow_util.ArrowTypeWithFieldInfo):
+        pyarrow_type = arrow_util.arrow_type(pyarrow_type)
+    pyarrow_type = typing.cast(pa.DataType, pyarrow_type)
 
     def none_unboxer(iterator: typing.Iterable):
         for obj in iterator:
@@ -468,9 +473,16 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                     "Unexpected dictionary type for non-string type"
                 )
             return ArrowWeaveList(col._arrow_data, types.String(), None)
-        elif pa.types.is_floating(col._arrow_data.type) or pa.types.is_integer(
-            col._arrow_data.type
-        ):
+        elif pa.types.is_floating(col._arrow_data.type):
+            # Ensure that -0.0 is 0. If we end up converting to a string
+            # later (which happens if we have non-numeric types within a union)
+            # then -0.0 will be converted to "-0.0" which is not equal to "0.0"
+            return ArrowWeaveList(
+                pc.choose(pc.equal(col._arrow_data, 0), col._arrow_data, 0),
+                types.Number(),
+                None,
+            )
+        elif pa.types.is_integer(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Number(), None)
         elif pa.types.is_timestamp(col._arrow_data.type):
             # Cast to int64 and then string. Leaving this as timestamp

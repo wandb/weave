@@ -172,3 +172,16 @@ def test_stream_authed(user_by_api_key_in_env):
 
     a = weave.use(st.rows()["hello"]).to_pylist_tagged()
     assert a == ["world"]
+
+
+def test_stream_templates(user_by_api_key_in_env):
+    st = make_stream_table(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
+    st.log({"hello": "world"})
+    st.finish()
+
+    a = weave.use(st.rows().get_board_templates_for_node())
+    assert len(a) > 0
