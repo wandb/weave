@@ -34,7 +34,7 @@ def get_projection(obj: stitch.ObjectRecorder) -> KeyTree:
             item_root = cols
             for k in key_path:
                 if k != "*":
-                    item_root = item_root.setdefault(k, {})
+                    item_root = item_root.setdefault(_dict_utils.escape_dots(k), {})
             tree_merge(item_root, get_projection(call.output))
         elif call.node.from_op.name.endswith("__getattr__"):
             key = call.inputs[1].val
