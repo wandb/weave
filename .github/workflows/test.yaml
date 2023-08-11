@@ -15,7 +15,7 @@ jobs:
   build-container:
     name: Build test container
     timeout-minutes: 20
-    runs-on: [self-hosted, gke-runner]
+    runs-on: [self-hosted, builder]
     # runs-on: ubuntu-latest
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
