@@ -26,7 +26,6 @@ export function flattenNested(rows: Row[]): Row[] {
       } else if (_.isObject(v)) {
         Object.assign(baseRow, flattenNestedObjects(v));
       } else {
-        console.log(`key: ${k}`, `value: ${v}`);
         baseRow[fixColNameForVega(k)] = v;
       }
     });
