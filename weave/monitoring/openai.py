@@ -29,6 +29,22 @@ def delta_update(value: dict, delta: dict) -> dict:
     return value
 
 
+def message_from_stream(stream: typing.Generator) -> typing.Any:
+    """Helper to extract a printable streaming message from an OpenAI stream response."""
+    # TODO: print role.
+    # TODO: print function call responses
+    cur_index = 0
+    for record in stream:
+        if "choices" in record:
+            for choice_update in record["choices"]:
+                if choice_update["index"] == cur_index:
+                    delta = choice_update["delta"]
+                    if "content" in delta:
+                        yield delta["content"]
+                else:
+                    yield "\n\nNEXT RESPONSE:\n\n"
+
+
 def openai_create_preprocess(span: monitor.SpanWithInputs) -> None:
     span.inputs = span.inputs["kwargs"]
     if span.inputs.get("stream"):

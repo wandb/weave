@@ -127,15 +127,15 @@ def board(
     # Add the input node as raw data
     varbar = panel_board.varbar()
 
-    raw_data = varbar.add("raw_data", input_node, hidden=True)
+    dataset = varbar.add("dataset", input_node)
 
     # Setup date range variables:
     ## 1. raw_data_range is derived from raw_data
-    raw_data_range = varbar.add(
-        "raw_data_range",
+    dataset_range = varbar.add(
+        "dataset_range",
         weave.ops.make_list(
-            a=raw_data[timestamp_col_name].min(),
-            b=raw_data[timestamp_col_name].max(),
+            a=dataset[timestamp_col_name].min(),
+            b=dataset[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -146,18 +146,18 @@ def board(
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "date_picker",
-        weave.panels.DateRange(user_zoom_range, domain=raw_data[timestamp_col_name]),
+        weave.panels.DateRange(user_zoom_range, domain=dataset[timestamp_col_name]),
     )
 
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
     ##    the range of data that will be displayed in the charts.
     bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(raw_data_range), hidden=True
+        "bin_range", user_zoom_range.coalesce(dataset_range), hidden=True
     )
 
     clean_data = varbar.add(
         "clean_data",
-        raw_data.map(
+        dataset.map(
             lambda row: ops.dict_(
                 id=row["output"]["id"],
                 object=row["output"]["object"],
@@ -179,7 +179,7 @@ def board(
         clean_data.filter(
             lambda row: weave.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
-                row[timestamp_col_name] < bin_range[1],
+                row[timestamp_col_name] <= bin_range[1],
             )
         ),
         hidden=True,
