@@ -99,7 +99,7 @@ jobs:
     timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
     needs:
       - build-container
-    # runs-on: [self-hosted, runner]
+    runs-on: [self-hosted, gke-runner]
     runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     services:
