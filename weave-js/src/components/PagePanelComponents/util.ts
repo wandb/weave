@@ -21,8 +21,17 @@ export type BranchPointType = {
   original_uri: string;
 };
 
+let IN_JUPYTER_CELL = false;
+
+export const detectInJupyterCell = () => {
+  if (window.location.toString().includes('weave_jupyter')) {
+    // Only become positive, never negative
+    IN_JUPYTER_CELL = true;
+  }
+};
+
 export const inJupyterCell = () => {
-  return window.location.toString().includes('weave_jupyter');
+  return IN_JUPYTER_CELL;
 };
 
 // TODO: currently deprecated, but works in all browsers

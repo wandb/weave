@@ -14,6 +14,7 @@ import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 import {
+  detectInJupyterCell,
   inJupyterCell,
   isServedLocally,
   uriFromNode,
@@ -236,7 +237,8 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    consoleLog('PAGE PANEL MOUNT');
+    detectInJupyterCell();
+    consoleLog('PAGE PANEL MOUNT', window.location.href);
     setLoading(true);
     if (expString != null) {
       weave.expression(expString, []).then(res => {
