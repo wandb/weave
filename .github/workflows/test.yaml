@@ -222,6 +222,6 @@ jobs:
             ${{ secrets.GITHUB_TOKEN }}
             # - uses: actions/upload-artifact@v3
       - name: Upload logs
-        run: ds upload-logs /tmp/weave/log
+        run: cd integration_test && npx ds upload-logs /tmp/weave/log
         env:
           CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
