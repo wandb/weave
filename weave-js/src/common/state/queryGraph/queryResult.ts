@@ -4,8 +4,9 @@ export interface Row {
   [key: string]: any;
 }
 
-function fixColNameForVega(name: string) {
-  return name.replace(/\.\//g, '_');
+export function fixColNameForVega(name: string) {
+  const safeName = typeof name === 'number' ? String(name) : name;
+  return safeName.replace(/\.\//g, '_');
 }
 
 export function flattenNested(rows: Row[]): Row[] {
