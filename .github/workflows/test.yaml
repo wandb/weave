@@ -207,7 +207,7 @@ jobs:
         # Use the following to run just a single test
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
-        run: export PYTHONPATH=$(pwd) && cd integration_test && npx ds run --record --parallel --browser chrome
+        run: export PYTHONPATH=$(pwd) && cd integration_test && npx ds run --record --browser chrome
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_testG
