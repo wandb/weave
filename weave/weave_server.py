@@ -130,7 +130,7 @@ ops_cache: typing.Optional[dict] = None
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
     global ops_cache
-    if ops is None:
+    if ops_cache is None:
         with wandb_api.from_environment():
             # TODO: this is super slow.
             if not environment.wandb_production():
