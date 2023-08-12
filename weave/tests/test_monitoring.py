@@ -1,8 +1,13 @@
 import os
+import pytest
 import time
-from weave import monitoring
+from weave.monitoring import monitor
 import weave
 import contextlib
+
+
+### Skipping some tests here. They are for features that no longer exist. Since we're
+# iterating on the API, I'm not removing them yet.
 
 
 @contextlib.contextmanager
@@ -18,13 +23,13 @@ def async_disabled():
             os.environ["WEAVE_DISABLE_ASYNC_FILE_STREAM"] = current
 
 
-def test_monitoring(user_by_api_key_in_env):
+def test_monitoring_basic(user_by_api_key_in_env):
     with async_disabled():
-
-        @monitoring.monitor(
-            entity_name=user_by_api_key_in_env.username,
-            project_name="test",
+        mon = monitor.new_monitor(
+            "%s/%s/test_monitoring" % (user_by_api_key_in_env.username, "test")
         )
+
+        @mon.trace()
         def example(a, b):
             return a + b
 
@@ -37,8 +42,8 @@ def test_monitoring(user_by_api_key_in_env):
                 results.append(i + j)
 
         # These underscore accesses are not public API. This is just for testing.
-        example._stream_table.finish()
-        node = example.rows()
+        mon._streamtable.finish()
+        node = mon.rows()
         inputs_node = node["inputs"]
         output_node = node["output"]
         input_results, output_results = weave.use([inputs_node, output_node])
@@ -47,14 +52,15 @@ def test_monitoring(user_by_api_key_in_env):
         assert output_results.to_pylist_tagged() == results
 
 
+@pytest.mark.skip("Feature removed")
 def test_monitoring_auto_false(user_by_api_key_in_env):
     with async_disabled():
 
-        @monitoring.monitor(
-            entity_name=user_by_api_key_in_env.username,
-            project_name="test",
-            auto_log=False,
-        )
+        # @monitoring.monitor(
+        #     entity_name=user_by_api_key_in_env.username,
+        #     project_name="test",
+        #     auto_log=False,
+        # )
         def example(a, b):
             return a + b
 
@@ -78,14 +84,15 @@ def test_monitoring_auto_false(user_by_api_key_in_env):
         assert weave.use(node).to_pylist_tagged() == rows[::-1]
 
 
+@pytest.mark.skip("Feature removed")
 def test_monitoring_capture_errors(user_by_api_key_in_env):
     with async_disabled():
 
-        @monitoring.monitor(
-            entity_name=user_by_api_key_in_env.username,
-            project_name="test",
-            raise_on_error=False,
-        )
+        # @monitoring.monitor(
+        #     entity_name=user_by_api_key_in_env.username,
+        #     project_name="test",
+        #     raise_on_error=False,
+        # )
         def example(a, b):
             if b == 5:
                 raise ValueError("5 is bad")
@@ -118,15 +125,16 @@ def test_monitoring_capture_errors(user_by_api_key_in_env):
         assert exception_results.to_pylist_tagged() == exceptions
 
 
+@pytest.mark.skip("Feature removed")
 def test_monitoring_processors(user_by_api_key_in_env):
     with async_disabled():
 
-        @monitoring.monitor(
-            entity_name=user_by_api_key_in_env.username,
-            project_name="test",
-            input_preprocessor=lambda a, b: {"val": f"{a} + {b}"},
-            output_postprocessor=lambda res: {"val": res},
-        )
+        # @monitoring.monitor(
+        #     entity_name=user_by_api_key_in_env.username,
+        #     project_name="test",
+        #     input_preprocessor=lambda a, b: {"val": f"{a} + {b}"},
+        #     output_postprocessor=lambda res: {"val": res},
+        # )
         def example(a, b):
             return a + b
 

@@ -22,9 +22,34 @@
     <meta name="functions-insert-dynamic-og" />
     <meta name="functions-insert-dynamic-meta" />
     <meta name="referrer" content="no-referrer-when-downgrade" />
-    <link rel="icon" href="/favicon.ico" />
-    <title>Weave</title>
-    <!-- See WeaveLoader.css for original source -->
+    
+    <!-- Title Section -->
+    <link rel="icon" href="/__frontend/favicon.ico" />
+    <title>W&B Weave</title>
+    <!-- og:site_name is the primary title  -->
+    <meta property="og:site_name" content="W&B Weave" /> 
+    <!-- og:title is the secondary title  -->
+    <!-- TODO: Make this dynamic -->
+    <meta property="og:title" content="weave.wandb.ai" />
+
+    <!-- Description Section -->
+    <!-- TODO: Make this dynamic -->
+    <!-- description is the longer-form text  -->
+    <meta property="og:description" content="Interactive data analytics for ML" />
+    <meta name="description" content="Interactive data analytics for ML" />
+
+    <!-- OpenGraph Spec -->
+    <meta property="og:type" content="text/html" />
+    <meta property="og:url" content="https://weave.wandb.ai/" />
+
+    <!-- OpenGraph:Image Spec -->
+    <!-- TODO: Make this dynamic -->
+    <!-- <meta property="og:image" content="http://87c5-2600-1700-89c6-5130-dcf3-9a7d-9a46-6a65.ngrok-free.app/__frontend/icon-weave-logo.svg" />
+    <meta property="og:image:secure_url" content="https://87c5-2600-1700-89c6-5130-dcf3-9a7d-9a46-6a65.ngrok-free.app/__frontend/icon-weave-logo.svg" />
+    <meta property="og:image:type" content="image/svg" />
+    <meta property="og:image:width" content="400" />
+    <meta property="og:image:height" content="400" />
+    <meta property="og:image:alt" content="Weave Logo" /> -->
     <style>
       @keyframes logo-animation{0%,100%,70%{transform:scale(1) rotate(0);opacity:.6}7.5%,8%{transform:scale(.75) rotate(0);opacity:.8}25%,47.5%{transform:scale(1) rotate(180deg);opacity:.6}55%,55.5%{transform:scale(.75) rotate(180deg);opacity:.8}}#weave-loader{width:64px;height:64px;opacity:.6;position:absolute;top:calc(50% - 32px);left:calc(50% - 32px);animation:4s ease-out infinite logo-animation}
     </style>
