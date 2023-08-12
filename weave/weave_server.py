@@ -124,21 +124,27 @@ def make_app():
     return app
 
 
+ops_cache: typing.Optional[dict] = None
+
+
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
-    with wandb_api.from_environment():
-        # TODO: this is super slow.
-        if not environment.wandb_production():
-            registry_mem.memory_registry.load_saved_ops()
-        ops = registry_mem.memory_registry.list_ops()
-        ret = []
-        for op in ops:
-            try:
-                serialized_op = op.to_dict()
-            except errors.WeaveSerializeError:
-                continue
-            ret.append(serialized_op)
-        return {"data": ret}
+    global ops_cache
+    if ops is None:
+        with wandb_api.from_environment():
+            # TODO: this is super slow.
+            if not environment.wandb_production():
+                registry_mem.memory_registry.load_saved_ops()
+            ops = registry_mem.memory_registry.list_ops()
+            ret = []
+            for op in ops:
+                try:
+                    serialized_op = op.to_dict()
+                except errors.WeaveSerializeError:
+                    continue
+                ret.append(serialized_op)
+            ops_cache = {"data": ret}
+    return ops_cache
 
 
 class ErrorDetailsDict(typing.TypedDict):

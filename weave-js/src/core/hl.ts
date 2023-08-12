@@ -383,13 +383,20 @@ export function getFunctionFrame(
   }
   return innerFrame;
 }
+
+export type CacheMapInterface = {
+  has: (node: EditingNode) => boolean;
+  get: (node: EditingNode) => EditingNode | undefined;
+  set: (node: EditingNode, value: EditingNode) => void;
+};
+
 // Preserves shallow-equality when it can, based on nodesEqual above.
 // nodesEqual uses shallow equality to compare op inputs.
 export async function refineEditingNode(
   client: Client,
   node: EditingNode,
   stack: Stack,
-  cache?: Map<EditingNode, EditingNode>
+  cache?: CacheMapInterface
 ): Promise<EditingNode> {
   if (cache?.has(node)) {
     return Promise.resolve(cache.get(node)!);
@@ -664,6 +671,66 @@ export async function refineEditingNode(
   }
 }
 
+class ExpiringLRUCache implements CacheMapInterface {
+  private cache: Map<EditingNode, EditingNode>;
+  private cacheKeys: Array<{
+    key: EditingNode;
+    timestamp: number;
+  }>;
+  private maxSize: number;
+  private ttl: number;
+
+  constructor(maxSize = 100, ttl = 1000 * 60 * 5) {
+    this.cache = new Map();
+    this.cacheKeys = [];
+    this.maxSize = maxSize;
+    this.ttl = ttl;
+  }
+
+  get(key: EditingNode) {
+    const val = this.cache.get(key);
+    this._prune()
+    return val;
+  }
+
+  set(key: EditingNode, value: EditingNode) {
+    this.cache.set(key, value);
+    this.cacheKeys.push({
+      key,
+      timestamp: Date.now()
+    });
+    if (this.cacheKeys.length > this.maxSize) {
+      const keyToRemove = this.cacheKeys.shift();
+      if (keyToRemove != null) {
+        this.cache.delete(keyToRemove['key']);
+      }
+    }
+    this._prune()
+  }
+
+  has(key: EditingNode) {
+    return this.cache.has(key);
+  }
+
+  _prune() {
+    const now = Date.now();
+    let i = -1;
+    for (const {key, timestamp} of this.cacheKeys) {
+      i++;
+      if (now - timestamp > this.ttl) {
+        this.cache.delete(key);
+      } else {
+        // we hit a key that is not expired, so we can stop
+        this.cacheKeys = this.cacheKeys.slice(i);
+        break;
+      }
+    }
+  }
+
+}
+
+const cache = new ExpiringLRUCache();
+
 /** You must catch errors from function, and rethrow them in the render
  * thread.
  */
@@ -675,7 +742,7 @@ export async function refineNode(
   if (node.nodeType !== 'output') {
     return node;
   }
-  return (await refineEditingNode(client, node, stack)) as Node;
+  return (await refineEditingNode(client, node, stack, cache)) as Node;
 }
 
 function isProducibleType(type: Type): boolean {

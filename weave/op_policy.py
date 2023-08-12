@@ -37,6 +37,9 @@ CACHE_OP_NAMES = [
     "op-umap_project",
     "op-openai_embed",
     "op-hdbscan_cluster",
+    # TODO: We have to do this more intelligently. This is not correct
+    # and cannot be checked in.
+    "run-history",
 ] + CACHE_AND_PARALLEL_OP_NAMES
 
 

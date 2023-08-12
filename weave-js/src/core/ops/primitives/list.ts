@@ -535,13 +535,15 @@ export const opMap = makeListOp({
       client.opStore
     );
     // We union the types of everything in the array!
-    let count = await client.query(opCount({arr: runnableNode}));
+    // let count = await client.query(opCount({arr: runnableNode}));
     // Put a limit in place for now. We'll expand this later. (25 matches run limit on Weave).
     // TODO: fix
-    if (count > MAX_RUN_LIMIT) {
-      console.warn('Dropping types in opMap refine');
-      count = MAX_RUN_LIMIT;
-    }
+    // if (count > MAX_RUN_LIMIT) {
+    //   console.warn('Dropping types in opMap refine');
+    //   count = MAX_RUN_LIMIT;
+    // }
+    // This is only safe in Weave1
+    const count = MAX_RUN_LIMIT;
     const allRefinedProms = _.range(count).map(i =>
       HL.refineNode(
         client,

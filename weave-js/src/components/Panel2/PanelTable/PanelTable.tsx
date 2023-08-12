@@ -127,7 +127,8 @@ export const PanelTable: React.FC<
 > = props => {
   const {input, config, updateConfig} = props;
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  // const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  const typedInputNodeUse = {result: inputNode, loading: false};
   const typedInputNode = typedInputNodeUse.loading
     ? undefined
     : typedInputNodeUse.result;
@@ -1366,10 +1367,12 @@ export const TableSpec: Panel2.PanelSpec = {
       // Can't happen, id was selected based on Node type
       throw new Error('Table input node is null');
     }
-    const tableNormInput = await weave.refineNode(
-      TableType.normalizeTableLike(inputNode),
-      stack
-    );
+    let tableNormInput = TableType.normalizeTableLike(inputNode);
+    if (tableNormInput !== inputNode) {
+      // TODO: PanelPlot default relies on stack for its config, but we pass
+      // it in empty!
+      tableNormInput = await weave.refineNode(tableNormInput, stack);
+    }
     return getTableConfig(tableNormInput, undefined, weave);
   },
   Component: PanelTable,

@@ -217,7 +217,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const weave = useWeaveContext();
   const {stack, path: parentPath} = usePanelContext();
 
-  panelInputExpr = useNodeWithServerType(panelInputExpr).result;
+  // panelInputExpr = useNodeWithServerType(panelInputExpr).result;
+
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,
     panelId,

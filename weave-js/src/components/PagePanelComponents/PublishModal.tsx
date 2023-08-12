@@ -52,9 +52,10 @@ export const PublishModal = ({
   const isValidName = isValidBoardName(boardName);
   const showError = boardName.length > 0 && !isValidName;
 
-  const isAuthenticated = useIsAuthenticated();
-  const userEntities = query.useUserEntities(isAuthenticated);
-  const userName = query.useUserName(isAuthenticated);
+  // Make sure we only make requests once this is open
+  const isAuthenticated = useIsAuthenticated(!open);
+  const userEntities = query.useUserEntities(isAuthenticated && open);
+  const userName = query.useUserName(isAuthenticated && open);
 
   const iconStyle = {
     verticalAlign: 'middle',

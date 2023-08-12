@@ -262,7 +262,8 @@ const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
   const {input} = props;
 
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  // const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  const typedInputNodeUse = {result: inputNode};
   const newProps = useMemo(() => {
     return {
       ...props,
@@ -3594,7 +3595,8 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   const {input} = props;
 
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  // const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  const typedInputNodeUse = {result: inputNode};
   const newProps = useMemo(() => {
     return {
       ...props,
@@ -3638,12 +3640,12 @@ export const Spec: Panel2.PanelSpec = {
     if (inputNode.nodeType === 'void') {
       throw new Error('Plot input node is null');
     }
-    // TODO: PanelPlot default relies on stack for its config, but we pass
-    // it in empty!
-    const tableNormInput = await weave.refineNode(
-      TableType.normalizeTableLike(inputNode),
-      stack
-    );
+    let tableNormInput = TableType.normalizeTableLike(inputNode);
+    if (tableNormInput !== inputNode) {
+      // TODO: PanelPlot default relies on stack for its config, but we pass
+      // it in empty!
+      tableNormInput = await weave.refineNode(tableNormInput, stack);
+    }
     return PlotState.panelPlotDefaultConfig(tableNormInput, undefined, stack);
   },
   ConfigComponent: PanelPlotConfig,
