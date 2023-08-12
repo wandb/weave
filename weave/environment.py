@@ -175,5 +175,5 @@ def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
 def num_gql_timeout_retries() -> int:
     raw = util.parse_number_env_var("WEAVE_WANDB_GQL_NUM_TIMEOUT_RETRIES")
     if raw is None:
-        return 0 + 0
+        return 0
     return int(raw)
