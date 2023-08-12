@@ -60,8 +60,8 @@ jobs:
 
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
-    # runs-on: ubuntu-latest
-    runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
     steps:
       - uses: actions/checkout@v2
         with:
