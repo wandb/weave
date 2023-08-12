@@ -16,6 +16,7 @@ from requests.auth import HTTPBasicAuth
 from . import engine_trace
 from . import environment as weave_env
 from . import wandb_client_api
+from . import debug_util
 
 # Importing at the top-level namespace so other files can import from here.
 from .context_state import WandbApiContext, _wandb_api_context
@@ -210,6 +211,7 @@ class WandbApi:
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = client.connect_sync()  # type: ignore
+        debug_util.append_json_to_file({"RAW_QUERY": query})
         return session.execute(query, kwargs)
 
     SERVER_INFO_QUERY = gql.gql(
