@@ -30,11 +30,8 @@ import {
 import {themes} from './Panel2/Editor.styles';
 import {
   IconAddNew,
-  IconCheckmark,
   IconClose,
-  IconCopy,
   IconHome,
-  IconLoading,
   IconOpenNewTab,
   IconPencilEdit,
 } from './Panel2/Icons';
@@ -130,7 +127,11 @@ const usePoorMansLocation = () => {
   return window.location;
 };
 
-const PagePanel: React.FC = props => {
+type PagePanelProps = {
+  browserType: string | undefined;
+};
+
+const PagePanel = ({browserType}: PagePanelProps) => {
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
   const urlParams = new URLSearchParams(location.search);
@@ -159,23 +160,16 @@ const PagePanel: React.FC = props => {
 
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
+      const pathname = inJupyterCell() ? window.location.pathname : '/';
 
       if (newExpStr.startsWith('get') && expString?.startsWith('get')) {
         // In the specific case that we are updating a get with another get
         // which happens when we transition between published and local states,
         // then don't retain the history. We used to always do a replace and
         // it was super confusing
-        window.history.replaceState(
-          null,
-          '',
-          `${window.location.pathname}?${searchParams}`
-        );
+        window.history.replaceState(null, '', `${pathname}?${searchParams}`);
       } else {
-        window.history.pushState(
-          null,
-          '',
-          `${window.location.pathname}?${searchParams}`
-        );
+        window.history.pushState(null, '', `${pathname}?${searchParams}`);
       }
     },
     [expString, weave]
@@ -184,6 +178,15 @@ const PagePanel: React.FC = props => {
   const [config, setConfig] = useState<ChildPanelFullConfig>(
     CHILD_PANEL_DEFAULT_CONFIG
   );
+
+  // If the exp string has gone away, perhaps by back button navigation,
+  // reset the config.
+  useEffect(() => {
+    if (!expString) {
+      setConfig(CHILD_PANEL_DEFAULT_CONFIG);
+    }
+  }, [expString]);
+
   const updateConfig = useCallback(
     (newConfig: Partial<ChildPanelFullConfig>) => {
       setConfig(currentConfig => ({...currentConfig, ...newConfig}));
@@ -233,7 +236,7 @@ const PagePanel: React.FC = props => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    consoleLog('PAGE PANEL MOUNT');
+    consoleLog('PAGE PANEL MOUNT', window.location.href);
     setLoading(true);
     if (expString != null) {
       weave.expression(expString, []).then(res => {
@@ -252,11 +255,6 @@ const PagePanel: React.FC = props => {
       } as any);
       setLoading(false);
     } else {
-      updateConfig({
-        input_node: voidNode(),
-        id: panelId,
-        config: panelConfig,
-      } as any);
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -312,7 +310,11 @@ const PagePanel: React.FC = props => {
         <PanelInteractContextProvider>
           <WeaveRoot className="weave-root" fullScreen={fullScreen}>
             {config.input_node.nodeType === 'void' ? (
-              <Home updateConfig={updateConfig} inJupyter={inJupyter} />
+              <Home
+                updateConfig={updateConfig}
+                inJupyter={inJupyter}
+                browserType={browserType}
+              />
             ) : (
               <div
                 style={{
@@ -498,7 +500,8 @@ const JupyterPageControls: React.FC<
   }
 > = props => {
   const [hoverText, setHoverText] = useState('');
-  const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
+  // TODO(fix): Hiding code export temporarily as it is partially broken
+  // const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
   const setInspectingPanel = useSetInspectingPanel();
   const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
@@ -614,7 +617,8 @@ const JupyterPageControls: React.FC<
           <IconPencilEdit />
         </JupyterControlsIcon>
       )}
-      <JupyterControlsIcon
+      {/* TODO: Hiding code export temporarily as it is partially broken */}
+      {/* <JupyterControlsIcon
         onClick={onCopy}
         onMouseEnter={e => {
           setHoverText('Copy code');
@@ -629,7 +633,7 @@ const JupyterPageControls: React.FC<
         ) : (
           <IconCopy />
         )}
-      </JupyterControlsIcon>
+      </JupyterControlsIcon> */}
       <JupyterControlsIcon
         onClick={props.openNewTab}
         onMouseEnter={e => {

@@ -1,12 +1,12 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {
-  IconAddNew,
   IconCopy,
-  IconDown,
+  IconChevronDown,
   IconInfo,
   IconOpenNewTab,
-} from '../../Panel2/Icons';
+  IconDelete,
+} from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import moment from 'moment';
@@ -25,7 +25,6 @@ import {
   opRootProject,
   opTableRows,
   typedDict,
-  varNode,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
@@ -35,11 +34,15 @@ import {
   HomeBoardPreview,
   HomeExpressionPreviewParts,
 } from './HomePreviewSidebar';
-import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
-import WandbLoader from '@wandb/weave/common/components/WandbLoader';
-import {IconMagicWandStar} from '../../Icon';
-import {getFullChildPanel} from '../../Panel2/ChildPanel';
-import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
+import {useHistory, useParams} from 'react-router-dom';
+import {HomeParams} from './Home';
+import {setDocumentTitle} from '@wandb/weave/util/document';
+import {
+  urlEntity,
+  urlProject,
+  urlProjectAssetPreview,
+  urlProjectAssets,
+} from '../../../urls';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -50,47 +53,27 @@ type CenterEntityBrowserPropsType = {
 export const CenterEntityBrowser: React.FC<
   CenterEntityBrowserPropsType
 > = props => {
-  const [selectedProjectName, setSelectedProjectNameRaw] = useState<
-    string | undefined
-  >();
-
-  const setSelectedProjectName = useCallback(
-    (projectName?: string) => {
-      setSelectedProjectNameRaw(projectName);
-      props.setPreviewNode(undefined);
-    },
-    [props, setSelectedProjectNameRaw]
-  );
-
-  if (selectedProjectName == null) {
-    return (
-      <CenterEntityBrowserInner
-        {...props}
-        setSelectedProjectName={setSelectedProjectName}
-      />
-    );
+  const params = useParams<HomeParams>();
+  if (params.project == null) {
+    return <CenterEntityBrowserInner {...props} />;
   } else {
-    return (
-      <CenterProjectBrowser
-        {...props}
-        projectName={selectedProjectName}
-        setSelectedProjectName={setSelectedProjectName}
-      />
-    );
+    return <CenterProjectBrowser {...props} projectName={params.project} />;
   }
 };
 
-type CenterEntityBrowserInnerPropsType = CenterEntityBrowserPropsType & {
-  setSelectedProjectName: (name: string | undefined) => void;
-};
+type CenterEntityBrowserInnerPropsType = CenterEntityBrowserPropsType;
 
 export const CenterEntityBrowserInner: React.FC<
   CenterEntityBrowserInnerPropsType
 > = props => {
+  const {entityName} = props;
+  const history = useHistory();
   const browserTitle = props.entityName;
-  const projectsMeta = query.useProjectsForEntityWithWeaveObject(
-    props.entityName
-  );
+  const projectsMeta = query.useProjectsForEntityWithWeaveObject(entityName);
+
+  useEffect(() => {
+    setDocumentTitle(entityName);
+  }, [entityName]);
 
   const browserData = useMemo(() => {
     // TODO: make sorting more customizable and awesome
@@ -99,6 +82,7 @@ export const CenterEntityBrowserInner: React.FC<
     );
     return sortedMeta.map(meta => ({
       _id: meta.name,
+      entity: entityName,
       project: meta.name,
       boards: (meta.num_boards ?? 0) > 0 ? meta.num_boards : null,
       tables:
@@ -107,7 +91,7 @@ export const CenterEntityBrowserInner: React.FC<
           : null,
       'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
-  }, [projectsMeta.result]);
+  }, [projectsMeta.result, entityName]);
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
@@ -115,10 +99,10 @@ export const CenterEntityBrowserInner: React.FC<
     return [
       [
         {
-          icon: IconDown,
+          icon: IconChevronDown,
           label: 'Browse project',
           onClick: row => {
-            props.setSelectedProjectName(row._id);
+            history.push(urlProject(row.entity, row.project));
           },
         },
       ],
@@ -136,7 +120,7 @@ export const CenterEntityBrowserInner: React.FC<
         },
       ],
     ];
-  }, [props]);
+  }, [props, history]);
 
   const loading = projectsMeta.loading;
 
@@ -157,22 +141,14 @@ type CenterProjectBrowserPropsType = CenterEntityBrowserInnerPropsType & {
   projectName: string;
 };
 const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
-  const [selectedAssetType, setSelectedAssetTypeRaw] = useState<
-    string | undefined
-  >();
-
-  const setSelectedAssetType = useCallback(
-    (projectName?: string) => {
-      setSelectedAssetTypeRaw(projectName);
-      props.setPreviewNode(undefined);
-    },
-    [props, setSelectedAssetTypeRaw]
-  );
+  const history = useHistory();
+  const params = useParams<HomeParams>();
+  const {entityName, projectName} = props;
 
   const noAccessNode = opIsNone({
     val: opRootProject({
-      entityName: constString(props.entityName),
-      projectName: constString(props.projectName),
+      entityName: constString(entityName),
+      projectName: constString(projectName),
     }),
   });
   const noAccessValueNode = useNodeValue(noAccessNode);
@@ -181,31 +157,22 @@ const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
   // accessible - which occurs when you change states.
   useEffect(() => {
     if (!noAccessValueNode.loading && noAccessValueNode.result) {
-      props.setSelectedProjectName(undefined);
+      history.push(urlEntity(entityName));
     }
-  }, [noAccessValueNode.loading, noAccessValueNode.result, props]);
+  }, [
+    noAccessValueNode.loading,
+    noAccessValueNode.result,
+    history,
+    entityName,
+    projectName,
+  ]);
 
-  if (selectedAssetType == null) {
-    return (
-      <CenterProjectBrowserInner
-        {...props}
-        setSelectedAssetType={setSelectedAssetType}
-      />
-    );
-  } else if (selectedAssetType === 'boards') {
-    return (
-      <CenterProjectBoardsBrowser
-        {...props}
-        setSelectedAssetType={setSelectedAssetType}
-      />
-    );
-  } else if (selectedAssetType === 'tables') {
-    return (
-      <CenterProjectTablesBrowser
-        {...props}
-        setSelectedAssetType={setSelectedAssetType}
-      />
-    );
+  if (params.assetType == null) {
+    return <CenterProjectBrowserInner {...props} />;
+  } else if (params.assetType === 'board') {
+    return <CenterProjectBoardsBrowser {...props} />;
+  } else if (params.assetType === 'table') {
+    return <CenterProjectTablesBrowser {...props} />;
   } else {
     return <>Not implemented</>;
   }
@@ -216,13 +183,19 @@ type CenterProjectBrowserInnerPropsType = {
   projectName: string;
   setPreviewNode: SetPreviewNodeType;
   navigateToExpression: NavigateToExpressionType;
-  setSelectedProjectName: (name: string | undefined) => void;
-  setSelectedAssetType: (name: string | undefined) => void;
 };
 
 const CenterProjectBrowserInner: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
+  const history = useHistory();
+  const params = useParams<HomeParams>();
+
+  useEffect(() => {
+    const title = `${params.entity}/${params.project}`;
+    setDocumentTitle(title);
+  }, [params.entity, params.project]);
+
   const browserTitle = props.projectName;
   const assetCounts = query.useProjectAssetCount(
     props.entityName,
@@ -263,15 +236,18 @@ const CenterProjectBrowserInner: React.FC<
     return [
       [
         {
-          icon: IconDown,
+          icon: IconChevronDown,
           label: 'Browse asset type',
           onClick: row => {
-            props.setSelectedAssetType(row._id);
+            const assetType = row._id === 'boards' ? 'board' : 'table';
+            history.push(
+              urlProjectAssets(params.entity!, params.project!, assetType)
+            );
           },
         },
       ],
     ];
-  }, [props]);
+  }, [history, params.entity, params.project]);
 
   return (
     <CenterBrowser
@@ -282,7 +258,8 @@ const CenterProjectBrowserInner: React.FC<
           key: 'entity',
           text: props.entityName,
           onClick: () => {
-            props.setSelectedProjectName(undefined);
+            props.setPreviewNode(undefined);
+            history.push(urlEntity(props.entityName));
           },
         },
       ]}
@@ -305,8 +282,17 @@ const rowToExpression = (
 const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
+  const history = useHistory();
+  const params = useParams<HomeParams>();
   const browserTitle = 'Boards';
-  const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
+  const [deletingId, setDeletingId] = useState<string | undefined>();
+  useEffect(() => {
+    setDocumentTitle(
+      params.preview
+        ? `${params.preview} Preview`
+        : `${params.entity}/${params.project} ${browserTitle}`
+    );
+  }, [params.entity, params.project, params.preview, browserTitle]);
 
   const boards = query.useProjectBoards(props.entityName, props.projectName);
   const browserData = useMemo(() => {
@@ -319,67 +305,102 @@ const CenterProjectBoardsBrowser: React.FC<
     }));
   }, [boards]);
 
+  const {setPreviewNode, navigateToExpression} = props;
+
+  useEffect(() => {
+    if (params.preview) {
+      const expr = rowToExpression(
+        params.entity!,
+        params.project!,
+        params.preview
+      );
+      const node = (
+        <HomeBoardPreview
+          expr={expr}
+          name={params.preview}
+          setPreviewNode={setPreviewNode}
+          navigateToExpression={navigateToExpression}
+        />
+      );
+      setPreviewNode(node);
+    } else {
+      setPreviewNode(undefined);
+    }
+  }, [
+    history,
+    params.entity,
+    params.project,
+    params.preview,
+    setPreviewNode,
+    navigateToExpression,
+  ]);
+
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
     return [
       [
         {
+          icon: IconOpenNewTab,
+          label: 'Open board',
+          onClick: row => {
+            props.navigateToExpression(
+              rowToExpression(params.entity!, params.project!, row._id)
+            );
+          },
+        },
+        {
           icon: IconInfo,
           label: 'Board details',
           onClick: row => {
-            setSelectedRowId(row._id);
-            const expr = rowToExpression(
-              props.entityName,
-              props.projectName,
-              row._id
+            history.push(
+              urlProjectAssetPreview(
+                params.entity!,
+                params.project!,
+                params.assetType === 'board' ? 'board' : 'table',
+                row._id
+              )
             );
-            const node = (
-              <HomeBoardPreview
-                expr={expr}
-                name={row.name}
-                setPreviewNode={props.setPreviewNode}
-                navigateToExpression={props.navigateToExpression}
-              />
-            );
-            props.setPreviewNode(node);
           },
         },
       ],
       [
         {
-          icon: IconOpenNewTab,
-          label: 'Open Board',
+          icon: IconDelete,
+          label: 'Delete board',
           onClick: row => {
-            props.navigateToExpression(
-              rowToExpression(props.entityName, props.projectName, row._id)
-            );
+            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            setDeletingId(uri);
           },
         },
       ],
     ];
-  }, [props, setSelectedRowId]);
+  }, [props, history, params.entity, params.project, params.assetType]);
 
   return (
     <CenterBrowser
       allowSearch
       title={browserTitle}
-      selectedRowId={selectedRowId}
+      selectedRowId={params.preview}
+      setPreviewNode={props.setPreviewNode}
+      deletingId={deletingId}
+      setDeletingId={setDeletingId}
       noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {
           key: 'entity',
           text: props.entityName,
           onClick: () => {
-            props.setSelectedProjectName(undefined);
-            props.setSelectedAssetType(undefined);
+            props.setPreviewNode(undefined);
+            history.push(urlEntity(props.entityName));
           },
         },
         {
           key: 'project',
           text: props.projectName,
           onClick: () => {
-            props.setSelectedAssetType(undefined);
+            props.setPreviewNode(undefined);
+            history.push(urlProject(props.entityName, props.projectName));
           },
         },
       ]}
@@ -439,9 +460,18 @@ const tableRowToNode = (
 const CenterProjectTablesBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
+  const history = useHistory();
+  const params = useParams<HomeParams>();
   const weave = useWeaveContext();
   const browserTitle = 'Tables';
-  const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
+  useEffect(() => {
+    if (params.preview) {
+      setDocumentTitle(params.preview);
+    } else {
+      const title = `${params.entity}/${params.project} ${browserTitle}`;
+      setDocumentTitle(title);
+    }
+  }, [params.entity, params.project, params.preview, browserTitle]);
 
   const runStreams = query.useProjectRunStreams(
     props.entityName,
@@ -479,10 +509,51 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
-  const [seedingBoard, setSeedingBoard] = useState(false);
-  const makeNewDashboard = useNewDashFromItems();
+  const {setPreviewNode, navigateToExpression} = props;
+  useEffect(() => {
+    if (params.preview) {
+      const row = browserData.find(b => b._id === params.preview);
+      if (!row) {
+        setPreviewNode(undefined);
+        return;
+      }
+      const expr = tableRowToNode(
+        row.kind,
+        params.entity!,
+        params.project!,
+        row._id
+      );
+      const node = (
+        <HomePreviewSidebarTemplate
+          title={row.name}
+          setPreviewNode={setPreviewNode}
+          primaryAction={{
+            icon: IconOpenNewTab,
+            label: 'Open Table',
+            onClick: () => {
+              navigateToExpression(expr);
+            },
+          }}>
+          <HomeExpressionPreviewParts
+            expr={expr}
+            navigateToExpression={navigateToExpression}
+          />
+        </HomePreviewSidebarTemplate>
+      );
+      setPreviewNode(node);
+    } else {
+      setPreviewNode(undefined);
+    }
+  }, [
+    browserData,
+    history,
+    params.entity,
+    params.project,
+    params.preview,
+    setPreviewNode,
+    navigateToExpression,
+  ]);
 
-  const makeBoardFromNode = useMakeLocalBoardFromNode();
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
@@ -493,83 +564,18 @@ const CenterProjectTablesBrowser: React.FC<
           icon: IconInfo,
           label: 'Table details',
           onClick: row => {
-            setSelectedRowId(row._id);
-            const expr = tableRowToNode(
-              row.kind,
-              props.entityName,
-              props.projectName,
-              row._id
+            history.push(
+              urlProjectAssetPreview(
+                props.entityName,
+                props.projectName,
+                'table',
+                row._id
+              )
             );
-            const node = (
-              <HomePreviewSidebarTemplate
-                title={row.name}
-                setPreviewNode={props.setPreviewNode}
-                // TODO: These actions are literally copy/paste from below - rework this pattern to be more generic
-                primaryAction={{
-                  icon: IconAddNew,
-                  label: 'Seed new board',
-                  onClick: () => {
-                    const name =
-                      'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
-                    makeNewDashboard(
-                      name,
-                      {panel0: getFullChildPanel(varNode(expr.type, 'var0'))},
-                      {var0: expr},
-                      newDashExpr => {
-                        props.navigateToExpression(newDashExpr);
-                      }
-                    );
-                  },
-                }}
-                secondaryAction={{
-                  icon: IconOpenNewTab,
-                  label: 'Open Table',
-                  onClick: () => {
-                    props.navigateToExpression(expr);
-                  },
-                }}>
-                <HomeExpressionPreviewParts expr={expr} />
-              </HomePreviewSidebarTemplate>
-            );
-            props.setPreviewNode(node);
           },
         },
       ],
       [
-        {
-          icon: IconAddNew,
-          label: 'Seed new board',
-          onClick: row => {
-            const node = tableRowToNode(
-              row.kind,
-              props.entityName,
-              props.projectName,
-              row._id
-            );
-            setSeedingBoard(true);
-            makeBoardFromNode('py_board-seed_board', node, newDashExpr => {
-              setSeedingBoard(false);
-              props.navigateToExpression(newDashExpr);
-            });
-          },
-        },
-        {
-          icon: IconMagicWandStar,
-          label: 'Seed auto board',
-          onClick: row => {
-            const node = tableRowToNode(
-              row.kind,
-              props.entityName,
-              props.projectName,
-              row._id
-            );
-            setSeedingBoard(true);
-            makeBoardFromNode('py_board-seed_autoboard', node, newDashExpr => {
-              setSeedingBoard(false);
-              props.navigateToExpression(newDashExpr);
-            });
-          },
-        },
         {
           icon: IconOpenNewTab,
           label: 'Open Table',
@@ -604,30 +610,30 @@ const CenterProjectTablesBrowser: React.FC<
         },
       ],
     ];
-  }, [makeBoardFromNode, makeNewDashboard, props, weave]);
+  }, [props, weave, history]);
 
   return (
     <>
-      {seedingBoard && <WandbLoader />}
       <CenterBrowser
         allowSearch
         title={browserTitle}
-        selectedRowId={selectedRowId}
+        selectedRowId={params.preview}
         noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
         breadcrumbs={[
           {
             key: 'entity',
             text: props.entityName,
             onClick: () => {
-              props.setSelectedProjectName(undefined);
-              props.setSelectedAssetType(undefined);
+              props.setPreviewNode(undefined);
+              history.push(urlEntity(props.entityName));
             },
           },
           {
             key: 'project',
             text: props.projectName,
             onClick: () => {
-              props.setSelectedAssetType(undefined);
+              props.setPreviewNode(undefined);
+              history.push(urlProject(props.entityName, props.projectName));
             },
           },
         ]}

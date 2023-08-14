@@ -23,6 +23,33 @@ from flask.testing import FlaskClient
 
 from .tests.wandb_system_tests_conftest import *
 
+from _pytest.config import Config
+from _pytest.reports import TestReport
+from typing import Tuple, Optional
+
+
+def pytest_report_teststatus(
+    report: TestReport, config: Config
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    if report.when == "call":
+        duration = "{:.2f}s".format(report.duration)
+        if report.failed:
+            return "failed", "F", f"FAILED({duration})"
+        elif report.passed:
+            return "passed", ".", f"PASSED({duration})"
+        elif hasattr(
+            report, "wasxfail"
+        ):  # 'xfail' means that the test was expected to fail
+            return report.outcome, "x", "XFAIL"
+        elif report.skipped:
+            return report.outcome, "s", "SKIPPED"
+
+    elif report.when in ("setup", "teardown"):
+        if report.failed:
+            return "error", "E", "ERROR"
+
+    return None, None, None
+
 
 ### Disable datadog engine tracing
 
@@ -64,6 +91,21 @@ def pytest_sessionstart(session):
 @pytest.fixture()
 def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
+
+
+def pytest_collection_modifyitems(config, items):
+    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
+    job_num = int(config.getoption("--job-num", default=None))
+
+    if job_num is None:
+        return
+
+    selected_items = []
+    for index, item in enumerate(items):
+        if index % 2 == job_num:
+            selected_items.append(item)
+
+    items[:] = selected_items
 
 
 @pytest.fixture(autouse=True)

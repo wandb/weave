@@ -28,6 +28,7 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import * as Table from './tableState';
 import {stripTag} from './util';
+import {IconClose} from '../Icons';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -479,6 +480,9 @@ export const ColumnHeader: React.FC<{
           content={
             columnSettingsOpen && (
               <div>
+                <S.CloseIconButton onClick={() => setColumnSettingsOpen(false)}>
+                  <IconClose width={20} />
+                </S.CloseIconButton>
                 <S.ColumnEditorSection>
                   <S.ColumnEditorSectionLabel>
                     Cell expression

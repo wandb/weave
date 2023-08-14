@@ -132,8 +132,11 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             )
         return f"""weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
-    def add_column(self, select_expr, name=None):
-        self.config.tableState.add_column(select_expr, name)
+    def add_column(
+        self, select_expr: typing.Callable, name: typing.Optional[str] = None
+    ) -> None:
+        config = typing.cast(TableConfig, self.config)
+        config.tableState.add_column(select_expr, name)
 
 
 def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:
@@ -361,9 +364,9 @@ def pinned_rows(self: Table):
     # output_type=lambda inputs: inputs['self'].input_node.output_type.object_type,
     refine_output_type=data_single_refine,
 )
-def active_data(self: Table) -> typing.Optional[typing.Any]:
+def active_data(self: Table) -> typing.Optional[dict]:
     data_node = _get_active_node(self, self.input_node)
-    return data_node
+    return data_node  # type: ignore
 
 
 @weave.op(
@@ -374,4 +377,4 @@ def active_data(self: Table) -> typing.Optional[typing.Any]:
 def active_row(self: Table):
     rows_node = _get_rows_node(self)
     data_node = _get_active_node(self, rows_node)
-    return weave.use(data_node)
+    return data_node

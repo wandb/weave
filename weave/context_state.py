@@ -150,7 +150,7 @@ def set_frontend_url(url: str):
 
 
 _eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_eager_mode", default=False
+    "eager_mode", default=False
 )
 
 
@@ -215,4 +215,4 @@ class WandbApiContext:
 ## wandb_api.py context
 _wandb_api_context: contextvars.ContextVar[
     typing.Optional[WandbApiContext]
-] = contextvars.ContextVar("_weave_api_context", default=None)
+] = contextvars.ContextVar("wandb_api_context", default=None)

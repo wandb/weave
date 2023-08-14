@@ -270,4 +270,9 @@ def timestamp(timestampISO: str) -> typing.Optional[datetime.datetime]:
     try:
         return datetime.datetime.fromisoformat(timestampISO)
     except ValueError:
-        return None
+        # TODO: Figure out why a non-iso format is getting emitted from the new DatePicker.
+        # This is a hack to get around that.
+        try:
+            return dateutil.parser.parse(timestampISO)
+        except dateutil.parser.ParserError:
+            return None

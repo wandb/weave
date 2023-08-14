@@ -41,11 +41,9 @@ import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
-import {IconButton} from '../IconButton';
 import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
 import {ConfigSection} from './ConfigPanel';
-import {IconPencilEdit} from './Icons';
 import {Panel, PanelConfigEditor, useUpdateConfig2} from './PanelComp';
 import {
   ExpressionEvent,
@@ -71,9 +69,9 @@ import {getStackIdAndName} from './panellib/libpanel';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
-import {IconOverflowHorizontal} from './Icons';
 import {getConfigForPath} from './panelTree';
 import {usePanelPanelContext} from './PanelPanelContextProvider';
+import {Button} from '../Button';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -616,12 +614,12 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
               <Tooltip
                 position="top center"
                 trigger={
-                  <IconButton
-                    // disabled={isLoading}
-                    data-test="panel-config"
-                    onClick={() => setInspectingPanel(props.pathEl ?? '')}>
-                    <IconPencilEdit />
-                  </IconButton>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    icon="pencil-edit"
+                    onClick={() => setInspectingPanel(props.pathEl ?? '')}
+                  />
                 }>
                 Open panel editor
               </Tooltip>
@@ -632,9 +630,11 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 updateConfig={updateConfig}
                 updateConfig2={updateConfig2}
                 trigger={
-                  <IconButton>
-                    <IconOverflowHorizontal />
-                  </IconButton>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    icon="overflow-horizontal"
+                  />
                 }
                 onOpen={() => setIsMenuOpen(true)}
                 onClose={() => setIsMenuOpen(false)}
@@ -747,20 +747,6 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
 
   const dashboardConfigOptions = curPanelSelected ? (
     <>
-      <ConfigPanel.ConfigOption label={`Type`}>
-        <ConfigPanel.ModifiedDropdownConfigField
-          value={curPanelId}
-          options={panelOptions}
-          onChange={(e, {value}) => {
-            if (typeof value === `string` && value) {
-              handlePanelChange(value);
-            }
-          }}
-        />
-      </ConfigPanel.ConfigOption>
-
-      <VariableEditor config={config} updateConfig={updatePanelConfig} />
-
       {curPanelId !== 'Group' && (
         <ConfigPanel.ConfigOption label="Input" multiline>
           <PanelContextProvider
@@ -773,6 +759,20 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
           </PanelContextProvider>
         </ConfigPanel.ConfigOption>
       )}
+
+      <ConfigPanel.ConfigOption label="Panel type">
+        <ConfigPanel.ModifiedDropdownConfigField
+          value={curPanelId}
+          options={panelOptions}
+          onChange={(e, {value}) => {
+            if (typeof value === `string` && value) {
+              handlePanelChange(value);
+            }
+          }}
+        />
+      </ConfigPanel.ConfigOption>
+
+      <VariableEditor config={config} updateConfig={updatePanelConfig} />
     </>
   ) : null;
 
@@ -833,6 +833,9 @@ export const VariableEditor: React.FC<{
 }> = ({config, updateConfig}) => {
   const frame: {[key: string]: NodeOrVoidNode} = {};
   const nextFrame = {...frame};
+  if (_.isEmpty(config.vars)) {
+    return null;
+  }
   return (
     <ConfigPanel.ConfigOption label="variables">
       <div>
