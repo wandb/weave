@@ -127,6 +127,7 @@ import {ReactComponent as ImportRandomizeAlt} from '../../assets/icons/icon-rand
 import {ReactComponent as ImportRecentClock} from '../../assets/icons/icon-recent-clock.svg';
 import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-reddit-social.svg';
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
+import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
@@ -579,6 +580,9 @@ export const IconRedditSocial = (props: SVGIconProps) => (
 export const IconRedo = (props: SVGIconProps) => (
   <ImportRedo {...updateIconProps(props)} />
 );
+export const IconRemove = (props: SVGIconProps) => (
+  <ImportRemove {...updateIconProps(props)} />
+);
 export const IconReport = (props: SVGIconProps) => (
   <ImportReport {...updateIconProps(props)} />
 );
@@ -879,6 +883,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'recent-clock': IconRecentClock,
   'reddit-social': IconRedditSocial,
   redo: IconRedo,
+  remove: IconRemove,
   report: IconReport,
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
