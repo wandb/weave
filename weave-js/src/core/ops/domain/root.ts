@@ -520,7 +520,7 @@ export const opRootAuditLogs = makeOp({
         project_asset: 'number' as const,
         report_asset: 'number' as const,
 
-        my_new_asset: 'number' as const,
+my_new_asset: 'number' as const,
       })
     ),
     error: 'string' as const,
