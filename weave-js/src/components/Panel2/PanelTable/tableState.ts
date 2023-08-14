@@ -52,6 +52,7 @@ import {
   voidNode,
   WeaveInterface,
   PathType,
+  filterNodes,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -148,6 +149,12 @@ export function initTableWithPickColumns(
     inputArrayNode,
     weave
   );
+
+  const listIndexWithStar =
+    filterNodes(inputArrayNode, n => {
+      return n.nodeType === 'output' && n.fromOp.name.endsWith('joinAll');
+    }).length > 0;
+
   if (pickColumns) {
     addCols = pickColumns.map(colKey => ({
       selectFn: opPick({
@@ -163,7 +170,9 @@ export function initTableWithPickColumns(
         members: [typedDict({}), rootObject()],
       })
     ) {
-      allColumns = autoTableColumnExpressions(exNode.type, objectType);
+      allColumns = autoTableColumnExpressions(exNode.type, objectType, {
+        listIndexWithStar,
+      });
     }
     const columns =
       allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
@@ -247,8 +256,14 @@ function allPathsFromStreamTable(allPaths: PathType[]): boolean {
 // of current behavior.
 export function autoTableColumnExpressions(
   tableRowType: Type,
-  objectType: Type
+  objectType: Type,
+  opts: {
+    listIndexWithStar: boolean;
+  } = {
+    listIndexWithStar: true,
+  }
 ): Node[] {
+  const {listIndexWithStar} = opts;
   let allPaths = allObjPaths(objectType).filter(
     path => !isNDArrayLike(path.type) && !isAssignableTo(path.type, 'none')
   );
@@ -273,22 +288,31 @@ export function autoTableColumnExpressions(
     .map(path => {
       let expr: Node = varNode(tableRowType, 'row');
       let pathStr: string[] = [];
+      const finishPick = () => {
+        if (pathStr.length > 0) {
+          expr = opPick({
+            obj: expr,
+            key: constString(pathStr.join('.')),
+          });
+          // We have to reset the pathStr after collapsing it into an opPick!
+          pathStr = [];
+        }
+      };
       for (const p of path) {
-        if (!p.startsWith('__object__')) {
-          pathStr.push(p);
-        } else {
-          if (pathStr.length > 0) {
-            expr = opPick({
-              obj: expr,
-              key: constString(pathStr.join('.')),
-            });
-            // We have to reset the pathStr after collapsing it into an opPick!
-            pathStr = [];
-          }
+        if (p.startsWith('__object')) {
+          finishPick();
           expr = opObjGetAttr({
             self: expr,
             name: constString(p.slice('__object__'.length)),
           });
+        } else if (p === '*' && !listIndexWithStar) {
+          finishPick();
+          expr = opIndex({
+            arr: expr,
+            index: constNumber(-1),
+          });
+        } else {
+          pathStr.push(p);
         }
       }
       if (pathStr.length > 0) {

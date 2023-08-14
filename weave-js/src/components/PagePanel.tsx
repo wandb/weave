@@ -236,7 +236,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    consoleLog('PAGE PANEL MOUNT');
+    consoleLog('PAGE PANEL MOUNT', window.location.href);
     setLoading(true);
     if (expString != null) {
       weave.expression(expString, []).then(res => {
