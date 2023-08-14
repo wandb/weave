@@ -287,6 +287,7 @@ def _map_nodes(
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
+    skip_static_lambdas: bool = False,
 ) -> Node:
     # This is an iterative implemenation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
@@ -314,6 +315,7 @@ def _map_nodes(
             walk_lambdas
             and isinstance(curr_node, ConstNode)
             and isinstance(curr_node.type, weave_types.Function)
+            and (len(curr_node.type.input_types) > 0 or not skip_static_lambdas)
         ):
             if curr_node.val not in already_mapped:
                 to_consider.append(curr_node.val)
@@ -356,13 +358,16 @@ def map_nodes_full(
     leaf_nodes: list[Node],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     on_error: OnErrorFnType = None,
+    skip_static_lambdas: bool = False,
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
     results: list[Node] = []
     for node_ndx, node in enumerate(leaf_nodes):
         try:
-            results.append(_map_nodes(node, map_fn, already_mapped, True))
+            results.append(
+                _map_nodes(node, map_fn, already_mapped, True, skip_static_lambdas)
+            )
         except Exception as e:
             if on_error:
                 results.append(on_error(node_ndx, e))

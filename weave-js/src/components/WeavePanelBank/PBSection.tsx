@@ -26,15 +26,10 @@ import {
   SCROLLBAR_STYLES,
   WHITE,
 } from '../../common/css/globals.styles';
-import {
-  IconAddNew as IconAddNewUnstyled,
-  IconPencilEdit,
-} from '../Panel2/Icons';
+import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {inJupyterCell} from '../PagePanelComponents/util';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {Tooltip} from '../Tooltip';
-import {IconButton} from '../IconButton';
-import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {
   useGetPanelIsHoveredByGroupPath,
   useGetPanelIsHoveredInOutlineByGroupPath,
@@ -42,6 +37,7 @@ import {
   useSetInspectingPanel,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
+import {Button} from '../Button';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -109,18 +105,21 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                     <Tooltip
                       position="bottom right"
                       trigger={
-                        <IconButton
-                          onClick={() => setInspectingPanel(groupPath)}>
-                          <IconPencilEdit />
-                        </IconButton>
+                        <Button
+                          variant="ghost"
+                          icon="pencil-edit"
+                          onClick={() => setInspectingPanel(groupPath)}
+                        />
                       }>
                       Open panel editor
                     </Tooltip>
                     {enableAddPanel && (
-                      <WBButton onClick={handleAddPanel}>
-                        <IconAddNew $marginRight={6} />
+                      <Button
+                        variant="ghost"
+                        onClick={handleAddPanel}
+                        icon="add-new">
                         New panel
-                      </WBButton>
+                      </Button>
                     )}
                   </ActionBar>
                 )}

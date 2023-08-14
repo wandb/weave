@@ -75,11 +75,15 @@ def recursively_merge_union_types_if_they_are_unions_of_structs(
 
 def recursively_build_pyarrow_array(
     py_objs: list[typing.Any],
-    pyarrow_type: pa.DataType,
+    pyarrow_type: typing.Union[pa.DataType, arrow_util.ArrowTypeWithFieldInfo],
     mapper,
     py_objs_already_mapped: bool = False,
 ) -> pa.Array:
     arrays: list[pa.Array] = []
+
+    if isinstance(pyarrow_type, arrow_util.ArrowTypeWithFieldInfo):
+        pyarrow_type = arrow_util.arrow_type(pyarrow_type)
+    pyarrow_type = typing.cast(pa.DataType, pyarrow_type)
 
     def none_unboxer(iterator: typing.Iterable):
         for obj in iterator:

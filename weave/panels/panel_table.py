@@ -132,8 +132,11 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             )
         return f"""weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
-    def add_column(self, select_expr, name=None):
-        self.config.tableState.add_column(select_expr, name)
+    def add_column(
+        self, select_expr: typing.Callable, name: typing.Optional[str] = None
+    ) -> None:
+        config = typing.cast(TableConfig, self.config)
+        config.tableState.add_column(select_expr, name)
 
 
 def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:

@@ -3,7 +3,7 @@
 # TODO: Notebook Walkthrough
 
 from ..wandb_interface.wandb_stream_table import StreamTable
-from .monitor_decorator import monitor
+from .monitor import init_monitor
 
 
 __all__ = ["StreamTable", "monitor"]

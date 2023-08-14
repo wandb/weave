@@ -17,24 +17,24 @@ class LegacyImageArtifactFileRefType(types.ObjectType):
 
     def property_types(self) -> dict[str, types.Type]:
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
     @classmethod
     def type_of_instance(cls, obj):
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
     def _to_dict(self) -> dict:
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
     @classmethod
     def from_dict(cls, d):
         raise errors.WeaveTypeError(
-            f"LegacyImageArtifactFileRefType should never be used! it is a temp type"
+            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
         )
 
 
@@ -262,6 +262,7 @@ class HtmlArtifactFileRef:
 # {"params": {"serialization_path": {"key": "output", "path":
 # "media/serialized_data/498587e8.npz"}, "shape": [10]} However, I suspect we
 # will just use the newer Weave1 NDArray type instead.
+
 
 # 3/22/23: However as of this comment, we just return NoneType() instead of this
 # type when we encounter legacy ndarray, since the table data is None

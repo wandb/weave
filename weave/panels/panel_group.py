@@ -9,6 +9,8 @@ from .. import weave_internal
 from .. import graph
 from .. import panel
 from .. import panel_util
+from .. import errors
+from .. import dispatch
 from .bank import default_panel_bank_flow_section_config, flow_layout
 
 from .panel_group_panel_info import PanelInfo
@@ -139,10 +141,25 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             else:
                 options_dict = {}
                 panel_info = {}
+                if self.config.gridConfig is None:
+                    self.config.gridConfig = default_panel_bank_flow_section_config()
+
                 for o in options["items"]:
                     if isinstance(o, GroupPanel):
                         options_dict[o.id] = o.panel
                         panel_info[o.id] = {"hidden": o.hidden}
+                        if o.id and o.layout:
+                            self.config.gridConfig["panels"].append(
+                                {
+                                    "id": o.id,
+                                    "layout": {
+                                        "x": o.layout.x,
+                                        "y": o.layout.y,
+                                        "w": o.layout.w,
+                                        "h": o.layout.h,
+                                    },
+                                }
+                            )
                     else:
                         raise ValueError("Items must be GroupPanel")
                 self.config.items = options_dict
@@ -159,7 +176,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             self.config.style = options["style"]
         self._normalize()
 
-    def _normalize(self, frame=None):
+    def _normalize(self, frame=None) -> dict[str, list[typing.Union[str, int]]]:
         if frame is None:
             frame = {}
         frame = copy.copy(frame)
@@ -167,32 +184,94 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         frame["input"] = self.input_node
 
         items = {}
-        for name, p in self.config.items.items():
-            try:
-                injected = panel.run_variable_lambdas(p, frame)
-            except weave.errors.WeaveDefinitionError:
-                return
-            child = panel_util.child_item(injected)
-            if not isinstance(child, graph.Node):
-                child._normalize(frame)
-            if isinstance(child, Group):
-                # lift group vars
-                for child_name, child_item in child.config.items.items():
-                    frame[child_name] = weave_internal.make_var_node(
-                        weave.type_of(child_item), child_name
-                    )
+        all_missing_vars = {}
+        config = typing.cast(GroupConfig, self.config)
+        for name, p in config.items.items():
+            injected, missing_vars = panel.run_variable_lambdas(p, frame)
+            if missing_vars:
+                child = injected
+            else:
+                child = panel_util.child_item(injected)
+                child_missing_vars = None
+                if isinstance(child, panel.Panel):
+                    child_missing_vars = child._normalize(frame)
+                    if child_missing_vars:
+                        for k, v in child_missing_vars.items():
+                            child_path = [name] + v
+                            missing_vars[k] = child_path
+                if isinstance(child, Group):
+                    # lift group vars
+                    child_config = typing.cast(GroupConfig, child.config)
+                    for child_name, child_item in child_config.items.items():
+                        if child_missing_vars:
+                            continue
+                        if not isinstance(child_item, graph.Node) and not isinstance(
+                            child_item, panel.Panel
+                        ):
+                            raise ValueError(
+                                "Group items must be panel.Panel or graph.Node, but panel at key '%s' is %s"
+                                % (child_name, type(child_item))
+                            )
+                        frame[child_name] = weave_internal.make_var_node(
+                            weave.type_of(child_item), child_name
+                        )
             items[name] = child
 
             # We build up config one item at a time. Construct a version
             # with the current items so that we can do type_of on it (type_of
             # will fail if we have a lambda in the config).
-            partial_config = dataclasses.replace(self.config, items=items)
-            config_var = weave_internal.make_var_node(
-                weave.type_of(partial_config), "self"
-            )
-            frame[name] = config_var.items[name]
+            all_missing_vars.update(missing_vars)
+            if not all_missing_vars:
+                partial_config = dataclasses.replace(self.config, items=items)
+                config_var = weave_internal.make_var_node(
+                    weave.type_of(partial_config), "self"
+                )
+                frame[name] = config_var.items[name]  # type: ignore
 
-        self.config.items = items
+        config.items = items
+        return all_missing_vars
+
+    def add(
+        self,
+        name: str,
+        node_or_panel: typing.Any,
+        hidden: bool = False,
+        layout: typing.Optional[GroupPanelLayout] = None,
+    ) -> dispatch.RuntimeVarNode:
+        config = typing.cast(GroupConfig, self.config)
+        config.items[name] = node_or_panel
+        if config.panelInfo is None:
+            config.panelInfo = {}
+        config.panelInfo[name] = {"hidden": hidden}
+        if layout is not None:
+            if config.gridConfig is None:
+                config.gridConfig = default_panel_bank_flow_section_config()
+            config.gridConfig["panels"].append(
+                {
+                    "id": name,
+                    "layout": {
+                        "x": layout.x,
+                        "y": layout.y,
+                        "w": layout.w,
+                        "h": layout.h,
+                    },
+                }
+            )
+        missing_vars = self._normalize()
+        if missing_vars:
+            raise errors.WeaveApiError(
+                "References to the following variables were not resolved at paths: %s"
+                % missing_vars
+            )
+        return weave_internal.make_var_node(weave.type_of(node_or_panel), name)  # type: ignore
+
+    def finalize(self):
+        missing_vars = self._normalize()
+        if missing_vars:
+            raise errors.WeaveApiError(
+                "References to the following variables were not resolved at paths: %s"
+                % missing_vars
+            )
 
     def to_code(self) -> typing.Optional[str]:
         field_vals: list[tuple[str, str]] = []

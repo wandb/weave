@@ -410,7 +410,7 @@ def weave_arrow_type_check(
                 reasons.append(f"Expected StringType, got {at}")
         elif isinstance(wt, types.UnknownType):
             if len(arr) != 0:
-                reasons.append(f"Non-zero length array with UnknownType")
+                reasons.append("Non-zero length array with UnknownType")
         elif isinstance(wt, types.Int):
             # We allow float32/64 because of a bug in our unnest implementation
             # which relies on pandas. TODO: Remove this when we fix unnest.
@@ -1274,7 +1274,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def tagged_value_tag(self) -> "ArrowWeaveListGeneric[types.TypedDict]":
         if not isinstance(self.object_type, tagged_value_type.TaggedValueType):
-            raise ValueError(f"Cannot get tagged_value_tag from non-TaggedValueType")
+            raise ValueError("Cannot get tagged_value_tag from non-TaggedValueType")
 
         return ArrowWeaveListGeneric[types.TypedDict](
             self._arrow_data.field("_tag"), self.object_type.tag, self._artifact
@@ -1282,7 +1282,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def tagged_value_value(self) -> "ArrowWeaveList":
         if not isinstance(self.object_type, tagged_value_type.TaggedValueType):
-            raise ValueError(f"Cannot get tagged_value_tag from non-TaggedValueType")
+            raise ValueError("Cannot get tagged_value_tag from non-TaggedValueType")
 
         return ArrowWeaveList(
             self._arrow_data.field("_value"), self.object_type.value, self._artifact
