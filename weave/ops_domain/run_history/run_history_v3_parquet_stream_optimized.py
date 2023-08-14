@@ -258,6 +258,31 @@ def _construct_live_data_awl(
     )
 
 
+def _pa_table_has_column(pa_table: pa.Table, col_name: str) -> bool:
+    return col_name in pa_table.column_names
+
+
+def _create_empty_column(
+    table: pa.Table, col_type: types.Type, artifact: artifact_base.Artifact
+) -> pa.Array:
+    return convert.to_arrow(
+        [None] * len(table), types.List(col_type), artifact=artifact
+    )._arrow_data
+
+
+def _update_pa_table_column(
+    table: pa.Table, col_name: str, arrow_col: pa.Array
+) -> pa.Table:
+    fields = [field.name for field in table.schema]
+    return table.set_column(fields.index(col_name), col_name, arrow_col)
+
+
+def _new_pa_table_column(
+    table: pa.Table, col_name: str, arrow_col: pa.Array
+) -> pa.Table:
+    return table.append_column(col_name, arrow_col)
+
+
 def _process_all_columns(
     flattened_object_type: types.TypedDict,
     raw_live_data: list[dict],
@@ -297,13 +322,19 @@ def _process_all_columns(
             live_columns[col_name] = processed_live_column
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
-                fields = [field.name for field in table.schema]
-                new_col = _process_history_column_in_memory(
-                    table[col_name], col_type, run_path, artifact
-                )
-                processed_history_pa_tables[table_ndx] = table.set_column(
-                    fields.index(col_name), col_name, new_col
-                )
+                if not _pa_table_has_column(table, col_name):
+                    new_table = _new_pa_table_column(
+                        table, col_name, _create_empty_column(table, col_type, artifact)
+                    )
+                else:
+                    new_table = _update_pa_table_column(
+                        table,
+                        col_name,
+                        _process_history_column_in_memory(
+                            table[col_name], col_type, run_path, artifact
+                        ),
+                    )
+                processed_history_pa_tables[table_ndx] = new_table
 
         elif _is_directly_convertible_type(col_type):
             live_columns_already_mapped[col_name] = raw_live_column
@@ -314,22 +345,25 @@ def _process_all_columns(
             live_columns_already_mapped[col_name] = processed_live_column
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
-                fields = [field.name for field in table.schema]
-                new_col = _drop_types_from_encoded_types(
-                    ArrowWeaveList(
-                        table[col_name],
-                        None,
-                        artifact=artifact,
+                if not _pa_table_has_column(table, col_name):
+                    new_table = _new_pa_table_column(
+                        table, col_name, _create_empty_column(table, col_type, artifact)
                     )
-                )
-                arrow_col = new_col._arrow_data
-                if types.Timestamp().assign_type(types.non_none(col_type)):
-                    arrow_col = arrow_col.cast("int64").cast(
-                        pa.timestamp("ms", tz="UTC")
+                else:
+                    new_col = _drop_types_from_encoded_types(
+                        ArrowWeaveList(
+                            table[col_name],
+                            None,
+                            artifact=artifact,
+                        )
                     )
-                processed_history_pa_tables[table_ndx] = table.set_column(
-                    fields.index(col_name), col_name, arrow_col
-                )
+                    arrow_col = new_col._arrow_data
+                    if types.Timestamp().assign_type(types.non_none(col_type)):
+                        arrow_col = arrow_col.cast("int64").cast(
+                            pa.timestamp("ms", tz="UTC")
+                        )
+                    new_table = _update_pa_table_column(table, col_name, arrow_col)
+                processed_history_pa_tables[table_ndx] = new_table
 
     return live_columns, live_columns_already_mapped, processed_history_pa_tables
 
