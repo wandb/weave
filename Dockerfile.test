@@ -8,11 +8,7 @@ COPY requirements.* /root/
 WORKDIR /root
 RUN python3 -m venv venv
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
-    pip install -r requirements.test.txt -r requirements.dev.txt"
-
-ENTRYPOINT "/bin/bash"
-
-FROM node:16 as js_builder
+    pip install -r requirements.test.txt -r requirements.dev.txt -r requirements.ecosystem.txt"
 
 RUN apt update && apt install -y gcc g++ make libcairo2-dev libjpeg-dev libgif-dev libpango1.0-dev
 
@@ -25,19 +21,8 @@ RUN --mount=type=cache,target=/usr/local/share/.cache \
     echo $SHA1 > ./build/sha1.txt && \
     rm -rf node_modules
 
-# final stage
-FROM builder
-WORKDIR /root
-
-COPY requirements.ecosystem.txt /root
-RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
-    pip install -r requirements.ecosystem.txt"
-
 COPY integration_test/package.json /root/integration_test/package.json
 COPY integration_test/package-lock.json /root/integration_test/package-lock.json
 RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && npm install
-
-# TODO, currently builder doesn't support --link
-COPY --from=js_builder /root/weave-js/build /root/weave-js-build
 
 ENTRYPOINT "/bin/bash"
