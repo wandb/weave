@@ -53,7 +53,9 @@ import {Spec as MultiTableSpec2} from './PanelTableMerge';
 import {Spec as TraceSpec} from './PanelTrace';
 import {Spec as TraceTreeModelSpec} from './PanelTraceTree/PanelTraceTreeModel';
 import {Spec as PanelTraceTreeTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer';
+import {Spec as PanelTraceTreeFromHistoryTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeFromHistoryTableViewer';
 import {Spec as TraceTreeTraceSpec} from './PanelTraceTree/PanelTraceTreeTrace';
+import {Spec as PanelTraceSpec} from './PanelTraceTree/PanelTrace';
 import {Spec as TypeSpec} from './PanelType';
 import {Spec as UnknownSpec} from './PanelUnknown';
 import {Spec as VideoSpec} from './PanelVideo';
@@ -62,7 +64,7 @@ import {Spec as WebVizSpec} from './PanelWebViz';
 
 // TODO: Wrap Panel components with makeSpec calls
 
-// These are the all the registered panels. To register a new one, just add
+// These are all the registered panels. To register a new one, just add
 // its spec here.
 // The order of this array determines the default panel recommendation order.
 // See scoreHandlerStack in availablePanels.ts for the function that
@@ -151,8 +153,10 @@ const initSpecs = () => {
       PanelArtifactVersionAliasesSpec,
 
       PanelTraceTreeTraceTableViewerSpec,
+      PanelTraceTreeFromHistoryTraceTableViewerSpec,
       TraceTreeTraceSpec,
       TraceTreeModelSpec,
+      PanelTraceSpec,
 
       // Organizational
       // LayoutContainerSpec,

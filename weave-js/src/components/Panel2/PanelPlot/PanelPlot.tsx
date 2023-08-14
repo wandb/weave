@@ -7,15 +7,16 @@ import CustomPanelRenderer, {
   MultiTableDataType,
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
+import * as S from './styles';
 import {
   constNode,
-  // constFunction,
+  constFunction,
   ConstNode,
   constNodeUnsafe,
   constNone,
   constNumber,
   constString,
-  // constStringList,
+  constStringList,
   escapeDots,
   Frame,
   isAssignableTo,
@@ -27,27 +28,26 @@ import {
   maybe,
   Node,
   numberBin,
+  timestampBin,
   oneOrMany,
-  // opAnd,
+  opAnd,
   opArray,
   opDict,
-  // opContains,
-  // opDateToNumber,
-  // opDict,
-  // opFilter,
+  opContains,
+  opDateToNumber,
+  opFilter,
   opIndex,
   // opMap,
   // opMerge,
-  // opNumberGreaterEqual,
-  // opNumberLessEqual,
-  // opNumberMult,
+  opNumberGreaterEqual,
+  opNumberLessEqual,
   opPick,
   // opRandomlyDownsample,
   opRunId,
   opRunName,
   OpStore,
   opUnnest,
-  // OutputNode,
+  OutputNode,
   Stack,
   Type,
   typedDict,
@@ -56,6 +56,10 @@ import {
   varNode,
   voidNode,
   withoutTags,
+  filterNodes,
+  taggedValueValueType,
+  isTaggedValue,
+  opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -72,7 +76,7 @@ import React, {
 } from 'react';
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
-import {Button, Checkbox, MenuItemProps, Tab} from 'semantic-ui-react';
+import {Button, MenuItemProps, Tab} from 'semantic-ui-react';
 import {calculatePosition} from 'vega-tooltip';
 
 import {useWeaveContext, useWeaveDashUiEnable} from '../../../context';
@@ -91,20 +95,20 @@ import {useTableStatesWithRefinedExpressions} from '../PanelTable/tableStateReac
 import * as TableType from '../PanelTable/tableType';
 import * as PlotState from './plotState';
 import {
-  defaultPlot,
   DimensionLike,
   ExpressionDimName,
   isValidConfig,
+  DIM_NAME_MAP,
+  DASHBOARD_DIM_NAME_MAP,
 } from './plotState';
 import {PanelPlotRadioButtons} from './RadioButtons';
 import {
   AnyPlotConfig,
   ConcretePlotConfig,
-  // AxisSelections,
-  // ContinuousSelection,
+  AxisSelections,
+  ContinuousSelection,
   DEFAULT_SCALE_TYPE,
-  DIM_NAME_MAP,
-  // DiscreteSelection,
+  DiscreteSelection,
   LAZY_PATHS,
   LINE_SHAPES,
   MarkOption,
@@ -119,6 +123,8 @@ import {
 import {toWeaveType} from '../toWeaveType';
 import {ConfigSection} from '../ConfigPanel';
 import {IconButton} from '../../IconButton';
+import {Tooltip} from '../../Tooltip';
+import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
 import {
   IconAddNew,
   IconCheckmark,
@@ -130,10 +136,12 @@ import {
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
+import {Option} from '@wandb/weave/common/util/uihelpers';
 
 const recordEvent = makeEventRecorder('Plot');
 
 // const PANELPLOT_MAX_DATAPOINTS = 2000;
+const DOMAIN_DATAFETCH_EXTRA_EXTENT = 2;
 
 const defaultFontStyleDict = {
   titleFont: 'Source Sans Pro',
@@ -170,17 +178,31 @@ function useIsDashboard() {
   return isOrgDashboard || isRepoInsightsDashboard;
 }
 
+function defaultPlot(
+  inputNode: Node,
+  stack: Stack,
+  enableDashUi: boolean
+): PlotConfig {
+  return PlotState.setDefaultSeriesNames(
+    PlotState.defaultPlot(inputNode, stack),
+    enableDashUi
+  );
+}
+
 const useConfig = (
   inputNode: Node,
   propsConfig?: AnyPlotConfig
 ): {config: PlotConfig; isRefining: boolean} => {
   const {stack} = usePanelContext();
   const weave = useWeaveContext();
+  const enableDashUi = useWeaveDashUiEnable();
 
-  const newConfig = useMemo(
-    () => PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
-    [propsConfig, inputNode, stack]
-  );
+  const newConfig = useMemo(() => {
+    return PlotState.setDefaultSeriesNames(
+      PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
+      !!enableDashUi
+    );
+  }, [propsConfig, inputNode, stack, enableDashUi]);
 
   const defaultColNameStrippedConfig = useMemo(
     () =>
@@ -293,7 +315,8 @@ const ensureValidSignals = (config: ConcretePlotConfig): ConcretePlotConfig => {
 const useConcreteConfig = (
   config: PlotConfig,
   input: Node,
-  stack: Stack
+  stack: Stack,
+  panelId: string
 ): {config: ConcretePlotConfig; loading: boolean} => {
   const lazyConfigElementsNode = useMemo(
     () =>
@@ -318,7 +341,9 @@ const useConcreteConfig = (
     [config]
   );
 
-  const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode);
+  const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode, {
+    callSite: 'PanelPlot.concreteConfig.' + panelId,
+  });
   const concreteConfigEvaluationResult = concreteConfigUse.result as
     | {[K in (typeof LAZY_PATHS)[number]]: any}
     | undefined;
@@ -329,7 +354,12 @@ const useConcreteConfig = (
     let loading: boolean = false;
     let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
-      newConfig = PlotState.defaultConcretePlot(input, stack);
+      newConfig = PlotState.defaultConcretePlot(
+        // Don't use the actual input.type here, defaultConcretePlot is expensive!
+        // but we don't need a hydrated config in the loading case.
+        constNode(list(typedDict({})), []),
+        stack
+      );
       loading = true;
     } else {
       // generate the new config with the concrete values obtained from the execution of the lazy paths
@@ -346,18 +376,13 @@ const useConcreteConfig = (
     }
 
     return {config: newConfig, loading};
-  }, [
-    concreteConfigEvaluationResult,
-    concreteConfigLoading,
-    config,
-    input,
-    stack,
-  ]);
+  }, [concreteConfigEvaluationResult, concreteConfigLoading, config, stack]);
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
+  const enableDashUi = useWeaveDashUiEnable();
   const inputNode = input;
 
   const weave = useWeaveContext();
@@ -370,7 +395,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     (newConfig?: Partial<PlotConfig>) => {
       if (!newConfig) {
         // if config is undefined, just use the default plot
-        propsUpdateConfig(defaultPlot(input, stack));
+        propsUpdateConfig(defaultPlot(input, stack, !!enableDashUi));
       } else {
         propsUpdateConfig({
           ...config,
@@ -378,7 +403,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         });
       }
     },
-    [config, propsUpdateConfig, input, stack]
+    [config, propsUpdateConfig, input, stack, enableDashUi]
   );
 
   const resetConfig = useCallback(() => {
@@ -449,7 +474,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const labelConfigDom = useMemo(() => {
     return (
       <>
-        {['X Axis Label', 'Y Axis Label', 'Color Legend Label'].map(name => {
+        {['X axis', 'Y axis', 'Color legend'].map(name => {
           const dimName = name.split(' ')[0].toLowerCase() as
             | 'x'
             | 'y'
@@ -471,30 +496,153 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
             </ConfigPanel.ConfigOption>
           );
         })}
-        {config.series.map((series, i) => {
-          const seriesName = `Series ${i + 1} Name`;
+      </>
+    );
+  }, [config, updateConfig]);
+
+  // Ensure that user cannot delete the last series
+  const seriesMenuItems = useCallback(
+    (s: SeriesConfig, index: number) => {
+      if (index === 0 && config.series.length === 1) {
+        return [];
+      }
+      return [
+        {
+          key: 'Remove series',
+          content: 'Remove series',
+          icon: <IconDelete />,
+          onClick: () => {
+            updateConfig(PlotState.removeSeries(config, s));
+          },
+        },
+      ];
+    },
+    [config, updateConfig]
+  );
+
+  const updateGroupBy = useCallback(
+    (
+      enabled: boolean,
+      seriesIndex: number,
+      dimName: keyof SeriesConfig['dims'],
+      value: string
+    ) => {
+      const fn = enabled
+        ? TableState.enableGroupByCol
+        : TableState.disableGroupByCol;
+      let newTable = fn(
+        config.series[seriesIndex].table,
+        value
+        // config.series[seriesIndex].dims[dimension.name as keyof SeriesConfig['dims']]
+      );
+      if (dimName === 'label') {
+        newTable = fn(newTable, config.series[seriesIndex].dims.color);
+      }
+      const newConfig = produce(config, draft => {
+        draft.series[seriesIndex].table = newTable;
+      });
+      updateConfig(newConfig);
+    },
+    [config, updateConfig]
+  );
+
+  const newSeriesConfigDom = useMemo(() => {
+    return (
+      <>
+        {config.series.map((s, i) => {
+          const groupByDropdownOptions: Option[] = PLOT_DIMS_UI.filter(
+            dimName => dimName !== 'mark'
+          ).map(dimName => {
+            return {
+              key: dimName,
+              text: dimName,
+              value: s.dims[dimName as keyof SeriesConfig['dims']],
+            };
+          });
           return (
-            <ConfigPanel.ConfigOption
-              key={seriesName}
-              label={config.series.length > 1 ? seriesName : 'Series'}>
-              <ConfigPanel.TextInputConfigField
-                dataTest={`${seriesName}-label`}
-                value={series.seriesName}
-                label={''}
-                onChange={(event, {value}) => {
-                  updateConfig(
-                    produce(config, draft => {
-                      draft.series[i].seriesName = value;
-                    })
-                  );
-                }}
-              />
-            </ConfigPanel.ConfigOption>
+            <ConfigSection
+              label={`Series ${i + 1}`}
+              menuItems={seriesMenuItems(s, i)}>
+              {
+                <ConfigPanel.ConfigOption
+                  key={`series-${i + 1}`}
+                  label={'Name'}
+                  multiline={true}>
+                  <ConfigPanel.TextInputConfigField
+                    dataTest={`series-${i + 1}-label`}
+                    value={s.seriesName}
+                    label={''}
+                    onChange={(event, {value}) => {
+                      updateConfig(
+                        produce(config, draft => {
+                          draft.series[i].seriesName = value;
+                        })
+                      );
+                    }}
+                  />
+                </ConfigPanel.ConfigOption>
+              }
+              <ConfigPanel.ConfigOption multiline={true} label="Group by">
+                <ConfigPanel.ModifiedDropdownConfigField
+                  multiple
+                  options={groupByDropdownOptions}
+                  value={s.table.groupBy.filter(value =>
+                    // In updateGroupBy above, if the dim is label, color also gets added
+                    // as another dimension to group by. It's confusing to the user
+                    // so we hide the automatic color grouping in the UI
+                    // TODO: need to discuss with shawn on grouping logic
+                    groupByDropdownOptions.some(o => o.value === value)
+                  )}
+                  onChange={(event, {value}) => {
+                    const values = value as string[];
+                    const valueToAdd = values.filter(
+                      x => !s.table.groupBy.includes(x)
+                    );
+                    const valueToRemove = s.table.groupBy.filter(
+                      x => !values.includes(x)
+                    );
+                    if (valueToAdd.length > 0) {
+                      const dimName = groupByDropdownOptions.find(
+                        o => o.value === valueToAdd[0]
+                      )?.text as keyof SeriesConfig['dims'];
+                      updateGroupBy(true, i, dimName, valueToAdd[0]);
+                    } else if (valueToRemove.length > 0) {
+                      const dimName = groupByDropdownOptions.find(
+                        o => o.value === valueToRemove[0]
+                      )?.text as keyof SeriesConfig['dims'];
+                      updateGroupBy(false, i, dimName, valueToRemove[0]);
+                    }
+                  }}
+                />
+              </ConfigPanel.ConfigOption>
+              {PLOT_DIMS_UI.map(dimName => {
+                const dimIsShared = PlotState.isDimShared(
+                  config.series,
+                  dimName,
+                  weave
+                );
+                const dimIsExpanded = config.configOptionsExpanded[dimName];
+                const dimIsSharedInUI = dimIsShared && !dimIsExpanded;
+                const seriesDim = PlotState.dimConstructors[dimName](s, weave);
+                return (
+                  <ConfigDimComponent
+                    key={`${dimName}-${i}`}
+                    input={input}
+                    config={config}
+                    updateConfig={updateConfig}
+                    indentation={0}
+                    isShared={dimIsSharedInUI}
+                    dimension={seriesDim}
+                    multiline={true}
+                  />
+                );
+              })}
+            </ConfigSection>
           );
         })}
       </>
     );
-  }, [config, updateConfig]);
+  }, [seriesMenuItems, config, weave, input, updateConfig, updateGroupBy]);
 
   const seriesConfigDom = useMemo(() => {
     const firstSeries = config.series[0];
@@ -547,7 +695,6 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       </>
     );
   }, [config, weave, input, updateConfig]);
-  const enableDashUi = useWeaveDashUiEnable();
 
   const vegaReadyTables = useVegaReadyTables(config.series, frame);
 
@@ -588,6 +735,30 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     ),
     [config, updateConfig, xScaleConfigEnabled, yScaleConfigEnabled]
   );
+
+  const [showAdvancedProperties, setShowAdvancedProperties] =
+    useState<boolean>(false);
+  const toggleAdvancedProperties = useCallback(() => {
+    setShowAdvancedProperties(prev => !prev);
+  }, []);
+  const advancedPropertiesDom = useMemo(() => {
+    return (
+      <>
+        {showAdvancedProperties ? (
+          <div onClick={toggleAdvancedProperties}>
+            {scaleConfigDom}
+            <S.AdvancedPropertiesHeader>
+              Hide advanced properties
+            </S.AdvancedPropertiesHeader>
+          </div>
+        ) : (
+          <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
+            Advanced properties
+          </S.AdvancedPropertiesHeader>
+        )}
+      </>
+    );
+  }, [showAdvancedProperties, toggleAdvancedProperties, scaleConfigDom]);
 
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const configTabs = useMemo(() => {
@@ -681,6 +852,37 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     );
   }, [config.series, input, weave]);
 
+  const addNewSeriesDom = useMemo(() => {
+    return (
+      <>
+        <S.AddNewSeriesContainer
+          onClick={() => {
+            if (config.series.length > 0) {
+              const newConfig = produce(
+                PlotState.addSeriesFromSeries(
+                  config,
+                  config.series[config.series.length - 1],
+                  'y',
+                  weave
+                ),
+                draft => {
+                  draft.series[
+                    draft.series.length - 1
+                  ].seriesName = `Series ${draft.series.length}`;
+                }
+              );
+              updateConfig(newConfig);
+            }
+          }}>
+          <S.AddNewSeriesText>New series</S.AddNewSeriesText>
+          <S.AddNewSeriesButton>
+            <IconAddNew width="18" height="18" />
+          </S.AddNewSeriesButton>
+        </S.AddNewSeriesContainer>
+      </>
+    );
+  }, [config, updateConfig, weave]);
+
   return useMemo(
     () =>
       enableDashUi ? (
@@ -688,8 +890,12 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           <ConfigSection label={`Properties`}>
             {dashboardConfigOptions}
             <VariableView newVars={cellFrame} />
-            {seriesConfigDom}
+            {xScaleConfigEnabled &&
+              yScaleConfigEnabled &&
+              advancedPropertiesDom}
           </ConfigSection>
+          {newSeriesConfigDom}
+          {addNewSeriesDom}
           <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
         </>
       ) : (
@@ -702,11 +908,15 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       enableDashUi,
       dashboardConfigOptions,
       cellFrame,
-      seriesConfigDom,
       labelConfigDom,
       configTabs,
       activeTabIndex,
       seriesButtons,
+      xScaleConfigEnabled,
+      yScaleConfigEnabled,
+      addNewSeriesDom,
+      advancedPropertiesDom,
+      newSeriesConfigDom,
     ]
   );
 };
@@ -743,7 +953,7 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
   axis,
 }) => {
   const currentScaleType =
-    getScaleValue<ScaleType>(`type`) ?? DEFAULT_SCALE_TYPE;
+    getScaleValue<ScaleType>(`scaleType`) ?? DEFAULT_SCALE_TYPE;
 
   const scaleTypeSpecificProp = SCALE_TYPE_SPECIFIC_PROPS[currentScaleType];
   const scaleTypeSpecificPropValue: number | undefined =
@@ -759,7 +969,7 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
           options={SCALE_TYPE_OPTIONS}
           value={currentScaleType}
           onChange={(event, {value}) => {
-            setScaleValue(`type`, value as ScaleType);
+            setScaleValue(`scaleType`, value as ScaleType);
           }}
         />
       </ConfigPanel.ConfigOption>
@@ -826,24 +1036,39 @@ type DimComponentInputType = {
   isShared: boolean;
   dimension: DimensionLike;
   extraOptions?: DimOptionOrSection[];
+  multiline?: boolean;
 };
 
 const ConfigDimLabel: React.FC<
   Omit<DimComponentInputType, 'extraOptions'> & {
     postfixComponent?: React.ReactElement;
+    multiline?: boolean;
+    enableDashUi?: boolean;
   }
 > = props => {
+  const dimName = props.dimension.name;
+  const seriesIndexStr =
+    props.isShared || props.config.series.length === 1
+      ? ''
+      : ` ${props.config.series.indexOf(props.dimension.series) + 1}`;
+  const label = props.enableDashUi
+    ? DASHBOARD_DIM_NAME_MAP[dimName]
+    : DIM_NAME_MAP[dimName] + seriesIndexStr;
+
   return (
-    <div style={{paddingLeft: 10 * props.indentation}}>
+    <div
+      style={{
+        paddingLeft: 10 * props.indentation,
+        borderLeft:
+          props.indentation > 0 && props.enableDashUi
+            ? `2px solid ${globals.MOON_200}`
+            : 'none',
+      }}>
       <ConfigPanel.ConfigOption
-        label={
-          DIM_NAME_MAP[props.dimension.name] +
-          (props.isShared || props.config.series.length === 1
-            ? ''
-            : ` ${props.config.series.indexOf(props.dimension.series) + 1}`)
-        }
+        label={label}
         data-test={`${props.dimension.name}-dim-config`}
-        postfixComponent={props.postfixComponent}>
+        postfixComponent={props.postfixComponent}
+        multiline={props.multiline}>
         {props.children}
       </ConfigPanel.ConfigOption>
     </div>
@@ -927,6 +1152,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     indentation,
     input,
     extraOptions,
+    multiline,
   } = props;
   const weave = useWeaveContext();
   const enableDashUi = useWeaveDashUiEnable();
@@ -970,13 +1196,16 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return [
-        removeSeriesDropdownOption,
-        addSeriesDropdownOption,
-        collapseDimDropdownOption,
-      ];
+      return enableDashUi
+        ? []
+        : [
+            removeSeriesDropdownOption,
+            addSeriesDropdownOption,
+            collapseDimDropdownOption,
+            enableDashUi,
+          ];
     },
-    [config, updateConfig, weave]
+    [config, updateConfig, weave, enableDashUi]
   );
 
   const makeSharedDimDropdownOptions = useCallback(
@@ -995,9 +1224,9 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return [expandDim];
+      return enableDashUi ? [] : [expandDim];
     },
-    [config, updateConfig]
+    [config, updateConfig, enableDashUi]
   );
 
   const uiStateOptions = useMemo(() => {
@@ -1131,10 +1360,6 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   );
 
   const postFixComponent = useMemo(() => {
-    if (dimOptions.length === 0) {
-      return undefined;
-    }
-
     if (!enableDashUi) {
       return (
         <PopupDropdown
@@ -1166,17 +1391,69 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       items: opts.slice(1).map(dimOptionToMenuItem),
     }));
 
+    const zeroMenuOptions =
+      uiStateOptions.length === 1 &&
+      uiStateOptions[0] === null &&
+      extraOptions == null;
+
+    const dimName = dimension.name as (typeof PLOT_DIMS_UI)[number];
+
     return (
-      <PopupMenu
-        position="bottom left"
-        trigger={
-          <ConfigDimMenuButton>
-            <IconOverflowHorizontal />
-          </ConfigDimMenuButton>
-        }
-        items={menuItems}
-        sections={menuSections}
-      />
+      <>
+        {!zeroMenuOptions && (
+          <PopupMenu
+            position="bottom left"
+            trigger={
+              <ConfigDimMenuButton>
+                <IconOverflowHorizontal />
+              </ConfigDimMenuButton>
+            }
+            items={menuItems}
+            sections={menuSections}
+          />
+        )}
+        {config.series.length > 1 &&
+          indentation === 0 &&
+          (isShared ? (
+            <Tooltip
+              position="top right"
+              trigger={
+                <S.ConstrainedIconContainer
+                  onClick={() => {
+                    // "expanding" the dimension means unconstraining it
+                    const newConfig = produce(config, draft => {
+                      draft.configOptionsExpanded[dimName] = true;
+                    });
+                    updateConfig(newConfig);
+                  }}>
+                  <IconLockedConstrained width={18} height={18} />
+                </S.ConstrainedIconContainer>
+              }>
+              Remove constraint across series
+            </Tooltip>
+          ) : (
+            <Tooltip
+              position="top right"
+              trigger={
+                <S.UnconstrainedIconContainer
+                  // "sharing" the dimension means constraining it
+                  onClick={() => {
+                    updateConfig(
+                      PlotState.makeDimensionShared(
+                        config,
+                        dimension.series,
+                        dimName,
+                        weave
+                      )
+                    );
+                  }}>
+                  <IconUnlockedUnconstrained width={18} height={18} />
+                </S.UnconstrainedIconContainer>
+              }>
+              Constrain dimension across series
+            </Tooltip>
+          ))}
+      </>
     );
 
     function dimOptionToMenuItem({
@@ -1213,27 +1490,19 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           return <IconWeave />;
       }
     }
-  }, [dimOptions, enableDashUi]);
-
-  const updateGroupBy = useCallback(
-    (enabled: boolean) => {
-      const fn = enabled
-        ? TableState.enableGroupByCol
-        : TableState.disableGroupByCol;
-      let newTable = fn(
-        config.series[0].table,
-        config.series[0].dims[dimension.name as keyof SeriesConfig['dims']]
-      );
-      if (dimension.name === 'label') {
-        newTable = fn(newTable, config.series[0].dims.color);
-      }
-      const newConfig = produce(config, draft => {
-        draft.series[0].table = newTable;
-      });
-      updateConfig(newConfig);
-    },
-    [config, dimension.name, updateConfig]
-  );
+  }, [
+    dimOptions,
+    enableDashUi,
+    config,
+    dimension.name,
+    dimension.series,
+    extraOptions,
+    indentation,
+    isShared,
+    uiStateOptions,
+    updateConfig,
+    weave,
+  ]);
 
   if (PlotState.isDropdownWithExpression(dimension)) {
     return (
@@ -1267,7 +1536,11 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isDropdown(dimension)) {
     const dimName = dimension.name;
     return (
-      <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
+      <ConfigDimLabel
+        {...props}
+        postfixComponent={postFixComponent}
+        multiline={enableDashUi && multiline}
+        enableDashUi={enableDashUi}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
           placeholder={dimension.defaultState().compareValue}
@@ -1292,7 +1565,11 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isWeaveExpression(dimension)) {
     return (
       <>
-        <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
+        <ConfigDimLabel
+          {...props}
+          postfixComponent={postFixComponent}
+          multiline={enableDashUi && multiline}
+          enableDashUi={enableDashUi}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}
@@ -1301,16 +1578,6 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             series={isShared ? config.series : [dimension.series]}
           />
         </ConfigDimLabel>
-        {enableDashUi && (
-          <ConfigPanel.ConfigOption label={`Group by ${dimension.name}`}>
-            <Checkbox
-              checked={config.series[0].table.groupBy.includes(
-                config.series[0].dims[dimension.name]
-              )}
-              onChange={(e, {checked}) => updateGroupBy(checked ?? false)}
-            />
-          </ConfigPanel.ConfigOption>
-        )}
       </>
     );
   }
@@ -1401,8 +1668,6 @@ function fixKeyForVegaTable(
   );
 }
 
-/*
-
 function filterTableNodeToContinuousSelection(
   node: Node,
   colId: string,
@@ -1413,11 +1678,53 @@ function filterTableNodeToContinuousSelection(
   return opFilter({
     arr: node,
     filterFn: constFunction({row: listObjectType(node.type)}, ({row}) => {
-      const colName = fixKeyForVegaTable(colId, table, opStore);
+      const colName = escapeDots(
+        TableState.getTableColumnName(
+          table.columnNames,
+          table.columnSelectFunctions,
+          colId,
+          opStore
+        )
+      );
+
       let colNode = opPick({obj: row, key: constString(colName)});
 
-      // TODO: make this more general and make use of the type system and config to
-      // emit the correct filter function.
+      const domainDiff = domain[1] - domain[0];
+      if (isAssignableTo(colNode.type, maybe(timestampBin))) {
+        return opAnd({
+          lhs: opNumberGreaterEqual({
+            lhs: opDateToNumber({
+              date: opPick({obj: colNode, key: constString('start')}),
+            }),
+            rhs: constNumber(
+              domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+          rhs: opNumberLessEqual({
+            lhs: opDateToNumber({
+              date: opPick({obj: colNode, key: constString('stop')}),
+            }),
+            rhs: constNumber(
+              domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+        });
+      } else if (isAssignableTo(colNode.type, maybe(numberBin))) {
+        return opAnd({
+          lhs: opNumberGreaterEqual({
+            lhs: opPick({obj: colNode, key: constString('start')}),
+            rhs: constNumber(
+              domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+          rhs: opNumberLessEqual({
+            lhs: opPick({obj: colNode, key: constString('stop')}),
+            rhs: constNumber(
+              domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            ),
+          }),
+        });
+      }
       if (
         isAssignableTo(
           colNode.type,
@@ -1427,25 +1734,27 @@ function filterTableNodeToContinuousSelection(
           })
         )
       ) {
-        colNode = opNumberMult({
-          lhs: opDateToNumber({date: colNode}),
-          rhs: constNumber(1000),
-        });
+        colNode = opDateToNumber({date: colNode});
       }
 
       return opAnd({
         lhs: opNumberGreaterEqual({
           lhs: colNode,
-          rhs: constNumber(domain[0]),
+          rhs: constNumber(
+            domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+          ),
         }),
         rhs: opNumberLessEqual({
           lhs: colNode,
-          rhs: constNumber(domain[1]),
+          rhs: constNumber(
+            domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+          ),
         }),
       });
     }),
   });
 }
+/*
 
 async function mergeRealizedTableData(
   oldTable: _.Dictionary<any>[],
@@ -1455,6 +1764,7 @@ async function mergeRealizedTableData(
   const uniqueArray = _.uniqBy(flatArray, '_rowIndex');
   return _.sortBy(uniqueArray, '_rowIndex');
 }
+*/
 
 function filterTableNodeToDiscreteSelection(
   node: Node,
@@ -1466,7 +1776,15 @@ function filterTableNodeToDiscreteSelection(
   return opFilter({
     arr: node,
     filterFn: constFunction({row: listObjectType(node.type)}, ({row}) => {
-      const colName = fixKeyForVegaTable(colId, table, opStore);
+      const colName = escapeDots(
+        TableState.getTableColumnName(
+          table.columnNames,
+          table.columnSelectFunctions,
+          colId,
+          opStore
+        )
+      );
+
       const colNode = opPick({obj: row, key: constString(colName)});
       const permittedValues = constStringList(domain);
 
@@ -1511,7 +1829,6 @@ function filterTableNodeToSelection(
   }
   return node;
 }
-*/
 
 function getMark(
   series: SeriesConfig,
@@ -1537,7 +1854,7 @@ function getMark(
     } else if (
       isAssignableTo(
         dimTypes.x,
-        union(['none', 'string', 'date', numberBin])
+        union(['none', 'string', 'date', numberBin, timestampBin])
       ) &&
       isAssignableTo(dimTypes.y, maybe('number'))
     ) {
@@ -1646,6 +1963,7 @@ const useLatestData = (
 */
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
+  const isDash = useWeaveDashUiEnable();
   const weave = useWeaveContext();
   const {
     input,
@@ -1669,15 +1987,19 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   // TODO(np): Hack to detect when we are on an activity dashboard
   const isDashboard = useIsDashboard();
 
-  const inputNode = input;
   const {frame, stack} = usePanelContext();
-  const {config, isRefining} = useConfig(inputNode, props.config);
+  const {config, isRefining} = useConfig(input, props.config);
+
+  const panelId = LLReact.useId();
+
+  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
+    useConcreteConfig(config, input, stack, panelId.toString());
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
       if (!newConfig) {
         // if config is undefined, just use the default plot
-        propsUpdateConfig(defaultPlot(input, stack));
+        propsUpdateConfig(defaultPlot(input, stack, !!isDash));
       } else {
         propsUpdateConfig({
           ...config,
@@ -1685,8 +2007,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         });
       }
     },
-    [config, propsUpdateConfig, input, stack]
+    [config, propsUpdateConfig, input, stack, isDash]
   );
+
+  const inputNode = input;
 
   const updateConfig2 = useCallback(
     (change: (oldConfig: PlotConfig) => PlotConfig) => {
@@ -1700,6 +2024,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
   updateConfigRef.current = updateConfig;
+
+  const concreteConfig = useMemo(
+    () => ensureValidSignals(unvalidatedConcreteConfig),
+    [unvalidatedConcreteConfig]
+  );
+
+  const configRef = useRef<PlotConfig>(config);
+  configRef.current = config;
+
+  const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
+  concreteConfigRef.current = concreteConfig;
 
   // side effect
   useEffect(() => {
@@ -1727,8 +2062,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     );
   }, [vegaReadyTables, inputNode, weave]);
 
-  const isDash = useWeaveDashUiEnable();
-
   const flatResultNode = useMemo(() => {
     const arrayArg: {
       [key: number]: ReturnType<
@@ -1737,26 +2070,35 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     } = {};
 
     const reduced = vegaReadyTables.reduce((acc, val, i) => {
-      const node: Node = listOfTableNodes[i];
-      /*
+      let node: Node = listOfTableNodes[i];
 
-      const series = config.series[i];
+      if (isDash) {
+        const series = config.series[i];
 
-      const mark = getMark(series, node, series.table);
-      if (['line', 'point'].includes(mark)) {
-        ['x' as const, 'y' as const]
-          .filter(axisName => mark === 'point' || axisName === 'x')
-          .forEach(axisName => {
+        const mark = getMark(series, node, series.table);
+        if (['bar', 'line', 'point', 'area'].includes(mark)) {
+          ['x' as const].forEach(axisName => {
             node = filterTableNodeToSelection(
               node,
-              config.signals.domain,
+              concreteConfig.signals.domain,
               series,
               axisName,
               weave.client.opStore
             );
           });
+        }
+        // If we have a nominal axis, limit it. We can end up with
+        // tons of unique values and Vega will basically hang.
+        const xAxisType = PlotState.getAxisType(concreteConfig.series[0], 'x');
+        const yAxisType = PlotState.getAxisType(concreteConfig.series[0], 'y');
+        if (xAxisType === 'nominal' || yAxisType === 'nominal') {
+          node = opLimit({
+            arr: node,
+            limit: constNumber(50),
+          });
+        }
       }
-      */
+
       /*
       if (isDash) {
         node = opRandomlyDownsample({
@@ -1771,28 +2113,26 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return acc;
     }, arrayArg);
     return opArray(reduced as any);
-  }, [vegaReadyTables, listOfTableNodes]); // , isDash]);
+  }, [
+    vegaReadyTables,
+    listOfTableNodes,
+    isDash,
+    config.series,
+    concreteConfig.series,
+    concreteConfig.signals.domain,
+    weave.client.opStore,
+  ]); // , isDash]);
 
   const flatResultNodeRef = useRef(flatResultNode);
 
   const flatResultNodeDidChange = flatResultNode !== flatResultNodeRef.current;
 
   flatResultNodeRef.current = flatResultNode;
-  const result = LLReact.useNodeValue(flatResultNode);
 
-  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(config, input, stack);
-
-  const concreteConfig = useMemo(
-    () => ensureValidSignals(unvalidatedConcreteConfig),
-    [unvalidatedConcreteConfig]
-  );
-
-  const configRef = useRef<PlotConfig>(config);
-  configRef.current = config;
-
-  const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
-  concreteConfigRef.current = concreteConfig;
+  const result = LLReact.useNodeValue(flatResultNode, {
+    callSite: 'PanelPlot.flatResultNode.' + panelId,
+    skip: isRefining || concreteConfigLoading,
+  });
 
   // enables domain sharing
 
@@ -1903,6 +2243,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     config.series
   );
   */
+
+  function scaleToVegaScale(s: Scale) {
+    return _.mapKeys(_.omitBy(s, _.isNil), (v, k) =>
+      k === 'scaleType' ? 'type' : k
+    );
+  }
 
   type DiscreteMappingScale = {domain: string[]; range: number[][]};
   const lineStyleScale: DiscreteMappingScale = useMemo(() => {
@@ -2036,8 +2382,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             if (!isTypedDict(rowType)) {
               throw new Error('expected typed dict');
             }
-            const mappedPropTypes = _.mapKeys(rowType.propertyTypes, (v, k) =>
-              PlotState.fixKeyForVega(k)
+            const mappedPropTypes = _.mapValues(
+              _.mapKeys(rowType.propertyTypes, (v, k) =>
+                PlotState.fixKeyForVega(k)
+              ),
+              (v, k) => (v && isTaggedValue(v) ? taggedValueValueType(v) : v)
             );
             const series = concreteConfig.series[row._seriesIndex];
             const seriesName = PlotState.defaultSeriesName(series, weave);
@@ -2095,6 +2444,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           },
           {nodeValue, nodeType}
         );
+
         return constNodeUnsafe(typedDict(type), value);
       }
     );
@@ -2108,60 +2458,98 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     concreteConfig.signals.domain,
   ]);
 
-  const brushableAxes = useMemo(
-    () =>
-      ['x' as const, 'y' as const].filter(axisName => {
-        const seriesTypes = listOfTableNodes.reduce((acc, node, i) => {
-          const dimName = PlotState.dimNamesRaw(
-            config.series[i].table,
-            config.series[i].dims,
-            weave
-          )[axisName];
-          const rowType = withoutTags(
-            listObjectType(node.type)
-          ) as TypedDictType;
-          const dimType = rowType.propertyTypes[dimName];
-          if (dimType != null) {
-            acc.push(dimType);
-          }
-          return acc;
-        }, [] as Type[]);
-
-        const uniqueTypes = _.uniqBy(seriesTypes, JSON.stringify);
-
-        let axisType: Type | undefined = 'invalid';
-        if (uniqueTypes.length > 2) {
-          return false;
-        } else if (
-          uniqueTypes.length === 2 &&
-          !uniqueTypes.includes('invalid')
-        ) {
-          return false;
-        } else if (uniqueTypes.length === 2) {
-          uniqueTypes.forEach(type => {
-            if (type !== 'invalid') {
-              axisType = type;
-            }
-          });
-        } else {
-          axisType = uniqueTypes.values().next().value;
-        }
-
-        if (axisType == null) {
-          return false;
-        }
-
+  const brushableAxes = useMemo(() => {
+    const brushTypes = ['x' as const, 'y' as const].map(axisName => {
+      // Sum and count operations are "extensive" properties meaning
+      // they depend on the size of the sample, while other operations
+      // like min/max/avg are "intensive" properties meaning they do not.
+      // (thanks gpt-4 for these definitions!)
+      // We like to configure the plot such that it rebins
+      // along the groupby axis (e.g. time) after zooming, which means
+      // the amount of points falling in each bin will change. The result
+      // of extensive operations will differ given the new bin size in
+      // these cases, and the data ends up "below" where it was when
+      // the user initiated the zoom. So we just disable brushing on
+      // extensive axes, and let the plot figure out the new extent
+      // automatically.
+      const seriesHasUnstableAggs = listOfTableNodes.map((n, i) => {
+        const series = config.series[i];
+        const seriesSelectFn =
+          series.table.columnSelectFunctions[series.dims[axisName]];
         return (
-          isAssignableTo(axisType, oneOrMany(maybe('number'))) ||
-          isAssignableTo(
-            axisType,
-            oneOrMany(maybe({type: 'timestamp', unit: 'ms'}))
-          ) ||
-          isAssignableTo(axisType, 'invalid') // TODO: check
+          filterNodes(
+            seriesSelectFn,
+            selFn =>
+              selFn.nodeType === 'output' &&
+              (selFn.fromOp.name === 'count' ||
+                selFn.fromOp.name.endsWith('sum'))
+          ).length > 0
         );
-      }),
-    [listOfTableNodes, config.series, weave]
-  );
+      });
+      if (seriesHasUnstableAggs.includes(true)) {
+        return undefined;
+      }
+      const seriesTypes = listOfTableNodes.reduce((acc, node, i) => {
+        const dimName = PlotState.dimNamesRaw(
+          config.series[i].table,
+          config.series[i].dims,
+          weave
+        )[axisName];
+        const rowType = withoutTags(listObjectType(node.type)) as TypedDictType;
+        const dimType = rowType.propertyTypes[dimName];
+        if (dimType != null) {
+          acc.push(dimType);
+        }
+        return acc;
+      }, [] as Type[]);
+
+      const uniqueTypes = _.uniqBy(seriesTypes, JSON.stringify);
+
+      let axisType: Type | undefined = 'invalid';
+      if (uniqueTypes.length > 2) {
+        return undefined;
+      } else if (uniqueTypes.length === 2 && !uniqueTypes.includes('invalid')) {
+        return undefined;
+      } else if (uniqueTypes.length === 2) {
+        uniqueTypes.forEach(type => {
+          if (type !== 'invalid') {
+            axisType = type;
+          }
+        });
+      } else {
+        axisType = uniqueTypes.values().next().value;
+      }
+
+      if (axisType == null) {
+        return undefined;
+      }
+
+      if (
+        isAssignableTo(axisType, oneOrMany(maybe('number'))) ||
+        isAssignableTo(axisType, oneOrMany(maybe(numberBin)))
+      ) {
+        return 'quantitative';
+      }
+
+      if (
+        isAssignableTo(axisType, oneOrMany(maybe({type: 'timestamp'}))) ||
+        isAssignableTo(axisType, oneOrMany(maybe(timestampBin)))
+      ) {
+        return 'temporal';
+      }
+
+      return undefined;
+    });
+    type BrushType = 'temporal' | 'quantitative';
+    const brushTypesResult: {x?: BrushType; y?: BrushType} = {};
+    if (brushTypes[0] != null) {
+      brushTypesResult.x = brushTypes[0];
+    }
+    if (brushTypes[1] != null) {
+      brushTypesResult.y = brushTypes[1];
+    }
+    return brushTypesResult;
+  }, [listOfTableNodes, config.series, weave]);
 
   const xScaleAndDomain = useMemo(
     () =>
@@ -2235,7 +2623,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
       if (xAxisType != null) {
         const fixedXKey = fixKeyForVega(dims.x);
-        if (isAssignableTo(dimTypes.x, maybe(numberBin))) {
+        if (
+          isAssignableTo(dimTypes.x, maybe(numberBin)) ||
+          isAssignableTo(dimTypes.x, maybe(timestampBin))
+        ) {
           if (mark === 'bar') {
             newSpec.encoding.x = {
               field: fixedXKey + '.start',
@@ -2434,6 +2825,20 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         };
       }
 
+      if (newSpec.mark.type === 'bar') {
+        // If we have start and end for an x or y dimension, but only
+        // center for the other dimension, tell vega to aggregate the
+        // other dimension. Since we always provide pre-computed to
+        // vega, the aggregation has no effect on the actual data. But
+        // This fixes an issue where Vega will only draw the "top" of
+        // the bar.
+        if (newSpec.encoding.x2 != null && newSpec.encoding.y2 == null) {
+          newSpec.encoding.y.aggregate = 'sum';
+        } else if (newSpec.encoding.y2 != null && newSpec.encoding.x2 == null) {
+          newSpec.encoding.x.aggregate = 'sum';
+        }
+      }
+
       if (!newSpec.encoding.tooltip) {
         newSpec.transform = [
           {
@@ -2561,7 +2966,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               name: 'brush',
               select: {
                 type: 'interval',
-                encodings: brushableAxes,
+                encodings: Object.keys(brushableAxes),
               },
             },
           ],
@@ -2613,7 +3018,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
         for (const axis of [`x`, `y`] as const) {
           if (
-            concreteConfig.axisSettings[axis].scale?.type === `log` &&
+            concreteConfig.axisSettings[axis].scale?.scaleType === `log` &&
             row[vegaCols[i][axis]] <= 0
           ) {
             return false;
@@ -2685,7 +3090,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
     // TODO(np): fixme
     if (axisSettings.x.scale != null) {
-      newSpec.encoding.x.scale = axisSettings.x.scale;
+      newSpec.encoding.x.scale = scaleToVegaScale(axisSettings.x.scale);
     }
     if (axisSettings.x.noTitle) {
       newSpec.encoding.x.axis.title = null;
@@ -2711,7 +3116,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       newSpec.encoding.y.axis = {...defaultFontStyleDict};
       // TODO(np): fixme
       if (axisSettings.y.scale != null) {
-        newSpec.encoding.y.scale = axisSettings.y.scale;
+        newSpec.encoding.y.scale = scaleToVegaScale(axisSettings.y.scale);
       }
       if (axisSettings.y.noTitle) {
         newSpec.encoding.y.axis.title = null;
@@ -2737,8 +3142,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
 
     if (newSpec.encoding.color != null) {
-      if (axisSettings?.color?.scale) {
-        newSpec.encoding.color.scale = axisSettings.color.scale;
+      if (axisSettings?.color?.scale != null) {
+        newSpec.encoding.color.scale = scaleToVegaScale(
+          axisSettings.color.scale
+        );
       }
 
       if (axisSettings.color && axisSettings.color.noTitle) {
@@ -2837,8 +3244,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('mouseup', async () => {
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig2 = updateConfig2Ref.current;
-        const currUpdateConfig = updateConfigRef.current;
-        const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
         const currConcreteConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
@@ -2857,58 +3262,26 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
           if (settingName === 'domain') {
-            const settingNodesAreConst = ['x' as const, 'y' as const].every(
+            (Object.keys(brushableAxes) as Array<'x' | 'y'>).forEach(
               dimName => {
-                const currentSettingNode = currConfig.signals.domain[dimName];
-                return isConstNode(currentSettingNode);
-              }
-            );
-
-            if (settingNodesAreConst) {
-              // we can use updateConfig
-              let newConfig = currConfig;
-              ['x' as const, 'y' as const].forEach(dimName => {
                 const axisSignal: [number, number] | string[] = signal[dimName];
                 const currentSetting =
                   currConcreteConfig.signals.domain[dimName];
 
-                if (!_.isEqual(currentSetting, axisSignal)) {
-                  newConfig = produce(newConfig, draft => {
-                    draft.signals.domain[dimName] = constNode(
-                      toWeaveType(axisSignal),
-                      axisSignal
-                    );
-                  });
+                let newDomain: Node;
+                if (brushableAxes[dimName] === 'temporal') {
+                  newDomain = constNode(
+                    {type: 'list', objectType: {type: 'timestamp'}},
+                    axisSignal as number[]
+                  );
+                } else {
+                  newDomain = constNode(toWeaveType(axisSignal), axisSignal);
                 }
 
-                // need to clear out the old selection, if there is one
-                newConfig = produce(newConfig, draft => {
-                  draft.signals.selection[dimName] = undefined;
-                });
-
-                currUpdateConfig(newConfig);
-              });
-            } else {
-              ['x' as const, 'y' as const].forEach(dimName => {
-                const axisSignal: [number, number] | string[] = signal[dimName];
-                const currentSetting =
-                  currConcreteConfig.signals.domain[dimName];
-
                 if (!_.isEqual(currentSetting, axisSignal)) {
-                  if (!isConstNode(currConfig.signals.domain[dimName])) {
-                    currMutateDomain[dimName]({
-                      val: constNode(toWeaveType(axisSignal), axisSignal),
-                    });
-                  } else {
-                    currUpdateConfig2((oldConfig: PlotConfig) => {
-                      return produce(oldConfig, draft => {
-                        draft.signals.domain[dimName] = constNode(
-                          toWeaveType(axisSignal),
-                          axisSignal
-                        );
-                      });
-                    });
-                  }
+                  currMutateDomain[dimName]({
+                    val: newDomain,
+                  });
                 }
 
                 // need to clear out the old selection, if there is one
@@ -2917,21 +3290,18 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                     draft.signals.selection[dimName] = undefined;
                   });
                 });
-              });
-            }
+              }
+            );
           } else {
-            let newConfig = currConfig;
-            ['x' as const, 'y' as const].forEach(dimName => {
-              const axisSignal: [number, number] | string[] = signal[dimName];
-              const currentSetting =
-                currConcreteConfig.signals.selection[dimName];
-              if (!_.isEqual(currentSetting, axisSignal)) {
-                newConfig = produce(currConfig, draft => {
+            currUpdateConfig2((oldConfig: PlotConfig) => {
+              return produce(oldConfig, draft => {
+                ['x' as const, 'y' as const].forEach(dimName => {
+                  const axisSignal: [number, number] | string[] =
+                    signal[dimName];
                   draft.signals.selection[dimName] = axisSignal;
                 });
-              }
+              });
             });
-            currUpdateConfig(newConfig);
           }
         } else if (
           _.isEmpty(data) &&
@@ -2940,13 +3310,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             _.isEmpty(currConcreteConfig.signals.selection.y)
           )
         ) {
-          currUpdateConfig(
-            produce(currConfig, draft => {
-              ['x' as const, 'y' as const].forEach(axisName => {
-                draft.signals.selection[axisName] = undefined;
+          currUpdateConfig2((oldConfig: PlotConfig) => {
+            return produce(oldConfig, draft => {
+              ['x' as const, 'y' as const].forEach(dimName => {
+                draft.signals.selection[dimName] = undefined;
               });
-            })
-          );
+            });
+          });
         }
 
         setTimeout(() => {
@@ -2957,14 +3327,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('dblclick', async () => {
         const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
-        const currUpdateConfig = updateConfigRef.current;
-
-        const settingNodesAreConst = ['x' as const, 'y' as const].every(
-          dimName => {
-            const currentSettingNode = currConfig.signals.domain[dimName];
-            return isConstNode(currentSettingNode);
-          }
-        );
 
         if (
           ['x' as const, 'y' as const].some(dimName => {
@@ -2975,23 +3337,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             );
           })
         ) {
-          if (settingNodesAreConst) {
-            // we can use updateConfig
-            let newConfig = currConfig;
-            ['x' as const, 'y' as const].forEach(dimName => {
-              newConfig = produce(newConfig, draft => {
-                // @ts-ignore
-                draft.signals.domain[dimName] = constNone();
-              });
+          ['x' as const, 'y' as const].forEach(dimName => {
+            currMutateDomain[dimName]({
+              val: constNode('none', null),
             });
-            currUpdateConfig(newConfig);
-          } else {
-            ['x' as const, 'y' as const].forEach(dimName => {
-              currMutateDomain[dimName]({
-                val: constNode('none', null),
-              });
-            });
-          }
+          });
         }
       });
       vegaView.addEventListener('mousedown', async () => {
@@ -2999,7 +3349,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         currSetToolTipsEnabled(false);
       });
     },
-    [concreteConfig.signals.selection, concreteConfig.series.length, hasLine]
+    [
+      concreteConfig.series.length,
+      concreteConfig.signals.selection,
+      hasLine,
+      brushableAxes,
+    ]
   );
 
   const [toolTipPos, setTooltipPos] = useState<{
@@ -3342,6 +3697,7 @@ export default Spec;
 
 const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
+  padding: 3px;
 `;
 
 const IconBlank = styled.svg`

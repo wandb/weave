@@ -29,6 +29,7 @@ from . import errors
 from . import registry_mem
 from . import op_def
 from .language_features.tagging import opdef_util
+from . import weave_types as types
 
 
 @dataclasses.dataclass
@@ -139,6 +140,20 @@ def stitch(
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
             sg.add_result(node, stitch_node(node, input_dict, sg))
         elif isinstance(node, graph.ConstNode):
+            # Note from Tim: I believe this block of code should be correct (ie. stitching inside
+            # of static lambdas). I wrote it while implementing a fix but it ended up not being needed.
+            # Stitch is a particularly touchy part of the code base. So i would rather leave this
+            # code commented out for now, but not delete it. My gut tells me that any static lambda
+            # will be re-executed if needed and therefore re-stitched. And furthermore, any caller
+            # of stitch right now (eg. gql compile) should explicitly NOT mutate static lambdas. So
+            # it might be a foot-gun to allow this code to run, even if it is correct. Let's find a
+            # use case for this code before we uncomment it.
+            # is_static_lambda = (
+            #     isinstance(node.type, types.Function)
+            #     and len(node.type.input_types) == 0
+            # )
+            # if is_static_lambda:
+            #     sg.add_result(node, subgraph_stitch(node.val, {}, sg))
             sg.add_result(node, ObjectRecorder(node, val=node.val))
         elif isinstance(node, graph.VarNode):
             if var_values and node.name in var_values:
@@ -303,6 +318,13 @@ def stitch_node_inner(
         inputs[0].tags["joinObj"] = joinKey
         # And we return the original object
         return inputs[0]
+    elif node.from_op.name == "execute":
+        # Special case where the execute op is used to execute a subgraph.
+        # We want the results to flow through
+        fn_node = inputs[0].val
+        if fn_node is None:
+            raise errors.WeaveInternalError("execute function should not be none")
+        return subgraph_stitch(fn_node, {}, sg)
     elif len(inputs) == 0:
         # op does not have any inputs, just track its downstream calls
         return ObjectRecorder(node)

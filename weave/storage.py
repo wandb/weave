@@ -1,6 +1,7 @@
 import os
 import re
 import typing
+import datetime
 import pathlib
 import functools
 
@@ -16,8 +17,12 @@ from . import mappers_python
 from . import box
 from . import errors
 from . import graph
+from . import timestamp
 
 Ref = ref_base.Ref
+
+if typing.TYPE_CHECKING:
+    from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 
 def split_path_dotfile(path, dotfile_name):
@@ -60,10 +65,42 @@ def _ensure_object_components_are_published(
 def _assert_valid_name_part(part: typing.Optional[str] = None):
     if part is None:
         return
-    # if not re.match(r"^[a-zA-Z0-9_\-.]+$", part): # from W&B Artifacts
     if not re.match(r"^[a-zA-Z0-9_\-]+$", part):
         raise ValueError(
             "Invalid name part %s. Must be alphanumeric, dashes, or underscores." % part
+        )
+
+
+def _assert_valid_entity_name(part: typing.Optional[str] = None):
+    if part is None:
+        return
+    if not re.match(r"^[a-z0-9_\-]+$", part):
+        raise ValueError(
+            "Invalid entity name %s. Must be lowercase, digits, dashes, or underscores."
+            % part
+        )
+
+
+def _assert_valid_project_name(part: typing.Optional[str] = None):
+    if part is None:
+        return
+    if len(part) > 128:
+        raise ValueError("Invalid project name %s. Must be <= 128 characters." % part)
+    if re.match(r"[\\#?%:]", part):
+        raise ValueError(
+            "Invalid project name %s. Can not contain \\, #, ?, %%, or :" % part
+        )
+
+
+def _assert_valid_artifact_name(part: typing.Optional[str] = None):
+    if part is None:
+        return
+    if len(part) > 128:
+        raise ValueError("Invalid artifact name %s. Must be <= 128 characters." % part)
+    if not re.match(r"^[a-zA-Z0-9_\-.]+$", part):  # from W&B Artifacts
+        raise ValueError(
+            "Invalid artifact name %s. Must be alphanumeric, periods, dashes, or underscores."
+            % part
         )
 
 
@@ -76,6 +113,8 @@ def _direct_publish(
     branch_name: typing.Optional[str] = None,
     metadata: typing.Optional[typing.Dict[str, typing.Any]] = None,
     assume_weave_type: typing.Optional[types.Type] = None,
+    *,
+    _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
 ):
     weave_type = assume_weave_type or _get_weave_type(obj)
 
@@ -83,11 +122,11 @@ def _direct_publish(
     name = name or _get_name(weave_type, obj)
     wb_artifact_type_name = wb_artifact_type_name or weave_type.name
 
-    _assert_valid_name_part(name)
-    _assert_valid_name_part(wb_project_name)
+    _assert_valid_artifact_name(name)
+    _assert_valid_project_name(wb_project_name)
     _assert_valid_name_part(wb_artifact_type_name)
     _assert_valid_name_part(branch_name)
-    _assert_valid_name_part(wb_entity_name)
+    _assert_valid_entity_name(wb_entity_name)
     # Validate entity name once we have them
 
     obj = box.box(obj)
@@ -101,7 +140,10 @@ def _direct_publish(
     #     nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
         artifact.save(
-            project=wb_project_name, entity_name=wb_entity_name, branch=branch_name
+            project=wb_project_name,
+            entity_name=wb_entity_name,
+            branch=branch_name,
+            _lite_run=_lite_run,
         )
 
     return ref
@@ -271,7 +313,25 @@ def recursively_unwrap_arrow(obj):
     return obj
 
 
-def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> dict:
+def _default_ref_persister_artifact(
+    type: types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
+) -> artifact_base.Artifact:
+    fs_art = artifact_local.LocalArtifact(type.name, "latest")
+    # Save all the reffed objects into the new artifact.
+    for mem_ref in refs:
+        if mem_ref.path is not None and mem_ref._type is not None:
+            fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
+    fs_art.save()
+    return fs_art
+
+
+def to_python(
+    obj: typing.Any,
+    wb_type: typing.Optional[types.Type] = None,
+    ref_persister: typing.Callable[
+        [types.Type, typing.Iterable[artifact_base.ArtifactRef]], artifact_base.Artifact
+    ] = _default_ref_persister_artifact,
+) -> dict:
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
 
@@ -282,12 +342,7 @@ def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> d
 
     if art.ref_count() > 0:
         # There are custom objects, create a local artifact to persist them.
-        fs_art = artifact_local.LocalArtifact(wb_type.name, "latest")
-        # Save all the reffed objects into the new artifact.
-        for mem_ref in art.refs():
-            if mem_ref.path is not None and mem_ref._type is not None:
-                fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
-        fs_art.save()
+        fs_art = ref_persister(wb_type, art.refs())
         # now map the original object again. Because there are now existing refs
         # to the local artifact for any custom objects, this new value will contain
         # those existing refs as absolute refs. We provide None for artifact because
@@ -320,6 +375,16 @@ def make_js_serializer():
     return functools.partial(to_weavejs, artifact=artifact)
 
 
+def convert_timestamps_to_epoch_ms(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, list):
+        return [convert_timestamps_to_epoch_ms(o) for o in obj]
+    if isinstance(obj, dict):
+        return {k: convert_timestamps_to_epoch_ms(v) for k, v in obj.items()}
+    if isinstance(obj, datetime.datetime):
+        return timestamp.python_datetime_to_ms(obj)
+    return obj
+
+
 def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     from .ops_arrow import list_ as arrow_list
 
@@ -331,7 +396,8 @@ def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     elif isinstance(obj, list):
         return [to_weavejs(item, artifact=artifact) for item in obj]
     elif isinstance(obj, arrow_list.ArrowWeaveList):
-        return obj.to_pylist_notags()
+        return convert_timestamps_to_epoch_ms(obj.to_pylist_notags())
+
     wb_type = types.TypeRegistry.type_of(obj)
 
     if artifact is None:

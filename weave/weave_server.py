@@ -32,6 +32,8 @@ from weave import filesystem
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 from weave import storage
 from weave import wandb_api
+from weave.language_features.tagging import tag_store
+
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -101,17 +103,11 @@ def import_ecosystem():
             from weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
-            # logging.warning(
-            #     'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
-            #     'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
-            #     "To disable this message, set WEAVE_SERVER_DISABLE_ECOSYSTEM=1."
-            # )
 
 
 def make_app():
-    import_ecosystem()
-
     logs.configure_logger()
+    import_ecosystem()
 
     app = Flask(__name__)
     app.register_blueprint(blueprint)
@@ -256,6 +252,8 @@ def execute():
         "deref": True,
         "serialize_fn": storage.make_js_serializer(),
     }
+    root_span = tracer.current_root_span()
+    tag_store.record_current_tag_store_size()
     if not PROFILE_DIR:
         start_time = time.time()
         with client_safe_http_exceptions_as_werkzeug():
@@ -272,13 +270,14 @@ def execute():
             elapsed = time.time() - start_time
             profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
             profile.dump_stats(profile_filename)
-            root_span = tracer.current_root_span()
             if root_span:
                 root_span.set_tag(
                     "profile_url",
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
+    if root_span is not None:
+        root_span.set_tag("request_size", len(req_bytes))
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
     response_payload = _value_or_errors_to_response(fixed_response)
@@ -352,44 +351,6 @@ def wb_viewer():
     authenticated = current_context is not None
 
     return {"authenticated": authenticated}
-
-
-DEBUG_MEM = False
-if not environment.wandb_production() and DEBUG_MEM:
-    # To use, hit /objgraph_getnewids to set a baseline, then do some requests.
-    # Then hit /pdb to drop the server into pdb and do
-    # import objgraph
-    # obj_ids = objgraph.get_new_ids()
-    # This will contain all the ids of objects that have been created since
-    # the last call to objgraph.get_new_ids()
-    # Then you can inspect objects like:
-    # obj_id = obj_ids['TypedDict'][0]
-    # obj = objgraph.at(obj_id)
-    # objgraph.show_backrefs([obj], max_depth=15)
-    #
-    # Other useful objgraph commands:
-    # objgraph.show_most_common_types(limit=20)
-    # obj = objgraph.by_type('TypedDict')[100]
-
-    import gc
-    import objgraph  # type: ignore[import]
-
-    @blueprint.route("/pdb")
-    def pdb():
-        breakpoint()
-        return "ok"
-
-    @blueprint.route("/objgraph_showgrowth")
-    def objgraph_showgrowth():
-        gc.collect()
-        objgraph.show_growth()
-        return "see logs"
-
-    @blueprint.route("/objgraph_getnewids")
-    def objgraph_getnewids():
-        gc.collect()
-        objgraph.get_new_ids()
-        return "see logs"
 
 
 app = make_app()

@@ -42,10 +42,16 @@ export const migrate = (config: v11.PlotConfig): PlotConfig => {
       ...config.signals,
       domain: {
         x: weave.constNode(
+          // this is problematic because weave python doesnt know
+          // how to deserialize 'any' if its a number. this is why
+          // we will update this in version 13
           {type: 'union', members: [{type: 'list', objectType: 'any'}, 'none']},
           config.signals.domain.x ?? null
         ),
         y: weave.constNode(
+          // this is problematic because weave python doesnt know
+          // how to deserialize 'any' if its a number. this is why
+          // we will update this in version 13
           {type: 'union', members: [{type: 'list', objectType: 'any'}, 'none']},
           config.signals.domain.y ?? null
         ),

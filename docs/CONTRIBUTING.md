@@ -27,6 +27,7 @@ Before you can contribute to Weave, you'll need to fork the repository and clone
 First, setup your python environment:
 
 ```
+pyenv install 3.9.7
 pyenv virtualenv 3.9.7 weave_dev
 pyenv local weave_dev
 pip install -e .
@@ -51,15 +52,22 @@ wandb init
 In order to develop against Weave, you will want 3 terminal sessions:
 
 1. `cd weave-js && yarn dev`: This will start a local server serving the frontend application (rendered in the notebook iframe)
-2. `./weave-server`: This will start an in-process server running the weave execution engine
+2. `./weave_server.sh`: This will start an in-process server running the weave execution engine
 3. `jupyter notebook`: This will start a notebook server - useful for interacting with your code!
    - note: you will want to use `weave.use_frontend_devmode()` at the top of development notebooks to ensure you hit the frontend server.
 
 ### Testing & Style
 
-Style and lint is enforced using pre-commit hooks.
+Style and lint is enforced using pre-commit hooks. All tests can be run via `cd weave && pytest`
 
-All tests can be run via `cd weave && pytest`
+### Notebook Style & Tests
+
+To successfully commit a Jupyter notebook:
+* make sure the notebook runs end-to-end-locally
+* make sure there is no empty cell at the end of the notebook (remove it if it appeared)
+* merge any sequences of consecutive markdown/non-code cells into a single markdown cell
+* reset kernel and clear output
+* then save the notebook and commit
 
 ## How Can I Contribute?
 

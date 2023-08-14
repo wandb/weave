@@ -4,6 +4,7 @@
 import {Spec as PanelAnyObj} from './PanelAnyObj';
 import {Spec as PanelCard} from './PanelCard';
 import {Spec as PanelColor} from './PanelColor';
+import {Spec as PanelHexColor} from './PanelHexColor';
 import {Spec as PanelEachColumn} from './PanelEachColumn';
 import {Spec as PanelFacetTabs} from './PanelFacetTabs';
 import {Spec as PanelFunctionEditor} from './PanelFunctionEditor';
@@ -23,6 +24,7 @@ import {Spec as PanelSections} from './PanelSections';
 import {Spec as PanelSlider} from './PanelSlider';
 import {Spec as PanelStringEditor} from './PanelStringEditor';
 import {Spec as PanelSelectEditor} from './PanelSelectEditor';
+import {Spec as PanelDateRange} from './PanelDateRange';
 import {Spec as PanelStringHistogramWeave} from './PanelStringHistogramWeave';
 import {Spec as PanelTextEditor} from './PanelTextEditor';
 import {Spec as PanelWeaveLink} from './PanelWeaveLink';
@@ -31,13 +33,14 @@ export const weavePythonPanelSpecs = () => {
   return [
     RunSpec,
     PanelAnyObj,
-    // PanelAuto doens't route config updates correctly and breaks stuff.
+    // PanelAuto doesn't route config updates correctly and breaks stuff.
     // Don't need it yet anyway
     // PanelAuto,
     PanelGpt3Model,
     PanelStringEditor,
     PanelTextEditor,
     PanelSelectEditor,
+    PanelDateRange,
     PanelPanel,
     PanelSlider,
     PanelRef,
@@ -53,6 +56,7 @@ export const weavePythonPanelSpecs = () => {
     PanelWeaveLink,
     PanelPlotly,
     PanelColor,
+    PanelHexColor,
     PanelLayoutFlow,
     PanelFacetTabs,
     PanelSections,

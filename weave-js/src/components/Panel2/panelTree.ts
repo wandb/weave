@@ -18,7 +18,7 @@ import {
   Stack,
   voidNode,
 } from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import * as _ from 'lodash';
 
 import {
@@ -380,6 +380,7 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
     layoutMode: 'grid',
     showExpressions: true,
     enableAddPanel: true,
+    disableDeletePanel: true,
     gridConfig: {
       panels: [
         {
@@ -419,14 +420,22 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
           equalSize: false,
           style: 'width:300px;',
           showExpressions: true,
-          allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
+          allowedPanels: [
+            'Expression',
+            'Query',
+            'Slider',
+            'StringEditor',
+            'SelectEditor',
+            'DateRange',
+          ],
           enableAddPanel: true,
+          disableDeletePanel: true,
           childNameBase: 'var',
         }
       ),
       main,
     },
-    {layoutMode: 'horizontal'}
+    {layoutMode: 'horizontal', disableDeletePanel: true}
   );
 };
 
@@ -438,6 +447,7 @@ export const ensureDashboardFromItems = (
     layoutMode: 'grid',
     showExpressions: true,
     enableAddPanel: true,
+    disableDeletePanel: true,
     gridConfig: {
       panels: Object.entries(seedItems).map(([name, item], ndx) => ({
         id: name,
@@ -469,13 +479,21 @@ export const ensureDashboardFromItems = (
         equalSize: false,
         style: 'width:300px;',
         showExpressions: true,
-        allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
+        allowedPanels: [
+          'Expression',
+          'Query',
+          'Slider',
+          'StringEditor',
+          'SelectEditor',
+          'DateRange',
+        ],
         enableAddPanel: true,
+        disableDeletePanel: true,
         childNameBase: 'var',
       }),
       main,
     },
-    {layoutMode: 'horizontal'}
+    {layoutMode: 'horizontal', disableDeletePanel: true}
   );
 };
 
@@ -488,6 +506,7 @@ export const ensureSimpleDashboard = (
       layoutMode: 'vertical',
       showExpressions: true,
       enableAddPanel: true,
+      disableDeletePanel: true,
     }
   );
 };

@@ -1,14 +1,19 @@
+// Critical performance note: We must not depend on config/updateConfig
+// in the callbacks we construct here. The stack that we construct in PanelContext
+// depends on the callbacks, and we don't want to depend on current config state.
+// If we do depend on current config state, everything in the UI will re-render
+// all the time, because everything depends on stack.
+
 import {
   constNodeUnsafe,
   dereferenceAllVars,
   isNodeOrVoidNode,
   NodeOrVoidNode,
   pushFrame,
-  replaceChainRoot,
   Stack,
   voidNode,
 } from '@wandb/weave/core';
-import produce, {Draft} from 'immer';
+import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
@@ -22,6 +27,7 @@ import {
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
+  ChildPanelProps,
   getFullChildPanel,
   isChildPanelFullConfig,
   mutateEnsureItemIsFullChildPanel,
@@ -41,8 +47,9 @@ import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 // import {VarBar} from '../Sidebar/VarBar';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
-import {inJupyterCell} from '../PagePanelComponents/util';
+// import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -54,12 +61,16 @@ const LAYOUT_MODES = [
   'layer' as const,
 ];
 
+interface PanelInfo {
+  hidden?: boolean;
+}
 export interface PanelGroupConfig {
   layoutMode: (typeof LAYOUT_MODES)[number];
   equalSize?: boolean;
-  showExpressions?: boolean;
+  showExpressions?: boolean | 'titleBar';
   style?: string;
   items: {[key: string]: ChildPanelConfig};
+  panelInfo?: {[key: string]: PanelInfo};
   gridConfig: PanelBankSectionConfig;
   allowedPanels?: string[];
   enableAddPanel?: boolean;
@@ -118,9 +129,10 @@ export const Group = styled.div<{
         border-top: none;
       }
     `}
-          
+
   ${props => props.compStyle}
 `;
+Group.displayName = 'S.Group';
 
 export const GroupItem = styled.div<{
   width?: string;
@@ -165,53 +177,7 @@ export const GroupItem = styled.div<{
           margin-bottom: 12px;
         `}
 `;
-
-// This is a mapping from JS PanelIDs to their corresponding Python type name
-export const panelIdAlternativeMapping: {[jsId: string]: string} = {
-  // These are manually defined in Weave1 python panel module.
-  table: 'tablePanel',
-  number: 'PanelNumber',
-  string: 'PanelString',
-  boolean: 'PanelBoolean',
-  date: 'PanelDate',
-  // Below are defined in `panel_legacy.py`
-  barchart: 'PanelBarchart',
-  'web-viz': 'PanelWebViz',
-  'video-file': 'PanelVideoFile',
-  'model-file': 'PanelModelFile',
-  'id-count': 'PanelIdCount',
-  link: 'PanelLink',
-  'run-overview': 'PanelRunOverview',
-  none: 'PanelNone',
-  artifactVersionAliases: 'PanelArtifactVersionAliases',
-  netron: 'PanelNetron',
-  object: 'PanelObject',
-  'audio-file': 'PanelAudioFile',
-  'string-histogram': 'PanelStringHistogram',
-  rawimage: 'PanelRawimage',
-  'precomputed-histogram': 'PanelPrecomputedHistogram',
-  'image-file-compare': 'PanelImageFileCompare',
-  'molecule-file': 'PanelMoleculeFile',
-  'multi-histogram': 'PanelMultiHistogram',
-  'object3D-file': 'PanelObject3DFile',
-  'run-color': 'PanelRunColor',
-  'multi-string-histogram': 'PanelMultiStringHistogram',
-  dir: 'PanelDir',
-  'id-compare-count': 'PanelIdCompareCount',
-  jupyter: 'PanelJupyter',
-  'bokeh-file': 'PanelBokehFile',
-  ndarray: 'PanelNdarray',
-  'id-compare': 'PanelIdCompare',
-  unknown: 'PanelUnknown',
-  'image-file': 'PanelImageFile',
-  'project-overview': 'PanelProjectOverview',
-  textdiff: 'PanelTextdiff',
-  type: 'PanelType',
-  text: 'PanelText',
-  'string-compare': 'PanelStringCompare',
-  'debug-expression-graph': 'PanelDebugExpressionGraph',
-  tracer: 'PanelTracer',
-};
+GroupItem.displayName = 'S.GroupItem';
 
 export const fixChildData = (
   fullItem: ChildPanelFullConfig
@@ -255,6 +221,8 @@ function dereferenceItemVars(item: any, stack: Stack): any {
     };
   } else if (isNodeOrVoidNode(item)) {
     return dereferenceAllVars(item, stack).node;
+  } else if (_.isArray(item)) {
+    return _.map(item, child => dereferenceItemVars(child, stack));
   } else if (_.isPlainObject(item)) {
     return _.mapValues(item, child => dereferenceItemVars(child, stack));
   }
@@ -581,12 +549,29 @@ export const PanelGroupItem: React.FC<{
         produce(config, draft => {
           draft.items[newName] = draft.items[name];
           delete draft.items[name];
+
+          // This updates the grid config with the new name, since we use names as ids
+          // if we had unique ids, we wouldnt have to do this
+          const gridConfigIndex = config.gridConfig.panels.findIndex(
+            p => p.id === name
+          );
+          if (gridConfigIndex !== -1) {
+            draft.gridConfig.panels[gridConfigIndex].id = newName;
+          }
         })
       );
     },
     [config, name, updateConfig]
   );
 
+  let controlBar: ChildPanelProps['controlBar'] = 'off';
+  if (config.layoutMode === 'layer' || !config.showExpressions) {
+    controlBar = 'off';
+  } else if (config.showExpressions === 'titleBar') {
+    controlBar = 'titleBar';
+  } else {
+    controlBar = 'editable';
+  }
   return (
     <PanelContextProvider
       newVars={siblingVars}
@@ -595,7 +580,7 @@ export const PanelGroupItem: React.FC<{
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
         config={item}
-        editable={config.layoutMode !== 'layer' && config.showExpressions}
+        controlBar={controlBar}
         updateConfig={itemUpdateConfig}
         updateConfig2={itemUpdateConfig2}
         updateName={itemUpdateName}
@@ -694,11 +679,18 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const setPanelIsHighlightedByPath = useSetPanelInputExprIsHighlighted();
   const setItemIsHighlighted = useCallback(
     (name: string, isHighlighted: boolean) => {
-      // console.log('SET ITEM IS HIGHLIGHTED', name, isHighlighted, config);
-      const itemPath = groupPath.concat(findItemPath(config, name));
-      setPanelIsHighlightedByPath(itemPath, isHighlighted);
+      // NOTE: this uses updateConfig2, even though we don't intend to update
+      // the config (we just return it from the updateConfig2 callback). This
+      // let's us get access to the current config, without depending on it
+      // in our closure. This is critical for performance.
+      updateConfig2(currentConfig => {
+        // console.log('SET ITEM IS HIGHLIGHTED', name, isHighlighted, config);
+        const itemPath = groupPath.concat(findItemPath(currentConfig, name));
+        setPanelIsHighlightedByPath(itemPath, isHighlighted);
+        return currentConfig;
+      });
     },
-    [config, groupPath, setPanelIsHighlightedByPath]
+    [groupPath, setPanelIsHighlightedByPath, updateConfig2]
   );
 
   const handleSiblingVarEvent = useCallback(
@@ -706,10 +698,8 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       console.log('PG2 handleSiblingVarEvent', varName, target, event);
       if (event.id === 'hover') {
         setItemIsHighlighted(varName, true);
-        // mutateItem(varName, item => (item.highlight = true));
       } else if (event.id === 'unhover') {
         setItemIsHighlighted(varName, false);
-        // mutateItem(varName, item => (item.highlight = false));
       } else if (event.id === 'mutate') {
         mutateItem(varName, item => {
           console.log('PG2 mutate input expr');
@@ -743,7 +733,12 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       keyedChildPanels[name] = unwrappedItem;
       newVars = {
         ...newVars,
-        ...getItemVars(name, item, stack, config.allowedPanels),
+        ...getItemVars(
+          name,
+          item,
+          pushFrame(stack, newVars),
+          config.allowedPanels
+        ),
       };
     });
     return keyedChildPanels;
@@ -759,7 +754,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
-  const inJupyter = inJupyterCell();
+  // const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   // if (isVarBar) {
@@ -826,6 +821,9 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           const widthItem = styleItems.find(i => i.includes('width'));
           width = widthItem?.split(':')[1];
         }
+        if (config.panelInfo?.[name]?.hidden) {
+          return null;
+        }
         return (
           <GroupItem
             key={name}
@@ -883,8 +881,10 @@ const AddVarButton = styled.div`
     height: 18px;
   }
 `;
+AddVarButton.displayName = 'S.AddVarButton';
 
 const IconAddNew = styled(IconAddNewUnstyled)`
   width: 18px;
   height: 18px;
 `;
+IconAddNew.displayName = 'S.IconAddNew';

@@ -170,7 +170,9 @@ class String:
         return str.rstrip()
 
     @op()
-    def format(self, named_items: dict[str, typing.Union[str, int]]) -> str:
+    def format(
+        self, named_items: dict[str, typing.Optional[typing.Union[str, int]]]
+    ) -> str:
         return self.format(**named_items)
 
     @op(hidden=True)
@@ -190,6 +192,12 @@ class String:
         if not isinstance(res, list):
             raise ValueError("Expected a list")
         return res
+
+    @op(name="string-toNumber", output_type=types.optional(types.Number()))
+    def to_number(self):
+        if self.isnumeric():
+            return float(self)  # type: ignore
+        return None
 
 
 types.String.instance_class = String

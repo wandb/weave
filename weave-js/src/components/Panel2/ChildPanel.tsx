@@ -1,3 +1,9 @@
+// Critical performance note: We must not depend on config/updateConfig
+// in the callbacks we construct here. The stack that we construct in PanelContext
+// depends on the callbacks, and we don't want to depend on current config state.
+// If we do depend on current config state, everything in the UI will re-render
+// all the time, because everything depends on stack.
+
 import EditableField from '@wandb/weave/common/components/EditableField';
 import {
   GRAY_350,
@@ -16,25 +22,29 @@ import {
   filterNodes,
   isAssignableTo,
   isNodeOrVoidNode,
-  replaceChainRoot,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {
+  RefObject,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
-import {IconButton} from '../IconButton';
 import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
 import {ConfigSection} from './ConfigPanel';
-import {IconPencilEdit} from './Icons';
-import {Panel, PanelConfigEditor} from './PanelComp';
+import {Panel, PanelConfigEditor, useUpdateConfig2} from './PanelComp';
 import {
   ExpressionEvent,
   PanelContextProvider,
@@ -56,6 +66,12 @@ import {
 } from './availablePanels';
 import {PanelInput, PanelProps} from './panel';
 import {getStackIdAndName} from './panellib/libpanel';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
+
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
+import {getConfigForPath} from './panelTree';
+import {usePanelPanelContext} from './PanelPanelContextProvider';
+import {Button} from '../Button';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -178,8 +194,8 @@ export const useChildPanelConfig = (
   return useMemo(() => getFullChildPanel(config), [config]);
 };
 
-interface ChildPanelProps {
-  editable?: boolean;
+export interface ChildPanelProps {
+  controlBar?: 'off' | 'editable' | 'titleBar';
   passthroughUpdate?: boolean;
   pathEl?: string;
   prefixHeader?: JSX.Element;
@@ -193,12 +209,13 @@ interface ChildPanelProps {
 }
 
 const useChildPanelCommon = (props: ChildPanelProps) => {
-  const {updateConfig, updateConfig2} = props;
+  const {updateConfig} = props;
+  const updateConfig2 = useUpdateConfig2(props);
   const config = useChildPanelConfig(props.config);
   const {id: panelId, config: panelConfig} = config;
   let {input_node: panelInputExpr} = config;
   const weave = useWeaveContext();
-  const {stack} = usePanelContext();
+  const {stack, path: parentPath} = usePanelContext();
 
   panelInputExpr = useNodeWithServerType(panelInputExpr).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
@@ -251,21 +268,20 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         props.allowedPanels,
         stack
       );
-      updateConfig({
-        ...config,
+      updateConfig2(curConfig => ({
+        ...curConfig,
         input_node: newExpression,
         id,
         config: newPanelConfig,
-      });
+      }));
     },
-    [config, props.allowedPanels, stack, updateConfig, weave]
+    [props.allowedPanels, stack, updateConfig2, weave]
   );
 
   const updateExpression = useCallback(
     (newExpression: NodeOrVoidNode) => {
       if (
-        weave.expToString(newExpression) ===
-        weave.expToString(config.input_node)
+        weave.expToString(newExpression) === weave.expToString(panelInputExpr)
       ) {
         // If expression strings match, no update. This prevents glitching
         // when types change (which I think happens in panel composition
@@ -275,23 +291,23 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         return;
       }
 
-      if (isAssignableTo(newExpression.type, config.input_node.type)) {
+      if (isAssignableTo(newExpression.type, handler?.inputType ?? 'invalid')) {
         // If type didn't change, keep current settings
-        updateConfig({...config, input_node: newExpression});
+        updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
       } else if (curPanelId === 'Each') {
         // "stick" to each
-        updateConfig({...config, input_node: newExpression});
-      } else if (props.allowedPanels != null && config.id === 'Expression') {
+        updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
+      } else if (props.allowedPanels != null && curPanelId === 'Expression') {
         // Major hacks here. allowedPanels is currently only set in the sidebar,
         // so use that to detect if we're there.
         // Expression ends up being the default panel for new panels. So we "stick"
         // to Expression if we're in the sidebar.
-        updateConfig({
-          ...config,
+        updateConfig2(curConfig => ({
+          ...curConfig,
           input_node: newExpression,
           id: 'Expression',
           config: undefined,
-        });
+        }));
       } else {
         // Auto panel behavior.
         initPanelForInput(newExpression);
@@ -299,10 +315,11 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     },
     [
       weave,
+      panelInputExpr,
+      handler?.inputType,
       curPanelId,
-      config,
       props.allowedPanels,
-      updateConfig,
+      updateConfig2,
       initPanelForInput,
     ]
   );
@@ -345,15 +362,15 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   }
   const updateAssignment = useCallback(
     (key: string, val: NodeOrVoidNode) => {
-      updateConfig({
-        ...config,
+      updateConfig2(curConfig => ({
+        ...curConfig,
         vars: {
-          ...config.vars,
+          ...curConfig.vars,
           [key]: val,
         },
-      });
+      }));
     },
-    [config, updateConfig]
+    [updateConfig2]
   );
 
   const updatePanelConfig2 = useCallback(
@@ -391,7 +408,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     () => ({...config.vars, input: panelInputExpr}),
     [config.vars, panelInputExpr]
   );
-  const {path: parentPath} = usePanelContext();
+
   // TODO: we shouldn't need this but pathEl is not always set currently.
   const path = useMemo(
     () =>
@@ -519,6 +536,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   );
 
   const [hoverPanel, setHoverPanel] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [expressionFocused, setExpressionFocused] = useState(false);
   const onFocusExpression = useCallback(() => {
@@ -527,6 +545,18 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const onBlurExpression = useCallback(() => {
     setExpressionFocused(false);
   }, []);
+
+  const {
+    config: fullConfig,
+    updateConfig,
+    updateConfig2,
+  } = usePanelPanelContext();
+  const {path} = usePanelContext();
+  const fullPath = [...path, props.pathEl ?? ''].filter(
+    el => el != null && el !== ''
+  );
+  const {ref: editorBarRef, width: editorBarWidth} =
+    useElementWidth<HTMLDivElement>();
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -537,9 +567,9 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       data-weavepath={props.pathEl ?? 'root'}
       onMouseEnter={() => setHoverPanel(true)}
       onMouseLeave={() => setHoverPanel(false)}>
-      {props.editable && (
+      {(props.controlBar === 'titleBar' || props.controlBar === 'editable') && (
         <Styles.EditorBar>
-          <EditorBarContent className="edit-bar">
+          <EditorBarContent className="edit-bar" ref={editorBarRef}>
             {props.prefixHeader}
             {props.pathEl != null && (
               <EditorPath>
@@ -548,41 +578,68 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   onCommit={props.updateName ?? (() => {})}
                   validateInput={validateName}
                   initialValue={props.pathEl}
+                  maxWidth={
+                    editorBarWidth != null ? editorBarWidth / 3 : undefined
+                  }
+                  maxLength={24}
                 />{' '}
-                ={' '}
+                {props.controlBar === 'editable' && '= '}
               </EditorPath>
             )}
-            {curPanelId !== 'Expression' && curPanelId !== 'RootBrowser' && (
-              <PanelNameEditor
-                value={curPanelId ?? ''}
-                autocompleteOptions={panelOptions}
-                setValue={handlePanelChange}
-              />
+            {props.controlBar === 'editable' &&
+              curPanelId !== 'Expression' &&
+              curPanelId !== 'RootBrowser' && (
+                <PanelNameEditor
+                  value={curPanelId ?? ''}
+                  autocompleteOptions={panelOptions}
+                  setValue={handlePanelChange}
+                />
+              )}
+            {props.controlBar === 'editable' ? (
+              <EditorExpression data-test="panel-expression-expression">
+                <WeaveExpression
+                  expr={panelInputExpr}
+                  setExpression={updateExpression}
+                  noBox
+                  truncate={!expressionFocused}
+                  onFocus={onFocusExpression}
+                  onBlur={onBlurExpression}
+                />
+              </EditorExpression>
+            ) : (
+              <div style={{width: '100%'}} />
             )}
-            <EditorExpression data-test="panel-expression-expression">
-              <WeaveExpression
-                expr={panelInputExpr}
-                setExpression={updateExpression}
-                noBox
-                truncate={!expressionFocused}
-                onFocus={onFocusExpression}
-                onBlur={onBlurExpression}
-              />
-            </EditorExpression>
-            <EditorIcons visible={hoverPanel}>
+            <EditorIcons visible={hoverPanel || isMenuOpen}>
               {props.prefixButtons}
               <Tooltip
                 position="top center"
                 trigger={
-                  <IconButton
-                    // disabled={isLoading}
-                    data-test="panel-config"
-                    onClick={() => setInspectingPanel(props.pathEl ?? '')}>
-                    <IconPencilEdit />
-                  </IconButton>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    icon="pencil-edit"
+                    onClick={() => setInspectingPanel(props.pathEl ?? '')}
+                  />
                 }>
                 Open panel editor
               </Tooltip>
+              <OutlineItemPopupMenu
+                config={fullConfig}
+                localConfig={getConfigForPath(fullConfig, fullPath)}
+                path={fullPath}
+                updateConfig={updateConfig}
+                updateConfig2={updateConfig2}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    icon="overflow-horizontal"
+                  />
+                }
+                onOpen={() => setIsMenuOpen(true)}
+                onClose={() => setIsMenuOpen(false)}
+                isOpen={isMenuOpen}
+              />
             </EditorIcons>
           </EditorBarContent>
         </Styles.EditorBar>
@@ -592,14 +649,29 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
           newVars={newVars}
           handleVarEvent={handleVarEvent}
           newPath={props.pathEl}>
-          <Panel
-            input={panelInput}
-            panelSpec={handler}
-            config={panelConfig}
-            updateConfig={updatePanelConfig}
-            updateConfig2={updatePanelConfig2}
-            updateInput={updatePanelInput}
-          />
+          {props.controlBar === 'titleBar' &&
+          isChildPanelFullConfig(props.config) &&
+          curPanelId === 'Expression' ? (
+            <div style={{paddingLeft: 16, paddingRight: 16}}>
+              <WeaveExpression
+                expr={panelInputExpr}
+                setExpression={updateExpression}
+                noBox
+                truncate={!expressionFocused}
+                onFocus={onFocusExpression}
+                onBlur={onBlurExpression}
+              />
+            </div>
+          ) : (
+            <Panel
+              input={panelInput}
+              panelSpec={handler}
+              config={panelConfig}
+              updateConfig={updatePanelConfig}
+              updateConfig2={updatePanelConfig2}
+              updateInput={updatePanelInput}
+            />
+          )}
         </PanelContextProvider>
       </PanelContainer>
     </Styles.Main>
@@ -675,20 +747,6 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
 
   const dashboardConfigOptions = curPanelSelected ? (
     <>
-      <ConfigPanel.ConfigOption label={`Type`}>
-        <ConfigPanel.ModifiedDropdownConfigField
-          value={curPanelId}
-          options={panelOptions}
-          onChange={(e, {value}) => {
-            if (typeof value === `string` && value) {
-              handlePanelChange(value);
-            }
-          }}
-        />
-      </ConfigPanel.ConfigOption>
-
-      <VariableEditor config={config} updateConfig={updatePanelConfig} />
-
       {curPanelId !== 'Group' && (
         <ConfigPanel.ConfigOption label="Input" multiline>
           <PanelContextProvider
@@ -701,6 +759,20 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
           </PanelContextProvider>
         </ConfigPanel.ConfigOption>
       )}
+
+      <ConfigPanel.ConfigOption label="Panel type">
+        <ConfigPanel.ModifiedDropdownConfigField
+          value={curPanelId}
+          options={panelOptions}
+          onChange={(e, {value}) => {
+            if (typeof value === `string` && value) {
+              handlePanelChange(value);
+            }
+          }}
+        />
+      </ConfigPanel.ConfigOption>
+
+      <VariableEditor config={config} updateConfig={updatePanelConfig} />
     </>
   ) : null;
 
@@ -761,6 +833,9 @@ export const VariableEditor: React.FC<{
 }> = ({config, updateConfig}) => {
   const frame: {[key: string]: NodeOrVoidNode} = {};
   const nextFrame = {...frame};
+  if (_.isEmpty(config.vars)) {
+    return null;
+  }
   return (
     <ConfigPanel.ConfigOption label="variables">
       <div>
@@ -924,3 +999,36 @@ const PanelContainer = styled.div`
   flex-grow: 1;
   overflow-y: auto;
 `;
+
+type ElementWidth<T> = {
+  ref: RefObject<T>;
+  width: number | null;
+};
+
+function useElementWidth<T extends HTMLElement>(): ElementWidth<T> {
+  const [elementWidth, setElementWidth] = useState<number | null>(null);
+  const elementRef = useRef<T>(null);
+
+  useLayoutEffect(() => {
+    if (elementRef.current == null) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry == null) {
+        return;
+      }
+      const w = entry.contentBoxSize[0].inlineSize;
+      setElementWidth(w);
+    });
+
+    resizeObserver.observe(elementRef.current);
+
+    return () => resizeObserver.disconnect();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elementRef.current]);
+
+  return {ref: elementRef, width: elementWidth};
+}

@@ -13,7 +13,6 @@ import callFunction, {
 } from './callers';
 import {Client} from './client';
 import {
-  ConstNode,
   EditingNode,
   EditingOp,
   EditingOpInputs,
@@ -34,7 +33,6 @@ import {nodesEqual} from './model/graph/editing';
 import {isVarNode} from './model/graph/typeHelpers';
 import {
   allObjPaths,
-  functionType,
   isAssignableTo,
   isConstType,
   isFunction,
@@ -228,59 +226,6 @@ export function findChainedAncestors(
   return results.concat(
     findChainedAncestors(Object.values(node.fromOp.inputs)[0], findFn)
   );
-}
-
-export function getChainRootVar(node: NodeOrVoidNode): VarNode | undefined {
-  if (node.nodeType === 'void') {
-    return undefined;
-  }
-  return findChainedAncestor(
-    node,
-    n => n.nodeType === 'var',
-    n => n.nodeType === 'output'
-  ) as VarNode | undefined;
-}
-
-export function getChainRootConst(node: NodeOrVoidNode): ConstNode | undefined {
-  if (node.nodeType === 'void') {
-    return undefined;
-  }
-  return findChainedAncestor(
-    node,
-    n => n.nodeType === 'const',
-    n => n.nodeType === 'output'
-  ) as ConstNode | undefined;
-}
-
-export function getChainRootOutputNode(
-  node: NodeOrVoidNode
-): OutputNode | undefined {
-  if (node.nodeType === 'void') {
-    return undefined;
-  }
-  const flatOutputNodes = findChainedAncestors(
-    node,
-    n => n.nodeType === 'output'
-  ) as OutputNode[];
-  if (flatOutputNodes.length === 0) {
-    return undefined;
-  }
-  return flatOutputNodes[flatOutputNodes.length - 1];
-}
-
-export function replaceChainRoot(
-  node: NodeOrVoidNode,
-  replaceWith: NodeOrVoidNode
-): NodeOrVoidNode {
-  if (node.nodeType === 'output') {
-    const chainRoot = getChainRootOutputNode(node);
-    if (chainRoot == null) {
-      // Shouldn't happen since we check if output node above.
-      throw new Error('no chain root found');
-    }
-    return replaceNode(node, chainRoot, replaceWith) as NodeOrVoidNode;
-  }
-  return replaceWith;
 }
 
 // Returns free variables in expression, ie variables that aren't bound by a lambda.
@@ -580,20 +525,20 @@ export async function refineEditingNode(
       inputsRefined[name] = argValuesRefined[i];
 
       // TODO: BIG Weave Python hacks here.
-      const inputType = inputsRefined[name].type;
-      if (isFunctionType(inputType)) {
-        if (!isFunctionType(opDef.inputTypes[name])) {
-          // inputsRefined[name].type = inputType.outputType;
-          inputsRefined[name] = {
-            nodeType: 'output',
-            type: inputType.outputType,
-            fromOp: {
-              name: 'execute',
-              inputs: {node: inputsRefined[name]},
-            },
-          };
-        }
-      }
+      // const inputType = inputsRefined[name].type;
+      // if (isFunctionType(inputType)) {
+      //   if (!isFunctionType(opDef.inputTypes[name])) {
+      //     // inputsRefined[name].type = inputType.outputType;
+      //     inputsRefined[name] = {
+      //       nodeType: 'output',
+      //       type: inputType.outputType,
+      //       fromOp: {
+      //         name: 'execute',
+      //         inputs: {node: inputsRefined[name]},
+      //       },
+      //     };
+      //   }
+      // }
     });
 
     const hasValidInput = opInputsAreValid(inputsRefined, opDef);
@@ -733,9 +678,11 @@ export async function refineNode(
   return (await refineEditingNode(client, node, stack)) as Node;
 }
 
-function isProducibleType(type: Type) {
+function isProducibleType(type: Type): boolean {
+  if (isFunction(type)) {
+    return isProducibleType(type.outputType);
+  }
   const PRODUCIBLE_TYPES: Type[] = [
-    functionType({}, 'any'),
     'string',
     'number',
     'boolean',
@@ -744,7 +691,7 @@ function isProducibleType(type: Type) {
     maybe('number'),
     maybe('boolean'),
   ];
-  return PRODUCIBLE_TYPES.find(t => isAssignableTo(type, t)) != null;
+  return PRODUCIBLE_TYPES.find(t => isAssignableTo(t, type)) != null;
 }
 
 /**
@@ -1121,4 +1068,24 @@ function simpleOpString(op: EditingOp, opStore: OpStore): string {
     op.inputs,
     opStore
   )} `;
+}
+
+// Return a list where each element is a node that is the first input to the next
+// element. The last element is the node itself.
+export function linearize(node: NodeOrVoidNode) {
+  function _linearize(n: OutputNode): OutputNode[] {
+    const firstArg = Object.values(n.fromOp.inputs)[0];
+    if (firstArg == null) {
+      return [n];
+    }
+    if (firstArg.nodeType !== 'output') {
+      return [n];
+    }
+    return [..._linearize(firstArg), n];
+  }
+
+  if (node.nodeType !== 'output') {
+    return undefined;
+  }
+  return _linearize(node);
 }

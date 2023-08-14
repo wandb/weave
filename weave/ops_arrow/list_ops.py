@@ -3,6 +3,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import numpy as np
 import typing
+from builtins import map as builtin_map
 
 from ..api import op, type_of
 from ..decorator_arrow_op import arrow_op
@@ -21,7 +22,7 @@ from .list_ import ArrowWeaveList, PathType, is_list_arrowweavelist
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert
-from .util import _to_compare_safe_call
+from .convert import to_compare_safe
 from .constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
@@ -409,30 +410,10 @@ def awl_group_by_result_type(
     ),
 )
 def groupby(self, group_by_fn):
-    safe_group_by_fn = _to_compare_safe_call(group_by_fn)
-    group_table_awl = _apply_fn_node_with_tag_pushdown(self, safe_group_by_fn)
-
-    if (
-        safe_group_by_fn is group_by_fn
-    ):  # we want to use `is` here since we want to check for identity
-        unsafe_group_table_awl = group_table_awl
-    else:
-        # This only can happen if `_to_compare_safe_call` modifies something - which
-        # in itself only happens if we are grouping by a media asset
-        unsafe_group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
-
     table = self._arrow_data
-
-    group_table = group_table_awl._arrow_data
-    group_table_as_array = arrow_as_array(group_table)
-
-    # strip tags recursively so we group on values only
-    group_table_as_array_awl = ArrowWeaveList(
-        group_table_as_array, group_table_awl.object_type, self._artifact
-    )
-    group_table_as_array_awl_stripped = (
-        group_table_as_array_awl._arrow_data_asarray_no_tags()
-    )
+    unsafe_group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
+    group_table_awl = to_compare_safe(unsafe_group_table_awl.without_tags())
+    group_table_as_array_awl_stripped = group_table_awl._arrow_data
     group_table_chunked = pa.chunked_array(
         pa.StructArray.from_arrays(
             [
@@ -507,10 +488,14 @@ def count(self: ArrowWeaveList) -> int:
 @op(
     name="ArrowWeaveList-__getitem__",
     output_type=lambda input_types: primitive_list.getitem_output_type(
-        {"arr": input_types["self"]}
+        {"arr": input_types["self"], "index": input_types["index"]},
+        list_type=ArrowWeaveListType,
     ),
 )
-def index(self: ArrowWeaveList, index: typing.Optional[int]):
+def index(
+    self: ArrowWeaveList,
+    index: typing.Optional[typing.Union[int, typing.List[typing.Optional[int]]]],
+):
     return self._index(index)
 
 
@@ -675,14 +660,29 @@ def concat(arr):
     elif len(arr) == 1:
         return arrow_tags.pushdown_list_tags(arr[0])
 
-    res = arr[0]
-    res = typing.cast(ArrowWeaveList, res)
-    res = arrow_tags.pushdown_list_tags(res)
+    tagged = list(builtin_map(lambda x: arrow_tags.pushdown_list_tags(x), arr))
 
-    for i in range(1, len(arr)):
-        tagged = arrow_tags.pushdown_list_tags(arr[i])
-        res = res.concat(tagged)
-    return res
+    # We merge the lists mergesort-style, which is `O(n*log(n))`
+    # DO NOT merge the lists reduce-style, which is `O(n^2)`
+    return merge_concat(tagged)
+
+
+def merge_concat(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
+    if len(arr) == 0:
+        raise ValueError("arr must not be empty")
+    if len(arr) == 1:
+        return arr[0]
+    left, right = merge_concat_split(arr)
+    return merge_concat(left).concat(merge_concat(right))
+
+
+def merge_concat_split(
+    arr: list[ArrowWeaveList],
+) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
+    if len(arr) < 2:
+        raise ValueError("arr must have length of at least 2")
+    middle_index = len(arr) // 2
+    return arr[:middle_index], arr[middle_index:]
 
 
 # # Putting this here instead of in number b/c it is just a map function

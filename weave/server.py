@@ -28,6 +28,8 @@ from . import logs
 from . import wandb_api
 from . import util
 from . import graph
+from .language_features.tagging import tag_store
+
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -93,6 +95,7 @@ def handle_request(
                 result = result.safe_map(serialize_fn)
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
+    tag_store.clear_tag_store()
     return HandleRequestResponse(result, nodes)
 
 
@@ -178,7 +181,7 @@ class HttpServerClient(object):
         return [storage.deref(r) for r in deserialized]
 
 
-_REQUESTED_SERVER_LOG_LEVEL = None
+_REQUESTED_SERVER_LOG_LEVEL: typing.Optional[int] = None
 
 
 class HttpServer(threading.Thread):
@@ -192,18 +195,16 @@ class HttpServer(threading.Thread):
         self.srv = make_server(host, port, app, threaded=False)
 
         # if the passed port is zero then a randomly allocated port will be used. this
-        # gets the value of the port that was assigned.  We use portpicker in colab or
-        # if it's available to ensure it's forwarding magic works.
-        try:
-            import portpicker
+        # gets the value of the port that was assigned.
+        self.port = self.srv.socket.getsockname()[1]
 
-            self.port = portpicker.pick_unused_port()
-        except ImportError:
-            self.port = self.srv.socket.getsockname()[1]
+    @property
+    def name(self):
+        return f"Weave Port: {self.port}"
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:
-            capture_weave_server_logs("ERROR")
+            capture_weave_server_logs(logging.ERROR)
 
         # The werkzeug logger does not exist at import time, so we can't just
         # iterate through all existing loggers and set their levels. Fetching it
@@ -211,7 +212,8 @@ class HttpServer(threading.Thread):
         # Without these two lines, request logs will always be printend. But by
         # default we don't want that.
         log = logging.getLogger("werkzeug")
-        log.setLevel(_REQUESTED_SERVER_LOG_LEVEL)
+        if _REQUESTED_SERVER_LOG_LEVEL is not None:
+            log.setLevel(_REQUESTED_SERVER_LOG_LEVEL)
 
         self.srv.serve_forever()
 
@@ -229,17 +231,21 @@ class HttpServer(threading.Thread):
         return url
 
 
-def capture_weave_server_logs(log_level_s: str = "INFO"):
+def capture_weave_server_logs(log_level: int = logging.INFO):
     global _REQUESTED_SERVER_LOG_LEVEL
-    log_level = logging.getLevelName(log_level_s)
-
     _REQUESTED_SERVER_LOG_LEVEL = log_level
 
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
 
+    console_log_settings: typing.Optional[logs.LogSettings] = None
+    if not util.is_notebook() or util.parse_boolean_env_var(
+        "WEAVE_SERVER_FORCE_HTTP_SERVER_CONSOLE_LOGS"
+    ):
+        console_log_settings = logs.LogSettings(logs.LogFormat.PRETTY, level=None)
+
     logs.enable_stream_logging(
         root_logger,
-        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, log_level),
-        pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, "INFO"),
+        wsgi_stream_settings=console_log_settings,
+        pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, logging.INFO),
     )

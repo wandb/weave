@@ -25,6 +25,7 @@ import {ReactComponent as ImportIconTextLanguageAlt} from '../../assets/icon-tex
 import {ReactComponent as ImportIconUndo} from '../../assets/icon-undo.svg';
 import {ReactComponent as ImportIconWeave} from '../../assets/icon-weave.svg';
 import {ReactComponent as WeaveLogo} from '../../assets/icon-weave-logo.svg';
+import {ReactComponent as WeaveLogoGray} from '../../assets/icon-weave-logo-gray.svg';
 import {ReactComponent as Docs} from '../../assets/icon-docs.svg';
 import {ReactComponent as Stack} from '../../assets/icon-stack.svg';
 import {ReactComponent as Delete} from '../../assets/icon-delete.svg';
@@ -36,6 +37,16 @@ import {ReactComponent as OpenNewTab} from '../../assets/icon-open-new-tab.svg';
 import {ReactComponent as Home} from '../../assets/icon-home.svg';
 import {ReactComponent as Checkmark} from '../../assets/icon-checkmark.svg';
 import {ReactComponent as Loading} from '../../assets/icon-loading.svg';
+
+import {ReactComponent as ChevronBack} from '../../assets/icon-chevron-back.svg';
+import {ReactComponent as DashboardBlackboard} from '../../assets/icon-dashboard-blackboard.svg';
+import {ReactComponent as Info} from '../../assets/icon-info.svg';
+import {ReactComponent as LaptopLocalComputer} from '../../assets/icon-laptop-local-computer.svg';
+import {ReactComponent as SortAscending} from '../../assets/icon-sort-ascending.svg';
+import {ReactComponent as SortDescending} from '../../assets/icon-sort-descending.svg';
+import {ReactComponent as UsersTeam} from '../../assets/icon-users-team.svg';
+import {ReactComponent as Wandb} from '../../assets/icon-wandb.svg';
+import {ReactComponent as UserProfilePersonal} from '../../assets/icon-user-profile-personal.svg';
 
 type SVGIconProps = SVGProps<SVGElement>;
 const updateIconProps = (props: SVGIconProps) => {
@@ -99,6 +110,10 @@ export const IconWeaveLogo = (props: SVGIconProps) => (
   <WeaveLogo {...updateIconProps(props)} />
 );
 
+export const IconWeaveLogoGray = (props: SVGIconProps) => (
+  <WeaveLogoGray {...updateIconProps(props)} />
+);
+
 export const IconUp = (props: SVGIconProps) => (
   <UpSVGRaw {...updateIconProps(props)} />
 );
@@ -138,6 +153,34 @@ export const IconCheckmark = (props: SVGIconProps) => (
 );
 export const IconLoading = (props: SVGIconProps) => (
   <Loading {...updateIconProps(props)} />
+);
+
+export const IconChevronBack = (props: SVGIconProps) => (
+  <ChevronBack {...updateIconProps(props)} />
+);
+export const IconDashboardBlackboard = (props: SVGIconProps) => (
+  <DashboardBlackboard {...updateIconProps(props)} />
+);
+export const IconInfo = (props: SVGIconProps) => (
+  <Info {...updateIconProps(props)} />
+);
+export const IconLaptopLocalComputer = (props: SVGIconProps) => (
+  <LaptopLocalComputer {...updateIconProps(props)} />
+);
+export const IconSortAscending = (props: SVGIconProps) => (
+  <SortAscending {...updateIconProps(props)} />
+);
+export const IconSortDescending = (props: SVGIconProps) => (
+  <SortDescending {...updateIconProps(props)} />
+);
+export const IconUsersTeam = (props: SVGIconProps) => (
+  <UsersTeam {...updateIconProps(props)} />
+);
+export const IconWandb = (props: SVGIconProps) => (
+  <Wandb {...updateIconProps(props)} />
+);
+export const IconUserProfilePersonal = (props: SVGIconProps) => (
+  <UserProfilePersonal {...updateIconProps(props)} />
 );
 
 const style = {

@@ -4,6 +4,7 @@ import typing
 from . import weave_types as types
 from . import errors
 from . import ops
+from . import ops_domain
 
 
 class Weave0TypeJson(typing.TypedDict):
@@ -104,8 +105,13 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return types.Int()
     elif old_type_name == "ndarray":
         # return ops.LegacyTableNDArrayType()
-        # Just return NoneType. The data is None.
-        return types.NoneType()
+        if old_type.get("params", {}).get("serialization_path") is not None:
+            # Just return NoneType. The data is None.
+            return types.NoneType()
+
+        # SDK converted the array to a pylist
+        return types.List(types.UnknownType())
+
         # return NumpyArrayType("f", shape=old_type._params.get("shape", (0,)))
     #
     # Media Types
@@ -171,6 +177,10 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return types.Number()  # type: ignore
     elif is_python_object_type and old_type["params"].get("class_name") == "Molecule":
         return ops.MoleculeArtifactFileRef.WeaveType()  # type: ignore
+
+    elif old_type_name == "wb_trace_tree":
+        return ops_domain.trace_tree.WBTraceTree.WeaveType()  # type: ignore
+
     #
     # Table Types
     #

@@ -1,11 +1,12 @@
 import 'react-base-table/lib/TableRow';
 
-import {WBButton} from '@wandb/ui';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {
   constFunction,
   constNumber,
   constString,
+  dereferenceAllVars,
   escapeDots,
   isAssignableTo,
   isOutputNode,
@@ -83,6 +84,7 @@ import {
   useRowsNode,
   useUpdateConfigKey,
 } from './util';
+import {Link} from './Link';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -528,6 +530,11 @@ const PanelTableInner: React.FC<
     ) => {
       const rowNode = rowData.rowNode;
       const columnDef = columnDefinitions[colId];
+      // MaybeWrappers are needed because the table will eagerly ask for enough
+      // rows to fill the screen, before we know if that many rows exist. This
+      // means that the true value of every cell is possibly nullable, even if
+      // the type doesn't say so. This is sort of a hard-coded way to ensure we
+      // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
         return (
           <GrowToParent>
@@ -641,6 +648,11 @@ const PanelTableInner: React.FC<
             </S.IndexColumnVal>
           );
         }
+        // MaybeWrappers are needed because the table will eagerly ask for enough
+        // rows to fill the screen, before we know if that many rows exist. This
+        // means that the true value of every cell is possibly nullable, even if
+        // the type doesn't say so. This is sort of a hard-coded way to ensure we
+        // don't error when we get nulls back for small tables
         return (
           <IndexCell
             runNode={runNode}
@@ -1026,7 +1038,7 @@ const PanelTableInner: React.FC<
         <div
           style={{
             textAlign: 'center',
-            position: 'relative',
+            position: 'absolute',
             width: '100%',
             height: `${
               height -
@@ -1043,21 +1055,20 @@ const PanelTableInner: React.FC<
             alignItems: 'center',
             alignContent: 'stretch',
           }}>
-          <div style={{flex: '0 0 auto', paddingBottom: '8px'}}>
+          <div
+            style={{flex: '0 0 auto', paddingBottom: '8px', color: MOON_500}}>
             No rows to display
           </div>
           {tableState.preFilterFunction?.nodeType === 'output' && (
             <div style={{flex: '0 0 auto'}}>
-              <WBButton
-                color="primary"
-                variant="contained"
+              <Link
                 onClick={() => {
                   updateTableState(
                     Table.updatePreFilter(tableState, voidNode())
                   );
                 }}>
-                Clear Filter
-              </WBButton>
+                Clear filters
+              </Link>
             </div>
           )}
         </div>
@@ -1360,7 +1371,9 @@ export const TableSpec: Panel2.PanelSpec = {
       TableType.normalizeTableLike(inputNode),
       stack
     );
-    return getTableConfig(tableNormInput, undefined, weave);
+    const dereffedInput = dereferenceAllVars(tableNormInput, stack)
+      .node as Node;
+    return getTableConfig(dereffedInput, undefined, weave);
   },
   Component: PanelTable,
   inputType,

@@ -3,14 +3,14 @@ This file contains the Weave Types and Mappers needed to handle tagged values.
 
 Here we will briefly describe how TaggedValues work. Firstly, note that we need
 to be able to associate any object in the python runtime with a set of tags. Due
-the the way Python works, the best way to implement this is to use a memory
+to the way Python works, the best way to implement this is to use a memory
 mapping from the python id of an object to a dictionary of tags. This is
 implemented in tag_store.py. Unlike other Weave Types, we cannot determine if an
-object is tagged simply by looking at it's python type, so the TaggedValueType
+object is tagged simply by looking at its python type, so the TaggedValueType
 has custom logic to determine if an object is a TaggedValue as well as special
 assignability rules. Furthermore when serializing the TaggedValue to disk, we
 need to serialize the tags as well - this is handled between the type class and
-the mappers below. 
+the mappers below.
 
 The net result of this system is that op resolvers can operate entirely agnostic
 to tags - there is no mutation of the underlying python object whatsoever.
@@ -21,7 +21,7 @@ list-tagCheckpoint). Ops that are core language ops will need to operate on tags
 directly (for example, list-concat). And ops that are weavifiable will get all
 internal tag handling for free (although, this is not yet implemented).
 Currently, the degenerate case is that a custom op either copies the object
-(creating a new memory address) or is not weavifiable, in which we will simply
+(creating a new memory address) or is not weavifiable, in which case we will simply
 drop tags.
 """
 

@@ -18,15 +18,23 @@ from ..language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,
 )
+
+
 import functools
 
 
-def getitem_output_type(input_types):
-    self_type = input_types["arr"]
+def getitem_output_type(input_types, list_type=types.List):
+    input_type_values = list(input_types.values())
+    self_type = input_type_values[0]
+    index_type = input_type_values[1]
     if self_type.object_type == types.UnknownType():
         # This happens when we're indexing an empty list
-        return types.NoneType()
-    return self_type.object_type
+        obj_res = types.NoneType()
+    else:
+        obj_res = self_type.object_type
+    if is_list_like(index_type):
+        return list_type(obj_res)
+    return obj_res
 
 
 def general_picker(obj, key):
@@ -50,28 +58,40 @@ class List:
         setter=__setitem__,
         input_type={
             "arr": types.List(types.Any()),
-            "index": types.optional(types.Int()),
         },
         output_type=getitem_output_type,
     )
-    def __getitem__(arr, index):
+    def __getitem__(
+        arr,
+        index: typing.Optional[typing.Union[int, typing.List[typing.Optional[int]]]],
+    ):
         if index == None:
             return None
-        # This is a hack to resolve the fact that WeaveJS expects groupby to
-        # return TaggedValue, while Weave Python currently still returns GroupResult
-        # TODO: Remove when we switch Weave Python over to using TaggedValue for this
-        # case.
-        try:
-            return arr.__getitem__(index)
-        except IndexError:
-            return None
+        if isinstance(index, int):
+            try:
+                return arr.__getitem__(index)
+            except IndexError:
+                return None
+        # otherwise we have a list-like (list or AWL)
+        indexes = typing.cast(typing.List[typing.Optional[int]], index)
+        result: list = []
+        for i in indexes:
+            if i == None:
+                result.append(None)
+            else:
+                try:
+                    result.append(arr.__getitem__(i))
+                except IndexError:
+                    result.append(None)
+        return result
 
     @op(
         name="filter",
         input_type={
             "arr": types.List(types.Any()),
             "filterFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.optional(types.Boolean())
+                {"row": input_types["arr"].object_type, "index": types.Int()},
+                types.optional(types.Boolean()),
             ),
         },
         output_type=lambda input_types: input_types["arr"],
@@ -132,7 +152,8 @@ class List:
         input_type={
             "arr": types.List(types.Any()),
             "mapFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.Any()
+                {"row": input_types["arr"].object_type, "index": types.Int()},
+                types.Any(),
             ),
         },
         output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
@@ -569,8 +590,8 @@ def _join_2_output_row_type(input_types):
 
     join_obj_type = types.optional(
         types.union(
-            input_types["joinFn1"].output_type,
-            input_types["joinFn2"].output_type,
+            input_types["join1Fn"].output_type,
+            input_types["join2Fn"].output_type,
         )
     )
     row_tag_type = types.TypedDict({"joinObj": join_obj_type})
@@ -587,10 +608,10 @@ def _join_2_output_type(input_types):
     input_type={
         "arr1": types.List(),
         "arr2": types.List(),
-        "joinFn1": lambda input_types: types.Function(
+        "join1Fn": lambda input_types: types.Function(
             {"row": input_types["arr1"].object_type}, types.Any()
         ),
-        "joinFn2": lambda input_types: types.Function(
+        "join2Fn": lambda input_types: types.Function(
             {"row": input_types["arr2"].object_type}, types.Any()
         ),
         "alias1": types.String(),
@@ -600,9 +621,9 @@ def _join_2_output_type(input_types):
     },
     output_type=_join_2_output_type,
 )
-def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
-    table1_join_keys = execute_fast.fast_map_fn(arr1, joinFn1)
-    table2_join_keys = execute_fast.fast_map_fn(arr2, joinFn2)
+def join_2(arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter):
+    table1_join_keys = execute_fast.fast_map_fn(arr1, join1Fn)
+    table2_join_keys = execute_fast.fast_map_fn(arr2, join2Fn)
 
     jk_to_idx: dict[str, typing.Tuple[list[int], list[int], typing.Any]] = {}
     for i, jk in enumerate(table1_join_keys):
@@ -786,8 +807,10 @@ def list_2Dprojection(
                     ]
                 )
         np_array_of_embeddings = np.array(embeddings)
-        np_projection = projection_utils.perform_2D_projection(
-            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+        np_projection = projection_utils.perform_2D_projection_with_timeout(
+            np_array_of_embeddings,
+            projectionAlgorithm,
+            algorithmOptions,
         )
         projection = np_projection.tolist()
     return [
@@ -847,7 +870,7 @@ def list_projection2D(
                     ]
                 )
         np_array_of_embeddings = np.array(embeddings)
-        np_projection = projection_utils.perform_2D_projection(
+        np_projection = projection_utils.perform_2D_projection_with_timeout(
             np_array_of_embeddings, projectionAlgorithm, algorithmOptions
         )
         projection = np_projection.tolist()

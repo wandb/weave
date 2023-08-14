@@ -166,7 +166,7 @@ export const opObjectKeyTypes = makeObjectOp({
   },
   returnValueDescription: `${docType(
     'typedDict'
-  )} with same keys as the input, and values corresponding the the ${docType(
+  )} with same keys as the input, and values corresponding to the ${docType(
     'type'
   )}.`,
   resolver: async (

@@ -9,5 +9,6 @@ from .panel_geo import *
 from .panel_time_series import *
 from ...ops_domain.runs2 import *
 from . import wandb_objs
+from .run_chain import *
 
 _context.clear_loading_built_ins(_loading_builtins_token)

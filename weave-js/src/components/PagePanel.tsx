@@ -1,7 +1,7 @@
 import Loader from '@wandb/weave/common/components/WandbLoader';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
 import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
@@ -10,7 +10,7 @@ import getConfig from '../config';
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
 import {consoleLog} from '../util';
-import {Home} from './PagePanelComponents/Home';
+import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 import {
@@ -30,11 +30,8 @@ import {
 import {themes} from './Panel2/Editor.styles';
 import {
   IconAddNew,
-  IconCheckmark,
   IconClose,
-  IconCopy,
   IconHome,
-  IconLoading,
   IconOpenNewTab,
   IconPencilEdit,
 } from './Panel2/Icons';
@@ -57,7 +54,7 @@ import {useWeaveAutomation} from './automation';
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
   position: absolute;
-  top: 50px
+  top: 50px;
   border-radius: 4px;
   right: 48px;
   // transform: translate(-50%, 0);
@@ -112,11 +109,35 @@ const JupyterControlsIcon = styled.div`
   }
 `;
 
-const PagePanel: React.FC = props => {
+// Simple function that forces rerender when URL changes.
+const usePoorMansLocation = () => {
+  const [location, setLocation] = useState(window.location.toString());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (window.location.toString() !== location) {
+        setLocation(window.location.toString());
+      }
+    }, 250);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [location]);
+
+  return window.location;
+};
+
+type PagePanelProps = {
+  browserType: string | undefined;
+};
+
+const PagePanel = ({browserType}: PagePanelProps) => {
   const weave = useWeaveContext();
-  const urlParams = new URLSearchParams(window.location.search);
+  const location = usePoorMansLocation();
+  const urlParams = new URLSearchParams(location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
+  const previewMode = urlParams.get('previewMode') != null;
   const expString = urlParams.get('exp');
   const expNode = urlParams.get('expNode');
   const panelId = urlParams.get('panelId') ?? '';
@@ -136,13 +157,20 @@ const PagePanel: React.FC = props => {
       if (newExpStr === expString) {
         return;
       }
+
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}?${searchParams}`
-      );
+      const pathname = inJupyterCell() ? window.location.pathname : '/';
+
+      if (newExpStr.startsWith('get') && expString?.startsWith('get')) {
+        // In the specific case that we are updating a get with another get
+        // which happens when we transition between published and local states,
+        // then don't retain the history. We used to always do a replace and
+        // it was super confusing
+        window.history.replaceState(null, '', `${pathname}?${searchParams}`);
+      } else {
+        window.history.pushState(null, '', `${pathname}?${searchParams}`);
+      }
     },
     [expString, weave]
   );
@@ -150,6 +178,15 @@ const PagePanel: React.FC = props => {
   const [config, setConfig] = useState<ChildPanelFullConfig>(
     CHILD_PANEL_DEFAULT_CONFIG
   );
+
+  // If the exp string has gone away, perhaps by back button navigation,
+  // reset the config.
+  useEffect(() => {
+    if (!expString) {
+      setConfig(CHILD_PANEL_DEFAULT_CONFIG);
+    }
+  }, [expString]);
+
   const updateConfig = useCallback(
     (newConfig: Partial<ChildPanelFullConfig>) => {
       setConfig(currentConfig => ({...currentConfig, ...newConfig}));
@@ -199,7 +236,7 @@ const PagePanel: React.FC = props => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    consoleLog('PAGE PANEL MOUNT');
+    consoleLog('PAGE PANEL MOUNT', window.location.href);
     setLoading(true);
     if (expString != null) {
       weave.expression(expString, []).then(res => {
@@ -218,11 +255,6 @@ const PagePanel: React.FC = props => {
       } as any);
       setLoading(false);
     } else {
-      updateConfig({
-        input_node: voidNode(),
-        id: panelId,
-        config: panelConfig,
-      } as any);
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,7 +310,11 @@ const PagePanel: React.FC = props => {
         <PanelInteractContextProvider>
           <WeaveRoot className="weave-root" fullScreen={fullScreen}>
             {config.input_node.nodeType === 'void' ? (
-              <Home updateConfig={updateConfig} inJupyter={inJupyter} />
+              <Home
+                updateConfig={updateConfig}
+                inJupyter={inJupyter}
+                browserType={browserType}
+              />
             ) : (
               <div
                 style={{
@@ -287,7 +323,7 @@ const PagePanel: React.FC = props => {
                   display: 'flex',
                   flexDirection: 'column',
                 }}>
-                {(!inJupyter || moarfullScreen) && (
+                {(!inJupyter || moarfullScreen) && !previewMode && (
                   <PersistenceManager
                     inputNode={config.input_node}
                     inputConfig={config.config}
@@ -297,6 +333,7 @@ const PagePanel: React.FC = props => {
                 )}
                 <PageContent
                   config={config}
+                  previewMode={previewMode}
                   updateConfig={updateConfig}
                   updateConfig2={updateConfig2}
                   goHome={goHome}
@@ -325,6 +362,7 @@ export default PagePanel;
 
 type PageContentProps = {
   config: ChildPanelFullConfig;
+  previewMode?: boolean;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2: (change: (oldConfig: any) => any) => void;
   goHome: () => void;
@@ -390,7 +428,7 @@ export const PageContent: FC<PageContentProps> = props => {
           overflow: 'hidden',
         }}>
         <ChildPanel
-          editable={!isPanel}
+          controlBar={!isPanel && !props.previewMode ? 'editable' : 'off'}
           prefixHeader={
             inJupyter ? (
               <Icon
@@ -462,7 +500,8 @@ const JupyterPageControls: React.FC<
   }
 > = props => {
   const [hoverText, setHoverText] = useState('');
-  const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
+  // TODO(fix): Hiding code export temporarily as it is partially broken
+  // const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
   const setInspectingPanel = useSetInspectingPanel();
   const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
@@ -578,7 +617,8 @@ const JupyterPageControls: React.FC<
           <IconPencilEdit />
         </JupyterControlsIcon>
       )}
-      <JupyterControlsIcon
+      {/* TODO: Hiding code export temporarily as it is partially broken */}
+      {/* <JupyterControlsIcon
         onClick={onCopy}
         onMouseEnter={e => {
           setHoverText('Copy code');
@@ -593,7 +633,7 @@ const JupyterPageControls: React.FC<
         ) : (
           <IconCopy />
         )}
-      </JupyterControlsIcon>
+      </JupyterControlsIcon> */}
       <JupyterControlsIcon
         onClick={props.openNewTab}
         onMouseEnter={e => {

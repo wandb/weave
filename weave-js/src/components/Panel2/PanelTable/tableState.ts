@@ -51,8 +51,10 @@ import {
   varNode,
   voidNode,
   WeaveInterface,
+  PathType,
+  filterNodes,
 } from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import _ from 'lodash';
 
 export type ColumnId = string;
@@ -147,6 +149,12 @@ export function initTableWithPickColumns(
     inputArrayNode,
     weave
   );
+
+  const listIndexWithStar =
+    filterNodes(inputArrayNode, n => {
+      return n.nodeType === 'output' && n.fromOp.name.endsWith('joinAll');
+    }).length > 0;
+
   if (pickColumns) {
     addCols = pickColumns.map(colKey => ({
       selectFn: opPick({
@@ -162,7 +170,9 @@ export function initTableWithPickColumns(
         members: [typedDict({}), rootObject()],
       })
     ) {
-      allColumns = autoTableColumnExpressions(exNode.type, objectType);
+      allColumns = autoTableColumnExpressions(exNode.type, objectType, {
+        listIndexWithStar,
+      });
     }
     const columns =
       allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
@@ -192,37 +202,117 @@ function isNDArrayLike(type: Type): boolean {
   return false;
 }
 
+const streamTableColumns = [
+  // Added by Stream Table
+  'timestamp',
+  '_client_id',
+  // Added by Run
+  '_timestamp',
+  // Added by Gorilla
+  '_step',
+];
+const monitoringColumns = [
+  // Added by monitor decorator
+  'result_id',
+  'inputs',
+  'output',
+  'latency_ms',
+  'start_datetime',
+  'end_datetime',
+  'exception',
+  ...streamTableColumns,
+];
+
+const excludedStreamTableColumns = [
+  '_client_id',
+  // Added by Run
+  '_timestamp',
+  // Added by Gorilla
+  '_step',
+];
+
+const excludedMonitoringColumns = ['timestamp', ...excludedStreamTableColumns];
+
+function allPathsFromMonitoring(allPaths: PathType[]): boolean {
+  for (const col of monitoringColumns) {
+    if (!allPaths.find(p => p.path[0] === col)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function allPathsFromStreamTable(allPaths: PathType[]): boolean {
+  for (const col of streamTableColumns) {
+    if (!allPaths.find(p => p.path[0] === col)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Try to pick nice default columns to make a table for the given object
 // type. See the initial columns test in tableState.test.ts to see examples
 // of current behavior.
 export function autoTableColumnExpressions(
   tableRowType: Type,
-  objectType: Type
+  objectType: Type,
+  opts: {
+    listIndexWithStar: boolean;
+  } = {
+    listIndexWithStar: true,
+  }
 ): Node[] {
-  const allPaths = allObjPaths(objectType).filter(
+  const {listIndexWithStar} = opts;
+  let allPaths = allObjPaths(objectType).filter(
     path => !isNDArrayLike(path.type) && !isAssignableTo(path.type, 'none')
   );
+
+  if (allPathsFromMonitoring(allPaths)) {
+    allPaths = allPaths.filter(
+      p => !excludedMonitoringColumns.includes(p.path[0])
+    );
+    allPaths = allPaths.sort((a, b) => {
+      const aIdx = monitoringColumns.indexOf(a.path[0]);
+      const bIdx = monitoringColumns.indexOf(b.path[0]);
+      return aIdx - bIdx;
+    });
+  } else if (allPathsFromStreamTable(allPaths)) {
+    allPaths = allPaths.filter(
+      p => !excludedStreamTableColumns.includes(p.path[0])
+    );
+  }
+
   return allPaths
     .map(pt => pt.path.map(escapeDots))
     .map(path => {
       let expr: Node = varNode(tableRowType, 'row');
       let pathStr: string[] = [];
+      const finishPick = () => {
+        if (pathStr.length > 0) {
+          expr = opPick({
+            obj: expr,
+            key: constString(pathStr.join('.')),
+          });
+          // We have to reset the pathStr after collapsing it into an opPick!
+          pathStr = [];
+        }
+      };
       for (const p of path) {
-        if (!p.startsWith('__object__')) {
-          pathStr.push(p);
-        } else {
-          if (pathStr.length > 0) {
-            expr = opPick({
-              obj: expr,
-              key: constString(pathStr.join('.')),
-            });
-            // We have to reset the pathStr after collapsing it into an opPick!
-            pathStr = [];
-          }
+        if (p.startsWith('__object')) {
+          finishPick();
           expr = opObjGetAttr({
             self: expr,
             name: constString(p.slice('__object__'.length)),
           });
+        } else if (p === '*' && !listIndexWithStar) {
+          finishPick();
+          expr = opIndex({
+            arr: expr,
+            index: constNumber(-1),
+          });
+        } else {
+          pathStr.push(p);
         }
       }
       if (pathStr.length > 0) {
@@ -418,8 +508,8 @@ export function equalStates(aTable: TableState, bTable?: TableState) {
   return true;
 }
 
-export function appendEmptyColumn(ts: TableState) {
-  const colId = newColumnId(ts);
+export function appendEmptyColumn(ts: TableState, index?: number) {
+  const colId = index == null ? newColumnId(ts) : `col-${index}`;
   return produce(ts, draft => {
     draft.columns[colId] = {
       panelId: '',
@@ -757,7 +847,7 @@ export function getRowFrame(inputNode: Node) {
   return {
     row: getExampleRow(inputNode),
     // Don't include index in frame for now. We don't need it yet.
-    // index: CG.varNode('number', 'index'),
+    index: varNode('number', 'index'),
     // Don't include arr in frame for now. We don't need it yet and
     // need to fix suggest ordering before including it.
     // arr: inputNode,
@@ -1435,9 +1525,10 @@ export function addNamedColumnToTable(
   table: TableState,
   name: string,
   selectFn: NodeOrVoidNode<Type>,
-  panelDef?: {panelID: string; panelConfig: any}
+  panelDef?: {panelID: string; panelConfig: any},
+  index?: number
 ): TableState {
-  table = appendEmptyColumn(table);
+  table = appendEmptyColumn(table, index);
   const columnId = table.order[table.order.length - 1];
   table = updateColumnSelect(table, columnId, selectFn);
   table = updateColumnName(table, columnId, name);

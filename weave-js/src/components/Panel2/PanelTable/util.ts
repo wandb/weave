@@ -1,5 +1,6 @@
 import {
   constNumber,
+  dereferenceAllVars,
   isList,
   isListLike,
   isTaggedValue,
@@ -9,6 +10,7 @@ import {
   MemoizedHasher,
   Node,
   NodeOrVoidNode,
+  nonNullableDeep,
   opIndex,
   opIndexCheckpoint,
   OpStore,
@@ -58,12 +60,11 @@ export const typeShapesMatch = (type: Type, toType: Type): boolean => {
 export const nodeIsValidList = (
   node: NodeOrVoidNode | undefined
 ): node is Node<ListType<'any'>> => {
-  return (
-    node != null &&
-    node.nodeType !== 'void' &&
-    isListLike(node.type) &&
-    listObjectType(node.type) !== 'invalid'
-  );
+  if (node == null || node.nodeType === 'void') {
+    return false;
+  }
+  const nonMaybeType = nonNullableDeep(node.type);
+  return isListLike(nonMaybeType) && listObjectType(nonMaybeType) !== 'invalid';
 };
 
 // useLoadOnce returns true only for the first loading state, and false thereafter
@@ -84,10 +85,12 @@ export const useAutomatedTableState = (
   currentTableState: Table.TableState | undefined,
   weave: WeaveInterface
 ) => {
-  const {table: autoTable} = useMemo(
-    () => Table.initTableFromTableType(input, weave),
-    [input, weave]
-  );
+  let {stack} = usePanelContext();
+  ({node: input as any, stack} = useRefEqualExpr(input, stack));
+  const {table: autoTable} = useMemo(() => {
+    const dereffedInput = dereferenceAllVars(input, stack).node as Node;
+    return Table.initTableFromTableType(dereffedInput, weave);
+  }, [input, stack, weave]);
 
   const colDiff = Table.tableColumnsDiff(weave, autoTable, currentTableState);
   const isDiff = colDiff.addedCols.length > 0 || colDiff.removedCols.length > 0;
@@ -97,8 +100,6 @@ export const useAutomatedTableState = (
       ? autoTable
       : currentTableState;
 
-  let {stack} = usePanelContext();
-  ({node: input as any, stack} = useRefEqualExpr(input, stack));
   const {loading, result: state} = useTableStateWithRefinedExpressions(
     tableState,
     input,

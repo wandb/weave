@@ -11,38 +11,35 @@ Our mission is to equip Machine Learning practitioners with the best tools to tu
 
 Whether you are a seasoned data scientist, an aspiring ML practitioner, or just a tech enthusiast eager to play with data, Weave is for you.
 
-## Quickstart
+## Getting Started with Weave
 
-Install `weave` using `pip install weave` and `import weave` in your notebook.
+[Run in a Google Colab ->](https://colab.research.google.com/drive/1TwlhvvoWIHKDtRUu6eW0NMRq0GzGZ9oX)
+[Run in a Jupyter notebook ->](./examples/get_started.ipynb)
 
-Then start exploring your existing datasets with 1 line of code!:
+Install via `pip install weave`, `import weave` in your notebook, and explore your data  with one line of code!
 
-```
-# use any existing dataframe, here we load the iris data and visualize the labels
+**1. View a dataframe**
+
+```python
+import weave
 from sklearn.datasets import load_iris
+
+# use any existing dataframe, here we load the iris data and visualize the labels
 iris = load_iris(as_frame=True)
 df = iris.data.assign(target=iris.target_names[iris.target])
 
 weave.show(df)
 ```
 
+<img src="/docs/assets/first_load.gif" width="100%">
+
+**2. Add a plot**
+
 <img src="./docs/assets/qs_table_plot.gif" width="100%">
-
-[Try this in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
-
-For example:
-
-**1. View a dataframe (in this case the Iris dataset)**
-
-![first_show](./docs/assets/first_show.png)
-
-**2. Interactively derive insights**
-
-![beginning_exploration](./docs/assets/beginning_exploration.png)
 
 **3. Create and share dashboards**
 
-![configured_iris_panel](./docs/assets/configured_iris_panel.png)
+<img src="./docs/assets/make_quick_board.gif" width="100%">
 
 ## 👩‍🏫 Example Notebooks
 
@@ -52,7 +49,7 @@ Weave has example notebooks demonstrating common usage patterns. To use the note
 pip install '.[examples]'
 ```
 
-then run through the notebooks in `./examples`.
+then run through the notebooks in the [examples directory](./examples)
 
 ## 🎉 Why Weave?
 
@@ -67,7 +64,7 @@ then run through the notebooks in `./examples`.
 
 Before you dive in, make sure you have the required software installed. You'll find all the details in our [Installation Guide](./docs/INSTALLATION.md).
 
-After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./docs/EXAMPLES.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
+After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./examples/README.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
 
 ---
 

@@ -1,13 +1,17 @@
 import re
+import random
 import typing
 
 import logging
 import contextvars
 import contextlib
 
+
 from . import value_or_error
 from . import debug_compile
 
+
+from . import serialize
 from . import compile_domain
 from . import op_args
 from . import weave_types as types
@@ -20,6 +24,7 @@ from . import compile_table
 from . import weave_internal
 from . import engine_trace
 from . import errors
+
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -69,6 +74,10 @@ def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
 # those depend on the decorators, which aren't defined in the engine.
 def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     function_node_type = typing.cast(types.Function, function_node.type)
+    if isinstance(function_node, graph.ConstNode) and isinstance(
+        function_node.val.type, types.Function
+    ):
+        return _call_execute(function_node.val)
     return graph.OutputNode(
         function_node_type.output_type, "execute", {"node": function_node}
     )
@@ -107,7 +116,13 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
             else:
                 raise
         except:
-            raise errors.WeaveInternalError("Error while dispatching: %s." % node)
+            logging.error(
+                "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
+                from_op.name,
+                from_op.input_types,
+                re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
+            )
+            raise
 
     return None
 
@@ -157,6 +172,10 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             node.from_op.name != op.name
         ):
             output_type = op.unrefined_output_type_for_params(params)
+
+        # Consider: If the UI does a `callOpVeryUnsafe`, it is possible that the
+        # graph is not correctly typed. Consider checking if they type is `Any`,
+        # then we may want to use the concrete output type instead.
 
         res = graph.OutputNode(_remove_optional(output_type), op.uri, params)
         # logging.info("Dispatched (no refine): %s -> %s", node, res.type)
@@ -319,6 +338,8 @@ def compile_apply_column_pushdown(
         "mapped_run-history2",
         "run-history",
         "mapped_run-history",
+        "run-history3",
+        "mapped_run-history3",
     ]
 
     if not graph.filter_nodes_full(
@@ -347,13 +368,16 @@ def compile_apply_column_pushdown(
                 )
             if "run-history" in node.from_op.name:
                 history_cols = list(run_cols.keys())
+
                 if len(history_cols) > 0:
                     return graph.OutputNode(
                         node.type,
                         node.from_op.name + "_with_columns",
                         {
                             "run": node.from_op.inputs["run"],
-                            "history_cols": weave_internal.const(history_cols),
+                            "history_cols": weave_internal.const(
+                                list(set([*history_cols, "_step"]))
+                            ),
                         },
                     )
         return node
@@ -400,7 +424,7 @@ def compile_execute(
     # However I think I later solved this with client-side execution and it can maybe
     # be removed.
     # I'm leaving this for now as it doesn't affect W&B prod (which never calls execute).
-    with_execute_ops = graph.map_nodes_full(nodes, _execute_nodes_map_fn)
+    with_execute_ops = graph.map_nodes_full(nodes, _execute_nodes_map_fn, on_error)
     return with_execute_ops
 
     def _replace_execute(node: graph.Node) -> typing.Optional[graph.Node]:
@@ -416,6 +440,36 @@ def compile_execute(
     return graph.map_nodes_full(with_execute_ops, _replace_execute)
 
 
+def _resolve_function_calls(node: graph.Node) -> typing.Optional[graph.Node]:
+    if (
+        not isinstance(node, graph.OutputNode)
+        or node.from_op.name != "function-__call__"
+    ):
+        return node
+
+    inputs = list(node.from_op.inputs.values())
+    fn_node = inputs[0]
+    if not (
+        isinstance(fn_node, graph.ConstNode)
+        and isinstance(fn_node.type, types.Function)
+    ):
+        return node
+
+    while isinstance(fn_node.val, graph.ConstNode) and isinstance(
+        fn_node.type, types.Function
+    ):
+        fn_node = fn_node.val
+
+    return weave_internal.better_call_fn(fn_node, *inputs[1:])
+
+
+def compile_function_calls(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _resolve_function_calls, on_error)
+
+
 def compile_quote(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
@@ -428,6 +482,72 @@ def compile_refine(
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
+
+
+def compile_merge_by_node_id(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    seen_nodes: dict[str, graph.Node] = {}
+
+    def _merge_by_node_id(node: graph.Node) -> graph.Node:
+        try:
+            nid = serialize.node_id(node)
+        except TypeError:
+            nid = str(random.random())
+        if nid in seen_nodes:
+            return seen_nodes[nid]
+        if isinstance(node, graph.OutputNode):
+            node = dispatch.RuntimeOutputNode(
+                node.type, node.from_op.name, node.from_op.inputs
+            )
+        elif isinstance(node, graph.VarNode):
+            node = dispatch.RuntimeVarNode(node.type, node.name)
+        elif isinstance(node, graph.ConstNode):
+            node = dispatch.RuntimeConstNode(node.type, node.val)
+        seen_nodes[nid] = node
+        return node
+
+    return graph.map_nodes_full(nodes, _merge_by_node_id, on_error)
+
+
+def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
+    if not isinstance(node, graph.OutputNode):
+        return None
+    if node.from_op.name not in [
+        "RunChain-history",
+        "panel_table-active_data",
+        "panel_table-active_row",
+        "Query-selected",
+        "panel_plot-selected_data",
+        "panel_table-all_rows",
+        "stream_table-rows",
+    ]:
+        return None
+    new_node = typing.cast(graph.Node, weave_internal.use(node))
+
+    # The result will typically contain expressions that were sent down as
+    # part of panel configs within Const nodes. They haven't been handled
+    # by deserialize/compile yet.
+    new_node_fixed_calls = compile_fix_calls([new_node])[0]
+
+    # This last line dedupes nodes that are identical. But it doesn't
+    # globally dedupe against the graph we've already compiled.
+    # There is still some duplication left in Weave execution...
+    new_node_merged = compile_merge_by_node_id([new_node_fixed_calls])[0]
+
+    # Do it again to handle nested calls
+    return compile_node_ops([new_node_merged])[0]
+
+
+def compile_node_ops(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    # Mission critical that we do not map into static lambdas. We do
+    # not want to expand nodes that are meant by the caller to be interpreted
+    # as their exact node.
+    return graph.map_nodes_full(nodes, _node_ops, on_error, True)
 
 
 # This compile pass using the `top_level` mapper since we recurse manually. We can't use
@@ -530,7 +650,30 @@ def _compile(
         results = results.batch_map(_track_errors(compile_await))
     with tracer.trace("compile:execute"):
         results = results.batch_map(_track_errors(compile_execute))
+    with tracer.trace("compile:function_calls"):
+        results = results.batch_map(_track_errors(compile_function_calls))
     with tracer.trace("compile:quote"):
+        # Mission critical to call `compile:quote` before and node re-writing
+        # compilers such as compile:node_ops and compile:gql. Why?:
+        #
+        # It is useful to define a "static lambda". A "static lambda" is a const
+        # node of type function with no inputs. This is used in our system to
+        # represent a constant value which is a node. Useful for generating
+        # boards or any sort of op that operates on nodes themselves.
+        #
+        # Moreover, this compile step will automatically "quote" inputs to ops
+        # that expect node inputs - effectively making static lambdas when
+        # called for.
+        #
+        # Furthermore, it is important to know that stream table rows (and many
+        # other ops) now support expansion (meaning they get expanded into a
+        # chain of new nodes in the compile pass).
+        #
+        # Conceptually, this created an issue: Compile passes that mutate nodes
+        # (eg node expansion or gql compile) would modify the quoted node. But,
+        # these functions that consume nodes do not want modified nodes.
+        # Instead, we want the raw node that the caller intended. For this
+        # reason we should always call compile:quote before any node re-writing.
         results = results.batch_map(_track_errors(compile_quote))
 
     # Some ops require const input nodes. This pass executes any branches necessary
@@ -539,12 +682,17 @@ def _compile(
     with tracer.trace("compile:resolve_required_consts"):
         results = results.batch_map(_track_errors(compile_resolve_required_consts))
 
+    with tracer.trace("compile:node_ops"):
+        results = results.batch_map(_track_errors(compile_node_ops))
+
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
+
     with tracer.trace("compile:gql"):
         results = results.batch_map(
             _track_errors(compile_domain.apply_domain_op_gql_translation)
         )
+
     with tracer.trace("compile:column_pushdown"):
         results = results.batch_map(_track_errors(compile_apply_column_pushdown))
 

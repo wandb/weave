@@ -569,7 +569,9 @@ def _artifact_ref_from_uri(
 
 
 @mutation
-def merge(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
+def merge_artifact(
+    self: graph.Node[typing.Any], root_args: typing.Any = None
+) -> typing.Any:
     self = compile.compile_fix_calls([self])[0]
     return _merge(_get_uri_from_node(self, "Merge"))
 
@@ -612,6 +614,7 @@ def publish_artifact(
     self: graph.Node[typing.Any],
     artifact_name: typing.Optional[str],
     project_name: typing.Optional[str],
+    entity_name: typing.Optional[str],
     # root_args: typing.Any = None,
 ) -> str:
     head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Publish"), "Publish")
@@ -620,6 +623,7 @@ def publish_artifact(
         head_ref.get(),
         art_name,
         project_name,
+        wb_entity_name=entity_name,
         metadata=head_ref.artifact.metadata.as_dict(),
     )
     return str(ref)
@@ -673,7 +677,15 @@ class Run:
         input_type={"self": types.Function(output_type=types.RunType())},
     )
     def id(self) -> str:
-        return weave_internal.use(self).id  # type: ignore
+        run = weave_internal.use(self)  # type: ignore
+
+        # Hack: Since nullability is handled at execution time, it is entirely
+        # possible for the run to be None, even though the type calls for
+        # RunType. This is a safety check that any op accepting a function as
+        # the first argument should account for.
+        if run == None:
+            return None  # type: ignore
+        return run.id  # type: ignore
 
     @op(
         name="run-await",

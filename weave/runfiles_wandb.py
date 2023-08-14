@@ -64,6 +64,7 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
         self._run_files_uri = uri
         self._read_run = None
         self._local_path: dict[str, str] = {}
+        self._ref = WandbRunFilesRef(self, None)
 
     @property
     def run(self) -> "WBRun":
@@ -75,6 +76,9 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
 
     @property
     def is_saved(self) -> bool:
+        # Note: I think this is OK to always be true, since run files are
+        # effectively always saved. But conceptually, the run could still be
+        # "open" which might warrant returning `False`.
         return True
 
     @property
@@ -196,7 +200,29 @@ class WeaveWBRunFilesURI(uris.WeaveURI):
         else:
             project_name, run_name = path.split("/", 1)
             path = ""
-        return cls(netloc, None, entity_name, project_name, run_name, path or None)
+        return cls(
+            f"{entity_name}/{project_name}/{run_name}",
+            None,
+            entity_name,
+            project_name,
+            run_name,
+            path or None,
+        )
+
+    @classmethod
+    def from_run_identifiers(
+        cls,
+        entity_name: str,
+        project_name: str,
+        run_name: str,
+    ) -> "WeaveWBRunFilesURI":
+        return cls(
+            f"{entity_name}/{project_name}/{run_name}",
+            None,
+            entity_name,
+            project_name,
+            run_name,
+        )
 
     def to_ref(self) -> WandbRunFilesRef:
         return WandbRunFilesRef.from_uri(self)

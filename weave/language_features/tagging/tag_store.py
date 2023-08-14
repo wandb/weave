@@ -14,26 +14,31 @@ The primary user-facing functions are:
 * `find_tag` - used to recursively lookup the tag for a given object
 
 """
-
+import logging
 import contextvars
 from contextlib import contextmanager
 import typing
 import weakref
 
 
-import pyarrow as pa
-
 from ... import box
 from ... import weave_types as types
 from ... import errors
 
+
+from ... import engine_trace
+
 from collections import defaultdict
+
+statsd = engine_trace.statsd()  # type: ignore
+
+NodeTagStoreType = dict[int, dict[str, typing.Any]]
+TagStoreType = defaultdict[int, NodeTagStoreType]
+
 
 # Private global objects used to store the tags for objects
 _OBJ_TAGS_MEM_MAP: contextvars.ContextVar[
-    typing.Optional[
-        defaultdict[int, dict[int, dict[str, typing.Any]]]
-    ]  # shape: {node_id: {obj_id: {tag_key: tag_value}}}
+    typing.Optional[TagStoreType]  # shape: {node_id: {obj_id: {tag_key: tag_value}}}
 ] = contextvars.ContextVar("obj_tags_mem_map", default=None)
 
 # Current node id for scoping tags
@@ -43,11 +48,37 @@ _OBJ_TAGS_CURR_NODE_ID: contextvars.ContextVar[int] = contextvars.ContextVar(
 
 
 # gets the current tag memory map for the current node
-def _current_obj_tag_mem_map() -> typing.Optional[dict[int, dict[str, typing.Any]]]:
+def _current_obj_tag_mem_map() -> typing.Optional[NodeTagStoreType]:
     node_tags = _OBJ_TAGS_MEM_MAP.get()
     if node_tags is None:
         return None
     return node_tags[_OBJ_TAGS_CURR_NODE_ID.get()]
+
+
+def current_tag_store_size() -> int:
+    current_mmap = _OBJ_TAGS_MEM_MAP.get()
+    if current_mmap is not None:
+        n_tag_store_entries = sum(len(current_mmap[key]) for key in current_mmap)
+    else:
+        n_tag_store_entries = 0
+    return n_tag_store_entries
+
+
+def record_current_tag_store_size() -> None:
+    n_tag_store_entries = current_tag_store_size()
+    logging.info(f"Current number of tag store entries: {n_tag_store_entries}")
+    statsd.gauge("weave.tag_store.num_entries", n_tag_store_entries)
+
+
+@contextmanager
+def with_tag_store_state(
+    curr_node_id: int, tags_mem_map: typing.Optional[TagStoreType]
+) -> typing.Iterator[None]:
+    tag_store_token = _OBJ_TAGS_MEM_MAP.set(tags_mem_map)
+    curr_node_id_token = _OBJ_TAGS_CURR_NODE_ID.set(curr_node_id)
+    yield
+    _OBJ_TAGS_CURR_NODE_ID.reset(curr_node_id_token)
+    _OBJ_TAGS_MEM_MAP.reset(tag_store_token)
 
 
 # sets the current node with optionally merged in parent tags
@@ -207,3 +238,14 @@ def is_tagged(obj: typing.Any) -> bool:
         return False
 
     return id_val in mem_map
+
+
+def clear_tag_store() -> None:
+    tag_store = _OBJ_TAGS_MEM_MAP.get()
+    cur_obj_tag_mem_map = _OBJ_TAGS_CURR_NODE_ID.get()
+
+    if tag_store is not None:
+        tag_store.clear()
+
+    if cur_obj_tag_mem_map is not None:
+        _OBJ_TAGS_CURR_NODE_ID.set(-1)

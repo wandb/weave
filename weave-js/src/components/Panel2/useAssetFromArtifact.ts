@@ -9,6 +9,7 @@ import {
   opFileContents,
   opFileDirectUrlAsOf,
   OutputNode,
+  WBTraceTreeType,
   TableType,
   Type,
   VoidNode,
@@ -19,14 +20,14 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import * as CGReact from '../../react';
 
 export const useAssetURLFromArtifact = <
-  InputNodeInternalType extends Exclude<MediaType, TableType>
+  InputNodeInternalType extends Exclude<MediaType, TableType | WBTraceTreeType>
 >(
   inputNode: Node<InputNodeInternalType>,
   ignoreExpiration?: boolean
 ) => {
   const nodeValueQuery = CGReact.useNodeValue(inputNode);
   const fileNode = useMemo(() => {
-    if (!nodeValueQuery.loading) {
+    if (!nodeValueQuery.loading && nodeValueQuery.result != null) {
       return opArtifactVersionFile({
         artifactVersion: opAssetArtifactVersion({asset: inputNode}),
         path: constString(nodeValueQuery.result.path),
@@ -49,7 +50,7 @@ export const useAssetURLFromArtifact = <
 };
 
 export const useAssetContentFromArtifact = <
-  InputNodeInternalType extends Exclude<MediaType, TableType>
+  InputNodeInternalType extends Exclude<MediaType, TableType | WBTraceTreeType>
 >(
   inputNode: Node<InputNodeInternalType>
 ) => {
@@ -154,16 +155,19 @@ export const useSignedUrlWithExpiration = (
         }
 
         // eslint-disable-next-line wandb/no-unprefixed-urls
-        const response = await fetch(directUrl.result + '?redirect=false', {
-          credentials: 'include',
-          method: 'GET',
-          mode: 'cors',
-          // TODO(np): This can and should be sent via cookie, but it's not
-          // being correctly set, breaking this code in devprod and integration tests.
-          headers: {
-            'use-admin-privileges': 'true',
-          },
-        });
+        const response = await fetch(
+          directUrl.result + '?redirect=false&content-disposition=inline',
+          {
+            credentials: 'include',
+            method: 'GET',
+            mode: 'cors',
+            // TODO(np): This can and should be sent via cookie, but it's not
+            // being correctly set, breaking this code in devprod and integration tests.
+            headers: {
+              'use-admin-privileges': 'true',
+            },
+          }
+        );
         const json = await response.json();
         if (json.url != null) {
           setSignedUrl(json.url);

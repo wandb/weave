@@ -91,7 +91,7 @@ export class MemoizedHasher implements Hasher {
     if (node.nodeType === 'const') {
       // TODO: think about what to do with function types. Right now we'll hash
       // the json representation of the graph there (which includes types).
-      return hash(JSON.stringify(node.val));
+      return hash(JSON.stringify(node));
     } else if (node.nodeType === 'output') {
       // important nodeId of an output op == opId of the op we came from
       return this.opId(node.fromOp);

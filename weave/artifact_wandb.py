@@ -6,10 +6,10 @@ import functools
 import tempfile
 import typing
 
-import wandb
+from wandb import Artifact
 from wandb.apis import public as wb_public
-from wandb.sdk.artifacts.local_artifact import Artifact as LocalArtifact
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
+
 
 from . import uris
 from . import util
@@ -21,12 +21,13 @@ from . import file_util
 from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
-from . import wandb_artifact_pusher
+from .wandb_interface import wandb_artifact_pusher
 
 from urllib import parse
 
 if typing.TYPE_CHECKING:
-    from wandb.sdk.interface import artifacts
+    from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+
 
 quote_slashes = functools.partial(parse.quote, safe="")
 
@@ -151,34 +152,34 @@ def _collection_and_alias_id_mapping_to_uri(
 ) -> ReadClientArtifactURIResult:
     is_deleted = False
     query = wb_public.gql(
-        """	
-    query ArtifactVersionFromIdAlias(	
-        $id: ID!,	
-        $aliasName: String!	
-    ) {	
-        artifactCollection(id: $id) {	
-            id	
-            name	
+        """
+    query ArtifactVersionFromIdAlias(
+        $id: ID!,
+        $aliasName: String!
+    ) {
+        artifactCollection(id: $id) {
+            id
+            name
             state
-            project {	
-                id	
-                name	
-                entity {	
-                    id	
-                    name	
-                }	
-            }	
-            artifactMembership(aliasName: $aliasName) {	
-                id	
-                versionIndex	
+            project {
+                id
+                name
+                entity {
+                    id
+                    name
+                }
+            }
+            artifactMembership(aliasName: $aliasName) {
+                id
+                versionIndex
                 commitHash
             }
-            defaultArtifactType {	
-                id	
-                name	
+            defaultArtifactType {
+                id
+                name
             }
-        }	
-    }	
+        }
+    }
     """
     )
     res = wandb_client_api.wandb_public_api().client.execute(
@@ -228,19 +229,19 @@ def _collection_and_alias_id_mapping_to_uri(
 def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
     is_deleted = False
     query = wb_public.gql(
-        """	
-    query ArtifactVersionFromServerId(	
-        $id: ID!,	
-    ) {	
-        artifact(id: $id) {	
+        """
+    query ArtifactVersionFromServerId(
+        $id: ID!,
+    ) {
+        artifact(id: $id) {
             id
             state
             commitHash
             versionIndex
-            artifactType {	
-                id	
-                name	
-            }	
+            artifactType {
+                id
+                name
+            }
             artifactSequence {
                 id
                 name
@@ -254,8 +255,8 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
                     }
                 }
             }
-        }	
-    }	
+        }
+    }
     """
     )
     res = wandb_client_api.wandb_public_api().client.execute(
@@ -356,7 +357,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         self._resolved_read_artifact_uri: typing.Optional["WeaveWBArtifactURI"] = None
         self._read_artifact = None
         if not uri:
-            self._writeable_artifact = LocalArtifact(
+            self._writeable_artifact = Artifact(
                 name, "op_def" if type is None else type
             )
         else:
@@ -422,6 +423,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def __repr__(self):
         return "<WandbArtifact %s>" % self.name
+
+    def delete(self) -> None:
+        self._saved_artifact.delete(delete_aliases=True)
 
     @property
     def commit_hash(self) -> str:
@@ -553,10 +557,16 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         project: str = DEFAULT_WEAVE_OBJ_PROJECT,
         entity_name: typing.Optional[str] = None,
         branch: typing.Optional[str] = None,
+        *,
+        _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
-            self._writeable_artifact, project, entity_name, additional_aliases
+            self._writeable_artifact,
+            project,
+            entity_name,
+            additional_aliases,
+            _lite_run=_lite_run,
         )
         version = res.version_str if branch is None else branch
         self._set_read_artifact_uri(
@@ -667,6 +677,12 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         return artifact_fs.FilesystemArtifactDir(
             self, path, total_size, sub_dirs, files
         )
+
+    def _get_file_paths(self) -> list[str]:
+        manifest = self._manifest()
+        if manifest is None:
+            raise errors.WeaveInternalError("No manifest when fetching file paths")
+        return manifest.get_paths_in_directory("")
 
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
@@ -912,3 +928,40 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
 
     def to_ref(self) -> WandbArtifactRef:
         return WandbArtifactRef.from_uri(self)
+
+
+# This is a wrapper around an artifact that acts like a list of files.
+# It fetchs a file from the manifest on __getItem__ and can return a count without fetching all files
+@dataclasses.dataclass
+class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
+    data: list[str]
+    artifact: WandbArtifact
+    idx: int = 0
+
+    def __init__(self, artifact: WandbArtifact, data: list[str] = []):
+        self.data = data if len(data) > 0 else artifact._get_file_paths()
+        self.artifact = artifact
+        self.idx = 0
+
+    def __getitem__(self, key):
+        path_or_paths = self.data[key]
+        if isinstance(path_or_paths, str):
+            return self.artifact._path_info(path_or_paths)
+        elif isinstance(path_or_paths, list):
+            return FilesystemArtifactFileIterator(self.artifact, path_or_paths)
+        raise errors.WeaveInternalError(
+            "Invalid key in FilesystemArtifactFileIterator __getItem__"
+        )
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.idx >= len(self.data):
+            raise StopIteration
+        current_element = self.__getitem__(self.idx)
+        self.idx += 1
+        return current_element

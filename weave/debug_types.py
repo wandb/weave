@@ -87,7 +87,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                         f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
                     )
     else:
-        reasons.append(f"Incompatible types")
+        reasons.append("Incompatible types")
     if reasons:
         indented_reasons = textwrap.indent("\n".join(reasons), "  ")
         return f"{short_type(to_type)} !<- {short_type(from_type)}\n{indented_reasons}"

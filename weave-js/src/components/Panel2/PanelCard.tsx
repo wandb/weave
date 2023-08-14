@@ -1,6 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {useState} from 'react';
 import styled, {css} from 'styled-components';
 

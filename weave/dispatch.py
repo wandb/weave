@@ -144,7 +144,7 @@ def _apply_ambiguity_rules(
     for rule_name, rule in rules:
         reduced_candidates = rule(candidates, first_arg_type)
         if len(reduced_candidates) < len(candidates):
-            logging.warning(
+            logging.debug(
                 f"Dispatch Ambiguity Resolution - {rule_name} Rule reduced set from {len(candidates)} to {len(reduced_candidates)}"
             )
         candidates = reduced_candidates
@@ -363,9 +363,7 @@ class BoundPotentialOpDefs:
 
 def _dispatch_dunder(
     name: str,
-) -> typing.Callable[
-    [graph.Node, list[typing.Any], dict[str, typing.Any]], "RuntimeOutputNode"
-]:
+) -> typing.Callable[..., "RuntimeOutputNode"]:
     def dispatch_dunder_inner(
         self_node: graph.Node, *args: typing.Any, **kwargs: typing.Any
     ) -> "RuntimeOutputNode":

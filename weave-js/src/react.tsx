@@ -9,29 +9,28 @@ import {
   EditingNode,
   expandAll,
   Frame,
-  getChainRootConst,
-  getChainRootOutputNode,
-  getChainRootVar,
   GlobalCGEventTracker,
   isAssignableTo,
   isConstNode,
   isFunction,
   isFunctionLiteral,
   isFunctionType,
+  isList,
+  isNodeOrVoidNode,
+  isTimestamp,
   isVoidNode,
   isWeaveDebugEnabled,
   Node,
   NodeOrVoidNode,
-  Op,
   opCount,
-  opDefIsLowLevel,
   opIndex,
   OpInputs,
+  opList,
+  opTimestamp,
   pushFrame,
   resolveVar,
   simplify,
   Stack,
-  StaticOpStore,
   Type,
   TypeToTSTypeInner,
   varNode,
@@ -55,6 +54,14 @@ import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
+import {
+  callResolverSimple,
+  clientSet,
+  getChainRootConstructor,
+  getChainRootVar,
+  isConstructor,
+} from './core/mutate';
+// import {useTraceUpdate} from './common/util/hooks';
 
 /**
  * React hook-style function to get the
@@ -115,27 +122,6 @@ export class InvalidGraph {
   constructor(public message: string, public node: NodeOrVoidNode) {}
 }
 
-const callResolverSimple = (
-  opName: string,
-  inputs: {[key: string]: any},
-  fromOp: Op
-): any => {
-  const tsOps = StaticOpStore.getInstance();
-  const opDef = tsOps.getOpDef(opName);
-  if (!opDefIsLowLevel(opDef)) {
-    throw new Error('opDef is not low level ' + opDef.name);
-  }
-  return opDef.resolver(
-    inputs,
-    null as any,
-    // Passing this in because opKinds uses it. null is invalid for the type.
-    // But we don't expect it to be used.
-    {op: fromOp, outputNode: null as any},
-    null as any,
-    null as any
-  );
-};
-
 const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
   if (node.nodeType === 'var') {
     const resolved = resolveVar(env, node.varName);
@@ -188,9 +174,16 @@ const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
           },
         },
       };
-    } else if (name === 'Object-__getattr__' || name === 'pick') {
+    } else if (
+      name === 'Object-__getattr__' ||
+      name === 'pick' ||
+      name === 'index' ||
+      name === 'dict' ||
+      name === 'list' ||
+      name === 'timestamp'
+    ) {
       let resolvedVal = callResolverSimple(name, inputs, node.fromOp);
-      if (resolvedVal.nodeType != null) {
+      if (resolvedVal != null && resolvedVal.nodeType != null) {
         resolvedVal = clientEval(resolvedVal, env);
       }
       return constNodeUnsafe(node.type, resolvedVal);
@@ -203,7 +196,7 @@ type ErrorStateType = {message: string; traceback: string[]};
 
 const errorToText = (e: any) => {
   if (e instanceof Error) {
-    return '' + e;
+    return e.message + '\n\nStack:\n' + e.stack;
   } else if (typeof e === 'string') {
     return e;
   } else if (
@@ -214,27 +207,52 @@ const errorToText = (e: any) => {
     _.isArray(e.traceback)
   ) {
     return e.message + '\n\nTraceback:\n' + e.traceback.join('\n');
+  } else if (
+    typeof e === 'object' &&
+    e != null &&
+    e.message != null &&
+    e.stack != null
+  ) {
+    return e.message + '\n\nStack:\n' + e.stack;
   } else {
     return '';
   }
 };
 
+let useNodeValueId = 0;
+
+// Construct an id, once per mounted component. Use this to help in
+// debugging.
+export const useId = () => {
+  const callSiteId = useRef(useNodeValueId++);
+  return callSiteId.current;
+};
+
 export const useNodeValue = <T extends Type>(
   node: NodeOrVoidNode<T>,
-  memoCacheId: number = 0
+  options?: {
+    memoCacheId?: number;
+    callSite?: string;
+    skip?: boolean;
+  }
 ): {loading: boolean; result: TypeToTSTypeInner<T>} => {
+  const memoCacheId = options?.memoCacheId ?? 0;
+  const callSite = options?.callSite;
+  const skip = options?.skip;
   const dashUiEnabled = useWeaveDashUiEnable();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
   const client = context.client;
-  const {stack, inPanelMaybe} = usePanelContext();
+  const {stack, panelMaybeNode} = usePanelContext();
 
   // consoleLog('USE NODE VALUE PRE CLIENT EVAL', weave.expToString(node), stack);
 
   node = useMemo(() => {
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
   }, [node, stack]);
+
+  node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
 
   node = useMemo(
     () => (dashUiEnabled ? clientEval(node, stack) : node),
@@ -267,6 +285,9 @@ export const useNodeValue = <T extends Type>(
   }, []);
 
   useEffect(() => {
+    if (skip) {
+      return;
+    }
     if (isConstNode(node)) {
       // See the "Mixing functions and expression" comment above.
       setResult({node, value: node.val});
@@ -287,9 +308,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
+      if (callSite != null) {
+        // console.log('useNodeValue subscribe', callSite, node);
+      }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
+          if (callSite != null) {
+            // console.log('useNodeValue resolve', callSite, node);
+          }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -300,7 +327,13 @@ export const useNodeValue = <T extends Type>(
     } else {
       return;
     }
-  }, [client, node, memoCacheId]);
+  }, [client, node, memoCacheId, callSite, skip]);
+  // useTraceUpdate('useNodeValue' + callSite, {
+  //   client,
+  //   node,
+  //   memoCacheId,
+  //   callSite,
+  // });
 
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught
@@ -311,13 +344,20 @@ export const useNodeValue = <T extends Type>(
       console.error(message);
       throw new Error(message);
     }
+    if (isConstNode(node)) {
+      return {loading: false, result: node.val};
+    }
     const loading = result.node.nodeType === 'void' || node !== result.node;
     return {
       loading,
       result: result.value,
     };
   }, [error, node, result.node, result.value]);
-  if (!finalResult.loading && inPanelMaybe && finalResult.result == null) {
+  if (
+    !finalResult.loading &&
+    panelMaybeNode === node &&
+    finalResult.result == null
+  ) {
     // Throw NullResult for PanelMaybe to catch.
     throw new NullResult(result.node);
   }
@@ -389,7 +429,7 @@ export const useValue = <T extends Type>(
     setMemoTrigger(t => t + 1);
   }, [refreshAllNodes, setMemoTrigger]);
 
-  const res = useNodeValue(node, memoTrigger);
+  const res = useNodeValue(node, {memoCacheId: memoTrigger});
 
   return useMemo(
     () => ({
@@ -438,13 +478,13 @@ export const parseRef = (ref: string): ArtifactURI => {
 };
 
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
-  const rootOutputNode = getChainRootOutputNode(absoluteTarget);
-  const rootConstNode = getChainRootConst(absoluteTarget);
+  const rootConstructorNode = getChainRootConstructor(absoluteTarget);
   const rootArgsInner: {[key: string]: any} = {};
   if (
-    rootOutputNode != null &&
-    rootOutputNode.fromOp.name === 'get' &&
-    isConstNode(rootOutputNode.fromOp.inputs.uri)
+    rootConstructorNode != null &&
+    rootConstructorNode.nodeType === 'output' &&
+    rootConstructorNode.fromOp.name === 'get' &&
+    isConstNode(rootConstructorNode.fromOp.inputs.uri)
   ) {
     return {
       rootArgs: rootArgsInner,
@@ -452,20 +492,13 @@ export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
       // TODO: we rely on the original root type here for the new type!
       // This is not quite right. The mutation resolver could return the actual
       // new type.
-      rootType: rootOutputNode.type,
-    };
-  } else if (rootConstNode) {
-    return {
-      rootArgs: rootArgsInner,
-      mutationStyle: 'clientRef' as const,
-      rootType: rootConstNode.type,
+      rootType: rootConstructorNode.type,
     };
   }
-  console.warn("Can't create mutation for this target", absoluteTarget);
   return {
     rootArgs: rootArgsInner,
-    mutationStyle: 'invalid' as const,
-    rootType: 'invalid' as const,
+    mutationStyle: 'clientRef' as const,
+    rootType: absoluteTarget.type,
   };
 };
 
@@ -492,30 +525,42 @@ export const makeCallAction = (
       return;
     }
 
-    // The first argument to any mutation is the target node. We need
-    // to put it inside a const node so that it doesn't get
-    // execute by the engine.
-    const constTarget = constNodeUnsafe(
-      toWeaveType(absoluteTarget),
-      absoluteTarget
-    );
-    const rootArgsNode = constNodeUnsafe(toWeaveType(rootArgs), rootArgs);
-    const calledNode = callOpVeryUnsafe(actionName, {
-      self: constTarget,
-      ...inputs,
-      root_args: rootArgsNode,
-    });
-    return client.action(calledNode as any).then(final => {
+    const onDone = (final: any) => {
       if (final == null && ignoreNullResult) {
         // pass
       } else if (mutationStyle === 'clientRef') {
-        // if (final._weaveStateId != null) {
-        //   weaveStateCallbacks[final._weaveStateId](final.value);
-        // } else {
-        //   throw new Error('Unexpected mutation result');
-        // }
         consoleLog('clientRef useAction result', final);
-        const newRootNode = constNodeUnsafe(toWeaveType(final), final);
+        let newRootNode: Node = constNodeUnsafe(toWeaveType(final), final);
+
+        // This is a gnarly hack. final is a json value, we don't know its True
+        // Weave type. This generally works for basic json types, but in particular
+        // it doesn't work for timestamps. This special cases when we have a simple
+        // set that sets a const node target to a list of timestamps, as is the
+        // case for PanelPlot zoom domain syncing. We set the result to
+        // a list of timestamp constructor ops instead.
+        // TODO: fix this generally. This issue is certainly broader than just the
+        //   hack here. We need to know the correct type of mutation results, and we
+        //   need a general way of converting objects to constructors op calls.
+        if (
+          actionName === 'set' &&
+          isConstructor(absoluteTarget) &&
+          isList(inputs.val.type) &&
+          isTimestamp(inputs.val.type.objectType)
+        ) {
+          newRootNode = opList({
+            a: opTimestamp({
+              timestampISO: constString(
+                new Date(newRootNode.val[0]).toISOString()
+              ),
+            }),
+            b: opTimestamp({
+              timestampISO: constString(
+                new Date(newRootNode.val[1]).toISOString()
+              ),
+            }),
+          } as any);
+        }
+
         if (getChainRootVar(target) != null) {
           consoleLog('CLIENT REF VAR CHAIN ROOT STARTING');
           triggerExpressionEvent(
@@ -574,7 +619,34 @@ export const makeCallAction = (
       // how to apply the mutation results back to some user-held state
       // (unlike in graphql).
       return true;
+    };
+
+    if (
+      actionName === 'set' &&
+      mutationStyle === 'clientRef' &&
+      inputs.val.nodeType === 'const'
+    ) {
+      const clientSetResult = clientSet(absoluteTarget, inputs.val.val);
+      if (clientSetResult.ok) {
+        return onDone(clientSetResult.value);
+      }
+    }
+
+    // The first argument to any mutation is the target node. We need
+    // to put it inside a const node so that it doesn't get
+    // execute by the engine.
+    const constTarget = constNodeUnsafe(
+      toWeaveType(absoluteTarget),
+      absoluteTarget
+    );
+    const rootArgsNode = constNodeUnsafe(toWeaveType(rootArgs), rootArgs);
+    const calledNode = callOpVeryUnsafe(actionName, {
+      self: constTarget,
+      ...inputs,
+      root_args: rootArgsNode,
     });
+
+    return client.action(calledNode as any).then(onDone);
   };
 };
 
@@ -775,6 +847,52 @@ export const useRefEqualExpr = (node: NodeOrVoidNode, stack: Stack) => {
   );
 };
 
+export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
+  const compareNodesWithoutTypes = (
+    a: NodeOrVoidNode,
+    b: NodeOrVoidNode | undefined
+  ): boolean => {
+    if (b == null) {
+      return false;
+    }
+    if (a.nodeType === 'void' && b.nodeType === 'void') {
+      return true;
+    } else if (a.nodeType === 'var' && b.nodeType === 'var') {
+      if (a.varName !== b.varName) {
+        return false;
+      }
+      return true;
+    } else if (a.nodeType === 'const' && b.nodeType === 'const') {
+      if (isNodeOrVoidNode(a.val) && isNodeOrVoidNode(b.val)) {
+        return compareNodesWithoutTypes(a.val, b.val);
+      }
+      if (a.val !== b.val) {
+        return false;
+      }
+      return true;
+    } else if (a.nodeType === 'output' && b.nodeType === 'output') {
+      if (a.fromOp.name !== b.fromOp.name) {
+        return false;
+      }
+      const aKeys = Object.keys(a.fromOp.inputs);
+      const bKeys = Object.keys(b.fromOp.inputs);
+      if (aKeys.length !== bKeys.length) {
+        return false;
+      }
+      for (const key of aKeys) {
+        if (
+          !compareNodesWithoutTypes(a.fromOp.inputs[key], b.fromOp.inputs[key])
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  };
+  return useDeepMemo(node, compareNodesWithoutTypes);
+};
+
 export const useNodeWithServerType = (
   node: NodeOrVoidNode,
   paramFrame?: Frame
@@ -788,6 +906,9 @@ export const useNodeWithServerType = (
   const [error, setError] = useState();
   let dereffedNode: NodeOrVoidNode;
   ({node, dereffedNode} = useRefEqualExpr(node, stack));
+
+  node = useRefEqualWithoutTypes(node);
+  dereffedNode = useRefEqualWithoutTypes(dereffedNode);
 
   const [result, setResult] = useState<{
     node: NodeOrVoidNode;

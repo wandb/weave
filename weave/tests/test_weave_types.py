@@ -491,7 +491,8 @@ def test_typetype():
     tt = weave.type_of(weave.types.TypedDict({"a": weave.types.Int()}))
     assert tt == weave.types.TypeType(
         attr_types={
-            "property_types": weave.types.Dict(types.String(), types.TypeType())
+            "not_required_keys": weave.types.List(types.String()),
+            "property_types": weave.types.Dict(types.String(), types.TypeType()),
         }
     )
 

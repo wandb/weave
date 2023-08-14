@@ -84,7 +84,7 @@ import weave
 weave.use_frontend_devmode()
 ```
 
-This tells the weave API to load the frontend from the development server on port :3000. The dev frontend will talk to your running backdend server on port :9994.
+This tells the weave API to load the frontend from the development server on port :3000. The dev frontend will talk to your running backend server on port :9994.
 
 You can tell everything is working if the weave UI renders and you see your server print out some logs whenever you interact with weave.
 

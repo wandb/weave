@@ -108,6 +108,17 @@ export type OutlinePanelProps = OutlineProps & {
   level?: number;
 };
 
+export const shouldDisablePanelDelete = (
+  config: ChildPanelFullConfig,
+  path: string[]
+) =>
+  (config?.id === 'Group' && config?.config.disableDeletePanel) ||
+  // This exclusion below was added July 2023
+  // all future dashboards should have the disableDeletePanel flag set to true for root, main, and sidebar to not need the below
+  // we can remove the 2 lines below in like 6 months
+  path.length === 0 ||
+  (path.length === 1 && ['main', 'sidebar'].includes(path[0]));
+
 const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   const {
     name,
@@ -119,7 +130,6 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     updateConfig,
     updateConfig2,
     level = 0,
-    setInspectingRoot,
   } = props;
 
   const panelIsHovered = usePanelIsHoveredByPath(path);
@@ -132,6 +142,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   const children = panelChildren(localConfig); // TODO: curPanelId!
 
   const [expanded, setExpanded] = useState(true);
+  const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
 
   const toggleExpanded = useCallback(() => {
     if (children != null) {
@@ -139,14 +150,15 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     }
   }, [children]);
 
+  const shouldHideMenu = shouldDisablePanelDelete(localConfig, path);
+
   return (
     <OutlineItem>
       <OutlineItemTitle
         level={level}
         panelIsHovered={panelIsHovered}
         onClick={() => {
-          const isRoot = _.isEqual(path, []);
-          isRoot ? setInspectingRoot(true) : setSelected(path);
+          setSelected(path);
           setPanelIsHoveredInOutline(path, false);
         }}
         onMouseEnter={() => {
@@ -169,7 +181,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
 
         <OutlineItemName>{name}</OutlineItemName>
         <OutlineItemPanelID>{curPanelId}</OutlineItemPanelID>
-        {path.length > 0 && (
+        {!shouldHideMenu && (
           <OutlineItemPopupMenu
             config={config}
             localConfig={localConfig}
@@ -181,6 +193,9 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
                 <IconOverflowHorizontal />
               </OutlineItemMenuButton>
             }
+            isOpen={isOutlineMenuOpen}
+            onOpen={() => setIsOutlineMenuOpen(true)}
+            onClose={() => setIsOutlineMenuOpen(false)}
           />
         )}
       </OutlineItemTitle>
@@ -199,7 +214,6 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
             setSelected={setSelected}
             path={[...path, key]}
             level={level + 1}
-            setInspectingRoot={setInspectingRoot}
           />
         ))}
     </OutlineItem>
@@ -214,7 +228,6 @@ export interface OutlineProps {
   ) => void;
   selected: string[];
   setSelected: (path: string[]) => void;
-  setInspectingRoot: (inspectingRoot: boolean) => void;
 }
 
 export const Outline: React.FC<OutlineProps> = props => {
@@ -230,7 +243,6 @@ export const Outline: React.FC<OutlineProps> = props => {
         selected={props.selected}
         setSelected={props.setSelected}
         path={[]}
-        setInspectingRoot={props.setInspectingRoot}
       />
     </OutlineContainer>
   );

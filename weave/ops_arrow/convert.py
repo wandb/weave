@@ -1,4 +1,5 @@
 import pyarrow as pa
+import pyarrow.compute as pc
 import typing
 
 from .. import artifact_base
@@ -74,11 +75,15 @@ def recursively_merge_union_types_if_they_are_unions_of_structs(
 
 def recursively_build_pyarrow_array(
     py_objs: list[typing.Any],
-    pyarrow_type: pa.DataType,
+    pyarrow_type: typing.Union[pa.DataType, arrow_util.ArrowTypeWithFieldInfo],
     mapper,
     py_objs_already_mapped: bool = False,
 ) -> pa.Array:
     arrays: list[pa.Array] = []
+
+    if isinstance(pyarrow_type, arrow_util.ArrowTypeWithFieldInfo):
+        pyarrow_type = arrow_util.arrow_type(pyarrow_type)
+    pyarrow_type = typing.cast(pa.DataType, pyarrow_type)
 
     def none_unboxer(iterator: typing.Iterable):
         for obj in iterator:
@@ -248,9 +253,9 @@ def recursively_build_pyarrow_array(
         return pa.ListArray.from_arrays(
             offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
         )
-
-    if py_objs_already_mapped:
-        return pa.array(py_objs, pyarrow_type)
+    elif pa.types.is_temporal(pyarrow_type):
+        if py_objs_already_mapped:
+            return pa.array(py_objs, type=pyarrow_type)
 
     values = [mapper.apply(o) if o is not None else None for o in py_objs]
 
@@ -273,7 +278,10 @@ def recursively_build_pyarrow_array(
 # used in op file-table, to convert from a wandb Table to Weave
 # (that code is very experimental and not totally working yet)
 def to_arrow_from_list_and_artifact(
-    obj: typing.Any, object_type: types.Type, artifact: artifact_base.Artifact
+    obj: typing.Any,
+    object_type: types.Type,
+    artifact: artifact_base.Artifact,
+    py_objs_already_mapped: bool = False,
 ) -> ArrowWeaveList:
     # Get what the parquet type will be.
     merged_object_type = recursively_merge_union_types_if_they_are_unions_of_structs(
@@ -283,13 +291,15 @@ def to_arrow_from_list_and_artifact(
     pyarrow_type = mapper.result_type()
 
     arrow_obj = recursively_build_pyarrow_array(
-        obj, pyarrow_type, mapper, py_objs_already_mapped=False
+        obj, pyarrow_type, mapper, py_objs_already_mapped=py_objs_already_mapped
     )
     return ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
 
 def to_arrow(
-    obj, wb_type=None, artifact: typing.Optional[artifact_base.Artifact] = None
+    obj,
+    wb_type=None,
+    artifact: typing.Optional[artifact_base.Artifact] = None,
 ):
     if isinstance(obj, ArrowWeaveList):
         return obj
@@ -463,12 +473,24 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                     "Unexpected dictionary type for non-string type"
                 )
             return ArrowWeaveList(col._arrow_data, types.String(), None)
-        elif pa.types.is_floating(col._arrow_data.type) or pa.types.is_integer(
-            col._arrow_data.type
-        ):
+        elif pa.types.is_floating(col._arrow_data.type):
+            # Ensure that -0.0 is 0. If we end up converting to a string
+            # later (which happens if we have non-numeric types within a union)
+            # then -0.0 will be converted to "-0.0" which is not equal to "0.0"
+            return ArrowWeaveList(
+                pc.choose(pc.equal(col._arrow_data, 0), col._arrow_data, 0),
+                types.Number(),
+                None,
+            )
+        elif pa.types.is_integer(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Number(), None)
         elif pa.types.is_timestamp(col._arrow_data.type):
-            return ArrowWeaveList(col._arrow_data, types.Timestamp(), None)
+            # Cast to int64 and then string. Leaving this as timestamp
+            # means it will later be cast directly to string, which is very expensive in
+            # pyarrow (1.6s for 500k records v. 0.01s for int64, a 100x improvement)
+            return ArrowWeaveList(
+                col._arrow_data.cast(pa.int64()).cast(pa.string()), types.String(), None
+            )
         elif pa.types.is_boolean(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Boolean(), None)
         elif ArtifactAssetType.assign_type(col.object_type):

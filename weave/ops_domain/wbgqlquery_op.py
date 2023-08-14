@@ -6,6 +6,7 @@ from ..wandb_client_api import wandb_gql_query
 from ..language_features.tagging import tagged_value_type
 from .. import engine_trace
 from .. import errors
+from .. import environment
 
 
 def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
@@ -26,9 +27,12 @@ def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
 )
 def wbgqlquery(query_str, alias_list):
     tracer = engine_trace.tracer()
+    num_timeout_retries = environment.num_gql_timeout_retries()
     with tracer.trace("wbgqlquery:public_api"):
         logging.info("Executing GQL query: %s", query_str)
-        gql_payload = wandb_gql_query(query_str)
+        gql_payload = wandb_gql_query(
+            query_str, num_timeout_retries=num_timeout_retries
+        )
     for alias in alias_list:
         if alias not in gql_payload:
             raise errors.WeaveGQLExecuteMissingAliasError(

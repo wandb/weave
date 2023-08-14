@@ -6,7 +6,7 @@ import {
   DragDropProvider,
   DragHandle,
 } from '@wandb/weave/common/containers/DragDropContainer';
-import produce from 'immer';
+import {produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useRef, useState} from 'react';
 import Measure from 'react-measure';
@@ -26,15 +26,10 @@ import {
   SCROLLBAR_STYLES,
   WHITE,
 } from '../../common/css/globals.styles';
-import {
-  IconAddNew as IconAddNewUnstyled,
-  IconPencilEdit,
-} from '../Panel2/Icons';
+import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {inJupyterCell} from '../PagePanelComponents/util';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {Tooltip} from '../Tooltip';
-import {IconButton} from '../IconButton';
-import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {
   useGetPanelIsHoveredByGroupPath,
   useGetPanelIsHoveredInOutlineByGroupPath,
@@ -42,6 +37,7 @@ import {
   useSetInspectingPanel,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
+import {Button} from '../Button';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -104,23 +100,26 @@ export const PBSection: React.FC<PBSectionProps> = props => {
               onScroll={onSectionsScroll}
               onMouseMove={onSectionsMouseMove}>
               <div className="panel-bank__section">
-                {!inJupyter && groupPath != null && (
+                {!inJupyter && groupPath != null && handleAddPanel != null && (
                   <ActionBar ref={actionBarRef}>
                     <Tooltip
                       position="bottom right"
                       trigger={
-                        <IconButton
-                          onClick={() => setInspectingPanel(groupPath)}>
-                          <IconPencilEdit />
-                        </IconButton>
+                        <Button
+                          variant="ghost"
+                          icon="pencil-edit"
+                          onClick={() => setInspectingPanel(groupPath)}
+                        />
                       }>
                       Open panel editor
                     </Tooltip>
                     {enableAddPanel && (
-                      <WBButton onClick={handleAddPanel}>
-                        <IconAddNew marginRight={6} />
+                      <Button
+                        variant="ghost"
+                        onClick={handleAddPanel}
+                        icon="add-new">
                         New panel
-                      </WBButton>
+                      </Button>
                     )}
                   </ActionBar>
                 )}
@@ -265,10 +264,10 @@ const AddPanelBarContainer = styled.div`
   }
 `;
 
-const IconAddNew = styled(IconAddNewUnstyled)<{marginRight?: number}>`
+const IconAddNew = styled(IconAddNewUnstyled)<{$marginRight?: number}>`
   width: 18px;
   height: 18px;
-  margin-right: ${p => p.marginRight ?? 8}px;
+  margin-right: ${p => p.$marginRight ?? 8}px;
 `;
 
 const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
