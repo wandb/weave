@@ -189,6 +189,13 @@ def pytest_addoption(parser):
         default="function",  # or "function" or "session" or "module"
         help='cli to set scope of fixture "user-scope"',
     )
+
+    parser.addoption(
+        "--job-num",
+        default=None,
+        help='cli to set "job-num"',
+    )
+
     parser.addoption(
         "--base-url",
         default=f"{wandb_server_host}:{LOCAL_BASE_PORT}",

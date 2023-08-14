@@ -276,17 +276,17 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
     }
   }, [panelSpec, props, configMode, updateConfig2]);
 
-  const {inPanelMaybe} = usePanelContext();
+  const {panelMaybeNode} = usePanelContext();
 
   unboundedContent = useMemo(() => {
     return dashUiEnabled ? (
-      <PanelCompErrorBoundary inPanelMaybe={inPanelMaybe}>
+      <PanelCompErrorBoundary inPanelMaybe={panelMaybeNode != null}>
         {unboundedContent}
       </PanelCompErrorBoundary>
     ) : (
       unboundedContent
     );
-  }, [dashUiEnabled, inPanelMaybe, unboundedContent]);
+  }, [dashUiEnabled, panelMaybeNode, unboundedContent]);
 
   if (props.input.nodeType === 'void') {
     return (
