@@ -34,8 +34,6 @@ jobs:
       # this script is hardcoded to build for linux/amd64
       - name: Prune docker cache
         run: docker system prune -f
-      - name: Build unit test image
-        run: python3 docker_build.py build_deps weave-test builder . Dockerfile.test
       - name: Build integration test image
         run: python3 docker_build.py build weave-integration-test . Dockerfile.test
 
