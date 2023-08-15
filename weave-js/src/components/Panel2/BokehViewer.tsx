@@ -55,9 +55,16 @@ const BokehViewerInner = (props: BokehViewerProps) => {
       if (bokehDivRef.current) {
         bokehDivRef.current.innerHTML = '';
       }
+      // Simple Bokeh objects will not have multiple roots. So
+      // we can just use the first root_id. This was discovered
+      // by unit tests creating simple Bokeh objects.
+      let rootId = 0;
+      if (props.bokehJson.roots.root_ids != null) {
+        rootId = props.bokehJson.roots.root_ids[0];
+      }
       (window as any).Bokeh.embed.embed_item({
         doc: props.bokehJson,
-        root_id: props.bokehJson.roots.root_ids[0],
+        root_id: rootId,
         target_id: bokehDivId,
       });
     }

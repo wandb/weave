@@ -104,7 +104,7 @@ class GQLTypeMixin:
 
 @weave_type("org", True)
 class Org(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
         name
     """
@@ -116,7 +116,7 @@ OrgType = typing.cast(types.Type, OrgType)
 
 @weave_type("entity", True)
 class Entity(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
         name
     """
@@ -128,7 +128,7 @@ EntityType = typing.cast(types.Type, EntityType)
 
 @weave_type("user", True)
 class User(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
         name
     """
@@ -140,7 +140,7 @@ UserType = typing.cast(types.Type, UserType)
 
 @weave_type("project", True)
 class Project(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
         name
     """
@@ -152,7 +152,7 @@ ProjectType = typing.cast(types.Type, ProjectType)
 
 @weave_type("run", True)
 class Run(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
         name
     """
@@ -164,7 +164,7 @@ RunType = typing.cast(types.Type, RunType)
 
 @weave_type("artifactType", True)
 class ArtifactType(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
         name
     """
@@ -176,7 +176,7 @@ ArtifactTypeType = typing.cast(types.Type, ArtifactTypeType)
 
 @weave_type("artifact", True)  # Name and Class mismatch intention due to weave0
 class ArtifactCollection(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
         name
     """
@@ -188,7 +188,7 @@ ArtifactCollectionType = typing.cast(types.Type, ArtifactCollectionType)
 
 @weave_type("artifactVersion", True)
 class ArtifactVersion(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
     """
 
@@ -201,7 +201,7 @@ ArtifactVersionType = typing.cast(types.Type, ArtifactVersionType)
     "artifactMembership", True
 )  # Name and Class mismatch intention due to weave0
 class ArtifactCollectionMembership(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
     """
 
@@ -214,7 +214,7 @@ ArtifactCollectionMembershipType = typing.cast(
 
 @weave_type("artifactAlias", True)
 class ArtifactAlias(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
     """
 
@@ -225,7 +225,7 @@ ArtifactAliasType = typing.cast(types.Type, ArtifactAliasType)
 
 @weave_type("report", True)
 class Report(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
     """
 
@@ -236,7 +236,7 @@ ReportType = typing.cast(types.Type, ReportType)
 
 @weave_type("runQueue", True)
 class RunQueue(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+    REQUIRED_FRAGMENT = """
         id
     """
 
