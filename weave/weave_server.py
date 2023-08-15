@@ -125,21 +125,38 @@ def make_app():
     return app
 
 
+class OpsCache(typing.TypedDict):
+    updated_at: float
+    ops_data: typing.Optional[dict]
+
+
+ops_cache: typing.Optional[OpsCache] = None
+
+
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
+    global ops_cache
     with wandb_api.from_environment():
         # TODO: this is super slow.
         if not environment.wandb_production():
             registry_mem.memory_registry.load_saved_ops()
-        ops = registry_mem.memory_registry.list_ops()
-        ret = []
-        for op in ops:
-            try:
-                serialized_op = op.to_dict()
-            except errors.WeaveSerializeError:
-                continue
-            ret.append(serialized_op)
-        return {"data": ret}
+        if (
+            ops_cache is None
+            or ops_cache["updated_at"] < registry_mem.memory_registry.updated_at()
+        ):
+            ops = registry_mem.memory_registry.list_ops()
+            ret = []
+            for op in ops:
+                try:
+                    serialized_op = op.to_dict()
+                except errors.WeaveSerializeError:
+                    continue
+                ret.append(serialized_op)
+            ops_cache = {
+                "updated_at": registry_mem.memory_registry.updated_at(),
+                "data": ret,
+            }
+    return ops_cache
 
 
 class ErrorDetailsDict(typing.TypedDict):
