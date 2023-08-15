@@ -556,6 +556,7 @@ def execute_forward_node(
             forward_node.set_result(run)
     else:
         result: typing.Any
+        # with tracer.trace("execute-sync") as span:
         with tracer.trace("execute-sync"):
             # TODO: This logic should all move into resolve_fn of op_def...
             if language_nullability.should_force_none_result(inputs, op_def):
@@ -570,6 +571,15 @@ def execute_forward_node(
                     )
             else:
                 result = execute_sync_op(op_def, inputs)
+                # span.set_tag("op_output", {"type": type(result).__name__})
+                # span.set_tag(
+                #     "op_input",
+                #     {
+                #         k: v
+                #         for k, v in inputs.items()
+                #         if isinstance(v, (str, int, float, bool))
+                #     },
+                # )
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)

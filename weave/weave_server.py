@@ -254,8 +254,8 @@ def execute():
     }
     root_span = tracer.current_root_span()
     tag_store.record_current_tag_store_size()
-    # Default to 5 second cache duration
-    impure_cache_key = str(int(time.time() // 5))
+    # Uncomment to set default to 15 second cache duration
+    impure_cache_key = None  # str(int(time.time() // 15))
     if "x-weave-impure-cache-key" in request.headers:
         impure_cache_key = request.headers["x-weave-impure-cache-key"]
 
