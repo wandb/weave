@@ -181,6 +181,7 @@ import {ReactComponent as ImportVertexGCP} from '../../assets/icons/icon-vertex-
 import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-play.svg';
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
+import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
@@ -742,6 +743,9 @@ export const IconWandb = (props: SVGIconProps) => (
 export const IconWarning = (props: SVGIconProps) => (
   <ImportWarning {...updateIconProps(props)} />
 );
+export const IconWarningAlt = (props: SVGIconProps) => (
+  <ImportWarningAlt {...updateIconProps(props)} />
+);
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
 );
@@ -937,6 +941,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'video-play': IconVideoPlay,
   wandb: IconWandb,
   warning: IconWarning,
+  'warning-alt': IconWarningAlt,
   webhook: IconWebhook,
   'x-axis': IconXAxis,
   'youtube-social': IconYoutubeSocial,
