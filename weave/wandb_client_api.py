@@ -68,3 +68,30 @@ def reset_wandb_thread_local_api_settings() -> None:
     _thread_local_api_settings.api_key = None
     _thread_local_api_settings.cookies = None
     _thread_local_api_settings.headers = None
+
+
+_WANDB_CLIENT_PATCHED = False
+
+
+def do_patch() -> None:
+    global _WANDB_CLIENT_PATCHED
+    if _WANDB_CLIENT_PATCHED:
+        return
+
+    orig_fn = public.Api._parse_artifact_path
+
+    def new_fn(self, path):  # type: ignore
+        # Fetching self.default_entity will trigger a network request.
+        # Here, we short-circuit that if we already have it.
+        if path is not None:
+            parts = path.split("/")
+            if len(parts) == 3:
+                return parts
+        return orig_fn(self, path)
+
+    public.Api._parse_artifact_path = new_fn  # type: ignore
+
+    _WANDB_CLIENT_PATCHED = True
+
+
+do_patch()
