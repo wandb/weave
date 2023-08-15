@@ -180,6 +180,7 @@ export const IconNames = {
   VideoPlay: 'video-play',
   Wandb: 'wandb',
   Warning: 'warning',
+  WarningAlt: 'warning-alt',
   Webhook: 'webhook',
   XAxis: 'x-axis',
   YoutubeSocial: 'youtube-social',
