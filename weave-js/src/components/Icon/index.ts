@@ -181,6 +181,7 @@ export {
   IconVideoPlay,
   IconWandb,
   IconWarning,
+  IconWarningAlt,
   IconWebhook,
   IconXAxis,
   IconYoutubeSocial,
