@@ -64,8 +64,8 @@ export const PreviewNode: React.FC<{
   inputExpr: string;
 }> = props => {
   const url = useMemo(() => {
-    return `${
-      window.location.origin
+    return `${window.location.origin}${
+      (window as any).CONFIG?.WEAVE_BACKEND_HOST ?? ''
     }/?previewMode=true&exp=${encodeURIComponent(props.inputExpr)}`;
   }, [props.inputExpr]);
 
