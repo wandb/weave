@@ -997,7 +997,8 @@ const EditorIcons = styled.div<{visible: boolean}>`
 
 const PanelContainer = styled.div`
   flex-grow: 1;
-  // overflow-y: auto;
+  // TODO
+  overflow-y: auto;
 `;
 
 type ElementWidth<T> = {

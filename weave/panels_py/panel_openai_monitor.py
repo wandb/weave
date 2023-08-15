@@ -235,6 +235,7 @@ def board(
     overview_tab = weave.panels.Group(
         layoutMode="grid",
         showExpressions=True,
+        enableAddPanel=True,
     )  # , showExpressions="titleBar")
     overview_tab.add(
         "request_count",
@@ -302,64 +303,77 @@ def board(
         layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=height),
     ),
 
+    # Show a plot for each attribute.
+    # TODO: This doesn't really work yet (needs some manual UI configuration currently,
+    # and it's ugly).
+    # overview_tab.add(
+    #     "attributes", weave.panels.EachColumn(filtered_window_data["attributes"])
+    # )
+
     ### Requests tab
 
-    requests_tab = weave.panels.Group(
-        layoutMode="grid",
-        showExpressions=True,
-    )  # l, showExpressions="titleBar")
+    # requests_tab = weave.panels.Group(
+    #     layoutMode="grid",
+    #     showExpressions=True,
+    # )  # l, showExpressions="titleBar")
 
-    requests_table = panels.Table(window_data)  # type: ignore
-    requests_table.add_column(lambda row: row["model"], "Model")
-    requests_table.add_column(lambda row: row["messages"][-1]["content"], "Message")
-    requests_table.add_column(lambda row: row["completion"]["content"], "Completion")
+    requests_table = panels.Table(filtered_window_data)  # type: ignore
+    requests_table.add_column(lambda row: row["output.model"], "Model")
     requests_table.add_column(
-        lambda row: row["usage"]["prompt_tokens"], "Prompt Tokens"
+        lambda row: row["inputs.messages"][-1]["content"], "Message"
     )
     requests_table.add_column(
-        lambda row: row["usage"]["completion_tokens"], "Completion Tokens"
+        lambda row: row["output.choices"][-1]["message.content"], "Completion"
     )
-    requests_table.add_column(lambda row: row["usage"]["total_tokens"], "Total Tokens")
+    requests_table.add_column(
+        lambda row: row["output.usage.prompt_tokens"], "Prompt Tokens"
+    )
+    requests_table.add_column(
+        lambda row: row["output.usage.completion_tokens"], "Completion Tokens"
+    )
+    requests_table.add_column(
+        lambda row: row["output.usage.total_tokens"], "Total Tokens"
+    )
     requests_table.add_column(lambda row: row["latency_ms"], "Latency")
     requests_table.add_column(lambda row: row["timestamp"], "Timestamp")
 
-    requests_table_var = requests_tab.add(
+    requests_table_var = overview_tab.add(
         "table",
         requests_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=15, w=24, h=8),
     )
-    requests_tab.add(
+    overview_tab.add(
         "input",
         panels.Table(  # type: ignore
-            requests_table_var.active_data()["messages"],
+            requests_table_var.active_data()["inputs.messages"],
             columns=[lambda row: row["role"], lambda row: row["content"]],
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=8, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=23, w=12, h=8),
     )
-    requests_tab.add(
+    overview_tab.add(
         "output",
         requests_table_var.active_row(),
-        layout=weave.panels.GroupPanelLayout(x=12, y=8, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=12, y=23, w=12, h=8),
     )
 
-    attributes_tab = weave.panels.Group(layoutMode="grid")
+    # attributes_tab = weave.panels.Group(layoutMode="grid")
 
-    users_tab = weave.panels.Group(layoutMode="grid")
+    # users_tab = weave.panels.Group(layoutMode="grid")
 
-    models_tab = weave.panels.Group(layoutMode="grid")
+    # models_tab = weave.panels.Group(layoutMode="grid")
 
-    tabs = panels.Group(
-        layoutMode="tab",
-        items={
-            "Overview": overview_tab,
-            "Requests": requests_tab,
-            # "Attributes": attributes_tab,
-            # "Users": users_tab,
-            # "Models": models_tab,
-        },
-    )
+    # tabs = panels.Group(
+    #     layoutMode="tab",
+    #     items={
+    #         "Overview": overview_tab,
+    #         "Requests": requests_tab,
+    #         # "Attributes": attributes_tab,
+    #         # "Users": users_tab,
+    #         # "Models": models_tab,
+    #     },
+    # )
 
-    return panels.Board(vars=varbar, panels=tabs)
+    return panels.Board(vars=varbar, panels=overview_tab)
 
 
 template_registry.register(
