@@ -76,7 +76,7 @@ const defaultOpts: RemoteWeaveOptions = {
   backoffBase: 500,
   backoffMax: 20000,
   backoffExpScalar: 0.8,
-  impureCacheDuration: 30,
+  impureCacheDuration: 10,
   fetch: fetch.bind(globalThis as any),
 };
 
