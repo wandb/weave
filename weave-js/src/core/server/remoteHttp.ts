@@ -95,6 +95,7 @@ const createClientCacheKey = (windowSizeMs: number = 15000) => {
 
 // Handles (de)serialization to send to a remote CG server
 export class RemoteHttpServer implements Server {
+  public clientCacheKey: string = createClientCacheKey();
   private readonly opts: RemoteWeaveOptions;
   private readonly flushInterval: NodeJS.Timer;
   private pendingNodes: Map<Node, NodeEntry> = new Map();
@@ -102,7 +103,6 @@ export class RemoteHttpServer implements Server {
   private nextFlushTime = 0;
   private backoffCount: number = 0;
   private trace: (...args: any[]) => void;
-  public clientCacheKey: string = createClientCacheKey();
 
   public constructor(
     inOpts: Partial<RemoteWeaveOptions>,
