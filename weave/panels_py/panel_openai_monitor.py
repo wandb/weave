@@ -4,6 +4,7 @@ import weave
 from .. import dispatch
 from .. import weave_internal as internal
 from .. import weave_types as types
+from .. import weave_internal
 from ..panels import panel_group
 from ..panels import panel_board
 from ..panels_py import panel_autoboard
@@ -191,12 +192,23 @@ def board(
         hidden=True,
     )
 
-    filtered_data = varbar.add(
-        "filtered_data",
-        window_data.filter(lambda row: row["model"] == "gpt-3.5-turbo-0613"),
+    filter_fn = varbar.add(
+        "filter_fn",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: weave_internal.const(True)
+        ),
+        hidden=True,
+    )
+    filter_editor = varbar.add(
+        "filter_editor",
+        weave.panels.FilterEditor(filter_fn, node=window_data),
     )
 
-    from .. import weave_internal
+    filtered_data = varbar.add("filtered_data", dataset.filter(filter_fn), hidden=True)
+
+    filtered_window_data = varbar.add(
+        "filtered_window_data", window_data.filter(filter_fn), hidden=True
+    )
 
     groupby = varbar.add("groupby", "output.model", hidden=True)
     groupby_dropdown = varbar.add(
@@ -227,7 +239,7 @@ def board(
     overview_tab.add(
         "request_count",
         panel_autoboard.timeseries_count_bar(
-            dataset,
+            filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
             groupby_key=groupby,
@@ -240,7 +252,7 @@ def board(
     overview_tab.add(
         "cost",
         panel_autoboard.timeseries(
-            dataset,
+            filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
             y_expr=lambda row: cost(row).sum(),
@@ -256,7 +268,7 @@ def board(
     overview_tab.add(
         "latency",
         panel_autoboard.timeseries(
-            dataset,
+            filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
             y_expr=lambda row: (row["end_time_ms"].avg() - row["start_time_ms"].avg())
@@ -271,22 +283,22 @@ def board(
 
     overview_tab.add(
         "avg cost per req",
-        cost(window_data).avg(),  # type: ignore
+        cost(filtered_window_data).avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg prompt tokens per req",
-        window_data["output.usage.prompt_tokens"].avg(),  # type: ignore
+        filtered_window_data["output.usage.prompt_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=6, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg completion tokens per req",
-        window_data["output.usage.completion_tokens"].avg(),  # type: ignore
+        filtered_window_data["output.usage.completion_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg total tokens per req",
-        window_data["output.usage.total_tokens"].avg(),  # type: ignore
+        filtered_window_data["output.usage.total_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=height),
     ),
 
