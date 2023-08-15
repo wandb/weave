@@ -19,7 +19,7 @@ from flask_cors import CORS
 from flask import send_from_directory
 import wandb
 
-from weave import graph, server, value_or_error
+from weave import context_state, graph, server, value_or_error
 from weave import storage
 from weave import registry_mem
 from weave import errors
@@ -34,6 +34,8 @@ from weave import storage
 from weave import wandb_api
 from weave.language_features.tagging import tag_store
 
+
+WEAVE_CLIENT_CACHE_KEY_HEADER = "x-weave-client-cache-key"
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -223,6 +225,14 @@ def _log_errors(
         logging.error(error_dict)
 
 
+def _get_client_cache_key_from_request(request):
+    # Uncomment to set default to 15 second cache duration
+    client_cache_key = None  # str(int(time.time() // 15))
+    if WEAVE_CLIENT_CACHE_KEY_HEADER in request.headers:
+        client_cache_key = request.headers[WEAVE_CLIENT_CACHE_KEY_HEADER]
+    return client_cache_key
+
+
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
@@ -254,10 +264,14 @@ def execute():
     }
     root_span = tracer.current_root_span()
     tag_store.record_current_tag_store_size()
+
+    client_cache_key = _get_client_cache_key_from_request(request)
+
     if not PROFILE_DIR:
         start_time = time.time()
         with client_safe_http_exceptions_as_werkzeug():
-            response = server.handle_request(**execute_args)
+            with context_state.set_client_cache_key(client_cache_key):
+                response = server.handle_request(**execute_args)
         elapsed = time.time() - start_time
     else:
         # Profile the request and add a link to local snakeviz to the trace.
@@ -265,7 +279,8 @@ def execute():
         start_time = time.time()
         try:
             with client_safe_http_exceptions_as_werkzeug():
-                response = profile.runcall(server.handle_request, **execute_args)
+                with context_state.set_client_cache_key(client_cache_key):
+                    response = profile.runcall(server.handle_request, **execute_args)
         finally:
             elapsed = time.time() - start_time
             profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"

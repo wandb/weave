@@ -89,6 +89,10 @@ interface NodeEntry {
 // TODO: currently deprecated, but works in all browsers
 declare function btoa(s: string): string;
 
+const createClientCacheKey = (windowSizeMs: number = 15000) => {
+  return Math.floor(Date.now() / windowSizeMs).toString();
+};
+
 // Handles (de)serialization to send to a remote CG server
 export class RemoteHttpServer implements Server {
   private readonly opts: RemoteWeaveOptions;
@@ -98,6 +102,7 @@ export class RemoteHttpServer implements Server {
   private nextFlushTime = 0;
   private backoffCount: number = 0;
   private trace: (...args: any[]) => void;
+  private clientCacheKey: string = createClientCacheKey();
 
   public constructor(
     inOpts: Partial<RemoteWeaveOptions>,
@@ -128,11 +133,14 @@ export class RemoteHttpServer implements Server {
   }
 
   public async query(
-    nodes: Node[]
-    // withBackendCacheReset?: boolean
+    nodes: Node[],
+    stripTags?: boolean,
+    withBackendCacheReset?: boolean
   ): Promise<any[]> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
-    // TODO: pass withBackendCacheReset across the network
+    if (withBackendCacheReset) {
+      this.clientCacheKey = createClientCacheKey();
+    }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
     return await Promise.all(
@@ -321,6 +329,8 @@ export class RemoteHttpServer implements Server {
         } else {
           additionalHeaders['weave-shadow'] = 'false';
         }
+
+        additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
 
         let respJson: any = {
           data: new Array(nodes.length).fill(null),
