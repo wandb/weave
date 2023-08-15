@@ -341,6 +341,15 @@ const CenterProjectBoardsBrowser: React.FC<
     return [
       [
         {
+          icon: IconOpenNewTab,
+          label: 'Open board',
+          onClick: row => {
+            props.navigateToExpression(
+              rowToExpression(params.entity!, params.project!, row._id)
+            );
+          },
+        },
+        {
           icon: IconInfo,
           label: 'Board details',
           onClick: row => {
@@ -351,17 +360,6 @@ const CenterProjectBoardsBrowser: React.FC<
                 params.assetType === 'board' ? 'board' : 'table',
                 row._id
               )
-            );
-          },
-        },
-      ],
-      [
-        {
-          icon: IconOpenNewTab,
-          label: 'Open Board',
-          onClick: row => {
-            props.navigateToExpression(
-              rowToExpression(params.entity!, params.project!, row._id)
             );
           },
         },

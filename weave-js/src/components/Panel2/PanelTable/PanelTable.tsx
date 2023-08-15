@@ -6,6 +6,7 @@ import {
   constFunction,
   constNumber,
   constString,
+  dereferenceAllVars,
   escapeDots,
   isAssignableTo,
   isOutputNode,
@@ -1370,7 +1371,9 @@ export const TableSpec: Panel2.PanelSpec = {
       TableType.normalizeTableLike(inputNode),
       stack
     );
-    return getTableConfig(tableNormInput, undefined, weave);
+    const dereffedInput = dereferenceAllVars(tableNormInput, stack)
+      .node as Node;
+    return getTableConfig(dereffedInput, undefined, weave);
   },
   Component: PanelTable,
   inputType,

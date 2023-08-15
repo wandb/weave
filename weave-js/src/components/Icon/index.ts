@@ -127,6 +127,7 @@ export {
   IconRecentClock,
   IconRedditSocial,
   IconRedo,
+  IconRemove,
   IconReport,
   IconRetry,
   IconRobotServiceMember,
