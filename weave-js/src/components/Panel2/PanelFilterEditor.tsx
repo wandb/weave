@@ -35,7 +35,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     ? constFunction({}, () => voidNode() as any)
     : valueQuery.result;
   const setVal = useMutation(valueNode, 'set');
-  const [mode, setMode] = React.useState<'visual' | 'expression'>('visual');
+  // const [mode, setMode] = React.useState<'visual' | 'expression'>('visual');
 
   if (!isFunctionLiteral(value)) {
     throw new Error('Expected function literal');
