@@ -8,7 +8,10 @@ COPY requirements.* /root/
 WORKDIR /root
 RUN python3 -m venv venv
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
-    pip install -r requirements.test.txt -r requirements.dev.txt -r requirements.ecosystem.txt"
+    pip install -r requirements.test.txt -r requirements.dev.txt"
+RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
+    pip install -r requirements.ecosystem.txt"
+
 
 RUN apt update && apt install -y gcc g++ make libcairo2-dev libjpeg-dev libgif-dev libpango1.0-dev
 
