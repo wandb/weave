@@ -89,6 +89,12 @@ interface NodeEntry {
 // TODO: currently deprecated, but works in all browsers
 declare function btoa(s: string): string;
 
+const createClientCacheKey = (windowSizeMs:number = 15000) => {
+  return Math.floor(
+    Date.now() / windowSizeMs
+  ).toString();
+}
+
 // Handles (de)serialization to send to a remote CG server
 export class RemoteHttpServer implements Server {
   private readonly opts: RemoteWeaveOptions;
@@ -98,7 +104,7 @@ export class RemoteHttpServer implements Server {
   private nextFlushTime = 0;
   private backoffCount: number = 0;
   private trace: (...args: any[]) => void;
-  private clientCacheKey: string = Math.random().toString();
+  private clientCacheKey: string = createClientCacheKey()
 
   public constructor(
     inOpts: Partial<RemoteWeaveOptions>,
@@ -135,7 +141,7 @@ export class RemoteHttpServer implements Server {
   ): Promise<any[]> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
     if (withBackendCacheReset) {
-      this.clientCacheKey = Math.random().toString();
+      this.clientCacheKey = createClientCacheKey()
     }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
