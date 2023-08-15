@@ -472,7 +472,7 @@ def execute_forward_node(
         no_cache = True
         if op_policy.should_cache(op_def.simple_name):
             no_cache = False
-        if impure_cache_key is not None and op_def.pure:
+        if impure_cache_key is not None and not op_def.pure:
             no_cache = False
 
     use_cache = not no_cache
