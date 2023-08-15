@@ -36,6 +36,96 @@ export const opDateSub = makeDateOp({
   },
 });
 
+export const opDateAddDuration = makeDateOp({
+  hidden: true,
+  name: 'date-addDuration',
+  argTypes: {date: 'date', duration: 'number'},
+  renderInfo: {
+    type: 'binary',
+    repr: '+',
+  },
+  description: `Returns the sum between a ${docType(
+    'date'
+  )} and duration in milliseconds ${docType('number')}`,
+  argDescriptions: {
+    date: `Date ${docType('date')}`,
+    duration: `Duration ${docType('number')}`,
+  },
+  returnValueDescription: `The sum between the a ${docType(
+    'date'
+  )} and duration in milliseconds ${docType('number')}`,
+  returnType: inputTypes => 'date',
+  resolver: inputs => {
+    if (
+      inputs.date == null ||
+      inputs.duration == null ||
+      inputs.duration <= 0
+    ) {
+      return null;
+    }
+    const dateAddDuration = moment
+      .utc(inputs.date)
+      .add(moment.duration(inputs.duration, 'milliseconds'))
+      .toDate();
+    return new Date(dateAddDuration);
+  },
+});
+
+export const opDateDiffDaysStringFormat = makeDateOp({
+  hidden: true,
+  name: 'date-diffDaysStringFormat',
+  argTypes: {lhs: 'date', rhs: 'date'},
+  renderInfo: {
+    type: 'binary',
+    repr: '-',
+  },
+  description: `Returns the difference between two ${docType('date', {
+    plural: true,
+  })} in days in a nice string form`,
+  argDescriptions: {
+    lhs: `First ${docType('date')}`,
+    rhs: `Second ${docType('date')}`,
+  },
+  returnValueDescription: `The difference between the two ${docType('date', {
+    plural: true,
+  })} in days in a nice string form`,
+  returnType: inputTypes => 'string',
+  resolver: inputs => {
+    if (inputs.lhs == null || inputs.rhs == null) {
+      return null;
+    }
+    const dateDiff = moment.utc(inputs.lhs).diff(inputs.rhs, 'milliseconds');
+    const dayDiff = Math.floor(
+      moment.duration(dateDiff, 'milliseconds').asDays()
+    );
+    if (dayDiff <= 0) {
+      return 'less than 1 day left';
+    }
+    return dayDiff.toString() + (dayDiff === 1 ? ' day' : ' days');
+  },
+});
+
+export const opTimestampToDate = makeDateOp({
+  hidden: true,
+  name: 'timestamp-toDate',
+  argTypes: {timestamp: {type: 'timestamp'}},
+  description: `Creates a ${docType('date')} from timestamp`,
+  argDescriptions: {
+    dateISO: `An ISO timestamp string to convert to a ${docType('date')}`,
+  },
+  returnValueDescription: `The ${docType('timestamp')} as a Date`,
+  renderInfo: {
+    type: 'function',
+  },
+  returnType: inputs => {
+    return 'date';
+  },
+  resolver: inputs => {
+    const date = new Date(inputs.timestamp);
+    return date;
+  },
+});
+
 export const opDateToNumber = makeDateOp({
   hidden: true,
   name: `date-toNumber`,
