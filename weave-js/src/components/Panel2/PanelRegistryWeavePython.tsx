@@ -23,7 +23,8 @@ import {Spec as RunSpec} from './PanelRun';
 import {Spec as PanelSections} from './PanelSections';
 import {Spec as PanelSlider} from './PanelSlider';
 import {Spec as PanelStringEditor} from './PanelStringEditor';
-import {Spec as PanelSelectEditor} from './PanelSelectEditor';
+// import {Spec as PanelSelectEditor} from './PanelSelectEditor';
+import {Spec as PanelDropdown} from './PanelDropdown';
 import {Spec as PanelDateRange} from './PanelDateRange';
 import {Spec as PanelStringHistogramWeave} from './PanelStringHistogramWeave';
 import {Spec as PanelTextEditor} from './PanelTextEditor';
@@ -39,7 +40,8 @@ export const weavePythonPanelSpecs = () => {
     PanelGpt3Model,
     PanelStringEditor,
     PanelTextEditor,
-    PanelSelectEditor,
+    // PanelSelectEditor,
+    PanelDropdown,
     PanelDateRange,
     PanelPanel,
     PanelSlider,

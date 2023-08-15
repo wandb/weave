@@ -45,6 +45,7 @@ def varbar(editable=True, items=None) -> panel_group.Group:
                 "Slider",
                 "StringEditor",
                 "SelectEditor",
+                "Dropdown",
                 "DateRange",
             ],
             enableAddPanel=True,

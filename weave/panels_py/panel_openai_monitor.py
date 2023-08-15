@@ -1,6 +1,7 @@
 import typing
 
 import weave
+from .. import dispatch
 from .. import weave_internal as internal
 from .. import weave_types as types
 from ..panels import panel_group
@@ -107,6 +108,10 @@ board_name = "py_board-" + BOARD_ID
 #         return table
 
 
+def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
+    return row["output.usage.total_tokens"] * 0.0015e-3
+
+
 @weave.op(  # type: ignore
     name=board_name,
     hidden=True,
@@ -155,34 +160,60 @@ def board(
         "bin_range", user_zoom_range.coalesce(dataset_range), hidden=True
     )
 
-    clean_data = varbar.add(
-        "clean_data",
-        dataset.map(
-            lambda row: ops.dict_(
-                id=row["output"]["id"],
-                object=row["output"]["object"],
-                model=row["output"]["model"],
-                messages=row["inputs"]["messages"],
-                usage=row["output"]["usage"],
-                completion=row["output"]["choices"][0]["message"],
-                finish_reason=row["output"]["choices"][0]["finish_reason"],
-                timestamp=row["timestamp"],
-                latency_ms=row["end_time_ms"] - row["start_time_ms"],
-            )
-        ),
-        hidden=True,
-    )
+    # clean_data = varbar.add(
+    #     "clean_data",
+    #     dataset.map(
+    #         lambda row: ops.dict_(
+    #             id=row["output"]["id"],
+    #             object=row["output"]["object"],
+    #             model=row["output"]["model"],
+    #             messages=row["inputs"]["messages"],
+    #             usage=row["output"]["usage"],
+    #             completion=row["output"]["choices"][0]["message"],
+    #             finish_reason=row["output"]["choices"][0]["finish_reason"],
+    #             timestamp=row["timestamp"],
+    #             latency_ms=row["end_time_ms"] - row["start_time_ms"],
+    #         )
+    #     ),
+    #     hidden=True,
+    # )
 
     # Derive the windowed data to use in the plots as a function of bin_range
+
     window_data = varbar.add(
         "window_data",
-        clean_data.filter(
+        dataset.filter(
             lambda row: weave.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
             )
         ),
         hidden=True,
+    )
+
+    filtered_data = varbar.add(
+        "filtered_data",
+        window_data.filter(lambda row: row["model"] == "gpt-3.5-turbo-0613"),
+    )
+
+    from .. import weave_internal
+
+    groupby = varbar.add("groupby", "output.model", hidden=True)
+    groupby_dropdown = varbar.add(
+        "groupby_dropdown",
+        weave.panels.Dropdown(
+            groupby,
+            choices=weave.ops.List.concat(
+                weave.ops.make_list(
+                    a=weave_internal.const(["output.model"]),
+                    b=dataset["attributes"]
+                    .keys()
+                    .flatten()
+                    .unique()
+                    .map(lambda k: weave_internal.const("attributes.") + k),
+                )
+            ),
+        ),
     )
 
     height = 5
@@ -196,70 +227,66 @@ def board(
     overview_tab.add(
         "request_count",
         panel_autoboard.timeseries_count_bar(
-            clean_data,
+            dataset,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            groupby_key="",
+            groupby_key=groupby,
             x_domain=user_zoom_range,
-            n_bins=50,
+            n_bins=100,
         ),
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=height),
     )
+
     overview_tab.add(
         "cost",
-        panel_autoboard.timeseries_sum_bar(
-            clean_data,
+        panel_autoboard.timeseries(
+            dataset,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_axis_key="latency_ms",
-            groupby_key="",
+            y_expr=lambda row: cost(row).sum(),
+            y_title="total cost ($)",
+            groupby_key=groupby,
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=height, w=8, h=height),
+        layout=weave.panels.GroupPanelLayout(x=0, y=height, w=12, h=height),
     )
+
+    # latency
     overview_tab.add(
         "latency",
-        panel_autoboard.timeseries_avg_line(
-            clean_data,
+        panel_autoboard.timeseries(
+            dataset,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_axis_key="latency_ms",
-            groupby_key="",
+            y_expr=lambda row: (row["end_time_ms"].avg() - row["start_time_ms"].avg())
+            / 1000,
+            y_title="avg latency (s)",
+            groupby_key=groupby,
             x_domain=user_zoom_range,
+            n_bins=50,
         ),
-        layout=weave.panels.GroupPanelLayout(x=8, y=height, w=8, h=height),
+        layout=weave.panels.GroupPanelLayout(x=12, y=height, w=12, h=height),
     )
-    overview_tab.add(
-        "active users",
-        panel_autoboard.timeseries_avg_line(
-            clean_data,
-            bin_domain_node=bin_range,
-            x_axis_key="timestamp",
-            y_axis_key="latency_ms",
-            groupby_key="",
-            x_domain=user_zoom_range,
-        ),
-        layout=weave.panels.GroupPanelLayout(x=16, y=height, w=8, h=height),
-    )
+
     overview_tab.add(
         "avg cost per req",
-        window_data["usage"]["prompt_tokens"].avg(),  # type: ignore
+        cost(window_data).avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg prompt tokens per req",
-        window_data["usage"]["prompt_tokens"].avg(),  # type: ignore
+        window_data["output.usage.prompt_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=6, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg completion tokens per req",
-        window_data["usage"]["completion_tokens"].avg(),  # type: ignore
+        window_data["output.usage.completion_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg total tokens per req",
-        window_data["usage"]["total_tokens"].avg(),  # type: ignore
+        window_data["output.usage.total_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=height),
     ),
 

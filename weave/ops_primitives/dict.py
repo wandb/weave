@@ -84,7 +84,7 @@ class TypedDict:
 
     @op(
         output_type=lambda input_type: types.List(
-            types.UnionType(
+            types.union(
                 *(
                     types.Const(types.String(), k)
                     for k in input_type["self"].property_types.keys()
