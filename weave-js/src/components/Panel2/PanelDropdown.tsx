@@ -86,7 +86,7 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   const valueNode = props.input;
   const isMultiple = isList(valueNode.type);
 
-  const valueQuery = useNodeValue(valueNode);
+  const valueQuery = useNodeValue(valueNode as any);
   const chosen = useMemo(() => valueQuery.result ?? [], [valueQuery]);
   const setVal = useMutation(valueNode, 'set');
   const options = useMemo(() => {
@@ -100,7 +100,7 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
         if (isMultiple) {
           setVal({val: constNodeUnsafe(config.choices.type, value)});
         } else if (value != null) {
-          setVal({val: constString(value)});
+          setVal({val: constString(value as string)});
         } else {
           setVal({val: constNone()});
         }
