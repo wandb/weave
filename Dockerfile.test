@@ -21,8 +21,8 @@ RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && npm
 
 COPY weave-js /root/weave-js
 
-RUN cd weave-js && --mount=type=cache,target=/usr/local/share/.cache \
-    SHA1=$(find $JS_DIR -not -path "*/.vite-cache/*" -not -path "*/node_modules/*" -not -path "*/build/*" -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d " " -f1) && \
+RUN -mount=type=cache,target=/usr/local/share/.cache \
+    cd weave-js && SHA1=$(find $JS_DIR -not -path "*/.vite-cache/*" -not -path "*/node_modules/*" -not -path "*/build/*" -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d " " -f1) && \
     yarn install --frozen-lockfile && \
     yarn build && \
     echo $SHA1 > ./build/sha1.txt && \
