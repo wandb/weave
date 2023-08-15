@@ -208,7 +208,7 @@ def set_client_cache_key(key: typing.Optional[str] = None):
 
 
 def get_client_cache_key():
-    return _impure_cache_key.get()
+    return _client_cache_key.get()
 
 
 # Context for wandb api
