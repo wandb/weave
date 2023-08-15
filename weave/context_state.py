@@ -193,6 +193,24 @@ def disable_analytics():
     return _analytics_enabled.set(False)
 
 
+_impure_cache_key: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("impure_cache_key", default=None)
+
+
+@contextlib.contextmanager
+def set_impure_cache_key(key: typing.Optional[str] = None):
+    token = _impure_cache_key.set(key)
+    try:
+        yield
+    finally:
+        _impure_cache_key.reset(token)
+
+
+def get_impure_cache_key():
+    return _impure_cache_key.get()
+
+
 # Context for wandb api
 # Instead of putting this in a shared file, we put it directly here
 # so that the patching at the top of this file will work correctly

@@ -58,6 +58,9 @@ export interface RemoteWeaveOptions {
   backoffMax: number;
   backoffExpScalar: number;
 
+  // Duration in seconds to cache impure nodes
+  impureCacheDuration?: number;
+
   fetch: typeof fetch;
 }
 
@@ -73,6 +76,7 @@ const defaultOpts: RemoteWeaveOptions = {
   backoffBase: 500,
   backoffMax: 20000,
   backoffExpScalar: 0.8,
+  impureCacheDuration: 30,
   fetch: fetch.bind(globalThis as any),
 };
 
@@ -320,6 +324,11 @@ export class RemoteHttpServer implements Server {
           additionalHeaders['x-weave-include-execution-time'] = 'true';
         } else {
           additionalHeaders['weave-shadow'] = 'false';
+        }
+        if (this.opts.impureCacheDuration != null) {
+          additionalHeaders['x-weave-impure-cache-key'] = Math.floor(
+            Date.now() / 1000 / this.opts.impureCacheDuration
+          ).toString();
         }
 
         let respJson: any = {
