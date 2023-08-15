@@ -254,37 +254,35 @@ def execute():
     }
     root_span = tracer.current_root_span()
     tag_store.record_current_tag_store_size()
-    impure_cache_key = None
+    # Default to 5 second cache duration
+    impure_cache_key = str(int(time.time() // 5))
     if "x-weave-impure-cache-key" in request.headers:
         impure_cache_key = request.headers["x-weave-impure-cache-key"]
-    else:
-        # round to the nearest 30 seconds
-        default_impure_cache_duration = os.getenv("WEAVE_DEFAULT_IMPURE_CACHE_DURATION")
-        if default_impure_cache_duration is not None:
-            impure_cache_key = str(int(time.time() // default_impure_cache_duration))
-    with context_state.set_impure_cache_key(impure_cache_key):
-        if not PROFILE_DIR:
-            start_time = time.time()
-            with client_safe_http_exceptions_as_werkzeug():
+
+    if not PROFILE_DIR:
+        start_time = time.time()
+        with client_safe_http_exceptions_as_werkzeug():
+            with context_state.set_impure_cache_key(impure_cache_key):
                 response = server.handle_request(**execute_args)
-            elapsed = time.time() - start_time
-        else:
-            # Profile the request and add a link to local snakeviz to the trace.
-            profile = cProfile.Profile()
-            start_time = time.time()
-            try:
-                with client_safe_http_exceptions_as_werkzeug():
+        elapsed = time.time() - start_time
+    else:
+        # Profile the request and add a link to local snakeviz to the trace.
+        profile = cProfile.Profile()
+        start_time = time.time()
+        try:
+            with client_safe_http_exceptions_as_werkzeug():
+                with context_state.set_impure_cache_key(impure_cache_key):
                     response = profile.runcall(server.handle_request, **execute_args)
-            finally:
-                elapsed = time.time() - start_time
-                profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
-                profile.dump_stats(profile_filename)
-                if root_span:
-                    root_span.set_tag(
-                        "profile_url",
-                        "http://localhost:8080/snakeviz/"
-                        + urllib.parse.quote(profile_filename),
-                    )
+        finally:
+            elapsed = time.time() - start_time
+            profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
+            profile.dump_stats(profile_filename)
+            if root_span:
+                root_span.set_tag(
+                    "profile_url",
+                    "http://localhost:8080/snakeviz/"
+                    + urllib.parse.quote(profile_filename),
+                )
     if root_span is not None:
         root_span.set_tag("request_size", len(req_bytes))
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
