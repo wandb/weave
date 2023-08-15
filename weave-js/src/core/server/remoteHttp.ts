@@ -102,7 +102,7 @@ export class RemoteHttpServer implements Server {
   private nextFlushTime = 0;
   private backoffCount: number = 0;
   private trace: (...args: any[]) => void;
-  private clientCacheKey: string = createClientCacheKey();
+  public clientCacheKey: string = createClientCacheKey();
 
   public constructor(
     inOpts: Partial<RemoteWeaveOptions>,
