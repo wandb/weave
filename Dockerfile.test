@@ -26,7 +26,8 @@ RUN --mount=type=cache,target=/usr/local/share/.cache \
     yarn install --frozen-lockfile && \
     yarn build && \
     echo $SHA1 > ./build/sha1.txt && \
-    rm -rf node_modules && cd -
+    rm -rf node_modules && mv build /root/weave-js-build && cd -
+
 
 
 ENTRYPOINT "/bin/bash"

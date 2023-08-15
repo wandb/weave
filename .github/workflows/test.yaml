@@ -34,8 +34,8 @@ jobs:
       # this script is hardcoded to build for linux/amd64
       - name: Prune docker cache
         run: docker system prune -f
-      - name: Build integration test image
-        run: python3 docker_build.py build weave-integration-test . Dockerfile.test
+      - name: Build test image
+        run: python3 docker_build.py build weave-test . Dockerfile.test
 
   lint:
     name: Python lint
@@ -93,7 +93,7 @@ jobs:
         job_num: [0, 1]
 
     # runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
@@ -149,7 +149,7 @@ jobs:
     runs-on: [self-hosted, gke-runner]
     # runs-on: ubuntu-latest
 
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
 
     strategy:
       fail-fast: false
