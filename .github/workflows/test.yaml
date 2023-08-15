@@ -223,20 +223,13 @@ jobs:
             # - uses: actions/upload-artifact@v3
       - name: Output logs
         run: |
-          for file in /tmp/weave/log/*; do
-              if [[ -f "$file" ]]; then
-                  echo "Log file $file:"
-
-                  cat "$file"
-                  echo "\n\n"
-              fi
-          done
+          cat /tmp/weave/log/*.log > /tmp/weave/log/all.log
+          cat /tmp/weave/log/all.log
         if: always()
 
       - name: Upload logs
         run: |
           cd integration_test
-          cat /tmp/weave/log/*.log > /tmp/weave/log/all.log
           npx ds upload-logs /tmp/weave/log/all.log
         if: always()
         env:
