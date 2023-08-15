@@ -209,6 +209,7 @@ def op_get_return_type_from_inputs(inputs):
     input_type={"uri": types.String()},
     output_type=types.TypeType(),
     hidden=True,
+    pure=False,
 )
 def get_returntype(uri):
     return op_get_return_type(uri)

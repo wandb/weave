@@ -127,6 +127,7 @@ import {ReactComponent as ImportRandomizeAlt} from '../../assets/icons/icon-rand
 import {ReactComponent as ImportRecentClock} from '../../assets/icons/icon-recent-clock.svg';
 import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-reddit-social.svg';
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
+import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
@@ -180,6 +181,7 @@ import {ReactComponent as ImportVertexGCP} from '../../assets/icons/icon-vertex-
 import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-play.svg';
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
+import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
@@ -579,6 +581,9 @@ export const IconRedditSocial = (props: SVGIconProps) => (
 export const IconRedo = (props: SVGIconProps) => (
   <ImportRedo {...updateIconProps(props)} />
 );
+export const IconRemove = (props: SVGIconProps) => (
+  <ImportRemove {...updateIconProps(props)} />
+);
 export const IconReport = (props: SVGIconProps) => (
   <ImportReport {...updateIconProps(props)} />
 );
@@ -738,6 +743,9 @@ export const IconWandb = (props: SVGIconProps) => (
 export const IconWarning = (props: SVGIconProps) => (
   <ImportWarning {...updateIconProps(props)} />
 );
+export const IconWarningAlt = (props: SVGIconProps) => (
+  <ImportWarningAlt {...updateIconProps(props)} />
+);
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
 );
@@ -879,6 +887,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'recent-clock': IconRecentClock,
   'reddit-social': IconRedditSocial,
   redo: IconRedo,
+  remove: IconRemove,
   report: IconReport,
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
@@ -932,6 +941,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'video-play': IconVideoPlay,
   wandb: IconWandb,
   warning: IconWarning,
+  'warning-alt': IconWarningAlt,
   webhook: IconWebhook,
   'x-axis': IconXAxis,
   'youtube-social': IconYoutubeSocial,
