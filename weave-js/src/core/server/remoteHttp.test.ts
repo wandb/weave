@@ -31,6 +31,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
@@ -59,6 +60,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
@@ -91,6 +93,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
@@ -135,6 +138,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
@@ -144,6 +148,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
@@ -153,6 +158,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
@@ -194,6 +200,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
@@ -203,6 +210,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
         },
         method: 'POST',
       });
