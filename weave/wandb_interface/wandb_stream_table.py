@@ -26,7 +26,7 @@ from .. import environment
 from .. import file_util
 from .. import graph
 from .. import errors
-from ..core_types.stream_table_type import StreamTableType
+from ..core_types.stream_table_type import StreamTableObj
 from ..ops_domain import stream_table_ops
 from ..ops_primitives import weave_api
 
@@ -47,6 +47,13 @@ ENCODE_ENTIRE_TYPE = True
 TYPE_ENCODE_PREFIX = "_wt_::"
 
 ROW_TYPE = typing.Union[dict, list[dict]]
+
+_INTEGRATION_HINTS = []
+
+
+def add_integration_hint(integration_name: str) -> None:
+    if integration_name not in _INTEGRATION_HINTS:
+        _INTEGRATION_HINTS.append(integration_name)
 
 
 class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
@@ -99,7 +106,7 @@ class _StreamTableSync:
 
     _artifact: WandbLiveRunFiles
 
-    _weave_stream_table: StreamTableType
+    _weave_stream_table: StreamTableObj
     _weave_stream_table_ref: artifact_base.ArtifactRef
 
     _client_id: str
@@ -156,15 +163,18 @@ class _StreamTableSync:
         self._ensure_remote_initialized()
         atexit.register(self._at_exit)
 
-    def _ensure_remote_initialized(self) -> StreamTableType:
+    def _ensure_remote_initialized(self) -> StreamTableObj:
         self._lite_run.ensure_run()
         print_url = False
         if not hasattr(self, "_weave_stream_table"):
             print_url = True
-            self._weave_stream_table = StreamTableType(
+            self._weave_stream_table = StreamTableObj(
                 table_name=self._table_name,
                 project_name=self._project_name,
                 entity_name=self._entity_name,
+                hints={
+                    "integrations": _INTEGRATION_HINTS,
+                },
             )
             self._weave_stream_table_ref = storage._direct_publish(
                 self._weave_stream_table,

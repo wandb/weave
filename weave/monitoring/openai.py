@@ -2,6 +2,7 @@ import typing
 import openai
 
 from . import monitor
+from ..wandb_interface import wandb_stream_table
 
 
 def delta_update(value: dict, delta: dict) -> dict:
@@ -98,3 +99,6 @@ class ChatCompletion:
     @staticmethod
     def create(**kwargs: typing.Any) -> typing.Any:
         return monitored_create(**kwargs)
+
+
+wandb_stream_table.add_integration_hint("openai")
