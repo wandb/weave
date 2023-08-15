@@ -40,6 +40,12 @@ const isValidBoardName = (name: string) => {
   );
 };
 
+const iconStyle = {
+  verticalAlign: 'middle',
+  display: 'inline-block',
+  marginRight: 8,
+};
+
 export const PublishModal = ({
   defaultName,
   open,
@@ -57,15 +63,6 @@ export const PublishModal = ({
   const isAuthenticated = useIsAuthenticated(!open);
   const userEntities = query.useUserEntities(isAuthenticated && open);
   const userName = query.useUserName(isAuthenticated && open);
-
-  const iconStyle = useMemo(
-    () => ({
-      verticalAlign: 'middle',
-      display: 'inline-block',
-      marginRight: 8,
-    }),
-    []
-  );
 
   const entityOptions: DropdownItemProps[] = useMemo(
     () =>
@@ -85,7 +82,7 @@ export const PublishModal = ({
             value: entName,
             text: entName,
           })),
-    [iconStyle, userEntities.result, userName.result]
+    [userEntities.result, userName.result]
   );
 
   const projectsNode = w.opEntityProjects({
