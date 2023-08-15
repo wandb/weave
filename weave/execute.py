@@ -467,7 +467,7 @@ def execute_forward_node(
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
 
     cache_mode = environment.cache_mode()
-    impure_cache_key = context_state.get_impure_cache_key()
+    impure_cache_key = context_state.get_client_cache_key()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
         if op_policy.should_cache(op_def.simple_name):
@@ -556,7 +556,6 @@ def execute_forward_node(
             forward_node.set_result(run)
     else:
         result: typing.Any
-        # with tracer.trace("execute-sync") as span:
         with tracer.trace("execute-sync"):
             # TODO: This logic should all move into resolve_fn of op_def...
             if language_nullability.should_force_none_result(inputs, op_def):
@@ -571,15 +570,6 @@ def execute_forward_node(
                     )
             else:
                 result = execute_sync_op(op_def, inputs)
-                # span.set_tag("op_output", {"type": type(result).__name__})
-                # span.set_tag(
-                #     "op_input",
-                #     {
-                #         k: v
-                #         for k, v in inputs.items()
-                #         if isinstance(v, (str, int, float, bool))
-                #     },
-                # )
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)

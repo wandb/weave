@@ -58,9 +58,6 @@ export interface RemoteWeaveOptions {
   backoffMax: number;
   backoffExpScalar: number;
 
-  // Duration in seconds to cache impure nodes
-  impureCacheDuration?: number;
-
   fetch: typeof fetch;
 }
 
@@ -76,7 +73,6 @@ const defaultOpts: RemoteWeaveOptions = {
   backoffBase: 500,
   backoffMax: 20000,
   backoffExpScalar: 0.8,
-  impureCacheDuration: 15,
   fetch: fetch.bind(globalThis as any),
 };
 
@@ -102,6 +98,7 @@ export class RemoteHttpServer implements Server {
   private nextFlushTime = 0;
   private backoffCount: number = 0;
   private trace: (...args: any[]) => void;
+  private clientCacheKey: string = Math.random().toString();
 
   public constructor(
     inOpts: Partial<RemoteWeaveOptions>,
@@ -132,11 +129,14 @@ export class RemoteHttpServer implements Server {
   }
 
   public async query(
-    nodes: Node[]
-    // withBackendCacheReset?: boolean
+    nodes: Node[],
+    stripTags?: boolean,
+    withBackendCacheReset?: boolean
   ): Promise<any[]> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
-    // TODO: pass withBackendCacheReset across the network
+    if (withBackendCacheReset) {
+      this.clientCacheKey = Math.random().toString();
+    }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
     return await Promise.all(
@@ -325,11 +325,8 @@ export class RemoteHttpServer implements Server {
         } else {
           additionalHeaders['weave-shadow'] = 'false';
         }
-        if (this.opts.impureCacheDuration != null) {
-          additionalHeaders['x-weave-impure-cache-key'] = Math.floor(
-            Date.now() / 1000 / this.opts.impureCacheDuration
-          ).toString();
-        }
+
+        additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
 
         let respJson: any = {
           data: new Array(nodes.length).fill(null),

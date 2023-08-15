@@ -193,21 +193,21 @@ def disable_analytics():
     return _analytics_enabled.set(False)
 
 
-_impure_cache_key: contextvars.ContextVar[
+_client_cache_key: contextvars.ContextVar[
     typing.Optional[str]
-] = contextvars.ContextVar("impure_cache_key", default=None)
+] = contextvars.ContextVar("client_cache_key", default=None)
 
 
 @contextlib.contextmanager
-def set_impure_cache_key(key: typing.Optional[str] = None):
-    token = _impure_cache_key.set(key)
+def set_client_cache_key(key: typing.Optional[str] = None):
+    token = _client_cache_key.set(key)
     try:
         yield
     finally:
-        _impure_cache_key.reset(token)
+        _client_cache_key.reset(token)
 
 
-def get_impure_cache_key():
+def get_client_cache_key():
     return _impure_cache_key.get()
 
 

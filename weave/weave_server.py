@@ -35,6 +35,8 @@ from weave import wandb_api
 from weave.language_features.tagging import tag_store
 
 
+WEAVE_CLIENT_CACHE_KEY_HEADER = "x-weave-impure-cache-key"
+
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
 if PROFILE_DIR is not None:
@@ -223,6 +225,14 @@ def _log_errors(
         logging.error(error_dict)
 
 
+def _get_client_cache_key(request):
+    # Uncomment to set default to 15 second cache duration
+    client_cache_key = None  # str(int(time.time() // 15))
+    if WEAVE_CLIENT_CACHE_KEY_HEADER in request.headers:
+        client_cache_key = request.headers[WEAVE_CLIENT_CACHE_KEY_HEADER]
+    return client_cache_key
+
+
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
@@ -254,15 +264,13 @@ def execute():
     }
     root_span = tracer.current_root_span()
     tag_store.record_current_tag_store_size()
-    # Uncomment to set default to 15 second cache duration
-    impure_cache_key = None  # str(int(time.time() // 15))
-    if "x-weave-impure-cache-key" in request.headers:
-        impure_cache_key = request.headers["x-weave-impure-cache-key"]
+
+    client_cache_key = _get_client_cache_key(request)
 
     if not PROFILE_DIR:
         start_time = time.time()
         with client_safe_http_exceptions_as_werkzeug():
-            with context_state.set_impure_cache_key(impure_cache_key):
+            with context_state.set_client_cache_key(client_cache_key):
                 response = server.handle_request(**execute_args)
         elapsed = time.time() - start_time
     else:
@@ -271,7 +279,7 @@ def execute():
         start_time = time.time()
         try:
             with client_safe_http_exceptions_as_werkzeug():
-                with context_state.set_impure_cache_key(impure_cache_key):
+                with context_state.set_client_cache_key(client_cache_key):
                     response = profile.runcall(server.handle_request, **execute_args)
         finally:
             elapsed = time.time() - start_time
