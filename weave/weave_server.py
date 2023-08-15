@@ -35,7 +35,7 @@ from weave import wandb_api
 from weave.language_features.tagging import tag_store
 
 
-WEAVE_CLIENT_CACHE_KEY_HEADER = "x-weave-impure-cache-key"
+WEAVE_CLIENT_CACHE_KEY_HEADER = "x-weave-client-cache-key"
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -225,7 +225,7 @@ def _log_errors(
         logging.error(error_dict)
 
 
-def _get_client_cache_key(request):
+def _get_client_cache_key_from_request(request):
     # Uncomment to set default to 15 second cache duration
     client_cache_key = None  # str(int(time.time() // 15))
     if WEAVE_CLIENT_CACHE_KEY_HEADER in request.headers:
@@ -265,7 +265,7 @@ def execute():
     root_span = tracer.current_root_span()
     tag_store.record_current_tag_store_size()
 
-    client_cache_key = _get_client_cache_key(request)
+    client_cache_key = _get_client_cache_key_from_request(request)
 
     if not PROFILE_DIR:
         start_time = time.time()
