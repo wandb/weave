@@ -136,7 +136,7 @@ def list_ops():
     global ops_cache
     with wandb_api.from_environment():
         # TODO: this is super slow.
-        if False and not environment.wandb_production():
+        if not environment.wandb_production():
             registry_mem.memory_registry.load_saved_ops()
         if (
             ops_cache is None
