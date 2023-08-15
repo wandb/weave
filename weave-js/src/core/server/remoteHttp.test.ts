@@ -31,6 +31,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
@@ -59,6 +60,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
@@ -91,6 +93,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
@@ -128,6 +131,8 @@ describe('RemoteHttpServer', () => {
       server.query([constBoolean(true)]),
     ]);
 
+    
+
     return result.then(r => {
       expect(fetch).toHaveBeenNthCalledWith(1, 'https://weave-host/execute', {
         body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]}}',
@@ -135,6 +140,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
@@ -144,6 +150,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
@@ -153,6 +160,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
@@ -194,6 +202,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
@@ -203,6 +212,7 @@ describe('RemoteHttpServer', () => {
         headers: {
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey
         },
         method: 'POST',
       });
