@@ -1,4 +1,4 @@
-import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
+import {constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
@@ -44,8 +44,6 @@ export const useUpdateConfigForPanelNode = (
   input: NodeOrVoidNode,
   updateInput?: (newInput: NodeOrVoidNode) => void
 ) => {
-  const weave = useWeaveContext();
-
   const setServerPanelConfig = useMutation(input, 'set');
 
   const updateConfigForPanelNode = useCallback(
