@@ -35,6 +35,37 @@ class AutoBoardConfig:
     pass
 
 
+def timeseries(
+    input_node: weave.Node[list[typing.Any]],
+    bin_domain_node: weave.Node,
+    x_axis_key: str,
+    y_expr: typing.Callable,
+    y_title: str,
+    groupby_key: typing.Union[weave.Node[str], str],
+    x_domain: weave.Node,
+    n_bins: int,
+) -> weave.Panel:
+    x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
+    if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
+        bin_fn = weave.ops.timestamp_bins_nice
+    elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
+        bin_fn = weave.ops.numbers_bins_equal
+    else:
+        raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
+    return weave.panels.Plot(
+        input_node,
+        x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, 100))["start"],
+        x_title=x_axis_key,
+        y=y_expr,
+        y_title=y_title,
+        label=lambda row: row[groupby_key],
+        groupby_dims=["x", "label"],
+        mark="line",
+        no_legend=True,
+        domain_x=x_domain,
+    )
+
+
 def timeseries_avg_line(
     input_node: weave.Node[list[typing.Any]],
     bin_domain_node: weave.Node,

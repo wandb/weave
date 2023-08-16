@@ -997,6 +997,7 @@ const EditorIcons = styled.div<{visible: boolean}>`
 
 const PanelContainer = styled.div`
   flex-grow: 1;
+  // TODO
   overflow-y: auto;
 `;
 

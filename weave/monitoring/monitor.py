@@ -66,7 +66,7 @@ class Span:
 
     # These are OpenTelemetry standard
     parent_id: typing.Optional[str]
-    trace_id: str
+    trace_id: typing.Optional[str]
     span_id: str
     name: str
     # OpenTelemetry enforces that attributes cannot have dicts or mixed types.
@@ -85,23 +85,29 @@ class Span:
 
     def __init__(
         self,
-        _streamtable: typing.Optional[StreamTable],
-        parent_id: typing.Optional[str],
-        trace_id: str,
         name: str,
-        attributes: dict[str, typing.Any],
+        _streamtable: typing.Optional[StreamTable] = None,
+        parent_id: typing.Optional[str] = None,
+        trace_id: typing.Optional[str] = None,
+        attributes: typing.Optional[dict[str, typing.Any]] = None,
+        inputs: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        output: typing.Optional[typing.Any] = None,
     ):
+        self.name = name
         self._streamtable = _streamtable
         self.parent_id = parent_id
+        if trace_id is None:
+            trace_id = str(uuid.uuid4())
         self.trace_id = trace_id
-        self.name = name
+        if attributes is None:
+            attributes = {}
         self.attributes = attributes
         self.status_code = StatusCode.UNSET
         self.span_id = str(uuid.uuid4())
         self.start_time = datetime.datetime.now()
         self.end_time = None
-        self.inputs = None
-        self.output = None
+        self.inputs = inputs
+        self.output = output
         self.exception = None
 
     def close(self) -> None:
@@ -168,13 +174,13 @@ class Monitor:
             )
 
         parent_span = _current_span.get()
+        trace_id = None
         if parent_span is not None:
             parent_id = parent_span.span_id
             trace_id = parent_span.trace_id
         else:
             parent_id = None
-            trace_id = str(uuid.uuid4())
-        span = Span(self._streamtable, parent_id, trace_id, name, _attributes.get())
+        span = Span(name, self._streamtable, parent_id, trace_id, _attributes.get())
         token = _current_span.set(span)
         try:
             yield span

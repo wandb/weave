@@ -290,7 +290,11 @@ export const useNodeValue = <T extends Type>(
     }
     if (isConstNode(node)) {
       // See the "Mixing functions and expression" comment above.
-      setResult({node, value: node.val});
+      if (isFunction(node.type)) {
+        setResult({node, value: node});
+      } else {
+        setResult({node, value: node.val});
+      }
       return;
     }
 
@@ -308,15 +312,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
-      if (callSite != null) {
-        // console.log('useNodeValue subscribe', callSite, node);
-      }
+      // if (callSite != null) {
+      //   console.log('useNodeValue subscribe', callSite, node);
+      // }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
-          if (callSite != null) {
-            // console.log('useNodeValue resolve', callSite, node);
-          }
+          // if (callSite != null) {
+          //   console.log('useNodeValue resolve', callSite, node);
+          // }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -345,7 +349,11 @@ export const useNodeValue = <T extends Type>(
       throw new Error(message);
     }
     if (isConstNode(node)) {
-      return {loading: false, result: node.val};
+      if (isFunction(node.type)) {
+        return {loading: false, result: node};
+      } else {
+        return {loading: false, result: node.val};
+      }
     }
     const loading = result.node.nodeType === 'void' || node !== result.node;
     return {
@@ -530,7 +538,15 @@ export const makeCallAction = (
         // pass
       } else if (mutationStyle === 'clientRef') {
         consoleLog('clientRef useAction result', final);
-        let newRootNode: Node = constNodeUnsafe(toWeaveType(final), final);
+        let newRootNode: Node;
+        if (isNodeOrVoidNode(final)) {
+          if (final.nodeType !== 'const') {
+            throw new Error('Unexpected mutation result');
+          }
+          newRootNode = final;
+        } else {
+          newRootNode = constNodeUnsafe(toWeaveType(final), final);
+        }
 
         // This is a gnarly hack. final is a json value, we don't know its True
         // Weave type. This generally works for basic json types, but in particular
