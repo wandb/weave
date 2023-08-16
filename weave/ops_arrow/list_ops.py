@@ -511,6 +511,23 @@ def limit(self: ArrowWeaveList, limit: int):
     return self._limit(limit)
 
 
+def explode_table(table: pa.Table, column: str) -> pa.Table:
+    null_filled = pc.fill_null(table[column], [None])
+    flattened = pc.list_flatten(null_filled)
+    other_columns = list(table.schema.names)
+    other_columns.remove(column)
+    if len(other_columns) == 0:
+        return pa.table({column: flattened})
+    else:
+        indices = pc.list_parent_indices(null_filled)
+        result = table.select(other_columns).take(indices)
+        result = result.append_column(
+            pa.field(column, table.schema.field(column).type.value_type),
+            flattened,
+        )
+        return result
+
+
 @op(
     name="ArrowWeaveList-unnest",
     input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
@@ -574,9 +591,10 @@ def unnest(self):
     # This requires us a hack in our AWL.validate function to allow float64 when
     # the weave type is int.
     # TODO: write an arrow based implementation, and remove the hack in validate.
-    exploded_table = pa.Table.from_pandas(
-        df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
-    )
+
+    exploded_table = arrow_obj
+    for column in list_cols:
+        exploded_table = explode_table(exploded_table, column)
 
     # Reconstruct the tagged list columns
     for col in exploded_table.column_names:
