@@ -528,7 +528,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
 
     for column in list_columns:
         value_lengths = table[column].combine_chunks().value_lengths()
-        if not pc.equals(value_lengths, value_lengths_0):
+        if not pc.equal(value_lengths, value_lengths_0):
             raise ValueError(
                 f"Cannot explode table with list columns of different shapes: {value_lengths} != {value_lengths_0}"
             )
@@ -611,7 +611,7 @@ def unnest(self):
             arrow_obj = arrow_obj.append_column(tag_col_name, col_tags)
             arrow_obj = arrow_obj.append_column(col, col_values)
 
-    exploded_table = explode_table(exploded_table, list_cols)
+    exploded_table = explode_table(arrow_obj, list_cols)
 
     # Reconstruct the tagged list columns
     for col in exploded_table.column_names:
