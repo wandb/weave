@@ -45,7 +45,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
 
   const updateVal = useCallback(
     (newVal: any) => {
-      console.log('SET VAL NEW VAL', newVal);
+      // console.log('SET VAL NEW VAL', newVal);
       setVal({
         // Note we have to double wrap in Const here!
         // We are editing a Weave function with expression editor.
