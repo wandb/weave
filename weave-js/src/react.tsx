@@ -312,15 +312,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
-      if (callSite != null) {
-        console.log('useNodeValue subscribe', callSite, node);
-      }
+      // if (callSite != null) {
+      //   console.log('useNodeValue subscribe', callSite, node);
+      // }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
-          if (callSite != null) {
-            console.log('useNodeValue resolve', callSite, node);
-          }
+          // if (callSite != null) {
+          //   console.log('useNodeValue resolve', callSite, node);
+          // }
           setResult({node, value: nodeRes});
         },
         caughtError => {
