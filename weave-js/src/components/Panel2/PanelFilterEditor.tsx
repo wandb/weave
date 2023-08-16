@@ -27,7 +27,7 @@ import {
   opBooleanNotEqual,
   constNumber,
   constBoolean,
-  opLimit,
+  // opLimit,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
@@ -38,6 +38,7 @@ import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
 import {Button, Popup} from 'semantic-ui-react';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
+import LinkButton from '@wandb/weave/common/components/LinkButton';
 
 const inputType = {
   type: 'function' as const,
@@ -160,21 +161,31 @@ const SingleFilterVisualEditor: React.FC<{
   const opChoices = getOpChoices(simpleKeyType);
   const opOptions = opChoices.map(key => ({text: key, value: key, key}));
 
+  // const valueQuery =
+  // TODO: opLimit is broken in weave python when we have an ArrowWeaveList...
+  // I think because we don't have opUnique?
+  //   key != null
+  //     ? opLimit({
+  //         arr: opUnique({
+  //           arr: opPick({obj: props.listNode, key: constString(key)}),
+  //         }),
+  //         limit: constNumber(500),
+  //       })
+  //     : voidNode();
   const valueQuery =
     key != null
-      ? opLimit({
-          arr: opUnique({
-            arr: opPick({obj: props.listNode, key: constString(key)}),
-          }),
-          limit: constNumber(500),
+      ? opUnique({
+          arr: opPick({obj: props.listNode, key: constString(key)}),
         })
       : voidNode();
   const valueChoices = useNodeValue(valueQuery).result ?? [];
-  const valueOptions = valueChoices.map((value: boolean | string | number) => ({
-    text: value.toString(),
-    value: value,
-    key: value.toString(),
-  }));
+  const valueOptions = valueChoices
+    .filter((value: any) => value != null)
+    .map((value: boolean | string | number) => ({
+      text: value.toString(),
+      value: value,
+      key: value.toString(),
+    }));
 
   const curClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
   const valid = visualClauseIsValid(curClause);
@@ -580,12 +591,16 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             open={editingFilterIndex === -1}
             trigger={
               <div>
-                <button
+                {/* TODO: this LinkButton is really bad, it's just a span. 
+                    Use something better
+                */}
+                <LinkButton
+                  style={{cursor: 'pointer'}}
                   onClick={() => {
                     setEditingFilterIndex(-1);
                   }}>
                   + Add filter
-                </button>
+                </LinkButton>
               </div>
             }
             content={
