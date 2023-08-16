@@ -257,7 +257,7 @@ export const PanelEachColumn: React.FC<PanelEachColumnProps> = props => {
   );
 
   return (
-    <div>
+    <div style={{height: '100%'}}>
       <WeaveExpression expr={searchExpr} setExpression={setSearchExpr} />
       <PBSection
         mode="flow"

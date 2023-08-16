@@ -465,8 +465,7 @@ def unnest(arr):
 def unique(arr):
     if not arr:
         return arr
-    res = np.unique(arr)
-    return res.tolist()
+    return list(dict.fromkeys(arr))
 
 
 def index_output_type(input_types):
