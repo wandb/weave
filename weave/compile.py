@@ -87,6 +87,21 @@ def _quote_node(node: graph.Node) -> graph.Node:
     return weave_internal.const(node)
 
 
+def _compact_history_count(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+    if isinstance(node, graph.OutputNode) and node.from_op.name == "count":
+        arr_node = node.from_op.inputs["arr"]
+        if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name.startswith(
+            "run-history"
+        ):
+            run_node = arr_node.from_op.inputs["run"]
+            return graph.OutputNode(
+                node.type,
+                "run-historyLineCount",
+                {"run": run_node},
+            )
+    return None
+
+
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         from_op = node.from_op
@@ -477,6 +492,13 @@ def compile_quote(
     return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
 
 
+def compile_compact_history_count(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _compact_history_count, on_error)
+
+
 def compile_refine(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
@@ -684,6 +706,9 @@ def _compile(
 
     with tracer.trace("compile:node_ops"):
         results = results.batch_map(_track_errors(compile_node_ops))
+
+    with tracer.trace("compile:compact_history_count"):
+        results = results.batch_map(_track_errors(compile_compact_history_count))
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
