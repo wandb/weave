@@ -526,7 +526,6 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
     # if they don't, then we raise an error below
     indices: typing.Optional[pa.Array] = None
 
-    """
     for column in list_columns:
         value_lengths = table[column].combine_chunks().value_lengths()
         if not pc.equals(value_lengths, value_lengths_0):
@@ -547,6 +546,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
     if indices is None:
         raise ValueError("Cannot explode table with no list columns")
 
+    """
     result = table.select(other_columns).take(indices)
     result = result.append_column(
         pa.field(column, table.schema.field(column).type.value_type),
