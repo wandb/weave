@@ -20,8 +20,6 @@ import {useNodeWithServerType} from '@wandb/weave/react';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
 
-import * as Tabs from '../../Tabs';
-
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
   box-shadow: 0px 8px 16px 0px #0e10140a;
@@ -333,30 +331,5 @@ export const HomeBoardPreview: React.FC<{
         navigateToExpression={navigateToExpression}
       />
     </HomePreviewSidebarTemplate>
-  );
-};
-
-export const HomePreviewTabs: React.FC<{
-  expr: Node;
-  navigateToExpression: NavigateToExpressionType;
-}> = ({expr, navigateToExpression}) => {
-  const [tabValue, setTabValue] = React.useState('Overview');
-
-  return (
-    <Tabs.Root value={tabValue} onValueChange={val => setTabValue(val)}>
-      <Tabs.List>
-        <Tabs.Trigger value="Overview">Overview</Tabs.Trigger>
-        <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>
-        <Tabs.Trigger value="Boards">Boards</Tabs.Trigger>
-      </Tabs.List>
-      <Tabs.Content value="Overview">
-        <HomeExpressionPreviewParts
-          expr={expr}
-          navigateToExpression={navigateToExpression}
-        />
-      </Tabs.Content>
-      <Tabs.Content value="Templates">Templates</Tabs.Content>
-      <Tabs.Content value="Boards">Boards</Tabs.Content>
-    </Tabs.Root>
   );
 };
