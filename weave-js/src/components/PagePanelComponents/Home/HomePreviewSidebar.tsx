@@ -1,3 +1,5 @@
+import { Button } from '@wandb/weave/components/Button';
+
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
 import styled from 'styled-components';
@@ -17,6 +19,8 @@ import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 import {useNodeWithServerType} from '@wandb/weave/react';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
+
+import * as Tabs from '../../Tabs'
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -156,16 +160,47 @@ export const HomeExpressionPreviewParts: React.FC<{
   const generators = useBoardGeneratorsForNode(expr);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
+
+  const [copyButtonText, setCopyButtonText] = React.useState<"Copy" | "Copied">("Copy");
+
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
-        <span style={{color: '#2B3038', fontWeight: 600}}>Preview</span>
+        <LayoutElements.BlockHeader>
+          PREVIEW
+          <Button
+            onClick={() => {
+              navigateToExpression(expr);
+            }}
+            size='small'
+            variant='ghost'
+            icon='full-screen-mode-expand'
+          >
+            Expand
+          </Button>
+        </LayoutElements.BlockHeader>
         <LayoutElements.Block>
           <PreviewNode inputExpr={inputExpr} />
         </LayoutElements.Block>
       </LayoutElements.VBlock>
       <LayoutElements.VBlock style={{gap: '8px'}}>
-        <span style={{color: '#2B3038', fontWeight: 600}}>Expression</span>
+      <LayoutElements.BlockHeader>
+          EXPRESSION
+          <Button
+            onClick={() => {
+              navigator.clipboard.writeText(weave.expToString(expr));
+              setCopyButtonText("Copied")
+              setTimeout(() => {
+                setCopyButtonText("Copy")
+              }, 3000);
+            }}
+            size='small'
+            variant='ghost'
+            icon='copy'
+          >
+            {copyButtonText}
+          </Button>
+        </LayoutElements.BlockHeader>
         <LayoutElements.Block>
           <WeaveExpression
             expr={expr}
@@ -190,9 +225,18 @@ export const HomeExpressionPreviewParts: React.FC<{
       ) : (
         generators.result.length > 0 && (
           <LayoutElements.VBlock style={{gap: '8px'}}>
-            <span style={{color: '#2B3038', fontWeight: 600}}>
-              Available Templates
-            </span>
+            <LayoutElements.BlockHeader>
+              CREATE A BOARD
+              {/* <Button
+                onClick={() => {
+                  console.log('view all templates')
+                }}
+                size='small'
+                variant='ghost'
+              >
+                View all templates
+              </Button> */}
+            </LayoutElements.BlockHeader>
             <LayoutElements.VStack
               style={{
                 gap: '8px',
@@ -291,3 +335,28 @@ export const HomeBoardPreview: React.FC<{
     </HomePreviewSidebarTemplate>
   );
 };
+
+export const HomePreviewTabs: React.FC<{
+  expr: Node;
+  navigateToExpression: NavigateToExpressionType;
+}> = ({expr, navigateToExpression}) => {
+  const [tabValue, setTabValue] = React.useState('Overview');
+
+  return (  
+    <Tabs.Root value={tabValue} onValueChange={(val) => setTabValue(val)}>
+      <Tabs.List>
+        <Tabs.Trigger value="Overview">Overview</Tabs.Trigger>
+        <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>
+        <Tabs.Trigger value="Boards">Boards</Tabs.Trigger>
+      </Tabs.List>
+      <Tabs.Content value="Overview">
+        <HomeExpressionPreviewParts
+          expr={expr}
+          navigateToExpression={navigateToExpression}
+        />
+      </Tabs.Content>
+      <Tabs.Content value="Templates">Templates</Tabs.Content>
+      <Tabs.Content value="Boards">Boards</Tabs.Content>
+    </Tabs.Root>
+  );
+}
