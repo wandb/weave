@@ -25,14 +25,14 @@ export const CenterLocalBrowser: React.FC<
   const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
   moment.updateLocale('en', {
-    calendar : {
+    calendar: {
       sameDay: '[Today]',
       nextDay: '[Tomorrow]',
       nextWeek: 'dddd',
       lastDay: '[Yesterday]',
       lastWeek: '[Last] dddd',
-      sameElse: 'YYYY-MM-DD'
-    }
+      sameElse: 'YYYY-MM-DD',
+    },
   });
 
   const browserData = useMemo(() => {
