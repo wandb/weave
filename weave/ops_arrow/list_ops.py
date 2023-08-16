@@ -552,6 +552,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
         pa.field(column, table.schema.field(column).type.value_type),
         flattened,
     )
+
     return result
     """
 
