@@ -94,22 +94,24 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   }, [choices]);
 
   return (
-    <ModifiedDropdown
-      value={chosen}
-      onChange={(e, {value}) => {
-        if (isMultiple) {
-          setVal({val: constNodeUnsafe(config.choices.type, value)});
-        } else if (value != null) {
-          setVal({val: constString(value as string)});
-        } else {
-          setVal({val: constNone()});
-        }
-      }}
-      options={options}
-      selection
-      multiple={isMultiple}
-      floating
-    />
+    <div style={{paddingLeft: 16}}>
+      <ModifiedDropdown
+        value={chosen}
+        onChange={(e, {value}) => {
+          if (isMultiple) {
+            setVal({val: constNodeUnsafe(config.choices.type, value)});
+          } else if (value != null) {
+            setVal({val: constString(value as string)});
+          } else {
+            setVal({val: constNone()});
+          }
+        }}
+        options={options}
+        selection
+        multiple={isMultiple}
+        floating
+      />
+    </div>
   );
 };
 

@@ -27,4 +27,4 @@ class FilterEditor(panel.Panel):
         if self.config is None:
             self.config = FilterEditorConfig()
         if "node" in options:
-            self.node = options["node"]
+            self.config.node = options["node"]
