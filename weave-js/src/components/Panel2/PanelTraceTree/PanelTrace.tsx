@@ -36,11 +36,11 @@ const inputType = {
         type: 'union' as const,
         members: ['string' as const, 'none' as const],
       },
-      start_time_ms: {
+      start_time_s: {
         type: 'union' as const,
         members: ['number' as const, 'none' as const],
       },
-      end_time_ms: {
+      end_time_s: {
         type: 'union' as const,
         members: ['number' as const, 'none' as const],
       },
@@ -67,11 +67,11 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
         ({row, index}) =>
           opDict({
             name: opPick({obj: row, key: constString('name')}),
-            start_time_ms: opPick({
+            start_time_s: opPick({
               obj: row,
-              key: constString('start_time_ms'),
+              key: constString('start_time_s'),
             }),
-            end_time_ms: opPick({obj: row, key: constString('end_time_ms')}),
+            end_time_s: opPick({obj: row, key: constString('end_time_s')}),
             trace_id: opPick({obj: row, key: constString('trace_id')}),
             span_id: opPick({obj: row, key: constString('span_id')}),
             parent_id: opPick({obj: row, key: constString('parent_id')}),
