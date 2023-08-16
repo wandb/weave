@@ -85,6 +85,17 @@ export const CenterEntityBrowserInner: React.FC<
     props.entityName
   );
 
+  moment.updateLocale('en', {
+    calendar : {
+      sameDay: '[Today]',
+      nextDay: '[Tomorrow]',
+      nextWeek: 'dddd',
+      lastDay: '[Yesterday]',
+      lastWeek: '[Last] dddd',
+      sameElse: 'YYYY-MM-DD'
+    }
+  });
+
   const browserData = useMemo(() => {
     // TODO: make sorting more customizable and awesome
     const sortedMeta = [...projectsMeta.result].sort(

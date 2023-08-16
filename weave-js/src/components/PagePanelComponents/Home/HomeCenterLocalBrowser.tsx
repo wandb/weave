@@ -24,6 +24,17 @@ export const CenterLocalBrowser: React.FC<
   const localDashboards = query.useLocalDashboards();
   const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
+  moment.updateLocale('en', {
+    calendar : {
+      sameDay: '[Today]',
+      nextDay: '[Tomorrow]',
+      nextWeek: 'dddd',
+      lastDay: '[Yesterday]',
+      lastWeek: '[Last] dddd',
+      sameElse: 'YYYY-MM-DD'
+    }
+  });
+
   const browserData = useMemo(() => {
     return localDashboards.result
       .sort(a => -a.createdAt)
