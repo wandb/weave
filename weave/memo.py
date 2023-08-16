@@ -59,7 +59,7 @@ def memo(f: typing.Any) -> typing.Any:
     return call_memo
 
 
-cross_request_cache: LruTimeWindowCache = cache.LruTimeWindowCache(
+cross_request_cache: cache.LruTimeWindowCache = cache.LruTimeWindowCache(
     datetime.timedelta(seconds=5)
 )
 
