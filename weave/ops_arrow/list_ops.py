@@ -519,6 +519,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
     if len(list_columns) == 0:
         return table
 
+    """
     first_column = list_columns[0]
     value_lengths_0 = table[first_column].combine_chunks().value_lengths()
 
@@ -552,6 +553,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
         flattened,
     )
     return result
+    """
 
 
 @op(
