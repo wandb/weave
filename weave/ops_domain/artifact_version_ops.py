@@ -153,6 +153,13 @@ gql_prop_op(
     types.Number(),
 )
 
+gql_prop_op(
+    "artifactVersion-ttlDurationSeconds",
+    wdt.ArtifactVersionType,
+    "ttlDurationSeconds",
+    types.Number(),
+)
+
 
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
