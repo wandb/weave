@@ -518,14 +518,14 @@ def explode_table(table: pa.Table, column: str) -> pa.Table:
     other_columns.remove(column)
     if len(other_columns) == 0:
         return pa.table({column: flattened})
-    else:
-        indices = pc.list_parent_indices(null_filled)
-        result = table.select(other_columns).take(indices)
-        result = result.append_column(
-            pa.field(column, table.schema.field(column).type.value_type),
-            flattened,
-        )
-        return result
+
+    indices = pc.list_parent_indices(null_filled)
+    result = table.select(other_columns).take(indices)
+    result = result.append_column(
+        pa.field(column, table.schema.field(column).type.value_type),
+        flattened,
+    )
+    return result
 
 
 @op(
