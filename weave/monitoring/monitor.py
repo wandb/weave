@@ -86,9 +86,11 @@ class Span:
     output: typing.Optional[typing.Any]
     # If an exception occurred, this will be set.
     exception: typing.Optional[Exception]
-    # Typically metrics should contain metrics about resources used
+    # Typically summary should contain metrics about resources used
     # during the function's execution (cpu, disk, tokens, api cost etc)
-    metrics: dict[str, typing.Any]
+    # or other information created in the course of actually executing
+    # the function.
+    summary: dict[str, typing.Any]
 
     _autoclose: bool = True
 
@@ -101,7 +103,7 @@ class Span:
         attributes: typing.Optional[dict[str, typing.Any]] = None,
         inputs: typing.Optional[typing.Dict[str, typing.Any]] = None,
         output: typing.Optional[typing.Any] = None,
-        metrics: typing.Optional[dict[str, typing.Any]] = None,
+        summary: typing.Optional[dict[str, typing.Any]] = None,
     ):
         self.name = name
         self._streamtable = _streamtable
@@ -119,9 +121,9 @@ class Span:
         self.inputs = inputs
         self.output = output
         self.exception = None
-        if metrics is None:
-            metrics = {}
-        self.metrics = metrics
+        if summary is None:
+            summary = {}
+        self.summary = summary
 
     def close(self) -> None:
         if self.status_code == StatusCode.UNSET:
@@ -144,7 +146,7 @@ class Span:
             )
         start_time_s = self.start_time.timestamp()
         end_time_s = self.end_time.timestamp()
-        self.metrics["latency_s"] = end_time_s - start_time_s
+        self.summary["latency_s"] = end_time_s - start_time_s
         return {
             "parent_id": self.parent_id,
             "trace_id": self.trace_id,
@@ -161,7 +163,7 @@ class Span:
                 else None
             ),
             "attributes": self.attributes,
-            "metrics": self.metrics,
+            "summary": self.summary,
         }
 
 

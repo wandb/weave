@@ -88,10 +88,10 @@ def openai_create_postprocess(span: monitor.SpanWithInputsAndOutput) -> typing.A
     if span.inputs.get("stream"):
         return wrapped_gen(span.output)
 
-    # move usage to metrics
+    # move usage to summary
     usage = span.output.pop("usage")
     for k, v in usage.items():
-        span.metrics[k] = v
+        span.summary[k] = v
 
     return span.output
 
