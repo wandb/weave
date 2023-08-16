@@ -65,21 +65,30 @@ class Span:
     _streamtable: typing.Optional[StreamTable]
 
     # These are OpenTelemetry standard
+
     parent_id: typing.Optional[str]
     trace_id: typing.Optional[str]
-    span_id: str
+    id: str  # span_id
     name: str
-    # OpenTelemetry enforces that attributes cannot have dicts or mixed types.
-    # We loosen that restriction and allow any Weave type
-    attributes: dict[str, typing.Any]
     status_code: str = StatusCode.UNSET
     start_time: datetime.datetime
     end_time: typing.Optional[datetime.datetime]
 
     # OpenTelemetry does not support these.
+
+    # Arbitrary key/value pairs. Values can be any Weave type, as
+    # opposed to opentelemetry where values can only be scalars or
+    # lists of homoegenous scalar types.
+    attributes: dict[str, typing.Any]
+    # The parameters to the function being traced.
     inputs: typing.Optional[typing.Dict[str, typing.Any]]
+    # The output of the function being traced.
     output: typing.Optional[typing.Any]
+    # If an exception occurred, this will be set.
     exception: typing.Optional[Exception]
+    # Typically metrics should contain metrics about resources used
+    # during the function's execution (cpu, disk, tokens, api cost etc)
+    metrics: dict[str, typing.Any]
 
     _autoclose: bool = True
 
@@ -92,6 +101,7 @@ class Span:
         attributes: typing.Optional[dict[str, typing.Any]] = None,
         inputs: typing.Optional[typing.Dict[str, typing.Any]] = None,
         output: typing.Optional[typing.Any] = None,
+        metrics: typing.Optional[dict[str, typing.Any]] = None,
     ):
         self.name = name
         self._streamtable = _streamtable
@@ -109,6 +119,9 @@ class Span:
         self.inputs = inputs
         self.output = output
         self.exception = None
+        if metrics is None:
+            metrics = {}
+        self.metrics = metrics
 
     def close(self) -> None:
         if self.status_code == StatusCode.UNSET:
@@ -129,14 +142,17 @@ class Span:
             raise ValueError(
                 "Cannot log a span that has not been ended.  Call span.end() before logging."
             )
+        start_time_s = self.start_time.timestamp()
+        end_time_s = self.end_time.timestamp()
+        self.metrics["latency_s"] = end_time_s - start_time_s
         return {
             "parent_id": self.parent_id,
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "name": self.name,
             "status_code": self.status_code,
-            "start_time_ms": self.start_time.timestamp() * 1000,
-            "end_time_ms": self.end_time.timestamp() * 1000,
+            "start_time_s": start_time_s,
+            "end_time_s": end_time_s,
             "inputs": self.inputs,
             "output": self.output,
             "exception": (
@@ -145,6 +161,7 @@ class Span:
                 else None
             ),
             "attributes": self.attributes,
+            "metrics": self.metrics,
         }
 
 
