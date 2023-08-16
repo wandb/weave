@@ -903,20 +903,6 @@ def flatten(arr):
             values = value_awl._arrow_data
             tags = tags_awl._arrow_data
 
-            tag_arrays = []
-
-            # while this technically calls to_pylist(), it is not actually
-            # breaking any data out to python in our internal weave definition,
-            # because it is just a list of integers that are the list offsets
-            # that are passed to the pa.repeat() call below
-
-            num_repeats = pc.subtract(
-                values.offsets[1:], values.offsets[:-1]
-            ).to_pylist()
-
-            for tag, rnum in zip(tags, num_repeats):
-                tag_arrays.append(pa.repeat(tag, rnum))
-            tags = pa.concat_arrays(tag_arrays)
         else:
             values = arrow_data
 
@@ -924,7 +910,11 @@ def flatten(arr):
         flattened_values = values.flatten()
 
         if tags is not None:
-            flattened_values = arrow_tags.direct_add_arrow_tags(flattened_values, tags)
+            list_parent_indices = pc.list_parent_indices(values)
+            flattened_tags = tags.take(list_parent_indices)
+            flattened_values = arrow_tags.direct_add_arrow_tags(
+                flattened_values, flattened_tags
+            )
 
         arrow_data = flattened_values
 
