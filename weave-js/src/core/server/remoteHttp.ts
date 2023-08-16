@@ -91,7 +91,7 @@ declare function btoa(s: string): string;
 
 const createClientCacheKey = (windowSizeMs: number = 15000) => {
   return null
-  return Math.floor(Date.now() / windowSizeMs).toString();
+  // return Math.floor(Date.now() / windowSizeMs).toString();
 };
 
 // Handles (de)serialization to send to a remote CG server
