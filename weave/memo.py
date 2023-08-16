@@ -1,10 +1,11 @@
 import typing
-
+import datetime
 
 import contextvars
 import contextlib
 
 from . import engine_trace
+from . import cache
 
 statsd = engine_trace.statsd()  # type: ignore
 
@@ -53,6 +54,26 @@ def memo(f: typing.Any) -> typing.Any:
         # statsd.increment("weave.memo.miss")
         result = f(*args, **kwargs)
         storage[key] = result
+        return result
+
+    return call_memo
+
+
+cross_request_cache: LruTimeWindowCache = cache.LruTimeWindowCache(
+    datetime.timedelta(seconds=5)
+)
+
+
+def cross_request_memo(f: typing.Any) -> typing.Any:
+    def call_memo(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+        key = (f, args, tuple(kwargs.items()))
+        val = cross_request_cache.get(key)
+        if not isinstance(val, cache.LruTimeWindowCache.NotFound):
+            # statsd.increment("weave.memo.hit")
+            return val
+        # statsd.increment("weave.memo.miss")
+        result = f(*args, **kwargs)
+        cross_request_cache.set(key, result)
         return result
 
     return call_memo
