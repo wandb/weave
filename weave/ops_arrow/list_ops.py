@@ -582,16 +582,6 @@ def unnest(self):
             arrow_obj = arrow_obj.append_column(tag_col_name, col_tags)
             arrow_obj = arrow_obj.append_column(col, col_values)
 
-    # todo: make this more efficient. we shouldn't have to convert back and forth
-    # from the arrow in-memory representation to pandas just to call the explode
-    # function. but there is no native pyarrow implementation of this
-
-    # This can replace int64 with float64! I believe it happens when we have nullable
-    # int. pandas represents nullability using nan.
-    # This requires us a hack in our AWL.validate function to allow float64 when
-    # the weave type is int.
-    # TODO: write an arrow based implementation, and remove the hack in validate.
-
     exploded_table = arrow_obj
     for column in list_cols:
         exploded_table = explode_table(exploded_table, column)
