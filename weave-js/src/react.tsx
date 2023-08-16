@@ -248,6 +248,8 @@ export const useNodeValue = <T extends Type>(
 
   // consoleLog('USE NODE VALUE PRE CLIENT EVAL', weave.expToString(node), stack);
 
+  const origNode = node;
+
   node = useMemo(() => {
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
   }, [node, stack]);
@@ -338,7 +340,6 @@ export const useNodeValue = <T extends Type>(
   //   memoCacheId,
   //   callSite,
   // });
-
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
@@ -363,7 +364,7 @@ export const useNodeValue = <T extends Type>(
   }, [error, node, result.node, result.value]);
   if (
     !finalResult.loading &&
-    panelMaybeNode === node &&
+    panelMaybeNode === origNode &&
     finalResult.result == null
   ) {
     // Throw NullResult for PanelMaybe to catch.
