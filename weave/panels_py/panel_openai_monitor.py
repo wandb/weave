@@ -50,15 +50,6 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                         "id": types.optional(types.String()),
                         "object": types.optional(types.String()),
                         "model": types.optional(types.String()),
-                        "usage": types.optional(
-                            types.TypedDict(
-                                {
-                                    "prompt_tokens": types.optional(types.Number()),
-                                    "completion_tokens": types.optional(types.Number()),
-                                    "total_tokens": types.optional(types.Number()),
-                                }
-                            )
-                        ),
                         "choices": types.optional(
                             types.List(
                                 types.TypedDict(
@@ -84,6 +75,15 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                 )
             ),
             "timestamp": types.optional(types.Timestamp()),
+            "summary": types.optional(
+                types.TypedDict(
+                    {
+                        "prompt_tokens": types.optional(types.Number()),
+                        "completion_tokens": types.optional(types.Number()),
+                        "total_tokens": types.optional(types.Number()),
+                    }
+                )
+            ),
         }
     )
 )
@@ -110,7 +110,7 @@ board_name = "py_board-" + BOARD_ID
 
 
 def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
-    return row["output.usage.total_tokens"] * 0.0015e-3
+    return row["summary.total_tokens"] * 0.0015e-3
 
 
 @weave.op(  # type: ignore
@@ -272,8 +272,7 @@ def board(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_expr=lambda row: (row["end_time_ms"].avg() - row["start_time_ms"].avg())
-            / 1000,
+            y_expr=lambda row: row["summary.latency_s"].avg(),
             y_title="avg latency (s)",
             groupby_key=groupby,
             x_domain=user_zoom_range,
@@ -289,17 +288,17 @@ def board(
     )
     overview_tab.add(
         "avg prompt tokens per req",
-        filtered_window_data["output.usage.prompt_tokens"].avg(),  # type: ignore
+        filtered_window_data["summary.prompt_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=6, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg completion tokens per req",
-        filtered_window_data["output.usage.completion_tokens"].avg(),  # type: ignore
+        filtered_window_data["summary.completion_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=height),
     )
     overview_tab.add(
         "avg total tokens per req",
-        filtered_window_data["output.usage.total_tokens"].avg(),  # type: ignore
+        filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=height),
     ),
 
@@ -325,16 +324,12 @@ def board(
     requests_table.add_column(
         lambda row: row["output.choices"][-1]["message.content"], "Completion"
     )
+    requests_table.add_column(lambda row: row["summary.prompt_tokens"], "Prompt Tokens")
     requests_table.add_column(
-        lambda row: row["output.usage.prompt_tokens"], "Prompt Tokens"
+        lambda row: row["summary.completion_tokens"], "Completion Tokens"
     )
-    requests_table.add_column(
-        lambda row: row["output.usage.completion_tokens"], "Completion Tokens"
-    )
-    requests_table.add_column(
-        lambda row: row["output.usage.total_tokens"], "Total Tokens"
-    )
-    requests_table.add_column(lambda row: row["latency_ms"], "Latency")
+    requests_table.add_column(lambda row: row["summary.total_tokens"], "Total Tokens")
+    requests_table.add_column(lambda row: row["summary.latency_s"], "Latency")
     requests_table.add_column(lambda row: row["timestamp"], "Timestamp")
 
     requests_table_var = overview_tab.add(

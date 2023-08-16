@@ -2,6 +2,7 @@
 
 import datetime
 import tqdm
+import os
 import numpy as np
 import pandas as pd
 import random
@@ -90,7 +91,12 @@ def random_predictions(n_users: int = 10) -> ops_arrow.ArrowWeaveList:
     users = [fake.user_name() for _ in range(n_users)]
 
     # Read the file and generate prompts
-    with open("../../weave/testdata/t8.shakespeare.txt", "r") as f:
+    with open(
+        os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "testdata/t8.shakespeare.txt")
+        ),
+        "r",
+    ) as f:
         lines = f.read().split("\n")
 
     # Define the time range

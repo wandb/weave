@@ -156,13 +156,13 @@ const HomeComp: FC<HomeProps> = props => {
     userName.result,
   ]);
 
-  const draftsSection = useMemo(() => {
+  const localSection = useMemo(() => {
     if (!isLocallyServed) {
       return [];
     }
     return [
       {
-        title: `Drafts`,
+        title: `Local`,
         items: [
           // Home Page TODO: Enable browsing assets in draft state on remote server
           // {
@@ -194,8 +194,8 @@ const HomeComp: FC<HomeProps> = props => {
   }, [history, props.browserType, isLocallyServed]);
 
   const navSections = useMemo(() => {
-    return [...recentSection, ...wandbSection, ...draftsSection];
-  }, [draftsSection, recentSection, wandbSection]);
+    return [...recentSection, ...wandbSection, ...localSection];
+  }, [localSection, recentSection, wandbSection]);
 
   const loading = userName.loading || isAuthenticated === undefined;
   const REDIRECT_RECENTS = [`/${URL_RECENT}`, `/${URL_RECENT}/`];
@@ -236,10 +236,7 @@ const HomeComp: FC<HomeProps> = props => {
   return (
     <LayoutElements.VStack>
       <LayoutElements.Block>
-        <HomeTopBar
-          inJupyter={props.inJupyter}
-          navigateToExpression={navigateToExpression}
-        />
+        <HomeTopBar />
       </LayoutElements.Block>
       {/* Main Region */}
       <LayoutElements.HSpace
@@ -247,7 +244,11 @@ const HomeComp: FC<HomeProps> = props => {
           gap: '12px',
         }}>
         {/* Left Bar */}
-        <LeftNav sections={navSections} />
+        <LeftNav
+          sections={navSections}
+          inJupyter={props.inJupyter}
+          navigateToExpression={navigateToExpression}
+        />
         {/* Center Content */}
         {!loading && (
           <CenterSpace>
