@@ -19,7 +19,7 @@ from flask_cors import CORS
 from flask import send_from_directory
 import wandb
 
-from weave import graph, server, value_or_error
+from weave import context_state, graph, server, value_or_error
 from weave import storage
 from weave import registry_mem
 from weave import errors
@@ -34,6 +34,8 @@ from weave import storage
 from weave import wandb_api
 from weave.language_features.tagging import tag_store
 
+
+WEAVE_CLIENT_CACHE_KEY_HEADER = "x-weave-client-cache-key"
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -123,21 +125,38 @@ def make_app():
     return app
 
 
+class OpsCache(typing.TypedDict):
+    updated_at: float
+    ops_data: typing.Optional[dict]
+
+
+ops_cache: typing.Optional[OpsCache] = None
+
+
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
+    global ops_cache
     with wandb_api.from_environment():
         # TODO: this is super slow.
         if not environment.wandb_production():
             registry_mem.memory_registry.load_saved_ops()
-        ops = registry_mem.memory_registry.list_ops()
-        ret = []
-        for op in ops:
-            try:
-                serialized_op = op.to_dict()
-            except errors.WeaveSerializeError:
-                continue
-            ret.append(serialized_op)
-        return {"data": ret}
+        if (
+            ops_cache is None
+            or ops_cache["updated_at"] < registry_mem.memory_registry.updated_at()
+        ):
+            ops = registry_mem.memory_registry.list_ops()
+            ret = []
+            for op in ops:
+                try:
+                    serialized_op = op.to_dict()
+                except errors.WeaveSerializeError:
+                    continue
+                ret.append(serialized_op)
+            ops_cache = {
+                "updated_at": registry_mem.memory_registry.updated_at(),
+                "data": ret,
+            }
+    return ops_cache
 
 
 class ErrorDetailsDict(typing.TypedDict):
@@ -223,6 +242,14 @@ def _log_errors(
         logging.error(error_dict)
 
 
+def _get_client_cache_key_from_request(request):
+    # Uncomment to set default to 15 second cache duration
+    client_cache_key = None  # str(int(time.time() // 15))
+    if WEAVE_CLIENT_CACHE_KEY_HEADER in request.headers:
+        client_cache_key = request.headers[WEAVE_CLIENT_CACHE_KEY_HEADER]
+    return client_cache_key
+
+
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
@@ -254,10 +281,14 @@ def execute():
     }
     root_span = tracer.current_root_span()
     tag_store.record_current_tag_store_size()
+
+    client_cache_key = _get_client_cache_key_from_request(request)
+
     if not PROFILE_DIR:
         start_time = time.time()
         with client_safe_http_exceptions_as_werkzeug():
-            response = server.handle_request(**execute_args)
+            with context_state.set_client_cache_key(client_cache_key):
+                response = server.handle_request(**execute_args)
         elapsed = time.time() - start_time
     else:
         # Profile the request and add a link to local snakeviz to the trace.
@@ -265,7 +296,8 @@ def execute():
         start_time = time.time()
         try:
             with client_safe_http_exceptions_as_werkzeug():
-                response = profile.runcall(server.handle_request, **execute_args)
+                with context_state.set_client_cache_key(client_cache_key):
+                    response = profile.runcall(server.handle_request, **execute_args)
         finally:
             elapsed = time.time() - start_time
             profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"

@@ -626,6 +626,36 @@ def test_arrow_unnest():
     ]
 
 
+def test_arrow_unnest_two_list_cols():
+    data = arrow.to_arrow(
+        [
+            {"a": [1, 2, 3], "b": "c", "c": ["a", "b", "c"]},
+            {"a": [4, 5, 6], "b": "d", "c": ["d", "e", "f"]},
+        ]
+    )
+    assert weave.type_of(data) == arrow.ArrowWeaveListType(
+        types.TypedDict(
+            {
+                "a": types.List(types.Int()),
+                "b": types.String(),
+                "c": types.List(types.String()),
+            }
+        )
+    )
+    unnest_node = weave.weave(data).unnest()
+    assert unnest_node.type == arrow.ArrowWeaveListType(
+        types.TypedDict({"a": types.Int(), "b": types.String(), "c": types.String()})
+    )
+    assert weave.use(weave.weave(data).unnest()).to_pylist_raw() == [
+        {"a": 1, "b": "c", "c": "a"},
+        {"a": 2, "b": "c", "c": "b"},
+        {"a": 3, "b": "c", "c": "c"},
+        {"a": 4, "b": "d", "c": "d"},
+        {"a": 5, "b": "d", "c": "e"},
+        {"a": 6, "b": "d", "c": "f"},
+    ]
+
+
 def test_arrow_nullable_concat():
     ca1 = pa.chunked_array([[1, 2], [3, 4]])
     ca2 = pa.compute.add(ca1, 1)

@@ -95,10 +95,11 @@ def test_artifact_dir():
 
 def pytest_collection_modifyitems(config, items):
     # Get the job number from environment variable (0 for even tests, 1 for odd tests)
-    job_num = int(config.getoption("--job-num", default=None))
-
+    job_num = config.getoption("--job-num", default=None)
     if job_num is None:
         return
+
+    job_num = int(job_num)
 
     selected_items = []
     for index, item in enumerate(items):

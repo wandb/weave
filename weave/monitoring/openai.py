@@ -1,10 +1,12 @@
 import typing
 import openai
+from openai import util as openai_util
+import functools
 
 from . import monitor
 
 
-def delta_update(value: dict, delta: dict) -> dict:
+def _delta_update(value: dict, delta: dict) -> dict:
     """
     Update the 'value' dictionary with the 'delta' dictionary.
 
@@ -16,7 +18,7 @@ def delta_update(value: dict, delta: dict) -> dict:
         if k not in value:
             value[k] = v
         elif isinstance(v, dict):
-            delta_update(value[k], v)
+            _delta_update(value[k], v)
         elif v is None:
             value[k] = None
         elif isinstance(v, str):
@@ -29,30 +31,31 @@ def delta_update(value: dict, delta: dict) -> dict:
     return value
 
 
-def message_from_stream(stream: typing.Generator) -> typing.Any:
-    """Helper to extract a printable streaming message from an OpenAI stream response."""
-    # TODO: print role.
-    # TODO: print function call responses
-    cur_index = 0
-    for record in stream:
-        if "choices" in record:
-            for choice_update in record["choices"]:
-                if choice_update["index"] == cur_index:
-                    delta = choice_update["delta"]
-                    if "content" in delta:
-                        yield delta["content"]
-                else:
-                    yield "\n\nNEXT RESPONSE:\n\n"
+def elide_api_key(api_key: str) -> str:
+    return api_key[:3] + "..." + api_key[-4:]
 
 
 def openai_create_preprocess(span: monitor.SpanWithInputs) -> None:
+    # The openai signature's are always args/kwargs, but the actual
+    # parameters for e.g. ChatCompletion.create can only be passed in kwargs.
+    # Generic parameters like api_key can be passed as args.
+    # TODO: handle api_key in args
     span.inputs = span.inputs["kwargs"]
+
+    api_key = None
+    try:
+        api_key = span.inputs.pop("api_key")
+    except KeyError:
+        api_key = openai_util.default_api_key()
+    span.attributes["api_key"] = elide_api_key(api_key)
+
     if span.inputs.get("stream"):
         span.disable_autoclose()
 
 
 def openai_create_postprocess(span: monitor.SpanWithInputsAndOutput) -> typing.Any:
     def wrapped_gen(gen: typing.Generator) -> typing.Generator:
+        # TODO: this needs to compute token usage.
         record = None
         for item in gen:
             if record is None:
@@ -72,7 +75,7 @@ def openai_create_postprocess(span: monitor.SpanWithInputsAndOutput) -> typing.A
                             {"index": i, "message": {}, "finish_reason": None}
                         )
                 if "delta" in choice_update:
-                    choices[index]["message"] = delta_update(
+                    choices[index]["message"] = _delta_update(
                         choices[index]["message"], choice_update["delta"]
                     )
                 if "finish_reason" in choice_update:
@@ -84,6 +87,12 @@ def openai_create_postprocess(span: monitor.SpanWithInputsAndOutput) -> typing.A
 
     if span.inputs.get("stream"):
         return wrapped_gen(span.output)
+
+    # move usage to summary
+    usage = span.output.pop("usage")
+    for k, v in usage.items():
+        span.summary[k] = v
+
     return span.output
 
 
@@ -92,6 +101,22 @@ mon = monitor.default_monitor()
 monitored_create = mon.trace(
     preprocess=openai_create_preprocess, postprocess=openai_create_postprocess
 )(openai.ChatCompletion.create)
+
+
+def message_from_stream(stream: typing.Generator) -> typing.Any:
+    """Helper to extract a printable streaming message from an OpenAI stream response."""
+    # TODO: print role.
+    # TODO: print function call responses
+    cur_index = 0
+    for record in stream:
+        if "choices" in record:
+            for choice_update in record["choices"]:
+                if choice_update["index"] == cur_index:
+                    delta = choice_update["delta"]
+                    if "content" in delta:
+                        yield delta["content"]
+                else:
+                    yield "\n\nNEXT RESPONSE:\n\n"
 
 
 class ChatCompletion:

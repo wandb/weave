@@ -15,11 +15,20 @@ _memo_storage: contextvars.ContextVar[typing.Optional[dict]] = contextvars.Conte
 
 @contextlib.contextmanager
 def memo_storage() -> typing.Generator[None, None, None]:
-    token = _memo_storage.set({})
+    # Here we only construct a new context if one does not already exist.
+    # This is because we often have recursive calls to the executor (particularly
+    # in the case of refinement during querying). In such cases we do not want
+    # to reset the memoization storage, as this would cause us to lose the
+    # memoized values from the previous call! We might want to do something
+    # similar for other context variables.
+    token = None
+    if _memo_storage.get() is None:
+        token = _memo_storage.set({})
     try:
         yield
     finally:
-        _memo_storage.reset(token)
+        if token is not None:
+            _memo_storage.reset(token)
 
 
 class NoValue:

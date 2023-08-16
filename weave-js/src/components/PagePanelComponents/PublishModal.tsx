@@ -3,9 +3,10 @@ import {
   DropdownItemProps,
   Form,
   Input,
+  Loader,
   Modal,
 } from 'semantic-ui-react';
-import React from 'react';
+import React, {useMemo} from 'react';
 import styled from 'styled-components';
 import {RED_550} from '@wandb/weave/common/css/color.styles';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
@@ -39,6 +40,12 @@ const isValidBoardName = (name: string) => {
   );
 };
 
+const iconStyle = {
+  verticalAlign: 'middle',
+  display: 'inline-block',
+  marginRight: 8,
+};
+
 export const PublishModal = ({
   defaultName,
   open,
@@ -52,33 +59,31 @@ export const PublishModal = ({
   const isValidName = isValidBoardName(boardName);
   const showError = boardName.length > 0 && !isValidName;
 
-  const isAuthenticated = useIsAuthenticated();
-  const userEntities = query.useUserEntities(isAuthenticated);
-  const userName = query.useUserName(isAuthenticated);
+  // Make sure we only make requests once this is open
+  const isAuthenticated = useIsAuthenticated(!open);
+  const userEntities = query.useUserEntities(isAuthenticated && open);
+  const userName = query.useUserName(isAuthenticated && open);
 
-  const iconStyle = {
-    verticalAlign: 'middle',
-    display: 'inline-block',
-    marginRight: 8,
-  };
-
-  const entityOptions: DropdownItemProps[] =
-    userEntities.result.length === 0
-      ? []
-      : userEntities.result.sort().map(entName => ({
-          icon: (
-            <Icon
-              name={
-                entName === userName.result
-                  ? 'user-profile-personal'
-                  : 'users-team'
-              }
-              style={iconStyle}
-            />
-          ),
-          value: entName,
-          text: entName,
-        }));
+  const entityOptions: DropdownItemProps[] = useMemo(
+    () =>
+      userEntities.result.length === 0
+        ? []
+        : userEntities.result.sort().map(entName => ({
+            icon: (
+              <Icon
+                name={
+                  entName === userName.result
+                    ? 'user-profile-personal'
+                    : 'users-team'
+                }
+                style={iconStyle}
+              />
+            ),
+            value: entName,
+            text: entName,
+          })),
+    [userEntities.result, userName.result]
+  );
 
   const projectsNode = w.opEntityProjects({
     entity: w.opRootEntity({
@@ -89,10 +94,17 @@ export const PublishModal = ({
   // Initialize the entity selector to first option (user entity)
   useEffect(() => {
     if (!userEntities.loading && entityOptions.length > 0) {
+      if (userName.result != null) {
+        for (const option of entityOptions) {
+          if (option.value === userName.result) {
+            setEntityName(userName.result);
+            return;
+          }
+        }
+      }
       setEntityName(entityOptions[0].value as string);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userEntities.loading]);
+  }, [entityOptions, userEntities.loading, userName.result]);
 
   const projectDataNode = w.opProjectName({project: projectsNode});
   const projectNamesValue = useNodeValue(projectDataNode, {
@@ -149,63 +161,75 @@ export const PublishModal = ({
           Name your board and select a destination entity and project in Weights
           & Biases.
         </M.Description>
-        <Form>
-          <Form.Field>
-            <label>Name</label>
-            <Input
-              value={boardName}
-              placeholder="Name"
-              onChange={e => setBoardName(e.target.value)}
-              error={showError}
-            />
-            {showError && (
-              <Error>Spaces and special characters are not allowed.</Error>
-            )}
-          </Form.Field>
-          <Form.Field>
-            <label>Entity</label>
-            <Dropdown
-              placeholder="Select entity"
-              fluid
-              selection
-              options={entityOptions}
-              value={entityName}
-              onChange={(e, data) => {
-                setEntityName(data.value as string);
-                setProjectName('');
-              }}
-            />
-          </Form.Field>
-          <Form.Field>
-            <label>Project</label>
-            {projectOptions.length > 0 ? (
-              <Dropdown
-                placeholder="Select project"
-                fluid
-                selection
-                options={projectOptions}
-                value={projectName}
-                onChange={(e, data) => {
-                  setProjectName(data.value as string);
-                }}
-              />
-            ) : (
-              <span>Entity has no project</span>
-            )}
-          </Form.Field>
-        </Form>
-        <M.Buttons>
-          <WBButton
-            variant="confirm"
-            loading={acting}
-            disabled={!isValidName || !entityName || !projectName || acting}
-            onClick={onPublish}>
-            Publish board
-          </WBButton>
-          <WBButton variant="ghost" onClick={onClose}>
-            Cancel
-          </WBButton>
-        </M.Buttons>
+        {isAuthenticated === false ? (
+          <span>Please authenticate with W&B to publish boards</span>
+        ) : (
+          <>
+            <Form>
+              <Form.Field>
+                <label>Name</label>
+                <Input
+                  value={boardName}
+                  placeholder="Name"
+                  onChange={e => setBoardName(e.target.value)}
+                  error={showError}
+                />
+                {showError && (
+                  <Error>Spaces and special characters are not allowed.</Error>
+                )}
+              </Form.Field>
+              <Form.Field>
+                <label>Entity</label>
+                {userEntities.loading ? (
+                  <Loader active inline size="tiny" />
+                ) : (
+                  <Dropdown
+                    placeholder="Select entity"
+                    fluid
+                    selection
+                    options={entityOptions}
+                    value={entityName}
+                    onChange={(e, data) => {
+                      setEntityName(data.value as string);
+                      setProjectName('');
+                    }}
+                  />
+                )}
+              </Form.Field>
+              <Form.Field>
+                <label>Project</label>
+                {userEntities.loading || projectNamesValue.loading ? (
+                  <Loader active inline size="tiny" />
+                ) : projectOptions.length > 0 ? (
+                  <Dropdown
+                    placeholder="Select project"
+                    fluid
+                    selection
+                    options={projectOptions}
+                    value={projectName}
+                    onChange={(e, data) => {
+                      setProjectName(data.value as string);
+                    }}
+                  />
+                ) : (
+                  <span>Entity has no project</span>
+                )}
+              </Form.Field>
+            </Form>
+            <M.Buttons>
+              <WBButton
+                variant="confirm"
+                loading={acting}
+                disabled={!isValidName || !entityName || !projectName || acting}
+                onClick={onPublish}>
+                Publish board
+              </WBButton>
+              <WBButton variant="ghost" onClick={onClose}>
+                Cancel
+              </WBButton>
+            </M.Buttons>
+          </>
+        )}
       </Modal.Content>
     </Modal>
   );
