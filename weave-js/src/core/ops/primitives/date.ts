@@ -94,12 +94,14 @@ export const opDateDiffDaysStringFormat = makeDateOp({
     if (inputs.lhs == null || inputs.rhs == null) {
       return null;
     }
-    const dateDiff = moment.utc(inputs.lhs).diff(inputs.rhs, 'milliseconds');
+    const dateDiff = moment
+      .utc(inputs.lhs)
+      .diff(moment.utc(inputs.rhs), 'milliseconds');
     const dayDiff = Math.floor(
       moment.duration(dateDiff, 'milliseconds').asDays()
     );
     if (dayDiff <= 0) {
-      return 'less than 1 day left';
+      return 'less than 1 day';
     }
     return dayDiff.toString() + (dayDiff === 1 ? ' day' : ' days');
   },
@@ -121,7 +123,7 @@ export const opTimestampToDate = makeDateOp({
     return 'date';
   },
   resolver: inputs => {
-    const date = new Date(inputs.timestamp);
+    const date = new Date(moment.utc(inputs.timestamp).toDate());
     return date;
   },
 });
