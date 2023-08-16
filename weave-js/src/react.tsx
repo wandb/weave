@@ -252,6 +252,13 @@ export const useNodeValue = <T extends Type>(
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
   }, [node, stack]);
 
+  const dereferencedPanelMaybeNode = useMemo(() => {
+    if (panelMaybeNode == null) {
+      return null;
+    }
+    return dereferenceAllVars(panelMaybeNode, stack).node;
+  }, [panelMaybeNode, stack]);
+
   node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
 
   node = useMemo(
@@ -334,7 +341,6 @@ export const useNodeValue = <T extends Type>(
   //   memoCacheId,
   //   callSite,
   // });
-
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
@@ -355,7 +361,10 @@ export const useNodeValue = <T extends Type>(
   }, [error, node, result.node, result.value]);
   if (
     !finalResult.loading &&
-    panelMaybeNode === node &&
+    ((dereferencedPanelMaybeNode === panelMaybeNode &&
+      dereferencedPanelMaybeNode === node) ||
+      (dereferencedPanelMaybeNode !== panelMaybeNode &&
+        _.isEqual(dereferencedPanelMaybeNode, node))) &&
     finalResult.result == null
   ) {
     // Throw NullResult for PanelMaybe to catch.
