@@ -1398,7 +1398,7 @@ def is_taggedvalue_arrowweavelist(
 def is_list_arrowweavelist(
     val: ArrowWeaveList,
 ) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.List]]:
-    return isinstance(val.object_type, types.List)
+    return types.List().assign_type(val.object_type)
 
 
 def dataframe_to_arrow(df):
