@@ -135,7 +135,13 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
           opObjGetAttr({self: objNode, name: constString(key)}),
       };
     } else {
-      throw new Error('Invalid input type');
+      // Unions are not supported, but we should not error
+      return {
+        objPropTypes: {},
+        pickOrGetattr: (objNode: Node, key: string) => {
+          throw new Error('Invalid input type');
+        },
+      };
     }
   }, [props.input.type]);
   const propertyTypes = _.mapKeys(objPropTypes, (v, k) => escapeDots(k));

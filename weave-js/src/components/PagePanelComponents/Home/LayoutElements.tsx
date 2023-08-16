@@ -1,3 +1,4 @@
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import styled from 'styled-components';
 
 const STYLE_DEBUG = false;
@@ -17,6 +18,7 @@ export const VStack = styled.div`
   flex-direction: column;
   ${debugStyle}
 `;
+VStack.displayName = 'S.VStack';
 
 export const HStack = styled.div`
   width: 100%;
@@ -25,6 +27,7 @@ export const HStack = styled.div`
   flex-direction: row;
   ${debugStyle}
 `;
+HStack.displayName = 'S.HStack';
 
 export const Space = styled.div`
   height: 100%;
@@ -33,11 +36,13 @@ export const Space = styled.div`
   flex: 1 1 auto;
   ${debugStyle}
 `;
+Space.displayName = 'S.Space';
 
 export const Block = styled.div`
   flex: 0 0 auto;
   ${debugStyle}
 `;
+Block.displayName = 'S.Block';
 
 export const VSpace = styled.div`
   height: 100%;
@@ -48,6 +53,7 @@ export const VSpace = styled.div`
   flex-direction: column;
   ${debugStyle}
 `;
+VSpace.displayName = 'S.VSpace';
 
 export const HSpace = styled.div`
   height: 100%;
@@ -58,6 +64,7 @@ export const HSpace = styled.div`
   flex-direction: row;
   ${debugStyle}
 `;
+HSpace.displayName = 'S.HSpace';
 
 export const VBlock = styled.div`
   flex: 0 0 auto;
@@ -65,6 +72,7 @@ export const VBlock = styled.div`
   flex-direction: column;
   ${debugStyle}
 `;
+VBlock.displayName = 'S.VBlock';
 
 export const HBlock = styled.div`
   flex: 0 0 auto;
@@ -72,3 +80,15 @@ export const HBlock = styled.div`
   flex-direction: row;
   ${debugStyle}
 `;
+HBlock.displayName = 'S.HBlock';
+
+export const BlockHeader = styled.div`
+  color: ${MOON_500};
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 24px;
+
+  display: flex;
+  justify-content: space-between;
+`;
+BlockHeader.displayName = 'S.BlockHeader';
