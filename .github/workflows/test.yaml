@@ -195,10 +195,16 @@ jobs:
           GITHUB_TOKEN:
             ${{ secrets.GITHUB_TOKEN }}
             # - uses: actions/upload-artifact@v3
+      - name: Output logs
+        run: |
+          cat /tmp/weave/log/*.log > /tmp/weave/log/all.log
+          cat /tmp/weave/log/all.log
+        if: always()
+
       - name: Upload logs
-        uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: weave-server-logs
-          path: /tmp/weave/log
-          retention-days: 3
+        run: |
+          cd integration_test
+          npx ds upload-logs /tmp/weave/log/all.log
+        if: always()
+        env:
+          CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
