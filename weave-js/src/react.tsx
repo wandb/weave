@@ -248,16 +248,11 @@ export const useNodeValue = <T extends Type>(
 
   // consoleLog('USE NODE VALUE PRE CLIENT EVAL', weave.expToString(node), stack);
 
+  const origNode = node;
+
   node = useMemo(() => {
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
   }, [node, stack]);
-
-  const dereferencedPanelMaybeNode = useMemo(() => {
-    if (panelMaybeNode == null) {
-      return null;
-    }
-    return dereferenceAllVars(panelMaybeNode, stack).node;
-  }, [panelMaybeNode, stack]);
 
   node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
 
@@ -361,10 +356,7 @@ export const useNodeValue = <T extends Type>(
   }, [error, node, result.node, result.value]);
   if (
     !finalResult.loading &&
-    ((dereferencedPanelMaybeNode === panelMaybeNode &&
-      dereferencedPanelMaybeNode === node) ||
-      (dereferencedPanelMaybeNode !== panelMaybeNode &&
-        _.isEqual(dereferencedPanelMaybeNode, node))) &&
+    panelMaybeNode === origNode &&
     finalResult.result == null
   ) {
     // Throw NullResult for PanelMaybe to catch.
