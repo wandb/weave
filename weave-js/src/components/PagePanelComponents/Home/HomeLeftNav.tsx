@@ -1,4 +1,4 @@
-import { Button } from '@wandb/weave/components/Button';
+import {Button} from '@wandb/weave/components/Button';
 import {MOON_800} from '@wandb/weave/common/css/color.styles';
 import {voidNode} from '@wandb/weave/core';
 
@@ -28,7 +28,7 @@ const LeftNavItemBlock = styled(LayoutElements.HBlock)`
 `;
 
 const NewBoardButtonWrapper = styled.div`
-  margin: 24px 24px 16px 24px
+  margin: 24px 24px 16px 24px;
 `;
 NewBoardButtonWrapper.displayName = 'S.NewBoardButton';
 
@@ -70,7 +70,11 @@ export const LeftNav: React.FC<{
         overflowY: 'auto',
       }}>
       <NewBoardButtonWrapper>
-        <Button variant="secondary" onClick={newDashboard} icon="add-new" size='large' >
+        <Button
+          variant="secondary"
+          onClick={newDashboard}
+          icon="add-new"
+          size="large">
           New blank board
         </Button>
       </NewBoardButtonWrapper>

@@ -1,4 +1,4 @@
-import { Button } from '@wandb/weave/components/Button';
+import {Button} from '@wandb/weave/components/Button';
 
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
@@ -20,7 +20,7 @@ import {useNodeWithServerType} from '@wandb/weave/react';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
 
-import * as Tabs from '../../Tabs'
+import * as Tabs from '../../Tabs';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -161,7 +161,9 @@ export const HomeExpressionPreviewParts: React.FC<{
   const [isGenerating, setIsGenerating] = React.useState(false);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
 
-  const [copyButtonText, setCopyButtonText] = React.useState<"Copy" | "Copied">("Copy");
+  const [copyButtonText, setCopyButtonText] = React.useState<'Copy' | 'Copied'>(
+    'Copy'
+  );
 
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
@@ -172,10 +174,9 @@ export const HomeExpressionPreviewParts: React.FC<{
             onClick={() => {
               navigateToExpression(expr);
             }}
-            size='small'
-            variant='ghost'
-            icon='full-screen-mode-expand'
-          >
+            size="small"
+            variant="ghost"
+            icon="full-screen-mode-expand">
             Expand
           </Button>
         </LayoutElements.BlockHeader>
@@ -184,20 +185,19 @@ export const HomeExpressionPreviewParts: React.FC<{
         </LayoutElements.Block>
       </LayoutElements.VBlock>
       <LayoutElements.VBlock style={{gap: '8px'}}>
-      <LayoutElements.BlockHeader>
+        <LayoutElements.BlockHeader>
           EXPRESSION
           <Button
             onClick={() => {
               navigator.clipboard.writeText(weave.expToString(expr));
-              setCopyButtonText("Copied")
+              setCopyButtonText('Copied');
               setTimeout(() => {
-                setCopyButtonText("Copy")
+                setCopyButtonText('Copy');
               }, 3000);
             }}
-            size='small'
-            variant='ghost'
-            icon='copy'
-          >
+            size="small"
+            variant="ghost"
+            icon="copy">
             {copyButtonText}
           </Button>
         </LayoutElements.BlockHeader>
@@ -342,8 +342,8 @@ export const HomePreviewTabs: React.FC<{
 }> = ({expr, navigateToExpression}) => {
   const [tabValue, setTabValue] = React.useState('Overview');
 
-  return (  
-    <Tabs.Root value={tabValue} onValueChange={(val) => setTabValue(val)}>
+  return (
+    <Tabs.Root value={tabValue} onValueChange={val => setTabValue(val)}>
       <Tabs.List>
         <Tabs.Trigger value="Overview">Overview</Tabs.Trigger>
         <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>
@@ -359,4 +359,4 @@ export const HomePreviewTabs: React.FC<{
       <Tabs.Content value="Boards">Boards</Tabs.Content>
     </Tabs.Root>
   );
-}
+};

@@ -244,7 +244,11 @@ const HomeComp: FC<HomeProps> = props => {
           gap: '12px',
         }}>
         {/* Left Bar */}
-        <LeftNav sections={navSections} inJupyter={props.inJupyter} navigateToExpression={navigateToExpression}/>
+        <LeftNav
+          sections={navSections}
+          inJupyter={props.inJupyter}
+          navigateToExpression={navigateToExpression}
+        />
         {/* Center Content */}
         {!loading && (
           <CenterSpace>
