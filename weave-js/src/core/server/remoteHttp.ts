@@ -90,12 +90,13 @@ interface NodeEntry {
 declare function btoa(s: string): string;
 
 const createClientCacheKey = (windowSizeMs: number = 15000) => {
-  return Math.floor(Date.now() / windowSizeMs).toString();
+  return null;
+  // return Math.floor(Date.now() / windowSizeMs).toString();
 };
 
 // Handles (de)serialization to send to a remote CG server
 export class RemoteHttpServer implements Server {
-  public clientCacheKey: string = createClientCacheKey();
+  public clientCacheKey: string | null = createClientCacheKey();
   private readonly opts: RemoteWeaveOptions;
   private readonly flushInterval: NodeJS.Timer;
   private pendingNodes: Map<Node, NodeEntry> = new Map();
@@ -330,7 +331,9 @@ export class RemoteHttpServer implements Server {
           additionalHeaders['weave-shadow'] = 'false';
         }
 
-        additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
+        if (this.clientCacheKey != null) {
+          additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
+        }
 
         let respJson: any = {
           data: new Array(nodes.length).fill(null),

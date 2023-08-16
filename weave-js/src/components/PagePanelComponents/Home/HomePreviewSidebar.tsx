@@ -1,3 +1,5 @@
+import {Button} from '@wandb/weave/components/Button';
+
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
 import styled from 'styled-components';
@@ -156,16 +158,47 @@ export const HomeExpressionPreviewParts: React.FC<{
   const generators = useBoardGeneratorsForNode(expr);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
+
+  const [copyButtonText, setCopyButtonText] = React.useState<'Copy' | 'Copied'>(
+    'Copy'
+  );
+
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
-        <span style={{color: '#2B3038', fontWeight: 600}}>Preview</span>
+        <LayoutElements.BlockHeader>
+          PREVIEW
+          <Button
+            onClick={() => {
+              navigateToExpression(expr);
+            }}
+            size="small"
+            variant="ghost"
+            icon="full-screen-mode-expand">
+            Expand
+          </Button>
+        </LayoutElements.BlockHeader>
         <LayoutElements.Block>
           <PreviewNode inputExpr={inputExpr} />
         </LayoutElements.Block>
       </LayoutElements.VBlock>
       <LayoutElements.VBlock style={{gap: '8px'}}>
-        <span style={{color: '#2B3038', fontWeight: 600}}>Expression</span>
+        <LayoutElements.BlockHeader>
+          EXPRESSION
+          <Button
+            onClick={() => {
+              navigator.clipboard.writeText(weave.expToString(expr));
+              setCopyButtonText('Copied');
+              setTimeout(() => {
+                setCopyButtonText('Copy');
+              }, 3000);
+            }}
+            size="small"
+            variant="ghost"
+            icon="copy">
+            {copyButtonText}
+          </Button>
+        </LayoutElements.BlockHeader>
         <LayoutElements.Block>
           <WeaveExpression
             expr={expr}
@@ -190,9 +223,18 @@ export const HomeExpressionPreviewParts: React.FC<{
       ) : (
         generators.result.length > 0 && (
           <LayoutElements.VBlock style={{gap: '8px'}}>
-            <span style={{color: '#2B3038', fontWeight: 600}}>
-              Available Templates
-            </span>
+            <LayoutElements.BlockHeader>
+              CREATE A BOARD
+              {/* <Button
+                onClick={() => {
+                  console.log('view all templates')
+                }}
+                size='small'
+                variant='ghost'
+              >
+                View all templates
+              </Button> */}
+            </LayoutElements.BlockHeader>
             <LayoutElements.VStack
               style={{
                 gap: '8px',
