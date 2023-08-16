@@ -547,16 +547,14 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
         raise ValueError("Cannot explode table with no list columns")
 
     result = table.select(other_columns).take(indices)
-    """
-    result = result.append_column(
-        pa.field(column, table.schema.field(column).type.value_type),
-        flattened,
-    )
 
-
+    for column in list_columns:
+        result = result.append_column(
+            pa.field(column, table.schema.field(column).type.value_type),
+            flattened_list_columns[column],
+        )
 
     return result
-    """
 
 
 @op(
