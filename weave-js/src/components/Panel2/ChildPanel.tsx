@@ -581,6 +581,9 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             padding: '0 16px 8px',
             lineHeight: '20px',
             marginTop: 16,
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+            overflow: 'hidden',
           }}>
           {props.pathEl != null && varNameToTitle(props.pathEl)}
         </div>
@@ -589,7 +592,16 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
             {!hoverPanel ? (
-              props.pathEl != null && varNameToTitle(props.pathEl)
+              props.pathEl != null && (
+                <div
+                  style={{
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                  }}>
+                  {varNameToTitle(props.pathEl)}
+                </div>
+              )
             ) : (
               <>
                 {props.prefixHeader}
