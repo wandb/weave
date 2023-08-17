@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import * as v14 from './v14';
 
 export type {ScaleType} from './v10';

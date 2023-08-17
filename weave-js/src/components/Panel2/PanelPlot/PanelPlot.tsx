@@ -2719,7 +2719,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.color = {
           datum: PlotState.defaultSeriesName(series, weave),
           title: 'series',
-          legend: config.legendSettings.color.noLegend
+          legend: concreteConfig.legendSettings.color.noLegend
             ? false
             : {...defaultFontStyleDict},
         };
@@ -2751,7 +2751,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           } else {
             newSpec.encoding.size = {
               field: fixKeyForVega(dims.pointSize),
-              legend: config.legendSettings.pointSize.noLegend
+              legend: concreteConfig.legendSettings.pointSize.noLegend
                 ? false
                 : {...defaultFontStyleDict},
             };
@@ -2776,7 +2776,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           );
 
           newSpec.encoding.shape = {
-            legend: config.legendSettings.pointShape.noLegend
+            legend: concreteConfig.legendSettings.pointShape.noLegend
               ? false
               : {...defaultFontStyleDict},
             field: fixKeyForVega(dims.pointShape),
@@ -2792,7 +2792,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             newSpec.mark.shape = series.constants.pointShape;
           } else {
             newSpec.encoding.shape = {
-              legend: config.legendSettings.pointShape.noLegend
+              legend: concreteConfig.legendSettings.pointShape.noLegend
                 ? false
                 : {...defaultFontStyleDict},
               datum: PlotState.defaultSeriesName(series, weave),
@@ -2812,7 +2812,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               datum: PlotState.defaultSeriesName(series, weave),
               legend:
                 concreteConfig.series.length > 1 &&
-                !config.legendSettings.lineStyle.noLegend
+                !concreteConfig.legendSettings.lineStyle.noLegend
                   ? {...defaultFontStyleDict}
                   : false,
               title: 'series',
@@ -3002,6 +3002,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     isOrgDashboard,
     concreteConfig.series,
     concreteConfig?.vegaOverlay,
+    concreteConfig.legendSettings,
     isDashboard,
     hasLine,
     brushableAxes,
