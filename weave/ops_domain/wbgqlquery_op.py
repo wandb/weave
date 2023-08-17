@@ -58,10 +58,11 @@ def _querytoobj_output_type(input_types: dict[str, types.Type]) -> types.Type:
         "result_dict": types.TypedDict({}),
         "result_key": types.String(),
         "output_type": types.TypeType(),
+        "gql_query_fragment": types.String(),
     },
     output_type=_querytoobj_output_type,
 )
-def querytoobj(result_dict, result_key, output_type):
+def querytoobj(result_dict, result_key, output_type, gql_query_fragment):
     if isinstance(output_type, tagged_value_type.TaggedValueType):
         output_type = output_type.value
 

@@ -27,6 +27,7 @@ from . import errors
 from . import propagate_gql_keys
 from . import input_provider
 from . import gql_with_keys
+from . import gql_to_weave
 from . import gql_op_plugin
 
 from .language_features.tagging import tagged_value_type_helpers
@@ -468,13 +469,80 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
     )
 
 
+def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node]:
+    if isinstance(node, graph.OutputNode):
+        from_op = node.from_op
+
+        if from_op.name == "gqlroot-wbgqlquery":
+            # get the initial type
+            assert "query_str" in from_op.inputs and isinstance(
+                from_op.inputs["query_str"], graph.ConstNode
+            )
+
+            output_type = gql_to_weave.get_query_weave_type(
+                compile_domain.normalize_gql_query_string(
+                    from_op.inputs["query_str"].val
+                )
+            )
+
+            return graph.OutputNode(
+                output_type,
+                "gqlroot-wbgqlquery",
+                from_op.inputs,
+            )
+
+        if from_op.name == "gqlroot-querytoobj":
+            assert "gql_query_fragment" in from_op.inputs and isinstance(
+                from_op.inputs["gql_query_fragment"], graph.ConstNode
+            )
+            inner_fragment = from_op.inputs["gql_query_fragment"].val
+
+            assert "output_type" in from_op.inputs and isinstance(
+                from_op.inputs["output_type"], graph.ConstNode
+            )
+            output_type = from_op.inputs["output_type"].val
+
+            if isinstance(output_type, gql_with_keys.GQLHasWithKeysType):
+                key_type = typing.cast(
+                    types.TypedDict,
+                    gql_to_weave.get_query_weave_type(
+                        compile_domain.normalize_gql_query_string(
+                            compile_domain.fragment_to_query(inner_fragment)
+                        )
+                    ),
+                )
+
+                key = gql_to_weave.get_outermost_alias(inner_fragment)
+                subtype = typing.cast(types.TypedDict, key_type.property_types[key])
+                output_type = output_type.with_keys(subtype.property_types)
+
+                return graph.OutputNode(
+                    output_type,
+                    "gqlroot-querytoobj",
+                    {
+                        **from_op.inputs,
+                        "output_type": graph.ConstNode(types.TypeType(), output_type),
+                    },
+                )
+
+    return node
+
+
+def compile_initialize_gql_types(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _initialize_gql_types_map_fn, on_error, True)
+
+
 def _call_gql_propagate_keys(
-    res: graph.OutputNode, p: stitch.StitchedGraph, original_node: graph.Node
+    node: graph.OutputNode, p: stitch.StitchedGraph, original_node: graph.Node
 ) -> types.Type:
     """Calls the GQL key propagation function for a node."""
+
     const_node_input_vals = {
         key: value.val
-        for key, value in res.from_op.inputs.items()
+        for key, value in node.from_op.inputs.items()
         if isinstance(value, graph.ConstNode)
     }
     ip = input_provider.InputAndStitchProvider(
@@ -482,10 +550,10 @@ def _call_gql_propagate_keys(
     )
 
     # Propagate GQL types
-    return propagate_gql_keys.propagate_gql_keys(res, ip)
+    return propagate_gql_keys.propagate_gql_keys(node, ip)
 
 
-def compile_refine(
+def compile_refine_and_propagate_gql(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
@@ -528,17 +596,18 @@ def compile_refine(
         i += 1
 
         if isinstance(node, graph.OutputNode):
-
-            # This node is not refined because
-
-            if node.from_op.name == "gqlroot-wbgqlquery":
-                # dont refine this one - it's already refined.
-                return node
-
             from_op = node.from_op
 
+            if from_op.name == "gqlroot-wbgqlquery":
+                # We skip the refine for this special node because we have already determined its type during
+                # the initialize_gql_types phase, so it is already "refined". The lazy_call() below would wipe
+                # that type out, leading to gql types not being propagated at all. So we skip it and use the
+                # correct, previously calculated type from that phase.
+
+                return node
+
             try:
-                op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
+                op = dispatch.get_op_for_inputs(from_op.name, from_op.input_types)
                 params = from_op.inputs
                 if isinstance(op.input_type, op_args.OpNamedArgs):
                     params = {
@@ -826,10 +895,13 @@ def _compile(
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
 
-    with tracer.trace("compile:gql"):
+    with tracer.trace("compile:gql_query"):
         results = results.batch_map(
             _track_errors(compile_domain.apply_domain_op_gql_translation)
         )
+
+    with tracer.trace("compile:initialize_gql_types"):
+        results = results.batch_map(_track_errors(compile_initialize_gql_types))
 
     with tracer.trace("compile:column_pushdown"):
         results = results.batch_map(_track_errors(compile_apply_column_pushdown))
@@ -839,8 +911,8 @@ def _compile(
     # that this is the final phase, so that when we execute the rest of the
     # graph, we reuse any results produced in this phase, instead of re-executing
     # those nodes.
-    with tracer.trace("compile:refine"):
-        results = results.batch_map(_track_errors(compile_refine))
+    with tracer.trace("compile:refine_and_propagate_gql"):
+        results = results.batch_map(_track_errors(compile_refine_and_propagate_gql))
 
     # This is very expensive!
     # loggable_nodes = graph_debug.combine_common_nodes(n)

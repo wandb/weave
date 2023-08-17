@@ -6,8 +6,8 @@ from . import registry_mem
 from . import errors
 from . import op_args
 from . import gql_to_weave
-from . import gql_with_keys
 from . import gql_op_plugin
+
 import graphql
 
 from .input_provider import InputAndStitchProvider
@@ -61,18 +61,7 @@ def apply_domain_op_gql_translation(
         if custom_resolver is not None:
             return custom_resolver(query_root_node, **node.from_op.inputs)
         else:
-            output_type = _get_plugin_output_type(node)
-            key_type = typing.cast(
-                types.TypedDict,
-                gql_to_weave.get_query_weave_type(
-                    _normalize_query_str(fragment_to_query(inner_fragment))
-                ),
-            )
-            assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
-
-            key = gql_to_weave.get_outermost_alias(inner_fragment)
-            subtype = typing.cast(types.TypedDict, key_type.property_types[key])
-            output_type = output_type.with_keys(subtype.property_types)
+            output_type = get_plugin_output_type(node)
 
             return graph.OutputNode(
                 output_type,
@@ -81,6 +70,9 @@ def apply_domain_op_gql_translation(
                     "result_dict": query_root_node,
                     "result_key": graph.ConstNode(types.String(), alias),
                     "output_type": graph.ConstNode(types.TypeType(), output_type),
+                    "gql_query_fragment": graph.ConstNode(
+                        types.String(), inner_fragment
+                    ),
                 },
             )
 
@@ -89,12 +81,9 @@ def apply_domain_op_gql_translation(
     combined_query_fragment = "\n".join(fragments)
     query_str = fragment_to_query(combined_query_fragment)
     if combined_query_fragment.strip() != "":
-        query_str = _normalize_query_str(query_str)
+        query_str = normalize_gql_query_string(query_str)
     query_str_const_node.val = query_str
     alias_list_const_node.val = aliases
-
-    # now propagate the gql payload type through the graph
-    query_root_node.type = gql_to_weave.get_query_weave_type(query_str)
 
     return res
 
@@ -102,7 +91,7 @@ def apply_domain_op_gql_translation(
 ### Everything below are helpers for the above function ###
 
 
-def _get_plugin_output_type(node: graph.OutputNode) -> types.Type:
+def get_plugin_output_type(node: graph.OutputNode) -> types.Type:
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     return op_def.concrete_output_type
 
@@ -343,7 +332,7 @@ def _zip_gql_doc(
     return gql_doc
 
 
-def _normalize_query_str(query_str: str) -> str:
+def normalize_gql_query_string(query_str: str) -> str:
     gql_doc = graphql.language.parse(query_str)
     gql_doc = _zip_gql_doc(gql_doc)
     return graphql.utilities.strip_ignored_characters(
