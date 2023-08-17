@@ -678,6 +678,11 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             <Popup
               key={i}
               position="left center"
+              popperModifiers={{
+                preventOverflow: {
+                  boundariesElement: 'offsetParent',
+                },
+              }}
               trigger={
                 <FilterPillBlock
                   clause={clause}
@@ -689,6 +694,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                   }}
                 />
               }
+              on="click"
               onClose={() => setEditingFilterIndex(null)}
               open={editingFilterIndex === i}
               content={
@@ -708,6 +714,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
           ))}
           <Popup
             position="left center"
+            popperModifiers={{
+              preventOverflow: {
+                boundariesElement: 'offsetParent',
+              },
+            }}
+            on="click"
             onClose={() => setEditingFilterIndex(null)}
             open={editingFilterIndex === -1}
             trigger={

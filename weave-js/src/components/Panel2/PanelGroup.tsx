@@ -576,10 +576,7 @@ export const PanelGroupItem: React.FC<{
   // correctly. For example, without this PanelDropdown renders its dropdown menu
   // within the parent, creating a scrollbar.
   let overflowVisible = false;
-  if (
-    (config.layoutMode === 'vertical' || config.layoutMode === 'horizontal') &&
-    !config.equalSize
-  ) {
+  if (config.layoutMode === 'vertical' && !config.equalSize) {
     overflowVisible = true;
   }
   return (
