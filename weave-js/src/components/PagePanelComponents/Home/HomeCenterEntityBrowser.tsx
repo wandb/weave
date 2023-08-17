@@ -351,7 +351,7 @@ const CenterProjectBoardsBrowser: React.FC<
       ],
     ];
   }, [props, history, params.entity, params.project, params.assetType]);
-  
+
   useEffect(() => {
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
@@ -395,7 +395,7 @@ const CenterProjectBoardsBrowser: React.FC<
     setPreviewNode,
     navigateToExpression,
     browserActions,
-    browserData
+    browserData,
   ]);
 
   return (
