@@ -22,6 +22,7 @@ import {
   MOON_250,
   MOON_500,
   MOON_800,
+  TEAL_400,
 } from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
 
@@ -51,9 +52,7 @@ const DashboardTemplateItem = styled(LayoutElements.VBlock)`
   border-radius: 4px;
   cursor: pointer;
   &:hover {
-    border: 1px solid #a9edf2;
-    background-color: #a9edf212;
-    color: #038194;
+    border: 1px solid ${TEAL_400};
   }
 `;
 DashboardTemplateItem.displayName = 'S.DashboardTemplateItem';
@@ -91,20 +90,6 @@ const HomeExpressionPreviewPartsWrapper = styled.div`
 HomeExpressionPreviewPartsWrapper.displayName =
   'S.HomeExpressionPreviewPartsWrapper';
 
-type Template = {
-  display_name: string;
-  description: string;
-  op_name: string;
-};
-
-const SEED_BOARD_OP_NAME = 'py_board-seed_board';
-const OPEN_AI_OP_NAME = 'py_board-open_ai_completions_monitor';
-const SEED_BOARD_TEMPLATE = {
-  op_name: SEED_BOARD_OP_NAME,
-  display_name: 'Simple Board',
-  description: 'Seed a board with a simple visualization of this table.',
-};
-
 export const HomePreviewSidebarTemplate: React.FC<{
   title: string;
   setPreviewNode: SetPreviewNodeType;
@@ -130,7 +115,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
           justifyContent: 'center',
           alignItems: 'center',
           gap: '12px',
-          padding: '0px 24px',
+          padding: '0px 16px',
         }}>
         <LayoutElements.VSpace
           style={{justifyContent: 'center', fontSize: '20px', fontWeight: 600}}>
@@ -207,6 +192,35 @@ const Loader = () => (
   </LayoutElements.VStack>
 );
 
+type Template = {
+  display_name: string;
+  description: string;
+  op_name: string;
+};
+
+const SEED_BOARD_OP_NAME = 'py_board-seed_board';
+const OPEN_AI_OP_NAME = 'py_board-open_ai_completions_monitor';
+const RECOMMENDED_TEMPLATES = [OPEN_AI_OP_NAME];
+const FALL_BACK_TEMPLATE = SEED_BOARD_OP_NAME;
+
+// Returns a recommended template in order of recommendation if they exist
+// else returns any template thats not the fallback as recommended
+// else returns fallback
+const getReccomendedTemplateInfo = (generators: Template[]) => {
+  for (const templateOpName of RECOMMENDED_TEMPLATES) {
+    const recommendedTemplate = generators.find(
+      template => template.op_name === templateOpName
+    );
+    if (recommendedTemplate) {
+      return recommendedTemplate;
+    }
+  }
+  return (
+    generators.find(template => template.op_name !== FALL_BACK_TEMPLATE) ||
+    generators.find(template => template.op_name === FALL_BACK_TEMPLATE)
+  );
+};
+
 export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
   navigateToExpression: NavigateToExpressionType;
@@ -219,18 +233,11 @@ export const HomeExpressionPreviewParts: React.FC<{
   const isLoadingTemplates =
     generators.loading || refinedExpression.loading || isGenerating;
   const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
-  const recommendedTemplateInfo =
-    generators.result.find(template => template.op_name === OPEN_AI_OP_NAME) ||
-    generators.result.find(
-      template => template.op_name !== SEED_BOARD_OP_NAME
-    ) ||
-    SEED_BOARD_TEMPLATE;
+  const recommendedTemplateInfo = getReccomendedTemplateInfo(generators.result);
 
   useEffect(() => {
-    if (isLoadingTemplates) {
-      setTabValue('Overview');
-    }
-  }, [isLoadingTemplates]);
+    setTabValue('Overview');
+  }, [expr]);
 
   return (
     <HomeExpressionPreviewPartsWrapper>
@@ -300,7 +307,7 @@ const OverviewTab = ({
     loading: boolean;
     result: NodeOrVoidNode;
   };
-  recommendedTemplateInfo: Template;
+  recommendedTemplateInfo?: Template;
   isLoadingTemplates: boolean;
   setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
   generators: Template[];
@@ -382,34 +389,35 @@ const OverviewTab = ({
             style={{
               gap: '8px',
             }}>
-            {recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
-              <>
-                <DashboardTemplate
-                  key={recommendedTemplateInfo.op_name}
-                  title={recommendedTemplateInfo.display_name}
-                  subtitle={recommendedTemplateInfo.description}
-                  onButtonClick={() => {
-                    setIsGenerating(true);
-                    makeBoardFromNode(
-                      recommendedTemplateInfo.op_name,
-                      refinedExpression.result as any,
-                      newDashExpr => {
-                        navigateToExpression(newDashExpr);
-                        setIsGenerating(false);
-                      }
-                    );
-                  }}
-                  isExpanded={true}
-                  isRecommended={true}
-                />
-                <Label style={{display: 'flex', justifyContent: 'center'}}>
-                  or
-                </Label>
-              </>
-            )}
+            {recommendedTemplateInfo &&
+              recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
+                <>
+                  <DashboardTemplate
+                    key={recommendedTemplateInfo.op_name}
+                    title={recommendedTemplateInfo.display_name}
+                    subtitle={recommendedTemplateInfo.description}
+                    onButtonClick={() => {
+                      setIsGenerating(true);
+                      makeBoardFromNode(
+                        recommendedTemplateInfo.op_name,
+                        refinedExpression.result as any,
+                        newDashExpr => {
+                          navigateToExpression(newDashExpr);
+                          setIsGenerating(false);
+                        }
+                      );
+                    }}
+                    isExpanded={true}
+                    isRecommended={true}
+                  />
+                  <Label style={{display: 'flex', justifyContent: 'center'}}>
+                    or
+                  </Label>
+                </>
+              )}
             <DashboardTemplate
               key={SEED_BOARD_OP_NAME}
-              subtitle={SEED_BOARD_TEMPLATE.description}
+              subtitle="Seed a board with a simple visualization of this table."
               onButtonClick={() => {
                 setIsGenerating(true);
                 makeBoardFromNode(
@@ -445,14 +453,14 @@ const TemplateTab = ({
     loading: boolean;
     result: NodeOrVoidNode;
   };
-  recommendedTemplateInfo: Template;
+  recommendedTemplateInfo?: Template;
   isLoadingTemplates: boolean;
   setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
   generators: Template[];
 }) => {
   const makeBoardFromNode = useMakeLocalBoardFromNode();
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(
-    recommendedTemplateInfo.op_name
+    recommendedTemplateInfo?.op_name || null
   );
 
   return isLoadingTemplates ? (
@@ -557,7 +565,7 @@ const DashboardTemplate: React.FC<{
             style={{
               marginBottom: '8px',
             }}>
-            <Pill label="Recommended Template" color="green" />
+            <Pill label="Recommended template" color="green" />
           </LayoutElements.Block>
         )}
         {title && (
