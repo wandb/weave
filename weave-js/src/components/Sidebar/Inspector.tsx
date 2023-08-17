@@ -26,7 +26,8 @@ export const Container = styled.div<{active: boolean}>`
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2); 
   */
   width: ${p => (p.active ? WIDTH_PX : 0)}px;
-  transition: width 0.3s;
+  // Don't do this, it makes open and closing the inspector janky
+  // transition: width 0.3s;
 `;
 
 export const Content = styled.div`
