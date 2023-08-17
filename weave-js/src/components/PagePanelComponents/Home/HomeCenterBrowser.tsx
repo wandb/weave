@@ -189,6 +189,7 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
 
   isModalActing?: boolean;
   setIsModalActing?: Dispatch<SetStateAction<boolean>>;
+  deleteTypeString?: string;
 };
 
 export const CenterBrowser = <RT extends CenterBrowserDataType>(
@@ -286,6 +287,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
             history.push('.');
           }
         }}
+        deleteTypeString={props.deleteTypeString}
       />
 
       <CenterSpaceHeader>

@@ -6,6 +6,8 @@ import {
   IconInfo,
   IconOpenNewTab,
   IconDelete,
+  IconFullScreenModeExpand,
+  IconAddNew,
 } from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
@@ -33,10 +35,15 @@ import {
   HomePreviewSidebarTemplate,
   HomeBoardPreview,
   HomeExpressionPreviewParts,
+  SEED_BOARD_OP_NAME,
 } from './HomePreviewSidebar';
 import {useHistory, useParams} from 'react-router-dom';
 import {HomeParams} from './Home';
 import {setDocumentTitle} from '@wandb/weave/util/document';
+import {
+  useMakeLocalBoardFromNode,
+} from '../../Panel2/pyBoardGen';
+import {useNodeWithServerType} from '@wandb/weave/react';
 import {
   urlEntity,
   urlProject,
@@ -385,6 +392,7 @@ const CenterProjectBoardsBrowser: React.FC<
       setPreviewNode={props.setPreviewNode}
       deletingId={deletingId}
       setDeletingId={setDeletingId}
+      deleteTypeString="board"
       noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {
@@ -463,6 +471,9 @@ const CenterProjectTablesBrowser: React.FC<
   const history = useHistory();
   const params = useParams<HomeParams>();
   const weave = useWeaveContext();
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
+  const [deletingId, setDeletingId] = useState<string | undefined>();
+
   const browserTitle = 'Tables';
   useEffect(() => {
     if (params.preview) {
@@ -510,6 +521,92 @@ const CenterProjectTablesBrowser: React.FC<
   }, [isLoading, loggedTables.result, runStreams.result]);
 
   const {setPreviewNode, navigateToExpression} = props;
+
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(() => {
+    return [
+      [
+        // Home Page TODO: Enable awesome previews
+        {
+          icon: IconInfo,
+          label: 'Table overview',
+          onClick: row => {
+            history.push(
+              urlProjectAssetPreview(
+                props.entityName,
+                props.projectName,
+                'table',
+                row._id
+              )
+            );
+          },
+        },
+        {
+          icon: IconFullScreenModeExpand,
+          label: 'Preview table',
+          onClick: row => {
+            props.navigateToExpression(
+              tableRowToNode(
+                row.kind,
+                props.entityName,
+                props.projectName,
+                row._id
+              )
+            );
+          },
+        },
+        {
+          icon: IconCopy,
+          label: 'Copy Weave expression',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
+            );
+            const copyText = weave.expToString(node);
+            navigator.clipboard.writeText(copyText).then(() => {
+              // give user feedback
+            });
+          },
+        },
+      ],
+      [
+        {
+          icon: IconAddNew,
+          label: 'New board',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
+            );
+            makeBoardFromNode(
+              SEED_BOARD_OP_NAME,
+              node,
+              newDashExpr => {
+                navigateToExpression(newDashExpr);
+              }
+            );
+          },
+        },
+      ],
+      [
+        {
+          icon: IconDelete,
+          label: 'Delete table',
+          onClick: row => {
+            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            setDeletingId(uri);
+          },
+        },
+      ],
+    ];
+  }, [props, weave, history]);
+
   useEffect(() => {
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
@@ -525,8 +622,10 @@ const CenterProjectTablesBrowser: React.FC<
       );
       const node = (
         <HomePreviewSidebarTemplate
-          title={row.name}
-          setPreviewNode={setPreviewNode}>
+          row={row}
+          setPreviewNode={setPreviewNode}
+          actions={browserActions}
+          >
           <HomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
@@ -547,63 +646,7 @@ const CenterProjectTablesBrowser: React.FC<
     navigateToExpression,
   ]);
 
-  const browserActions: Array<
-    CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(() => {
-    return [
-      [
-        // Home Page TODO: Enable awesome previews
-        {
-          icon: IconInfo,
-          label: 'Table details',
-          onClick: row => {
-            history.push(
-              urlProjectAssetPreview(
-                props.entityName,
-                props.projectName,
-                'table',
-                row._id
-              )
-            );
-          },
-        },
-      ],
-      [
-        {
-          icon: IconOpenNewTab,
-          label: 'Open Table',
-          onClick: row => {
-            props.navigateToExpression(
-              tableRowToNode(
-                row.kind,
-                props.entityName,
-                props.projectName,
-                row._id
-              )
-            );
-          },
-        },
-      ],
-      [
-        {
-          icon: IconCopy,
-          label: 'Copy Weave expression',
-          onClick: row => {
-            const node = tableRowToNode(
-              row.kind,
-              props.entityName,
-              props.projectName,
-              row._id
-            );
-            const copyText = weave.expToString(node);
-            navigator.clipboard.writeText(copyText).then(() => {
-              // give user feedback
-            });
-          },
-        },
-      ],
-    ];
-  }, [props, weave, history]);
+  
 
   return (
     <>
@@ -611,6 +654,9 @@ const CenterProjectTablesBrowser: React.FC<
         allowSearch
         title={browserTitle}
         selectedRowId={params.preview}
+        deletingId={deletingId}
+        setDeletingId={setDeletingId}
+        deleteTypeString="table"
         noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
         breadcrumbs={[
           {

@@ -25,6 +25,8 @@ import {
   TEAL_400,
 } from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
+import {ActionCell, CenterBrowserActionType} from './HomeCenterBrowser';
+
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -90,8 +92,18 @@ const HomeExpressionPreviewPartsWrapper = styled.div`
 HomeExpressionPreviewPartsWrapper.displayName =
   'S.HomeExpressionPreviewPartsWrapper';
 
+type RowData = {
+  _id: string;
+  _updatedAt: number;
+  name: string;
+  kind: string;
+  'updated at': string;
+  'created at': string;
+  'created by': string;
+};
+
 export const HomePreviewSidebarTemplate: React.FC<{
-  title: string;
+  row: RowData;
   setPreviewNode: SetPreviewNodeType;
   children?: React.ReactNode;
   primaryAction?: {
@@ -104,6 +116,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
     label: string;
     onClick: () => void;
   };
+  actions?: Array<CenterBrowserActionType<RowData>>;
 }> = props => {
   const history = useHistory();
   return (
@@ -114,16 +127,19 @@ export const HomePreviewSidebarTemplate: React.FC<{
           alignContent: 'center',
           justifyContent: 'center',
           alignItems: 'center',
-          gap: '12px',
+          gap: '8px',
           padding: '0px 16px',
         }}>
         <LayoutElements.VSpace
           style={{justifyContent: 'center', fontSize: '20px', fontWeight: 600}}>
-          {props.title}
+          {props.row.name}
         </LayoutElements.VSpace>
         {/* <LayoutElements.Block>
           <IconOverflowHorizontal />
         </LayoutElements.Block> */}
+        <CenterTableActionCellIcon>
+          <ActionCell actions={props.actions} row={props.row} />
+        </CenterTableActionCellIcon>
         <CenterTableActionCellIcon>
           <IconClose
             style={{
@@ -198,7 +214,7 @@ type Template = {
   op_name: string;
 };
 
-const SEED_BOARD_OP_NAME = 'py_board-seed_board';
+export const SEED_BOARD_OP_NAME = 'py_board-seed_board';
 const OPEN_AI_OP_NAME = 'py_board-open_ai_completions_monitor';
 const RECOMMENDED_TEMPLATES = [OPEN_AI_OP_NAME];
 const FALL_BACK_TEMPLATE = SEED_BOARD_OP_NAME;
