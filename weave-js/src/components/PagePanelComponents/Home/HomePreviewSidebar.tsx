@@ -371,7 +371,8 @@ const OverviewTab = ({
       {/*  Only show the create a board section if a board can be created ie there exists at least one template */}
       {isLoadingTemplates ? (
         <Loader />
-      ) : generators.length > 0 && (
+      ) : (
+        generators.length > 0 && (
           <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
             <LayoutElements.BlockHeader>
               CREATE A BOARD
@@ -439,7 +440,7 @@ const OverviewTab = ({
             </LayoutElements.VStack>
           </LayoutElements.VBlock>
         )
-      }
+      )}
     </LayoutElements.VStack>
   );
 };
