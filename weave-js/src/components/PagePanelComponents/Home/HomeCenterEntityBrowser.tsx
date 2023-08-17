@@ -310,6 +310,48 @@ const CenterProjectBoardsBrowser: React.FC<
 
   const {setPreviewNode, navigateToExpression} = props;
 
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(() => {
+    return [
+      [
+        {
+          icon: IconOpenNewTab,
+          label: 'Open board',
+          onClick: row => {
+            props.navigateToExpression(
+              rowToExpression(params.entity!, params.project!, row._id)
+            );
+          },
+        },
+        {
+          icon: IconInfo,
+          label: 'Board details',
+          onClick: row => {
+            history.push(
+              urlProjectAssetPreview(
+                params.entity!,
+                params.project!,
+                params.assetType === 'board' ? 'board' : 'table',
+                row._id
+              )
+            );
+          },
+        },
+      ],
+      [
+        {
+          icon: IconDelete,
+          label: 'Delete board',
+          onClick: row => {
+            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            setDeletingId(uri);
+          },
+        },
+      ],
+    ];
+  }, [props, history, params.entity, params.project, params.assetType]);
+  
   useEffect(() => {
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
@@ -352,49 +394,9 @@ const CenterProjectBoardsBrowser: React.FC<
     params.preview,
     setPreviewNode,
     navigateToExpression,
+    browserActions,
+    browserData
   ]);
-
-  const browserActions: Array<
-    CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(() => {
-    return [
-      [
-        {
-          icon: IconOpenNewTab,
-          label: 'Open board',
-          onClick: row => {
-            props.navigateToExpression(
-              rowToExpression(params.entity!, params.project!, row._id)
-            );
-          },
-        },
-        {
-          icon: IconInfo,
-          label: 'Board details',
-          onClick: row => {
-            history.push(
-              urlProjectAssetPreview(
-                params.entity!,
-                params.project!,
-                params.assetType === 'board' ? 'board' : 'table',
-                row._id
-              )
-            );
-          },
-        },
-      ],
-      [
-        {
-          icon: IconDelete,
-          label: 'Delete board',
-          onClick: row => {
-            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
-            setDeletingId(uri);
-          },
-        },
-      ],
-    ];
-  }, [props, history, params.entity, params.project, params.assetType]);
 
   return (
     <CenterBrowser
