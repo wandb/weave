@@ -87,39 +87,6 @@ def _quote_node(node: graph.Node) -> graph.Node:
     return weave_internal.const(node)
 
 
-def _node_simplification(node: graph.Node) -> typing.Optional[graph.OutputNode]:
-    if isinstance(node, graph.OutputNode) and node.from_op.name == "count":
-        arr_node = node.from_op.inputs["arr"]
-        if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name.startswith(
-            "run-history"
-        ):
-            run_node = arr_node.from_op.inputs["run"]
-            return graph.OutputNode(
-                node.type,
-                "run-historyLineCount",
-                {"run": run_node},
-            )
-    elif isinstance(node, graph.OutputNode) and node.from_op.name == "unique":
-        arr_node = node.from_op.inputs["arr"]
-        if (
-            isinstance(arr_node, graph.OutputNode)
-            and arr_node.from_op.name == "ArrowWeaveList-flatten"
-        ):
-            arr_node_2 = arr_node.from_op.inputs["arr"]
-            if (
-                isinstance(arr_node_2, graph.OutputNode)
-                and arr_node_2.from_op.name == "ArrowWeaveListTypedDict-keys"
-            ):
-                awl_node = arr_node_2.from_op.inputs["self"]
-                return graph.OutputNode(
-                    node.type,
-                    "ArrowWeaveListTypedDict-columnNames",
-                    {"self": awl_node},
-                )
-
-    return None
-
-
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         from_op = node.from_op
@@ -237,6 +204,45 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
             and not rhs.from_op.inputs
         ):
             return lhs
+    elif isinstance(node, graph.OutputNode) and node.from_op.name == "count":
+        # When the graph is `run.history.count`, we can avoid the more costly
+        # loading of all run history and instead directly fetch the history
+        # count from the server by reducing to `run.historyLineCount` which
+        # compiles to a single gql edge. This is particularly helpful when
+        # loading StreamTables backed by runs. It helps with the client-side
+        # map refinement, table row count, and with logic that is conditioned
+        # on empty tables
+        arr_node = node.from_op.inputs["arr"]
+        if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name.startswith(
+            "run-history"
+        ):
+            run_node = arr_node.from_op.inputs["run"]
+            return graph.OutputNode(
+                node.type,
+                "run-historyLineCount",
+                {"run": run_node},
+            )
+    elif isinstance(node, graph.OutputNode) and node.from_op.name == "unique":
+        # When the graph is `awl.keys.flatten.unique`, the user is really
+        # asking for the columnNames. This can be reduced to a simple `awl.columnNames`
+        # which is extremely fast as it is simply the property types of the list!
+        #
+        # Note: we cannot perform such optimization on pure lists because we don't have
+        # a way to operate on the type of the node itself.
+        arr_node = node.from_op.inputs["arr"]
+        if (
+            isinstance(arr_node, graph.OutputNode)
+            and arr_node.from_op.name == "ArrowWeaveList-flatten"
+        ):
+            arr_node_2 = arr_node.from_op.inputs["arr"]
+            if (
+                isinstance(arr_node_2, graph.OutputNode)
+                and arr_node_2.from_op.name == "ArrowWeaveListTypedDict-keys"
+            ):
+                awl_node = arr_node_2.from_op.inputs["self"]
+                return graph.OutputNode(
+                    node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node}
+                )
     return None
 
 
@@ -510,13 +516,6 @@ def compile_quote(
     return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
 
 
-def compile_node_simplification(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _node_simplification, on_error)
-
-
 def compile_refine(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
@@ -677,9 +676,6 @@ def _compile(
     with tracer.trace("compile:fix_calls"):
         results = results.batch_map(_track_errors(compile_fix_calls))
 
-    with tracer.trace("compile:simple_optimizations"):
-        results = results.batch_map(_track_errors(compile_simple_optimizations))
-
     with tracer.trace("compile:lambda_uniqueness"):
         results = results.batch_map(_track_errors(compile_lambda_uniqueness))
 
@@ -725,8 +721,10 @@ def _compile(
     with tracer.trace("compile:node_ops"):
         results = results.batch_map(_track_errors(compile_node_ops))
 
-    with tracer.trace("compile:node_simplification"):
-        results = results.batch_map(_track_errors(compile_node_simplification))
+    with tracer.trace("compile:simple_optimizations"):
+        # Simple Optimizations should happen after `node_ops` to ensure we operate on
+        # the expanded nodes.
+        results = results.batch_map(_track_errors(compile_simple_optimizations))
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
