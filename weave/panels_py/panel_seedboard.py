@@ -38,5 +38,5 @@ def seed_board(
 template_registry.register(
     "py_board-seed_board",
     "Simple Board",
-    "Single panel starting dashboard",
+    "Seed a board with a simple visualization of this table.",
 )
