@@ -467,14 +467,12 @@ def execute_forward_node(
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
 
     cache_mode = environment.cache_mode()
-    client_cache_key = None
-    client_cache_key_context = context_state.get_client_cache_key()
+    client_cache_key = context_state.get_client_cache_key()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
         if op_policy.should_cache(op_def.simple_name):
-            if op_def.pure or client_cache_key_context is not None:
+            if op_def.pure or client_cache_key is not None:
                 no_cache = False
-                client_cache_key = client_cache_key_context
 
     use_cache = not no_cache
     if isinstance(node, graph.ConstNode):
@@ -505,7 +503,7 @@ def execute_forward_node(
                 op_def, input_refs, impure_cache_key=client_cache_key
             )
 
-        if run_key and (op_def.pure or client_cache_key is not None):
+        if run_key:
             run = TRACE_LOCAL.get_run_val(run_key)
             if run is not None and run != None:  # stupid box none makes us check !=
                 # Watch out, we handle loading async runs in different ways.
