@@ -47,21 +47,22 @@ def timeseries(
 ) -> weave.Panel:
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
+        x_title = ""
         bin_fn = weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
+        x_title = x_axis_key
         bin_fn = weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     return weave.panels.Plot(
         input_node,
         x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, 100))["start"],
-        x_title=x_axis_key,
+        x_title=x_title,
         y=y_expr,
         y_title=y_title,
         label=lambda row: row[groupby_key],
         groupby_dims=["x", "label"],
         mark="line",
-        no_legend=True,
         domain_x=x_domain,
     )
 
@@ -106,15 +107,17 @@ def timeseries_sum_bar(
 ) -> weave.Panel:
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
+        x_title = ""
         bin_fn = weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
+        x_title = x_axis_key
         bin_fn = weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     return weave.panels.Plot(
         input_node,
         x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins)),
-        x_title=x_axis_key,
+        x_title=x_title,
         y=lambda row: row[y_axis_key].sum(),
         y_title="sum_" + y_axis_key,
         label=lambda row: row[groupby_key],
@@ -135,15 +138,17 @@ def timeseries_count_bar(
 ) -> weave.Panel:
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
+        x_title = ""
         bin_fn = weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
+        x_title = x_axis_key
         bin_fn = weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     return weave.panels.Plot(
         input_node,
         x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins)),
-        x_title=x_axis_key,
+        x_title=x_title,
         y=lambda row: row.count(),
         label=lambda row: row[groupby_key],
         groupby_dims=["x", "label"],

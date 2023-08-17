@@ -1010,6 +1010,12 @@ function simpleArgsString(args: EditingOpInputs, opStore: OpStore): string {
 function simpleOpString(op: EditingOp, opStore: OpStore): string {
   const argNames = Object.keys(op.inputs);
   const argValues = Object.values(op.inputs);
+  if (op.name.endsWith('bin')) {
+    // Bin ops like timestamp-bin produce really ugly strings. Simplify by not showing the rhs
+    // argument. This makes default plot legends that are binned by timestamp much nicer.
+    return `${simpleNodeString(argValues[0], opStore)} bin`;
+  }
+
   if (isUnaryOp(op, opStore)) {
     return `${opSymbol(op, opStore)}${simpleNodeString(argValues[0], opStore)}`;
   }
