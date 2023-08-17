@@ -177,9 +177,8 @@ jobs:
         # wants to write to is closed.
         run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
         shell: bash
-      - uses: datadog/agent-github-action@v1.3
-        with:
-          api_key: ${{ secrets.DD_API_KEY }}
+      - name: Get and start DD agent
+        run: D_AGENT_MAJOR_VERSION=7 DD_API_KEY=${{secrets.DD_API_KEY}} DD_SITE="datadoghq.com" bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)" && systemctl start datadog-agent
       - name: Cypress run
         # Use the following to run just a single test
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
