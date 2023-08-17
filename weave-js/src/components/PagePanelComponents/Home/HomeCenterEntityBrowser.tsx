@@ -352,13 +352,18 @@ const CenterProjectBoardsBrowser: React.FC<
     ];
   }, [props, history, params.entity, params.project, params.assetType]);
 
-  const sidebarActions = useMemo(() => browserActions.map((actionSection, index) => {
-      if (index === 0) {
-        return actionSection.filter(action => action.label !== 'Board details');
-      }
-      return actionSection;
-    })
-  , [browserActions])
+  const sidebarActions = useMemo(
+    () =>
+      browserActions.map((actionSection, index) => {
+        if (index === 0) {
+          return actionSection.filter(
+            action => action.label !== 'Board details'
+          );
+        }
+        return actionSection;
+      }),
+    [browserActions]
+  );
 
   useEffect(() => {
     if (params.preview) {
@@ -403,7 +408,7 @@ const CenterProjectBoardsBrowser: React.FC<
     setPreviewNode,
     navigateToExpression,
     sidebarActions,
-    browserData
+    browserData,
   ]);
 
   return (
@@ -625,14 +630,18 @@ const CenterProjectTablesBrowser: React.FC<
     ];
   }, [props, weave, history, makeBoardFromNode, navigateToExpression]);
 
-
-  const sidebarActions = useMemo(() => browserActions.map((actionSection, index) => {
-    if (index === 0) {
-      return actionSection.filter(action => action.label !== 'Table overview');
-    }
-    return actionSection;
-  })
-, [browserActions])
+  const sidebarActions = useMemo(
+    () =>
+      browserActions.map((actionSection, index) => {
+        if (index === 0) {
+          return actionSection.filter(
+            action => action.label !== 'Table overview'
+          );
+        }
+        return actionSection;
+      }),
+    [browserActions]
+  );
 
   useEffect(() => {
     if (params.preview) {
