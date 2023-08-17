@@ -33,17 +33,13 @@ import {useNodeValue} from '@wandb/weave/react';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
   HomePreviewSidebarTemplate,
-  HomeBoardPreview,
   HomeExpressionPreviewParts,
   SEED_BOARD_OP_NAME,
 } from './HomePreviewSidebar';
 import {useHistory, useParams} from 'react-router-dom';
 import {HomeParams} from './Home';
 import {setDocumentTitle} from '@wandb/weave/util/document';
-import {
-  useMakeLocalBoardFromNode,
-} from '../../Panel2/pyBoardGen';
-import {useNodeWithServerType} from '@wandb/weave/react';
+import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
 import {
   urlEntity,
   urlProject,
@@ -316,18 +312,34 @@ const CenterProjectBoardsBrowser: React.FC<
 
   useEffect(() => {
     if (params.preview) {
+      const row = browserData.find(b => b._id === params.preview);
+      if (!row) {
+        setPreviewNode(undefined);
+        return;
+      }
       const expr = rowToExpression(
         params.entity!,
         params.project!,
         params.preview
       );
       const node = (
-        <HomeBoardPreview
-          expr={expr}
-          name={params.preview}
+        <HomePreviewSidebarTemplate
+          title={params.preview}
+          row={row}
+          actions={browserActions}
           setPreviewNode={setPreviewNode}
-          navigateToExpression={navigateToExpression}
-        />
+          primaryAction={{
+            icon: IconOpenNewTab,
+            label: `Open board`,
+            onClick: () => {
+              navigateToExpression(expr);
+            },
+          }}>
+          <HomeExpressionPreviewParts
+            expr={expr}
+            navigateToExpression={navigateToExpression}
+          />
+        </HomePreviewSidebarTemplate>
       );
       setPreviewNode(node);
     } else {
@@ -584,13 +596,9 @@ const CenterProjectTablesBrowser: React.FC<
               props.projectName,
               row._id
             );
-            makeBoardFromNode(
-              SEED_BOARD_OP_NAME,
-              node,
-              newDashExpr => {
-                navigateToExpression(newDashExpr);
-              }
-            );
+            makeBoardFromNode(SEED_BOARD_OP_NAME, node, newDashExpr => {
+              navigateToExpression(newDashExpr);
+            });
           },
         },
       ],
@@ -605,7 +613,7 @@ const CenterProjectTablesBrowser: React.FC<
         },
       ],
     ];
-  }, [props, weave, history]);
+  }, [props, weave, history, makeBoardFromNode, navigateToExpression]);
 
   useEffect(() => {
     if (params.preview) {
@@ -622,10 +630,10 @@ const CenterProjectTablesBrowser: React.FC<
       );
       const node = (
         <HomePreviewSidebarTemplate
+          title={row.name}
           row={row}
           setPreviewNode={setPreviewNode}
-          actions={browserActions}
-          >
+          actions={browserActions}>
           <HomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
@@ -637,6 +645,7 @@ const CenterProjectTablesBrowser: React.FC<
       setPreviewNode(undefined);
     }
   }, [
+    browserActions,
     browserData,
     history,
     params.entity,
@@ -645,8 +654,6 @@ const CenterProjectTablesBrowser: React.FC<
     setPreviewNode,
     navigateToExpression,
   ]);
-
-  
 
   return (
     <>

@@ -145,7 +145,9 @@ const CenterSpaceHeader = styled(LayoutElements.VBlock)`
 `;
 CenterSpaceHeader.displayName = 'S.CenterSpaceHeader';
 
-type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
+export type CenterBrowserDataType<
+  E extends {[key: string]: string | number} = {}
+> = {
   _id: string;
 } & E;
 

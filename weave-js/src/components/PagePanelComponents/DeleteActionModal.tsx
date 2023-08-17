@@ -16,7 +16,7 @@ export const DeleteActionModal = ({
   acting,
   onClose,
   onDelete,
-  deleteTypeString = 'board'
+  deleteTypeString = 'board',
 }: DeleteActionModalProps) => {
   return (
     <Modal

@@ -25,8 +25,11 @@ import {
   TEAL_400,
 } from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
-import {ActionCell, CenterBrowserActionType} from './HomeCenterBrowser';
-
+import {
+  ActionCell,
+  CenterBrowserActionType,
+  CenterBrowserDataType,
+} from './HomeCenterBrowser';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -92,18 +95,9 @@ const HomeExpressionPreviewPartsWrapper = styled.div`
 HomeExpressionPreviewPartsWrapper.displayName =
   'S.HomeExpressionPreviewPartsWrapper';
 
-type RowData = {
-  _id: string;
-  _updatedAt: number;
-  name: string;
-  kind: string;
-  'updated at': string;
-  'created at': string;
-  'created by': string;
-};
-
-export const HomePreviewSidebarTemplate: React.FC<{
-  row: RowData;
+type HomePreviewSidebarTemplateProps<RT extends CenterBrowserDataType> = {
+  title: string;
+  row?: RT;
   setPreviewNode: SetPreviewNodeType;
   children?: React.ReactNode;
   primaryAction?: {
@@ -116,8 +110,12 @@ export const HomePreviewSidebarTemplate: React.FC<{
     label: string;
     onClick: () => void;
   };
-  actions?: Array<CenterBrowserActionType<RowData>>;
-}> = props => {
+  actions?: Array<CenterBrowserActionType<RT>>;
+};
+
+export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
+  props: HomePreviewSidebarTemplateProps<RT>
+) => {
   const history = useHistory();
   return (
     <CenterSpace>
@@ -132,14 +130,16 @@ export const HomePreviewSidebarTemplate: React.FC<{
         }}>
         <LayoutElements.VSpace
           style={{justifyContent: 'center', fontSize: '20px', fontWeight: 600}}>
-          {props.row.name}
+          {props.title}
         </LayoutElements.VSpace>
         {/* <LayoutElements.Block>
           <IconOverflowHorizontal />
         </LayoutElements.Block> */}
-        <CenterTableActionCellIcon>
-          <ActionCell actions={props.actions} row={props.row} />
-        </CenterTableActionCellIcon>
+        {props.row && (
+          <CenterTableActionCellIcon>
+            <ActionCell actions={props.actions} row={props.row} />
+          </CenterTableActionCellIcon>
+        )}
         <CenterTableActionCellIcon>
           <IconClose
             style={{
