@@ -351,7 +351,15 @@ const CenterProjectBoardsBrowser: React.FC<
       ],
     ];
   }, [props, history, params.entity, params.project, params.assetType]);
-  
+
+  const sidebarActions = useMemo(() => browserActions.map((actionSection, index) => {
+      if (index === 0) {
+        return actionSection.filter(action => action.label !== 'Board details');
+      }
+      return actionSection;
+    })
+  , [browserActions])
+
   useEffect(() => {
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
@@ -368,7 +376,7 @@ const CenterProjectBoardsBrowser: React.FC<
         <HomePreviewSidebarTemplate
           title={params.preview}
           row={row}
-          actions={browserActions}
+          actions={sidebarActions}
           setPreviewNode={setPreviewNode}
           primaryAction={{
             icon: IconOpenNewTab,
@@ -394,7 +402,7 @@ const CenterProjectBoardsBrowser: React.FC<
     params.preview,
     setPreviewNode,
     navigateToExpression,
-    browserActions,
+    sidebarActions,
     browserData
   ]);
 
@@ -617,6 +625,15 @@ const CenterProjectTablesBrowser: React.FC<
     ];
   }, [props, weave, history, makeBoardFromNode, navigateToExpression]);
 
+
+  const sidebarActions = useMemo(() => browserActions.map((actionSection, index) => {
+    if (index === 0) {
+      return actionSection.filter(action => action.label !== 'Table overview');
+    }
+    return actionSection;
+  })
+, [browserActions])
+
   useEffect(() => {
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
@@ -635,7 +652,7 @@ const CenterProjectTablesBrowser: React.FC<
           title={row.name}
           row={row}
           setPreviewNode={setPreviewNode}
-          actions={browserActions}>
+          actions={sidebarActions}>
           <HomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
@@ -647,7 +664,7 @@ const CenterProjectTablesBrowser: React.FC<
       setPreviewNode(undefined);
     }
   }, [
-    browserActions,
+    sidebarActions,
     browserData,
     history,
     params.entity,
