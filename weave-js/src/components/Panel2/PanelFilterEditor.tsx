@@ -677,7 +677,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
           {visualClauses.map((clause, i) => (
             <Popup
               key={i}
-              position="right center"
+              position="left center"
               trigger={
                 <FilterPillBlock
                   clause={clause}
@@ -689,6 +689,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                   }}
                 />
               }
+              onClose={() => setEditingFilterIndex(null)}
               open={editingFilterIndex === i}
               content={
                 <SingleFilterVisualEditor
@@ -706,10 +707,11 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             />
           ))}
           <Popup
-            position="right center"
+            position="left center"
+            onClose={() => setEditingFilterIndex(null)}
             open={editingFilterIndex === -1}
             trigger={
-              <div>
+              <div style={{marginTop: 8}}>
                 {/* TODO: this LinkButton is really bad, it's just a span. 
                     Use something better
                 */}
