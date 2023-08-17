@@ -102,7 +102,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
               <div className="panel-bank__section">
                 {!inJupyter && groupPath != null && handleAddPanel != null && (
                   <ActionBar ref={actionBarRef}>
-                    <Tooltip
+                    {/* This opens the editor at the outline level on the main board.
+                    The button was always shown on the page, but it leads to a kind
+                    of confusing place, so I'm just disabling it. */}
+
+                    {/* <Tooltip
                       position="bottom right"
                       trigger={
                         <Button
@@ -112,7 +116,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                         />
                       }>
                       Open panel editor
-                    </Tooltip>
+                    </Tooltip> */}
                     {enableAddPanel && (
                       <Button
                         variant="ghost"
