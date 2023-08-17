@@ -29,12 +29,10 @@ import {
 import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {inJupyterCell} from '../PagePanelComponents/util';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
-import {Tooltip} from '../Tooltip';
 import {
   useGetPanelIsHoveredByGroupPath,
   useGetPanelIsHoveredInOutlineByGroupPath,
   useSelectedPath,
-  useSetInspectingPanel,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
 import {Button} from '../Button';
@@ -55,7 +53,6 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
     props;
   const selectedPath = useSelectedPath();
-  const setInspectingPanel = useSetInspectingPanel();
   const getPanelIsHovered = useGetPanelIsHoveredByGroupPath(groupPath ?? []);
   const getPanelIsHoveredInOutline = useGetPanelIsHoveredInOutlineByGroupPath(
     groupPath ?? []
