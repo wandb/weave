@@ -235,23 +235,23 @@ export const NEW_BLUES = {
 };
 
 // Don't know if we ultimately want this here. This is copied from
-// color.ts runColorDict in the W&B code.
+// color.ts runColorDict in the W&B code. But I reordered them.
 
 export const WB_RUN_COLORS = [
+  '#5387DD',
   '#E87B9F',
-  '#A12864',
   '#DA4C4C',
+  '#A0C75C',
   '#F0B899',
   '#E57439',
   '#EDB732',
-  '#A0C75C',
-  '#479A5F',
   '#87CEBF',
   '#229487',
-  '#5BC5DB',
-  '#5387DD',
   '#7D54B2',
   '#C565C7',
   '#A46750',
   '#A1A9AD',
+  '#5BC5DB',
+  '#A12864',
+  '#479A5F',
 ];
