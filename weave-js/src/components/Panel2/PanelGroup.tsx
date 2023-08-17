@@ -572,11 +572,19 @@ export const PanelGroupItem: React.FC<{
   } else {
     controlBar = 'editable';
   }
+  // This makes it so controls in the varbar can overflow the parent container
+  // correctly. For example, without this PanelDropdown renders its dropdown menu
+  // within the parent, creating a scrollbar.
+  let overflowVisible = false;
+  if (config.layoutMode === 'vertical' && !config.equalSize) {
+    overflowVisible = true;
+  }
   return (
     <PanelContextProvider
       newVars={siblingVars}
       handleVarEvent={handleSiblingVarEvent}>
       <ChildPanel
+        overflowVisible={overflowVisible}
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
         config={item}
