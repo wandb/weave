@@ -201,6 +201,7 @@ export interface ChildPanelProps {
   prefixHeader?: JSX.Element;
   prefixButtons?: JSX.Element;
   allowedPanels?: string[];
+  overflowVisible?: boolean;
   config: ChildPanelConfig | undefined;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2?: (change: (oldConfig: any) => any) => void;
@@ -567,7 +568,21 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       data-weavepath={props.pathEl ?? 'root'}
       onMouseEnter={() => setHoverPanel(true)}
       onMouseLeave={() => setHoverPanel(false)}>
-      {(props.controlBar === 'titleBar' || props.controlBar === 'editable') && (
+      {props.controlBar === 'titleBar' && (
+        <div
+          style={{
+            fontWeight: 'bold',
+            padding: '0 16px 8px',
+            lineHeight: '20px',
+            marginTop: 16,
+          }}>
+          {props.pathEl != null &&
+            props.pathEl
+              .replace(/_/g, ' ')
+              .replace(/\b\w/g, char => char.toUpperCase())}
+        </div>
+      )}
+      {props.controlBar === 'editable' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
             {props.prefixHeader}
@@ -644,14 +659,12 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
           </EditorBarContent>
         </Styles.EditorBar>
       )}
-      <PanelContainer>
+      <PanelContainer overflowVisible={props.overflowVisible}>
         <PanelContextProvider
           newVars={newVars}
           handleVarEvent={handleVarEvent}
           newPath={props.pathEl}>
-          {props.controlBar === 'titleBar' &&
-          isChildPanelFullConfig(props.config) &&
-          curPanelId === 'Expression' ? (
+          {props.controlBar === 'titleBar' && curPanelId === 'Expression' ? (
             <div style={{paddingLeft: 16, paddingRight: 16}}>
               <WeaveExpression
                 expr={panelInputExpr}
@@ -995,10 +1008,9 @@ const EditorIcons = styled.div<{visible: boolean}>`
   visibility: ${p => (p.visible ? `visible` : `hidden`)};
 `;
 
-const PanelContainer = styled.div`
+const PanelContainer = styled.div<{overflowVisible?: boolean}>`
   flex-grow: 1;
-  // TODO
-  overflow-y: auto;
+  overflow-y: ${p => (p.overflowVisible ? 'visible' : 'auto')};
 `;
 
 type ElementWidth<T> = {

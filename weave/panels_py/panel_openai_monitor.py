@@ -131,17 +131,17 @@ def board(
     ### Varbar
 
     # Add the input node as raw data
-    varbar = panel_board.varbar()
+    varbar = panel_board.varbar(editable=False)
 
-    dataset = varbar.add("dataset", input_node)
+    source_data = varbar.add("source_data", input_node)
 
     # Setup date range variables:
     ## 1. raw_data_range is derived from raw_data
     dataset_range = varbar.add(
         "dataset_range",
         weave.ops.make_list(
-            a=dataset[timestamp_col_name].min(),
-            b=dataset[timestamp_col_name].max(),
+            a=source_data[timestamp_col_name].min(),
+            b=source_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -151,8 +151,8 @@ def board(
 
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
-        "date_picker",
-        weave.panels.DateRange(user_zoom_range, domain=dataset[timestamp_col_name]),
+        "time_range",
+        weave.panels.DateRange(user_zoom_range, domain=source_data[timestamp_col_name]),
     )
 
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
@@ -183,7 +183,7 @@ def board(
 
     window_data = varbar.add(
         "window_data",
-        dataset.filter(
+        source_data.filter(
             lambda row: weave.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
@@ -199,26 +199,28 @@ def board(
         ),
         hidden=True,
     )
-    filter_editor = varbar.add(
-        "filter_editor",
+    filters = varbar.add(
+        "filters",
         weave.panels.FilterEditor(filter_fn, node=window_data),
     )
 
-    filtered_data = varbar.add("filtered_data", dataset.filter(filter_fn), hidden=True)
+    filtered_data = varbar.add(
+        "filtered_data", source_data.filter(filter_fn), hidden=True
+    )
 
     filtered_window_data = varbar.add(
         "filtered_window_data", window_data.filter(filter_fn), hidden=True
     )
 
     groupby = varbar.add("groupby", "output.model", hidden=True)
-    groupby_dropdown = varbar.add(
-        "groupby_dropdown",
+    grouping = varbar.add(
+        "grouping",
         weave.panels.Dropdown(
             groupby,
             choices=weave.ops.List.concat(
                 weave.ops.make_list(
                     a=weave_internal.const(["output.model"]),
-                    b=dataset["attributes"]
+                    b=source_data["attributes"]
                     .keys()
                     .flatten()
                     .unique()
