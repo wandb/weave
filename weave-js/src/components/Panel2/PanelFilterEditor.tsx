@@ -212,8 +212,8 @@ const SingleFilterVisualEditor: React.FC<{
     <div>
       <ModifiedDropdown
         value={key}
-        onChange={(e, {value}) => {
-          const newKey = value as string;
+        onChange={(e, {value: k}) => {
+          const newKey = k as string;
           const newSimpleKeyType = getSimpleKeyType(
             opPick({
               obj: listItem,
@@ -221,7 +221,7 @@ const SingleFilterVisualEditor: React.FC<{
             }).type
           );
           const newOpChoices = getOpChoices(newSimpleKeyType);
-          setKey(value as string);
+          setKey(newKey);
           setOp(newOpChoices[0]);
           setValue(undefined);
         }}
