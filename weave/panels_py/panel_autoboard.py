@@ -61,7 +61,6 @@ def timeseries(
         label=lambda row: row[groupby_key],
         groupby_dims=["x", "label"],
         mark="line",
-        no_legend=True,
         domain_x=x_domain,
     )
 
