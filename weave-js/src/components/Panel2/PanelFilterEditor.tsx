@@ -161,7 +161,7 @@ const SingleFilterVisualEditor: React.FC<{
       getSimpleKeyType(opPick({obj: listItem, key: constString(k)}).type) !==
       'other'
   );
-  const keyOptions = keyChoices.map(key => ({text: key, value: key, key}));
+  const keyOptions = keyChoices.map(k => ({text: k, value: k, k}));
 
   const [key, setKey] = useState<string | undefined>(
     defaultKey ?? keyChoices[0]
@@ -177,7 +177,7 @@ const SingleFilterVisualEditor: React.FC<{
   );
 
   const opChoices = getOpChoices(simpleKeyType);
-  const opOptions = opChoices.map(key => ({text: key, value: key, key}));
+  const opOptions = opChoices.map(k => ({text: k, value: k, k}));
 
   // const valueQuery =
   // TODO: opLimit is broken in weave python when we have an ArrowWeaveList...
@@ -198,11 +198,11 @@ const SingleFilterVisualEditor: React.FC<{
       : voidNode();
   const valueChoices = useNodeValue(valueQuery).result ?? [];
   const valueOptions = valueChoices
-    .filter((value: any) => value != null)
-    .map((value: boolean | string | number) => ({
-      text: value.toString(),
-      value: value,
-      key: value.toString(),
+    .filter((v: any) => v != null)
+    .map((v: boolean | string | number) => ({
+      text: v.toString(),
+      value: v,
+      key: v.toString(),
     }));
 
   const curClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
@@ -214,15 +214,15 @@ const SingleFilterVisualEditor: React.FC<{
         value={key}
         onChange={(e, {value}) => {
           const newKey = value as string;
-          const simpleKeyType = getSimpleKeyType(
+          const newSimpleKeyType = getSimpleKeyType(
             opPick({
               obj: listItem,
               key: constString(newKey),
             }).type
           );
-          const opChoices = getOpChoices(simpleKeyType);
+          const newOpChoices = getOpChoices(newSimpleKeyType);
           setKey(value as string);
-          setOp(opChoices[0]);
+          setOp(newOpChoices[0]);
           setValue(undefined);
         }}
         options={keyOptions}
@@ -230,13 +230,13 @@ const SingleFilterVisualEditor: React.FC<{
       />
       <ModifiedDropdown
         value={op}
-        onChange={(e, {value}) => {
-          if (value === 'in') {
+        onChange={(e, {value: v}) => {
+          if (v === 'in') {
             setValue([]);
           } else {
             setValue(undefined);
           }
-          setOp(value as string);
+          setOp(v as string);
         }}
         options={opOptions}
         selection
@@ -252,8 +252,8 @@ const SingleFilterVisualEditor: React.FC<{
         <ModifiedDropdown
           value={value}
           multiple={op === 'in'}
-          onChange={(e, {value}) => {
-            setValue(value);
+          onChange={(e, {value: v}) => {
+            setValue(v);
           }}
           options={valueOptions}
           selection
@@ -280,7 +280,7 @@ const clauseNodeToVisualStringIn = (
   clause: Node
 ): VisualClauseStringIn | null => {
   const inValues: string[] = [];
-  let key: string | undefined = undefined;
+  let key: string | undefined;
   const addClauseValue = (node: Node) => {
     const singleClause = clauseNodeToVisual(node);
     if (singleClause == null) {
