@@ -82,7 +82,10 @@ function executeNotebook(notebookPath: string) {
   );
 }
 
-export function checkWeaveNotebookOutputs(notebookPath: string) {
+export function checkWeaveNotebookOutputs(
+  notebookPath: string,
+  fail: boolean = false
+) {
   cy.readFile(notebookPath).then(notebookContents => {
     const notebook = parseNotebook(notebookContents);
     if (notebook.cells[0].source[0]?.includes('# weave-test-skip-all')) {
@@ -98,5 +101,8 @@ export function checkWeaveNotebookOutputs(notebookPath: string) {
       cy.wait(1000);
       checkAllPanelsRendered();
     });
+    if (fail) {
+      throw new Error('fail here');
+    }
   });
 }
