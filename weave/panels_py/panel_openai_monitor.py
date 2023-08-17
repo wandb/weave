@@ -284,24 +284,24 @@ def board(
     )
 
     overview_tab.add(
-        "avg cost per req",
+        "avg_cost_per_req",
         cost(filtered_window_data).avg(),  # type: ignore
-        layout=weave.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=height),
+        layout=weave.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=3),
     )
     overview_tab.add(
-        "avg prompt tokens per req",
+        "avg_prompt_tokens_per_req",
         filtered_window_data["summary.prompt_tokens"].avg(),  # type: ignore
-        layout=weave.panels.GroupPanelLayout(x=6, y=height * 2, w=6, h=height),
+        layout=weave.panels.GroupPanelLayout(x=6, y=height * 2, w=6, h=3),
     )
     overview_tab.add(
-        "avg completion tokens per req",
+        "avg_completion_tokens_per_req",
         filtered_window_data["summary.completion_tokens"].avg(),  # type: ignore
-        layout=weave.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=height),
+        layout=weave.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=3),
     )
     overview_tab.add(
-        "avg total tokens per req",
+        "avg_total_tokens_per_req",
         filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
-        layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=height),
+        layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=3),
     ),
 
     # Show a plot for each attribute.
@@ -337,7 +337,7 @@ def board(
     requests_table_var = overview_tab.add(
         "table",
         requests_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=15, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
     )
     overview_tab.add(
         "input",
@@ -345,12 +345,12 @@ def board(
             requests_table_var.active_data()["inputs.messages"],
             columns=[lambda row: row["role"], lambda row: row["content"]],
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=23, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=21, w=12, h=8),
     )
     overview_tab.add(
         "output",
         requests_table_var.active_row(),
-        layout=weave.panels.GroupPanelLayout(x=12, y=23, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=12, y=21, w=12, h=8),
     )
 
     # attributes_tab = weave.panels.Group(layoutMode="grid")
