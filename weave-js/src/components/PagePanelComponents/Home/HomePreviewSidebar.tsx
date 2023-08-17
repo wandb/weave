@@ -219,8 +219,12 @@ export const HomeExpressionPreviewParts: React.FC<{
   const isLoadingTemplates =
     generators.loading || refinedExpression.loading || isGenerating;
   const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
-  const recommendedTemplateInfo = generators.result.find(template => template.op_name === OPEN_AI_OP_NAME) || 
-    generators.result.find(template => template.op_name !== SEED_BOARD_OP_NAME) || SEED_BOARD_TEMPLATE;
+  const recommendedTemplateInfo =
+    generators.result.find(template => template.op_name === OPEN_AI_OP_NAME) ||
+    generators.result.find(
+      template => template.op_name !== SEED_BOARD_OP_NAME
+    ) ||
+    SEED_BOARD_TEMPLATE;
 
   useEffect(() => {
     if (isLoadingTemplates) {
