@@ -3,6 +3,7 @@ import {checkWeaveNotebookOutputs} from '../../notebooks';
 describe('../examples/experimental/app/RunChain.ipynb notebook test', () => {
   it('passes', () => {
     checkWeaveNotebookOutputs('../examples/experimental/app/RunChain.ipynb');
-    cy.expect(false).to.equal(true);
+    const f = true;
+    cy.expect(f).to.equal(!!!f);
   });
 });
