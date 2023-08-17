@@ -86,14 +86,14 @@ export const CenterEntityBrowserInner: React.FC<
   );
 
   moment.updateLocale('en', {
-    calendar : {
+    calendar: {
       sameDay: '[Today at] hh:mm A',
       nextDay: '[Tomorrow]',
       nextWeek: 'dddd',
       lastDay: '[Yesterday at] hh:mm A',
       lastWeek: '[Last] dddd [at] hh:mm A',
-      sameElse: 'YYYY-MM-DD'
-    }
+      sameElse: 'YYYY-MM-DD',
+    },
   });
 
   const browserData = useMemo(() => {
