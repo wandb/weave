@@ -436,10 +436,33 @@ export const opRunHistoryType2 = OpKinds.makeBasicOp({
   ) => opRunHistoryTypeResolver(run, engine),
 });
 
+export const opRunHistoryType3 = OpKinds.makeBasicOp({
+  hidden: true,
+  name: 'refine_history3_type',
+  argTypes: {
+    run: TypeHelpers.nullableOneOrMany('run'),
+  },
+  description: `Returns the type of a ${docType('run')} history.`,
+  argDescriptions: {
+    run: `A ${docType('run')}`,
+  },
+  returnValueDescription: `The type of the ${docType('run')} history`,
+  returnType: inputs => 'type',
+  resolver: async (
+    {run},
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context,
+    engine
+  ) => opRunHistoryTypeResolver(run, engine),
+});
+
 const opRunHistoryResolveOutputType = async (
   executableNode: GraphTypes.OutputNode<Types.Type>,
   client: Client,
-  historyVersion: 1 | 2
+  historyVersion: 1 | 2 | 3
 ) => {
   // See opRunSummary for comment
 
@@ -475,7 +498,9 @@ const opRunHistoryResolveOutputType = async (
   let result = nullableTaggableStrip(
     historyVersion === 1
       ? await client.query(opRunHistoryType({run}))
-      : await client.query(opRunHistoryType2({run}))
+      : historyVersion === 2
+      ? await client.query(opRunHistoryType2({run}))
+      : await client.query(opRunHistoryType3({run}))
   );
 
   if (TypeHelpers.isListLike(refinedRunNode.type)) {
@@ -541,7 +566,7 @@ export const opRunHistory3 = makeRunOp({
   hidden: true,
   resolver: ({run}) => opRunHistoryResolver(run),
   resolveOutputType: async (inputTypes, node, executableNode, client) => {
-    return opRunHistoryResolveOutputType(executableNode, client, 2);
+    return opRunHistoryResolveOutputType(executableNode, client, 3);
   },
 });
 
