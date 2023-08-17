@@ -368,73 +368,78 @@ const OverviewTab = ({
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
+      {/*  Only show the create a board section if a board can be created ie there exists at least one template */}
       {isLoadingTemplates ? (
         <Loader />
       ) : (
-        <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
-          <LayoutElements.BlockHeader>
-            CREATE A BOARD
-            {hasTemplates && (
-              <Button
-                onClick={() => {
-                  setTabValue('Templates');
-                }}
-                size="small"
-                variant="ghost">
-                View all templates
-              </Button>
-            )}
-          </LayoutElements.BlockHeader>
-          <LayoutElements.VStack
-            style={{
-              gap: '8px',
-            }}>
-            {recommendedTemplateInfo &&
-              recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
-                <>
-                  <DashboardTemplate
-                    key={recommendedTemplateInfo.op_name}
-                    title={recommendedTemplateInfo.display_name}
-                    subtitle={recommendedTemplateInfo.description}
-                    onButtonClick={() => {
-                      setIsGenerating(true);
-                      makeBoardFromNode(
-                        recommendedTemplateInfo.op_name,
-                        refinedExpression.result as any,
-                        newDashExpr => {
-                          navigateToExpression(newDashExpr);
-                          setIsGenerating(false);
-                        }
-                      );
-                    }}
-                    isExpanded={true}
-                    isRecommended={true}
-                  />
-                  <Label style={{display: 'flex', justifyContent: 'center'}}>
-                    or
-                  </Label>
-                </>
+        generators.length > 0 && (
+          <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
+            <LayoutElements.BlockHeader>
+              CREATE A BOARD
+              {hasTemplates && (
+                <Button
+                  onClick={() => {
+                    setTabValue('Templates');
+                  }}
+                  size="small"
+                  variant="ghost">
+                  View all templates
+                </Button>
               )}
-            <DashboardTemplate
-              key={SEED_BOARD_OP_NAME}
-              subtitle="Seed a board with a simple visualization of this table."
-              onButtonClick={() => {
-                setIsGenerating(true);
-                makeBoardFromNode(
-                  SEED_BOARD_OP_NAME,
-                  refinedExpression.result as any,
-                  newDashExpr => {
-                    navigateToExpression(newDashExpr);
-                    setIsGenerating(false);
-                  }
-                );
-              }}
-              isExpanded={true}
-              buttonVariant={generators.length === 1 ? 'primary' : 'secondary'}
-              buttonText="New board"
-            />
-          </LayoutElements.VStack>
-        </LayoutElements.VBlock>
+            </LayoutElements.BlockHeader>
+            <LayoutElements.VStack
+              style={{
+                gap: '8px',
+              }}>
+              {recommendedTemplateInfo &&
+                recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
+                  <>
+                    <DashboardTemplate
+                      key={recommendedTemplateInfo.op_name}
+                      title={recommendedTemplateInfo.display_name}
+                      subtitle={recommendedTemplateInfo.description}
+                      onButtonClick={() => {
+                        setIsGenerating(true);
+                        makeBoardFromNode(
+                          recommendedTemplateInfo.op_name,
+                          refinedExpression.result as any,
+                          newDashExpr => {
+                            navigateToExpression(newDashExpr);
+                            setIsGenerating(false);
+                          }
+                        );
+                      }}
+                      isExpanded={true}
+                      isRecommended={true}
+                    />
+                    <Label style={{display: 'flex', justifyContent: 'center'}}>
+                      or
+                    </Label>
+                  </>
+                )}
+              <DashboardTemplate
+                key={SEED_BOARD_OP_NAME}
+                subtitle="Seed a board with a simple visualization of this table."
+                onButtonClick={() => {
+                  setIsGenerating(true);
+                  makeBoardFromNode(
+                    SEED_BOARD_OP_NAME,
+                    refinedExpression.result as any,
+                    newDashExpr => {
+                      navigateToExpression(newDashExpr);
+                      setIsGenerating(false);
+                    }
+                  );
+                }}
+                isExpanded={true}
+                buttonVariant={
+                  generators.length === 1 ? 'primary' : 'secondary'
+                }
+                buttonText="New board"
+              />
+            </LayoutElements.VStack>
+          </LayoutElements.VBlock>
+        )
       )}
     </LayoutElements.VStack>
   );
