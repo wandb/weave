@@ -6,6 +6,7 @@ import {
   IconInfo,
   IconOpenNewTab,
   IconDelete,
+  IconTable,
 } from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
@@ -18,6 +19,7 @@ import {
   opArtifactMembershipArtifactVersion,
   opArtifactMembershipForAlias,
   opArtifactVersionFile,
+  opCount,
   opFileTable,
   opGet,
   opIsNone,
@@ -43,6 +45,39 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
+import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
+import styled from 'styled-components';
+
+const LoggingPatternBlockCode = styled.pre`
+  width: 100%;
+  font-size: 11.5px;
+  overflow-x: auto;
+`;
+
+const LoggingPatternBlockTitle = styled.div`
+  width: 100%;
+  border-bottom: 1px solid #e5e5e5;
+  padding-bottom: 6px;
+`;
+
+const LoggingPatternBlock = styled.div`
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid #e5e5e5;
+  padding: 12px;
+  border-radius: 4px;
+`;
+
+const SidebarTemplateSimpleWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+`;
+
+const USE_EMPTY_STREAM_TABLE_CTA = true;
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -524,21 +559,15 @@ const CenterProjectTablesBrowser: React.FC<
         row._id
       );
       const node = (
-        <HomePreviewSidebarTemplate
-          title={row.name}
+        <HomeTablePreviewSidebarTemplate
+          isStreamTable={row.kind === 'Stream Table'}
+          entityName={params.entity!}
+          projectName={params.project!}
+          tableName={row._id}
           setPreviewNode={setPreviewNode}
-          primaryAction={{
-            icon: IconOpenNewTab,
-            label: 'Open Table',
-            onClick: () => {
-              navigateToExpression(expr);
-            },
-          }}>
-          <HomeExpressionPreviewParts
-            expr={expr}
-            navigateToExpression={navigateToExpression}
-          />
-        </HomePreviewSidebarTemplate>
+          expr={expr}
+          navigateToExpression={navigateToExpression}
+        />
       );
       setPreviewNode(node);
     } else {
@@ -644,5 +673,128 @@ const CenterProjectTablesBrowser: React.FC<
         actions={browserActions}
       />
     </>
+  );
+};
+
+type TableTemplatePropsType = {
+  entityName: string;
+  projectName: string;
+  tableName: string;
+  expr: Node;
+  setPreviewNode: SetPreviewNodeType;
+  navigateToExpression: NavigateToExpressionType;
+};
+
+const HomeTablePreviewSidebarTemplate: React.FC<
+  TableTemplatePropsType & {
+    isStreamTable: boolean;
+  }
+> = props => {
+  if (props.isStreamTable && USE_EMPTY_STREAM_TABLE_CTA) {
+    return <HomeStreamTablePreviewSidebarTemplate {...props} />;
+  } else {
+    return <StandardTablePreviewSidebarTemplate {...props} />;
+  }
+};
+
+const StandardTablePreviewSidebarTemplate: React.FC<
+  TableTemplatePropsType
+> = props => {
+  return (
+    <HomePreviewSidebarTemplate
+      title={props.tableName}
+      setPreviewNode={props.setPreviewNode}
+      primaryAction={{
+        icon: IconOpenNewTab,
+        label: 'Open Table',
+        onClick: () => {
+          props.navigateToExpression(props.expr);
+        },
+      }}>
+      <HomeExpressionPreviewParts
+        expr={props.expr}
+        navigateToExpression={props.navigateToExpression}
+      />
+    </HomePreviewSidebarTemplate>
+  );
+};
+
+const HomeStreamTablePreviewSidebarTemplate: React.FC<
+  TableTemplatePropsType
+> = props => {
+  const rowCountNode = opCount({arr: props.expr});
+  const rowCountVal = useNodeValue(rowCountNode);
+
+  if (!rowCountVal.loading && rowCountVal.result > 0) {
+    return <StandardTablePreviewSidebarTemplate {...props} />;
+  } else {
+    return (
+      <HomePreviewSidebarTemplate
+        title={props.tableName}
+        setPreviewNode={props.setPreviewNode}>
+        <EmptyStreamTablePreviewParts
+          entityName={props.entityName}
+          projectName={props.projectName}
+          tableName={props.tableName}
+          loading={rowCountVal.loading}
+        />
+      </HomePreviewSidebarTemplate>
+    );
+  }
+};
+
+const EmptyStreamTablePreviewParts: React.FC<{
+  entityName: string;
+  projectName: string;
+  tableName: string;
+  loading: boolean;
+}> = props => {
+  const tableId = `${props.entityName}/${props.projectName}/${props.tableName}`;
+  return (
+    <SidebarTemplateSimpleWrapper>
+      {props.loading ? (
+        <WeaveAnimatedLoader style={{height: '64px', width: '64px'}} />
+      ) : (
+        <>
+          <IconTable
+            style={{
+              width: 50,
+              height: 50,
+              margin: 10,
+            }}
+          />
+          <div>This table appears to be empty.</div>
+          <div>Common patterns for logging data include:</div>
+          <LoggingPatternBlock>
+            <LoggingPatternBlockTitle>
+              StreamTable Logging
+            </LoggingPatternBlockTitle>
+            <LoggingPatternBlockCode>
+              <code>
+                from weave.monitoring import StreamTable
+                <br />
+                st = StreamTable("{tableId}")
+                <br />
+                st.log(...)
+              </code>
+            </LoggingPatternBlockCode>
+          </LoggingPatternBlock>
+          <LoggingPatternBlock>
+            <LoggingPatternBlockTitle>
+              OpenAI LLM Monitoring
+            </LoggingPatternBlockTitle>
+            <LoggingPatternBlockCode>
+              <code>
+                from weave.monitoring import openai, init_monitor
+                <br />
+                init_monitor('{tableId}')
+                <br />
+                openai.ChatCompletion.create(...)
+              </code>
+            </LoggingPatternBlockCode>
+          </LoggingPatternBlock>
+        </>
+      )}
+    </SidebarTemplateSimpleWrapper>
   );
 };
