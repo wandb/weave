@@ -260,7 +260,7 @@ export const HomeExpressionPreviewParts: React.FC<{
             </TabContentWrapper>
           </Tabs.Content>
         }
-        {/* <Tabs.Content value="Boards">Boards</Tabs.Content> */}
+        {/* <Tabs.Content value="Boards" style={{height: 'calc( 100% - 38px )'}}>Boards</Tabs.Content> */}
       </Tabs.Root>
     </HomeExpressionPreviewPartsWrapper>
   );
@@ -286,7 +286,7 @@ const OverviewTab = ({
   recommendedTemplateInfo: Template,
   isLoadingTemplates: boolean,
   setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>,
-  generators: Array<Template>,
+  generators: Template[],
   setTabValue: React.Dispatch<React.SetStateAction<string>>,
   hasTemplates: boolean,
 }) => {
@@ -390,7 +390,7 @@ const OverviewTab = ({
               }
               <DashboardTemplate
                 key={SEED_BOARD_OP_NAME}
-                subtitle="Seed a board with a simple visualization of this table."
+                subtitle={SEED_BOARD_TEMPLATE.description}
                 onButtonClick={() => {
                   setIsGenerating(true);
                   makeBoardFromNode(
@@ -429,7 +429,7 @@ const TemplateTab = ({
     recommendedTemplateInfo: Template,
     isLoadingTemplates: boolean,
     setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>,
-    generators: Array<Template>,
+    generators: Template[],
   }) => {
   const makeBoardFromNode = useMakeLocalBoardFromNode();
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(recommendedTemplateInfo.op_name);
@@ -493,9 +493,6 @@ const TemplateTab = ({
     )
   );
 };
-
-
-
 
 const DashboardTemplate: React.FC<{
   title?: string;
