@@ -209,9 +209,9 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
         # loading of all run history and instead directly fetch the history
         # count from the server by reducing to `run.historyLineCount` which
         # compiles to a single gql edge. This is particularly helpful when
-        # loading StreamTables backed by runs. It helps with the client-side
-        # map refinement, table row count, and with logic that is conditioned
-        # on empty tables
+        # loading StreamTables backed by runs. It helps with the client-side map
+        # refinement, table row count, and with logic that is conditioned on
+        # empty tables
         arr_node = node.from_op.inputs["arr"]
         if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name.startswith(
             "run-history"
@@ -223,12 +223,13 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                 {"run": run_node},
             )
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "unique":
-        # When the graph is `awl.keys.flatten.unique`, the user is really
-        # asking for the columnNames. This can be reduced to a simple `awl.columnNames`
-        # which is extremely fast as it is simply the property types of the list!
+        # When the graph is `awl.keys.flatten.unique`, the user is really asking
+        # for the columnNames. This can be reduced to a simple `awl.columnNames`
+        # which is extremely fast as it is simply the property types of the
+        # list!
         #
-        # Note: we cannot perform such optimization on pure lists because we don't have
-        # a way to operate on the type of the node itself.
+        # Note: we cannot perform such optimization on pure lists because we
+        # don't have a way to operate on the type of the node itself.
         arr_node = node.from_op.inputs["arr"]
         if (
             isinstance(arr_node, graph.OutputNode)
