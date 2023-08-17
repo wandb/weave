@@ -6,6 +6,8 @@ import {
   IconInfo,
   IconOpenNewTab,
   IconDelete,
+  IconFullScreenModeExpand,
+  IconAddNew,
 } from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
@@ -555,7 +557,7 @@ const CenterProjectTablesBrowser: React.FC<
         // Home Page TODO: Enable awesome previews
         {
           icon: IconInfo,
-          label: 'Table details',
+          label: 'Table overview',
           onClick: row => {
             history.push(
               urlProjectAssetPreview(
@@ -567,11 +569,9 @@ const CenterProjectTablesBrowser: React.FC<
             );
           },
         },
-      ],
-      [
         {
-          icon: IconOpenNewTab,
-          label: 'Open Table',
+          icon: IconFullScreenModeExpand,
+          label: 'Preview table',
           onClick: row => {
             props.navigateToExpression(
               tableRowToNode(
@@ -583,8 +583,6 @@ const CenterProjectTablesBrowser: React.FC<
             );
           },
         },
-      ],
-      [
         {
           icon: IconCopy,
           label: 'Copy Weave expression',
@@ -599,6 +597,34 @@ const CenterProjectTablesBrowser: React.FC<
             navigator.clipboard.writeText(copyText).then(() => {
               // give user feedback
             });
+          },
+        },
+      ],
+      [
+        {
+          icon: IconAddNew,
+          label: 'New board',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
+            );
+            const copyText = weave.expToString(node);
+            navigator.clipboard.writeText(copyText).then(() => {
+              // give user feedback
+            });
+          },
+        },
+      ],
+      [
+        {
+          icon: IconDelete,
+          label: 'Delete table',
+          onClick: row => {
+            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            // setDeletingId(uri);
           },
         },
       ],
