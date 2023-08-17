@@ -607,7 +607,12 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             raise errors.WeaveInternalError("config is None")
 
         self.config.legendSettings = LegendSettings(
-            x=LegendSetting(True), y=LegendSetting(True), color=LegendSetting(True)
+            x=LegendSetting(True),
+            y=LegendSetting(True),
+            color=LegendSetting(True),
+            pointShape=LegendSetting(),
+            lineStyle=LegendSetting(),
+            pointSize=LegendSetting(),
         )
 
     def to_code(self) -> typing.Optional[str]:
