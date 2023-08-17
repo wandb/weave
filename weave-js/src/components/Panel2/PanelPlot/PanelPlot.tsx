@@ -2719,7 +2719,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.color = {
           datum: PlotState.defaultSeriesName(series, weave),
           title: 'series',
-          legend: {...defaultFontStyleDict},
+          legend: config.legendSettings.color.noLegend
+            ? false
+            : {...defaultFontStyleDict},
         };
       }
 
@@ -2749,7 +2751,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           } else {
             newSpec.encoding.size = {
               field: fixKeyForVega(dims.pointSize),
-              legend: {...defaultFontStyleDict},
+              legend: config.legendSettings.pointSize.noLegend
+                ? false
+                : {...defaultFontStyleDict},
             };
 
             if (isAssignableTo(dimTypes.pointSize, maybe('number'))) {
@@ -2772,7 +2776,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           );
 
           newSpec.encoding.shape = {
-            legend: {...defaultFontStyleDict},
+            legend: config.legendSettings.pointShape.noLegend
+              ? false
+              : {...defaultFontStyleDict},
             field: fixKeyForVega(dims.pointShape),
           };
 
@@ -2786,7 +2792,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             newSpec.mark.shape = series.constants.pointShape;
           } else {
             newSpec.encoding.shape = {
-              legend: {...defaultFontStyleDict},
+              legend: config.legendSettings.pointShape.noLegend
+                ? false
+                : {...defaultFontStyleDict},
               datum: PlotState.defaultSeriesName(series, weave),
               title: 'series',
             };
@@ -2802,7 +2810,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           encoding: {
             strokeDash: {
               datum: PlotState.defaultSeriesName(series, weave),
-              legend: {...defaultFontStyleDict},
+              legend:
+                concreteConfig.series.length > 1 &&
+                !config.legendSettings.lineStyle.noLegend
+                  ? {...defaultFontStyleDict}
+                  : false,
               title: 'series',
               scale: lineStyleScale,
             },
