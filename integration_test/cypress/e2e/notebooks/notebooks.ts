@@ -86,23 +86,27 @@ export function checkWeaveNotebookOutputs(
   notebookPath: string,
   fail: boolean = false
 ) {
-  cy.readFile(notebookPath).then(notebookContents => {
-    const notebook = parseNotebook(notebookContents);
-    if (notebook.cells[0].source[0]?.includes('# weave-test-skip-all')) {
-      cy.log(
-        'Skipping notebook due to weave-test-skip-all directive ' + notebookPath
-      );
-      return;
-    }
-    executeNotebook(notebookPath);
-    forEachWeaveOutputCellInNotebook(notebookPath, cellId => {
-      // assert that there is at least 1 element with an attribute 'data-test-weave-id'
-      checkAllPanelsRendered();
-      cy.wait(1000);
-      checkAllPanelsRendered();
+  cy.readFile(notebookPath)
+    .then(notebookContents => {
+      const notebook = parseNotebook(notebookContents);
+      if (notebook.cells[0].source[0]?.includes('# weave-test-skip-all')) {
+        cy.log(
+          'Skipping notebook due to weave-test-skip-all directive ' +
+            notebookPath
+        );
+        return;
+      }
+      executeNotebook(notebookPath);
+      forEachWeaveOutputCellInNotebook(notebookPath, cellId => {
+        // assert that there is at least 1 element with an attribute 'data-test-weave-id'
+        checkAllPanelsRendered();
+        cy.wait(1000);
+        checkAllPanelsRendered();
+      });
+    })
+    .then(() => {
+      if (fail) {
+        throw new Error('error');
+      }
     });
-    if (fail) {
-      throw new Error('fail here');
-    }
-  });
 }
