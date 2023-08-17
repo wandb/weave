@@ -87,7 +87,7 @@ def _quote_node(node: graph.Node) -> graph.Node:
     return weave_internal.const(node)
 
 
-def _compact_history_count(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+def _node_simplification(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode) and node.from_op.name == "count":
         arr_node = node.from_op.inputs["arr"]
         if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name.startswith(
@@ -99,6 +99,24 @@ def _compact_history_count(node: graph.Node) -> typing.Optional[graph.OutputNode
                 "run-historyLineCount",
                 {"run": run_node},
             )
+    elif isinstance(node, graph.OutputNode) and node.from_op.name == "unique":
+        arr_node = node.from_op.inputs["arr"]
+        if (
+            isinstance(arr_node, graph.OutputNode)
+            and arr_node.from_op.name == "ArrowWeaveList-flatten"
+        ):
+            arr_node_2 = arr_node.from_op.inputs["arr"]
+            if (
+                isinstance(arr_node_2, graph.OutputNode)
+                and arr_node_2.from_op.name == "ArrowWeaveListTypedDict-keys"
+            ):
+                awl_node = arr_node_2.from_op.inputs["self"]
+                return graph.OutputNode(
+                    node.type,
+                    "ArrowWeaveListTypedDict-propertyTypes",
+                    {"self": awl_node},
+                )
+
     return None
 
 
@@ -492,11 +510,11 @@ def compile_quote(
     return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
 
 
-def compile_compact_history_count(
+def compile_node_simplification(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _compact_history_count, on_error)
+    return graph.map_nodes_full(nodes, _node_simplification, on_error)
 
 
 def compile_refine(
@@ -707,8 +725,8 @@ def _compile(
     with tracer.trace("compile:node_ops"):
         results = results.batch_map(_track_errors(compile_node_ops))
 
-    with tracer.trace("compile:compact_history_count"):
-        results = results.batch_map(_track_errors(compile_compact_history_count))
+    with tracer.trace("compile:node_simplification"):
+        results = results.batch_map(_track_errors(compile_node_simplification))
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
