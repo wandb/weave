@@ -36,95 +36,84 @@ export const opDateSub = makeDateOp({
   },
 });
 
-export const opDateAddDuration = makeDateOp({
-  hidden: true,
-  name: 'date-addDuration',
-  argTypes: {date: 'date', duration: 'number'},
-  renderInfo: {
-    type: 'binary',
-    repr: '+',
-  },
-  description: `Returns the sum between a ${docType(
-    'date'
-  )} and duration in milliseconds ${docType('number')}`,
-  argDescriptions: {
-    date: `Date ${docType('date')}`,
-    duration: `Duration ${docType('number')}`,
-  },
-  returnValueDescription: `The sum between the a ${docType(
-    'date'
-  )} and duration in milliseconds ${docType('number')}`,
-  returnType: inputTypes => 'date',
-  resolver: inputs => {
-    if (
-      inputs.date == null ||
-      inputs.duration == null ||
-      inputs.duration <= 0
-    ) {
-      return null;
-    }
-    const dateAddDuration = moment
-      .utc(inputs.date)
-      .add(moment.duration(inputs.duration, 'milliseconds'))
-      .toDate();
-    return new Date(dateAddDuration);
-  },
-});
+const momentDurations: moment.unitOfTime.DurationConstructor[] = [
+  'years',
+  'months',
+  'days',
+  'hours',
+  'minutes',
+  'seconds',
+  'milliseconds',
+];
 
-export const opDateDiffDaysStringFormat = makeDateOp({
+export const opTimestampDiffStringFormat = makeDateOp({
   hidden: true,
   name: 'date-diffDaysStringFormat',
-  argTypes: {lhs: 'date', rhs: 'date'},
-  renderInfo: {
-    type: 'binary',
-    repr: '-',
-  },
-  description: `Returns the difference between two ${docType('date', {
-    plural: true,
-  })} in days in a nice string form`,
+  argTypes: {lhs: {type: 'timestamp'}, rhs: {type: 'timestamp'}},
+  description: `Returns the difference between two millisecond ${docType(
+    'timestamp',
+    {
+      plural: true,
+    }
+  )} in days in a nice string form`,
   argDescriptions: {
-    lhs: `First ${docType('date')}`,
-    rhs: `Second ${docType('date')}`,
+    lhs: `First ${docType('timestamp')}`,
+    rhs: `Second ${docType('timestamp')}`,
   },
-  returnValueDescription: `The difference between the two ${docType('date', {
-    plural: true,
-  })} in days in a nice string form`,
+  returnValueDescription: `The difference between the two ${docType(
+    'timestamp',
+    {
+      plural: true,
+    }
+  )} in days in a nice string form`,
   returnType: inputTypes => 'string',
   resolver: inputs => {
     if (inputs.lhs == null || inputs.rhs == null) {
       return null;
     }
-    const dateDiff = moment
-      .utc(inputs.lhs)
-      .diff(moment.utc(inputs.rhs), 'milliseconds');
-    const dayDiff = Math.floor(
-      moment.duration(dateDiff, 'milliseconds').asDays()
-    );
-    if (dayDiff <= 0) {
-      return 'less than 1 day';
+    const timestampDiff =
+      moment.utc(inputs.lhs).valueOf() - moment.utc(inputs.rhs).valueOf();
+    for (const unit of momentDurations) {
+      const duration = moment.duration(1, unit).asMilliseconds();
+      const diff = timestampDiff / duration;
+
+      if (diff >= 1) {
+        if (unit === 'years' || unit === 'months') {
+          return diff.toFixed(1) + ' ' + unit;
+        } else {
+          if (Math.floor(diff) === 1) {
+            return '1' + ' ' + unit.slice(0, -1);
+          }
+          return Math.floor(diff) + ' ' + unit;
+        }
+      }
     }
-    return dayDiff.toString() + (dayDiff === 1 ? ' day' : ' days');
+    return 'less than 1 millisecond';
   },
 });
 
-export const opTimestampToDate = makeDateOp({
+export const opDatetimeAddDuration = makeDateOp({
   hidden: true,
-  name: 'timestamp-toDate',
-  argTypes: {timestamp: {type: 'timestamp'}},
-  description: `Creates a ${docType('date')} from timestamp`,
+  name: 'datetime-add',
+  argTypes: {lhs: {type: 'timestamp'}, rhs: 'number'},
+  description: `Returns the sum between a ${docType(
+    'timestamp'
+  )} and duration in milliseconds ${docType('number')}`,
   argDescriptions: {
-    dateISO: `An ISO timestamp string to convert to a ${docType('date')}`,
+    lhs: `An ISO timestamp`,
+    rhs: `Duration ${docType('number')}`,
   },
-  returnValueDescription: `The ${docType('timestamp')} as a Date`,
-  renderInfo: {
-    type: 'function',
-  },
+  returnValueDescription: `The sum between the a ${docType(
+    'timestamp'
+  )} and duration in milliseconds ${docType('number')}`,
   returnType: inputs => {
-    return 'date';
+    return {type: 'timestamp'};
   },
   resolver: inputs => {
-    const date = new Date(moment.utc(inputs.timestamp).toDate());
-    return date;
+    if (inputs.lhs == null || inputs.rhs == null || inputs.rhs <= 0) {
+      return null;
+    }
+    return moment.utc(inputs.lhs).valueOf() + inputs.rhs;
   },
 });
 
