@@ -27,6 +27,7 @@ import {
   opBooleanNotEqual,
   constNumber,
   constBoolean,
+  opOr,
   // opLimit,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
@@ -39,6 +40,7 @@ import {PanelContextProvider} from './PanelContext';
 import {Button, Popup} from 'semantic-ui-react';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import LinkButton from '@wandb/weave/common/components/LinkButton';
+import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
 
 const inputType = {
   type: 'function' as const,
@@ -60,6 +62,13 @@ interface VisualClauseString {
   op: '=' | '!=';
   value: string;
 }
+
+interface VisualClauseStringIn {
+  key: string;
+  simpleKeyType: 'string';
+  op: 'in';
+  value: string[];
+}
 interface VisualClauseBoolean {
   key: string;
   simpleKeyType: 'boolean';
@@ -76,6 +85,7 @@ interface VisualClauseNumber {
 
 type VisualClause =
   | VisualClauseString
+  | VisualClauseStringIn
   | VisualClauseBoolean
   | VisualClauseNumber;
 
@@ -83,7 +93,7 @@ interface VisualClauseWorkingState {
   key: string | undefined;
   simpleKeyType: 'number' | 'string' | 'boolean' | 'other';
   op: string | undefined;
-  value: string | number | boolean | undefined;
+  value: string | string[] | number | boolean | undefined;
 }
 
 const visualClauseIsValid = (
@@ -95,8 +105,14 @@ const visualClauseIsValid = (
   if (clause.simpleKeyType === 'number' && typeof clause.value !== 'number') {
     return false;
   }
-  if (clause.simpleKeyType === 'string' && typeof clause.value !== 'string') {
-    return false;
+  if (clause.simpleKeyType === 'string') {
+    if (clause.op === 'in') {
+      if (!Array.isArray(clause.value) || !clause.value.every(_.isString)) {
+        return false;
+      }
+    } else if (typeof clause.value !== 'string') {
+      return false;
+    }
   }
   if (clause.simpleKeyType === 'boolean' && typeof clause.value !== 'boolean') {
     return false;
@@ -117,8 +133,10 @@ const getSimpleKeyType = (keyType: Type) => {
 const getOpChoices = (
   simpleKeyType: 'string' | 'number' | 'boolean' | 'other'
 ) => {
-  return simpleKeyType === 'boolean' || simpleKeyType === 'string'
+  return simpleKeyType === 'boolean'
     ? ['=', '!=']
+    : simpleKeyType === 'string'
+    ? ['=', '!=', 'in']
     : simpleKeyType === 'number'
     ? ['=', '!=', '<', '<=', '>', '>=']
     : [];
@@ -173,7 +191,7 @@ const SingleFilterVisualEditor: React.FC<{
   //       })
   //     : voidNode();
   const valueQuery =
-    key != null
+    key != null && simpleKeyType === 'string'
       ? opUnique({
           arr: opPick({obj: props.listNode, key: constString(key)}),
         })
@@ -212,18 +230,35 @@ const SingleFilterVisualEditor: React.FC<{
       />
       <ModifiedDropdown
         value={op}
-        onChange={(e, {value}) => setOp(value as string)}
+        onChange={(e, {value}) => {
+          if (value === 'in') {
+            setValue([]);
+          } else {
+            setValue(undefined);
+          }
+          setOp(value as string);
+        }}
         options={opOptions}
         selection
       />
-      <ModifiedDropdown
-        value={value}
-        onChange={(e, {value}) => {
-          setValue(value);
-        }}
-        options={valueOptions}
-        selection
-      />
+      {simpleKeyType === 'number' ? (
+        <NumberInput
+          value={value}
+          onChange={newVal => {
+            setValue(newVal);
+          }}
+        />
+      ) : (
+        <ModifiedDropdown
+          value={value}
+          multiple={op === 'in'}
+          onChange={(e, {value}) => {
+            setValue(value);
+          }}
+          options={valueOptions}
+          selection
+        />
+      )}
       <Button onClick={props.onCancel}>Cancel</Button>
       <Button
         disabled={!valid}
@@ -241,12 +276,67 @@ const SingleFilterVisualEditor: React.FC<{
   );
 };
 
+const clauseNodeToVisualStringIn = (
+  clause: Node
+): VisualClauseStringIn | null => {
+  const inValues: string[] = [];
+  let key: string | undefined = undefined;
+  const addClauseValue = (node: Node) => {
+    const singleClause = clauseNodeToVisual(node);
+    if (singleClause == null) {
+      return false;
+    }
+    if (singleClause.simpleKeyType !== 'string') {
+      return false;
+    }
+    if (singleClause.op === 'in') {
+      return false;
+    }
+    if (key == null) {
+      key = singleClause.key;
+    } else if (key !== singleClause.key) {
+      return false;
+    }
+    inValues.push(singleClause.value);
+    return true;
+  };
+  while (true) {
+    if (clause.nodeType !== 'output') {
+      return null;
+    }
+    const op = clause.fromOp;
+    if (op.name === 'or') {
+      if (!addClauseValue(op.inputs.rhs)) {
+        return null;
+      }
+      clause = op.inputs.lhs;
+    } else {
+      if (!addClauseValue(clause)) {
+        return null;
+      }
+      break;
+    }
+  }
+  if (key == null) {
+    return null;
+  }
+  return {
+    key,
+    simpleKeyType: 'string',
+    op: 'in',
+    value: inValues,
+  };
+};
+
 const clauseNodeToVisual = (clause: Node): VisualClause | null => {
   if (clause.nodeType !== 'output') {
     return null;
   }
   const op = clause.fromOp;
   let opString;
+  if (op.name === 'or') {
+    return clauseNodeToVisualStringIn(clause);
+  }
   if (['string-equal', 'boolean-equal', 'number-equal'].includes(op.name)) {
     opString = '=';
   } else if (
@@ -328,43 +418,65 @@ const visualClausesToFilterExpression = (
     });
     let compOp;
     let valueNode;
-    if (visualClause.simpleKeyType === 'string') {
-      if (visualClause.op === '=') {
-        compOp = opStringEqual;
-      } else if (visualClause.op === '!=') {
-        compOp = opStringNotEqual;
+    let clause;
+    if (visualClause.op === 'in') {
+      const val = visualClause.value as string[];
+      if (val.length === 0) {
+        return constNodeUnsafe('boolean', false);
       }
-      valueNode = constString(visualClause.value);
-    } else if (visualClause.simpleKeyType === 'number') {
-      if (visualClause.op === '=') {
-        compOp = opNumberEqual;
-      } else if (visualClause.op === '!=') {
-        compOp = opNumberNotEqual;
-      } else if (visualClause.op === '<') {
-        compOp = opNumberLess;
-      } else if (visualClause.op === '<=') {
-        compOp = opNumberLessEqual;
-      } else if (visualClause.op === '>') {
-        compOp = opNumberGreater;
-      } else if (visualClause.op === '>=') {
-        compOp = opNumberGreaterEqual;
+      clause = opStringEqual({
+        lhs: keyNode,
+        rhs: constString(val[0]),
+      });
+      for (let i = 1; i < val.length; i++) {
+        const clauseI = opStringEqual({
+          lhs: keyNode,
+          rhs: constString(val[i]),
+        });
+        clause = opOr({
+          lhs: clause,
+          rhs: clauseI,
+        });
       }
-      valueNode = constNumber(visualClause.value);
-    } else if (visualClause.simpleKeyType === 'boolean') {
-      if (visualClause.op === '=') {
-        compOp = opBooleanEqual;
-      } else if (visualClause.op === '!=') {
-        compOp = opBooleanNotEqual;
+    } else {
+      if (visualClause.simpleKeyType === 'string') {
+        if (visualClause.op === '=') {
+          compOp = opStringEqual;
+        } else if (visualClause.op === '!=') {
+          compOp = opStringNotEqual;
+        }
+        valueNode = constString(visualClause.value);
+      } else if (visualClause.simpleKeyType === 'number') {
+        if (visualClause.op === '=') {
+          compOp = opNumberEqual;
+        } else if (visualClause.op === '!=') {
+          compOp = opNumberNotEqual;
+        } else if (visualClause.op === '<') {
+          compOp = opNumberLess;
+        } else if (visualClause.op === '<=') {
+          compOp = opNumberLessEqual;
+        } else if (visualClause.op === '>') {
+          compOp = opNumberGreater;
+        } else if (visualClause.op === '>=') {
+          compOp = opNumberGreaterEqual;
+        }
+        valueNode = constNumber(visualClause.value);
+      } else if (visualClause.simpleKeyType === 'boolean') {
+        if (visualClause.op === '=') {
+          compOp = opBooleanEqual;
+        } else if (visualClause.op === '!=') {
+          compOp = opBooleanNotEqual;
+        }
+        valueNode = constBoolean(visualClause.value);
       }
-      valueNode = constBoolean(visualClause.value);
+      if (compOp == null) {
+        throw new Error('Invalid visual clause');
+      }
+      clause = compOp({
+        lhs: keyNode,
+        rhs: valueNode as any,
+      });
     }
-    if (compOp == null) {
-      throw new Error('Invalid visual clause');
-    }
-    const clause = compOp({
-      lhs: keyNode,
-      rhs: valueNode as any,
-    });
     if (expr.nodeType === 'const' && expr.val === true) {
       return clause;
     }
@@ -403,6 +515,9 @@ const FilterPill = (props: {
   onRemove: () => void;
 }) => {
   const {clause} = props;
+  const valueStr = _.isArray(clause.value)
+    ? clause.value.join(', ')
+    : clause.value;
   return (
     <div
       style={{
@@ -412,11 +527,15 @@ const FilterPill = (props: {
         padding: '4px 16px',
         cursor: 'pointer',
         position: 'relative',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        maxWidth: '90%',
+        overflow: 'hidden',
       }}
       onClick={props.onClick}>
       <div style={{marginRight: 4}}>{clause.key}</div>
       <div style={{marginRight: 4}}>{clause.op}</div>
-      <div>{clause.value}</div>
+      <div>{valueStr}</div>
     </div>
   );
 };
@@ -562,7 +681,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               trigger={
                 <FilterPillBlock
                   clause={clause}
-                  onClick={() => setEditingFilterIndex(0)}
+                  onClick={() => setEditingFilterIndex(i)}
                   onRemove={() => {
                     updateValFromVisualClauses(
                       removeVisualClause(visualClauses, i)
@@ -570,7 +689,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                   }}
                 />
               }
-              open={editingFilterIndex === 0}
+              open={editingFilterIndex === i}
               content={
                 <SingleFilterVisualEditor
                   listNode={props.config!.node}
