@@ -455,6 +455,9 @@ def _tag_safe_deref(ref):
     return res
 
 
+client_cache_key_op_allow_list = ["gqlroot-wbgqlquery"]
+
+
 def execute_forward_node(
     fg: forward_graph.ForwardGraph,
     forward_node: forward_graph.ForwardNode,
@@ -467,7 +470,9 @@ def execute_forward_node(
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
 
     cache_mode = environment.cache_mode()
-    client_cache_key = context_state.get_client_cache_key()
+    client_cache_key = None
+    if op_def.name in client_cache_key_op_allow_list:
+        client_cache_key = context_state.get_client_cache_key()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
         if op_policy.should_cache(op_def.simple_name):
