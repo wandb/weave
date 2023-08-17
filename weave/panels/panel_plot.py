@@ -291,6 +291,9 @@ class LegendSettings:
     x: LegendSetting
     y: LegendSetting
     color: LegendSetting
+    pointShape: LegendSetting
+    pointSize: LegendSetting
+    lineStyle: LegendSetting
 
 
 @weave.type()
@@ -335,7 +338,7 @@ class PlotConfig:
     legendSettings: typing.Optional[LegendSettings]
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
-    configVersion: int = 14
+    configVersion: int = 15
 
 
 def set_through_array(
@@ -543,7 +546,12 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 config_axisSettings.y.scale = AxisScale(scaleType=y_axis_type)
 
             config_legendSettings = LegendSettings(
-                x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
+                x=LegendSetting(),
+                y=LegendSetting(),
+                color=LegendSetting(),
+                pointShape=LegendSetting(),
+                lineStyle=LegendSetting(),
+                pointSize=LegendSetting(),
             )
 
             self.config = PlotConfig(
@@ -599,7 +607,12 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             raise errors.WeaveInternalError("config is None")
 
         self.config.legendSettings = LegendSettings(
-            x=LegendSetting(True), y=LegendSetting(True), color=LegendSetting(True)
+            x=LegendSetting(True),
+            y=LegendSetting(True),
+            color=LegendSetting(True),
+            pointShape=LegendSetting(),
+            lineStyle=LegendSetting(),
+            pointSize=LegendSetting(),
         )
 
     def to_code(self) -> typing.Optional[str]:
@@ -613,7 +626,12 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         )
 
         default_legendSettings = LegendSettings(
-            x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
+            x=LegendSetting(),
+            y=LegendSetting(),
+            color=LegendSetting(),
+            pointShape=LegendSetting(),
+            lineStyle=LegendSetting(),
+            pointSize=LegendSetting(),
         )
         default_configOptionsExpanded = ConfigOptionsExpanded()
 
