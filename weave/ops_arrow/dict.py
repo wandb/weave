@@ -13,6 +13,7 @@ from ..language_features.tagging import (
     process_opdef_output_type,
 )
 from .arrow_tags import direct_add_arrow_tags
+from . import convert
 
 from .constructors import (
     vectorized_container_constructor_preprocessor,
@@ -405,4 +406,30 @@ def awl_projection_2d(
             }
         ),
         table._artifact,
+    )
+
+
+@op(
+    name="ArrowWeaveListTypedDict-keys",
+    input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
+    output_type=lambda input_types: ArrowWeaveListType(types.List(types.String())),
+)
+def keys(self):
+    keys = list(self.object_type.property_types.keys())
+    return convert.to_arrow(
+        [keys] * len(self), types.List(types.List(types.String())), self._artifact
+    )
+
+
+@op(
+    name="ArrowWeaveListTypedDict-columnNames",
+    hidden=True,
+    input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
+    output_type=lambda input_types: ArrowWeaveListType(types.String()),
+)
+def columnNames(self):
+    return convert.to_arrow(
+        list(self.object_type.property_types.keys()),
+        types.List(types.String()),
+        self._artifact,
     )

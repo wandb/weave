@@ -1768,3 +1768,19 @@ def test_flatten_handles_tagged_lists():
         }
         for i in expected
     ]
+
+
+def test_keys_ops():
+    awl = arrow.to_arrow([{"a": 1}, {"a": 1, "b": 2, "c": 2}, {"c": 3}])
+    node = weave.save(awl)
+    keys_node = node.keys()
+    # Unfortunately, we lose specific info about key presence in AWL.
+    assert weave.use(keys_node).to_pylist_raw() == [
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+    ]
+
+    all_keys_node = keys_node.flatten().unique()
+
+    assert weave.use(all_keys_node).to_pylist_raw() == ["a", "b", "c"]
