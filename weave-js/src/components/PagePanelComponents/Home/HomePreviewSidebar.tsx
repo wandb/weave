@@ -216,7 +216,8 @@ export const HomeExpressionPreviewParts: React.FC<{
   
   const isLoadingTemplates = generators.loading || refinedExpression.loading || isGenerating
   const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
-  const recommendedTemplateInfo = generators.result.find(template => template.op_name === OPEN_AI_OP_NAME) || SEED_BOARD_TEMPLATE;
+  const recommendedTemplateInfo = generators.result.find(template => template.op_name === OPEN_AI_OP_NAME) || 
+    generators.result.find(template => template.op_name !== SEED_BOARD_OP_NAME) || SEED_BOARD_TEMPLATE;
 
   useEffect(() => {
     if (isLoadingTemplates) {
@@ -232,6 +233,7 @@ export const HomeExpressionPreviewParts: React.FC<{
           {hasTemplates && <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>}
           {/* <Tabs.Trigger value="Boards">Boards</Tabs.Trigger> */}
         </Tabs.List>
+        {/* 38 px is the height of the tab header, to make sure the height of content doesnt exceed window, its explicitly set here */}
         <Tabs.Content value="Overview" style={{height: 'calc( 100% - 38px )'}}>
           <TabContentWrapper>
             <OverviewTab
