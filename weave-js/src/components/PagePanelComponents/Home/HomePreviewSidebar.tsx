@@ -1,6 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
-import { Pill } from '@wandb/weave/components/Tag';
-import * as Tabs  from '@wandb/weave/components/Tabs';
+import {Pill} from '@wandb/weave/components/Tag';
+import * as Tabs from '@wandb/weave/components/Tabs';
 
 import React, {useEffect, useState} from 'react';
 import * as LayoutElements from './LayoutElements';
@@ -18,7 +18,11 @@ import {
 } from '../../Panel2/pyBoardGen';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 import {useNodeWithServerType} from '@wandb/weave/react';
-import {MOON_250, MOON_500, MOON_800} from '@wandb/weave/common/css/color.styles';
+import {
+  MOON_250,
+  MOON_500,
+  MOON_800,
+} from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
@@ -41,7 +45,7 @@ const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
 `;
 CenterTableActionCellIcon.displayName = 'S.CenterTableActionCellIcon';
 
-const DashboardTemplateItem = styled(LayoutElements.VBlock)`  
+const DashboardTemplateItem = styled(LayoutElements.VBlock)`
   padding: 16px 16px 16px 12px;
   border: 1px solid ${MOON_250};
   border-radius: 4px;
@@ -54,23 +58,22 @@ const DashboardTemplateItem = styled(LayoutElements.VBlock)`
 `;
 DashboardTemplateItem.displayName = 'S.DashboardTemplateItem';
 
-const DashboardTemplateItemText = styled(LayoutElements.Block)` 
+const DashboardTemplateItemText = styled(LayoutElements.Block)`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 4px;
-  
 `;
 DashboardTemplateItemText.displayName = 'S.DashboardTemplateItemText';
 
-const TabContentWrapper = styled.div` 
+const TabContentWrapper = styled.div`
   overflow-y: scroll;
   padding: 16px;
   height: 100%;
 `;
 TabContentWrapper.displayName = 'S.TabContentWrapper';
 
-const Label = styled.span` 
+const Label = styled.span`
   color: ${MOON_500};
   font-size: 15px;
   font-weight: 400;
@@ -85,7 +88,8 @@ const HomeExpressionPreviewPartsWrapper = styled.div`
     height: 100%;
   }
 `;
-HomeExpressionPreviewPartsWrapper.displayName = 'S.HomeExpressionPreviewPartsWrapper';
+HomeExpressionPreviewPartsWrapper.displayName =
+  'S.HomeExpressionPreviewPartsWrapper';
 
 type Template = {
   display_name: string;
@@ -97,8 +101,8 @@ const SEED_BOARD_OP_NAME = 'py_board-seed_board';
 const OPEN_AI_OP_NAME = 'py_board-open_ai_completions_monitor';
 const SEED_BOARD_TEMPLATE = {
   op_name: SEED_BOARD_OP_NAME,
-  display_name: "Simple Board",
-  description: "Seed a board with a simple visualization of this table."
+  display_name: 'Simple Board',
+  description: 'Seed a board with a simple visualization of this table.',
 };
 
 export const HomePreviewSidebarTemplate: React.FC<{
@@ -146,9 +150,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
           />
         </CenterTableActionCellIcon>
       </LayoutElements.HBlock>
-      <LayoutElements.VSpace>
-        {props.children}
-      </LayoutElements.VSpace>
+      <LayoutElements.VSpace>{props.children}</LayoutElements.VSpace>
       {(props.primaryAction || props.secondaryAction) && (
         <LayoutElements.HBlock
           style={{
@@ -203,7 +205,7 @@ const Loader = () => (
     }}>
     <WeaveAnimatedLoader style={{height: '64px', width: '64px'}} />
   </LayoutElements.VStack>
-)
+);
 
 export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
@@ -213,8 +215,9 @@ export const HomeExpressionPreviewParts: React.FC<{
   const generators = useBoardGeneratorsForNode(expr);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tabValue, setTabValue] = useState('Overview');
-  
-  const isLoadingTemplates = generators.loading || refinedExpression.loading || isGenerating
+
+  const isLoadingTemplates =
+    generators.loading || refinedExpression.loading || isGenerating;
   const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
   const recommendedTemplateInfo = generators.result.find(template => template.op_name === OPEN_AI_OP_NAME) || 
     generators.result.find(template => template.op_name !== SEED_BOARD_OP_NAME) || SEED_BOARD_TEMPLATE;
@@ -227,10 +230,15 @@ export const HomeExpressionPreviewParts: React.FC<{
 
   return (
     <HomeExpressionPreviewPartsWrapper>
-      <Tabs.Root value={tabValue} onValueChange={(val: string) => setTabValue(val)} className='h-full'>
-        <Tabs.List className='px-16'>
+      <Tabs.Root
+        value={tabValue}
+        onValueChange={(val: string) => setTabValue(val)}
+        className="h-full">
+        <Tabs.List className="px-16">
           <Tabs.Trigger value="Overview">Overview</Tabs.Trigger>
-          {hasTemplates && <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>}
+          {hasTemplates && (
+            <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>
+          )}
           {/* <Tabs.Trigger value="Boards">Boards</Tabs.Trigger> */}
         </Tabs.List>
         {/* 38 px is the height of the tab header, to make sure the height of content doesnt exceed window, its explicitly set here */}
@@ -249,9 +257,12 @@ export const HomeExpressionPreviewParts: React.FC<{
             />
           </TabContentWrapper>
         </Tabs.Content>
-        {hasTemplates && <Tabs.Content value="Templates" style={{height: 'calc( 100% - 38px )'}}>
+        {hasTemplates && (
+          <Tabs.Content
+            value="Templates"
+            style={{height: 'calc( 100% - 38px )'}}>
             <TabContentWrapper>
-              <TemplateTab 
+              <TemplateTab
                 navigateToExpression={navigateToExpression}
                 refinedExpression={refinedExpression}
                 recommendedTemplateInfo={recommendedTemplateInfo}
@@ -261,7 +272,7 @@ export const HomeExpressionPreviewParts: React.FC<{
               />
             </TabContentWrapper>
           </Tabs.Content>
-        }
+        )}
         {/* <Tabs.Content value="Boards" style={{height: 'calc( 100% - 38px )'}}>Boards</Tabs.Content> */}
       </Tabs.Root>
     </HomeExpressionPreviewPartsWrapper>
@@ -284,13 +295,13 @@ const OverviewTab = ({
   refinedExpression: {
     loading: boolean;
     result: NodeOrVoidNode;
-  },
-  recommendedTemplateInfo: Template,
-  isLoadingTemplates: boolean,
-  setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>,
-  generators: Template[],
-  setTabValue: React.Dispatch<React.SetStateAction<string>>,
-  hasTemplates: boolean,
+  };
+  recommendedTemplateInfo: Template;
+  isLoadingTemplates: boolean;
+  setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
+  generators: Template[];
+  setTabValue: React.Dispatch<React.SetStateAction<string>>;
+  hasTemplates: boolean;
 }) => {
   const weave = useWeaveContext();
   const inputExpr = weave.expToString(expr);
@@ -298,7 +309,7 @@ const OverviewTab = ({
   const [copyButtonText, setCopyButtonText] = useState<'Copy' | 'Copied'>(
     'Copy'
   );
-  
+
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
@@ -346,140 +357,59 @@ const OverviewTab = ({
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
-      {isLoadingTemplates ? 
-        <Loader /> : (
-          <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
-            <LayoutElements.BlockHeader>
-              CREATE A BOARD
-              {hasTemplates && <Button
+      {isLoadingTemplates ? (
+        <Loader />
+      ) : (
+        <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
+          <LayoutElements.BlockHeader>
+            CREATE A BOARD
+            {hasTemplates && (
+              <Button
                 onClick={() => {
                   setTabValue('Templates');
                 }}
-                size='small'
-                variant='ghost'
-              >
+                size="small"
+                variant="ghost">
                 View all templates
-              </Button>}
-            </LayoutElements.BlockHeader>
-            <LayoutElements.VStack
-              style={{
-                gap: '8px',
-              }}>
-              {recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME &&
-                <>
-                  <DashboardTemplate
-                    key={recommendedTemplateInfo.op_name}
-                    title={recommendedTemplateInfo.display_name}
-                    subtitle={recommendedTemplateInfo.description}
-                    onButtonClick={() => {
-                      setIsGenerating(true);
-                      makeBoardFromNode(
-                        recommendedTemplateInfo.op_name,
-                        refinedExpression.result as any,
-                        newDashExpr => {
-                          navigateToExpression(newDashExpr);
-                          setIsGenerating(false);
-                        }
-                      );
-                    }}
-                    isExpanded={true}
-                    isRecommended={true}
-                  />
-                  <Label style={{display: 'flex', justifyContent: 'center'}}>
-                    or
-                  </Label>
-                </>
-              }
-              <DashboardTemplate
-                key={SEED_BOARD_OP_NAME}
-                subtitle={SEED_BOARD_TEMPLATE.description}
-                onButtonClick={() => {
-                  setIsGenerating(true);
-                  makeBoardFromNode(
-                    SEED_BOARD_OP_NAME,
-                    refinedExpression.result as any,
-                    newDashExpr => {
-                      navigateToExpression(newDashExpr);
-                      setIsGenerating(false);
-                    }
-                  );
-                }}
-                isExpanded={true}
-                buttonVariant={generators.length === 1 ? 'primary' : 'secondary'}
-                buttonText='New board'
-              />
-            </LayoutElements.VStack>
-          </LayoutElements.VBlock>
-        )
-      }
-    </LayoutElements.VStack>
-  )
-}
-
-const TemplateTab = ({ 
-  navigateToExpression, 
-  refinedExpression, 
-  recommendedTemplateInfo, 
-  isLoadingTemplates, 
-  setIsGenerating, 
-  generators} : {
-    navigateToExpression: NavigateToExpressionType,
-    refinedExpression: {
-      loading: boolean;
-      result: NodeOrVoidNode;
-    },
-    recommendedTemplateInfo: Template,
-    isLoadingTemplates: boolean,
-    setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>,
-    generators: Template[],
-  }) => {
-  const makeBoardFromNode = useMakeLocalBoardFromNode();
-  const [expandedTemplate, setExpandedTemplate] = useState<string | null>(recommendedTemplateInfo.op_name);
-
-  return(
-    isLoadingTemplates ? <Loader /> : (
-      <LayoutElements.VStack
-        style={{
-          gap: '8px',
-          paddingBottom: '32px'
-        }}>
-        <Label style={{
-          marginBottom: '8px',
-        }}>
-          Weave analyzes your data schema to suggest relevant board templates. Select a template to instantly generate a board.
-        </Label>
-        {recommendedTemplateInfo && (
-          <DashboardTemplate
-            key={recommendedTemplateInfo.op_name}
-            title={recommendedTemplateInfo.display_name}
-            subtitle={recommendedTemplateInfo.description}
-            onButtonClick={() => {
-              setIsGenerating(true);
-              makeBoardFromNode(
-                recommendedTemplateInfo.op_name,
-                refinedExpression.result as any,
-                newDashExpr => {
-                  navigateToExpression(newDashExpr);
-                  setIsGenerating(false);
-                }
-              );
-            }}
-            onClick={() => {setExpandedTemplate(recommendedTemplateInfo.op_name)}}
-            isExpanded={recommendedTemplateInfo.op_name === expandedTemplate}
-            isRecommended={true}
-          />
-        )}
-        {generators.map(template => {
-          if (recommendedTemplateInfo && recommendedTemplateInfo.op_name === template.op_name) {return null;};
-          return (
+              </Button>
+            )}
+          </LayoutElements.BlockHeader>
+          <LayoutElements.VStack
+            style={{
+              gap: '8px',
+            }}>
+            {recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
+              <>
+                <DashboardTemplate
+                  key={recommendedTemplateInfo.op_name}
+                  title={recommendedTemplateInfo.display_name}
+                  subtitle={recommendedTemplateInfo.description}
+                  onButtonClick={() => {
+                    setIsGenerating(true);
+                    makeBoardFromNode(
+                      recommendedTemplateInfo.op_name,
+                      refinedExpression.result as any,
+                      newDashExpr => {
+                        navigateToExpression(newDashExpr);
+                        setIsGenerating(false);
+                      }
+                    );
+                  }}
+                  isExpanded={true}
+                  isRecommended={true}
+                />
+                <Label style={{display: 'flex', justifyContent: 'center'}}>
+                  or
+                </Label>
+              </>
+            )}
             <DashboardTemplate
-              key={template.op_name}
-              title={template.display_name}
-              subtitle={template.description}
+              key={SEED_BOARD_OP_NAME}
+              subtitle={SEED_BOARD_TEMPLATE.description}
               onButtonClick={() => {
                 setIsGenerating(true);
                 makeBoardFromNode(
-                  template.op_name,
+                  SEED_BOARD_OP_NAME,
                   refinedExpression.result as any,
                   newDashExpr => {
                     navigateToExpression(newDashExpr);
@@ -487,12 +417,109 @@ const TemplateTab = ({
                   }
                 );
               }}
-              onClick={() => {setExpandedTemplate(template.op_name)}}
-              isExpanded={expandedTemplate === template.op_name}
+              isExpanded={true}
+              buttonVariant={generators.length === 1 ? 'primary' : 'secondary'}
+              buttonText="New board"
             />
-        )})}
-      </LayoutElements.VStack>
-    )
+          </LayoutElements.VStack>
+        </LayoutElements.VBlock>
+      )}
+    </LayoutElements.VStack>
+  );
+};
+
+const TemplateTab = ({
+  navigateToExpression,
+  refinedExpression,
+  recommendedTemplateInfo,
+  isLoadingTemplates,
+  setIsGenerating,
+  generators,
+}: {
+  navigateToExpression: NavigateToExpressionType;
+  refinedExpression: {
+    loading: boolean;
+    result: NodeOrVoidNode;
+  };
+  recommendedTemplateInfo: Template;
+  isLoadingTemplates: boolean;
+  setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
+  generators: Template[];
+}) => {
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
+  const [expandedTemplate, setExpandedTemplate] = useState<string | null>(
+    recommendedTemplateInfo.op_name
+  );
+
+  return isLoadingTemplates ? (
+    <Loader />
+  ) : (
+    <LayoutElements.VStack
+      style={{
+        gap: '8px',
+        paddingBottom: '32px',
+      }}>
+      <Label
+        style={{
+          marginBottom: '8px',
+        }}>
+        Weave analyzes your data schema to suggest relevant board templates.
+        Select a template to instantly generate a board.
+      </Label>
+      {recommendedTemplateInfo && (
+        <DashboardTemplate
+          key={recommendedTemplateInfo.op_name}
+          title={recommendedTemplateInfo.display_name}
+          subtitle={recommendedTemplateInfo.description}
+          onButtonClick={() => {
+            setIsGenerating(true);
+            makeBoardFromNode(
+              recommendedTemplateInfo.op_name,
+              refinedExpression.result as any,
+              newDashExpr => {
+                navigateToExpression(newDashExpr);
+                setIsGenerating(false);
+              }
+            );
+          }}
+          onClick={() => {
+            setExpandedTemplate(recommendedTemplateInfo.op_name);
+          }}
+          isExpanded={recommendedTemplateInfo.op_name === expandedTemplate}
+          isRecommended={true}
+        />
+      )}
+      {generators.map(template => {
+        if (
+          recommendedTemplateInfo &&
+          recommendedTemplateInfo.op_name === template.op_name
+        ) {
+          return null;
+        }
+        return (
+          <DashboardTemplate
+            key={template.op_name}
+            title={template.display_name}
+            subtitle={template.description}
+            onButtonClick={() => {
+              setIsGenerating(true);
+              makeBoardFromNode(
+                template.op_name,
+                refinedExpression.result as any,
+                newDashExpr => {
+                  navigateToExpression(newDashExpr);
+                  setIsGenerating(false);
+                }
+              );
+            }}
+            onClick={() => {
+              setExpandedTemplate(template.op_name);
+            }}
+            isExpanded={expandedTemplate === template.op_name}
+          />
+        );
+      })}
+    </LayoutElements.VStack>
   );
 };
 
@@ -522,37 +549,46 @@ const DashboardTemplate: React.FC<{
           overflow: 'hidden',
         }}>
         {isRecommended && (
-          <LayoutElements.Block style={{
-            marginBottom: '8px',
-          }}>
-            <Pill label="Recommended Template" color='green'/>
+          <LayoutElements.Block
+            style={{
+              marginBottom: '8px',
+            }}>
+            <Pill label="Recommended Template" color="green" />
           </LayoutElements.Block>
         )}
-        {title && <DashboardTemplateItemText
-          style={{
-            fontWeight: 600,
-            fontSize: '16px',
-            lineHeight: '24px',
-            color: MOON_800,
-          }}>
-          {title}
-        </DashboardTemplateItemText>}
-        {subtitle && <DashboardTemplateItemText
-          style={{
-            fontSize: '14px',
-            fontWeight: '400',
-            lineHeight: '20px',
-            color: MOON_500,
-          }}>
-          {subtitle}
-        </DashboardTemplateItemText>
-        }
+        {title && (
+          <DashboardTemplateItemText
+            style={{
+              fontWeight: 600,
+              fontSize: '16px',
+              lineHeight: '24px',
+              color: MOON_800,
+            }}>
+            {title}
+          </DashboardTemplateItemText>
+        )}
+        {subtitle && (
+          <DashboardTemplateItemText
+            style={{
+              fontSize: '14px',
+              fontWeight: '400',
+              lineHeight: '20px',
+              color: MOON_500,
+            }}>
+            {subtitle}
+          </DashboardTemplateItemText>
+        )}
         {isExpanded && (
           <LayoutElements.Block
             style={{
               marginTop: '8px',
             }}>
-            <Button icon="add-new" variant={buttonVariant} onClick={onButtonClick} size="large" className='w-full'>
+            <Button
+              icon="add-new"
+              variant={buttonVariant}
+              onClick={onButtonClick}
+              size="large"
+              className="w-full">
               {buttonText}
             </Button>
           </LayoutElements.Block>
