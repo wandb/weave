@@ -422,12 +422,12 @@ def keys(self):
 
 
 @op(
-    name="ArrowWeaveListTypedDict-propertyTypes",
+    name="ArrowWeaveListTypedDict-columnNames",
     hidden=True,
     input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
     output_type=lambda input_types: ArrowWeaveListType(types.String()),
 )
-def propertyTypes(self):
+def columnNames(self):
     return convert.to_arrow(
         list(self.object_type.property_types.keys()),
         types.List(types.String()),

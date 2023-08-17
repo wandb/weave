@@ -113,7 +113,7 @@ def _node_simplification(node: graph.Node) -> typing.Optional[graph.OutputNode]:
                 awl_node = arr_node_2.from_op.inputs["self"]
                 return graph.OutputNode(
                     node.type,
-                    "ArrowWeaveListTypedDict-propertyTypes",
+                    "ArrowWeaveListTypedDict-columnNames",
                     {"self": awl_node},
                 )
 
