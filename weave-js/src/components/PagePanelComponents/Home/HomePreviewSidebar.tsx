@@ -390,31 +390,32 @@ const OverviewTab = ({
             style={{
               gap: '8px',
             }}>
-            {recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
-              <>
-                <DashboardTemplate
-                  key={recommendedTemplateInfo.op_name}
-                  title={recommendedTemplateInfo.display_name}
-                  subtitle={recommendedTemplateInfo.description}
-                  onButtonClick={() => {
-                    setIsGenerating(true);
-                    makeBoardFromNode(
-                      recommendedTemplateInfo.op_name,
-                      refinedExpression.result as any,
-                      newDashExpr => {
-                        navigateToExpression(newDashExpr);
-                        setIsGenerating(false);
-                      }
-                    );
-                  }}
-                  isExpanded={true}
-                  isRecommended={true}
-                />
-                <Label style={{display: 'flex', justifyContent: 'center'}}>
-                  or
-                </Label>
-              </>
-            )}
+            {recommendedTemplateInfo && 
+              recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
+                <>
+                  <DashboardTemplate
+                    key={recommendedTemplateInfo.op_name}
+                    title={recommendedTemplateInfo.display_name}
+                    subtitle={recommendedTemplateInfo.description}
+                    onButtonClick={() => {
+                      setIsGenerating(true);
+                      makeBoardFromNode(
+                        recommendedTemplateInfo.op_name,
+                        refinedExpression.result as any,
+                        newDashExpr => {
+                          navigateToExpression(newDashExpr);
+                          setIsGenerating(false);
+                        }
+                      );
+                    }}
+                    isExpanded={true}
+                    isRecommended={true}
+                  />
+                  <Label style={{display: 'flex', justifyContent: 'center'}}>
+                    or
+                  </Label>
+                </>
+              )}
             <DashboardTemplate
               key={SEED_BOARD_OP_NAME}
               subtitle="Seed a board with a simple visualization of this table."
