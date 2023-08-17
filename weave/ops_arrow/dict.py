@@ -417,7 +417,7 @@ def awl_projection_2d(
 def keys(self):
     keys = list(self.object_type.property_types.keys())
     return convert.to_arrow(
-        keys * len(self), types.List(types.String()), self._artifact
+        [keys] * len(self), types.List(types.List(types.String())), self._artifact
     )
 
 
@@ -425,7 +425,11 @@ def keys(self):
     name="ArrowWeaveListTypedDict-propertyTypes",
     hidden=True,
     input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
-    output_type=lambda input_types: types.List(types.String()),
+    output_type=lambda input_types: ArrowWeaveListType(types.String()),
 )
 def propertyTypes(self):
-    return list(self.object_type.property_types.keys())
+    return convert.to_arrow(
+        list(self.object_type.property_types.keys()),
+        types.List(types.String()),
+        self._artifact,
+    )
