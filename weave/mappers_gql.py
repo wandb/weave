@@ -17,6 +17,7 @@ from .mappers_python_def import (
 from . import errors
 from . import weave_types as types
 from . import mappers_python
+from .gql_with_keys import GQLHasKeysType
 
 
 class PyDictToUntypedOpaqueDict(mappers.Mapper):
@@ -27,6 +28,8 @@ class PyDictToUntypedOpaqueDict(mappers.Mapper):
 def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
     if isinstance(type, uod.UntypedOpaqueDict.WeaveType()):
         return PyDictToUntypedOpaqueDict(type, mapper, artifact, path)
+    elif isinstance(type, GQLHasKeysType):
+        return DictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
         return NoneToPyNone(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
