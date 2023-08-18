@@ -350,7 +350,15 @@ const CenterProjectBoardsBrowser: React.FC<
         },
       ],
     ];
-  }, [props, history, params.entity, params.project, params.assetType]);
+  }, [
+    history,
+    params.entity,
+    params.project,
+    params.assetType,
+    props.entityName,
+    props.projectName,
+    props.navigateToExpression,
+  ]);
 
   const sidebarActions = useMemo(
     () =>
@@ -551,8 +559,8 @@ const CenterProjectTablesBrowser: React.FC<
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(() => {
-    return [
+  > = useMemo(
+    () => [
       [
         // Home Page TODO: Enable awesome previews
         {
@@ -627,8 +635,16 @@ const CenterProjectTablesBrowser: React.FC<
           },
         },
       ],
-    ];
-  }, [props, weave, history, makeBoardFromNode, navigateToExpression]);
+    ],
+    [
+      props.entityName,
+      props.projectName,
+      weave,
+      history,
+      makeBoardFromNode,
+      navigateToExpression,
+    ]
+  );
 
   const sidebarActions = useMemo(
     () =>
