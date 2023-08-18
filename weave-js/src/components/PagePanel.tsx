@@ -164,7 +164,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
       const pathname = inJupyterCell() ? window.location.pathname : '/';
-
+      
       if (
         newExpStr.startsWith('get') &&
         expString?.startsWith('get') &&
@@ -173,7 +173,10 @@ const PagePanel = ({browserType}: PagePanelProps) => {
       ) {
         transparentlyMountExpString.current = newExpStr;
       }
-      history.push(`${pathname}?${searchParams}`);
+
+      // @ts-ignore
+      const prefix = window.CONFIG ? window.CONFIG.PREFIX : '';
+      history.push(`${pathname}${prefix}?${searchParams}`);
     },
     [expString, history, weave]
   );
