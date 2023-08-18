@@ -7,17 +7,19 @@ import {
   opUnique,
   voidNode,
 } from '@wandb/weave/core';
+import {IconChevronDown} from '@wandb/weave/components/Icon';
 import React, {useCallback, useMemo} from 'react';
 
 import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {
+  ConfigFieldWrapper,
+  ConfigFieldModifiedDropdown,
   ConfigOption,
   ConfigSection,
   ExpressionConfigField,
 } from './ConfigPanel';
 import {useUpdateConfig2} from './PanelComp';
-import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 
 const inputType = {
   type: 'union' as const,
@@ -94,23 +96,25 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   }, [choices]);
 
   return (
-    <div style={{paddingLeft: 16}}>
-      <ModifiedDropdown
-        value={chosen}
-        onChange={(e, {value}) => {
-          if (isMultiple) {
-            setVal({val: constNodeUnsafe(config.choices.type, value)});
-          } else if (value != null) {
-            setVal({val: constString(value as string)});
-          } else {
-            setVal({val: constNone()});
-          }
-        }}
-        options={options}
-        selection
-        multiple={isMultiple}
-        floating
-      />
+    <div style={{padding: '0 16px'}}>
+      <ConfigFieldWrapper withIcon>
+        <ConfigFieldModifiedDropdown
+          value={chosen}
+          onChange={(e, {value}) => {
+            if (isMultiple) {
+              setVal({val: constNodeUnsafe(config.choices.type, value)});
+            } else if (value != null) {
+              setVal({val: constString(value as string)});
+            } else {
+              setVal({val: constNone()});
+            }
+          }}
+          options={options}
+          multiple={isMultiple}
+          floating
+          icon={<IconChevronDown width={18} />}
+        />
+      </ConfigFieldWrapper>
     </div>
   );
 };

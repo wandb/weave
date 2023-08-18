@@ -50,6 +50,7 @@ export {
   IconFacebookSocial,
   IconFailed,
   IconFlashBolt,
+  IconFilterAlt,
   IconFolderAlt,
   IconFolderProject,
   IconFolderProjectMove,
