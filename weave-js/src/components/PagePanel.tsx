@@ -140,7 +140,6 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   const location = usePoorMansLocation();
   const urlParams = new URLSearchParams(location.search);
   React.useEffect(() => {
-    console.log('Inside Page Panel', weave, location, urlParams);
     const options = {
       context: {
         hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),

@@ -1,6 +1,3 @@
-import Analytics from '@segment/analytics.js-core/build/analytics';
-import SegmentIntegration from '@segment/analytics.js-integration-segmentio';
-
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
   urlPrefixed(path: string): string;
