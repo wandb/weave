@@ -164,7 +164,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
       const pathname = inJupyterCell() ? window.location.pathname : '/';
-      
+
       if (
         newExpStr.startsWith('get') &&
         expString?.startsWith('get') &&
