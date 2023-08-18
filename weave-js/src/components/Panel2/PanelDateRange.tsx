@@ -14,7 +14,7 @@ import {useUpdateConfig2} from './PanelComp';
 import {useMutation, useNodeValue} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import {ValidatingTextInput} from '../ValidatingTextInput';
-import { MOON_50, MOON_800 } from '@wandb/weave/common/css/color.styles';
+import {MOON_50, MOON_800} from '@wandb/weave/common/css/color.styles';
 
 const inputType = {
   type: 'union' as const,
@@ -35,7 +35,6 @@ const StyledTextBox = styled.div`
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 16px;
-  height: 24px;
   line-height: 20px;
   > div {
     width: 100%;
@@ -45,7 +44,7 @@ const StyledTextBox = styled.div`
     font-size: 16px;
     background-color: ${MOON_50};
     outline: none;
-    color: ${MOON_800}
+    color: ${MOON_800};
   }
   display: flex;
   align-content: center;
@@ -250,32 +249,32 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
         display: 'flex',
         flexDirection: 'column',
       }}>
-        <ConfigPanel.ConfigOption label="Start">
-          <StyledTextBox>
-             <DateEditor
-              timestamp={start}
-              onCommit={updateStart}
-              allowDelta={true}
-              deltaDirection="down"
-              deltaFromOffset={end}
-            /> 
-          </StyledTextBox>
-        </ConfigPanel.ConfigOption>
-        <ConfigPanel.ConfigOption label="End">
-          <StyledTextBox >
-            <DateEditor
-              timestamp={end}
-              onCommit={updateEnd}
-              allowDelta={true}
-              deltaDirection="up"
-              deltaFromOffset={start}
-            /> 
-          </StyledTextBox>
-        </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label="Start">
+        <StyledTextBox>
+          <DateEditor
+            timestamp={start}
+            onCommit={updateStart}
+            allowDelta={true}
+            deltaDirection="down"
+            deltaFromOffset={end}
+          />
+        </StyledTextBox>
+      </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label="End">
+        <StyledTextBox>
+          <DateEditor
+            timestamp={end}
+            onCommit={updateEnd}
+            allowDelta={true}
+            deltaDirection="up"
+            deltaFromOffset={start}
+          />
+        </StyledTextBox>
+      </ConfigPanel.ConfigOption>
       {durationMillis != null && (
         <ConfigPanel.ConfigOption label="Duration">
           <StyledTextBox>
-            duration {monthRoundedTime(durationMillis / 1000)}
+            {monthRoundedTime(durationMillis / 1000)}
           </StyledTextBox>
         </ConfigPanel.ConfigOption>
       )}

@@ -43,7 +43,6 @@ import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
 import {Button, Popup} from 'semantic-ui-react';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
-import LinkButton from '@wandb/weave/common/components/LinkButton';
 import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
 
 const inputType = {
@@ -646,7 +645,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
           gap: '4px',
           right: '16px',
           // This is extremely hacky, but it puts the buttons equal with the header
-          top: visualClauses !== null && visualClauses.length === 0 ? '-38px' : '-30px',
+          top:
+            actualMode === 'visual' &&
+            visualClauses &&
+            visualClauses.length === 0
+              ? '-38px'
+              : '-30px',
           position: 'absolute',
         }}>
         <WBButton

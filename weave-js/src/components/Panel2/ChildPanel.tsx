@@ -687,11 +687,12 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
           handleVarEvent={handleVarEvent}
           newPath={props.pathEl}>
           {props.controlBar === 'titleBar' && curPanelId === 'Expression' ? (
-            <div style={{
-              margin: '0 16px',
-              backgroundColor: MOON_50,
-              padding: '4px 8px',
-              borderRadius: '4px',
+            <div
+              style={{
+                margin: '0 16px',
+                backgroundColor: MOON_50,
+                padding: '4px 8px',
+                borderRadius: '4px',
               }}>
               <WeaveExpression
                 expr={panelInputExpr}
