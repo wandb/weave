@@ -9,7 +9,7 @@ from ..language_features.tagging import tagged_value_type
 from .. import engine_trace
 from .. import errors
 from .. import environment
-from .. import gql_to_weave
+from .. import mappers_python
 from .. import gql_with_keys
 
 
@@ -25,11 +25,15 @@ def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
 # and returns the results as a weave type.
 @op(
     name="gqlroot-wbgqlquery",
-    input_type={"query_str": types.String(), "alias_list": types.List(types.String())},
+    input_type={
+        "query_str": types.String(),
+        "alias_list": types.List(types.String()),
+        "output_type": types.TypeType(),
+    },
     output_type=_wbgqlquery_output_type,
     pure=False,
 )
-def wbgqlquery(query_str, alias_list):
+def wbgqlquery(query_str, alias_list, output_type):
     tracer = engine_trace.tracer()
     num_timeout_retries = environment.num_gql_timeout_retries()
     with tracer.trace("wbgqlquery:public_api"):
@@ -42,7 +46,8 @@ def wbgqlquery(query_str, alias_list):
             raise errors.WeaveGQLExecuteMissingAliasError(
                 f"Alias {alias} not found in query results"
             )
-    return gql_payload
+    mapper = mappers_python.map_from_gql(output_type, None)
+    return mapper.apply(gql_payload)
 
 
 def _querytoobj_output_type(input_types: dict[str, types.Type]) -> types.Type:
