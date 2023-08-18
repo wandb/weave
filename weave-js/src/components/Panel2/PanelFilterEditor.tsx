@@ -152,9 +152,15 @@ const getOpChoices = (
 // But we hardcode a sort order for our monitoring Span type for now.
 // In the future this could be controlled by a config parameter.
 const keySortOrder = (key: string) => {
-  if (key.startsWith('attributes.')) return 1;
-  if (key.startsWith('summary.')) return 2;
-  if (key === 'id' || key.includes('_id')) return 4;
+  if (key.startsWith('attributes.')) {
+    return 1;
+  }
+  if (key.startsWith('summary.')) {
+    return 2;
+  }
+  if (key === 'id' || key.includes('_id')) {
+    return 4;
+  }
   return 3;
 };
 
