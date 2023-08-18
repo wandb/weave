@@ -20,6 +20,7 @@ import {
   ExpressionConfigField,
 } from './ConfigPanel';
 import {useUpdateConfig2} from './PanelComp';
+import styled from 'styled-components';
 
 const inputType = {
   type: 'union' as const,
@@ -36,6 +37,12 @@ const inputType = {
   ],
 };
 
+const StyledDiv = styled.div`
+  padding: 0 16px;
+  && .ui.search.dropdown>.text {
+    cursor: pointer;
+  }
+`;
 export interface PanelDropdownConfig {
   choices: NodeOrVoidNode;
 }
@@ -96,7 +103,7 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   }, [choices]);
 
   return (
-    <div style={{padding: '0 16px'}}>
+    <StyledDiv>
       <ConfigFieldWrapper withIcon>
         <ConfigFieldModifiedDropdown
           value={chosen}
@@ -115,7 +122,7 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
           icon={<IconChevronDown width={18} />}
         />
       </ConfigFieldWrapper>
-    </div>
+    </StyledDiv>
   );
 };
 

@@ -212,7 +212,7 @@ const SingleFilterVisualEditor: React.FC<{
   const valid = visualClauseIsValid(curClause);
 
   return (
-    <div>
+    <div style={{gap:'4px', display: 'flex', flexDirection: 'column'}}>
       <ModifiedDropdown
         value={key}
         onChange={(e, {value: k}) => {
@@ -262,19 +262,21 @@ const SingleFilterVisualEditor: React.FC<{
           selection
         />
       )}
-      <Button onClick={props.onCancel}>Cancel</Button>
-      <Button
-        disabled={!valid}
-        onClick={() => {
-          if (valid) {
-            props.onOK(curClause);
-          } else {
-            // Shouldn't really happen since we filter above.
-            props.onCancel();
-          }
-        }}>
-        OK
-      </Button>
+      <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px'}}>
+        <WBButton onClick={props.onCancel} variant='secondary'>Cancel</WBButton>
+        <WBButton
+          disabled={!valid}
+          onClick={() => {
+            if (valid) {
+              props.onOK(curClause);
+            } else {
+              // Shouldn't really happen since we filter above.
+              props.onCancel();
+            }
+          }}>
+          OK
+        </WBButton>
+      </div>
     </div>
   );
 };
@@ -643,14 +645,9 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
           alignItems: 'center',
           marginBottom: '8px',
           gap: '4px',
+          // This puts the buttons equal with the header
           right: '16px',
-          // This is extremely hacky, but it puts the buttons equal with the header
-          top:
-            actualMode === 'visual' &&
-            visualClauses &&
-            visualClauses.length === 0
-              ? '-38px'
-              : '-30px',
+          top: '-30px',
           position: 'absolute',
         }}>
         <WBButton
@@ -731,7 +728,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             onClose={() => setEditingFilterIndex(null)}
             open={editingFilterIndex === -1}
             trigger={
-              <div style={{marginTop: 8}}>
+              <div>
                 <WBButton
                   variant="ghost"
                   onClick={() => {
