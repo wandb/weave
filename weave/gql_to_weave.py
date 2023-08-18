@@ -19,7 +19,6 @@ import typing
 
 from . import errors
 from . import weave_types as types
-from . import untyped_opaque_dict as uod
 
 
 _GQL_SCHEMA: typing.Optional[graphql.GraphQLSchema] = None
@@ -56,6 +55,8 @@ def gql_type_to_weave_type(
     gql_type: graphql.GraphQLType,
     selection_set: typing.Optional[graphql.SelectionSetNode],
 ) -> types.Type:
+    from . import untyped_opaque_dict as uod
+
     if (
         isinstance(gql_type, (GraphQLObjectType, GraphQLInterfaceType))
         and selection_set
@@ -112,7 +113,7 @@ def gql_type_to_weave_type(
         elif gql_type.name == "Boolean":
             t = types.Boolean()
         elif gql_type.name == "JSON":
-            t = uod.UntypedOpaqueDict.WeaveType()  # type: ignore
+            t = uod.DictSavedAsString.WeaveType()  # type: ignore
         elif gql_type.name == "DateTime":
             t = types.Timestamp()
         elif gql_type.name == "Duration":

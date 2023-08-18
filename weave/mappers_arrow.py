@@ -14,7 +14,7 @@ from . import errors
 from . import node_ref
 from . import artifact_base
 from .language_features.tagging import tagged_value_type
-from .ops_domain import wbmedia
+from . import untyped_opaque_dict as uod
 import contextvars
 
 from . import gql_with_keys
@@ -215,11 +215,6 @@ class ArrowStringToString(mappers.Mapper):
         return obj
 
 
-class StringToArrowString(mappers_python.StringToPyString):
-    def result_type(self):
-        return pa.string()
-
-
 class FunctionToArrowFunction(mappers.Mapper):
     def result_type(self):
         return pa.string()
@@ -352,6 +347,16 @@ class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
         )
 
 
+class DictSavedAsStringToArrowString(mappers.Mapper):
+    def result_type(self):
+        return pa.string()
+
+
+class ArrowStringToDictSavedAsString(mappers.Mapper):
+    def apply(self, obj):
+        return uod.DictSavedAsString(json.load(obj))
+
+
 def map_to_arrow_(
     type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
 ):
@@ -359,6 +364,8 @@ def map_to_arrow_(
 
     if isinstance(type, types.Const):
         type = type.val_type
+    if isinstance(type, uod.DictSavedAsString.WeaveType):  # type: ignore
+        return DictSavedAsStringToArrowString(type, mapper, artifact, path)
     if isinstance(type, types.TypedDict):
         return TypedDictToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.List) or isinstance(type, arrow.ArrowWeaveListType):
@@ -396,6 +403,8 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
 
     if isinstance(type, types.TypedDict):
         return mappers_python.TypedDictToPyDict(type, mapper, artifact, path)
+    if isinstance(type, uod.DictSavedAsString):
+        return ArrowStringToDictSavedAsString(type, mapper, artifact, path)
     elif isinstance(type, (types.List, arrow.ArrowWeaveListType)):
         return ArrowToArrowWeaveListOrPylist(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):

@@ -1,21 +1,9 @@
 from typing import Optional, Any, Iterator
-import json
 from dataclasses import field
-from .decorator_class import weave_class
-from . import weave_types as types
+from .decorator_type import type as weave_type
 
 
-class DictSavedAsStringType(types.BasicType):
-    def save_instance(self, obj, artifact, name):
-        obj = json.dumps(obj.json_dict, separators=(",", ":"))
-        return super().save_instance(obj, artifact, name)
-
-    def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.object.json") as f:
-            return json.load(json.load(f))
-
-
-@weave_class(weave_type=DictSavedAsStringType)
+@weave_type("DictSavedAsString", False)
 class DictSavedAsString:
     """
     UntypedOpaqueDict is a Weave Type that is used to store arbitrary JSON data.
