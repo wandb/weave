@@ -145,7 +145,9 @@ const CenterSpaceHeader = styled(LayoutElements.VBlock)`
 `;
 CenterSpaceHeader.displayName = 'S.CenterSpaceHeader';
 
-type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
+export type CenterBrowserDataType<
+  E extends {[key: string]: string | number} = {}
+> = {
   _id: string;
 } & E;
 
@@ -189,6 +191,7 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
 
   isModalActing?: boolean;
   setIsModalActing?: Dispatch<SetStateAction<boolean>>;
+  deleteTypeString?: string;
 };
 
 export const CenterBrowser = <RT extends CenterBrowserDataType>(
@@ -286,6 +289,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
             history.push('.');
           }
         }}
+        deleteTypeString={props.deleteTypeString}
       />
 
       <CenterSpaceHeader>
