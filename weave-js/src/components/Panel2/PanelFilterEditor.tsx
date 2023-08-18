@@ -113,6 +113,9 @@ const visualClauseIsValid = (
       if (!Array.isArray(clause.value) || !clause.value.every(_.isString)) {
         return false;
       }
+      if (clause.value.length === 0) {
+        return false;
+      }
     } else if (typeof clause.value !== 'string') {
       return false;
     }
@@ -181,9 +184,6 @@ const SingleFilterVisualEditor: React.FC<{
   const [key, setKey] = useState<string | undefined>(
     defaultKey ?? keyChoices[0]
   );
-  const [op, setOp] = useState<string | undefined>(defaultOp);
-  const [value, setValue] = useState<any | undefined>(defaultValue);
-
   const simpleKeyType = getSimpleKeyType(
     opPick({
       obj: listItem,
@@ -193,6 +193,9 @@ const SingleFilterVisualEditor: React.FC<{
 
   const opChoices = getOpChoices(simpleKeyType);
   const opOptions = opChoices.map(k => ({text: k, value: k, k}));
+
+  const [op, setOp] = useState<string | undefined>(defaultOp ?? opChoices[0]);
+  const [value, setValue] = useState<any | undefined>(defaultValue);
 
   // const valueQuery =
   // TODO: opLimit is broken in weave python when we have an ArrowWeaveList...
@@ -247,7 +250,11 @@ const SingleFilterVisualEditor: React.FC<{
         value={op}
         onChange={(e, {value: v}) => {
           if (v === 'in') {
-            setValue([]);
+            if (op === '=') {
+              setValue([value]);
+            } else {
+              setValue([]);
+            }
           } else {
             setValue(undefined);
           }
