@@ -37,6 +37,12 @@ class DictSavedAsString:
 
     json_dict: dict = field(default_factory=lambda: {})
 
+    def __repr__(self) -> str:
+        return f"DictSavedAsString({self.json_dict})"
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
     def get(self, key: str, default: Optional[Any] = None) -> Any:
         return self.json_dict.get(key, default)
 
