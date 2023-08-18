@@ -51,30 +51,6 @@ def get_gql_schema() -> graphql.GraphQLSchema:
     return _GQL_SCHEMA
 
 
-def gql_payload_to_weave_payload(
-    payload: typing.Any, weave_type: types.Type
-) -> typing.Any:
-
-    if isinstance(weave_type, types.TypedDict):
-        return {
-            key: gql_payload_to_weave_payload(value, weave_type.property_types[key])
-            for key, value in payload.items()
-        }
-    elif isinstance(weave_type, types.Dict):
-        raise NotImplementedError()
-    elif isinstance(weave_type, types.List):
-        return [
-            gql_payload_to_weave_payload(item, weave_type.object_type)
-            for item in payload
-        ]
-    elif isinstance(weave_type, uod.UntypedOpaqueDict.WeaveType()):  # type: ignore
-        return uod.UntypedOpaqueDict.from_json_dict(payload)  # type: ignore
-    elif isinstance(weave_type, types.ObjectType):
-        return
-
-    return payload
-
-
 def gql_type_to_weave_type(
     gql_type: graphql.GraphQLType,
     selection_set: typing.Optional[graphql.SelectionSetNode],

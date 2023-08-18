@@ -37,12 +37,14 @@ def apply_domain_op_gql_translation(
 
     query_str_const_node = graph.ConstNode(types.String(), "")
     alias_list_const_node = graph.ConstNode(types.List(types.String()), [])
+    output_type_node = graph.ConstNode(types.TypeType(), types.Any())
     query_root_node = graph.OutputNode(
         types.Dict(types.String(), types.TypedDict({})),
         "gqlroot-wbgqlquery",
         {
             "query_str": query_str_const_node,
             "alias_list": alias_list_const_node,
+            "output_type": output_type_node,
         },
     )
     fragments = []

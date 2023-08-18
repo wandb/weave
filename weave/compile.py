@@ -488,7 +488,10 @@ def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node
             return graph.OutputNode(
                 output_type,
                 "gqlroot-wbgqlquery",
-                from_op.inputs,
+                {
+                    **from_op.inputs,
+                    "output_type": graph.ConstNode(types.TypeType(), output_type),
+                },
             )
 
         if from_op.name == "gqlroot-querytoobj":
