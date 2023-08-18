@@ -22,6 +22,7 @@ import {
   GRAY_350,
   GRAY_400,
   GRAY_500,
+  MOON_50,
   PANEL_HOVERED_SHADOW,
   SCROLLBAR_STYLES,
   WHITE,
@@ -29,12 +30,10 @@ import {
 import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {inJupyterCell} from '../PagePanelComponents/util';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
-import {Tooltip} from '../Tooltip';
 import {
   useGetPanelIsHoveredByGroupPath,
   useGetPanelIsHoveredInOutlineByGroupPath,
   useSelectedPath,
-  useSetInspectingPanel,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
 import {Button} from '../Button';
@@ -55,7 +54,6 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
     props;
   const selectedPath = useSelectedPath();
-  const setInspectingPanel = useSetInspectingPanel();
   const getPanelIsHovered = useGetPanelIsHoveredByGroupPath(groupPath ?? []);
   const getPanelIsHoveredInOutline = useGetPanelIsHoveredInOutlineByGroupPath(
     groupPath ?? []
@@ -75,7 +73,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const addPanelBarRef = useRef<HTMLDivElement | null>(null);
   return (
     <DragDropProvider>
-      <div className="panel-bank" style={{height: '100%'}}>
+      <div
+        className="panel-bank"
+        // We set the background color for the main area of the board here
+        // for now... Maybe this will work for all uses of PB in Weave
+        style={{height: '100%', backgroundColor: MOON_50}}>
         <Measure
           bounds
           onResize={contentRect => {
@@ -102,7 +104,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
               <div className="panel-bank__section">
                 {!inJupyter && groupPath != null && handleAddPanel != null && (
                   <ActionBar ref={actionBarRef}>
-                    <Tooltip
+                    {/* This opens the editor at the outline level on the main board.
+                    The button was always shown on the page, but it leads to a kind
+                    of confusing place, so I'm just disabling it. */}
+
+                    {/* <Tooltip
                       position="bottom right"
                       trigger={
                         <Button
@@ -112,7 +118,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                         />
                       }>
                       Open panel editor
-                    </Tooltip>
+                    </Tooltip> */}
                     {enableAddPanel && (
                       <Button
                         variant="ghost"

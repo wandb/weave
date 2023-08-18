@@ -134,6 +134,14 @@ gql_prop_op(
     types.Timestamp(),
 )
 
+gql_prop_op(
+    "run-historyLineCount",
+    wdt.RunType,
+    "historyLineCount",
+    types.Number(),
+    hidden=True,
+)
+
 
 def config_to_values(config: dict) -> dict:
     """

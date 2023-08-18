@@ -1010,7 +1010,7 @@ function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
     y: {},
     color: {},
   };
-  const legendSettings: PlotConfig['legendSettings'] = {
+  const legendSettings: v1.PlotConfig['legendSettings'] = {
     color: {},
   };
 

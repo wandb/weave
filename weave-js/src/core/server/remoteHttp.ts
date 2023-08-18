@@ -90,13 +90,12 @@ interface NodeEntry {
 declare function btoa(s: string): string;
 
 const createClientCacheKey = (windowSizeMs: number = 15000) => {
-  return null;
-  // return Math.floor(Date.now() / windowSizeMs).toString();
+  return Math.floor(Date.now() / windowSizeMs).toString();
 };
 
 // Handles (de)serialization to send to a remote CG server
 export class RemoteHttpServer implements Server {
-  public clientCacheKey: string | null = createClientCacheKey();
+  public clientCacheKey: string | undefined = createClientCacheKey();
   private readonly opts: RemoteWeaveOptions;
   private readonly flushInterval: NodeJS.Timer;
   private pendingNodes: Map<Node, NodeEntry> = new Map();

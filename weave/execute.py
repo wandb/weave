@@ -471,9 +471,8 @@ def execute_forward_node(
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
         if op_policy.should_cache(op_def.simple_name):
-            no_cache = False
-        if client_cache_key is not None and not op_def.pure:
-            no_cache = False
+            if op_def.pure or client_cache_key is not None:
+                no_cache = False
 
     use_cache = not no_cache
     if isinstance(node, graph.ConstNode):
@@ -504,7 +503,7 @@ def execute_forward_node(
                 op_def, input_refs, impure_cache_key=client_cache_key
             )
 
-        if run_key and (op_def.pure or client_cache_key is not None):
+        if run_key:
             run = TRACE_LOCAL.get_run_val(run_key)
             if run is not None and run != None:  # stupid box none makes us check !=
                 # Watch out, we handle loading async runs in different ways.
