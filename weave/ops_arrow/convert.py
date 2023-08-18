@@ -123,7 +123,7 @@ def recursively_build_pyarrow_array(
         mapper, mappers_arrow.DictSavedAsStringToArrowString
     ):
         serialized = [
-            json.dumps(val) if val is not None else None
+            json.dumps(val.json_dict) if val is not None else None
             for val in none_unboxer(py_objs)
         ]
         return pa.array(serialized, type=pyarrow_type)
