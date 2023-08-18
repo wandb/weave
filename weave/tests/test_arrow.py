@@ -1734,3 +1734,53 @@ def test_arrow_op_decorator_handles_optional_tagged_type():
     actual = weave.use(toTimestamp)
 
     assert actual.to_pylist_raw() == expected.to_pylist_raw()
+
+
+def test_flatten_handles_tagged_lists():
+    data = [[1], [2, 3], [4, 5, 6]]
+    for i in range(len(data)):
+        data[i] = box.box(data[i])
+        tag_store.add_tags(data[i], {"outer": "outer"})
+        for j in range(len(data[i])):
+            data[i][j] = box.box(data[i][j])
+            tag_store.add_tags(data[i][j], {"inner": "inner"})
+
+    awl = arrow.to_arrow(data)
+    node = weave.save(awl)
+    flattened = node.flatten()
+
+    assert flattened.type == arrow.ArrowWeaveListType(
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"outer": types.String(), "inner": types.String()}),
+            types.Int(),
+        )
+    )
+
+    expected = [1, 2, 3, 4, 5, 6]
+    assert weave.use(flattened).to_pylist_notags() == expected
+    assert weave.use(flattened).to_pylist_raw() == [
+        {
+            "_tag": {
+                "outer": "outer",
+                "inner": "inner",
+            },
+            "_value": i,
+        }
+        for i in expected
+    ]
+
+
+def test_keys_ops():
+    awl = arrow.to_arrow([{"a": 1}, {"a": 1, "b": 2, "c": 2}, {"c": 3}])
+    node = weave.save(awl)
+    keys_node = node.keys()
+    # Unfortunately, we lose specific info about key presence in AWL.
+    assert weave.use(keys_node).to_pylist_raw() == [
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+    ]
+
+    all_keys_node = keys_node.flatten().unique()
+
+    assert weave.use(all_keys_node).to_pylist_raw() == ["a", "b", "c"]

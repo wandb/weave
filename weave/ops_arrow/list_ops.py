@@ -923,10 +923,36 @@ def flatten_return_type(input_types):
 def flatten(arr):
     # TODO:
     #   - handle N levels instead of 1
-    #   - handle tags
+
     arrow_data = arr._arrow_data
     if is_list_arrowweavelist(arr):
-        arrow_data = arrow_data.flatten()
+        # unwrap tags
+
+        tags = None
+        if isinstance(arr.object_type, tagged_value_type.TaggedValueType):
+            value_awl, tags_awl = (
+                arr.tagged_value_value(),
+                arr.tagged_value_tag(),
+            )
+
+            values = value_awl._arrow_data
+            tags = tags_awl._arrow_data
+
+        else:
+            values = arrow_data
+
+        assert isinstance(values, pa.ListArray)
+        flattened_values = values.flatten()
+
+        if tags is not None:
+            list_parent_indices = pc.list_parent_indices(values)
+            flattened_tags = tags.take(list_parent_indices)
+            flattened_values = arrow_tags.direct_add_arrow_tags(
+                flattened_values, flattened_tags
+            )
+
+        arrow_data = flattened_values
+
     return ArrowWeaveList(
         arrow_data,
         flatten_return_object_type(arr.object_type),

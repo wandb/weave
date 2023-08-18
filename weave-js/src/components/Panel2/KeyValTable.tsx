@@ -1,9 +1,13 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 
-export const Table = styled.table``;
+export const Table = styled.table`
+  font-size: 13px;
+`;
 export const Row = styled.tr``;
 export const Key = styled.td`
+  white-space: nowrap;
+  text-overflow: ellipsis;
   vertical-align: top;
   padding: 0 !important;
   color: ${globals.gray500};
