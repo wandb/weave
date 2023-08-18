@@ -1,11 +1,22 @@
 from typing import Optional, Any, Iterator
 import json
 from dataclasses import field
-from .decorator_type import type as weave_type
+from .decorator_class import weave_class
+from . import weave_types as types
 
 
-@weave_type("UntypedOpaqueDict", True)
-class UntypedOpaqueDict:
+class DictSavedAsStringType(types.BasicType):
+    def save_instance(self, obj, artifact, name):
+        obj = json.dumps(obj.json_dict, separators=(",", ":"))
+        return super().save_instance(obj, artifact, name)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            return json.load(json.load(f))
+
+
+@weave_class(weave_type=DictSavedAsStringType)
+class DictSavedAsString:
     """
     UntypedOpaqueDict is a Weave Type that is used to store arbitrary JSON data.
     Unlike `Dict` or `TypedDict`, this Type does not need to define the keys/fields.
@@ -24,19 +35,13 @@ class UntypedOpaqueDict:
     loaded using the Weave Type system.
     """
 
-    json_str: str = field(default="{}")
-
-    @classmethod
-    def from_json_dict(cls, json_dict: dict) -> "UntypedOpaqueDict":
-        inst = cls(json_str=json.dumps(json_dict, separators=(",", ":")))
-        inst._json_dict = json_dict
-        return inst
+    json_dict: dict = field(default_factory=lambda: {})
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
         return self.json_dict.get(key, default)
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, UntypedOpaqueDict):
+        if not isinstance(other, DictSavedAsString):
             return False
         return self.json_dict == other.json_dict
 
@@ -44,19 +49,13 @@ class UntypedOpaqueDict:
         return self.json_dict[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
+        self.json_dict[key] = value
 
     def __delitem__(self, key: str) -> None:
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
+        del self.json_dict[key]
 
     def __iter__(self) -> Iterator[Any]:
         return iter(self.json_dict)
 
     def __len__(self) -> int:
         return len(self.json_dict)
-
-    @property
-    def json_dict(self) -> dict:
-        if not hasattr(self, "_json_dict"):
-            self._json_dict = json.loads(self.json_str)
-        return self._json_dict
