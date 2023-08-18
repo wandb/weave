@@ -37,6 +37,7 @@ CACHE_OP_NAMES = [
     "op-umap_project",
     "op-openai_embed",
     "op-hdbscan_cluster",
+    "gqlroot-wbgqlquery",
 ] + CACHE_AND_PARALLEL_OP_NAMES
 
 

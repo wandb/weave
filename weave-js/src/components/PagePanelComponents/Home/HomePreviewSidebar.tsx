@@ -25,6 +25,11 @@ import {
   TEAL_400,
 } from '@wandb/weave/common/css/color.styles';
 import {useHistory} from 'react-router-dom';
+import {
+  ActionCell,
+  CenterBrowserActionType,
+  CenterBrowserDataType,
+} from './HomeCenterBrowser';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -90,8 +95,9 @@ const HomeExpressionPreviewPartsWrapper = styled.div`
 HomeExpressionPreviewPartsWrapper.displayName =
   'S.HomeExpressionPreviewPartsWrapper';
 
-export const HomePreviewSidebarTemplate: React.FC<{
+type HomePreviewSidebarTemplateProps<RT extends CenterBrowserDataType> = {
   title: string;
+  row?: RT;
   setPreviewNode: SetPreviewNodeType;
   children?: React.ReactNode;
   primaryAction?: {
@@ -104,7 +110,12 @@ export const HomePreviewSidebarTemplate: React.FC<{
     label: string;
     onClick: () => void;
   };
-}> = props => {
+  actions?: Array<CenterBrowserActionType<RT>>;
+};
+
+export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
+  props: HomePreviewSidebarTemplateProps<RT>
+) => {
   const history = useHistory();
   return (
     <CenterSpace>
@@ -114,7 +125,7 @@ export const HomePreviewSidebarTemplate: React.FC<{
           alignContent: 'center',
           justifyContent: 'center',
           alignItems: 'center',
-          gap: '12px',
+          gap: '8px',
           padding: '0px 16px',
         }}>
         <LayoutElements.VSpace
@@ -124,6 +135,11 @@ export const HomePreviewSidebarTemplate: React.FC<{
         {/* <LayoutElements.Block>
           <IconOverflowHorizontal />
         </LayoutElements.Block> */}
+        {props.row && (
+          <CenterTableActionCellIcon>
+            <ActionCell actions={props.actions} row={props.row} />
+          </CenterTableActionCellIcon>
+        )}
         <CenterTableActionCellIcon>
           <IconClose
             style={{
@@ -198,7 +214,7 @@ type Template = {
   op_name: string;
 };
 
-const SEED_BOARD_OP_NAME = 'py_board-seed_board';
+export const SEED_BOARD_OP_NAME = 'py_board-seed_board';
 const OPEN_AI_OP_NAME = 'py_board-open_ai_completions_monitor';
 const RECOMMENDED_TEMPLATES = [OPEN_AI_OP_NAME];
 const FALL_BACK_TEMPLATE = SEED_BOARD_OP_NAME;
@@ -368,73 +384,78 @@ const OverviewTab = ({
           {/* </Unclickable> */}
         </LayoutElements.Block>
       </LayoutElements.VBlock>
+      {/*  Only show the create a board section if a board can be created ie there exists at least one template */}
       {isLoadingTemplates ? (
         <Loader />
       ) : (
-        <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
-          <LayoutElements.BlockHeader>
-            CREATE A BOARD
-            {hasTemplates && (
-              <Button
-                onClick={() => {
-                  setTabValue('Templates');
-                }}
-                size="small"
-                variant="ghost">
-                View all templates
-              </Button>
-            )}
-          </LayoutElements.BlockHeader>
-          <LayoutElements.VStack
-            style={{
-              gap: '8px',
-            }}>
-            {recommendedTemplateInfo &&
-              recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
-                <>
-                  <DashboardTemplate
-                    key={recommendedTemplateInfo.op_name}
-                    title={recommendedTemplateInfo.display_name}
-                    subtitle={recommendedTemplateInfo.description}
-                    onButtonClick={() => {
-                      setIsGenerating(true);
-                      makeBoardFromNode(
-                        recommendedTemplateInfo.op_name,
-                        refinedExpression.result as any,
-                        newDashExpr => {
-                          navigateToExpression(newDashExpr);
-                          setIsGenerating(false);
-                        }
-                      );
-                    }}
-                    isExpanded={true}
-                    isRecommended={true}
-                  />
-                  <Label style={{display: 'flex', justifyContent: 'center'}}>
-                    or
-                  </Label>
-                </>
+        generators.length > 0 && (
+          <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
+            <LayoutElements.BlockHeader>
+              CREATE A BOARD
+              {hasTemplates && (
+                <Button
+                  onClick={() => {
+                    setTabValue('Templates');
+                  }}
+                  size="small"
+                  variant="ghost">
+                  View all templates
+                </Button>
               )}
-            <DashboardTemplate
-              key={SEED_BOARD_OP_NAME}
-              subtitle="Seed a board with a simple visualization of this table."
-              onButtonClick={() => {
-                setIsGenerating(true);
-                makeBoardFromNode(
-                  SEED_BOARD_OP_NAME,
-                  refinedExpression.result as any,
-                  newDashExpr => {
-                    navigateToExpression(newDashExpr);
-                    setIsGenerating(false);
-                  }
-                );
-              }}
-              isExpanded={true}
-              buttonVariant={generators.length === 1 ? 'primary' : 'secondary'}
-              buttonText="New board"
-            />
-          </LayoutElements.VStack>
-        </LayoutElements.VBlock>
+            </LayoutElements.BlockHeader>
+            <LayoutElements.VStack
+              style={{
+                gap: '8px',
+              }}>
+              {recommendedTemplateInfo &&
+                recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
+                  <>
+                    <DashboardTemplate
+                      key={recommendedTemplateInfo.op_name}
+                      title={recommendedTemplateInfo.display_name}
+                      subtitle={recommendedTemplateInfo.description}
+                      onButtonClick={() => {
+                        setIsGenerating(true);
+                        makeBoardFromNode(
+                          recommendedTemplateInfo.op_name,
+                          refinedExpression.result as any,
+                          newDashExpr => {
+                            navigateToExpression(newDashExpr);
+                            setIsGenerating(false);
+                          }
+                        );
+                      }}
+                      isExpanded={true}
+                      isRecommended={true}
+                    />
+                    <Label style={{display: 'flex', justifyContent: 'center'}}>
+                      or
+                    </Label>
+                  </>
+                )}
+              <DashboardTemplate
+                key={SEED_BOARD_OP_NAME}
+                subtitle="Seed a board with a simple visualization of this table."
+                onButtonClick={() => {
+                  setIsGenerating(true);
+                  makeBoardFromNode(
+                    SEED_BOARD_OP_NAME,
+                    refinedExpression.result as any,
+                    newDashExpr => {
+                      navigateToExpression(newDashExpr);
+                      setIsGenerating(false);
+                    }
+                  );
+                }}
+                isExpanded={true}
+                buttonVariant={
+                  generators.length === 1 ? 'primary' : 'secondary'
+                }
+                buttonText="New board"
+              />
+            </LayoutElements.VStack>
+          </LayoutElements.VBlock>
+        )
       )}
     </LayoutElements.VStack>
   );

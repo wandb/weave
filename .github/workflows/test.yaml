@@ -44,8 +44,8 @@ jobs:
     timeout-minutes: 7
     needs:
       - build-container
-    runs-on: [self-hosted, gke-runner]
-    # runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
@@ -88,13 +88,13 @@ jobs:
     timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
     needs:
       - build-container
-    runs-on: [self-hosted, gke-runner]
+    # runs-on: [self-hosted, gke-runner]
     strategy:
       fail-fast: false
       matrix:
         job_num: [0, 1]
 
-    # runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
     services:
       wandbservice:
@@ -148,8 +148,8 @@ jobs:
       # - lint
       # - test
     if: always()
-    runs-on: [self-hosted, gke-runner]
-    # runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
 

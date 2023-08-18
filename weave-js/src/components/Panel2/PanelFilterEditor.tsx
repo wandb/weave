@@ -30,6 +30,10 @@ import {
   opOr,
   // opLimit,
 } from '@wandb/weave/core';
+import {Icon} from '@wandb/weave/components/Icon';
+import {Button} from '@wandb/weave/components/Button';
+import {MOON_50} from '@wandb/weave/common/css/color.styles';
+
 import * as _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 
@@ -37,9 +41,8 @@ import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
-import {Button, Popup} from 'semantic-ui-react';
+import {Popup} from 'semantic-ui-react';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
-import LinkButton from '@wandb/weave/common/components/LinkButton';
 import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
 
 const inputType = {
@@ -209,7 +212,7 @@ const SingleFilterVisualEditor: React.FC<{
   const valid = visualClauseIsValid(curClause);
 
   return (
-    <div>
+    <div style={{gap: '4px', display: 'flex', flexDirection: 'column'}}>
       <ModifiedDropdown
         value={key}
         onChange={(e, {value: k}) => {
@@ -259,19 +262,29 @@ const SingleFilterVisualEditor: React.FC<{
           selection
         />
       )}
-      <Button onClick={props.onCancel}>Cancel</Button>
-      <Button
-        disabled={!valid}
-        onClick={() => {
-          if (valid) {
-            props.onOK(curClause);
-          } else {
-            // Shouldn't really happen since we filter above.
-            props.onCancel();
-          }
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          justifyContent: 'flex-end',
+          marginTop: '4px',
         }}>
-        OK
-      </Button>
+        <Button onClick={props.onCancel} variant="secondary">
+          Cancel
+        </Button>
+        <Button
+          disabled={!valid}
+          onClick={() => {
+            if (valid) {
+              props.onOK(curClause);
+            } else {
+              // Shouldn't really happen since we filter above.
+              props.onCancel();
+            }
+          }}>
+          OK
+        </Button>
+      </div>
     </div>
   );
 };
@@ -509,7 +522,7 @@ const removeVisualClause = (
   return [...clauses.slice(0, index), ...clauses.slice(index + 1)];
 };
 
-const FilterPill = (props: {
+const FilterPillBlock = (props: {
   clause: VisualClause;
   onClick: () => void;
   onRemove: () => void;
@@ -521,50 +534,39 @@ const FilterPill = (props: {
   return (
     <div
       style={{
-        display: 'inline-flex',
+        marginBottom: 4,
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: MOON_50,
         borderRadius: 8,
-        backgroundColor: '#eee',
-        padding: '4px 16px',
-        cursor: 'pointer',
-        position: 'relative',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        maxWidth: '90%',
-        overflow: 'hidden',
-      }}
-      onClick={props.onClick}>
-      <div style={{marginRight: 4}}>{clause.key}</div>
-      <div style={{marginRight: 4}}>{clause.op}</div>
-      <div>{valueStr}</div>
-    </div>
-  );
-};
-
-const FilterPillBlock = (props: {
-  clause: VisualClause;
-  onClick: () => void;
-  onRemove: () => void;
-}) => {
-  const [hover, setHover] = React.useState(false);
-  return (
-    <div
-      style={{marginBottom: 4, display: 'flex', alignItems: 'center'}}
-      onMouseOver={() => setHover(true)}
-      onMouseOut={() => setHover(false)}>
-      <FilterPill
-        clause={props.clause}
-        onClick={props.onClick}
-        onRemove={props.onRemove}
+      }}>
+      <Icon
+        name="filter-alt"
+        style={{
+          margin: '0 8px',
+        }}
       />
       <div
         style={{
-          display: hover ? 'block' : 'none',
-          marginLeft: 8,
+          padding: '4px 8px 4px 0',
+          cursor: 'pointer',
+          textOverflow: 'ellipsis',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          width: '95%',
+          lineHeight: '22px',
+        }}
+        onClick={props.onClick}>
+        {`${clause.key} ${clause.op} ${valueStr}`}
+      </div>
+      <Icon
+        name="close"
+        onClick={props.onRemove}
+        style={{
+          margin: '0 8px',
           cursor: 'pointer',
         }}
-        onClick={props.onRemove}>
-        x
-      </div>
+      />
     </div>
   );
 };
@@ -644,40 +646,56 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
   }
 
   return (
-    <div style={{width: '100%', height: '100%', paddingLeft: 16}}>
-      <div style={{display: 'flex', alignItems: 'center'}}>
-        <div
-          style={{
-            marginRight: 8,
-            color: visualClauses == null ? '#aaa' : undefined,
-            textDecoration: actualMode === 'visual' ? 'underline' : undefined,
-            cursor: 'pointer',
-          }}
-          onClick={() => visualClauses != null && setMode('visual')}>
-          visual
-        </div>
-        <div> | </div>
-        <div
-          style={{
-            marginLeft: 8,
-            textDecoration:
-              actualMode === 'expression' ? 'underline' : undefined,
-            cursor: 'pointer',
-          }}
-          onClick={() => setMode('expression')}>
-          expression
-        </div>
+    <div style={{width: '100%', height: '100%', padding: '0 16px'}}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: '8px',
+          gap: '4px',
+          // This puts the buttons equal with the header
+          right: '16px',
+          top: '-30px',
+          position: 'absolute',
+        }}>
+        <Button
+          variant="ghost"
+          size="small"
+          disabled={visualClauses == null}
+          onClick={() => visualClauses != null && setMode('visual')}
+          active={actualMode === 'visual'}>
+          Visual
+        </Button>
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={() => setMode('expression')}
+          active={actualMode === 'expression'}>
+          Expression
+        </Button>
       </div>
       {mode === 'expression' || visualClauses == null ? (
-        <PanelContextProvider newVars={paramVars}>
-          <WeaveExpression expr={value.val} setExpression={updateVal} noBox />
-        </PanelContextProvider>
+        <div
+          style={{
+            backgroundColor: MOON_50,
+            padding: '4px 8px',
+            borderRadius: '4px',
+          }}>
+          <PanelContextProvider newVars={paramVars}>
+            <WeaveExpression expr={value.val} setExpression={updateVal} noBox />
+          </PanelContextProvider>
+        </div>
       ) : (
         <div>
           {visualClauses.map((clause, i) => (
             <Popup
               key={i}
-              position="right center"
+              position="left center"
+              popperModifiers={{
+                preventOverflow: {
+                  boundariesElement: 'offsetParent',
+                },
+              }}
               trigger={
                 <FilterPillBlock
                   clause={clause}
@@ -689,6 +707,8 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                   }}
                 />
               }
+              on="click"
+              onClose={() => setEditingFilterIndex(null)}
               open={editingFilterIndex === i}
               content={
                 <SingleFilterVisualEditor
@@ -706,20 +726,24 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             />
           ))}
           <Popup
-            position="right center"
+            position="left center"
+            popperModifiers={{
+              preventOverflow: {
+                boundariesElement: 'offsetParent',
+              },
+            }}
+            on="click"
+            onClose={() => setEditingFilterIndex(null)}
             open={editingFilterIndex === -1}
             trigger={
               <div>
-                {/* TODO: this LinkButton is really bad, it's just a span. 
-                    Use something better
-                */}
-                <LinkButton
-                  style={{cursor: 'pointer'}}
+                <Button
+                  variant="ghost"
                   onClick={() => {
                     setEditingFilterIndex(-1);
                   }}>
-                  + Add filter
-                </LinkButton>
+                  + New filter
+                </Button>
               </div>
             }
             content={
