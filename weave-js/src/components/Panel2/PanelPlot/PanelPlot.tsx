@@ -3509,6 +3509,15 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const loaderComp = <Panel2Loader />;
 
+  // Hardcode plot colors for now.
+  if (vegaSpec.encoding.color == null) {
+    vegaSpec.encoding.color = {};
+  }
+  if (vegaSpec.encoding.color.scale == null) {
+    vegaSpec.encoding.color.scale = {};
+  }
+  vegaSpec.encoding.color.scale.range = globals.WB_RUN_COLORS;
+
   return (
     <div
       data-test="panel-plot-2-wrapper"

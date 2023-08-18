@@ -8,6 +8,7 @@ import EditableField from '@wandb/weave/common/components/EditableField';
 import {
   GRAY_350,
   GRAY_50,
+  MOON_50,
   linkHoverBlue,
 } from '@wandb/weave/common/css/globals.styles';
 import {ValidatingTextInput} from '@wandb/weave/components/ValidatingTextInput';
@@ -505,6 +506,12 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   );
 };
 
+const varNameToTitle = (varName: string) => {
+  return varName
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+};
+
 // This is the standard way to render subpanels. We should migrate
 // other cases to this (Table cell, SelectPanel in Facet, and probably
 // PanelExpression and PanelRootQuery)
@@ -571,91 +578,106 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       {props.controlBar === 'titleBar' && (
         <div
           style={{
-            fontWeight: 'bold',
+            fontWeight: '600',
             padding: '0 16px 8px',
             lineHeight: '20px',
             marginTop: 16,
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+            overflow: 'hidden',
           }}>
-          {props.pathEl != null &&
-            props.pathEl
-              .replace(/_/g, ' ')
-              .replace(/\b\w/g, char => char.toUpperCase())}
+          {props.pathEl != null && varNameToTitle(props.pathEl)}
         </div>
       )}
       {props.controlBar === 'editable' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {props.prefixHeader}
-            {props.pathEl != null && (
-              <EditorPath>
-                <ValidatingTextInput
-                  dataTest="panel-expression-path"
-                  onCommit={props.updateName ?? (() => {})}
-                  validateInput={validateName}
-                  initialValue={props.pathEl}
-                  maxWidth={
-                    editorBarWidth != null ? editorBarWidth / 3 : undefined
-                  }
-                  maxLength={24}
-                />{' '}
-                {props.controlBar === 'editable' && '= '}
-              </EditorPath>
-            )}
-            {props.controlBar === 'editable' &&
-              curPanelId !== 'Expression' &&
-              curPanelId !== 'RootBrowser' && (
-                <PanelNameEditor
-                  value={curPanelId ?? ''}
-                  autocompleteOptions={panelOptions}
-                  setValue={handlePanelChange}
-                />
-              )}
-            {props.controlBar === 'editable' ? (
-              <EditorExpression data-test="panel-expression-expression">
-                <WeaveExpression
-                  expr={panelInputExpr}
-                  setExpression={updateExpression}
-                  noBox
-                  truncate={!expressionFocused}
-                  onFocus={onFocusExpression}
-                  onBlur={onBlurExpression}
-                />
-              </EditorExpression>
+            {!hoverPanel ? (
+              props.pathEl != null && (
+                <div
+                  style={{
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                  }}>
+                  {varNameToTitle(props.pathEl)}
+                </div>
+              )
             ) : (
-              <div style={{width: '100%'}} />
+              <>
+                {props.prefixHeader}
+                {props.pathEl != null && (
+                  <EditorPath>
+                    <ValidatingTextInput
+                      dataTest="panel-expression-path"
+                      onCommit={props.updateName ?? (() => {})}
+                      validateInput={validateName}
+                      initialValue={props.pathEl}
+                      maxWidth={
+                        editorBarWidth != null ? editorBarWidth / 3 : undefined
+                      }
+                      maxLength={24}
+                    />{' '}
+                    {props.controlBar === 'editable' && '= '}
+                  </EditorPath>
+                )}
+                {props.controlBar === 'editable' &&
+                  curPanelId !== 'Expression' &&
+                  curPanelId !== 'RootBrowser' && (
+                    <PanelNameEditor
+                      value={curPanelId ?? ''}
+                      autocompleteOptions={panelOptions}
+                      setValue={handlePanelChange}
+                    />
+                  )}
+                {props.controlBar === 'editable' ? (
+                  <EditorExpression data-test="panel-expression-expression">
+                    <WeaveExpression
+                      expr={panelInputExpr}
+                      setExpression={updateExpression}
+                      noBox
+                      truncate={!expressionFocused}
+                      onFocus={onFocusExpression}
+                      onBlur={onBlurExpression}
+                    />
+                  </EditorExpression>
+                ) : (
+                  <div style={{width: '100%'}} />
+                )}
+                <EditorIcons visible={hoverPanel || isMenuOpen}>
+                  {props.prefixButtons}
+                  <Tooltip
+                    position="top center"
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        icon="pencil-edit"
+                        onClick={() => setInspectingPanel(props.pathEl ?? '')}
+                      />
+                    }>
+                    Open panel editor
+                  </Tooltip>
+                  <OutlineItemPopupMenu
+                    config={fullConfig}
+                    localConfig={getConfigForPath(fullConfig, fullPath)}
+                    path={fullPath}
+                    updateConfig={updateConfig}
+                    updateConfig2={updateConfig2}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        icon="overflow-horizontal"
+                      />
+                    }
+                    onOpen={() => setIsMenuOpen(true)}
+                    onClose={() => setIsMenuOpen(false)}
+                    isOpen={isMenuOpen}
+                  />
+                </EditorIcons>
+              </>
             )}
-            <EditorIcons visible={hoverPanel || isMenuOpen}>
-              {props.prefixButtons}
-              <Tooltip
-                position="top center"
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    icon="pencil-edit"
-                    onClick={() => setInspectingPanel(props.pathEl ?? '')}
-                  />
-                }>
-                Open panel editor
-              </Tooltip>
-              <OutlineItemPopupMenu
-                config={fullConfig}
-                localConfig={getConfigForPath(fullConfig, fullPath)}
-                path={fullPath}
-                updateConfig={updateConfig}
-                updateConfig2={updateConfig2}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    icon="overflow-horizontal"
-                  />
-                }
-                onOpen={() => setIsMenuOpen(true)}
-                onClose={() => setIsMenuOpen(false)}
-                isOpen={isMenuOpen}
-              />
-            </EditorIcons>
           </EditorBarContent>
         </Styles.EditorBar>
       )}
@@ -665,7 +687,13 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
           handleVarEvent={handleVarEvent}
           newPath={props.pathEl}>
           {props.controlBar === 'titleBar' && curPanelId === 'Expression' ? (
-            <div style={{paddingLeft: 16, paddingRight: 16}}>
+            <div
+              style={{
+                margin: '0 16px',
+                backgroundColor: MOON_50,
+                padding: '4px 8px',
+                borderRadius: '4px',
+              }}>
               <WeaveExpression
                 expr={panelInputExpr}
                 setExpression={updateExpression}
