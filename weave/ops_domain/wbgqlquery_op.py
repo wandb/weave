@@ -9,7 +9,7 @@ from ..language_features.tagging import tagged_value_type
 from .. import engine_trace
 from .. import errors
 from .. import environment
-from .. import mappers_python
+from .. import mappers_gql
 from .. import gql_with_keys
 
 
@@ -46,7 +46,7 @@ def wbgqlquery(query_str, alias_list, output_type):
             raise errors.WeaveGQLExecuteMissingAliasError(
                 f"Alias {alias} not found in query results"
             )
-    mapper = mappers_python.map_from_gql(output_type, None)
+    mapper = mappers_gql.map_from_gql(output_type, None)
     return mapper.apply(gql_payload)
 
 

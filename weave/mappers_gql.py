@@ -57,4 +57,4 @@ def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
     raise errors.WeaveValueError(f"Unknown type {type}")
 
 
-mappers_python.map_from_gql = mappers.make_mapper(map_from_gql_payload_)
+map_from_gql = mappers.make_mapper(map_from_gql_payload_)
