@@ -9,7 +9,6 @@ import getConfig from '../config';
 
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
-import {consoleLog} from '../util';
 import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
@@ -50,6 +49,9 @@ import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import Inspector from './Sidebar/Inspector';
 import {useWeaveAutomation} from './automation';
+import {consoleLog} from '../util';
+import {trackPage} from '../util/events';
+import {getCookie} from '../common/util/cookie';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -109,6 +111,8 @@ const JupyterControlsIcon = styled.div`
   }
 `;
 
+const HOST_SESSION_ID_COOKIE = `host_session_id`;
+
 // Simple function that forces rerender when URL changes.
 const usePoorMansLocation = () => {
   const [location, setLocation] = useState(window.location.toString());
@@ -135,6 +139,15 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
   const urlParams = new URLSearchParams(location.search);
+  React.useEffect(() => {
+    console.log('Inside Page Panel', weave, location, urlParams);
+    const options = {
+      context: {
+        hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
+      },
+    };
+    trackPage({url: window.location.href}, options);
+  }, [window.location.href]);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
   const previewMode = urlParams.get('previewMode') != null;

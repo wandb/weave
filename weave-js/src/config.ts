@@ -1,3 +1,6 @@
+import Analytics from '@segment/analytics.js-core/build/analytics';
+import SegmentIntegration from '@segment/analytics.js-integration-segmentio';
+
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
   urlPrefixed(path: string): string;
@@ -40,3 +43,17 @@ export const setConfig = (newConfig: Partial<Config>) => {
 export default function getConfig() {
   return config;
 }
+
+// TODO: We need a way to tell whether we're on Server or not
+const host = document.location.origin;
+const apiHost =
+  host.replace('https://', '').replace('http://', '') + '/analytics';
+const integrationSettings = {
+  'Segment.io': {
+    // apiHost,
+    retryQueue: true,
+  },
+};
+window.analytics = new (Analytics as any)();
+window.analytics?.use(SegmentIntegration);
+window.analytics?.init(integrationSettings);
