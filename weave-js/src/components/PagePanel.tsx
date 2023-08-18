@@ -121,6 +121,16 @@ const usePoorMansLocation = () => {
     const interval = setInterval(() => {
       if (window.location.toString() !== location) {
         setLocation(window.location.toString());
+        console.log(
+          'inside poor mans location useEffect',
+          window.location.toString()
+        );
+        const options = {
+          context: {
+            hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
+          },
+        };
+        trackPage({url: window.location.href}, options);
       }
     }, 250);
     return () => {
@@ -140,13 +150,11 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   const location = usePoorMansLocation();
   const urlParams = new URLSearchParams(location.search);
   React.useEffect(() => {
-    const options = {
-      context: {
-        hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
-      },
-    };
-    trackPage({url: window.location.href}, options);
-  }, [window.location.href]);
+    console.log(
+      "ok I'm in page panel, empty useEffect ",
+      window.location.toString()
+    );
+  }, []);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
   const previewMode = urlParams.get('previewMode') != null;
