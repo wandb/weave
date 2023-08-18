@@ -271,12 +271,12 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
           />
         </StyledTextBox>
       </ConfigPanel.ConfigOption>
-      
+
       <ConfigPanel.ConfigOption label="Duration">
         <StyledTextBox>
-          {durationMillis != null ? (
-            monthRoundedTime(durationMillis / 1000) || 'N/A'
-          ) : 'N/A'}
+          {durationMillis != null
+            ? monthRoundedTime(durationMillis / 1000) || 'N/A'
+            : 'N/A'}
         </StyledTextBox>
       </ConfigPanel.ConfigOption>
     </div>

@@ -39,7 +39,7 @@ const inputType = {
 
 const StyledDiv = styled.div`
   padding: 0 16px;
-  && .ui.search.dropdown>.text {
+  && .ui.search.dropdown > .text {
     cursor: pointer;
   }
 `;

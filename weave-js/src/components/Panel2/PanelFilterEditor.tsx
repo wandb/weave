@@ -31,7 +31,7 @@ import {
   // opLimit,
 } from '@wandb/weave/core';
 import {Icon} from '@wandb/weave/components/Icon';
-import {Button as WBButton} from '@wandb/weave/components/Button';
+import {Button} from '@wandb/weave/components/Button';
 import {MOON_50} from '@wandb/weave/common/css/color.styles';
 
 import * as _ from 'lodash';
@@ -41,7 +41,7 @@ import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
-import {Button, Popup} from 'semantic-ui-react';
+import {Popup} from 'semantic-ui-react';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
 
@@ -212,7 +212,7 @@ const SingleFilterVisualEditor: React.FC<{
   const valid = visualClauseIsValid(curClause);
 
   return (
-    <div style={{gap:'4px', display: 'flex', flexDirection: 'column'}}>
+    <div style={{gap: '4px', display: 'flex', flexDirection: 'column'}}>
       <ModifiedDropdown
         value={key}
         onChange={(e, {value: k}) => {
@@ -262,9 +262,17 @@ const SingleFilterVisualEditor: React.FC<{
           selection
         />
       )}
-      <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px'}}>
-        <WBButton onClick={props.onCancel} variant='secondary'>Cancel</WBButton>
-        <WBButton
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          justifyContent: 'flex-end',
+          marginTop: '4px',
+        }}>
+        <Button onClick={props.onCancel} variant="secondary">
+          Cancel
+        </Button>
+        <Button
           disabled={!valid}
           onClick={() => {
             if (valid) {
@@ -275,7 +283,7 @@ const SingleFilterVisualEditor: React.FC<{
             }
           }}>
           OK
-        </WBButton>
+        </Button>
       </div>
     </div>
   );
@@ -650,21 +658,21 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
           top: '-30px',
           position: 'absolute',
         }}>
-        <WBButton
+        <Button
           variant="ghost"
           size="small"
           disabled={visualClauses == null}
           onClick={() => visualClauses != null && setMode('visual')}
           active={actualMode === 'visual'}>
           Visual
-        </WBButton>
-        <WBButton
+        </Button>
+        <Button
           variant="ghost"
           size="small"
           onClick={() => setMode('expression')}
           active={actualMode === 'expression'}>
           Expression
-        </WBButton>
+        </Button>
       </div>
       {mode === 'expression' || visualClauses == null ? (
         <div
@@ -729,13 +737,13 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             open={editingFilterIndex === -1}
             trigger={
               <div>
-                <WBButton
+                <Button
                   variant="ghost"
                   onClick={() => {
                     setEditingFilterIndex(-1);
                   }}>
                   + New filter
-                </WBButton>
+                </Button>
               </div>
             }
             content={
