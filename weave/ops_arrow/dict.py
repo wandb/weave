@@ -433,3 +433,53 @@ def columnNames(self):
         types.List(types.String()),
         self._artifact,
     )
+
+
+def _with_column_type(cur_type: types.Type, key: str, new_col_type: types.Type):
+    if not isinstance(cur_type, types.TypedDict):
+        raise ValueError("invalid type ", cur_type)
+    path = _dict_utils.split_escaped_string(key)
+
+    property_types = {**cur_type.property_types}
+
+    if len(path) > 1:
+        return _with_column_type(
+            cur_type,
+            path[0],
+            _with_column_type(
+                property_types[path[0]], ".".join(path[1:]), new_col_type
+            ),
+        )
+
+    col_names = list(property_types.keys())
+    try:
+        key_index = col_names.index(key)
+    except ValueError:
+        key_index = None
+    if key_index is not None:
+        property_types.pop(key)
+        col_names.pop(key_index)
+    property_types[key] = new_col_type
+    return types.TypedDict(property_types)
+
+
+def _with_columns_output_type(input_type):
+    new_col_types = input_type["cols"]
+    obj_type = input_type["self"].object_type
+    for k, v in new_col_types.property_types.items():
+        print("K V", k, v)
+        obj_type = _with_column_type(obj_type, k, v.object_type)
+    return ArrowWeaveListType(obj_type)
+
+
+@op(
+    name="ArrowWeaveListTypedDict-with_columns",
+    hidden=True,
+    input_type={
+        "self": ArrowWeaveListType(types.TypedDict({})),
+        "cols": types.Dict(types.String(), ArrowWeaveListType()),
+    },
+    output_type=_with_columns_output_type,
+)
+def with_column(self, cols):
+    return self.with_columns(cols)

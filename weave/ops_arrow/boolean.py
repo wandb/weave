@@ -90,3 +90,31 @@ def bool_or(self, other):
 )
 def bool_not(self):
     return ArrowWeaveList(pc.invert(self._arrow_data), types.Boolean(), self._artifact)
+
+
+# TODO: move to typeddict
+@arrow_op(
+    name="ArrowWeaveListTypedDict-cond",
+    input_type={
+        "cases": ArrowWeaveListType(types.TypedDict()),
+        "results": types.List(types.Any()),
+    },
+    output_type=lambda input_type: ArrowWeaveListType(
+        types.optional(input_type["results"].object_type)
+    ),
+)
+def awl_cond(cases, results):
+    if isinstance(results, ArrowWeaveList) and isinstance(
+        results._arrow_data, pa.ListArray
+    ):
+        n_els = len(results._arrow_data[0])
+        result_object_type = types.TypeRegistry.type_of(
+            results._arrow_data[0].as_py()
+        ).object_type
+        results = [
+            pa.compute.list_element(results._arrow_data, i) for i in range(n_els)
+        ]
+    else:
+        result_object_type = types.TypeRegistry.type_of(results).object_type
+    result_array = pc.case_when(cases._arrow_data, *results)
+    return ArrowWeaveList(result_array, result_object_type, cases._artifact)

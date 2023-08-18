@@ -110,7 +110,20 @@ board_name = "py_board-" + BOARD_ID
 
 
 def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
-    return row["summary.total_tokens"] * 0.0015e-3
+    return weave.ops.cond(
+        weave.ops.dict_(
+            a=row["output.model"] == "gpt-3.5-turbo-0613",
+            b=row["output.model"] == "gpt-4-0613",
+        ),
+        weave.ops.make_list(
+            # gpt-3.5-turbo-0613
+            a=row["summary.prompt_tokens"] * 0.0015e-3
+            + row["summary.completion_tokens"] * 0.002e-3,
+            # gpt-4-0613
+            b=row["summary.prompt_tokens"] * 0.03e-3
+            + row["summary.completion_tokens"] * 0.06e-3,
+        ),
+    )
 
 
 @weave.op(  # type: ignore
@@ -135,13 +148,33 @@ def board(
 
     source_data = varbar.add("source_data", input_node)
 
+    augmented_data = varbar.add(
+        "augmented_data",
+        source_data.with_columns(
+            weave.ops.dict_(**{"summary.cost": source_data.map(lambda row: cost(row))})
+        ),
+        hidden=True,
+    )
+
+    filter_fn = varbar.add(
+        "filter_fn",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: weave_internal.const(True)
+        ),
+        hidden=True,
+    )
+
+    filtered_data = varbar.add(
+        "filtered_data", augmented_data.filter(filter_fn), hidden=True
+    )
+
     # Setup date range variables:
     ## 1. raw_data_range is derived from raw_data
-    dataset_range = varbar.add(
-        "dataset_range",
+    filtered_range = varbar.add(
+        "filtered_range",
         weave.ops.make_list(
-            a=source_data[timestamp_col_name].min(),
-            b=source_data[timestamp_col_name].max(),
+            a=filtered_data[timestamp_col_name].min(),
+            b=filtered_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -158,7 +191,7 @@ def board(
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
     ##    the range of data that will be displayed in the charts.
     bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(dataset_range), hidden=True
+        "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
     )
 
     # clean_data = varbar.add(
@@ -183,7 +216,7 @@ def board(
 
     window_data = varbar.add(
         "window_data",
-        source_data.filter(
+        augmented_data.filter(
             lambda row: weave.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
@@ -192,20 +225,9 @@ def board(
         hidden=True,
     )
 
-    filter_fn = varbar.add(
-        "filter_fn",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: weave_internal.const(True)
-        ),
-        hidden=True,
-    )
     filters = varbar.add(
         "filters",
         weave.panels.FilterEditor(filter_fn, node=window_data),
-    )
-
-    filtered_data = varbar.add(
-        "filtered_data", source_data.filter(filter_fn), hidden=True
     )
 
     filtered_window_data = varbar.add(
@@ -258,7 +280,7 @@ def board(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_expr=lambda row: cost(row).sum(),
+            y_expr=lambda row: row["summary.cost"].sum(),
             y_title="total cost ($)",
             groupby_key=groupby,
             x_domain=user_zoom_range,
@@ -285,7 +307,7 @@ def board(
 
     overview_tab.add(
         "avg_cost_per_req",
-        cost(filtered_window_data).avg(),  # type: ignore
+        filtered_window_data["summary.cost"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=3),
     )
     overview_tab.add(
@@ -332,6 +354,7 @@ def board(
     )
     requests_table.add_column(lambda row: row["summary.total_tokens"], "Total Tokens")
     requests_table.add_column(lambda row: row["summary.latency_s"], "Latency")
+    requests_table.add_column(lambda row: row["summary.cost"], "Cost")
     requests_table.add_column(lambda row: row["timestamp"], "Timestamp")
 
     requests_table_var = overview_tab.add(

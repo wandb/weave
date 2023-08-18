@@ -41,3 +41,11 @@ def none_coalesce(lhs: typing.Any, rhs: typing.Any):
     if isinstance(lhs, list) and isinstance(rhs, list):
         return [l or r for l, r in zip(lhs, rhs)]
     return lhs or rhs
+
+
+@op(output_type=lambda input_type: types.optional(input_type["results"].object_type))
+def cond(cases: dict[str, bool], results: list[typing.Any]):
+    for c, r in zip(cases.values(), results):
+        if c:
+            return r
+    return None

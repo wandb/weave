@@ -11,11 +11,13 @@ import {
   dict,
   filePathToType,
   isConstType,
+  isList,
   isSimpleTypeShape,
   isTaggedValue,
   isTypedDict,
   isUnion,
   list,
+  maybe,
   nonNullable,
   taggedValue,
   Type,
@@ -27,6 +29,7 @@ import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
 import {opIndex} from '../primitives';
 import {makeStandardOp} from '../opKinds';
+import {splitEscapedString} from '../primitives/splitEscapedString';
 
 // import * as TypeHelpers from '../model/typeHelpers';
 // import * as Types from '../model/types';
@@ -694,6 +697,101 @@ export const opCrossProduct = makeOp({
       return {type: 'list', objectType: typedDict(newPropTypes)};
     }
     throw new Error('unhandled type in op-cross-product');
+  },
+});
+
+export const opCond2 = makeOp({
+  name: 'op-cond2',
+  renderInfo: {
+    type: 'function',
+  },
+  description: 'hello',
+  argDescriptions: {},
+  returnValueDescription: 'hello',
+  argTypes: {
+    conds: {
+      type: 'dict',
+      objectType: 'boolean',
+    },
+    results: {
+      type: 'list',
+      objectType: 'any',
+    },
+  },
+  returnType: inputNodes => {
+    return maybe(inputNodes.results.type.objectType);
+  },
+});
+
+const _withColumnType = (
+  curType: Type | undefined,
+  key: string,
+  newColType: Type
+): Type => {
+  if (curType == null || !isTypedDict(curType)) {
+    throw new Error('invalid type');
+  }
+  const path = splitEscapedString(key);
+  const propertyTypes = {...curType.propertyTypes} as {[key: string]: Type};
+  if (path.length > 1) {
+    return _withColumnType(
+      curType,
+      path[0],
+      _withColumnType(
+        propertyTypes[path[0]],
+        path.slice(1).join('.'),
+        newColType
+      )
+    );
+  }
+  let colNames = Object.keys(propertyTypes);
+  const colIndex = colNames.findIndex(colName => colName === key);
+  if (colIndex !== -1) {
+    delete propertyTypes[key];
+    colNames = colNames.splice(colIndex, 1);
+  }
+  propertyTypes[key] = newColType;
+  return typedDict(propertyTypes);
+};
+
+const _withColumnsOutputType = (selfType: ListType, colsType: Type) => {
+  if (!isTypedDict(colsType)) {
+    throw new Error('invalid');
+  }
+
+  let objType = selfType.objectType;
+  for (const [k, v] of Object.entries(colsType.propertyTypes)) {
+    if (v == null || !isList(v)) {
+      throw new Error('invalid ');
+    }
+    objType = _withColumnType(objType, k, v.objectType);
+  }
+  return list(objType);
+};
+
+export const opWithColumns = makeOp({
+  name: 'ArrowWeaveListTypedDict-with_columns',
+  renderInfo: {
+    type: 'function',
+  },
+  description: 'hello',
+  argDescriptions: {},
+  returnValueDescription: 'hello',
+  argTypes: {
+    self: {
+      type: 'list',
+      objectType: {
+        type: 'typedDict',
+        propertyTypes: {},
+      },
+    },
+    cols: {
+      type: 'dict',
+      objectType: {type: 'list', objectType: 'any'},
+    },
+  },
+  returnType: inputNodes => {
+    return _withColumnsOutputType(inputNodes.self.type, inputNodes.cols.type);
   },
 });
 
