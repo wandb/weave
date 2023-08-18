@@ -50,6 +50,7 @@ import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
 import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
+import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
 import {ReactComponent as ImportFolderAlt} from '../../assets/icons/icon-folder-alt.svg';
 import {ReactComponent as ImportFolderProject} from '../../assets/icons/icon-folder-project.svg';
 import {ReactComponent as ImportFolderProjectMove} from '../../assets/icons/icon-folder-project-move.svg';
@@ -349,6 +350,9 @@ export const IconFailed = (props: SVGIconProps) => (
 );
 export const IconFlashBolt = (props: SVGIconProps) => (
   <ImportFlashBolt {...updateIconProps(props)} />
+);
+export const IconFilterAlt = (props: SVGIconProps) => (
+  <ImportFilterAlt {...updateIconProps(props)} />
 );
 export const IconFolderAlt = (props: SVGIconProps) => (
   <ImportFolderAlt {...updateIconProps(props)} />
@@ -810,6 +814,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
   'flash-bolt': IconFlashBolt,
+  'filter-alt': IconFilterAlt,
   'folder-alt': IconFolderAlt,
   'folder-project': IconFolderProject,
   'folder-project-move': IconFolderProjectMove,

@@ -8,6 +8,7 @@ import EditableField from '@wandb/weave/common/components/EditableField';
 import {
   GRAY_350,
   GRAY_50,
+  MOON_50,
   linkHoverBlue,
 } from '@wandb/weave/common/css/globals.styles';
 import {ValidatingTextInput} from '@wandb/weave/components/ValidatingTextInput';
@@ -577,7 +578,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       {props.controlBar === 'titleBar' && (
         <div
           style={{
-            fontWeight: 'bold',
+            fontWeight: '600',
             padding: '0 16px 8px',
             lineHeight: '20px',
             marginTop: 16,
@@ -686,7 +687,13 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
           handleVarEvent={handleVarEvent}
           newPath={props.pathEl}>
           {props.controlBar === 'titleBar' && curPanelId === 'Expression' ? (
-            <div style={{paddingLeft: 16, paddingRight: 16}}>
+            <div
+              style={{
+                margin: '0 16px',
+                backgroundColor: MOON_50,
+                padding: '4px 8px',
+                borderRadius: '4px',
+              }}>
               <WeaveExpression
                 expr={panelInputExpr}
                 setExpression={updateExpression}

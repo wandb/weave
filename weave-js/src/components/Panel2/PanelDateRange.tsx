@@ -1,4 +1,5 @@
 import React, {useMemo, useCallback} from 'react';
+import styled from 'styled-components';
 
 import * as Panel from './panel';
 import * as ConfigPanel from './ConfigPanel';
@@ -13,6 +14,7 @@ import {useUpdateConfig2} from './PanelComp';
 import {useMutation, useNodeValue} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import {ValidatingTextInput} from '../ValidatingTextInput';
+import {MOON_50, MOON_800} from '@wandb/weave/common/css/color.styles';
 
 const inputType = {
   type: 'union' as const,
@@ -27,6 +29,26 @@ const inputType = {
     },
   ],
 };
+
+const StyledTextBox = styled.div`
+  background-color: ${MOON_50};
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 16px;
+  line-height: 20px;
+  > div {
+    width: 100%;
+  }
+  &&& input {
+    font-family: Source Sans Pro;
+    font-size: 16px;
+    background-color: ${MOON_50};
+    outline: none;
+    color: ${MOON_800};
+  }
+  display: flex;
+  align-content: center;
+`;
 
 interface PanelDateRangeConfig {
   domain: NodeOrVoidNode;
@@ -223,33 +245,40 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
     <div
       style={{
         height: '100%',
-        paddingLeft: 16,
+        padding: '0 16px',
         display: 'flex',
         flexDirection: 'column',
       }}>
-      <div style={{display: 'flex', alignItems: 'center', width: '100%'}}>
-        <div style={{width: 40}}>start</div>
-        <DateEditor
-          timestamp={start}
-          onCommit={updateStart}
-          allowDelta={true}
-          deltaDirection="down"
-          deltaFromOffset={end}
-        />
-      </div>
-      <div style={{display: 'flex', alignItems: 'center', width: '100%'}}>
-        <div style={{width: 40}}>end</div>
-        <DateEditor
-          timestamp={end}
-          onCommit={updateEnd}
-          allowDelta={true}
-          deltaDirection="up"
-          deltaFromOffset={start}
-        />
-      </div>
-      {durationMillis != null && (
-        <div>duration {monthRoundedTime(durationMillis / 1000)}</div>
-      )}
+      <ConfigPanel.ConfigOption label="Start">
+        <StyledTextBox>
+          <DateEditor
+            timestamp={start}
+            onCommit={updateStart}
+            allowDelta={true}
+            deltaDirection="down"
+            deltaFromOffset={end}
+          />
+        </StyledTextBox>
+      </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label="End">
+        <StyledTextBox>
+          <DateEditor
+            timestamp={end}
+            onCommit={updateEnd}
+            allowDelta={true}
+            deltaDirection="up"
+            deltaFromOffset={start}
+          />
+        </StyledTextBox>
+      </ConfigPanel.ConfigOption>
+
+      <ConfigPanel.ConfigOption label="Duration">
+        <StyledTextBox>
+          {durationMillis != null
+            ? monthRoundedTime(durationMillis / 1000) || 'N/A'
+            : 'N/A'}
+        </StyledTextBox>
+      </ConfigPanel.ConfigOption>
     </div>
   );
 };
