@@ -348,13 +348,6 @@ def test_op_with_refiner(fake_wandb):
                                 "keys": {
                                     "id": "string",
                                     "name": "string",
-                                    "entity": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "id": "string",
-                                            "name": "string",
-                                        },
-                                    },
                                     "runs_c1233b7003317090ab5e2a75db4ad965": {
                                         "type": "typedDict",
                                         "propertyTypes": {

@@ -84,8 +84,6 @@ def gql_prop_op(
     first_arg_name = input_type.name
 
     def gql_property_getter_op_fn(**inputs):
-        if isinstance(output_type, weave_types.Timestamp):
-            return output_type.from_isostring(inputs[first_arg_name].gql[prop_name])
         return inputs[first_arg_name].gql[prop_name]
 
     sig = signature(gql_property_getter_op_fn)

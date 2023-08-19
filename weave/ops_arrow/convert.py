@@ -119,14 +119,6 @@ def recursively_build_pyarrow_array(
             none_unboxer(py_objs),
             type=pyarrow_type,
         )
-    elif pa.types.is_string(pyarrow_type) and isinstance(
-        mapper, mappers_arrow.DictSavedAsStringToArrowString
-    ):
-        serialized = [
-            json.dumps(val.json_dict) if val is not None else None
-            for val in none_unboxer(py_objs)
-        ]
-        return pa.array(serialized, type=pyarrow_type)
 
     elif pa.types.is_struct(pyarrow_type):
         keys: list[str] = []

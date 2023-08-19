@@ -83,7 +83,7 @@ def gql_type_to_weave_type(
             if key == "__typename":
                 # __typename does not appear explicitly in the schema, but all types have it
                 # it just returns a string, so treat that case here.
-                property_types[key] = types.String()
+                property_types[key] = types.Const(types.String(), gql_type.name)
             else:
                 property_types[key] = gql_type_to_weave_type(
                     gql_type.fields[selection.name.value].type, selection.selection_set
