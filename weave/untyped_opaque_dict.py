@@ -33,18 +33,18 @@ class ImmutableBase:
     def mutable_copy(self):
         return unfreeze(self)
 
-
-class ImmutableDict(dict, ImmutableBase):
     def __setitem__(self, key, value):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def __delitem__(self, key):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
-    def update(self, *args, **kwargs):
+    def clear(self):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
-    def pop(self, *args, **kwargs):
+
+class ImmutableDict(dict, ImmutableBase):
+    def update(self, *args, **kwargs):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def popitem(self, *args, **kwargs):
@@ -53,7 +53,7 @@ class ImmutableDict(dict, ImmutableBase):
     def setdefault(self, *args, **kwargs):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
-    def clear(self):
+    def pop(self, *args):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def __repr__(self):
@@ -61,12 +61,6 @@ class ImmutableDict(dict, ImmutableBase):
 
 
 class ImmutableList(list, ImmutableBase):
-    def __setitem__(self, index, value):
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
-
-    def __delitem__(self, index):
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
-
     def append(self, value):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
@@ -79,16 +73,13 @@ class ImmutableList(list, ImmutableBase):
     def remove(self, value):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
-    def pop(self, *args):
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
-
     def sort(self, *args, **kwargs):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def reverse(self):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
-    def clear(self):
+    def pop(self, *args):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def __repr__(self):
@@ -131,12 +122,6 @@ class UntypedOpaqueDict(ImmutableBase):
 
     def __getitem__(self, key):
         return self.json_dict[key]
-
-    def __setitem__(self, key, value):
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
-
-    def __delitem__(self, key):
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def __iter__(self):
         return iter(self.json_dict)
