@@ -96,7 +96,7 @@ class ImmutableList(list, ImmutableBase):
 
 
 @weave_type("UntypedOpaqueDict", True)
-class UntypedOpaqueDict:
+class UntypedOpaqueDict(ImmutableBase):
     """
     UntypedOpaqueDict is a Weave Type that is used to store arbitrary JSON data.
     Unlike `Dict` or `TypedDict`, this Type does not need to define the keys/fields.
