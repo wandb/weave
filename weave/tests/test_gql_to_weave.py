@@ -269,7 +269,10 @@ def test_inline_fragments():
                                                                                     "createdBy": types.UnionType(
                                                                                         types.TypedDict(
                                                                                             {
-                                                                                                "__typename": types.String(),
+                                                                                                "__typename": types.Const(
+                                                                                                    types.String(),
+                                                                                                    "Run",
+                                                                                                ),
                                                                                                 "id": types.String(),
                                                                                                 "name": types.String(),
                                                                                                 "displayName": types.optional(
@@ -279,7 +282,10 @@ def test_inline_fragments():
                                                                                         ),
                                                                                         types.TypedDict(
                                                                                             {
-                                                                                                "__typename": types.String(),
+                                                                                                "__typename": types.Const(
+                                                                                                    types.String(),
+                                                                                                    "User",
+                                                                                                ),
                                                                                             }
                                                                                         ),
                                                                                     ),

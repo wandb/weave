@@ -161,7 +161,10 @@ def test_typename():
                                                                     {
                                                                         "node": types.TypedDict(
                                                                             {
-                                                                                "__typename": types.String(),
+                                                                                "__typename": types.Const(
+                                                                                    types.String(),
+                                                                                    "ArtifactCollection",
+                                                                                ),
                                                                                 "id": types.String(),
                                                                                 "name": types.String(),
                                                                             }
