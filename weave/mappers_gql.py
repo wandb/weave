@@ -1,3 +1,5 @@
+import datetime
+
 from . import untyped_opaque_dict as uod
 from . import mappers
 from .mappers_python_def import (
@@ -6,13 +8,13 @@ from .mappers_python_def import (
     IntToPyInt,
     PyFloatToFloat,
     StringToPyString,
-    PyTimestampToTimestamp,
     ObjectDictToObject,
     TypedDictToPyDict,
     DictToPyDict,
     ListToPyList,
-    PyUnionToUnion,
 )
+
+from .mappers_weave import UnionMapper
 
 from . import errors
 from . import weave_types as types
@@ -22,6 +24,33 @@ from .gql_with_keys import GQLHasKeysType
 class PyDictToUntypedOpaqueDict(mappers.Mapper):
     def apply(self, obj):
         return uod.UntypedOpaqueDict(obj)
+
+
+class GQLPayloadUnionToUnion(UnionMapper):
+    def apply(self, obj):
+        if self.is_single_object_nullable:
+            if obj is None:
+                return None
+            non_null_mapper = next(
+                filter(
+                    lambda m: types.NoneType().assign_type(m.type), self._member_mappers
+                )
+            )
+            return non_null_mapper.apply(obj)
+        elif "__typename" in obj:
+            typename = obj["__typename"]
+            for mapper in self._member_mappers:
+                if mapper.type.name == typename:
+                    return mapper.apply(obj)
+        raise errors.WeaveValueError(
+            f"Cant find a member of union {self.type} with typename {typename}"
+        )
+
+
+class GQLTimestampToTimestamp(mappers.Mapper):
+    def apply(self, obj):
+        assert isinstance(self.type, types.Timestamp)
+        return self.type.from_isostring(obj)
 
 
 def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
@@ -42,7 +71,7 @@ def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
     elif isinstance(type, types.Timestamp):
-        return PyTimestampToTimestamp(type, mapper, artifact, path)
+        return GQLTimestampToTimestamp(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
@@ -52,7 +81,7 @@ def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
     elif isinstance(type, types.List):
         return ListToPyList(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
-        return PyUnionToUnion(type, mapper, artifact, path)
+        return GQLPayloadUnionToUnion(type, mapper, artifact, path)
     raise errors.WeaveValueError(f"Unknown type {type}")
 
 

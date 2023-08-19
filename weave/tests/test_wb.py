@@ -1449,8 +1449,8 @@ def run_history_as_of_mocker(q, ndx):
                     {
                         "node": {
                             **fwb.run_payload,  # type: ignore
-                            "history_c81e728d9d4c2f636f067f89cc14862c": example_history[
-                                2
+                            "history_c81e728d9d4c2f636f067f89cc14862c": [
+                                example_history[2]
                             ],
                         }
                     }
