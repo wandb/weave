@@ -993,7 +993,8 @@ class ObjectType(Type):
         with artifact.open(f"{name}.object.json") as f:
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
-        return mapper.apply(result)
+        mapped_result = mapper.apply(result)
+        return mapped_result
 
 
 @dataclasses.dataclass(frozen=True)

@@ -1,10 +1,16 @@
-from typing import Optional, Any, Iterator
-from dataclasses import field
-from .decorator_type import type as weave_type
+import typing
+
+from . import weave_types as types
+from .decorator_class import weave_class
+from . import errors
 
 
-@weave_type("DictSavedAsString", False)
-class DictSavedAsString:
+class UntypedOpaqueDictType(types.BasicType):
+    name = "untyped_opaque_dict"
+
+
+@weave_class(UntypedOpaqueDictType)
+class UntypedOpaqueDict(dict):
     """
     UntypedOpaqueDict is a Weave Type that is used to store arbitrary JSON data.
     Unlike `Dict` or `TypedDict`, this Type does not need to define the keys/fields.
@@ -23,33 +29,23 @@ class DictSavedAsString:
     loaded using the Weave Type system.
     """
 
-    json_dict: dict = field(default_factory=lambda: {})
-
     def __repr__(self) -> str:
-        return f"DictSavedAsString({self.json_dict})"
+        return f"UntypedOpaqueDict({dict(self)})"
 
     def __str__(self) -> str:
         return self.__repr__()
 
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
-        return self.json_dict.get(key, default)
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, DictSavedAsString):
-            return False
-        return self.json_dict == other.json_dict
-
-    def __getitem__(self, key: str) -> Any:
-        return self.json_dict[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.json_dict[key] = value
+    def __setitem__(self, key: str, value: typing.Any) -> None:
+        raise errors.WeaveTypeError(
+            "UntypedOpaqueDict is immutable and does not support setting items."
+        )
 
     def __delitem__(self, key: str) -> None:
-        del self.json_dict[key]
+        raise errors.WeaveTypeError(
+            "UntypedOpaqueDict is immutable and does not support setting items."
+        )
 
-    def __iter__(self) -> Iterator[Any]:
-        return iter(self.json_dict)
-
-    def __len__(self) -> int:
-        return len(self.json_dict)
+    def update(self, *args, **kwargs) -> None:
+        raise errors.WeaveTypeError(
+            "UntypedOpaqueDict is immutable and does not support setting items."
+        )

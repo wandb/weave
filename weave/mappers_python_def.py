@@ -18,6 +18,7 @@ from . import artifact_fs
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
 from .gql_with_keys import GQLHasKeysType, GQLTypeMixin
+from .untyped_opaque_dict import UntypedOpaqueDictType
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -380,6 +381,8 @@ def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
         return DictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.List):
         return ListToPyList(type, mapper, artifact, path)
+    elif isinstance(type, UntypedOpaqueDictType):
+        return mappers.Mapper(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return UnionToPyUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
@@ -429,6 +432,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options
         return DictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.List):
         return ListToPyList(type, mapper, artifact, path)
+    elif isinstance(type, UntypedOpaqueDictType):
+        return mappers.Mapper(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return PyUnionToUnion(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):

@@ -354,7 +354,7 @@ class DictSavedAsStringToArrowString(mappers.Mapper):
 
 class ArrowStringToDictSavedAsString(mappers.Mapper):
     def apply(self, obj):
-        return uod.DictSavedAsString(json.load(obj))
+        return uod.UntypedOpaqueDict(json.load(obj))
 
 
 def map_to_arrow_(
@@ -364,7 +364,7 @@ def map_to_arrow_(
 
     if isinstance(type, types.Const):
         type = type.val_type
-    if isinstance(type, uod.DictSavedAsString.WeaveType):  # type: ignore
+    if isinstance(type, uod.UntypedOpaqueDictType):  # type: ignore
         return DictSavedAsStringToArrowString(type, mapper, artifact, path)
     if isinstance(type, types.TypedDict):
         return TypedDictToArrowStruct(type, mapper, artifact, path)
@@ -403,7 +403,7 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
 
     if isinstance(type, types.TypedDict):
         return mappers_python.TypedDictToPyDict(type, mapper, artifact, path)
-    if isinstance(type, uod.DictSavedAsString):
+    if isinstance(type, uod.UntypedOpaqueDict):
         return ArrowStringToDictSavedAsString(type, mapper, artifact, path)
     elif isinstance(type, (types.List, arrow.ArrowWeaveListType)):
         return ArrowToArrowWeaveListOrPylist(type, mapper, artifact, path)

@@ -113,7 +113,7 @@ def gql_type_to_weave_type(
         elif gql_type.name == "Boolean":
             t = types.Boolean()
         elif gql_type.name == "JSON":
-            t = uod.DictSavedAsString.WeaveType()  # type: ignore
+            t = uod.UntypedOpaqueDictType()
         elif gql_type.name == "DateTime":
             t = types.Timestamp()
         elif gql_type.name == "Duration":

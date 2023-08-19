@@ -13,6 +13,7 @@ from .language_features.tagging import tagged_value_type
 import dataclasses
 from weave import weave_internal, context, storage
 from .ops_primitives import weave_api
+from .untyped_opaque_dict import UntypedOpaqueDictType
 
 
 class RefToPyRef(mappers.Mapper):
