@@ -89,7 +89,7 @@ def _get_history2(run: wdt.Run, columns=None):
     )
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = [dict(d) for d in run.gql["sampledParquetHistory"]["liveData"]]
+    live_data = run.gql["sampledParquetHistory"]["liveData"].mutable_copy()
     for row in live_data:
         for colname in columns:
             if colname not in row:

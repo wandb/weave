@@ -1,6 +1,98 @@
 import json
-from .decorator_type import type as weave_type
 from dataclasses import field
+
+from .decorator_type import type as weave_type
+
+
+IMMUTABLE_ERROR_MESSAGE = "This object is immutable"
+
+
+def freeze(data):
+    if isinstance(data, UntypedOpaqueDict):
+        return UntypedOpaqueDict.from_json_dict(
+            {key: freeze(value) for key, value in data.items()}
+        )
+    if isinstance(data, dict):
+        return ImmutableDict({key: freeze(value) for key, value in data.items()})
+    elif isinstance(data, list):
+        return ImmutableList([freeze(value) for value in data])
+    else:
+        return data
+
+
+def unfreeze(data):
+    if isinstance(data, (dict, UntypedOpaqueDict)):  # also covers ImmutableDict
+        return {key: unfreeze(value) for key, value in data.items()}
+    elif isinstance(data, list):  # also covers ImmutableList
+        return [unfreeze(value) for value in data]
+    else:
+        return data
+
+
+class ImmutableBase:
+    def mutable_copy(self):
+        return unfreeze(self)
+
+
+class ImmutableDict(dict, ImmutableBase):
+    def __setitem__(self, key, value):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def __delitem__(self, key):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def update(self, *args, **kwargs):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def pop(self, *args, **kwargs):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def popitem(self, *args, **kwargs):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def setdefault(self, *args, **kwargs):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def clear(self):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def __repr__(self):
+        return "ImmutableDict(" + super().__repr__() + ")"
+
+
+class ImmutableList(list, ImmutableBase):
+    def __setitem__(self, index, value):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def __delitem__(self, index):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def append(self, value):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def extend(self, values):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def insert(self, index, value):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def remove(self, value):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def pop(self, *args):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def sort(self, *args, **kwargs):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def reverse(self):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def clear(self):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def __repr__(self):
+        return "ImmutableList(" + super().__repr__() + ")"
 
 
 @weave_type("UntypedOpaqueDict", True)
@@ -28,7 +120,7 @@ class UntypedOpaqueDict:
     @classmethod
     def from_json_dict(cls, json_dict: dict):
         inst = cls(json_str=json.dumps(json_dict, separators=(",", ":")))
-        inst._json_dict = json_dict
+        inst._json_dict = freeze(json_dict)
         return inst
 
     def get(self, key, default=None):
@@ -41,10 +133,10 @@ class UntypedOpaqueDict:
         return self.json_dict[key]
 
     def __setitem__(self, key, value):
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def __delitem__(self, key):
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
     def __iter__(self):
         return iter(self.json_dict)
@@ -52,10 +144,13 @@ class UntypedOpaqueDict:
     def __len__(self):
         return len(self.json_dict)
 
+    def items(self):
+        return self.json_dict.items()
+
     @property
     def json_dict(self):
         if not hasattr(self, "_json_dict"):
-            self._json_dict = json.loads(self.json_str)
+            self._json_dict = freeze(json.loads(self.json_str))
         return self._json_dict
 
 
