@@ -275,7 +275,7 @@ const HomeComp: FC<HomeProps> = props => {
         {/* Right Bar */}
         <LayoutElements.Block
           style={{
-            width: previewNode != null ? '450px' : '0px',
+            width: previewNode != null ? '400px' : '0px',
           }}>
           {previewNode}
         </LayoutElements.Block>

@@ -174,6 +174,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   useEnablePageAnalytics();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
+  const history = useHistory();
   const urlParams = new URLSearchParams(location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
@@ -190,6 +191,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   const inJupyter = inJupyterCell();
   const authed = useIsAuthenticated();
   const isLocal = isServedLocally();
+  const transparentlyMountExpString = useRef('');
 
   const setUrlExp = useCallback(
     (exp: NodeOrVoidNode) => {
@@ -202,17 +204,17 @@ const PagePanel = ({browserType}: PagePanelProps) => {
       searchParams.set('exp', newExpStr);
       const pathname = inJupyterCell() ? window.location.pathname : '/';
 
-      if (newExpStr.startsWith('get') && expString?.startsWith('get')) {
-        // In the specific case that we are updating a get with another get
-        // which happens when we transition between published and local states,
-        // then don't retain the history. We used to always do a replace and
-        // it was super confusing
-        window.history.replaceState(null, '', `${pathname}?${searchParams}`);
-      } else {
-        window.history.pushState(null, '', `${pathname}?${searchParams}`);
+      if (
+        newExpStr.startsWith('get') &&
+        expString?.startsWith('get') &&
+        newExpStr.includes('local-artifact') &&
+        expString.includes('wandb-artifact')
+      ) {
+        transparentlyMountExpString.current = newExpStr;
       }
+      history.push(`${pathname}?${searchParams}`);
     },
-    [expString, weave]
+    [expString, history, weave]
   );
 
   const [config, setConfig] = useState<ChildPanelFullConfig>(
@@ -277,14 +279,22 @@ const PagePanel = ({browserType}: PagePanelProps) => {
 
   useEffect(() => {
     consoleLog('PAGE PANEL MOUNT', window.location.href);
-    setLoading(true);
+    const doTransparently =
+      expString != null && transparentlyMountExpString.current === expString;
+    setLoading(!doTransparently);
     if (expString != null) {
       weave.expression(expString, []).then(res => {
-        updateConfig({
-          input_node: res.expr as any,
-          id: panelId,
-          config: panelConfig,
-        } as any);
+        if (doTransparently) {
+          updateConfig({
+            input_node: res.expr as any,
+          });
+        } else {
+          updateConfig({
+            input_node: res.expr as any,
+            id: panelId,
+            config: panelConfig,
+          } as any);
+        }
         setLoading(false);
       });
     } else if (expNode != null) {

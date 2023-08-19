@@ -42,6 +42,7 @@ def gql_prop_op(
     input_type: weave_types.Type,
     prop_name: str,
     output_type: weave_types.Type,
+    hidden: bool = False,
 ):
     first_arg_name = input_type.name
 
@@ -63,6 +64,7 @@ def gql_prop_op(
         ),
         input_type={first_arg_name: input_type},
         output_type=output_type,
+        hidden=hidden,
     )(gql_property_getter_op_fn)
 
 

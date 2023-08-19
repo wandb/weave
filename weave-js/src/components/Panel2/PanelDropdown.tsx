@@ -7,17 +7,20 @@ import {
   opUnique,
   voidNode,
 } from '@wandb/weave/core';
+import {IconChevronDown} from '@wandb/weave/components/Icon';
 import React, {useCallback, useMemo} from 'react';
 
 import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {
+  ConfigFieldWrapper,
+  ConfigFieldModifiedDropdown,
   ConfigOption,
   ConfigSection,
   ExpressionConfigField,
 } from './ConfigPanel';
 import {useUpdateConfig2} from './PanelComp';
-import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
+import styled from 'styled-components';
 
 const inputType = {
   type: 'union' as const,
@@ -34,6 +37,12 @@ const inputType = {
   ],
 };
 
+const StyledDiv = styled.div`
+  padding: 0 16px;
+  && .ui.search.dropdown > .text {
+    cursor: pointer;
+  }
+`;
 export interface PanelDropdownConfig {
   choices: NodeOrVoidNode;
 }
@@ -94,22 +103,26 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   }, [choices]);
 
   return (
-    <ModifiedDropdown
-      value={chosen}
-      onChange={(e, {value}) => {
-        if (isMultiple) {
-          setVal({val: constNodeUnsafe(config.choices.type, value)});
-        } else if (value != null) {
-          setVal({val: constString(value as string)});
-        } else {
-          setVal({val: constNone()});
-        }
-      }}
-      options={options}
-      selection
-      multiple={isMultiple}
-      floating
-    />
+    <StyledDiv>
+      <ConfigFieldWrapper withIcon>
+        <ConfigFieldModifiedDropdown
+          value={chosen}
+          onChange={(e, {value}) => {
+            if (isMultiple) {
+              setVal({val: constNodeUnsafe(config.choices.type, value)});
+            } else if (value != null) {
+              setVal({val: constString(value as string)});
+            } else {
+              setVal({val: constNone()});
+            }
+          }}
+          options={options}
+          multiple={isMultiple}
+          floating
+          icon={<IconChevronDown width={18} />}
+        />
+      </ConfigFieldWrapper>
+    </StyledDiv>
   );
 };
 

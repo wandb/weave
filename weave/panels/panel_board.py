@@ -49,7 +49,7 @@ def varbar(editable=True, items=None) -> panel_group.Group:
                 "DateRange",
                 "FilterEditor",
             ],
-            enableAddPanel=True,
+            enableAddPanel=editable,
             childNameBase="var",
         ),
         items=items,
