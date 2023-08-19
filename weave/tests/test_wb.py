@@ -374,17 +374,11 @@ def test_map_gql_op(fake_wandb):
 
 def test_legacy_run_file_table_format(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock1)
-    cell_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(1)
-        .summary()["legacy_table"]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()[1]["col1"]
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).summary()
+    cell_node = cell_node["legacy_table"]
+    cell_node = cell_node.table()
+    cell_node = cell_node.rows()
+    cell_node = cell_node.dropna().concat().createIndexCheckpointTag()[1]["col1"]
     assert weave.use(cell_node) == "c"
     assert weave.use(cell_node.indexCheckpoint()) == 1
     assert weave.use(cell_node.run().name()) == "amber-glade-100"

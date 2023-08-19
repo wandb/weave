@@ -222,6 +222,42 @@ class FakeClient:
         )
 
 
+def hold_out_keys_from_traversal(d):
+    held_out_from_traversal = {}
+    held_out_from_traversal["summaryMetricsSubset"] = d.pop("summaryMetricsSubset")
+    held_out_from_traversal["summaryMetrics"] = d.pop("summaryMetrics")
+    return held_out_from_traversal
+
+
+def traverse_response(response):
+    if isinstance(response, dict):
+        held_out_from_traversal = {}
+        if "summaryMetrics" in response and "summaryMetricsSubset" not in response:
+            response["summaryMetricsSubset"] = response["summaryMetrics"]
+            held_out_from_traversal = hold_out_keys_from_traversal(response)
+        elif "summaryMetricsSubset" in response and "summaryMetrics" not in response:
+            response["summaryMetrics"] = response["summaryMetricsSubset"]
+            held_out_from_traversal = hold_out_keys_from_traversal(response)
+
+        for k, v in response.items():
+            response[k] = traverse_response(v)
+        if held_out_from_traversal:
+            response.update(held_out_from_traversal)
+
+    elif isinstance(response, list):
+        response = [traverse_response(v) for v in response]
+
+    return response
+
+
+def ensure_summary_metrics_and_summary_metrics_subset(handler):
+    def wrapper(*args, **kwargs):
+        result = handler(*args, **kwargs)
+        return traverse_response(result)
+
+    return wrapper
+
+
 class FakeApi:
     client = FakeClient()
     run = mock.Mock(return_value=FakeRun())
@@ -244,7 +280,9 @@ class FakeApi:
         self,
         handler: typing.Callable[[dict[str, typing.Any], int], typing.Optional[dict]],
     ):
-        self.client.mock_handlers.append(handler)
+        self.client.mock_handlers.append(
+            ensure_summary_metrics_and_summary_metrics_subset(handler)
+        )
 
     def execute_log(self):
         return self.client.execute_log
