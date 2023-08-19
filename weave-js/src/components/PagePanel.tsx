@@ -52,6 +52,7 @@ import {useWeaveAutomation} from './automation';
 import {consoleLog} from '../util';
 import {trackPage} from '../util/events';
 import {getCookie} from '../common/util/cookie';
+import {useHistory} from 'react-router-dom';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -113,6 +114,40 @@ const JupyterControlsIcon = styled.div`
 
 const HOST_SESSION_ID_COOKIE = `host_session_id`;
 
+function useEnablePageAnalytics() {
+  const history = useHistory();
+  const pathRef = useRef('');
+
+  useEffect(() => {
+    const options = {
+      context: {
+        hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
+      },
+    };
+
+    const unlisten = history.listen(location => {
+      const currentPath = `${location.pathname}${location.search}`;
+      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+      if (pathRef.current !== currentPath) {
+        trackPage({url: fullURL}, options);
+        pathRef.current = currentPath;
+      }
+    });
+
+    // Track initial page view
+    const initialPath = `${history.location.pathname}${history.location.search}`;
+    const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+    if (pathRef.current !== initialPath) {
+      trackPage({url: fullURL}, options);
+      pathRef.current = initialPath;
+    }
+
+    return () => {
+      unlisten();
+    };
+  }, []);
+}
+
 // Simple function that forces rerender when URL changes.
 const usePoorMansLocation = () => {
   const [location, setLocation] = useState(window.location.toString());
@@ -121,12 +156,6 @@ const usePoorMansLocation = () => {
     const interval = setInterval(() => {
       if (window.location.toString() !== location) {
         setLocation(window.location.toString());
-        const options = {
-          context: {
-            hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
-          },
-        };
-        trackPage({url: window.location.href}, options);
       }
     }, 250);
     return () => {
@@ -142,6 +171,7 @@ type PagePanelProps = {
 };
 
 const PagePanel = ({browserType}: PagePanelProps) => {
+  useEnablePageAnalytics();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
   const urlParams = new URLSearchParams(location.search);
