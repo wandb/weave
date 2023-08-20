@@ -631,3 +631,10 @@ def test_early_termination_of_gql_key_propagation(fake_wandb):
 
     names = weave.use(names_node)
     assert names[0] == "test-project-1"
+
+    # Test that we can convert instances of keyless types to arrow
+    # and back to keyless types.
+
+    arrow = projects_node.list_to_arrow()
+    awl = weave.use(arrow)
+    assert awl[0] == projects[0]
