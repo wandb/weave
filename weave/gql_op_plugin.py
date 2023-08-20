@@ -7,9 +7,11 @@ from . import op_def
 from . import input_provider
 from . import weave_types as types
 
-# A GQLKeyPropFn is a function that is called during the refinement phase of the compile pass
+# A GQLOutputTypeFn is a function that is called during the refinement phase of the compile pass
 # to propagate the GQL keys of a node's input types to its output type.
-GQLKeyPropFn = typing.Callable[[input_provider.InputProvider, types.Type], types.Type]
+GQLOutputTypeFn = typing.Callable[
+    [input_provider.InputProvider, types.Type], types.Type
+]
 
 
 _ROOT_RESOLVERS: set[op_def.OpDef] = set()
@@ -24,7 +26,7 @@ class GqlOpPlugin:
     # given the input types to the op, return a new output type with the input types'
     # gql keys propagated appropriately. this is not a part of output_type to avoid
     # the UI needing to make additional network requests to get the output type
-    gql_op_output_type: typing.Optional[GQLKeyPropFn] = None
+    gql_op_output_type: typing.Optional[GQLOutputTypeFn] = None
 
     def __post_init__(self) -> None:
         if self.root_resolver is not None:
@@ -43,11 +45,11 @@ def wb_gql_op_plugin(
     query_fn: typing.Callable[[input_provider.InputAndStitchProvider, str], str],
     is_root: bool = False,
     root_resolver: typing.Optional["op_def.OpDef"] = None,
-    gql_key_propagation_fn: typing.Optional[GQLKeyPropFn] = None,
+    gql_op_output_type: typing.Optional[GQLOutputTypeFn] = None,
 ) -> dict[str, GqlOpPlugin]:
     return {
         "wb_domain_gql": GqlOpPlugin(
-            query_fn, is_root, root_resolver, gql_key_propagation_fn
+            query_fn, is_root, root_resolver, gql_op_output_type
         )
     }
 

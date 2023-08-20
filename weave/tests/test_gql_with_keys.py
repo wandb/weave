@@ -575,7 +575,7 @@ def test_gql_connection_op():
 
 def test_early_termination_of_gql_key_propagation(fake_wandb):
     # Test to ensure that an operation without a defined GQL key propagation function
-    # (gql_key_prop_fn) still executes. The result can still be serialized and deserialized,
+    # (gql_op_output_type) still executes. The result can still be serialized and deserialized,
     # even without the keys for the result.
 
     # Add a mock to the fake wandb API.
@@ -600,7 +600,7 @@ def test_early_termination_of_gql_key_propagation(fake_wandb):
         }
     )
 
-    # Compile a project node. Since root_all_reports() lacks a gql_key_prop_fn,
+    # Compile a project node. Since root_all_reports() lacks a gql_op_output_type,
     # the projects should not have keys.
     projects_node = compile.compile([root_all_reports().project()])[0]
     assert projects_node.type == types.List(wdt.ProjectType)

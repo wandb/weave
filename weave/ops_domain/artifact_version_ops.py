@@ -107,7 +107,7 @@ def _root_artifact_version_plugin(inputs, inner):
     """
 
 
-def _gql_key_propagation_fn_for_root_artifact_version(
+def _gql_op_output_type_for_root_artifact_version(
     inputs: input_provider.InputProvider, input_type: types.Type
 ) -> types.Type:
     project_alias = _make_alias(
@@ -137,7 +137,7 @@ def _gql_key_propagation_fn_for_root_artifact_version(
         _root_artifact_version_plugin,
         is_root=True,
         root_resolver=root_artifact_version_gql_resolver,
-        gql_key_propagation_fn=_gql_key_propagation_fn_for_root_artifact_version,
+        gql_op_output_type=_gql_op_output_type_for_root_artifact_version,
     ),
 )
 def root_artifact_version(

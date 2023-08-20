@@ -50,7 +50,7 @@ def root_all_artifacts_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_artifacts_gql_resolver,
-        gql_key_propagation_fn=gql_with_keys.make_root_op_gql_key_prop_fn(
+        gql_op_output_type=gql_with_keys.make_root_op_gql_op_output_type(
             "artifacts_500", lambda inputs: "", wdt.ArtifactCollectionType
         ),
     ),
@@ -161,7 +161,7 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
                 }}
             }}
         """,
-        gql_key_propagation_fn=lambda inputs, input_type: types.optional(
+        gql_op_output_type=lambda inputs, input_type: types.optional(
             wdt.ArtifactCollectionMembershipType.with_keys(
                 typing.cast(typing.Any, input_type)
                 .keys["artifactMemberships_first_1"]["edges"]

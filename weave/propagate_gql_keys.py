@@ -12,7 +12,7 @@ import typing
 def _propagate_gql_keys_for_node(
     opdef: "op_def.OpDef",
     node: graph.OutputNode,
-    key_fn: gql_op_plugin.GQLKeyPropFn,
+    key_fn: gql_op_plugin.GQLOutputTypeFn,
     ip: input_provider.InputProvider,
 ) -> types.Type:
     # Mutates node
@@ -69,7 +69,7 @@ def propagate_gql_keys(
         opdef = registry_mem.memory_registry.get_op(fq_opname)
         plugin = gql_op_plugin.get_gql_plugin(opdef)
 
-        key_fn: typing.Optional[gql_op_plugin.GQLKeyPropFn] = None
+        key_fn: typing.Optional[gql_op_plugin.GQLOutputTypeFn] = None
 
         if plugin is None or plugin.gql_op_output_type is None:
             if fq_opname.endswith("GQLResolver"):

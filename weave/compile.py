@@ -663,7 +663,7 @@ def compile_refine_and_propagate_gql(
                 res = op.lazy_call(**params)
 
                 # The GQL key propagation logic needs to happen in the refine pass rather than the GQL
-                # compile pass. This is because the gql_key_prop_fns need refined input types or else
+                # compile pass. This is because the gql_op_output_types need refined input types or else
                 # they can produce incorrect results. For example, consider this node:
                 #
                 #   root-project(...).filteredRuns(...).limit(1).run-summary()
@@ -675,7 +675,7 @@ def compile_refine_and_propagate_gql(
                 #   TaggedValueType({...},
                 #     List(object_type=TaggedValueType({['run']}, Dict(key_type=String(), object_type=Any()))))
                 #
-                # If we encounter ops without a gql_key_prop_fn, like pick(), we need to call
+                # If we encounter ops without a gql_op_output_type, like pick(), we need to call
                 # unrefined_output_type_for_params(). This can lead to invalid unrefined types propagating.
                 #
                 # In this example, after pick() and dropna() we end up with an invalid list type.
@@ -692,8 +692,8 @@ def compile_refine_and_propagate_gql(
                 # refine. In the future, if we can call compile_refine without triggering re-execution,
                 # we could move this to a separate post-refine step.
 
-                # We need the special gql_key_prop_fn instead of using callable output types because the
-                # gql_key_prop_fn needs access to an InputProvider to traverse key trees and generate
+                # We need the special gql_op_output_type instead of using callable output types because the
+                # gql_op_output_type needs access to an InputProvider to traverse key trees and generate
                 # aliases. Normal callable output types don't receive this.
 
                 # Overall, propagating GQL keys during refine simplifies the logic by avoiding issues

@@ -230,15 +230,15 @@ def _alias(
     return alias
 
 
-def make_root_op_gql_key_prop_fn(
+def make_root_op_gql_op_output_type(
     prop_name: str,
     param_str_fn: ParamStrFn,
     output_type: GQLHasWithKeysType,
     use_alias: bool = False,
-) -> gql_op_plugin.GQLKeyPropFn:
-    """Creates a GQLKeyPropFn for a root op that returns a list of objects with keys."""
+) -> gql_op_plugin.GQLOutputTypeFn:
+    """Creates a GQLOutputTypeFn for a root op that returns a list of objects with keys."""
 
-    def _root_op_gql_key_prop_fn(
+    def _root_op_gql_op_output_type(
         inputs: InputProvider, input_type: types.Type
     ) -> types.Type:
         key = (
@@ -264,4 +264,4 @@ def make_root_op_gql_key_prop_fn(
         )
         return types.List(object_type)
 
-    return _root_op_gql_key_prop_fn
+    return _root_op_gql_op_output_type
