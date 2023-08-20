@@ -574,11 +574,11 @@ def test_gql_connection_op():
 
 
 def test_early_termination_of_gql_key_propagation(fake_wandb):
-    # this test checks to make sure that if we encounter an op that does not
-    # have a GQL key prop fn defined, it still executes and we can still
-    # serialize and deserialize the result, even though we dont have the
-    # keys for the result
+    # Test to ensure that an operation without a defined GQL key propagation function
+    # (gql_key_prop_fn) still executes. The result can still be serialized and deserialized,
+    # even without the keys for the result.
 
+    # Add a mock to the fake wandb API.
     fake_wandb.fake_api.add_mock(
         lambda query, idx: {
             "instance": {
@@ -600,25 +600,22 @@ def test_early_termination_of_gql_key_propagation(fake_wandb):
         }
     )
 
-    # all reports has not been migrated yet
-    projects_node = root_all_reports().project()
-
-    # these projects should not have keys because root_all_reports() does not return a HasKeys type
+    # Compile a project node. Since root_all_reports() lacks a gql_key_prop_fn,
+    # the projects should not have keys.
+    projects_node = compile.compile([root_all_reports().project()])[0]
     assert projects_node.type == types.List(wdt.ProjectType)
 
+    # Test that even without serializable instances, the execute works,
+    # refining the type to projectTypeWithKeys().
     projects = weave.use(projects_node)
     assert len(projects) == 1
 
-    # keys are picked back up when we convert a literal to a constnode
-    # and call type_of on it
-
-    # convert projects to a constnode and call typeof on it to get its type (and keys)
+    # Test that keys are restored when converting a literal to a
+    # constnode and calling type_of on it.
     names_node = ops.project_ops.name(projects)
-
-    # compile because we need to run dispatch to use the right op (mapped project-name)
-    # because it wont be dispatched above (the above graph is not executable as is)
-    names_node = compile.compile([names_node])[0]
-
+    names_node = compile.compile([names_node])[
+        0
+    ]  # Compile for dispatch to use the correct operation.
     assert names_node.type == types.List(
         TaggedValueType(
             types.TypedDict(
