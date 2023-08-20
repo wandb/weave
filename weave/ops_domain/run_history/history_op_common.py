@@ -33,6 +33,7 @@ from ... import artifact_fs
 from ...wandb_interface import wandb_stream_table
 from ...compile_table import KeyTree
 from ...ops_primitives import _dict_utils
+from ... import gql_json_cache
 
 tracer = engine_trace.tracer()
 
@@ -122,7 +123,9 @@ def get_full_columns(columns: typing.Optional[list[str]]):
 
 def get_full_columns_prefixed(run: wdt.Run, columns: typing.Optional[list[str]]):
     all_columns = get_full_columns(columns)
-    all_paths = list(run.gql.get("historyKeys", {}).get("keys", {}).keys())
+    all_paths = list(
+        gql_json_cache.use_json(run.gql.get("historyKeys", "{}")).get("keys", {}).keys()
+    )
     return _filter_known_paths_to_requested_paths(all_paths, all_columns)
 
 
@@ -283,7 +286,7 @@ def refine_history_type(
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
 
-    historyKeys = run.gql["historyKeys"]["keys"]
+    historyKeys = gql_json_cache.use_json(run.gql["historyKeys"])["keys"]
 
     return _refine_history_type_inner(historyKeys, columns)
 
@@ -412,10 +415,11 @@ def mock_history_rows(
 
     step_type = types.TypedDict({"_step": types.Int()})
     steps: typing.Union[ArrowWeaveList, list] = []
+    history_keys = gql_json_cache.use_json(run.gql["historyKeys"])
 
-    last_step = run.gql["historyKeys"]["lastStep"]
-    history_keys = run.gql["historyKeys"]["keys"]
-    for key, key_details in history_keys.items():
+    last_step = history_keys["lastStep"]
+    keys = history_keys["keys"]
+    for key, key_details in keys.items():
         if key == "_step":
             type_counts: list[TypeCount] = key_details["typeCounts"]
             count = type_counts[0]["count"]

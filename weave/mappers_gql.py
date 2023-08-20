@@ -1,13 +1,10 @@
-import datetime
-
-from . import untyped_opaque_json as uoj
+import json
 from . import mappers
 from .mappers_python_def import (
     NoneToPyNone,
     BoolToPyBool,
     IntToPyInt,
     PyFloatToFloat,
-    StringToPyString,
     ObjectDictToObject,
     TypedDictToPyDict,
     DictToPyDict,
@@ -20,6 +17,8 @@ from . import errors
 from . import weave_types as types
 from .gql_with_keys import GQLHasKeysType
 
+from . import gql_json_cache
+
 
 class GQLTypedDictToTypedDict(TypedDictToPyDict):
     def apply(self, obj):
@@ -28,11 +27,6 @@ class GQLTypedDictToTypedDict(TypedDictToPyDict):
         if obj is None:
             return None
         return super().apply(obj)
-
-
-class GQLToUntypedOpaqueJSON(mappers.Mapper):
-    def apply(self, obj):
-        return uoj.UntypedOpaqueJSON.from_json(obj)
 
 
 class GQLUnionToUnion(UnionMapper):
@@ -62,6 +56,19 @@ class GQLUnionToUnion(UnionMapper):
         )
 
 
+class GQLStringToString(mappers.Mapper):
+    def apply(self, obj):
+        if isinstance(obj, str):
+            return obj
+
+        # the weave type of the graphql JSON type is a string, so here we
+        # convert the json object to a string, but we also cache the python
+        # object, in case we need to use it later in an op (like history or summary)
+        serialized = json.dumps(obj)
+        gql_json_cache.cache_json(serialized, obj)
+        return serialized
+
+
 class GQLTimestampToTimestamp(mappers.Mapper):
     def apply(self, obj):
         assert isinstance(self.type, types.Timestamp)
@@ -74,9 +81,7 @@ class GQLConstToConst(mappers.Mapper):
 
 
 def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
-    if isinstance(type, uoj.UntypedOpaqueJSONType):
-        return GQLToUntypedOpaqueJSON(type, mapper, artifact, path)
-    elif isinstance(type, GQLHasKeysType):
+    if isinstance(type, GQLHasKeysType):
         return DictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
         return NoneToPyNone(type, mapper, artifact, path)
@@ -89,7 +94,7 @@ def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
     elif isinstance(type, types.Number):
         return PyFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
-        return StringToPyString(type, mapper, artifact, path)
+        return GQLStringToString(type, mapper, artifact, path)
     elif isinstance(type, types.Timestamp):
         return GQLTimestampToTimestamp(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):

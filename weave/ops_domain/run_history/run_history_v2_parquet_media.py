@@ -9,11 +9,11 @@ from ...ops_domain import wbmedia
 from ...ops_arrow.list_ops import concat
 from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
 from ... import engine_trace
+from ... import gql_json_cache
 
 from ...api import use
 
 import pyarrow as pa
-from ... import untyped_opaque_json as uoj
 
 from . import history_op_common
 
@@ -89,8 +89,13 @@ def _get_history2(run: wdt.Run, columns=None):
         run.gql["name"],
     )
 
-    # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = uoj.unfrozen(run.gql["sampledParquetHistory"]["liveData"])
+    # turn the liveset into an arrow table. the liveset is a list of json strings
+    # with cached python object representations which we read from the cache
+    # via use_json() and make mutable copies of via unfrozen()
+    live_data = [
+        gql_json_cache.unfrozen(gql_json_cache.use_json(row))
+        for row in run.gql["sampledParquetHistory"]["liveData"]
+    ]
     for row in live_data:
         for colname in columns:
             if colname not in row:

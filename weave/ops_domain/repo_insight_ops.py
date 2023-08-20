@@ -5,9 +5,10 @@ from ..api import op
 from ..gql_with_keys import (
     _make_alias,
 )
+
+from ..gql_json_cache import use_json
 from .. import weave_types as types
 from .. import errors
-from .. import untyped_opaque_json as uoj
 
 
 rpt_op_configs = {
@@ -105,10 +106,11 @@ def make_rpt_op(plot_name, output_row_type):
             "first: 100000",
             prefix="repoInsightsPlotData",
         )
-        unfrozen_result = uoj.unfrozen(gql_result)
-        res = unfrozen_result[alias]
-        raw_rows = [edge["node"]["row"] for edge in res["edges"]]
-        schema = res.get("schema", [])
+        res = gql_result[alias]
+        raw_rows = [use_json(edge["node"]["row"]) for edge in res["edges"]]
+        schema_str = res.get("schema", "[]")
+        schema = use_json(schema_str)
+
         is_normalized_user_count = res.get("isNormalizedUserCount", False)
 
         if not schema:

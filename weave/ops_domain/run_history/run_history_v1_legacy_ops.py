@@ -5,11 +5,11 @@ from ... import weave_types as types
 from .. import wb_domain_types as wdt
 from .. import wb_util
 from ... import engine_trace
-from ... import untyped_opaque_json as uoj
 
 import pyarrow as pa
 
 from . import history_op_common
+from ... import gql_json_cache
 
 
 tracer = engine_trace.tracer()
@@ -77,7 +77,10 @@ def _get_history(run: wdt.Run, columns=None):
         ) or pa.table([])
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = uoj.unfrozen(run.gql["sampledParquetHistory"]["liveData"])
+    live_data = [
+        gql_json_cache.unfrozen(gql_json_cache.use_json(row))
+        for row in run.gql["sampledParquetHistory"]["liveData"]
+    ]
 
     with tracer.trace("liveSet.impute"):
         for row in live_data:
@@ -95,6 +98,8 @@ def _get_history(run: wdt.Run, columns=None):
 
     # deserialize json
     with tracer.trace("json.loads"):
+        # These fields are not cached, beacuse they are read from parquet and not from GQL.
+        # So we actually use json.loads here.
         for field in binary_fields:
             for row in parquet_history:
                 if row[field] is not None:
