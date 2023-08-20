@@ -8,7 +8,7 @@ These example notebooks demonstrate LLM monitoring with Weave. As a primary use 
 * [OpenAI Proxy Quickstart](../monitoring/openai_proxy_quickstart.ipynb): set up a proxy to monitor OpenAI API calls
 * [Weave Monitoring API](../monitoring/monitor_api.ipynb): understand the Weave monitoring API
 
-<img src="../../docs/assets/mini_prodmon_overview.gif" width="50%">
+<img src="../../docs/assets/mini_prodmon_overview.gif" width="65%">
 
 ## OpenAI Integration
 
