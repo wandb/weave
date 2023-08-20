@@ -31,7 +31,7 @@ export const urlPrefixed = (path: string, host: boolean = false) => {
     return url.pathname;
   }
   return url.href;
-}
+};
 
 const DEFAULT_CONFIG: Config = {
   urlPrefixed,

@@ -65,7 +65,10 @@ export const PreviewNode: React.FC<{
   inputExpr: string;
 }> = props => {
   const url = useMemo(() => {
-    return urlPrefixed(`/?previewMode=true&exp=${encodeURIComponent(props.inputExpr)}`, true);
+    return urlPrefixed(
+      `/?previewMode=true&exp=${encodeURIComponent(props.inputExpr)}`,
+      true
+    );
   }, [props.inputExpr]);
 
   return (
