@@ -32,7 +32,8 @@ _GQL_JSON_CACHE: contextvars.ContextVar[dict[str, typing.Any]] = contextvars.Con
 
 def immutable_error_message(self: Any, args: Any, kwargs: Any) -> str:
     return (
-        f"Cannot modify {self} with args: {args} kwargs: {kwargs}. Object is immutable."
+        f"Cannot modify {str(self)[:1000]} with args: {args} kwargs: {kwargs}. Object is immutable. "
+        "Call unfrozen() on the object to get a mutable copy."
     )
 
 
