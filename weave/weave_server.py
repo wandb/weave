@@ -349,6 +349,7 @@ def send_local_file(path):
 
 
 def frontend_env():
+    """If you add vars here, make sure to define their types in weave-js/src/entrypoint.tsx"""
     return {
         "PREFIX": environment.weave_link_prefix(),
         "ANALYITCS_DISABLED": environment.analyics_disabled(),
@@ -377,6 +378,13 @@ def frontend(path):
 @blueprint.route("/", defaults={"path": None})
 @blueprint.route("/<path:path>")
 def root_frontend(path):
+    # To support server cases where we're mounted under an existing path, i.e.
+    # /wandb/weave, then index.html will load something like /wandb/weave/.../env.js
+    if path is not None:
+        path = path.split("/")[-1]
+    if path == "env.js":
+        js = f"window.CONFIG = {json.dumps(frontend_env())}"
+        return Response(js, mimetype="application/javascript")
     return send_from_directory(blueprint.static_folder, "index.html")
 
 

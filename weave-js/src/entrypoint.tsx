@@ -10,6 +10,17 @@ import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
 
+// These get popuated via /__frontend/env.js and are defined in weave_server.py
+declare global {
+  interface Window { 
+    CONFIG: {
+      PREFIX: string,
+      ANALYITCS_DISABLED: boolean,
+      WEAVE_BACKEND_HOST: string,
+    }
+  }
+}
+
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
     // Update state so the next render will show the fallback UI.
@@ -60,7 +71,7 @@ const Main = ({browserType}: MainProps) => (
 );
 
 ReactDOM.render(
-  <Router>
+  <Router basename={window.CONFIG.PREFIX}>
     <Switch>
       <Route path={`/${URL_RECENT}/:assetType?`}>
         <Main browserType={URL_RECENT} />
