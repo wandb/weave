@@ -393,6 +393,47 @@ def to_weave_arrow(v: typing.Any):
     return api.weave(awl)
 
 
+def to_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
+    def _convert_col_to_parquet_friendly(
+        col: ArrowWeaveList, path: PathType
+    ) -> typing.Optional[ArrowWeaveList]:
+        _, non_none_type = types.split_none(col.object_type)
+        if isinstance(non_none_type, types.UnionType):
+            full_length_fields = []
+            for i in range(len(non_none_type.members)):
+                member_field = col._arrow_data.field(i)
+                padding = len(col) - len(member_field)
+                if padding > 0:
+                    member_field = pa.concat_arrays(
+                        [member_field, pa.nulls(padding, type=member_field.type)]
+                    )
+                else:
+                    # A case where this can happen:
+                    # pa.nulls(1, pa.list_(pa.dense_union([pa.field('a', pa.int32()), pa.field('b', pa.float64())])))
+                    # Then union in the list has type_codes and offsets of len zero, but a field
+                    # of len one that has the null.
+                    member_field = member_field.slice(0, len(col))
+                full_length_fields.append(member_field)
+            struct = pa.StructArray.from_arrays(
+                [col._arrow_data.type_codes, col._arrow_data.offsets]
+                + full_length_fields,
+                ["type_codes", "offsets"]
+                + [str(i) for i in list(range(len(full_length_fields)))],
+            )
+            return ArrowWeaveList(struct, col.object_type, col._artifact)
+        elif isinstance(col.object_type, types.TypedDict):
+            if not col.object_type.property_types:
+                return ArrowWeaveList(
+                    col._arrow_data.is_valid(),
+                    col.object_type,
+                    col._artifact,
+                )
+        return None
+
+    with unsafe_awl_construction("to_parquet_friendly"):
+        return l.map_column(_convert_col_to_parquet_friendly)
+
+
 def from_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
     def _ident(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         return None
