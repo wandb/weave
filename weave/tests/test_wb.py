@@ -855,7 +855,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
-                    "artifactMembership_a9aa34b91abdb163475121bd51290fcb": {
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
                         **fwb.artifactMembership_payload
                     },
                 },
