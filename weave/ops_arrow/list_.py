@@ -632,20 +632,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             mapped = with_mapped_children
         return mapped
 
-    def _decode_gql_types(self) -> "ArrowWeaveList":
-        def _decode_gql(awl: ArrowWeaveList, path: PathType) -> ArrowWeaveList:
-            if isinstance(
-                awl.object_type, gql_with_keys.GQLHasKeysType
-            ) and pa.types.is_dictionary(awl._arrow_data.type):
-                return ArrowWeaveList(
-                    awl._arrow_data.dictionary_decode(),
-                    awl.object_type,
-                    awl._artifact,
-                )
-            return awl
-
-        return self.map_column(_decode_gql)
-
     def separate_tags(
         self,
     ) -> typing.Tuple["ArrowWeaveList", dict[PathType, "ArrowWeaveList"]]:

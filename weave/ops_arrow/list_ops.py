@@ -587,8 +587,6 @@ def unnest(self):
     if not list_cols:
         return self
 
-    self = self._decode_gql_types()
-
     if isinstance(self._arrow_data, pa.StructArray):
         rb = pa.RecordBatch.from_struct_array(
             self._arrow_data
