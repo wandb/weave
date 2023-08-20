@@ -22,8 +22,8 @@ from . import history_op_common
 from ... import artifact_base, io_service
 from .. import wbmedia
 from ...ops_domain.table import _patch_legacy_image_file_types
-from ...ops_arrow.list_ import weave_arrow_type_check
-from ...ops_arrow.path import PathType, PathItemType
+from ...ops_arrow.list_ import weave_arrow_type_check, PathType, PathItemType
+
 
 tracer = engine_trace.tracer()
 
