@@ -110,23 +110,41 @@ board_name = "py_board-" + BOARD_ID
 
 
 def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
-    return (
-        weave.ops.case(
-            [
-                {
-                    "when": row["output.model"] == "gpt-3.5-turbo-0613",
-                    "then": row["summary.prompt_tokens"] * 0.0015
-                    + row["summary.completion_tokens"] * 0.002,
-                },
-                {
-                    "when": row["output.model"] == "gpt-4-0613",
-                    "then": row["summary.prompt_tokens"] * 0.03
-                    + row["summary.completion_tokens"] * 0.06,
-                },
-            ]
-        )
-        / 1000
+    model = row["output.model"]
+    pt = row["summary.prompt_tokens"]
+    ct = row["summary.completion_tokens"]
+    cost_per_1000 = weave.ops.case(
+        [
+            # finetuned
+            {"when": model.startsWith("ada:"), "then": pt * 0.0016 + ct * 0.0016},
+            {"when": model.startsWith("babbage:"), "then": pt * 0.0024 + ct * 0.0024},
+            {"when": model.startsWith("curie:"), "then": pt * 0.012 + ct * 0.012},
+            {"when": model.startsWith("davinci:"), "then": pt * 0.12 + ct * 0.12},
+            # non-finetuned
+            {"when": model == "gpt-4-32k-0314", "then": pt * 0.06 + ct * 0.12},
+            {"when": model == "gpt-4-32k-0613", "then": pt * 0.06 + ct * 0.12},
+            {"when": model == "gpt-3.5-turbo-0613", "then": pt * 0.0015 + ct * 0.002},
+            {
+                "when": model == "gpt-3.5-turbo-16k-0613",
+                "then": pt * 0.003 + ct * 0.004,
+            },
+            {
+                "when": model == "text-embedding-ada-002-v2",
+                "then": pt * 0.0001 + ct * 0.0001,
+            },
+            {"when": model == "ada", "then": pt * 0.0004 + ct * 0.0004},
+            {"when": model == "babbage", "then": pt * 0.0005 + ct * 0.0005},
+            {"when": model == "curie", "then": pt * 0.002 + ct * 0.002},
+            {"when": model == "davinci", "then": pt * 0.02 + ct * 0.02},
+            {
+                "when": model.startsWith("gpt-3.5-turbo"),
+                "then": pt * 0.002 + ct * 0.002,
+            },
+            {"when": model.startsWith("gpt-4"), "then": pt * 0.03 + ct * 0.06},
+            {"when": True, "then": 0},
+        ]
     )
+    return cost_per_1000 / 1000
 
 
 @weave.op(  # type: ignore
