@@ -30,9 +30,14 @@ _GQL_JSON_CACHE: contextvars.ContextVar[dict[str, typing.Any]] = contextvars.Con
 # copy of the value. The op can then modify the copy and the cache will not be affected.
 
 
-def immutable_error_message(self: Any, args: Any, kwargs: Any) -> str:
+def immutable_error_message(
+    self: Any, caller_args: Any, caller_kwargs: Any, max_self_str_len: int = 1000
+) -> str:
+    self_str = str(self)
+    if len(self_str) > max_self_str_len:
+        self_str = self_str[:max_self_str_len] + "..."
     return (
-        f"Cannot modify {str(self)[:1000]} with args: {args} kwargs: {kwargs}. Object is immutable. "
+        f"Cannot modify {self_str} with args: {caller_args} kwargs: {caller_kwargs}. Object is immutable. "
         "Call unfrozen() on the object to get a mutable copy."
     )
 
