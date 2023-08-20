@@ -21,6 +21,15 @@ from . import weave_types as types
 from .gql_with_keys import GQLHasKeysType
 
 
+class GQLTypedDictToTypedDict(TypedDictToPyDict):
+    def apply(self, obj):
+        # Hack!! Our output types throughout GQL are all wrong. They are non-nullable
+        # when in reality GQL responses can frequently be optional.
+        if obj is None:
+            return None
+        return super().apply(obj)
+
+
 class GQLToUntypedOpaqueJSON(mappers.Mapper):
     def apply(self, obj):
         return uoj.UntypedOpaqueJSON.from_json(obj)
@@ -86,7 +95,7 @@ def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
-        return TypedDictToPyDict(type, mapper, artifact, path)
+        return GQLTypedDictToTypedDict(type, mapper, artifact, path)
     elif isinstance(type, types.Dict):
         return DictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.List):
