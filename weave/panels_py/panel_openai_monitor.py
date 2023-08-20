@@ -110,19 +110,22 @@ board_name = "py_board-" + BOARD_ID
 
 
 def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
-    return weave.ops.cond(
-        weave.ops.dict_(
-            a=row["output.model"] == "gpt-3.5-turbo-0613",
-            b=row["output.model"] == "gpt-4-0613",
-        ),
-        weave.ops.make_list(
-            # gpt-3.5-turbo-0613
-            a=row["summary.prompt_tokens"] * 0.0015e-3
-            + row["summary.completion_tokens"] * 0.002e-3,
-            # gpt-4-0613
-            b=row["summary.prompt_tokens"] * 0.03e-3
-            + row["summary.completion_tokens"] * 0.06e-3,
-        ),
+    return (
+        weave.ops.case(
+            [
+                {
+                    "when": row["output.model"] == "gpt-3.5-turbo-0613",
+                    "then": row["summary.prompt_tokens"] * 0.0015
+                    + row["summary.completion_tokens"] * 0.002,
+                },
+                {
+                    "when": row["output.model"] == "gpt-4-0613",
+                    "then": row["summary.prompt_tokens"] * 0.03
+                    + row["summary.completion_tokens"] * 0.06,
+                },
+            ]
+        )
+        / 1000
     )
 
 

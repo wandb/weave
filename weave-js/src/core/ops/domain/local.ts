@@ -15,6 +15,7 @@ import {
   isSimpleTypeShape,
   isTaggedValue,
   isTypedDict,
+  isTypedDictLike,
   isUnion,
   list,
   maybe,
@@ -22,6 +23,7 @@ import {
   taggedValue,
   Type,
   typedDict,
+  typedDictPropertyTypes,
   union,
   unionObjectTypeAttrTypes,
 } from '../../model';
@@ -700,8 +702,8 @@ export const opCrossProduct = makeOp({
   },
 });
 
-export const opCond2 = makeOp({
-  name: 'op-cond2',
+export const opCond = makeOp({
+  name: 'op-cond',
   renderInfo: {
     type: 'function',
   },
@@ -709,17 +711,22 @@ export const opCond2 = makeOp({
   argDescriptions: {},
   returnValueDescription: 'hello',
   argTypes: {
-    conds: {
+    cases: {
       type: 'dict',
       objectType: 'boolean',
     },
     results: {
-      type: 'list',
+      type: 'dict',
       objectType: 'any',
     },
   },
   returnType: inputNodes => {
-    return maybe(inputNodes.results.type.objectType);
+    if (!isTypedDictLike(inputNodes.results.type)) {
+      throw new Error('unexpected type in opCond');
+    }
+    return maybe(
+      union(Object.values(typedDictPropertyTypes(inputNodes.results.type)))
+    );
   },
 });
 

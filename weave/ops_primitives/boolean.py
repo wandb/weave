@@ -1,6 +1,8 @@
 import typing
 from ..api import op, weave_class
 from .. import weave_types as types
+from .. import dispatch
+from .dict import dict_
 
 
 @weave_class(weave_type=types.Boolean)
@@ -43,9 +45,35 @@ def none_coalesce(lhs: typing.Any, rhs: typing.Any):
     return lhs or rhs
 
 
-@op(output_type=lambda input_type: types.optional(input_type["results"].object_type))
-def cond(cases: dict[str, bool], results: list[typing.Any]):
-    for c, r in zip(cases.values(), results):
+@op(
+    output_type=lambda input_type: types.optional(
+        types.union(*input_type["results"].property_types.values())
+    )
+)
+def cond(cases: dict[str, bool], results: dict[str, typing.Any]):
+    """Return first result.values()[i] for which case.values()[i] is True.
+
+    Can be used where to achieve if/then/else, or SQL CASE-like behavior.
+
+    Arguments are dictionaries, not lists, but keys are ignored entirely.
+    This is important for vectorization. Lists are stored row-oriented in arrow,
+    but we actually want columns for each case and result. Using dictionaries
+    achieve this, since we map them to arrow structs.
+    """
+    for c, r in zip(cases.values(), results.values()):
         if c:
             return r
     return None
+
+
+class Case(typing.TypedDict):
+    # These are both actually Nodes, but this gets type-checking to pass for now.
+    when: bool
+    then: typing.Any
+
+
+def case(cases: list[Case]) -> dispatch.RuntimeOutputNode:
+    """Helper for writing cond expressions."""
+    sep_cases = {"%s" % i: cases[i]["when"] for i in range(len(cases))}
+    sep_results = {"%s" % i: cases[i]["then"] for i in range(len(cases))}
+    return cond(dict_(**sep_cases), dict_(**sep_results))
