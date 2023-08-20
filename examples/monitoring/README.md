@@ -1,14 +1,14 @@
 # Monitor & Visualize LLM Usage with Weave
 
-These example notebooks demonstrate LLM monitoring with Weave, starting with visualizing and understanding OpenAI API usage for a project or team.
-
-<img src="../../docs/assets/mini_prodmon_overview.gif" width="100%">
+These example notebooks demonstrate LLM monitoring with Weave. As a primary use case for your LLM project or team, you can easily track, visualize, and understand OpenAI API usage.
 
 ## Notebooks
 
 * [OpenAI Monitoring Demo](../monitoring/openai_ux_demo.ipynb): create, explore, and share OpenAI Monitoring Boards in Weave
-* [Weave Monitoring API](../monitoring/monitor_api.ipynb): understand the Weave monitoring API
 * [OpenAI Proxy Quickstart](../monitoring/openai_proxy_quickstart.ipynb): set up a proxy to monitor OpenAI API calls
+* [Weave Monitoring API](../monitoring/monitor_api.ipynb): understand the Weave monitoring API
+
+<img src="../../docs/assets/mini_prodmon_overview.gif" width="50%">
 
 ## OpenAI Integration
 
