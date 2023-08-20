@@ -1,10 +1,7 @@
-import hashlib
 import pyarrow as pa
 import pyarrow.compute as pc
 import typing
-import json
 
-from pyarrow import parquet as pq
 
 from .. import artifact_base
 from .. import weave_types as types
@@ -15,13 +12,10 @@ from .. import artifact_mem
 from .. import errors
 from .. import arrow_util
 from .. import api
-from .. import gql_with_keys
-from .. import artifact_fs
+
 
 from .arrow import (
     ArrowWeaveListType,
-    load_array_and_type_from_parquet,
-    file_name_for_dictionary,
 )
 from .list_ import ArrowWeaveList, PathType, unsafe_awl_construction
 
