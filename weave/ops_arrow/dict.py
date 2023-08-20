@@ -437,7 +437,7 @@ def columnNames(self):
 
 def _with_column_type(cur_type: types.Type, key: str, new_col_type: types.Type):
     if not isinstance(cur_type, types.TypedDict):
-        raise ValueError("invalid type ", cur_type)
+        cur_type = types.TypedDict()
     path = _dict_utils.split_escaped_string(key)
 
     property_types = {**cur_type.property_types}
@@ -467,7 +467,8 @@ def _with_columns_output_type(input_type):
     new_col_types = input_type["cols"]
     obj_type = input_type["self"].object_type
     for k, v in new_col_types.property_types.items():
-        print("K V", k, v)
+        # added column type is optional, because we may need to extend with None
+        # if it is too short.
         obj_type = _with_column_type(obj_type, k, v.object_type)
     return ArrowWeaveListType(obj_type)
 
@@ -481,5 +482,8 @@ def _with_columns_output_type(input_type):
     },
     output_type=_with_columns_output_type,
 )
-def with_column(self, cols):
+def with_columns(self, cols):
+    for col_val in cols.values():
+        if len(self) != len(col_val):
+            return None
     return self.with_columns(cols)

@@ -570,8 +570,19 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self._invalid_reason = None
 
     def with_column(self, key: str, val: "ArrowWeaveList"):
+        """Add a column to the AWL.
+
+        key can be a dot-separated path. Any non-TypedDict values encountered
+        in traversal will be replaced with empty TypedDicts.
+
+        leaf will be replaced with val if leaf exists. Added value is always
+        added to the end of the TypedDict (remember, they are ordered).
+
+        Result len is always len(self). Will raise if len(val) != len(self)
+        """
         if not isinstance(self.object_type, types.TypedDict):
-            raise ValueError("must add to TypedDict")
+            self = make_vec_dict()
+        self_object_type = typing.cast(types.TypedDict, self.object_type)
 
         path = _dict_utils.split_escaped_string(key)
 
@@ -580,9 +591,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 path[0], self.column(path[0]).with_column(".".join(path[1:]), val)
             )
 
-        col_names = list(self.object_type.property_types.keys())
+        col_names = list(self_object_type.property_types.keys())
         col_data = [self._arrow_data.field(i) for i in range(len(col_names))]
-        property_types = {**self.object_type.property_types}
+        property_types = {**self_object_type.property_types}
         try:
             key_index = col_names.index(key)
         except ValueError:

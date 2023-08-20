@@ -736,7 +736,7 @@ const _withColumnType = (
   newColType: Type
 ): Type => {
   if (curType == null || !isTypedDict(curType)) {
-    throw new Error('invalid type');
+    curType = typedDict({});
   }
   const path = splitEscapedString(key);
   const propertyTypes = {...curType.propertyTypes} as {[key: string]: Type};
