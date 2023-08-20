@@ -77,7 +77,7 @@ def root_all_projects():
 
 
 # Section 3/6: Attribute Getters
-gql_prop_op("project-name", wdt.ProjectType, "name", types.String())
+name = gql_prop_op("project-name", wdt.ProjectType, "name", types.String())
 gql_prop_op(
     "project-createdAt",
     wdt.ProjectType,

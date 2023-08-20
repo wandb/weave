@@ -3,6 +3,7 @@ from .. import weave_types as types
 from ..ops_domain import wb_domain_types as wdt
 
 from ..ops_domain.project_ops import root_all_projects
+from ..ops_domain.report_ops import root_all_reports
 
 from .. import compile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
@@ -570,3 +571,66 @@ def test_gql_connection_op():
     expected = types.TypeRegistry.type_from_dict(expected_compiled_type_dict)
 
     assert compiled_node.type == expected
+
+
+def test_early_termination_of_gql_key_propagation(fake_wandb):
+    # this test checks to make sure that if we encounter an op that does not
+    # have a GQL key prop fn defined, it still executes and we can still
+    # serialize and deserialize the result, even though we dont have the
+    # keys for the result
+
+    fake_wandb.fake_api.add_mock(
+        lambda query, idx: {
+            "instance": {
+                "views_500": {
+                    "edges": [
+                        {
+                            "node": {
+                                "type": "runs",
+                                "id": "c1233b7003317090ab5e2a75db4ad965",
+                                "project": {
+                                    "id": "e1233b7003317090ab5e2a75db4ad965",
+                                    "name": "test-project-1",
+                                },
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    )
+
+    # all reports has not been migrated yet
+    projects_node = root_all_reports().project()
+
+    # these projects should not have keys because root_all_reports() does not return a HasKeys type
+    assert projects_node.type == types.List(wdt.ProjectType)
+
+    projects = weave.use(projects_node)
+    assert len(projects) == 1
+
+    # keys are picked back up when we convert a literal to a constnode
+    # and call type_of on it
+
+    # convert projects to a constnode and call typeof on it to get its type (and keys)
+    names_node = ops.project_ops.name(projects)
+
+    # compile because we need to run dispatch to use the right op (mapped project-name)
+    # because it wont be dispatched above (the above graph is not executable as is)
+    names_node = compile.compile([names_node])[0]
+
+    assert names_node.type == types.List(
+        TaggedValueType(
+            types.TypedDict(
+                {
+                    "project": wdt.ProjectType.with_keys(
+                        {"id": types.String(), "name": types.String()}
+                    )
+                }
+            ),
+            types.String(),
+        )
+    )
+
+    names = weave.use(names_node)
+    assert names[0] == "test-project-1"
