@@ -12,12 +12,12 @@ import {URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
 
 // These get popuated via /__frontend/env.js and are defined in weave_server.py
 declare global {
-  interface Window { 
+  interface Window {
     CONFIG: {
-      PREFIX: string,
-      ANALYITCS_DISABLED: boolean,
-      WEAVE_BACKEND_HOST: string,
-    }
+      PREFIX: string;
+      ANALYITCS_DISABLED: boolean;
+      WEAVE_BACKEND_HOST: string;
+    };
   }
 }
 
