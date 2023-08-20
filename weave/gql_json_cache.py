@@ -136,7 +136,7 @@ def use_json(key: str) -> typing.Any:
     if result is None:
         result = json.loads(key)
         cache_json(key, result)
-    return result
+    return unfrozen(result)
 
 
 def cache_json(key: str, value: typing.Any) -> None:

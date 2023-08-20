@@ -78,7 +78,7 @@ def _get_history(run: wdt.Run, columns=None):
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = [
-        gql_json_cache.unfrozen(gql_json_cache.use_json(row))
+        gql_json_cache.use_json(row)
         for row in run.gql["sampledParquetHistory"]["liveData"]
     ]
 

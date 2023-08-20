@@ -23,6 +23,7 @@ from ... import artifact_base, io_service
 from .. import wbmedia
 from ...ops_domain.table import _patch_legacy_image_file_types
 from ...ops_arrow.list_ import weave_arrow_type_check, PathType, PathItemType
+from ... import gql_json_cache
 
 
 tracer = engine_trace.tracer()
@@ -523,7 +524,10 @@ def _get_live_data_from_run(run: wdt.Run, columns=None):
     if columns is None:
         return raw_live_data
     column_set = set(columns)
-    return [{k: v for k, v in row.items() if k in column_set} for row in raw_live_data]
+    return [
+        {k: v for k, v in gql_json_cache.use_json(row).items() if k in column_set}
+        for row in raw_live_data
+    ]
 
 
 def _extract_column_from_live_data(live_data: list[dict], column_name: str):
