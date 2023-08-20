@@ -284,7 +284,7 @@ const rowToExpression = (
 
 const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
-> = props => {
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
   const browserTitle = 'Boards';
@@ -297,7 +297,7 @@ const CenterProjectBoardsBrowser: React.FC<
     );
   }, [params.entity, params.project, params.preview, browserTitle]);
 
-  const boards = query.useProjectBoards(props.entityName, props.projectName);
+  const boards = query.useProjectBoards(entityName, projectName);
   const browserData = useMemo(() => {
     return boards.result.map(b => ({
       _id: b.name,
@@ -308,8 +308,6 @@ const CenterProjectBoardsBrowser: React.FC<
     }));
   }, [boards]);
 
-  const {setPreviewNode, navigateToExpression} = props;
-
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
@@ -319,7 +317,7 @@ const CenterProjectBoardsBrowser: React.FC<
           icon: IconOpenNewTab,
           label: 'Open board',
           onClick: row => {
-            props.navigateToExpression(
+            navigateToExpression(
               rowToExpression(params.entity!, params.project!, row._id)
             );
           },
@@ -344,13 +342,21 @@ const CenterProjectBoardsBrowser: React.FC<
           icon: IconDelete,
           label: 'Delete board',
           onClick: row => {
-            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            const uri = `wandb-artifact:///${entityName}/${projectName}/${row._id}:latest/obj`;
             setDeletingId(uri);
           },
         },
       ],
     ];
-  }, [props, history, params.entity, params.project, params.assetType]);
+  }, [
+    history,
+    params.entity,
+    params.project,
+    params.assetType,
+    entityName,
+    projectName,
+    navigateToExpression,
+  ]);
 
   const sidebarActions = useMemo(
     () =>
@@ -416,26 +422,26 @@ const CenterProjectBoardsBrowser: React.FC<
       allowSearch
       title={browserTitle}
       selectedRowId={params.preview}
-      setPreviewNode={props.setPreviewNode}
+      setPreviewNode={setPreviewNode}
       deletingId={deletingId}
       setDeletingId={setDeletingId}
       deleteTypeString="board"
-      noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
+      noDataCTA={`No Weave boards found for project: ${entityName}/${projectName}`}
       breadcrumbs={[
         {
           key: 'entity',
-          text: props.entityName,
+          text: entityName,
           onClick: () => {
-            props.setPreviewNode(undefined);
-            history.push(urlEntity(props.entityName));
+            setPreviewNode(undefined);
+            history.push(urlEntity(entityName));
           },
         },
         {
           key: 'project',
-          text: props.projectName,
+          text: projectName,
           onClick: () => {
-            props.setPreviewNode(undefined);
-            history.push(urlProject(props.entityName, props.projectName));
+            setPreviewNode(undefined);
+            history.push(urlProject(entityName, projectName));
           },
         },
       ]}
@@ -494,7 +500,7 @@ const tableRowToNode = (
 
 const CenterProjectTablesBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
-> = props => {
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
   const weave = useWeaveContext();
@@ -511,14 +517,8 @@ const CenterProjectTablesBrowser: React.FC<
     }
   }, [params.entity, params.project, params.preview, browserTitle]);
 
-  const runStreams = query.useProjectRunStreams(
-    props.entityName,
-    props.projectName
-  );
-  const loggedTables = query.useProjectRunLoggedTables(
-    props.entityName,
-    props.projectName
-  );
+  const runStreams = query.useProjectRunStreams(entityName, projectName);
+  const loggedTables = query.useProjectRunLoggedTables(entityName, projectName);
   const isLoading = runStreams.loading || loggedTables.loading;
   const browserData = useMemo(() => {
     if (isLoading) {
@@ -547,12 +547,10 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
-  const {setPreviewNode, navigateToExpression} = props;
-
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(() => {
-    return [
+  > = useMemo(
+    () => [
       [
         // Home Page TODO: Enable awesome previews
         {
@@ -560,12 +558,7 @@ const CenterProjectTablesBrowser: React.FC<
           label: 'Table overview',
           onClick: row => {
             history.push(
-              urlProjectAssetPreview(
-                props.entityName,
-                props.projectName,
-                'table',
-                row._id
-              )
+              urlProjectAssetPreview(entityName, projectName, 'table', row._id)
             );
           },
         },
@@ -573,13 +566,8 @@ const CenterProjectTablesBrowser: React.FC<
           icon: IconFullScreenModeExpand,
           label: 'Preview table',
           onClick: row => {
-            props.navigateToExpression(
-              tableRowToNode(
-                row.kind,
-                props.entityName,
-                props.projectName,
-                row._id
-              )
+            navigateToExpression(
+              tableRowToNode(row.kind, entityName, projectName, row._id)
             );
           },
         },
@@ -589,8 +577,8 @@ const CenterProjectTablesBrowser: React.FC<
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
-              props.entityName,
-              props.projectName,
+              entityName,
+              projectName,
               row._id
             );
             const copyText = weave.expToString(node);
@@ -607,8 +595,8 @@ const CenterProjectTablesBrowser: React.FC<
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
-              props.entityName,
-              props.projectName,
+              entityName,
+              projectName,
               row._id
             );
             makeBoardFromNode(SEED_BOARD_OP_NAME, node, newDashExpr => {
@@ -622,13 +610,21 @@ const CenterProjectTablesBrowser: React.FC<
           icon: IconDelete,
           label: 'Delete table',
           onClick: row => {
-            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            const uri = `wandb-artifact:///${entityName}/${projectName}/${row._id}:latest/obj`;
             setDeletingId(uri);
           },
         },
       ],
-    ];
-  }, [props, weave, history, makeBoardFromNode, navigateToExpression]);
+    ],
+    [
+      entityName,
+      projectName,
+      weave,
+      history,
+      makeBoardFromNode,
+      navigateToExpression,
+    ]
+  );
 
   const sidebarActions = useMemo(
     () =>
@@ -692,22 +688,22 @@ const CenterProjectTablesBrowser: React.FC<
         deletingId={deletingId}
         setDeletingId={setDeletingId}
         deleteTypeString="table"
-        noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
+        noDataCTA={`No Weave tables found for project: ${entityName}/${projectName}`}
         breadcrumbs={[
           {
             key: 'entity',
-            text: props.entityName,
+            text: entityName,
             onClick: () => {
-              props.setPreviewNode(undefined);
-              history.push(urlEntity(props.entityName));
+              setPreviewNode(undefined);
+              history.push(urlEntity(entityName));
             },
           },
           {
             key: 'project',
-            text: props.projectName,
+            text: projectName,
             onClick: () => {
-              props.setPreviewNode(undefined);
-              history.push(urlProject(props.entityName, props.projectName));
+              setPreviewNode(undefined);
+              history.push(urlProject(entityName, projectName));
             },
           },
         ]}
