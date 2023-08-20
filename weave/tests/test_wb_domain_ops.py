@@ -111,6 +111,7 @@ def test_root_project_concat(fake_wandb):
                             "node": {
                                 **fwb.run_payload,
                                 "summaryMetricsSubset": '{"loss": 0.1}',
+                                "summaryMetrics": '{"loss": 0.1}',
                             },
                         }
                     ]

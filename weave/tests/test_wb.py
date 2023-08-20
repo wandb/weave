@@ -64,6 +64,38 @@ artifact_browser_response = {
     }
 }
 
+workspace_response_run1_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+        },
+        "legacy_table": {
+            "_type": "table-file",
+            "path": "media/tables/legacy_table.table.json",
+        },
+        "image": {
+            "height": 64,
+            "sha256": "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025",
+            "path": "media/images/random_image_9_440fab0d6f537b4557a1.png",
+            "size": 4228,
+            "_type": "image-file",
+            "width": 64,
+            "format": "png",
+        },
+    }
+)
+
+
+workspace_response_run3_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
+        },
+    }
+)
+
 
 def workspace_response(include_display_name=True):
     return {
@@ -74,27 +106,8 @@ def workspace_response(include_display_name=True):
                     {
                         "node": {
                             **fwb.run_payload,  # type: ignore
-                            "summaryMetricsSubset": json.dumps(
-                                {
-                                    "table": {
-                                        "_type": "table-file",
-                                        "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                    },
-                                    "legacy_table": {
-                                        "_type": "table-file",
-                                        "path": "media/tables/legacy_table.table.json",
-                                    },
-                                    "image": {
-                                        "height": 64,
-                                        "sha256": "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025",
-                                        "path": "media/images/random_image_9_440fab0d6f537b4557a1.png",
-                                        "size": 4228,
-                                        "_type": "image-file",
-                                        "width": 64,
-                                        "format": "png",
-                                    },
-                                }
-                            ),
+                            "summaryMetricsSubset": workspace_response_run1_summary_metrics,
+                            "summaryMetrics": workspace_response_run1_summary_metrics,
                             **(
                                 {"displayName": "amber-glade-100"}
                                 if include_display_name
@@ -106,6 +119,7 @@ def workspace_response(include_display_name=True):
                         "node": {
                             **fwb.run2_payload,  # type: ignore
                             "summaryMetricsSubset": json.dumps({}),
+                            "summaryMetrics": json.dumps({}),
                             **(
                                 {"displayName": "run2-display_name"}
                                 if include_display_name
@@ -116,14 +130,8 @@ def workspace_response(include_display_name=True):
                     {
                         "node": {
                             **fwb.run3_payload,  # type: ignore
-                            "summaryMetricsSubset": json.dumps(
-                                {
-                                    "table": {
-                                        "_type": "table-file",
-                                        "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
-                                    },
-                                }
-                            ),
+                            "summaryMetricsSubset": workspace_response_run3_summary_metrics,
+                            "summaryMetrics": workspace_response_run3_summary_metrics,
                             **(
                                 {"displayName": "run3-display_name"}
                                 if include_display_name
@@ -137,6 +145,28 @@ def workspace_response(include_display_name=True):
     }
 
 
+workspace_response_no_run_displayname_run1_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+        },
+        "legacy_table": {
+            "_type": "table-file",
+            "path": "media/tables/legacy_table.table.json",
+        },
+    }
+)
+
+workspace_response_no_run_displayname_run3_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
+        },
+    }
+)
+
 workspace_response_no_run_displayname = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
@@ -145,37 +175,22 @@ workspace_response_no_run_displayname = {
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                },
-                                "legacy_table": {
-                                    "_type": "table-file",
-                                    "path": "media/tables/legacy_table.table.json",
-                                },
-                            }
-                        ),
+                        "summaryMetricsSubset": workspace_response_no_run_displayname_run1_summary_metrics,
+                        "summaryMetrics": workspace_response_no_run_displayname_run1_summary_metrics,
                     },
                 },
                 {
                     "node": {
                         **fwb.run2_payload,  # type: ignore
                         "summaryMetricsSubset": json.dumps({}),
+                        "summaryMetrics": json.dumps({}),
                     },
                 },
                 {
                     "node": {
                         **fwb.run3_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
-                                },
-                            }
-                        ),
+                        "summaryMetricsSubset": workspace_response_no_run_displayname_run3_summary_metrics,
+                        "summaryMetrics": workspace_response_no_run_displayname_run3_summary_metrics,
                     },
                 },
             ]
@@ -191,6 +206,15 @@ empty_workspace_response = {
     }
 }
 
+workspace_response_filtered_run1_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+        }
+    }
+)
+
 workspace_response_filtered = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
@@ -199,14 +223,8 @@ workspace_response_filtered = {
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                }
-                            }
-                        ),
+                        "summaryMetricsSubset": workspace_response_filtered_run1_summary_metrics,
+                        "summaryMetrics": workspace_response_filtered_run1_summary_metrics,
                         "displayName": "amber-glade-100",
                     }
                 },
