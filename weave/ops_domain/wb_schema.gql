@@ -183,6 +183,7 @@ type Run implements Node {
   outputArtifacts(first: Int): ArtifactConnection
   inputArtifacts(first: Int): InputArtifactConnection
   history(minStep: Int64, maxStep: Int64): [String!]!
+  historyLineCount: Int
   historyKeys: JSON
   computeSeconds: Duration!
   parquetHistory(liveKeys: [String!]!): ParquetHistory!
