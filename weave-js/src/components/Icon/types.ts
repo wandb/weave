@@ -49,6 +49,7 @@ export const IconNames = {
   FacebookSocial: 'facebook-social',
   Failed: 'failed',
   FlashBolt: 'flash-bolt',
+  FilterAlt: 'filter-alt',
   FolderAlt: 'folder-alt',
   FolderProject: 'folder-project',
   FolderProjectMove: 'folder-project-move',
