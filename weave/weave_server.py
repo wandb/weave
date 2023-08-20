@@ -328,14 +328,6 @@ def execute_v2():
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)
-    req_bytes = request.data
-    req_compressed = zlib.compress(req_bytes)
-    req_b64 = base64.b64encode(req_compressed).decode("ascii")
-    logging.info(
-        "Execute request (zlib): %s",
-        req_b64,
-    )
-
     response = server.handle_request(request.json, deref=True)
     # print("RESPONSE BEFORE SERI", response)
 
