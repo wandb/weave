@@ -1,6 +1,6 @@
 import json
 import typing
-from typing import Any
+import copy
 
 import contextvars
 import contextlib
@@ -17,101 +17,6 @@ import contextlib
 _GQL_JSON_CACHE: contextvars.ContextVar[dict[str, typing.Any]] = contextvars.ContextVar(
     "gql_json_cache", default={}
 )
-
-
-# These classes are used to ensure that cached values are not modified.
-# This is necessary because some ops read from the cache and then modify the
-# returned value. If the value is cached, then the modification will be visible
-# to other ops that read from the cache.
-
-# To get around this, we use these immutable classes to wrap the cached values.
-# This ensures that the cached values are not modified. If an op needs to modify
-# a cached value, it should first unfrozen() the value, which will return a mutable
-# copy of the value. The op can then modify the copy and the cache will not be affected.
-
-
-def immutable_error_message(
-    self: Any, caller_args: Any, caller_kwargs: Any, max_self_str_len: int = 1000
-) -> str:
-    self_str = str(self)
-    if len(self_str) > max_self_str_len:
-        self_str = self_str[:max_self_str_len] + "..."
-    return (
-        f"Cannot modify {self_str} with args: {caller_args} kwargs: {caller_kwargs}. Object is immutable. "
-        "Call unfrozen() on the object to get a mutable copy."
-    )
-
-
-class ImmutableDict(dict):
-    def update(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def popitem(self, *args: Any, **kwargs: Any) -> Any:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def setdefault(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def pop(self, *args: Any, **kwargs: Any) -> Any:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def __setitem__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def __delitem__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def __repr__(self) -> str:
-        return "ImmutableDict(" + super().__repr__() + ")"
-
-
-class ImmutableList(list):
-    def append(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def extend(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def insert(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def remove(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def sort(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def reverse(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def pop(self, *args: Any, **kwargs: Any) -> Any:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def __setitem__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def __delitem__(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(immutable_error_message(self, args, kwargs))
-
-    def __repr__(self) -> str:
-        return "ImmutableList(" + super().__repr__() + ")"
-
-
-def frozen(obj: Any) -> Any:
-    if isinstance(obj, dict):
-        return ImmutableDict({key: frozen(value) for key, value in obj.items()})
-    elif isinstance(obj, list):
-        return ImmutableList(frozen(v) for v in obj)
-    return obj
-
-
-def unfrozen(data: Any) -> Any:
-    if isinstance(data, dict):
-        return {key: unfrozen(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [unfrozen(value) for value in data]
-    else:
-        return data
 
 
 @contextlib.contextmanager
@@ -136,8 +41,12 @@ def use_json(key: str) -> typing.Any:
     if result is None:
         result = json.loads(key)
         cache_json(key, result)
-    return unfrozen(result)
+
+    # deepcopy ensures we never modify the cached object.
+    return copy.deepcopy(result)
 
 
+# This should only be called in two places. In use_json above,
+# and in mappers_gql.py in the GQLStringToString mapper.
 def cache_json(key: str, value: typing.Any) -> None:
-    gql_json_cache()[key] = frozen(value)
+    gql_json_cache()[key] = value
