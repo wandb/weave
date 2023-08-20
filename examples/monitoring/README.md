@@ -2,6 +2,8 @@
 
 These example notebooks demonstrate LLM monitoring with Weave, starting with visualizing and understanding OpenAI API usage for a project or team.
 
+<img src="../../docs/assets/mini_prodmon_overview.gif" width="100%">
+
 ## Notebooks
 
 * [OpenAI Monitoring Demo](../monitoring/openai_ux_demo.ipynb): create, explore, and share OpenAI Monitoring Boards in Weave
