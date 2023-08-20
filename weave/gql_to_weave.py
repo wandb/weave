@@ -55,7 +55,7 @@ def gql_type_to_weave_type(
     gql_type: graphql.GraphQLType,
     selection_set: typing.Optional[graphql.SelectionSetNode],
 ) -> types.Type:
-    from . import untyped_opaque_dict as uod
+    from . import untyped_opaque_json as uoj
 
     if (
         isinstance(gql_type, (GraphQLObjectType, GraphQLInterfaceType))
@@ -113,7 +113,7 @@ def gql_type_to_weave_type(
         elif gql_type.name == "Boolean":
             t = types.Boolean()
         elif gql_type.name == "JSON":
-            t = uod.UntypedOpaqueDictType()
+            t = uoj.UntypedOpaqueJSONType()
         elif gql_type.name == "DateTime":
             t = types.Timestamp()
         elif gql_type.name == "Duration":

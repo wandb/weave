@@ -1,6 +1,6 @@
 import datetime
 
-from . import untyped_opaque_dict as uod
+from . import untyped_opaque_json as uoj
 from . import mappers
 from .mappers_python_def import (
     NoneToPyNone,
@@ -21,9 +21,9 @@ from . import weave_types as types
 from .gql_with_keys import GQLHasKeysType
 
 
-class GQLDictToUntypedOpaqueDict(mappers.Mapper):
+class GQLToUntypedOpaqueJSON(mappers.Mapper):
     def apply(self, obj):
-        return uod.UntypedOpaqueDict.from_json_dict(obj)
+        return uoj.UntypedOpaqueJSON.from_json(obj)
 
 
 class GQLUnionToUnion(UnionMapper):
@@ -65,8 +65,8 @@ class GQLConstToConst(mappers.Mapper):
 
 
 def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
-    if isinstance(type, uod.UntypedOpaqueDictType):
-        return GQLDictToUntypedOpaqueDict(type, mapper, artifact, path)
+    if isinstance(type, uoj.UntypedOpaqueJSONType):
+        return GQLToUntypedOpaqueJSON(type, mapper, artifact, path)
     elif isinstance(type, GQLHasKeysType):
         return DictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):

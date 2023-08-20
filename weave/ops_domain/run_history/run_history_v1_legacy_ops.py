@@ -5,7 +5,7 @@ from ... import weave_types as types
 from .. import wb_domain_types as wdt
 from .. import wb_util
 from ... import engine_trace
-
+from ... import untyped_opaque_json as uoj
 
 import pyarrow as pa
 
@@ -77,7 +77,7 @@ def _get_history(run: wdt.Run, columns=None):
         ) or pa.table([])
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = run.gql["sampledParquetHistory"]["liveData"].mutable_copy()
+    live_data = uoj.unfrozen(run.gql["sampledParquetHistory"]["liveData"])
 
     with tracer.trace("liveSet.impute"):
         for row in live_data:

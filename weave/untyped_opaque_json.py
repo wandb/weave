@@ -1,38 +1,15 @@
 import json
+import typing
 from dataclasses import field
+from collections import namedtuple
+
 
 from .decorator_type import type as weave_type
 
-
-IMMUTABLE_ERROR_MESSAGE = "This object is immutable"
-
-
-def freeze(data):
-    if isinstance(data, UntypedOpaqueDict):
-        return UntypedOpaqueDict.from_json_dict(
-            {key: freeze(value) for key, value in data.items()}
-        )
-    if isinstance(data, dict):
-        return ImmutableDict({key: freeze(value) for key, value in data.items()})
-    elif isinstance(data, list):
-        return ImmutableList([freeze(value) for value in data])
-    else:
-        return data
-
-
-def unfreeze(data):
-    if isinstance(data, (dict, UntypedOpaqueDict)):  # also covers ImmutableDict
-        return {key: unfreeze(value) for key, value in data.items()}
-    elif isinstance(data, list):  # also covers ImmutableList
-        return [unfreeze(value) for value in data]
-    else:
-        return data
+IMMUTABLE_ERROR_MESSAGE = "This object is immutable."
 
 
 class ImmutableBase:
-    def mutable_copy(self):
-        return unfreeze(self)
-
     def __setitem__(self, key, value):
         raise TypeError(IMMUTABLE_ERROR_MESSAGE)
 
@@ -86,8 +63,29 @@ class ImmutableList(list, ImmutableBase):
         return "ImmutableList(" + super().__repr__() + ")"
 
 
-@weave_type("UntypedOpaqueDict", True)
-class UntypedOpaqueDict(ImmutableBase):
+def frozen(obj):
+    if isinstance(obj, UntypedOpaqueJSON):
+        return UntypedOpaqueJSON.from_json(frozen(obj.json))
+    if isinstance(obj, dict):
+        return ImmutableDict({key: frozen(value) for key, value in obj.items()})
+    elif isinstance(obj, list):
+        return ImmutableList(frozen(v) for v in obj)
+    return obj
+
+
+def unfrozen(data):
+    if isinstance(data, UntypedOpaqueJSON):
+        return unfrozen(data.json)
+    if isinstance(data, dict):
+        return {key: unfrozen(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [unfrozen(value) for value in data]
+    else:
+        return data
+
+
+@weave_type("UntypedOpaqueJSON", True)
+class UntypedOpaqueJSON:
     """
     UntypedOpaqueDict is a Weave Type that is used to store arbitrary JSON data.
     Unlike `Dict` or `TypedDict`, this Type does not need to define the keys/fields.
@@ -109,34 +107,46 @@ class UntypedOpaqueDict(ImmutableBase):
     json_str: str = field(default="{}")
 
     @classmethod
-    def from_json_dict(cls, json_dict: dict):
-        inst = cls(json_str=json.dumps(json_dict, separators=(",", ":")))
-        inst._json_dict = freeze(json_dict)
+    def from_json(cls, json_dict: typing.Any):
+        json_str = json.dumps(json_dict)
+        inst = cls(json_str=json_str)
+        inst._json = frozen(json_dict)
         return inst
 
-    def get(self, key, default=None):
-        return self.json_dict.get(key, default)
-
-    def __eq__(self, other):
-        return self.json_dict == other.json_dict
+    @property
+    def json(self):
+        if not hasattr(self, "_json"):
+            self._json = frozen(json.loads(self.json_str))
+        return self._json
 
     def __getitem__(self, key):
-        return self.json_dict[key]
+        return self.json[key]
+
+    def __setitem__(self, key, value):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def __delitem__(self, key):
+        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+
+    def get(self, key, default=None):
+        return self.json.get(key, default)
+
+    def __eq__(self, other):
+        if isinstance(other, UntypedOpaqueJSON):
+            return self.json == other.json
+        return self.json == other
 
     def __iter__(self):
-        return iter(self.json_dict)
+        return iter(self.json)
 
     def __len__(self):
-        return len(self.json_dict)
+        return len(self.json)
+
+    def __repr__(self):
+        return "UntypedOpaqueJSON(" + self.json_str + ")"
 
     def items(self):
-        return self.json_dict.items()
-
-    @property
-    def json_dict(self):
-        if not hasattr(self, "_json_dict"):
-            self._json_dict = freeze(json.loads(self.json_str))
-        return self._json_dict
+        return self.json.items()
 
 
-UntypedOpaqueDictType = UntypedOpaqueDict.WeaveType  # type: ignore
+UntypedOpaqueJSONType = UntypedOpaqueJSON.WeaveType  # type: ignore

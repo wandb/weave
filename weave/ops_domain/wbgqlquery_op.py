@@ -11,7 +11,7 @@ from .. import errors
 from .. import environment
 from .. import mappers_gql
 from .. import gql_with_keys
-from .. import untyped_opaque_dict as uod
+from .. import untyped_opaque_json as uoj
 
 
 def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
@@ -48,7 +48,7 @@ def wbgqlquery(query_str, alias_list, output_type):
                 f"Alias {alias} not found in query results"
             )
     mapper = mappers_gql.map_from_gql(output_type, None)
-    return uod.freeze(mapper.apply(gql_payload))
+    return uoj.frozen(mapper.apply(gql_payload))
 
 
 def _querytoobj_output_type(input_types: dict[str, types.Type]) -> types.Type:

@@ -274,14 +274,12 @@ def test_rpt_op(fake_wandb):
                     {"node": {"row": [0.5, "US", 1674068711.643377, "pytorch"]}},
                     {"node": {"row": [0.75, "CA", 1674068711.643377, "pytorch"]}},
                 ],
-                "schema": json.dumps(
-                    [
-                        {"Name": "user_fraction", "Type": "FLOAT"},
-                        {"Name": "country", "Type": "STRING"},
-                        {"Name": "created_week", "Type": "TIMESTAMP"},
-                        {"Name": "framework", "Type": "STRING"},
-                    ]
-                ),
+                "schema": [
+                    {"Name": "user_fraction", "Type": "FLOAT"},
+                    {"Name": "country", "Type": "STRING"},
+                    {"Name": "created_week", "Type": "TIMESTAMP"},
+                    {"Name": "framework", "Type": "STRING"},
+                ],
                 "isNormalizedUserCount": True,
             }  #
         }

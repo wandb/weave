@@ -13,6 +13,7 @@ from ... import engine_trace
 from ...api import use
 
 import pyarrow as pa
+from ... import untyped_opaque_json as uoj
 
 from . import history_op_common
 
@@ -89,7 +90,7 @@ def _get_history2(run: wdt.Run, columns=None):
     )
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = run.gql["sampledParquetHistory"]["liveData"].mutable_copy()
+    live_data = uoj.unfrozen(run.gql["sampledParquetHistory"]["liveData"])
     for row in live_data:
         for colname in columns:
             if colname not in row:
