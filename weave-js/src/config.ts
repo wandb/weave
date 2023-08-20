@@ -1,5 +1,6 @@
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
+  ANALYITCS_DISABLED: boolean;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;
@@ -23,12 +24,22 @@ const backendWeaveViewerUrl = () => {
   return WEAVE_BACKEND_HOST + '/wb_viewer';
 };
 
+export const urlPrefixed = (path: string, host: boolean = false) => {
+  let url = new URL(window.location.origin + window.CONFIG.PREFIX);
+  url = new URL(url.href.replace(/\/$/, '') + path);
+  if (!host) {
+    return url.pathname;
+  }
+  return url.href;
+}
+
 const DEFAULT_CONFIG: Config = {
-  urlPrefixed: (path: string) => path,
+  urlPrefixed,
   backendWeaveExecutionUrl,
   backendWeaveOpsUrl,
   backendWeaveViewerUrl,
   ENABLE_DEBUG_FEATURES: false,
+  ANALYITCS_DISABLED: window.CONFIG.ANALYITCS_DISABLED,
 } as const;
 
 let config = {...DEFAULT_CONFIG};
