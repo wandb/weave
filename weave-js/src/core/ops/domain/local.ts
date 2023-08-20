@@ -730,7 +730,7 @@ export const opCond = makeOp({
   },
 });
 
-const _withColumnType = (
+const withColumnType = (
   curType: Type | undefined,
   key: string,
   newColType: Type
@@ -741,10 +741,10 @@ const _withColumnType = (
   const path = splitEscapedString(key);
   const propertyTypes = {...curType.propertyTypes} as {[key: string]: Type};
   if (path.length > 1) {
-    return _withColumnType(
+    return withColumnType(
       curType,
       path[0],
-      _withColumnType(
+      withColumnType(
         propertyTypes[path[0]],
         path.slice(1).join('.'),
         newColType
@@ -761,7 +761,7 @@ const _withColumnType = (
   return typedDict(propertyTypes);
 };
 
-const _withColumnsOutputType = (selfType: ListType, colsType: Type) => {
+const withColumnsOutputType = (selfType: ListType, colsType: Type) => {
   if (!isTypedDict(colsType)) {
     throw new Error('invalid');
   }
@@ -771,7 +771,7 @@ const _withColumnsOutputType = (selfType: ListType, colsType: Type) => {
     if (v == null || !isList(v)) {
       throw new Error('invalid ');
     }
-    objType = _withColumnType(objType, k, v.objectType);
+    objType = withColumnType(objType, k, v.objectType);
   }
   return list(objType);
 };
@@ -798,7 +798,7 @@ export const opWithColumns = makeOp({
     },
   },
   returnType: inputNodes => {
-    return _withColumnsOutputType(inputNodes.self.type, inputNodes.cols.type);
+    return withColumnsOutputType(inputNodes.self.type, inputNodes.cols.type);
   },
 });
 
