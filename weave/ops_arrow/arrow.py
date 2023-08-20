@@ -10,7 +10,7 @@ import textwrap
 
 py_type = type
 
-from .. import mappers_python
+from .. import gql_with_keys
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
