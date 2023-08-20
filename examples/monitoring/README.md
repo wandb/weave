@@ -24,10 +24,24 @@ See details and create an interactive board in the [OpenAI monitoring notebook](
 
 To log all calls made via an OpenAI proxy:
 
-1. Find [your wandb API key](https://wandb.ai/authorize) and [your OpenAI API key](https://platform.openai.com/account/api-keys).
-2. Set your OPENAI_API_KEY to these two keys joined by ":", i.e. wandb_api_key:openai_api_key.
-3. Change the OpenAI base url to `https://wandb.ai/proxy/openai/v1`.
-4. Optionally set headers on each call to configure the wandb entity, project, and data stream name.
-5. Call OpenAI via the OpenAI SDK or CURL from the base url. 
+1. Find your wandb API key: for the public cloud instance, this will be at [wandb.ai/authorize](https://wandb.ai/authorize). On other instances, append "/authorize" to the base url of your instance.
+2. Find [your OpenAI API key](https://platform.openai.com/account/api-keys).
+3. Set your OPENAI_API_KEY to these two keys joined by ":", i.e. wandb_api_key:openai_api_key.
+4. Change the OpenAI base url to `https://wandb.ai/proxy/openai/v1` for the public cloud instance (otherwise, replace `wandb.ai` with the base url for your instance).
+5. Optionally set headers on each call to configure the wandb entity, project, and data stream name (see the table below for details).
+6. Call OpenAI via the OpenAI SDK or CURL from the base url. 
 
-See details and try some calls from the [proxy quickstart notebook](../monitoring/openai_proxy_quickstart.ipynb).
+Try some calls from the [proxy quickstart notebook](../monitoring/openai_proxy_quickstart.ipynb).
+
+### OpenAI Proxy Headers
+
+You can configure where your data is streamed and stored via proxy headers. For OpenAI SDK calls, pass a dictionary of "header name" keys to "header value" values in the `headers` argument.
+For CURL, add each header as an argument flag in the CURL command with the syntax `-H header_name: header_value`:
+
+| Header name | Description | SDK Example | CURL Example | Default setting |
+|-------------|-------------|-------------|--------------|-----------------|
+|X-Wandb-Entity| set the wandb entity for this call | {"X-Wandb-Entity" : "my_dream_team"}| `-H X-Wandb-Entity: my_dream_team`| your default entity on your W&B instance |
+|X-Wandb-Project| set the wandb project name for this call | {"X-Wandb-Project" : "my_dream_llm"}| `-H X-Wandb-Project: my_dream_llm`| `monitoring` |
+|X-Wandb-Stream| set the StreamTable name for this call | {"X-Wandb-Stream" : "my_chatbot_test"}| `-H X-Wandb-Stream: my_chatbot_test` | `openai` |
+|X-Wandb-Atrribute-X| add custom attributes as extra columns in your data stream table | {"X-Wandb-Attribute-chatbot_version" : "0.0.0"}| `-H X-Wandb-Attribute-chatbot_version: 0.0.0` | N/A |
+|X-Wandb-Client-Id| set this to group related requests together | {"X-Wandb-Client-Id" : "user_A_bottest"}| `-H X-Wandb-Client: user_A_bottest` | unique Client Id for each request |

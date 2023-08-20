@@ -5,8 +5,9 @@
 The `examples/` folder contains:
 * `getting_started`: Learn how to build interactive data applications
 * `reference`: Syntax and usage for Weave types, ops, and panels
+* `monitoring`: Examples and documentation for LLM monitoring
 * `experimental`:  Everything else, ranging from focused proofs-of-concept to very experimental works-in-progress—we hope these inspire your exploration and welcome PRs for improvement!
-* `apps (future)`: Example applications
+* `apps`: Example applications
 * `guides (future)`: Guides to use specific features for advanced users
 
 
@@ -32,6 +33,10 @@ Colabs to get started:
 - [View and transform images](../examples/getting_started/2_images_gen.ipynb)
 - [Train MNIST and visualize predictions](../examples/experimental/mnist_train.ipynb)
 
+### LLM Monitoring
+
+- [OpenAI API Usage Board](../examples/monitoring/openai_ux_demo.ipynb)
+
 ### Weave fundamentals
 
 - [End-to-end walkthrough](../examples/getting_started/1_weave_demo.ipynb)
@@ -44,6 +49,7 @@ Colabs to get started:
 - [Monitor time-series data](../examples/experimental/app/Monitor.ipynb)
 - [Visual storytelling](../examples/experimental/skip_test/Diffusion%20explore.ipynb)
 - [Remix art](../examples/experimental/app/art_explore.ipynb)
+
 
 ### Explore the Ecosystem
 
