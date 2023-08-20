@@ -536,7 +536,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
             # Occurs if we have an optional<list> column. Due to the way flatten works, any rows where the
             # list is null will be dropped. So we need to put the null inside a list, which causes flatten
             # to keep it around. This doesn't always work for tables where the list item type is
-            # intricate (e.g., struct of dictionary encoded structs), but these are rare cases
+            # intricate (e.g., struct of dictionary encoded structs), but these are rare cases.
             null_filled = pc.fill_null(table[column], [None])
         else:
             null_filled = table[column]
