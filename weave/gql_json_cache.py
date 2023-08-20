@@ -29,55 +29,66 @@ _GQL_JSON_CACHE: contextvars.ContextVar[dict[str, typing.Any]] = contextvars.Con
 # a cached value, it should first unfrozen() the value, which will return a mutable
 # copy of the value. The op can then modify the copy and the cache will not be affected.
 
-IMMUTABLE_ERROR_MESSAGE = "This object is immutable"
+
+def immutable_error_message(self: Any, args: Any, kwargs: Any) -> str:
+    return (
+        f"Cannot modify {self} with args: {args} kwargs: {kwargs}. Object is immutable."
+    )
 
 
-class ImmutableBase:
-    def __setitem__(self, key: Any, value: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
-
-    def __delitem__(self, key: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(" + super().__repr__() + ")"
-
-
-class ImmutableDict(dict, ImmutableBase):
+class ImmutableDict(dict):
     def update(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
     def popitem(self, *args: Any, **kwargs: Any) -> Any:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
     def setdefault(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
-    def pop(self, *args: Any) -> Any:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+    def pop(self, *args: Any, **kwargs: Any) -> Any:
+        raise TypeError(immutable_error_message(self, args, kwargs))
+
+    def __setitem__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
+
+    def __delitem__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
+
+    def __repr__(self) -> str:
+        return "ImmutableDict(" + super().__repr__() + ")"
 
 
-class ImmutableList(list, ImmutableBase):
-    def append(self, value: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+class ImmutableList(list):
+    def append(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
-    def extend(self, values: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+    def extend(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
-    def insert(self, index: Any, value: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+    def insert(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
-    def remove(self, value: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+    def remove(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
     def sort(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
-    def reverse(self) -> None:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+    def reverse(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
 
-    def pop(self, *args: Any) -> Any:
-        raise TypeError(IMMUTABLE_ERROR_MESSAGE)
+    def pop(self, *args: Any, **kwargs: Any) -> Any:
+        raise TypeError(immutable_error_message(self, args, kwargs))
+
+    def __setitem__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
+
+    def __delitem__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(immutable_error_message(self, args, kwargs))
+
+    def __repr__(self) -> str:
+        return "ImmutableList(" + super().__repr__() + ")"
 
 
 def frozen(obj: Any) -> Any:
