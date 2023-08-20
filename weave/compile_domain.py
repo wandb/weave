@@ -362,17 +362,6 @@ def _custom_root_resolver(node: graph.Node) -> typing.Optional["op_def.OpDef"]:
     return None
 
 
-def _custom_key_fn(node: graph.Node) -> typing.Optional[gql_op_plugin.GQLKeyPropFn]:
-    if not isinstance(node, graph.OutputNode):
-        return None
-
-    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    wb_domain_gql = gql_op_plugin.get_gql_plugin(op_def)
-    if wb_domain_gql is not None:
-        return wb_domain_gql.gql_op_output_type
-    return None
-
-
 def required_const_input_names(node: graph.Node) -> typing.Optional[list[str]]:
     if not isinstance(node, graph.OutputNode):
         return None

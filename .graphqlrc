@@ -1,1 +1,1 @@
-schema: "./weave/schema.gql"
+schema: "./weave/wb_schema.gql"
