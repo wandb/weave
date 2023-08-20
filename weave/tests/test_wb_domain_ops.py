@@ -537,3 +537,13 @@ def test_escaped_gql_query(fake_wandb):
         }
         """,
     )
+
+
+def test_null_propagation_through_nonnull_gql_ops(fake_wandb):
+    fake_wandb.fake_api.add_mock(
+        lambda q, ix: {"project_8d1592567720841659de23c02c97d594": None}
+    )
+
+    # this should fail?
+    node = ops.project("e_0", "p_0").run("r_0").name()
+    assert weave.use(node) == None
