@@ -18,8 +18,7 @@ from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
 from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from .list_ import ArrowWeaveList, is_list_arrowweavelist
-from .path import PathType
+from .list_ import ArrowWeaveList, PathType, is_list_arrowweavelist
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert

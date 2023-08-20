@@ -1,5 +1,4 @@
 import dataclasses
-import hashlib
 import json
 import pyarrow as pa
 import numpy as np
@@ -11,14 +10,10 @@ import textwrap
 
 py_type = type
 
-from . import path as arrow_path
+from .. import mappers_python
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
-from .. import gql_with_keys
-
-if typing.TYPE_CHECKING:
-    from .list_ import ArrowWeaveList
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
