@@ -75,17 +75,9 @@ def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
 def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     function_node_type = typing.cast(types.Function, function_node.type)
     if isinstance(function_node, graph.ConstNode) and isinstance(
-        function_node.type, types.Function
+        function_node.val.type, types.Function
     ):
-        # In the case where we have a Const of type function, the value is
-        # an expression. We can just return it and let the engine execute
-        # it.
-        # One case in which this happens is if you declare a variable that holds
-        # a function like (row) => row['output.model'] and then pass that as a dimension
-        # in a PanelPlot config field. PanelPlot constructs something like dict_(x=..., y=...)
-        # which it passes to groupby in the case where the dim is grouped, or map in the
-        # case where it's not. But we need expressions the dict_ values, not functions!
-        return function_node.val
+        return _call_execute(function_node.val)
     return graph.OutputNode(
         function_node_type.output_type, "execute", {"node": function_node}
     )

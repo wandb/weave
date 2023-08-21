@@ -293,7 +293,7 @@ def board(
             x_axis_key="timestamp",
             y_expr=lambda row: row.count(),
             y_title="request count",
-            color_expr=grouping_fn,
+            color_expr=lambda row: grouping_fn(row),
             x_domain=user_zoom_range,
             n_bins=100,
             mark="bar",
@@ -309,14 +309,13 @@ def board(
             x_axis_key="timestamp",
             y_expr=lambda row: row["summary.cost"].sum(),
             y_title="total cost ($)",
-            color_expr=grouping_fn,
+            color_expr=lambda row: grouping_fn(row),
             x_domain=user_zoom_range,
             n_bins=50,
         ),
         layout=weave.panels.GroupPanelLayout(x=0, y=height, w=12, h=height),
     )
 
-    # # latency
     overview_tab.add(
         "latency",
         panel_autoboard.timeseries(
@@ -325,7 +324,7 @@ def board(
             x_axis_key="timestamp",
             y_expr=lambda row: row["summary.latency_s"].avg(),
             y_title="avg latency (s)",
-            color_expr=grouping_fn,
+            color_expr=lambda row: grouping_fn(row),
             x_domain=user_zoom_range,
             n_bins=50,
         ),
