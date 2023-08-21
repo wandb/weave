@@ -1,6 +1,26 @@
+declare global {
+  interface Window {
+    WEAVE_CONFIG: {
+      PREFIX: string;
+      ANALYTICS_DISABLED: boolean;
+      WEAVE_BACKEND_HOST: string;
+    };
+  }
+}
+// These get populated via /__frontend/env.js and are defined in weave_server.py
+if (!window.WEAVE_CONFIG) {
+  console.warn('Unable to get configuration from server, using defaults');
+  window.WEAVE_CONFIG = {
+    PREFIX: '',
+    ANALYTICS_DISABLED: false,
+    WEAVE_BACKEND_HOST: '/__weave',
+  };
+}
+
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
   ANALYTICS_DISABLED: boolean;
+  PREFIX: string;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;
@@ -38,6 +58,7 @@ const DEFAULT_CONFIG: Config = {
   backendWeaveExecutionUrl,
   backendWeaveOpsUrl,
   backendWeaveViewerUrl,
+  PREFIX: window.WEAVE_CONFIG.PREFIX,
   ENABLE_DEBUG_FEATURES: false,
   ANALYTICS_DISABLED: window.WEAVE_CONFIG.ANALYTICS_DISABLED,
 } as const;

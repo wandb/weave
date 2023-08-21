@@ -349,7 +349,7 @@ def send_local_file(path):
 
 
 def frontend_env():
-    """If you add vars here, make sure to define their types in weave-js/src/entrypoint.tsx"""
+    """If you add vars here, make sure to define their types in weave-js/src/config.ts"""
     return {
         "PREFIX": environment.weave_link_prefix(),
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
