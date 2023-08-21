@@ -21,6 +21,10 @@ def op(
     *,  # Marks the rest of the arguments as keyword-only.
     plugins=None,
     mutation=False,
+    # If True, the op will be weavified, ie it's resolver will be stored as a Weave
+    # op graph. The compile node_ops pass will expand the node to the weavified
+    # version, instead of executing the original python resolver body.
+    weavify=False,
 ):
     """Decorator for declaring an op.
 
@@ -63,6 +67,10 @@ def op(
             mutation=mutation,
             _decl_locals=inspect.currentframe().f_back.f_locals,
         )
+        if weavify:
+            from .weavify import op_to_weave_fn
+
+            op.weave_fn = op_to_weave_fn(op)
 
         op_version = registry_mem.memory_registry.register_op(op)
 

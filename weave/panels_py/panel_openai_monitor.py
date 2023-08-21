@@ -108,11 +108,32 @@ board_name = "py_board-" + BOARD_ID
 #         # table.add_column(lambda row: row["messages"][-1]["content"], "Message")
 #         return table
 
+API_COST_INPUT_TYPE = types.TypedDict(
+    {
+        "output": types.optional(
+            types.TypedDict(
+                {
+                    "model": types.optional(types.String()),
+                }
+            )
+        ),
+        "summary": types.optional(
+            types.TypedDict(
+                {
+                    "prompt_tokens": types.optional(types.Number()),
+                    "completion_tokens": types.optional(types.Number()),
+                }
+            )
+        ),
+    }
+)
 
-def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
-    model = row["output.model"]
-    pt = row["summary.prompt_tokens"]
-    ct = row["summary.completion_tokens"]
+
+@weave.op(weavify=True, input_type={"record": API_COST_INPUT_TYPE})  # type: ignore
+def openai_request_cost(record) -> float:  # type: ignore
+    model = record["output.model"]
+    pt = record["summary.prompt_tokens"]
+    ct = record["summary.completion_tokens"]
     cost_per_1000 = weave.ops.case(
         [
             # finetuned
@@ -144,7 +165,7 @@ def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
             {"when": True, "then": 0},
         ]
     )
-    return cost_per_1000 / 1000
+    return cost_per_1000 / 1000  # type: ignore
 
 
 @weave.op(  # type: ignore
@@ -172,7 +193,13 @@ def board(
     augmented_data = varbar.add(
         "augmented_data",
         source_data.with_columns(
-            weave.ops.dict_(**{"summary.cost": source_data.map(lambda row: cost(row))})
+            weave.ops.dict_(
+                **{
+                    "summary.cost": source_data.map(
+                        lambda row: openai_request_cost(row)
+                    )
+                }
+            )
         ),
         hidden=True,
     )
