@@ -104,7 +104,10 @@ export default defineConfig(({mode, command}) => {
   return {
     plugins,
     base:
-      mode === 'production' && command !== 'serve' ? '/__frontend/' : undefined,
+      mode === 'production' && command !== 'serve'
+        ? // eslint-disable-next-line node/no-process-env
+          process.env.URL_BASE ?? '/__frontend/'
+        : undefined,
     resolve: {
       alias,
       dedupe: ['react', '@material-ui/styles', 'mdast-util-to-hast'],
