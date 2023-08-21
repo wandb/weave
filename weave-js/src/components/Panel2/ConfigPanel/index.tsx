@@ -300,6 +300,12 @@ export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
       height: 100%;
       width: 100% !important;
     }
+    && > input {
+      cursor: pointer;
+    }
+    && > .text {
+      cursor: pointer;
+    }
 
     &.active svg {
       transform: rotate(180deg);
