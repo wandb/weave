@@ -1,3 +1,6 @@
+// Shared compoennts and helpers for building visual editors,
+// like PanelFilterEditor and PanelGroupEditor
+
 import React from 'react';
 import {Button} from '@wandb/weave/components/Button';
 import {Type, isAssignableTo, maybe} from '@wandb/weave/cg';
