@@ -363,7 +363,7 @@ def frontend(path):
     """Serve the frontend with a simple fileserver over HTTP."""
     # We serve up a dynamic env.js file before all other js.
     if path == "env.js":
-        js = f"window.CONFIG = {json.dumps(frontend_env())}"
+        js = f"window.WEAVE_CONFIG = {json.dumps(frontend_env())}"
         return Response(js, mimetype="application/javascript")
     full_path = pathlib.Path(blueprint.static_folder) / path
     # prevent path traversal
@@ -383,7 +383,7 @@ def root_frontend(path):
     if path is not None:
         path = path.split("/")[-1]
     if path == "env.js":
-        js = f"window.CONFIG = {json.dumps(frontend_env())}"
+        js = f"window.WEAVE_CONFIG = {json.dumps(frontend_env())}"
         return Response(js, mimetype="application/javascript")
     return send_from_directory(blueprint.static_folder, "index.html")
 

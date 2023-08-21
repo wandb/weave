@@ -13,11 +13,19 @@ import {URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
 // These get populated via /__frontend/env.js and are defined in weave_server.py
 declare global {
   interface Window {
-    CONFIG: {
+    WEAVE_CONFIG: {
       PREFIX: string;
-      ANALYITCS_DISABLED: boolean;
+      ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
     };
+  }
+}
+if (!window.WEAVE_CONFIG) {
+  console.warn("Unable to get configuration from server, using defaults")
+  window.WEAVE_CONFIG = {
+    PREFIX: '',
+    ANALYTICS_DISABLED: false,
+    WEAVE_BACKEND_HOST: '/__weave',
   }
 }
 
@@ -71,7 +79,7 @@ const Main = ({browserType}: MainProps) => (
 );
 
 ReactDOM.render(
-  <Router basename={window.CONFIG.PREFIX}>
+  <Router basename={window.WEAVE_CONFIG.PREFIX}>
     <Switch>
       <Route path={`/${URL_RECENT}/:assetType?`}>
         <Main browserType={URL_RECENT} />

@@ -32,29 +32,6 @@ export default defineConfig(({mode, command}) => {
     : undefined;
   /* eslint-enable */
 
-  const modifyEnvPlugin = (): Plugin => {
-    let config;
-
-    return {
-      name: 'modify-env-js',
-
-      configResolved(resolvedConfig) {
-        // store the resolved config
-        config = resolvedConfig;
-      },
-
-      // use stored config in other hooks
-      transform(code, id) {
-        if (config.command === 'serve') {
-          // build: plugin invoked by Rollup
-          if (/env.js$/.test(id)) {
-            return code.replace('/__weave', `http://localhost:9994/__weave`);
-          }
-        }
-      },
-    };
-  };
-
   const alias = [
     // Allow absolute imports inside this package
     {
@@ -80,7 +57,7 @@ export default defineConfig(({mode, command}) => {
     {find: 'unserialize', replacement: 'yields-unserialize'},
   ];
 
-  const plugins: any = [svgr(), blockCjsPlugin, fileUrls, modifyEnvPlugin()];
+  const plugins: any = [svgr(), blockCjsPlugin, fileUrls];
 
   // enable the react plugin in dev only, for fast refresh
 
@@ -139,6 +116,12 @@ export default defineConfig(({mode, command}) => {
           secure: false,
           changeOrigin: true,
         },
+        // This ensures our dynamic env.js file is served from the backend
+        '^.*/__frontend/env.js': {
+          target: 'http://localhost:9994',
+          secure: false,
+          changeOrigin: true,
+        }
       },
     },
     preview: {

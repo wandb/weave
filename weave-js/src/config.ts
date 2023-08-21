@@ -7,7 +7,7 @@ interface Config {
   backendWeaveOpsUrl(): string;
 }
 
-const WEAVE_BACKEND_HOST = (window as any).CONFIG?.WEAVE_BACKEND_HOST ?? '';
+const WEAVE_BACKEND_HOST = window.WEAVE_CONFIG.WEAVE_BACKEND_HOST;
 
 const backendWeaveExecutionUrl = (shadow: boolean = false) => {
   if (shadow) {
@@ -25,7 +25,7 @@ const backendWeaveViewerUrl = () => {
 };
 
 export const urlPrefixed = (path: string, host: boolean = false) => {
-  let url = new URL(window.location.origin + window.CONFIG.PREFIX);
+  let url = new URL(window.location.origin + window.WEAVE_CONFIG.PREFIX);
   url = new URL(url.href.replace(/\/$/, '') + path);
   if (!host) {
     return url.pathname;
@@ -39,7 +39,7 @@ const DEFAULT_CONFIG: Config = {
   backendWeaveOpsUrl,
   backendWeaveViewerUrl,
   ENABLE_DEBUG_FEATURES: false,
-  ANALYITCS_DISABLED: window.CONFIG.ANALYITCS_DISABLED,
+  ANALYTICS_DISABLED: window.WEAVE_CONFIG.ANALYTICS_DISABLED,
 } as const;
 
 let config = {...DEFAULT_CONFIG};
