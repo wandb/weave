@@ -40,3 +40,18 @@ def test_relative_string_autoformat(multiplier, unit, num_ms):
 
     assert_date_string(multiplier, unit, "from now", from_now_result)
     assert_date_string(multiplier, unit, "ago", ago_result)
+
+
+@pytest.mark.parametrize("diff_ms", [0, 0.5, -0.5])
+def test_relative_string_autoformat_edge_cases(diff_ms):
+    ts1 = datetime.datetime.now()
+    ts2 = ts1 + datetime.timedelta(milliseconds=diff_ms)
+
+    result = weave.use(date.auto_format_relative_string(ts1, ts2))
+
+    if diff_ms == 0:
+        assert result == "less than 1 ms from now"
+    elif diff_ms > 0:
+        assert result == "less than 1 ms from now"
+    elif diff_ms < 0:
+        assert result == "less than 1 ms ago"
