@@ -1,6 +1,9 @@
 # Monitor & Visualize LLM Usage with Weave
 
-These example notebooks demonstrate LLM monitoring with Weave. As a primary use case for your LLM project or team, you can easily track, visualize, and understand OpenAI API usage.
+These example notebooks demonstrate LLM monitoring with Weave. 
+Easily track, visualize, and understand usage of LLMs across your organization.
+
+Maintain data privacy and control by leveraging W&B's [hosting options](https://docs.wandb.ai/guides/hosting) and projects/team-level access control.
 
 ## Notebooks
 
@@ -30,7 +33,7 @@ To log all calls made via an OpenAI proxy:
 2. Find [your OpenAI API key](https://platform.openai.com/account/api-keys).
 3. Set your OPENAI_API_KEY to these two keys joined by ":", i.e. wandb_api_key:openai_api_key.
 4. Change the OpenAI base url to `https://wandb.ai/proxy/openai/v1` for the public cloud instance (or replace `wandb.ai` with the base url for your instance).
-5. Optionally set headers on each call to customize the wandb entity, project, data stream name, and other aspects of logging (see the table below for details).
+5. Optionally set headers on each call to customize the wandb entity, project, and other aspects of logging (see the table below for details).
 6. Call OpenAI via the OpenAI SDK or CURL from the base url. 
 
 Try some calls from the [proxy quickstart notebook](../monitoring/openai_proxy_quickstart.ipynb).
