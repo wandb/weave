@@ -1,6 +1,6 @@
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
-  ANALYITCS_DISABLED: boolean;
+  ANALYTICS_DISABLED: boolean;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;

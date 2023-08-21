@@ -89,7 +89,7 @@ def weave_link_prefix() -> str:
     return ""
 
 
-def analyics_disabled() -> bool:
+def analytics_disabled() -> bool:
     if os.getenv("WEAVE_DISABLE_ANALYTICS") == "true":
         return True
     return False

@@ -21,12 +21,12 @@ declare global {
   }
 }
 if (!window.WEAVE_CONFIG) {
-  console.warn("Unable to get configuration from server, using defaults")
+  console.warn('Unable to get configuration from server, using defaults');
   window.WEAVE_CONFIG = {
     PREFIX: '',
     ANALYTICS_DISABLED: false,
     WEAVE_BACKEND_HOST: '/__weave',
-  }
+  };
 }
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
