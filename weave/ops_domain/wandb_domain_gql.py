@@ -11,6 +11,8 @@ from .. import op_def
 from .. import gql_with_keys
 from ..input_provider import InputProvider
 
+import pyarrow as pa
+
 """
 This file contains utilities for constructing GQL ops (used by all the ops in
 `ops_domain`). There are explicitly 4 functions:
@@ -35,18 +37,22 @@ Please see `project_ops.py` for examples of all the above cases.
 """
 
 
-def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef, prop_name: str) -> None:
+def register_vectorized_gql_prop_op(
+    scalar_op: op_def.OpDef, prop_name: str, scalar_output_type: weave_types.Type
+) -> None:
     op_args = scalar_op.input_type
 
     first_arg_name: str
     scalar_input_type: weave_types.Type
     scalar_op_name = scalar_op.name
     first_arg_name = next(iter(op_args.to_dict()))
-    scalar_input_type = op_args.initial_arg_types[first_arg_name]
+    original_scalar_input_type = op_args.initial_arg_types[first_arg_name]
 
-    # we can make this assumption because the GQL prop ops do not have output types dependent
-    # on input types
-    scalar_output_type = typing.cast(weave_types.Type, scalar_op.output_type)
+    # require that the desired key be present on the object type
+    assert isinstance(original_scalar_input_type, gql_with_keys.GQLHasWithKeysType)
+    scalar_input_type = original_scalar_input_type.with_keys(
+        {prop_name: scalar_output_type}
+    )
 
     vectorized_op_name = "ArrowWeaveList-" + scalar_op_name.split("-")[1]
     arrow_input_type = {first_arg_name: ArrowWeaveListType(scalar_input_type)}
@@ -56,7 +62,10 @@ def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef, prop_name: str) -> 
         self = typing.cast(ArrowWeaveList, inputs[first_arg_name])
         object_type = typing.cast(gql_with_keys.GQLHasKeysType, self.object_type)
         return ArrowWeaveList(
-            self._arrow_data.dictionary.field(prop_name).take(self._arrow_data.indices),
+            # keep things dictionary encoded
+            pa.DictionaryArray.from_arrays(
+                self._arrow_data.indices, self._arrow_data.dictionary.field(prop_name)
+            ),
             object_type.keys[prop_name],
             self._artifact,
         )
@@ -104,7 +113,7 @@ def gql_prop_op(
     )(gql_property_getter_op_fn)
 
     # side effect: register an arrow-vectorized version of the op
-    register_vectorized_gql_prop_op(scalar_op, prop_name)
+    register_vectorized_gql_prop_op(scalar_op, prop_name, output_type)
     return scalar_op
 
 

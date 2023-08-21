@@ -1292,7 +1292,11 @@ def test_list_numbers_equal_notequal():
 
 
 def test_vectorized_prop_op_gql_pick():
-    runs = [wdt.Run({"id": "A"}), wdt.Run({"id": "B"}), wdt.Run({"id": "C"})]
+    runs = [
+        wdt.Run({"id": "A", "key2": 1}),
+        wdt.Run({"id": "B", "key2": 1}),
+        wdt.Run({"id": "C", "key2": 1}),
+    ]
     for run in runs:
         tag_store.add_tags(run, {"mytag": "test" + run.gql["id"]})
     awl = arrow.to_arrow(runs)
