@@ -10,13 +10,10 @@ import {
   opPick,
   pickSuggestions,
   NodeOrVoidNode,
-  isAssignableTo,
-  maybe,
   Type,
   // opLimit,
 } from '@wandb/weave/core';
 import {IconChevronDown} from '@wandb/weave/components/Icon';
-import {Button} from '@wandb/weave/components/Button';
 import {MOON_50} from '@wandb/weave/common/css/color.styles';
 
 import * as _ from 'lodash';
@@ -27,6 +24,7 @@ import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
 import {ConfigFieldModifiedDropdown, ConfigFieldWrapper} from './ConfigPanel';
+import {VisualEditorMode, getSimpleKeyType} from './visualEditors';
 
 const inputType = {
   type: 'function' as const,
@@ -60,16 +58,6 @@ const keySortOrder = (key: string) => {
     return 4;
   }
   return 3;
-};
-
-const getSimpleKeyType = (keyType: Type) => {
-  return isAssignableTo(keyType, maybe('string'))
-    ? 'string'
-    : isAssignableTo(keyType, maybe('number'))
-    ? 'number'
-    : isAssignableTo(keyType, maybe('boolean'))
-    ? 'boolean'
-    : 'other';
 };
 
 const groupingExpressionToVisualState = (
@@ -198,33 +186,11 @@ export const PanelGroupingEditor: React.FC<
 
   return (
     <div style={{width: '100%', height: '100%', padding: '0 16px'}}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          marginBottom: '8px',
-          gap: '4px',
-          // This puts the buttons equal with the header
-          right: '16px',
-          top: '-30px',
-          position: 'absolute',
-        }}>
-        <Button
-          variant="ghost"
-          size="small"
-          disabled={groupingState == null}
-          onClick={() => groupingState != null && setMode('visual')}
-          active={actualMode === 'visual'}>
-          Visual
-        </Button>
-        <Button
-          variant="ghost"
-          size="small"
-          onClick={() => setMode('expression')}
-          active={actualMode === 'expression'}>
-          Expression
-        </Button>
-      </div>
+      <VisualEditorMode
+        mode={mode}
+        visualAvailable={groupingState != null}
+        setMode={setMode}
+      />
       {mode === 'expression' || groupingState == null ? (
         <div
           style={{
