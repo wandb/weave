@@ -28,7 +28,7 @@ export const urlPrefixed = (path: string, host: boolean = false) => {
   let url = new URL(window.location.origin + window.WEAVE_CONFIG.PREFIX);
   url = new URL(url.href.replace(/\/$/, '') + path);
   if (!host) {
-    return url.pathname;
+    return url.pathname + url.search;
   }
   return url.href;
 };

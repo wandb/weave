@@ -89,6 +89,10 @@ def weave_link_prefix() -> str:
     return ""
 
 
+def weave_backend_host() -> str:
+    return os.getenv("WEAVE_BACKEND_HOST", "/__weave")
+
+
 def analytics_disabled() -> bool:
     if os.getenv("WEAVE_DISABLE_ANALYTICS") == "true":
         return True

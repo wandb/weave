@@ -353,7 +353,7 @@ def frontend_env():
     return {
         "PREFIX": environment.weave_link_prefix(),
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
-        "WEAVE_BACKEND_HOST": "/__weave",
+        "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
     }
 
 
