@@ -52,7 +52,44 @@ def datetime_add(lhs, rhs):
     return lhs + datetime.timedelta(milliseconds=rhs)
 
 
-@op(name="datetime-")
+AUTO_FORMAT_UNITS_AND_NUM_MS = (
+    ("years", 365 * 24 * 60 * 60 * 1000),
+    ("months", 30 * 24 * 60 * 60 * 1000),  # Approximating a month as 30 days
+    ("days", 24 * 60 * 60 * 1000),
+    ("hours", 60 * 60 * 1000),
+    ("minutes", 60 * 1000),
+    ("seconds", 1000),
+    ("milliseconds", 1),
+)
+
+
+@op(
+    name="timestamp-relativeStringAutoFormat",
+    input_type={
+        "timestamp1": types.Timestamp(),
+        "timestamp2": types.optional(types.Timestamp()),
+    },
+    output_type=types.optional(types.String()),
+)
+def auto_format_diff_string(timestamp1, timestamp2):
+    if timestamp2 == None:
+        return None
+
+    delta: datetime.timedelta = timestamp2 - timestamp1
+    diff_ms = delta.total_seconds() * 1000
+
+    suffix = "ago" if timestamp1 > timestamp2 else "from now"
+
+    for unit, num_ms in AUTO_FORMAT_UNITS_AND_NUM_MS:
+        if diff_ms >= num_ms:
+            diff = (
+                diff_ms // num_ms if unit in ["years", "months"] else diff_ms / num_ms
+            )
+            return f"{abs(diff)} {unit} {suffix}"
+
+    return f"less than 1 ms {suffix}"
+
+
 @op(
     name="timedelta-mult",
     input_type={
