@@ -1,4 +1,8 @@
 (async function () {
+  const ANALYTICS_DISABLED = window.CONFIG?.ANALYTICS_DISABLED ?? false;
+  if (ANALYTICS_DISABLED) {
+    return;
+  }
   // OneTrust Cookies Consent Notice
   // OneTrust requires JQuery, and by default loads an outdated version along with its own script.
   // We're turning off that default behavior and loading our own updated version of JQuery instead.
@@ -178,7 +182,6 @@
     window.thirdPartyAnalyticsOK = true;
     // This function runs when the user changes their cookie consent settings,
     // or when optanon determines we don't need to check for cookie consent.
-    console.log('Enabling analytics!!!');
     enableSegmentAnalytics();
     enablePendo();
   };

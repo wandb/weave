@@ -351,7 +351,7 @@ def send_local_file(path):
 def frontend_env():
     return {
         "PREFIX": environment.weave_link_prefix(),
-        "ANALYITCS_DISABLED": environment.analyics_disabled(),
+        "ANALYTICS_DISABLED": environment.analytics_disabled(),
         "WEAVE_BACKEND_HOST": "/__weave",
     }
 
