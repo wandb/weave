@@ -47,7 +47,7 @@ All these headers are optional. By default, your request data will be logged to 
 If you specify a project name or stream name that does not yet exist under the given wandb entity, a new instance will be created.
 If you specify a wandb entity to which you do not have access, no data will be logged. 
 
- The last header type, `X-Wandb-Attribute-`, lets you add custom attribute fields and values to any call. For example, logging `X-Wandb-Attribute-my_attr` : "my_attr_value" will add a column named `attributes.my_attr` to the stream table and store `my_attr_value` in the row for this call.
+The last header type, `X-Wandb-Attribute-`, lets you add custom attribute fields and values to any call. For example, logging `X-Wandb-Attribute-my_attr` : "my_attr_value" will add a column named `attributes.my_attr` to the stream table and store `my_attr_value` in the row for this call.
 
 | Header name | Description | SDK Example | CURL Example | Default setting |
 |-------------|-------------|-------------|--------------|-----------------|
