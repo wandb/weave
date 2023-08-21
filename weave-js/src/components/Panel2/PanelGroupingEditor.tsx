@@ -118,7 +118,6 @@ export const PanelGroupingEditor: React.FC<
     value.nodeType === 'const'
       ? groupingExpressionToVisualState(value.val)
       : null;
-  const actualMode = groupingState == null ? 'expression' : mode;
 
   if (!isFunctionLiteral(value)) {
     throw new Error('Expected function literal');
