@@ -1,6 +1,6 @@
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
-  ANALYITCS_DISABLED: boolean;
+  ANALYTICS_DISABLED: boolean;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;
@@ -39,7 +39,7 @@ const DEFAULT_CONFIG: Config = {
   backendWeaveOpsUrl,
   backendWeaveViewerUrl,
   ENABLE_DEBUG_FEATURES: false,
-  ANALYITCS_DISABLED: window.CONFIG.ANALYITCS_DISABLED,
+  ANALYTICS_DISABLED: window.CONFIG.ANALYTICS_DISABLED,
 } as const;
 
 let config = {...DEFAULT_CONFIG};

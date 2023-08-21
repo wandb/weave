@@ -352,7 +352,7 @@ def frontend_env():
     """If you add vars here, make sure to define their types in weave-js/src/entrypoint.tsx"""
     return {
         "PREFIX": environment.weave_link_prefix(),
-        "ANALYITCS_DISABLED": environment.analyics_disabled(),
+        "ANALYTICS_DISABLED": environment.analyics_disabled(),
         "WEAVE_BACKEND_HOST": "/__weave",
     }
 

@@ -15,7 +15,7 @@ declare global {
   interface Window {
     CONFIG: {
       PREFIX: string;
-      ANALYITCS_DISABLED: boolean;
+      ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
     };
   }
