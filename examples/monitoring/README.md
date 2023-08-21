@@ -1,9 +1,8 @@
 # Monitor & Visualize LLM Usage with Weave
 
 These example notebooks demonstrate LLM monitoring with Weave. 
-Easily track, visualize, and understand usage of LLMs across your organization.
-
-Maintain data privacy and control by leveraging W&B's [hosting options](https://docs.wandb.ai/guides/hosting) and projects/team-level access control.
+Easily track, visualize, and understand LLM usage across your organization.
+Maintain data privacy and control by leveraging W&B's [hosting options](https://docs.wandb.ai/guides/hosting) and data access at the project/team level.
 
 ## Notebooks
 
