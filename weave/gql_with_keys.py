@@ -119,10 +119,12 @@ class GQLHasKeysType(types.Type):
             return True
 
         if isinstance(other_type, GQLHasKeysType):
-            if self.__class__ == other_type.__class__:
-                other_td = types.TypedDict(other_type.keys)
-                self_td = types.TypedDict(self.keys)
-                return other_td.assign_type(self_td)
+            if self.keyless_weave_type_class != other_type.keyless_weave_type_class:
+                return False
+
+            other_td = types.TypedDict(other_type.keys)
+            self_td = types.TypedDict(self.keys)
+            return other_td.assign_type(self_td)
 
         return False
 

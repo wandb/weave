@@ -54,7 +54,7 @@ def register_vectorized_gql_prop_op(
         {prop_name: scalar_output_type}
     )
 
-    vectorized_op_name = "ArrowWeaveList-" + scalar_op_name.split("-")[1]
+    vectorized_op_name = "ArrowWeaveList" + scalar_op_name
     arrow_input_type = {first_arg_name: ArrowWeaveListType(scalar_input_type)}
     arrow_output_type = ArrowWeaveListType(scalar_output_type)
 

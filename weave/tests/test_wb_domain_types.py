@@ -23,6 +23,16 @@ def test_with_keys_assignability():
     assert org_with_keys.assign_type(org_with_keys_2)
 
 
+def test_with_keys_not_assignability():
+    org_type = wdt.OrgType
+    org_with_keys = org_type.with_keys({"name": types.String()})
+    project_type = wdt.ProjectType
+    project_with_keys = project_type.with_keys({"name": types.String()})
+
+    assert not org_with_keys.assign_type(project_with_keys)
+    assert not project_with_keys.assign_type(org_with_keys)
+
+
 def test_type_of_run_with_keys():
     run = wdt.Run.from_gql({"a": "1"})
     assert types.TypeRegistry.type_of(run) == wdt.RunType.with_keys(
