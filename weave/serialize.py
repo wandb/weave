@@ -117,7 +117,7 @@ def node_id(node: graph.Node):
     else:
         raise errors.WeaveInternalError("invalid node encountered: %s" % node)
     hash = hashlib.md5()
-    hash.update(json.dumps(hashable).encode())
+    hash.update(json.dumps(hashable, default=str).encode())
     return hash.hexdigest()
 
 
