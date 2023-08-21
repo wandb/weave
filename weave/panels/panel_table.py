@@ -362,7 +362,9 @@ def pinned_data(self: typing.Union[Table, Query]):
     refine_output_type=rows_refine,
 )
 def pinned_rows(self: Table):
-    rows_node = _get_rows_node(self)
+    # _get_active_node uses an "activeRowForGrouping" which is relative to the unsorted table.
+    # for the index to be correct, we need to use the unsorted table.
+    rows_node = _get_rows_node(self, apply_sort=False)
     pinned_data_node = _get_pinned_node(self, rows_node)
     return weave.use(pinned_data_node)
 
