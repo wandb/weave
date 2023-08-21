@@ -133,10 +133,20 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         return f"""weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
     def add_column(
-        self, select_expr: typing.Callable, name: typing.Optional[str] = None
-    ) -> None:
+        self,
+        select_expr: typing.Callable,
+        name: typing.Optional[str] = None,
+        groupby: bool = False,
+        sort_dir: typing.Optional[str] = None,
+    ) -> str:
         config = typing.cast(TableConfig, self.config)
-        config.tableState.add_column(select_expr, name)
+        return config.tableState.add_column(
+            select_expr, name, groupby=groupby, sort_dir=sort_dir
+        )
+
+    def enable_sort(self, col_id: str, dir: typing.Optional[str] = "asc") -> None:
+        config = typing.cast(TableConfig, self.config)
+        config.tableState.enable_sort(col_id, dir=dir)
 
 
 def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:
