@@ -12,7 +12,7 @@ import urllib.parse
 from flask import json
 from werkzeug.exceptions import HTTPException
 
-from flask import Response, Flask, Blueprint
+from flask import Flask, Blueprint
 from flask import request
 from flask import abort
 from flask_cors import CORS
@@ -348,22 +348,10 @@ def send_local_file(path):
     return send_from_directory("/", path)
 
 
-def frontend_env():
-    return {
-        "PREFIX": environment.weave_link_prefix(),
-        "ANALYITCS_DISABLED": environment.analyics_disabled(),
-        "WEAVE_BACKEND_HOST": "/__weave",
-    }
-
-
 @blueprint.route("/__frontend", defaults={"path": None})
 @blueprint.route("/__frontend/<path:path>")
 def frontend(path):
     """Serve the frontend with a simple fileserver over HTTP."""
-    # We serve up a dynamic env.js file before all other js.
-    if path == "env.js":
-        js = f"window.CONFIG = {json.dumps(frontend_env())}"
-        return Response(js, mimetype="application/javascript")
     full_path = pathlib.Path(blueprint.static_folder) / path
     # prevent path traversal
     if not full_path.resolve().is_relative_to(blueprint.static_folder):
