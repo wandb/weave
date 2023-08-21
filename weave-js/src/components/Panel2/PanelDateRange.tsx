@@ -29,25 +29,31 @@ const inputType = {
     },
   ],
 };
-
+const StyledConfigOpt = styled(ConfigPanel.ConfigOption)`
+  && {
+    font-size: 15px;
+  }
+`;
 const StyledTextBox = styled.div`
   background-color: ${MOON_50};
   border-radius: 4px;
   padding: 2px 8px;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 20px;
+  min-height: 32px;
   > div {
     width: 100%;
   }
   &&& input {
     font-family: Source Sans Pro;
-    font-size: 16px;
+    font-size: 15px;
     background-color: ${MOON_50};
     outline: none;
     color: ${MOON_800};
   }
   display: flex;
   align-content: center;
+  flex-wrap: wrap;
 `;
 
 interface PanelDateRangeConfig {
@@ -181,12 +187,12 @@ export const PanelDateRangeConfigComponent: React.FC<
 
   return (
     <>
-      <ConfigPanel.ConfigOption label={`domain`}>
+      <StyledConfigOpt label={`domain`}>
         <ConfigPanel.ExpressionConfigField
           expr={config.domain}
           setExpression={updateDomain}
         />
-      </ConfigPanel.ConfigOption>
+      </StyledConfigOpt>
     </>
   );
 };
@@ -249,7 +255,7 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
         display: 'flex',
         flexDirection: 'column',
       }}>
-      <ConfigPanel.ConfigOption label="Start">
+      <StyledConfigOpt label="Start">
         <StyledTextBox>
           <DateEditor
             timestamp={start}
@@ -259,8 +265,8 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
             deltaFromOffset={end}
           />
         </StyledTextBox>
-      </ConfigPanel.ConfigOption>
-      <ConfigPanel.ConfigOption label="End">
+      </StyledConfigOpt>
+      <StyledConfigOpt label="End">
         <StyledTextBox>
           <DateEditor
             timestamp={end}
@@ -270,15 +276,14 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
             deltaFromOffset={start}
           />
         </StyledTextBox>
-      </ConfigPanel.ConfigOption>
-
-      <ConfigPanel.ConfigOption label="Duration">
+      </StyledConfigOpt>
+      <StyledConfigOpt label="Duration">
         <StyledTextBox>
           {durationMillis != null
             ? monthRoundedTime(durationMillis / 1000) || 'N/A'
             : 'N/A'}
         </StyledTextBox>
-      </ConfigPanel.ConfigOption>
+      </StyledConfigOpt>
     </div>
   );
 };

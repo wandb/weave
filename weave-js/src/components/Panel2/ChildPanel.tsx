@@ -509,7 +509,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 const varNameToTitle = (varName: string) => {
   return varName
     .replace(/_/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase());
+    .replace(/\b\w/, char => char.toUpperCase());
 };
 
 // This is the standard way to render subpanels. We should migrate
