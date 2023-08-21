@@ -155,11 +155,8 @@ export const PanelGroupingEditor: React.FC<
   );
 
   const updateValFromVisualState = useCallback(
-    (groupingState: VisualGroupingState) => {
-      const newExpr = visualGroupingStateToExpression(
-        groupingState,
-        listItem.type
-      );
+    (gs: VisualGroupingState) => {
+      const newExpr = visualGroupingStateToExpression(gs, listItem.type);
       updateVal(newExpr);
     },
     [listItem.type, updateVal]
@@ -206,9 +203,9 @@ export const PanelGroupingEditor: React.FC<
           <ConfigFieldWrapper withIcon>
             <ConfigFieldModifiedDropdown
               value={groupingState.key}
-              onChange={(e, {value}) => {
+              onChange={(e, {value: v}) => {
                 updateValFromVisualState(
-                  setGroupingKey(groupingState, value as string)
+                  setGroupingKey(groupingState, v as string)
                 );
               }}
               options={keyOptions}
