@@ -113,6 +113,9 @@ const visualClauseIsValid = (
       if (!Array.isArray(clause.value) || !clause.value.every(_.isString)) {
         return false;
       }
+      if (clause.value.length === 0) {
+        return false;
+      }
     } else if (typeof clause.value !== 'string') {
       return false;
     }
@@ -145,6 +148,22 @@ const getOpChoices = (
     : [];
 };
 
+// FilterEditor is a generic editor for filters, for any list.
+// But we hardcode a sort order for our monitoring Span type for now.
+// In the future this could be controlled by a config parameter.
+const keySortOrder = (key: string) => {
+  if (key.startsWith('attributes.')) {
+    return 1;
+  }
+  if (key.startsWith('summary.')) {
+    return 2;
+  }
+  if (key === 'id' || key.includes('_id')) {
+    return 4;
+  }
+  return 3;
+};
+
 const SingleFilterVisualEditor: React.FC<{
   listNode: Node;
   clause: VisualClause | null;
@@ -159,19 +178,18 @@ const SingleFilterVisualEditor: React.FC<{
     arr: props.listNode,
     index: varNode('number', 'n'),
   });
-  const keyChoices = pickSuggestions(listItem.type).filter(
-    k =>
-      getSimpleKeyType(opPick({obj: listItem, key: constString(k)}).type) !==
-      'other'
-  );
+  const keyChoices = pickSuggestions(listItem.type)
+    .filter(
+      k =>
+        getSimpleKeyType(opPick({obj: listItem, key: constString(k)}).type) !==
+        'other'
+    )
+    .sort((a, b) => keySortOrder(a) - keySortOrder(b) || a.localeCompare(b));
   const keyOptions = keyChoices.map(k => ({text: k, value: k, k}));
 
   const [key, setKey] = useState<string | undefined>(
     defaultKey ?? keyChoices[0]
   );
-  const [op, setOp] = useState<string | undefined>(defaultOp);
-  const [value, setValue] = useState<any | undefined>(defaultValue);
-
   const simpleKeyType = getSimpleKeyType(
     opPick({
       obj: listItem,
@@ -181,6 +199,9 @@ const SingleFilterVisualEditor: React.FC<{
 
   const opChoices = getOpChoices(simpleKeyType);
   const opOptions = opChoices.map(k => ({text: k, value: k, k}));
+
+  const [op, setOp] = useState<string | undefined>(defaultOp ?? opChoices[0]);
+  const [value, setValue] = useState<any | undefined>(defaultValue);
 
   // const valueQuery =
   // TODO: opLimit is broken in weave python when we have an ArrowWeaveList...
@@ -235,7 +256,11 @@ const SingleFilterVisualEditor: React.FC<{
         value={op}
         onChange={(e, {value: v}) => {
           if (v === 'in') {
-            setValue([]);
+            if (op === '=') {
+              setValue([value]);
+            } else {
+              setValue([]);
+            }
           } else {
             setValue(undefined);
           }
