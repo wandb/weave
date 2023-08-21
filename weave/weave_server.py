@@ -12,7 +12,7 @@ import urllib.parse
 from flask import json
 from werkzeug.exceptions import HTTPException
 
-from flask import Response, Flask, Blueprint
+from flask import Flask, Blueprint, Response
 from flask import request
 from flask import abort
 from flask_cors import CORS
