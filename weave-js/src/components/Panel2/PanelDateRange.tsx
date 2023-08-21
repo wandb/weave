@@ -34,6 +34,7 @@ const StyledConfigOpt = styled(ConfigPanel.ConfigOption)`
     font-size: 15px;
   }
 `;
+StyledConfigOpt.displayName = 'StyledConfigOpt';
 const StyledTextBox = styled.div`
   background-color: ${MOON_50};
   border-radius: 4px;
@@ -55,7 +56,7 @@ const StyledTextBox = styled.div`
   align-content: center;
   flex-wrap: wrap;
 `;
-
+StyledTextBox.displayName = 'StyledTextBox';
 interface PanelDateRangeConfig {
   domain: NodeOrVoidNode;
 }
