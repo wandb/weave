@@ -71,21 +71,26 @@ AUTO_FORMAT_UNITS_AND_NUM_MS = (
     },
     output_type=types.optional(types.String()),
 )
-def auto_format_diff_string(timestamp1, timestamp2):
+def auto_format_relative_string(timestamp1, timestamp2):
     if timestamp2 == None:
         return None
 
     delta: datetime.timedelta = timestamp2 - timestamp1
-    diff_ms = delta.total_seconds() * 1000
+    diff_ms = abs(delta.total_seconds() * 1000)
 
     suffix = "ago" if timestamp1 > timestamp2 else "from now"
 
-    for unit, num_ms in AUTO_FORMAT_UNITS_AND_NUM_MS:
-        if diff_ms >= num_ms:
-            diff = (
-                diff_ms // num_ms if unit in ["years", "months"] else diff_ms / num_ms
-            )
-            return f"{abs(diff)} {unit} {suffix}"
+    for unit, unit_ms in AUTO_FORMAT_UNITS_AND_NUM_MS:
+        if diff_ms >= unit_ms:
+            diff = round(diff_ms / unit_ms, 2)
+
+            if int(diff) == diff:
+                diff = int(diff)
+
+            if diff == 1:
+                unit = unit[:-1]
+
+            return f"{diff} {unit} {suffix}"
 
     return f"less than 1 ms {suffix}"
 
