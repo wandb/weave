@@ -321,10 +321,11 @@ def board(
     requests_table = panels.Table(filtered_window_data)  # type: ignore
     requests_table.add_column(lambda row: row["output.model"], "Model")
     requests_table.add_column(
-        lambda row: row["inputs.messages"][-1]["content"], "Message"
+        lambda row: row["inputs.messages"][-1]["content"], "inputs.messages[-1].content"
     )
     requests_table.add_column(
-        lambda row: row["output.choices"][-1]["message.content"], "Completion"
+        lambda row: row["output.choices"][-1]["message.content"],
+        "output.choices[-1].message.content",
     )
     requests_table.add_column(lambda row: row["summary.prompt_tokens"], "Prompt Tokens")
     requests_table.add_column(
@@ -332,7 +333,9 @@ def board(
     )
     requests_table.add_column(lambda row: row["summary.total_tokens"], "Total Tokens")
     requests_table.add_column(lambda row: row["summary.latency_s"], "Latency")
-    requests_table.add_column(lambda row: row["timestamp"], "Timestamp")
+    requests_table.add_column(
+        lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
+    )
 
     requests_table_var = overview_tab.add(
         "table",
