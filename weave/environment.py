@@ -89,6 +89,10 @@ def weave_link_prefix() -> str:
     return ""
 
 
+def weave_onprem() -> bool:
+    return os.getenv("GORILLA_ONPREM") == "true"
+
+
 def analytics_disabled() -> bool:
     if os.getenv("WEAVE_DISABLE_ANALYTICS") == "true":
         return True
