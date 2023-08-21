@@ -26,6 +26,6 @@ def test_const_serialization():
 def test_gql_haskeys_stripping():
     instance = wb_domain_types.Run({"a": types.String()})
     type = types.TypeRegistry.type_of(instance)
-    assert isinstance(type, gql_with_keys.GQLHasKeysType)
+    assert isinstance(type, gql_with_keys.PartialObjectType)
     serialized = type.to_dict()
     assert weavejs_fixes.remove_gql_haskeys_from_types(serialized) == "run"

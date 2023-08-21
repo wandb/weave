@@ -260,7 +260,7 @@ class ArrowWeaveListType(types.Type):
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_artifact):
-    if isinstance(object_type, gql_with_keys.GQLHasKeysType):
+    if isinstance(object_type, gql_with_keys.PartialObjectType):
         # GQLHasKeys is a leaf type
         return arrow_data
     if _object_type_has_props(object_type):

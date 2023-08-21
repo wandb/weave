@@ -505,7 +505,7 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
     return opdef.is_gql_root_resolver() or (
         plugin is not None
         and plugin.gql_op_output_type is not None
-        and isinstance(unwrapped_first_arg_type, gql_with_keys.GQLHasKeysType)
+        and isinstance(unwrapped_first_arg_type, gql_with_keys.PartialObjectType)
     )
 
 
@@ -545,7 +545,7 @@ def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node
             )
             output_type = from_op.inputs["output_type"].val
 
-            if isinstance(output_type, gql_with_keys.GQLHasWithKeysType):
+            if isinstance(output_type, gql_with_keys.AbstractPartialObjectType):
                 key_type = typing.cast(
                     types.TypedDict,
                     gql_to_weave.get_query_weave_type(

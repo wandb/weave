@@ -364,7 +364,7 @@ def map_to_arrow_(
         return ListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return UnionToArrowUnion(type, mapper, artifact, path)
-    elif isinstance(type, gql_with_keys.GQLHasKeysType):
+    elif isinstance(type, gql_with_keys.PartialObjectType):
         return GQLHasKeysToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
@@ -399,7 +399,7 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
         return ArrowToArrowWeaveListOrPylist(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return ArrowUnionToUnion(type, mapper, artifact, path)
-    elif isinstance(type, gql_with_keys.GQLHasKeysType):
+    elif isinstance(type, gql_with_keys.PartialObjectType):
         return mappers_python.GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return mappers_python.ObjectDictToObject(type, mapper, artifact, path)

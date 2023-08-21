@@ -2,7 +2,7 @@ import typing
 
 from . import mappers
 from . import weave_types as types
-from .gql_with_keys import GQLHasKeysType
+from .gql_with_keys import PartialObjectType
 
 
 class TypedDictMapper(mappers.Mapper):
@@ -21,7 +21,7 @@ class TypedDictMapper(mappers.Mapper):
 
 class GQLMapper(mappers.Mapper):
     def __init__(self, type_: types.Type, mapper, artifact, path):
-        self.type = typing.cast(GQLHasKeysType, type_)
+        self.type = typing.cast(PartialObjectType, type_)
         self._artifact = artifact
         self.path = path
         self.mapper = mapper

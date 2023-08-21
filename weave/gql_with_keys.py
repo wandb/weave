@@ -12,10 +12,10 @@ from .decorator_type import type as weave_type
 from .input_provider import InputProvider
 
 
-T = typing.TypeVar("T", bound="GQLTypeMixin")
+T = typing.TypeVar("T", bound="PartialObject")
 
 
-class GQLHasWithKeysType(types.Type):
+class AbstractPartialObjectType(types.Type):
     """Base class for types like projectType(), runType(), etc. Instances of this class do not have keys,
     but they have a method called with_keys() that allows them to generate instances of the type with
     keys. E.g.,
@@ -30,16 +30,16 @@ class GQLHasWithKeysType(types.Type):
     """
 
     @classmethod
-    def with_keys(cls, keys: dict[str, types.Type]) -> "GQLHasKeysType":
+    def with_keys(cls, keys: dict[str, types.Type]) -> "PartialObjectType":
         """Creates a new Weave Type that is assignable to the original Weave Type, but
         also has the specified keys. This is used during the compile pass for creating a Weave Type
         to represent the exact output type of a specific GQL query, and for communicating the
         data shape to arrow."""
 
-        return GQLHasKeysType(cls, keys)
+        return PartialObjectType(cls, keys)
 
     @classmethod
-    def type_of_instance(cls, obj: "GQLTypeMixin") -> types.Type:
+    def type_of_instance(cls, obj: "PartialObject") -> types.Type:
         if obj.gql == {} or obj.gql is None:
             return cls()
 
@@ -66,7 +66,7 @@ def gql_weave_type(
             name,
             True,
             None,
-            [GQLHasWithKeysType],
+            [AbstractPartialObjectType],
         )
         return decorator(_instance_class)
 
@@ -74,7 +74,7 @@ def gql_weave_type(
 
 
 @dataclass
-class GQLTypeMixin:
+class PartialObject:
     gql: dict = field(default_factory=dict)
 
     @classmethod
@@ -82,7 +82,7 @@ class GQLTypeMixin:
         return cls(gql=gql_dict)
 
 
-class GQLHasKeysType(types.Type):
+class PartialObjectType(types.Type):
     """Base class for types like projectTypeWithKeys({...}), runTypeWithKeys({...}), etc.
 
     Assignability rules:
@@ -109,7 +109,7 @@ class GQLHasKeysType(types.Type):
     def _assign_type_inner(self, other_type: types.Type) -> bool:
         # TODO: think more about how this will work with tags - might need to be modified
         return (
-            isinstance(other_type, GQLHasKeysType)
+            isinstance(other_type, PartialObjectType)
             and self.keyless_weave_type_class == other_type.keyless_weave_type_class
             and self.keys == other_type.keys
         )
@@ -118,7 +118,7 @@ class GQLHasKeysType(types.Type):
         if other_type.__class__ is self.keyless_weave_type_class:
             return True
 
-        if isinstance(other_type, GQLHasKeysType):
+        if isinstance(other_type, PartialObjectType):
             if self.keyless_weave_type_class != other_type.keyless_weave_type_class:
                 return False
 
@@ -146,7 +146,7 @@ class GQLHasKeysType(types.Type):
         return result
 
     def __eq__(self, other: typing.Any) -> bool:
-        if isinstance(other, GQLHasKeysType):
+        if isinstance(other, PartialObjectType):
             return (
                 self.keyless_weave_type_class == other.keyless_weave_type_class
                 and self.keys == other.keys
@@ -154,7 +154,7 @@ class GQLHasKeysType(types.Type):
         return False
 
     @classmethod
-    def from_dict(cls, d: dict) -> "GQLHasKeysType":
+    def from_dict(cls, d: dict) -> "PartialObjectType":
         property_types = {}
         for key, type_ in d["keys"].items():
             property_types[key] = types.TypeRegistry.type_from_dict(type_)
@@ -165,7 +165,7 @@ class GQLHasKeysType(types.Type):
         return cls(keyless_weave_type_class, property_types)
 
     def save_instance(
-        self, obj: GQLTypeMixin, artifact: artifact_fs.FilesystemArtifact, name: str
+        self, obj: PartialObject, artifact: artifact_fs.FilesystemArtifact, name: str
     ) -> None:
         from . import mappers_python
 
@@ -181,7 +181,7 @@ class GQLHasKeysType(types.Type):
         artifact: artifact_fs.FilesystemArtifact,
         name: str,
         extra: typing.Optional[list] = None,
-    ) -> GQLTypeMixin:
+    ) -> PartialObject:
         from . import mappers_python
 
         with artifact.open(
@@ -192,14 +192,14 @@ class GQLHasKeysType(types.Type):
         mapped_result = mapper.apply(result)
         if extra is not None:
             return mapped_result[extra[0]]
-        return typing.cast(GQLTypeMixin, mapped_result)
+        return typing.cast(PartialObject, mapped_result)
 
-    def instance_to_dict(self, obj: GQLTypeMixin) -> dict[str, typing.Any]:
+    def instance_to_dict(self, obj: PartialObject) -> dict[str, typing.Any]:
         return obj.gql
 
-    def instance_from_dict(self, d: dict[str, typing.Any]) -> GQLTypeMixin:
+    def instance_from_dict(self, d: dict[str, typing.Any]) -> PartialObject:
         instance_class = typing.cast(
-            typing.Type[GQLTypeMixin], self.keyless_weave_type_class.instance_class
+            typing.Type[PartialObject], self.keyless_weave_type_class.instance_class
         )
         return instance_class.from_gql(d)
 
@@ -235,7 +235,7 @@ def _alias(
 def make_root_op_gql_op_output_type(
     prop_name: str,
     param_str_fn: ParamStrFn,
-    output_type: GQLHasWithKeysType,
+    output_type: AbstractPartialObjectType,
     use_alias: bool = False,
 ) -> gql_op_plugin.GQLOutputTypeFn:
     """Creates a GQLOutputTypeFn for a root op that returns a list of objects with keys."""

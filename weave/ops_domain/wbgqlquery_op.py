@@ -71,14 +71,14 @@ def querytoobj(result_dict, result_key, output_type, gql_query_fragment):
     if isinstance(output_type, tagged_value_type.TaggedValueType):
         output_type = output_type.value
 
-    if not isinstance(output_type, gql_with_keys.GQLHasKeysType):
+    if not isinstance(output_type, gql_with_keys.PartialObjectType):
         raise ValueError(
             f"Invalid output type for gqlroot-querytoobj, must be a GQLHasKeysType, got {output_type}"
         )
 
     instance_class = output_type.keyless_weave_type_class.instance_class
 
-    if instance_class is None or not issubclass(instance_class, wdt.GQLTypeMixin):
+    if instance_class is None or not issubclass(instance_class, wdt.PartialObject):
         raise ValueError(
             f"Invalid output type for gqlroot-querytoobj, must be a GQLTypeMixin, got {output_type}"
         )

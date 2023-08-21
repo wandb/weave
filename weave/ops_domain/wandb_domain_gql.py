@@ -49,7 +49,9 @@ def register_vectorized_gql_prop_op(
     original_scalar_input_type = op_args.initial_arg_types[first_arg_name]
 
     # require that the desired key be present on the object type
-    assert isinstance(original_scalar_input_type, gql_with_keys.GQLHasWithKeysType)
+    assert isinstance(
+        original_scalar_input_type, gql_with_keys.AbstractPartialObjectType
+    )
     scalar_input_type = original_scalar_input_type.with_keys(
         {prop_name: scalar_output_type}
     )
@@ -60,7 +62,7 @@ def register_vectorized_gql_prop_op(
 
     def vectorized_gql_property_getter_op_fn(**inputs):
         self = typing.cast(ArrowWeaveList, inputs[first_arg_name])
-        object_type = typing.cast(gql_with_keys.GQLHasKeysType, self.object_type)
+        object_type = typing.cast(gql_with_keys.PartialObjectType, self.object_type)
         return ArrowWeaveList(
             # keep things dictionary encoded
             pa.DictionaryArray.from_arrays(
@@ -155,7 +157,7 @@ def gql_direct_edge_op(
     is_root = input_type is None
     first_arg_name = "gql_obj" if input_type is None else input_type.name
     if not output_type.instance_class or isinstance(
-        output_type.instance_class, wb_domain_types.GQLTypeMixin
+        output_type.instance_class, wb_domain_types.PartialObject
     ):
         raise ValueError(
             f"output_type must be a GQLTypeMixin, got {output_type} instead"
@@ -183,9 +185,9 @@ def gql_direct_edge_op(
         key = alias if alias != "" else prop_name
 
         ret_type = output_type
-        if isinstance(self_type, gql_with_keys.GQLHasKeysType):
+        if isinstance(self_type, gql_with_keys.PartialObjectType):
             keys = self_type.keys
-            assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
+            assert isinstance(output_type, gql_with_keys.AbstractPartialObjectType)
             new_keys = keys[key]
             if is_many:
                 new_keys = typing.cast(weave_types.List, new_keys).object_type
@@ -271,7 +273,7 @@ def gql_connection_op(
 ):
     first_arg_name = "gql_obj" if input_type is None else input_type.name
     if not output_type.instance_class or isinstance(
-        output_type.instance_class, wb_domain_types.GQLTypeMixin
+        output_type.instance_class, wb_domain_types.PartialObject
     ):
         raise ValueError(
             f"output_type must be a GQLTypeMixin, got {output_type} instead"
@@ -303,9 +305,9 @@ def gql_connection_op(
         alias = gql_with_keys._alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
-        if isinstance(self_type, gql_with_keys.GQLHasKeysType):
+        if isinstance(self_type, gql_with_keys.PartialObjectType):
             keys = self_type.keys
-            assert isinstance(output_type, gql_with_keys.GQLHasWithKeysType)
+            assert isinstance(output_type, gql_with_keys.AbstractPartialObjectType)
             new_keys = typing.cast(
                 weave_types.TypedDict,
                 typing.cast(
