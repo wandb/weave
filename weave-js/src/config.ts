@@ -1,3 +1,6 @@
+import Analytics from '@segment/analytics.js-core/build/analytics';
+import SegmentIntegration from '@segment/analytics.js-integration-segmentio';
+
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
   urlPrefixed(path: string): string;
@@ -39,4 +42,24 @@ export const setConfig = (newConfig: Partial<Config>) => {
 
 export default function getConfig() {
   return config;
+}
+
+// If on-prem, send events to Gorilla proxy
+const IS_ONPREM = (window as any).CONFIG?.ONPREM ?? false;
+const ANALYTICS_DISABLED = (window as any).CONFIG?.ANALYTICS_DISABLED ?? false;
+if (IS_ONPREM && !ANALYTICS_DISABLED) {
+  const host = document.location.origin;
+  if (host.startsWith('https://')) {
+    const apiHost =
+      host.replace('https://', '') + WEAVE_BACKEND_HOST + '/analytics';
+    const integrationSettings = {
+      'Segment.io': {
+        apiHost,
+        retryQueue: true,
+      },
+    };
+    window.analytics = new (Analytics as any)();
+    (window.analytics as any).use(SegmentIntegration);
+    (window.analytics as any).init(integrationSettings);
+  }
 }
