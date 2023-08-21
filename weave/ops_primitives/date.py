@@ -35,13 +35,13 @@ def datetimetd_sub(lhs, rhs):
 
 
 @op(
-    name="datetime-add",
+    name="datetime-addms",
     input_type={
-        "lhs": types.UnionType(types.Timestamp(), types.TimeDelta()),
+        "lhs": types.UnionType(types.Timestamp(), types.Number()),
         "rhs": lambda input_types: types.optional(
             types.Timestamp()
-            if types.TimeDelta().assign_type(input_types["lhs"])
-            else types.TimeDelta()
+            if types.Number().assign_type(input_types["lhs"])
+            else types.Number()
         ),
     },
     output_type=types.optional(types.Timestamp()),
@@ -49,9 +49,10 @@ def datetimetd_sub(lhs, rhs):
 def datetime_add(lhs, rhs):
     if rhs == None:
         return None
-    return lhs + rhs
+    return lhs + datetime.timedelta(milliseconds=rhs)
 
 
+@op(name="datetime-")
 @op(
     name="timedelta-mult",
     input_type={
