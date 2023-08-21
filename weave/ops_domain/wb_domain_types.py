@@ -1,7 +1,11 @@
 import typing
 from .. import weave_types as types
 from ..decorator_type import type as weave_type
-from ..gql_with_keys import gql_weave_type, PartialObject, AbstractPartialObjectType
+from ..gql_with_keys import (
+    gql_weave_type,
+    PartialObject,
+    GeneratePartialMixin,
+)
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -42,7 +46,7 @@ class Org(PartialObject):
 
 
 OrgType = Org.WeaveType()  # type: ignore
-OrgType = typing.cast(AbstractPartialObjectType, OrgType)
+OrgType = typing.cast(GeneratePartialMixin, OrgType)
 
 
 @gql_weave_type("entity")
@@ -54,7 +58,7 @@ class Entity(PartialObject):
 
 
 EntityType = Entity.WeaveType()  # type: ignore
-EntityType = typing.cast(AbstractPartialObjectType, EntityType)
+EntityType = typing.cast(GeneratePartialMixin, EntityType)
 
 
 @gql_weave_type("user")
@@ -66,7 +70,7 @@ class User(PartialObject):
 
 
 UserType = User.WeaveType()  # type: ignore
-UserType = typing.cast(AbstractPartialObjectType, UserType)
+UserType = typing.cast(GeneratePartialMixin, UserType)
 
 
 @gql_weave_type("project")
@@ -78,7 +82,7 @@ class Project(PartialObject):
 
 
 ProjectType = Project.WeaveType()  # type: ignore
-ProjectType = typing.cast(AbstractPartialObjectType, ProjectType)
+ProjectType = typing.cast(GeneratePartialMixin, ProjectType)
 
 
 @gql_weave_type("run")
@@ -90,7 +94,7 @@ class Run(PartialObject):
 
 
 RunType = Run.WeaveType()  # type: ignore
-RunType = typing.cast(AbstractPartialObjectType, RunType)
+RunType = typing.cast(GeneratePartialMixin, RunType)
 
 
 @gql_weave_type("artifactType")
@@ -102,7 +106,7 @@ class ArtifactType(PartialObject):
 
 
 ArtifactTypeType = ArtifactType.WeaveType()  # type: ignore
-ArtifactTypeType = typing.cast(AbstractPartialObjectType, ArtifactTypeType)
+ArtifactTypeType = typing.cast(GeneratePartialMixin, ArtifactTypeType)
 
 
 @gql_weave_type("artifact")  # Name and Class mismatch intention due to weave0
@@ -114,7 +118,7 @@ class ArtifactCollection(PartialObject):
 
 
 ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
-ArtifactCollectionType = typing.cast(AbstractPartialObjectType, ArtifactCollectionType)
+ArtifactCollectionType = typing.cast(GeneratePartialMixin, ArtifactCollectionType)
 
 
 @gql_weave_type("artifactVersion")
@@ -125,7 +129,7 @@ class ArtifactVersion(PartialObject):
 
 
 ArtifactVersionType = ArtifactVersion.WeaveType()  # type: ignore
-ArtifactVersionType = typing.cast(AbstractPartialObjectType, ArtifactVersionType)
+ArtifactVersionType = typing.cast(GeneratePartialMixin, ArtifactVersionType)
 
 
 @gql_weave_type("artifactMembership")  # Name and Class mismatch intention due to weave0
@@ -137,7 +141,7 @@ class ArtifactCollectionMembership(PartialObject):
 
 ArtifactCollectionMembershipType = ArtifactCollectionMembership.WeaveType()  # type: ignore
 ArtifactCollectionMembershipType = typing.cast(
-    AbstractPartialObjectType, ArtifactCollectionMembershipType
+    GeneratePartialMixin, ArtifactCollectionMembershipType
 )
 
 
@@ -149,7 +153,7 @@ class ArtifactAlias(PartialObject):
 
 
 ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
-ArtifactAliasType = typing.cast(AbstractPartialObjectType, ArtifactAliasType)
+ArtifactAliasType = typing.cast(GeneratePartialMixin, ArtifactAliasType)
 
 
 @gql_weave_type("report")
@@ -160,7 +164,7 @@ class Report(PartialObject):
 
 
 ReportType = Report.WeaveType()  # type: ignore
-ReportType = typing.cast(AbstractPartialObjectType, ReportType)
+ReportType = typing.cast(GeneratePartialMixin, ReportType)
 
 
 @gql_weave_type("runQueue")
@@ -171,7 +175,7 @@ class RunQueue(PartialObject):
 
 
 RunQueueType = RunQueue.WeaveType()  # type: ignore
-RunQueueType = typing.cast(AbstractPartialObjectType, RunQueueType)
+RunQueueType = typing.cast(GeneratePartialMixin, RunQueueType)
 
 
 # Simple types (maybe should be put into primitives?)

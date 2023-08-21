@@ -162,7 +162,7 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
             }}
         """,
         gql_op_output_type=lambda inputs, input_type: types.optional(
-            wdt.ArtifactCollectionMembershipType.with_keys(
+            wdt.ArtifactCollectionMembershipType.with_attrs(
                 typing.cast(typing.Any, input_type)
                 .keys["artifactMemberships_first_1"]["edges"]
                 .object_type["node"]

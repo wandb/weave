@@ -216,7 +216,7 @@ def _project_artifacts_gql_op_output_type(
     inputs: input_provider.InputProvider, input_type: types.Type
 ) -> types.Type:
     return types.List(
-        wdt.ArtifactCollectionType.with_keys(
+        wdt.ArtifactCollectionType.with_attrs(
             typing.cast(typing.Any, input_type)
             .keys["artifactTypes_100"]["edges"]
             .object_type["node"]["artifactCollections_100"]["edges"]

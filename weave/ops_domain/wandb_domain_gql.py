@@ -49,10 +49,8 @@ def register_vectorized_gql_prop_op(
     original_scalar_input_type = op_args.initial_arg_types[first_arg_name]
 
     # require that the desired key be present on the object type
-    assert isinstance(
-        original_scalar_input_type, gql_with_keys.AbstractPartialObjectType
-    )
-    scalar_input_type = original_scalar_input_type.with_keys(
+    assert isinstance(original_scalar_input_type, gql_with_keys.GeneratePartialMixin)
+    scalar_input_type = original_scalar_input_type.with_attrs(
         {prop_name: scalar_output_type}
     )
 
@@ -187,12 +185,12 @@ def gql_direct_edge_op(
         ret_type = output_type
         if isinstance(self_type, gql_with_keys.PartialObjectType):
             keys = self_type.keys
-            assert isinstance(output_type, gql_with_keys.AbstractPartialObjectType)
+            assert isinstance(output_type, gql_with_keys.GeneratePartialMixin)
             new_keys = keys[key]
             if is_many:
                 new_keys = typing.cast(weave_types.List, new_keys).object_type
             new_keys = typing.cast(weave_types.TypedDict, new_keys)
-            ret_type = output_type.with_keys(new_keys.property_types)
+            ret_type = output_type.with_attrs(new_keys.property_types)
 
         if is_many:
             ret_type = weave_types.List(ret_type)
@@ -307,7 +305,7 @@ def gql_connection_op(
 
         if isinstance(self_type, gql_with_keys.PartialObjectType):
             keys = self_type.keys
-            assert isinstance(output_type, gql_with_keys.AbstractPartialObjectType)
+            assert isinstance(output_type, gql_with_keys.GeneratePartialMixin)
             new_keys = typing.cast(
                 weave_types.TypedDict,
                 typing.cast(
@@ -320,7 +318,7 @@ def gql_connection_op(
                     ).object_type,
                 ).property_types["node"],
             )
-            return weave_types.List(output_type.with_keys(new_keys.property_types))
+            return weave_types.List(output_type.with_attrs(new_keys.property_types))
 
         return weave_types.List(output_type)
 

@@ -15,7 +15,7 @@ from .input_provider import InputProvider
 T = typing.TypeVar("T", bound="PartialObject")
 
 
-class AbstractPartialObjectType(types.Type):
+class GeneratePartialMixin(types.Type):
     """Base class for types like projectType(), runType(), etc. Instances of this class do not have keys,
     but they have a method called with_keys() that allows them to generate instances of the type with
     keys. E.g.,
@@ -30,13 +30,13 @@ class AbstractPartialObjectType(types.Type):
     """
 
     @classmethod
-    def with_keys(cls, keys: dict[str, types.Type]) -> "PartialObjectType":
+    def with_attrs(cls, attrs: dict[str, types.Type]) -> "PartialObjectType":
         """Creates a new Weave Type that is assignable to the original Weave Type, but
         also has the specified keys. This is used during the compile pass for creating a Weave Type
         to represent the exact output type of a specific GQL query, and for communicating the
         data shape to arrow."""
 
-        return PartialObjectType(cls, keys)
+        return PartialObjectType(cls, attrs)
 
     @classmethod
     def type_of_instance(cls, obj: "PartialObject") -> types.Type:
@@ -44,7 +44,7 @@ class AbstractPartialObjectType(types.Type):
             return cls()
 
         gql_type = typing.cast(types.TypedDict, types.TypeRegistry.type_of(obj.gql))
-        return cls.with_keys(gql_type.property_types)
+        return cls.with_attrs(gql_type.property_types)
 
 
 def gql_weave_type(
@@ -66,7 +66,7 @@ def gql_weave_type(
             name,
             True,
             None,
-            [AbstractPartialObjectType],
+            [GeneratePartialMixin],
         )
         return decorator(_instance_class)
 
@@ -235,7 +235,7 @@ def _alias(
 def make_root_op_gql_op_output_type(
     prop_name: str,
     param_str_fn: ParamStrFn,
-    output_type: AbstractPartialObjectType,
+    output_type: GeneratePartialMixin,
     use_alias: bool = False,
 ) -> gql_op_plugin.GQLOutputTypeFn:
     """Creates a GQLOutputTypeFn for a root op that returns a list of objects with keys."""
@@ -261,7 +261,7 @@ def make_root_op_gql_op_output_type(
             if isinstance(key_type, types.TypedDict):
                 key_type = key_type.property_types[key]
 
-        object_type = output_type.with_keys(
+        object_type = output_type.with_attrs(
             typing.cast(types.TypedDict, key_type).property_types
         )
         return types.List(object_type)
