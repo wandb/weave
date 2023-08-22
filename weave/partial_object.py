@@ -13,7 +13,7 @@ from .input_provider import InputProvider
 T = typing.TypeVar("T", bound="PartialObject")
 
 
-class PartialObjectTypeGeneratorType(types.ObjectType):
+class PartialObjectTypeGeneratorType(types._PlainStringNamedType):
     """Base class for types like projectType(), runType(), etc. Instances of this class do not have keys,
     but they have a method called with_keys() that allows them to generate instances of the type with
     keys. E.g.,
