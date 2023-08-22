@@ -620,9 +620,9 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
       ? filterExpressionToVisualClauses(value.val)
       : null;
 
-  const [tempVal, setTempVal] = React.useState<VisualClause[] | null>(
-    visualClauses
-  );
+  const [tempVisualClauses, setTempVisualClauses] = React.useState<
+    VisualClause[] | null
+  >(visualClauses);
 
   if (!isFunctionLiteral(value)) {
     throw new Error('Expected function literal');
@@ -630,18 +630,18 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
 
   const inputTypes = value.type.inputTypes;
 
-  const resetTempVal = useMemo(
+  const resetTempVisualClauses = useMemo(
     () => () => {
       if (value.nodeType === 'const') {
-        setTempVal(filterExpressionToVisualClauses(value.val));
+        setTempVisualClauses(filterExpressionToVisualClauses(value.val));
       }
     },
-    [setTempVal, value.val, value.nodeType]
+    [setTempVisualClauses, value.val, value.nodeType]
   );
 
   React.useEffect(() => {
-    resetTempVal();
-  }, [value.val, resetTempVal]);
+    resetTempVisualClauses();
+  }, [value.val, resetTempVisualClauses]);
 
   const updateVal = useCallback(
     (newVal: any) => {
@@ -731,8 +731,11 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               }
               on="click"
               onClose={() => {
-                if (tempVal !== null && !_.isEqual(tempVal, visualClauses)) {
-                  updateValFromVisualClauses(tempVal);
+                if (
+                  tempVisualClauses !== null &&
+                  !_.isEqual(tempVisualClauses, visualClauses)
+                ) {
+                  updateValFromVisualClauses(tempVisualClauses);
                 }
                 setEditingFilterIndex(null);
               }}
@@ -740,21 +743,25 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               content={
                 <SingleFilterVisualEditor
                   listNode={props.config!.node}
-                  clause={tempVal?.[i] ?? clause}
+                  clause={tempVisualClauses?.[i] ?? clause}
                   onCancel={() => {
-                    resetTempVal();
+                    resetTempVisualClauses();
                     setEditingFilterIndex(null);
                   }}
                   onOK={() => {
                     setEditingFilterIndex(null);
-                    if (tempVal?.[i]) {
+                    if (tempVisualClauses?.[i]) {
                       updateValFromVisualClauses(
-                        setVisualClauseIndex(visualClauses, i, tempVal?.[i])
+                        setVisualClauseIndex(
+                          visualClauses,
+                          i,
+                          tempVisualClauses?.[i]
+                        )
                       );
                     }
                   }}
                   setTempClause={newClause =>
-                    setTempVal(
+                    setTempVisualClauses(
                       setVisualClauseIndex(visualClauses, i, newClause)
                     )
                   }
@@ -771,8 +778,11 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             }}
             on="click"
             onClose={() => {
-              if (tempVal !== null && !_.isEqual(tempVal, visualClauses)) {
-                updateValFromVisualClauses(tempVal);
+              if (
+                tempVisualClauses !== null &&
+                !_.isEqual(tempVisualClauses, visualClauses)
+              ) {
+                updateValFromVisualClauses(tempVisualClauses);
               }
               setEditingFilterIndex(null);
             }}
@@ -793,22 +803,27 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                 listNode={props.config!.node}
                 clause={null}
                 onCancel={() => {
-                  resetTempVal();
+                  resetTempVisualClauses();
                   setEditingFilterIndex(null);
                 }}
                 onOK={() => {
                   setEditingFilterIndex(null);
-                  if (tempVal && tempVal.length > visualClauses.length) {
+                  if (
+                    tempVisualClauses &&
+                    tempVisualClauses.length > visualClauses.length
+                  ) {
                     updateValFromVisualClauses(
                       addVisualClause(
                         visualClauses,
-                        tempVal?.[tempVal.length - 1]
+                        tempVisualClauses?.[tempVisualClauses.length - 1]
                       )
                     );
                   }
                 }}
                 setTempClause={newClause =>
-                  setTempVal(addVisualClause(visualClauses, newClause))
+                  setTempVisualClauses(
+                    addVisualClause(visualClauses, newClause)
+                  )
                 }
               />
             }
