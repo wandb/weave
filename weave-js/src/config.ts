@@ -1,7 +1,5 @@
-
 import Analytics from '@segment/analytics.js-core/build/analytics';
 import SegmentIntegration from '@segment/analytics.js-integration-segmentio';
-
 
 declare global {
   interface Window {
@@ -9,6 +7,7 @@ declare global {
       PREFIX: string;
       ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
+      ONPREM: boolean;
     };
   }
 }
@@ -18,6 +17,7 @@ if (!window.WEAVE_CONFIG) {
   window.WEAVE_CONFIG = {
     PREFIX: '',
     ANALYTICS_DISABLED: false,
+    ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
   };
 }
@@ -25,6 +25,7 @@ if (!window.WEAVE_CONFIG) {
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
   ANALYTICS_DISABLED: boolean;
+  ONPREM: boolean;
   PREFIX: string;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
@@ -65,6 +66,7 @@ const DEFAULT_CONFIG: Config = {
   backendWeaveViewerUrl,
   PREFIX: window.WEAVE_CONFIG.PREFIX,
   ENABLE_DEBUG_FEATURES: false,
+  ONPREM: window.WEAVE_CONFIG.ONPREM,
   ANALYTICS_DISABLED: window.WEAVE_CONFIG.ANALYTICS_DISABLED,
 } as const;
 
@@ -79,8 +81,8 @@ export default function getConfig() {
 }
 
 // If on-prem, send events to Gorilla proxy
-const IS_ONPREM = (window as any).CONFIG?.ONPREM ?? false;
-const ANALYTICS_DISABLED = (window as any).CONFIG?.ANALYTICS_DISABLED ?? false;
+const IS_ONPREM = config.ONPREM ?? false;
+const ANALYTICS_DISABLED = config.ANALYTICS_DISABLED ?? false;
 if (IS_ONPREM && !ANALYTICS_DISABLED) {
   const host = document.location.origin;
   if (host.startsWith('https://')) {
