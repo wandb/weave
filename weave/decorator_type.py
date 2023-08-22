@@ -50,7 +50,7 @@ def type(
             bases = tuple(__mixins) + bases
 
         TargetType = _py_type(f"{target_name}Type", bases, {})
-        TargetType.name = target_name
+        TargetType._name = target_name
         TargetType.instance_classes = target
         TargetType.instance_class = target
 

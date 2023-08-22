@@ -193,19 +193,22 @@ def remove_nan_and_inf(obj):
 def remove_gql_haskeys_from_types(data):
     """Convert weave-internal types like
 
-    {"type":"GQLHasKeys","keys":{"name":"string"},"keyless_weave_type_class":"project"}
+    {"type":"PartialObject","keys":{"name":"string"},"keyless_weave_type_class":"project"}
 
     to types weave0 can understand. in this case:
 
     "project"
 
     """
+
+    # TODO: check this
+
     if isinstance(data, list):
         return [remove_gql_haskeys_from_types(d) for d in data]
     elif isinstance(data, dict):
         for key in data:
             if key == "type":
-                if data[key] == "GQLHasKeys":
+                if data[key] == "PartialObject":
                     return data["keyless_weave_type_class"]
     return data
 

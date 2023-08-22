@@ -2,7 +2,7 @@ import typing
 
 from . import mappers
 from . import weave_types as types
-from .gql_with_keys import PartialObjectType
+from .partial_object import PartialObjectType
 
 
 class TypedDictMapper(mappers.Mapper):

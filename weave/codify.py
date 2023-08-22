@@ -91,9 +91,9 @@ def _try_otc_using_codifiable_mixin(obj: typing.Any) -> typing.Optional[str]:
 #     obj_type = weave_types.TypeRegistry.type_of(obj)
 #     if obj_type is not None:
 #         # check instantiation by name
-#         assert weave_types.type_name_to_type(obj_type.name)() == obj_type
+#         assert weave_types.type_name_to_type(obj_type._name)() == obj_type
 #         d = obj_type.instance_to_dict(obj)
-#         obj_type_name = obj_type.name
+#         obj_type_name = obj_type._name
 #         return f"""weave.codify.load_type({obj_type_name}, {d})"""
 #     return None
 
@@ -126,7 +126,7 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
         class_type, weave_types.Type
     ):
         qualified_classpath = "weave.weave_types"
-        qualified_classname = f"type_name_to_type('{class_type.name}')"
+        qualified_classname = f"type_name_to_type('{class_type._name}')"
     else:
         qualified_classpath = _module_name_corrections(class_type.__module__)
         qualified_classname = class_type.__name__
@@ -163,6 +163,7 @@ def _otc_using_storage_fallback(obj: typing.Any) -> str:
 
 
 # Helpers
+
 
 # Hack:
 def _module_name_corrections(qualified_name: str) -> str:

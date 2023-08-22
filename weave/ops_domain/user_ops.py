@@ -58,7 +58,8 @@ gql_connection_op(
     lambda inputs: "first: 100",
 )
 
+
 # Section 6/6: Non Standard Business Logic Ops
 @op(name="user-link")
-def link(project: wdt.User) -> wdt.Link:
-    return wdt.Link(project.gql["name"], project.gql["name"])
+def link(user: wdt.User) -> wdt.Link:
+    return wdt.Link(user["name"], user["name"])

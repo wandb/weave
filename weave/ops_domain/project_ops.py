@@ -10,7 +10,7 @@ from .wandb_domain_gql import (
     gql_connection_op,
     gql_root_op,
 )
-from .. import gql_with_keys
+from .. import partial_object
 from .. import weave_types as types
 from .. import errors
 from .. import input_provider
@@ -41,7 +41,7 @@ project = gql_root_op(
 )
 def root_all_projects_gql_resolver(gql_result):
     return [
-        wdt.Project.from_gql(project["node"])
+        wdt.Project.from_keys(project["node"])
         for project in gql_result["instance"]["projects_500"]["edges"]
     ]
 
@@ -65,7 +65,7 @@ def root_all_projects_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_projects_gql_resolver,
-        gql_op_output_type=gql_with_keys.make_root_op_gql_op_output_type(
+        gql_op_output_type=partial_object.make_root_op_gql_op_output_type(
             "projects_500", lambda inputs: "", wdt.ProjectType
         ),
     ),
@@ -207,9 +207,7 @@ gql_connection_op(
     ),
 )
 def link(project: wdt.Project) -> wdt.Link:
-    return wdt.Link(
-        project.gql["name"], f"{project.gql['entity']['name']}/{project.gql['name']}"
-    )
+    return wdt.Link(project["name"], f"{project['entity']['name']}/{project['name']}")
 
 
 def _project_artifacts_gql_op_output_type(
@@ -254,7 +252,7 @@ def artifacts(
     project: wdt.Project,
 ):
     return [
-        wdt.ArtifactCollection.from_gql(edge["node"])
-        for typeEdge in project.gql["artifactTypes_100"]["edges"]
+        wdt.ArtifactCollection.from_keys(edge["node"])
+        for typeEdge in project["artifactTypes_100"]["edges"]
         for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
     ]

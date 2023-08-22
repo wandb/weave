@@ -84,17 +84,16 @@ def _get_history2(run: wdt.Run, columns=None):
     _history_type = types.List(_object_type)
 
     run_path = wb_util.RunPath(
-        run.gql["project"]["entity"]["name"],
-        run.gql["project"]["name"],
-        run.gql["name"],
+        run["project"]["entity"]["name"],
+        run["project"]["name"],
+        run["name"],
     )
 
     # turn the liveset into an arrow table. the liveset is a list of json strings
     # with cached python object representations which we read from the cache
     # via use_json()
     live_data = [
-        gql_json_cache.use_json(row)
-        for row in run.gql["sampledParquetHistory"]["liveData"]
+        gql_json_cache.use_json(row) for row in run["sampledParquetHistory"]["liveData"]
     ]
     for row in live_data:
         for colname in columns:

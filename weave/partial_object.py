@@ -2,20 +2,18 @@ import json
 import typing
 import hashlib
 
-from dataclasses import dataclass, field
 from . import weave_types as types
 from . import artifact_fs
 from . import gql_op_plugin
 
 
-from .decorator_type import type as weave_type
 from .input_provider import InputProvider
 
 
 T = typing.TypeVar("T", bound="PartialObject")
 
 
-class GeneratePartialMixin(types.Type):
+class PartialObjectTypeGeneratorType(types.ObjectType):
     """Base class for types like projectType(), runType(), etc. Instances of this class do not have keys,
     but they have a method called with_keys() that allows them to generate instances of the type with
     keys. E.g.,
@@ -40,49 +38,51 @@ class GeneratePartialMixin(types.Type):
 
     @classmethod
     def type_of_instance(cls, obj: "PartialObject") -> types.Type:
-        if obj.gql == {} or obj.gql is None:
+        if obj.keys == []:
             return cls()
 
-        gql_type = typing.cast(types.TypedDict, types.TypeRegistry.type_of(obj.gql))
-        return cls.with_attrs(gql_type.property_types)
-
-
-def gql_weave_type(
-    name: str,
-) -> typing.Callable[[typing.Type[T]], typing.Type[T]]:
-    """Decorator that emits a Weave Type for the decorated GQL instance type. Classes decorated
-    with this decorator also emit a keyless weavetype. E.g.,
-
-    @gql_weave_type("project")
-    class Project(GQLTypeMixin):
-        ...
-
-    will emit a Weave Type for projectType(). Instances of projectType() have a method called
-    with_keys() that allows them to generate instances of projectTypeWithKeys({...}).
-    """
-
-    def _gql_weave_type(_instance_class: typing.Type[T]) -> typing.Type[T]:
-        decorator = weave_type(
-            name,
-            True,
-            None,
-            [GeneratePartialMixin],
+        keys_type = typing.cast(
+            types.TypedDict, types.TypeRegistry.type_of(obj.to_dict())
         )
-        return decorator(_instance_class)
-
-    return _gql_weave_type
+        return cls.with_attrs(keys_type.property_types)
 
 
-@dataclass
 class PartialObject:
-    gql: dict = field(default_factory=dict)
+    keys: list[str]
+
+    def __init__(self, keys: list[str]):
+        self.keys = keys
 
     @classmethod
-    def from_gql(cls: typing.Type[T], gql_dict: dict) -> T:
-        return cls(gql=gql_dict)
+    def from_keys(cls: typing.Type[T], key_dict: dict) -> T:
+        base = cls(list(key_dict.keys()))
+        for key in key_dict:
+            setattr(base, key, key_dict[key])
+        return base
+
+    def to_dict(self) -> dict[str, typing.Any]:
+        return {key: getattr(self, key) for key in self.keys}
+
+    def __getitem__(self, key: str) -> typing.Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: typing.Any) -> None:
+        return setattr(self, key, value)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({json.dumps(self.to_dict())})"
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def __eq__(self, other: typing.Any) -> bool:
+        return isinstance(other, PartialObject) and self.to_dict() == other.to_dict()
+
+    def get(self, key: str, default: typing.Any = None) -> typing.Any:
+        return getattr(self, key, default)
 
 
-class PartialObjectType(types.Type):
+class PartialObjectType(types.ObjectType):
     """Base class for types like projectTypeWithKeys({...}), runTypeWithKeys({...}), etc.
 
     Assignability rules:
@@ -94,17 +94,16 @@ class PartialObjectType(types.Type):
 
     # e.g., Project.WeaveType. Note: this property is the class itself, not an instance of the class.
     keyless_weave_type_class: typing.Type[types.Type]
-    keys: dict[str, types.Type]  # e.g., {"name": String()}
 
     def __init__(
         self,
         keyless_weave_type_class: typing.Type[types.Type],
-        keys: typing.Union[dict[str, types.Type], types.TypedDict],
+        attrs: typing.Union[dict[str, types.Type], types.TypedDict],
     ):
         self.keyless_weave_type_class = keyless_weave_type_class
-        if isinstance(keys, types.TypedDict):
-            keys = keys.property_types
-        self.keys = keys
+        if isinstance(attrs, types.TypedDict):
+            attrs = attrs.property_types
+        super().__init__(**attrs)
 
     def _assign_type_inner(self, other_type: types.Type) -> bool:
         # TODO: think more about how this will work with tags - might need to be modified
@@ -128,9 +127,21 @@ class PartialObjectType(types.Type):
 
         return False
 
+    def property_types(self) -> dict[str, types.Type]:
+        # we can't use the default implementation of property_types() because it
+        # assumes that the types fields are specified as dataclass fields, which
+        # doesn't work for anonymously generated object types
+
+        return self.attr_types  # type: ignore
+
+    @property
+    def keys(self) -> dict[str, types.Type]:
+        # this attribute is inherited from ObjectType
+        return self.attr_types  # type: ignore
+
     def _str_repr(self) -> str:
         keys_repr = dict(sorted([(k, v.__repr__()) for k, v in self.keys.items()]))
-        return f"{self.keyless_weave_type_class.__name__}WithKeys({keys_repr})"
+        return f"{self.keyless_weave_type_class.__name__}({keys_repr})"
 
     def __repr__(self) -> str:
         return self._str_repr()
@@ -195,13 +206,13 @@ class PartialObjectType(types.Type):
         return typing.cast(PartialObject, mapped_result)
 
     def instance_to_dict(self, obj: PartialObject) -> dict[str, typing.Any]:
-        return obj.gql
+        return obj.to_dict()
 
     def instance_from_dict(self, d: dict[str, typing.Any]) -> PartialObject:
         instance_class = typing.cast(
             typing.Type[PartialObject], self.keyless_weave_type_class.instance_class
         )
-        return instance_class.from_gql(d)
+        return instance_class.from_keys(d)
 
 
 ParamStrFn = typing.Callable[[InputProvider], str]
@@ -235,7 +246,7 @@ def _alias(
 def make_root_op_gql_op_output_type(
     prop_name: str,
     param_str_fn: ParamStrFn,
-    output_type: GeneratePartialMixin,
+    output_type: PartialObjectTypeGeneratorType,
     use_alias: bool = False,
 ) -> gql_op_plugin.GQLOutputTypeFn:
     """Creates a GQLOutputTypeFn for a root op that returns a list of objects with keys."""

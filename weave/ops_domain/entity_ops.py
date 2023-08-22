@@ -28,7 +28,7 @@ entity = gql_root_op(
 # Section 3/6: Attribute Getters
 @op(name="entity-name")
 def entity_name(entity: wdt.Entity) -> str:
-    return entity.gql["name"]
+    return entity["name"]
 
 
 gql_prop_op(
@@ -69,4 +69,4 @@ gql_connection_op(
 # Section 6/6: Non Standard Business Logic Ops
 @op(name="entity-link")
 def entity_link(entity: wdt.Entity) -> wdt.Link:
-    return wdt.Link(entity.gql["name"], f"/{entity.gql['name']}")
+    return wdt.Link(entity["name"], f"/{entity['name']}")

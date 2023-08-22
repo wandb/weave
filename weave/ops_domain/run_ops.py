@@ -51,7 +51,7 @@ from .wandb_domain_gql import (
     gql_connection_op,
 )
 
-from ..gql_with_keys import _make_alias
+from ..partial_object import _make_alias
 
 from . import wb_util
 from .. import engine_trace
@@ -166,11 +166,11 @@ def refine_config_type(run: wdt.Run) -> types.Type:
     config_field_s = None
     try:
         # If config was explicitly requested, this will be the case.
-        config_field_s = run.gql["config"]
+        config_field_s = run["config"]
     except KeyError:
         # Otherwise we'll be refining implicitly in compile, but we only need
         # to provide the summary requested by the rest of the graph.
-        config_field_s = run.gql["configSubset"]
+        config_field_s = run["configSubset"]
     if not config_field_s:
         config_field_s = "{}"
 
@@ -214,11 +214,11 @@ def _run_config_plugin(inputs: InputAndStitchProvider, inner: str):
 )
 def config(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
-        config_to_values(json.loads(run.gql["configSubset"] or "{}")),
+        config_to_values(json.loads(run["configSubset"] or "{}")),
         wb_util.RunPath(
-            run.gql["project"]["entity"]["name"],
-            run.gql["project"]["name"],
-            run.gql["name"],
+            run["project"]["entity"]["name"],
+            run["project"]["name"],
+            run["name"],
         ),
     )
 
@@ -234,11 +234,11 @@ def refine_summary_type(run: wdt.Run) -> types.Type:
     summary_field_s = None
     try:
         # If summary was explicitly requested, this will be the case.
-        summary_field_s = run.gql["summaryMetrics"]
+        summary_field_s = run["summaryMetrics"]
     except KeyError:
         # Otherwise we'll be refining implicitly in compile, but we only need
         # to provide the summary requested by the rest of the graph.
-        summary_field_s = run.gql["summaryMetricsSubset"]
+        summary_field_s = run["summaryMetricsSubset"]
     if not summary_field_s:
         summary_field_s = "{}"
 
@@ -271,11 +271,11 @@ def _run_summary_plugin(inputs: InputAndStitchProvider, inner: str):
 )
 def summary(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
-        json.loads(run.gql["summaryMetricsSubset"] or "{}"),
+        json.loads(run["summaryMetricsSubset"] or "{}"),
         wb_util.RunPath(
-            run.gql["project"]["entity"]["name"],
-            run.gql["project"]["name"],
-            run.gql["name"],
+            run["project"]["entity"]["name"],
+            run["project"]["name"],
+            run["name"],
         ),
     )
 
@@ -294,7 +294,7 @@ def _history_as_of_plugin(inputs, inner):
 def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
     alias = _make_alias(str(asOfStep), prefix="history")
 
-    data = run.gql[alias]
+    data = run[alias]
     if isinstance(data, list):
         if len(data) > 0:
             data = data[0]
@@ -377,8 +377,8 @@ gql_connection_op(
 )
 def link(run: wdt.Run) -> wdt.Link:
     return wdt.Link(
-        run.gql["displayName"],
-        f'/{run.gql["project"]["entity"]["name"]}/{run.gql["project"]["name"]}/runs/{run.gql["name"]}',
+        run["displayName"],
+        f'/{run["project"]["entity"]["name"]}/{run["project"]["name"]}/runs/{run["name"]}',
     )
 
 
@@ -405,4 +405,4 @@ def run_logged_artifact_version(
     run: wdt.Run, artifactVersionName: str
 ) -> wdt.ArtifactVersion:
     alias = _make_alias(artifactVersionName, prefix="artifact")
-    return wdt.ArtifactVersion.from_gql(run.gql["project"][alias])
+    return wdt.ArtifactVersion.from_keys(run["project"][alias])

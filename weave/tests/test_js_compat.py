@@ -10,7 +10,7 @@
 from .. import weave_types as types
 from .. import weavejs_fixes
 from ..ops_domain import wb_domain_types
-from .. import gql_with_keys
+from .. import partial_object
 
 
 def test_const_serialization():
@@ -26,6 +26,6 @@ def test_const_serialization():
 def test_gql_haskeys_stripping():
     instance = wb_domain_types.Run({"a": types.String()})
     type = types.TypeRegistry.type_of(instance)
-    assert isinstance(type, gql_with_keys.PartialObjectType)
+    assert isinstance(type, partial_object.PartialObjectType)
     serialized = type.to_dict()
     assert weavejs_fixes.remove_gql_haskeys_from_types(serialized) == "run"

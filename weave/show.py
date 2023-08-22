@@ -26,7 +26,7 @@ from . import ops
 def make_varname_for_type(t: types.Type):
     if isinstance(t, types.List) and isinstance(t.object_type, types.TypedDict):
         return "table"
-    return t.name
+    return t._name
 
 
 def make_container(

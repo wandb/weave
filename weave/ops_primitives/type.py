@@ -8,7 +8,7 @@ from .. import weave_types as types
     name="type-name",
 )
 def type_name(self: types.Type) -> str:
-    return self.name
+    return self._name
 
 
 def _cast_output_type(input_type):

@@ -3,7 +3,7 @@ import wandb
 import weave
 from weave.language_features.tagging import make_tag_getter_op
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.gql_with_keys import _make_alias
+from weave.partial_object import _make_alias
 from weave.ops_domain import wbmedia
 import numpy as np
 from weave.ops_arrow.list_ops import filter

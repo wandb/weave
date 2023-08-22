@@ -26,7 +26,7 @@ from . import engine_trace
 from . import errors
 from . import propagate_gql_keys
 from . import input_provider
-from . import gql_with_keys
+from . import partial_object
 from . import gql_to_weave
 from . import gql_op_plugin
 
@@ -257,7 +257,7 @@ def _make_auto_op_map_fn(when_type: typing.Callable[[types.Type], bool], call_op
                 or (
                     isinstance(op_def.concrete_output_type, types.Type)
                     and op_def.concrete_output_type._base_type is not None
-                    and op_def.concrete_output_type._base_type.name == "Panel"
+                    and op_def.concrete_output_type._base_type._name == "Panel"
                 )
             ):
                 # These are supposed to be a passthrough op, we don't want to convert
@@ -505,7 +505,7 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
     return opdef.is_gql_root_resolver() or (
         plugin is not None
         and plugin.gql_op_output_type is not None
-        and isinstance(unwrapped_first_arg_type, gql_with_keys.PartialObjectType)
+        and isinstance(unwrapped_first_arg_type, partial_object.PartialObjectType)
     )
 
 
@@ -545,7 +545,7 @@ def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node
             )
             output_type = from_op.inputs["output_type"].val
 
-            if isinstance(output_type, gql_with_keys.GeneratePartialMixin):
+            if isinstance(output_type, partial_object.PartialObjectTypeGeneratorType):
                 key_type = typing.cast(
                     types.TypedDict,
                     gql_to_weave.get_query_weave_type(

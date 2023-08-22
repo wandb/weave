@@ -10,7 +10,7 @@ from .. import engine_trace
 from .. import errors
 from .. import environment
 from .. import mappers_gql
-from .. import gql_with_keys
+from .. import partial_object
 
 
 def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
@@ -71,19 +71,19 @@ def querytoobj(result_dict, result_key, output_type, gql_query_fragment):
     if isinstance(output_type, tagged_value_type.TaggedValueType):
         output_type = output_type.value
 
-    if not isinstance(output_type, gql_with_keys.PartialObjectType):
+    if not isinstance(output_type, partial_object.PartialObjectType):
         raise ValueError(
-            f"Invalid output type for gqlroot-querytoobj, must be a GQLHasKeysType, got {output_type}"
+            f"Invalid output type for gqlroot-querytoobj, must be a PartialObjectType, got {output_type}"
         )
 
     instance_class = output_type.keyless_weave_type_class.instance_class
 
     if instance_class is None or not issubclass(instance_class, wdt.PartialObject):
         raise ValueError(
-            f"Invalid output type for gqlroot-querytoobj, must be a GQLTypeMixin, got {output_type}"
+            f"Invalid output type for gqlroot-querytoobj, must be a PartialObjectType, got {output_type}"
         )
     res_gql = result_dict[result_key]
     if res_gql == None:
         return None
-    res = instance_class.from_gql(res_gql)
+    res = instance_class.from_keys(res_gql)
     return res

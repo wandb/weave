@@ -3,8 +3,6 @@ from .. import storage
 from ..ops_domain import wb_domain_types as wdt
 from .. import weave_types as types
 
-from ..language_features.tagging import tagged_value_type
-
 
 def test_with_keys_assignability():
     org_type = wdt.OrgType
@@ -34,7 +32,7 @@ def test_with_keys_not_assignability():
 
 
 def test_type_of_run_with_keys():
-    run = wdt.Run.from_gql({"a": "1"})
+    run = wdt.Run.from_keys({"a": "1"})
     assert types.TypeRegistry.type_of(run) == wdt.RunType.with_attrs(
         {"a": types.String()}
     )
@@ -46,13 +44,13 @@ def test_serialize_deserialize_run_type():
 
 
 def test_storage_on_type_with_keys():
-    run = wdt.Run.from_gql({"a": "1"})
+    run = wdt.Run.from_keys({"a": "1"})
     obj_id = storage.save(run, "my-test-run")
     loaded = storage.get(obj_id)
     assert loaded == run
 
 
 def test_type_of_run_node_with_keys():
-    run = wdt.Run.from_gql({"a": "1"})
+    run = wdt.Run.from_keys({"a": "1"})
     node = weave.save(run)
     assert node.type == wdt.RunType.with_attrs({"a": types.String()})

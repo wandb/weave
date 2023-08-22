@@ -45,7 +45,7 @@ def test_basic(server_type):
 def test_type_returning_op(server_type, cereal_csv):
     with client(server_type) as wc:
         csv_type = weave.use(ops.local_path_refine_type(cereal_csv), client=wc)
-        assert csv_type.name == "local_file"
+        assert csv_type._name == "local_file"
 
 
 @pytest.mark.timeout(10)

@@ -97,10 +97,10 @@ def artifact_membership_link(
     artifactMembership: wdt.ArtifactCollectionMembership,
 ) -> wdt.Link:
     return wdt.Link(
-        name=f"{artifactMembership.gql['artifactCollection']['name']}:v{artifactMembership.gql['versionIndex']}",
-        url=f"/{artifactMembership.gql['artifactCollection']['defaultArtifactType']['project']['entity']['name']}/"
-        f"{artifactMembership.gql['artifactCollection']['defaultArtifactType']['project']['name']}/"
-        f"artifacts/{urllib.parse.quote(artifactMembership.gql['artifactCollection']['defaultArtifactType']['name'])}/"
-        f"{urllib.parse.quote(artifactMembership.gql['artifactCollection']['name'])}"
-        f"/v{artifactMembership.gql['versionIndex']}",
+        name=f"{artifactMembership['artifactCollection']['name']}:v{artifactMembership['versionIndex']}",
+        url=f"/{artifactMembership['artifactCollection']['defaultArtifactType']['project']['entity']['name']}/"
+        f"{artifactMembership['artifactCollection']['defaultArtifactType']['project']['name']}/"
+        f"artifacts/{urllib.parse.quote(artifactMembership['artifactCollection']['defaultArtifactType']['name'])}/"
+        f"{urllib.parse.quote(artifactMembership['artifactCollection']['name'])}"
+        f"/v{artifactMembership['versionIndex']}",
     )

@@ -124,7 +124,7 @@ def get_full_columns(columns: typing.Optional[list[str]]):
 def get_full_columns_prefixed(run: wdt.Run, columns: typing.Optional[list[str]]):
     all_columns = get_full_columns(columns)
     all_paths = list(
-        gql_json_cache.use_json(run.gql.get("historyKeys", "{}")).get("keys", {}).keys()
+        gql_json_cache.use_json(run.get("historyKeys", "{}")).get("keys", {}).keys()
     )
     return _filter_known_paths_to_requested_paths(all_paths, all_columns)
 
@@ -283,10 +283,10 @@ def refine_history_type(
     run: wdt.Run,
     columns: typing.Optional[list[str]] = None,
 ) -> types.TypedDict:
-    if "historyKeys" not in run.gql:
+    if "historyKeys" not in run.keys:
         raise ValueError("historyKeys not in run gql")
 
-    historyKeys = gql_json_cache.use_json(run.gql["historyKeys"])["keys"]
+    historyKeys = gql_json_cache.use_json(run["historyKeys"])["keys"]
 
     return _refine_history_type_inner(historyKeys, columns)
 
@@ -326,9 +326,9 @@ def _refine_history_type_inner(
 
 
 def history_keys(run: wdt.Run) -> list[str]:
-    if "historyKeys" not in run.gql:
+    if "historyKeys" not in run.keys:
         raise ValueError("historyKeys not in run gql")
-    if "sampledParquetHistory" not in run.gql:
+    if "sampledParquetHistory" not in run.keys:
         raise ValueError("sampledParquetHistory not in run gql")
     object_type = refine_history_type(run)
 
@@ -395,7 +395,7 @@ def read_history_parquet(run: wdt.Run, columns=None):
     io = io_service.get_sync_client()
     object_type = refine_history_type(run, columns=columns)
     tables = []
-    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+    for url in run["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
@@ -415,7 +415,7 @@ def mock_history_rows(
 
     step_type = types.TypedDict({"_step": types.Int()})
     steps: typing.Union[ArrowWeaveList, list] = []
-    history_keys = gql_json_cache.use_json(run.gql["historyKeys"])
+    history_keys = gql_json_cache.use_json(run["historyKeys"])
 
     last_step = history_keys["lastStep"]
     keys = history_keys["keys"]

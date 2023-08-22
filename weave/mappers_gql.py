@@ -15,7 +15,7 @@ from .mappers_weave import UnionMapper
 
 from . import errors
 from . import weave_types as types
-from .gql_with_keys import PartialObjectType
+from .partial_object import PartialObjectType
 
 from . import gql_json_cache
 

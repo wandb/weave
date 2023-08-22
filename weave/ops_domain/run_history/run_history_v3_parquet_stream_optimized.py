@@ -136,9 +136,9 @@ def _get_history3(run: wdt.Run, columns=None):
     ]
 
     run_path = wb_util.RunPath(
-        run.gql["project"]["entity"]["name"],
-        run.gql["project"]["name"],
-        run.gql["name"],
+        run["project"]["entity"]["name"],
+        run["project"]["name"],
+        run["name"],
     )
     (
         live_columns,
@@ -520,7 +520,7 @@ def _drop_types_from_encoded_types(awl: ArrowWeaveList) -> ArrowWeaveList:
 
 
 def _get_live_data_from_run(run: wdt.Run, columns=None):
-    raw_live_data = run.gql["sampledParquetHistory"]["liveData"]
+    raw_live_data = run["sampledParquetHistory"]["liveData"]
     if columns is None:
         return raw_live_data
     column_set = set(columns)
@@ -578,7 +578,7 @@ def _read_raw_history_awl_tables(
 ) -> list[ArrowWeaveList]:
     io = io_service.get_sync_client()
     tables = []
-    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+    for url in run["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)

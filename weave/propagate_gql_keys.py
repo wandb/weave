@@ -2,7 +2,7 @@ from . import op_def
 from . import graph
 from . import weave_types as types
 from . import registry_mem
-from . import gql_with_keys
+from . import partial_object
 from . import input_provider
 from . import gql_op_plugin
 

@@ -168,13 +168,13 @@ class Registry:
             self._op_versions[(new_name, op.version)] = op
 
     # def register_type(self, type: weave_types.Type):
-    #    self._types[type.name] = type
+    #    self._types[type._name] = type
 
     # def get_type(self, name):
     #    # TODO, don't repeat this all the time
     #    types = all_subclasses(weave_types.Type)
     #    for type in types:
-    #        if type.name == name:
+    #        if type._name == name:
     #            return type
     #    raise Exception("type not found")
 

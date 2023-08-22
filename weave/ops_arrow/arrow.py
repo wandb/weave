@@ -10,7 +10,7 @@ import textwrap
 
 py_type = type
 
-from .. import gql_with_keys
+from .. import partial_object
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
@@ -260,7 +260,7 @@ class ArrowWeaveListType(types.Type):
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_artifact):
-    if isinstance(object_type, gql_with_keys.PartialObjectType):
+    if isinstance(object_type, partial_object.PartialObjectType):
         # GQLHasKeys is a leaf type
         return arrow_data
     if _object_type_has_props(object_type):

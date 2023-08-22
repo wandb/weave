@@ -24,7 +24,7 @@ from .. import errors
 )
 def root_all_reports_gql_resolver(gql_result):
     return [
-        wdt.Report.from_gql(report["node"])
+        wdt.Report.from_keys(report["node"])
         for report in gql_result["instance"]["views_500"]["edges"]
         if report["node"]["type"] == "runs"  # yes, this is how we filter to Reports!?
     ]
@@ -122,13 +122,13 @@ def make_name_and_id(id: str, name: typing.Optional[str]) -> str:
     ),
 )
 def link(report: wdt.Report) -> wdt.Link:
-    project = report.gql["project"]
+    project = report["project"]
     entity = project["entity"]
 
     project_name = project["name"]
     entity_name = entity["name"]
-    report_id = report.gql["id"]
-    report_name = report.gql["displayName"]
+    report_id = report["id"]
+    report_name = report["displayName"]
 
     url = f"/{entity_name}/{project_name}/reports/{make_name_and_id(report_id, report_name)}"
     return wdt.Link(report_name, url)

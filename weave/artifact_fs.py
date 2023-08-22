@@ -458,6 +458,6 @@ def update_weave_meta(wb_type: types.Type, artifact: FilesystemArtifact) -> None
     panel_type = types.type_name_to_type("Panel")
     artifact.metadata["_weave_meta"] = {
         "is_weave_obj": True,
-        "type_name": wb_type.name,
+        "type_name": wb_type._name,
         "is_panel": panel_type and panel_type().assign_type(wb_type),
     }

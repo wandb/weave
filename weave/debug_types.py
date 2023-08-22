@@ -74,7 +74,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                         f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
                     )
 
-    elif to_type.name == from_type.name:
+    elif to_type._name == from_type._name:
         type_vars = to_type.type_vars
         for k, to_type_type in type_vars.items():
             from_type_type = getattr(from_type, k)

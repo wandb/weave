@@ -2,7 +2,7 @@ import datetime
 import json
 from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
-from ..gql_with_keys import (
+from ..partial_object import (
     _make_alias,
 )
 

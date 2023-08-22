@@ -3,7 +3,7 @@ import typing
 from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from . import wb_domain_types as wdt
-from ..gql_with_keys import _make_alias
+from ..partial_object import _make_alias
 from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
@@ -23,7 +23,7 @@ from .wandb_domain_gql import (
 # because the attribute is part of the required fragment
 @op(name="artifactType-name")
 def op_artifact_type_name(artifactType: wdt.ArtifactType) -> str:
-    return artifactType.gql["name"]
+    return artifactType["name"]
 
 
 # Section 4/6: Direct Relationship Ops
@@ -76,11 +76,9 @@ def artifact_versions(
     artifactType: wdt.ArtifactType,
 ) -> list[wdt.ArtifactVersion]:
     res = []
-    for artifactCollectionEdge in artifactType.gql[first_100_collections_alias][
-        "edges"
-    ]:
+    for artifactCollectionEdge in artifactType[first_100_collections_alias]["edges"]:
         for artifactEdge in artifactCollectionEdge["node"][first_100_artifacts_alias][
             "edges"
         ]:
-            res.append(wdt.ArtifactVersion.from_gql(artifactEdge["node"]))
+            res.append(wdt.ArtifactVersion.from_keys(artifactEdge["node"]))
     return res

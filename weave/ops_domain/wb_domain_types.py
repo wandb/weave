@@ -1,11 +1,14 @@
 import typing
 from .. import weave_types as types
 from ..decorator_type import type as weave_type
-from ..gql_with_keys import (
-    gql_weave_type,
+from ..partial_object import (
     PartialObject,
-    GeneratePartialMixin,
+    PartialObjectType,
+    PartialObjectTypeGeneratorType,
 )
+
+
+from ..decorator_class import weave_class
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -37,8 +40,38 @@ require changing a few of the ops to fetch such info as well
 """
 
 
-@gql_weave_type("org")
-class Org(PartialObject):
+def gql_type(
+    name: str,
+) -> typing.Callable[[typing.Type["GQLBase"]], typing.Type[PartialObject]]:
+    """Decorator that emits a Weave Type for the decorated PartialObject instance type. Classes decorated
+    with this decorator also emit a keyless weavetype. E.g.,
+
+    @gql_weave_type("project")
+    class Project(GQLTypeMixin):
+        ...
+
+    will emit a Weave Type for projectType(). Instances of projectType() have a method called
+    with_keys() that allows them to generate instances of projectTypeWithKeys({...}).
+    """
+
+    def _gql_type(_instance_class: typing.Type[GQLBase]) -> typing.Type[PartialObject]:
+        TargetType = type(f"{name}Type", (PartialObjectTypeGeneratorType,), {})
+        TargetType._name = name  # type: ignore
+
+        decorator = weave_class(TargetType)
+        FinalInstanceClass = decorator(_instance_class)
+        FinalInstanceClass.WeaveType = TargetType  # type: ignore
+        return FinalInstanceClass
+
+    return _gql_type
+
+
+class GQLBase(PartialObject):
+    REQUIRED_FRAGMENT: str
+
+
+@gql_type("org")
+class Org(GQLBase):
     REQUIRED_FRAGMENT = """
         id
         name
@@ -46,11 +79,11 @@ class Org(PartialObject):
 
 
 OrgType = Org.WeaveType()  # type: ignore
-OrgType = typing.cast(GeneratePartialMixin, OrgType)
+OrgType = typing.cast(PartialObjectType, OrgType)
 
 
-@gql_weave_type("entity")
-class Entity(PartialObject):
+@gql_type("entity")
+class Entity(GQLBase):
     REQUIRED_FRAGMENT = """
         id
         name
@@ -58,11 +91,11 @@ class Entity(PartialObject):
 
 
 EntityType = Entity.WeaveType()  # type: ignore
-EntityType = typing.cast(GeneratePartialMixin, EntityType)
+EntityType = typing.cast(PartialObjectType, EntityType)
 
 
-@gql_weave_type("user")
-class User(PartialObject):
+@gql_type("user")
+class User(GQLBase):
     REQUIRED_FRAGMENT = """
         id
         name
@@ -70,11 +103,11 @@ class User(PartialObject):
 
 
 UserType = User.WeaveType()  # type: ignore
-UserType = typing.cast(GeneratePartialMixin, UserType)
+UserType = typing.cast(PartialObjectType, UserType)
 
 
-@gql_weave_type("project")
-class Project(PartialObject):
+@gql_type("project")
+class Project(GQLBase):
     REQUIRED_FRAGMENT = """
         id
         name
@@ -82,11 +115,11 @@ class Project(PartialObject):
 
 
 ProjectType = Project.WeaveType()  # type: ignore
-ProjectType = typing.cast(GeneratePartialMixin, ProjectType)
+ProjectType = typing.cast(PartialObjectType, ProjectType)
 
 
-@gql_weave_type("run")
-class Run(PartialObject):
+@gql_type("run")
+class Run(GQLBase):
     REQUIRED_FRAGMENT = """
         id
         name
@@ -94,11 +127,11 @@ class Run(PartialObject):
 
 
 RunType = Run.WeaveType()  # type: ignore
-RunType = typing.cast(GeneratePartialMixin, RunType)
+RunType = typing.cast(PartialObjectType, RunType)
 
 
-@gql_weave_type("artifactType")
-class ArtifactType(PartialObject):
+@gql_type("artifactType")
+class ArtifactType(GQLBase):
     REQUIRED_FRAGMENT = """
         id
         name
@@ -106,11 +139,11 @@ class ArtifactType(PartialObject):
 
 
 ArtifactTypeType = ArtifactType.WeaveType()  # type: ignore
-ArtifactTypeType = typing.cast(GeneratePartialMixin, ArtifactTypeType)
+ArtifactTypeType = typing.cast(PartialObjectType, ArtifactTypeType)
 
 
-@gql_weave_type("artifact")  # Name and Class mismatch intention due to weave0
-class ArtifactCollection(PartialObject):
+@gql_type("artifact")  # Name and Class mismatch intention due to weave0
+class ArtifactCollection(GQLBase):
     REQUIRED_FRAGMENT = """
         id
         name
@@ -118,22 +151,22 @@ class ArtifactCollection(PartialObject):
 
 
 ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
-ArtifactCollectionType = typing.cast(GeneratePartialMixin, ArtifactCollectionType)
+ArtifactCollectionType = typing.cast(PartialObjectType, ArtifactCollectionType)
 
 
-@gql_weave_type("artifactVersion")
-class ArtifactVersion(PartialObject):
+@gql_type("artifactVersion")
+class ArtifactVersion(GQLBase):
     REQUIRED_FRAGMENT = """
         id
     """
 
 
 ArtifactVersionType = ArtifactVersion.WeaveType()  # type: ignore
-ArtifactVersionType = typing.cast(GeneratePartialMixin, ArtifactVersionType)
+ArtifactVersionType = typing.cast(PartialObjectType, ArtifactVersionType)
 
 
-@gql_weave_type("artifactMembership")  # Name and Class mismatch intention due to weave0
-class ArtifactCollectionMembership(PartialObject):
+@gql_type("artifactMembership")  # Name and Class mismatch intention due to weave0
+class ArtifactCollectionMembership(GQLBase):
     REQUIRED_FRAGMENT = """
         id
     """
@@ -141,41 +174,41 @@ class ArtifactCollectionMembership(PartialObject):
 
 ArtifactCollectionMembershipType = ArtifactCollectionMembership.WeaveType()  # type: ignore
 ArtifactCollectionMembershipType = typing.cast(
-    GeneratePartialMixin, ArtifactCollectionMembershipType
+    PartialObjectType, ArtifactCollectionMembershipType
 )
 
 
-@gql_weave_type("artifactAlias")
-class ArtifactAlias(PartialObject):
+@gql_type("artifactAlias")
+class ArtifactAlias(GQLBase):
     REQUIRED_FRAGMENT = """
         id
     """
 
 
 ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
-ArtifactAliasType = typing.cast(GeneratePartialMixin, ArtifactAliasType)
+ArtifactAliasType = typing.cast(PartialObjectType, ArtifactAliasType)
 
 
-@gql_weave_type("report")
-class Report(PartialObject):
+@gql_type("report")
+class Report(GQLBase):
     REQUIRED_FRAGMENT = """
         id
     """
 
 
 ReportType = Report.WeaveType()  # type: ignore
-ReportType = typing.cast(GeneratePartialMixin, ReportType)
+ReportType = typing.cast(PartialObjectType, ReportType)
 
 
-@gql_weave_type("runQueue")
-class RunQueue(PartialObject):
+@gql_type("runQueue")
+class RunQueue(GQLBase):
     REQUIRED_FRAGMENT = """
         id
     """
 
 
 RunQueueType = RunQueue.WeaveType()  # type: ignore
-RunQueueType = typing.cast(GeneratePartialMixin, RunQueueType)
+RunQueueType = typing.cast(PartialObjectType, RunQueueType)
 
 
 # Simple types (maybe should be put into primitives?)
