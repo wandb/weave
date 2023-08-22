@@ -1,13 +1,15 @@
 import analytics
 import subprocess
+import socket
 
 from . import context_state
+from . import env
 
 analytics.write_key = "uJ8vZgKqTBVH6ZdhD4GZGZYsR7ucfJmb"
 
 
-def whoami():
-    return subprocess.check_output("whoami").decode().strip()
+def hostname():
+    return socket.gethostname()
 
 
 identify_called = False
@@ -16,18 +18,28 @@ identify_called = False
 def _identify():
     global identify_called
     if not identify_called:
-        who = whoami()
-        analytics.identify(who, {"whoami": who})
+        host = hostname()
+        analytics.identify(host, {"hostname": host})
     identify_called = True
 
 
+def analytics_enabled():
+    context_enabled = context_state.analytics_enabled()
+    env_enabled = env.usage_analytics_enabled
+
+    return context_enabled and env_enabled
+
+
 def track(action: str, info=None):
-    if not context_state.analytics_enabled():
+    if not analytics_enabled():
         return
-    _identify()
-    if info is None:
-        info = {}
-    analytics.track(whoami(), action, info)
+    try:
+        _identify()
+        if info is None:
+            info = {}
+        analytics.track(hostname(), action, info)
+    except:
+        pass
 
 
 def use_called():
