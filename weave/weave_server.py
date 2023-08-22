@@ -402,8 +402,9 @@ def wb_viewer():
         with wandb_api.from_environment():
             current_context = wandb_api.get_wandb_api_context()
     authenticated = current_context is not None
+    user_id = current_context.user_id
 
-    return {"authenticated": authenticated}
+    return {"authenticated": authenticated, "user_id": user_id}
 
 
 app = make_app()

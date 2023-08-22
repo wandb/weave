@@ -117,6 +117,39 @@ const HOST_SESSION_ID_COOKIE = `host_session_id`;
 function useEnablePageAnalytics() {
   const history = useHistory();
   const pathRef = useRef('');
+  const [userId, setUserId] = useState('');
+  const anonApiKey = getCookie('anon_api_key');
+
+  const additionalHeaders: Record<string, string> = {};
+  if (anonApiKey != null && anonApiKey !== '') {
+    additionalHeaders['x-wandb-anonymous-auth-id'] = btoa(anonApiKey);
+  }
+  useEffect(() => {
+    fetch(getConfig().backendWeaveViewerUrl(), {
+      credentials: 'include',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...additionalHeaders,
+      },
+    })
+      .then(res => {
+        if (res.status === 200) {
+          return res.json();
+        }
+        return;
+      })
+      .then(json => {
+        const userId = json?.user_id ?? '';
+        if (userId !== userId) {
+          setUserId(userId);
+          (window.analytics as any).identify(userId);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+      });
+  }, []);
 
   useEffect(() => {
     const options = {
