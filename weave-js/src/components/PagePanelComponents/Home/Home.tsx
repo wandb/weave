@@ -30,6 +30,7 @@ import {
   urlRecentBoards,
   urlRecentTables,
 } from '../../../urls';
+import getConfig from '../../../config';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -222,7 +223,8 @@ const HomeComp: FC<HomeProps> = props => {
     ...REDIRECT_LOCAL,
   ];
   let {pathname} = window.location;
-  pathname = pathname.substring(window.WEAVE_CONFIG.PREFIX.length);
+  const basename = getConfig().PREFIX;
+  pathname = pathname.substring(basename.length);
   if (!loading && REDIRECT_ANY.includes(pathname)) {
     // If we have Recent enabled, go for that!
     if (REDIRECT_RECENTS.includes(pathname)) {
