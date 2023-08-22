@@ -1,5 +1,4 @@
 import analytics
-import subprocess
 import socket
 
 from . import context_state
