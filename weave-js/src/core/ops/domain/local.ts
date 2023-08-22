@@ -11,13 +11,14 @@ import {
   dict,
   filePathToType,
   isConstType,
-  isList,
+  isListLike,
   isSimpleTypeShape,
   isTaggedValue,
   isTypedDict,
   isTypedDictLike,
   isUnion,
   list,
+  listObjectType,
   maybe,
   nonNullable,
   taggedValue,
@@ -30,7 +31,7 @@ import {
 import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
 import {opIndex} from '../primitives';
-import {makeStandardOp} from '../opKinds';
+import {makeStandardOp, makeBasicOp} from '../opKinds';
 import {splitEscapedString} from '../primitives/splitEscapedString';
 
 // import * as TypeHelpers from '../model/typeHelpers';
@@ -735,11 +736,13 @@ const withColumnType = (
   key: string,
   newColType: Type
 ): Type => {
-  if (curType == null || !isTypedDict(curType)) {
+  if (curType == null || !isTypedDictLike(curType)) {
     curType = typedDict({});
   }
   const path = splitEscapedString(key);
-  const propertyTypes = {...curType.propertyTypes} as {[key: string]: Type};
+  const propertyTypes = {...typedDictPropertyTypes(curType)} as {
+    [key: string]: Type;
+  };
   if (path.length > 1) {
     return withColumnType(
       curType,
@@ -768,15 +771,15 @@ const withColumnsOutputType = (selfType: ListType, colsType: Type) => {
 
   let objType = selfType.objectType;
   for (const [k, v] of Object.entries(colsType.propertyTypes)) {
-    if (v == null || !isList(v)) {
+    if (v == null || !isListLike(v)) {
       throw new Error('invalid ');
     }
-    objType = withColumnType(objType, k, v.objectType);
+    objType = withColumnType(objType, k, listObjectType(v));
   }
   return list(objType);
 };
 
-export const opWithColumns = makeOp({
+export const opWithColumns = makeBasicOp({
   name: 'ArrowWeaveListTypedDict-with_columns',
   renderInfo: {
     type: 'function',
@@ -797,8 +800,11 @@ export const opWithColumns = makeOp({
       objectType: {type: 'list', objectType: 'any'},
     },
   },
-  returnType: inputNodes => {
-    return withColumnsOutputType(inputNodes.self.type, inputNodes.cols.type);
+  returnType: inputTypes => {
+    return withColumnsOutputType(inputTypes.self, inputTypes.cols);
+  },
+  resolver: inputs => {
+    throw new Error('cant resolve op-chain-run in js');
   },
 });
 
