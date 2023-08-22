@@ -3439,7 +3439,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
 
     const row = opIndex({
-      arr: listOfTableNodes[tooltipSeriesIndex],
+      arr: opIndex({
+        arr: flatResultNode,
+        index: constNumber(tooltipSeriesIndex),
+      }),
       index: constNumber(valueResultIndex),
     });
     const toolTipFn =
