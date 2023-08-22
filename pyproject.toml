@@ -30,6 +30,12 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
+[project.optional-dependencies]
+monitoring = [
+    "openai",
+    "tiktoken"
+]
+
 [project.urls]
 Company = "https://wandb.com"
 Documentation = "https://docs.wandb.com/"
