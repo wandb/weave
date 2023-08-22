@@ -49,8 +49,8 @@ import {ReactComponent as ImportExpandRight} from '../../assets/icons/icon-expan
 import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-expand-uncollapse.svg';
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
-import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
+import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
 import {ReactComponent as ImportFolderAlt} from '../../assets/icons/icon-folder-alt.svg';
 import {ReactComponent as ImportFolderProject} from '../../assets/icons/icon-folder-project.svg';
 import {ReactComponent as ImportFolderProjectMove} from '../../assets/icons/icon-folder-project-move.svg';
@@ -117,6 +117,7 @@ import {ReactComponent as ImportPause} from '../../assets/icons/icon-pause.svg';
 import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg';
 import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil-edit.svg';
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
+import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
 import {ReactComponent as ImportPrivacyOpen} from '../../assets/icons/icon-privacy-open.svg';
 import {ReactComponent as ImportPythonLogo} from '../../assets/icons/icon-python-logo.svg';
@@ -184,6 +185,7 @@ import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
+import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
 import {ReactComponent as ImportZoomInTool} from '../../assets/icons/icon-zoom-in-tool.svg';
@@ -348,11 +350,11 @@ export const IconFacebookSocial = (props: SVGIconProps) => (
 export const IconFailed = (props: SVGIconProps) => (
   <ImportFailed {...updateIconProps(props)} />
 );
-export const IconFlashBolt = (props: SVGIconProps) => (
-  <ImportFlashBolt {...updateIconProps(props)} />
-);
 export const IconFilterAlt = (props: SVGIconProps) => (
   <ImportFilterAlt {...updateIconProps(props)} />
+);
+export const IconFlashBolt = (props: SVGIconProps) => (
+  <ImportFlashBolt {...updateIconProps(props)} />
 );
 export const IconFolderAlt = (props: SVGIconProps) => (
   <ImportFolderAlt {...updateIconProps(props)} />
@@ -551,6 +553,9 @@ export const IconPencilEdit = (props: SVGIconProps) => (
 );
 export const IconPhoto = (props: SVGIconProps) => (
   <ImportPhoto {...updateIconProps(props)} />
+);
+export const IconPin = (props: SVGIconProps) => (
+  <ImportPin {...updateIconProps(props)} />
 );
 export const IconPlay = (props: SVGIconProps) => (
   <ImportPlay {...updateIconProps(props)} />
@@ -753,6 +758,9 @@ export const IconWarningAlt = (props: SVGIconProps) => (
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
 );
+export const IconXAxiAlt = (props: SVGIconProps) => (
+  <ImportXAxiAlt {...updateIconProps(props)} />
+);
 export const IconXAxis = (props: SVGIconProps) => (
   <ImportXAxis {...updateIconProps(props)} />
 );
@@ -813,8 +821,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'expand-uncollapse': IconExpandUncollapse,
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
-  'flash-bolt': IconFlashBolt,
   'filter-alt': IconFilterAlt,
+  'flash-bolt': IconFlashBolt,
   'folder-alt': IconFolderAlt,
   'folder-project': IconFolderProject,
   'folder-project-move': IconFolderProjectMove,
@@ -881,6 +889,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   paused: IconPaused,
   'pencil-edit': IconPencilEdit,
   photo: IconPhoto,
+  pin: IconPin,
   play: IconPlay,
   'privacy-open': IconPrivacyOpen,
   'python-logo': IconPythonLogo,
@@ -948,6 +957,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
   webhook: IconWebhook,
+  'x-axi-alt': IconXAxiAlt,
   'x-axis': IconXAxis,
   'youtube-social': IconYoutubeSocial,
   'zoom-in-tool': IconZoomInTool,
