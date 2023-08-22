@@ -1285,8 +1285,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if name not in property_types:
             return make_vec_none(len(self))
 
+        is_dictionary_encoded = pa.types.is_dictionary(self._arrow_data.type)
+        if is_dictionary_encoded:
+            indices = self._arrow_data.indices
+            dictionary = self._arrow_data.dictionary
+
+            new_data = pa.DictionaryArray.from_arrays(indices, dictionary.field(name))
+        else:
+            new_data = self._arrow_data.field(name)
+
         return ArrowWeaveList(
-            self._arrow_data.field(name),
+            new_data,
             property_types[name],
             self._artifact,
             invalid_reason=self._invalid_reason,
