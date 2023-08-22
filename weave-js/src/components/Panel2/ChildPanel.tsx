@@ -214,7 +214,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const updateConfig2 = useUpdateConfig2(props);
   const config = useChildPanelConfig(props.config);
   const {id: panelId, config: panelConfig} = config;
-  let {input_node: panelInputExpr} = config;
+  const {input_node: panelInputExpr} = config;
   const weave = useWeaveContext();
   const {stack, path: parentPath} = usePanelContext();
 
