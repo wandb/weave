@@ -369,11 +369,11 @@ def board(
     requests_table = panels.Table(filtered_window_data)  # type: ignore
     requests_table.add_column(lambda row: row["output.model"], "Model")
     requests_table.add_column(
-        lambda row: row["inputs.messages"][-1]["content"], "inputs.messages[-1].content"
+        lambda row: row["inputs.messages"][-1]["content"], "Last Prompt"
     )
     requests_table.add_column(
         lambda row: row["output.choices"][-1]["message.content"],
-        "output.choices[-1].message.content",
+        "Completion",
     )
     requests_table.add_column(lambda row: row["summary.prompt_tokens"], "Prompt Tokens")
     requests_table.add_column(
