@@ -6,9 +6,9 @@ SHA=$(cat $SCRIPT_DIR/sha1.txt)
 cd $SCRIPT_DIR/..
 tar --exclude='frontend/bundle.sh' --exclude='frontend/build.sh' -cvzf /tmp/$SHA.tar.gz frontend
 
-if [[ "${IS_RELEASE_ENV}" == "true" && "${CI}" == "true" ]]; then
+if [[ "${CI}" == "true" && -n "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
     echo "Uploading bundle to cloud storage..."
-#    gsutil cp /tmp/$SHA.tar.gz gs://wandb-cdn-prod/weave/*
+    gcloud storage cp /tmp/$SHA.tar.gz gs://wandb-cdn-prod/weave/$SHA.tar.gz
 else
-    echo "Upload bundle by running: gsutil cp /tmp/$SHA.tar.gz gs://wandb-cdn-prod/weave/"
+    echo "Upload bundle by running: gcloud storage cp /tmp/$SHA.tar.gz gs://wandb-cdn-prod/weave/$SHA.tar.gz"
 fi
