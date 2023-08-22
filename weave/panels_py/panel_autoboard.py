@@ -26,6 +26,7 @@ import typing
 
 import weave
 from .. import weave_internal
+from ..panels import panel_plot
 
 from .generator_templates import template_registry
 
@@ -35,15 +36,36 @@ class AutoBoardConfig:
     pass
 
 
+# Was putting in these midpoint functions, but date-add and some other
+# date functions don't have arrow equivalents yet, so these don't vectorize
+# @weave.op(
+#     weavify=True,
+#     name="numberbin-midpoint",
+#     input_type={"bin": weave.types.NumberBinType},
+# )
+# def number_bin_midpoint(bin) -> float:
+#     return (bin["start"] + bin["stop"]) / 2
+
+
+# @weave.op(
+#     weavify=True,
+#     name="timestampbin-midpoint",
+#     input_type={"bin": weave.types.TimestampBinType},
+# )
+# def timestamp_bin_midpoint(bin) -> float:
+#     return bin["start"].add((bin["stop"].sub(bin["start"])).div(2))
+
+
 def timeseries(
     input_node: weave.Node[list[typing.Any]],
     bin_domain_node: weave.Node,
     x_axis_key: str,
     y_expr: typing.Callable,
     y_title: str,
-    groupby_key: typing.Union[weave.Node[str], str],
+    color_expr: typing.Callable,
     x_domain: weave.Node,
     n_bins: int,
+    mark: panel_plot.MarkOption = "line",
 ) -> weave.Panel:
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
@@ -54,15 +76,21 @@ def timeseries(
         bin_fn = weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
+    if mark == "bar":
+        x = lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins))
+    else:
+        # TODO: should be midpoint
+        x = lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins))["start"]
+
     return weave.panels.Plot(
         input_node,
-        x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, 100))["start"],
+        x=x,
         x_title=x_title,
         y=y_expr,
         y_title=y_title,
-        label=lambda row: row[groupby_key],
+        label=color_expr,
         groupby_dims=["x", "label"],
-        mark="line",
+        mark=mark,
         domain_x=x_domain,
     )
 

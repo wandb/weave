@@ -112,8 +112,10 @@ def _cond_output_type(input_type):
     output_type=_cond_output_type,
 )
 def awl_cond(cases, results):
+    cases = cases.without_tags()
     # Will crash if results are not of the same type.
     if isinstance(results, ArrowWeaveList):
+        results = results.without_tags()
         result_values = [
             results._arrow_data.field(i) for i in range(len(results._arrow_data.type))
         ]
