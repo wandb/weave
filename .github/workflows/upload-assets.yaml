@@ -34,12 +34,12 @@ jobs:
           fi
       - id: 'auth'
         name: 'Authenticate to Google Cloud'
-        if: ${{ steps.build.outputs.UPLOAD_ASSERTS }}
+        if: ${{ steps.build.outputs.UPLOAD_ASSETS }}
         uses: 'google-github-actions/auth@v1'
         with:
           workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.WORKLOAD_SERVICE_ACCOUNT }}
       - id: 'upload'
-        if: ${{ steps.build.outputs.UPLOAD_ASSERTS }}
+        if: ${{ steps.build.outputs.UPLOAD_ASSETS }}
         run: ./weave/frontend/bundle.sh
 
