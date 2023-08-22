@@ -114,6 +114,7 @@ const JupyterControlsIcon = styled.div`
 
 const HOST_SESSION_ID_COOKIE = `host_session_id`;
 
+// TODO: This should be merged with useIsAuthenticated and refactored to useWBViewer()
 function useEnablePageAnalytics() {
   const history = useHistory();
   const pathRef = useRef('');
