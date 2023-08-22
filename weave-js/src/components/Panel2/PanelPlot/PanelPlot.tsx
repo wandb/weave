@@ -3619,7 +3619,11 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   const {input} = props;
 
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  // const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  const typedInputNodeUse = {
+    loading: false,
+    result: inputNode,
+  };
   const newProps = useMemo(() => {
     return {
       ...props,

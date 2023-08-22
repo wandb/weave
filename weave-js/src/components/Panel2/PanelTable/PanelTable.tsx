@@ -128,7 +128,11 @@ export const PanelTable: React.FC<
 > = props => {
   const {input, config, updateConfig} = props;
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  // const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  const typedInputNodeUse = {
+    loading: false,
+    result: inputNode,
+  };
   const typedInputNode = typedInputNodeUse.loading
     ? undefined
     : typedInputNodeUse.result;
