@@ -12,7 +12,7 @@ import urllib.parse
 from flask import json
 from werkzeug.exceptions import HTTPException
 
-from flask import Response, Flask, Blueprint
+from flask import Flask, Blueprint, Response
 from flask import request
 from flask import abort
 from flask_cors import CORS
@@ -349,11 +349,12 @@ def send_local_file(path):
 
 
 def frontend_env():
+    """If you add vars here, make sure to define their types in weave-js/src/config.ts"""
     return {
         "PREFIX": environment.weave_link_prefix(),
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
         "ONPREM": environment.weave_onprem(),
-        "WEAVE_BACKEND_HOST": "/__weave",
+        "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
     }
 
 
@@ -362,8 +363,8 @@ def frontend_env():
 def frontend(path):
     """Serve the frontend with a simple fileserver over HTTP."""
     # We serve up a dynamic env.js file before all other js.
-    if path == "env.js":
-        js = f"window.CONFIG = {json.dumps(frontend_env())}"
+    if path is not None and path.endswith("env.js"):
+        js = f"window.WEAVE_CONFIG = {json.dumps(frontend_env())}"
         return Response(js, mimetype="application/javascript")
     full_path = pathlib.Path(blueprint.static_folder) / path
     # prevent path traversal
@@ -378,6 +379,13 @@ def frontend(path):
 @blueprint.route("/", defaults={"path": None})
 @blueprint.route("/<path:path>")
 def root_frontend(path):
+    # To support server cases where we're mounted under an existing path, i.e.
+    # /wandb/weave, then index.html will load something like /wandb/weave/.../env.js
+    if path is not None:
+        path = path.split("/")[-1]
+    if path == "env.js":
+        js = f"window.WEAVE_CONFIG = {json.dumps(frontend_env())}"
+        return Response(js, mimetype="application/javascript")
     return send_from_directory(blueprint.static_folder, "index.html")
 
 
