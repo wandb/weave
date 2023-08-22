@@ -212,6 +212,14 @@ def board(
         hidden=True,
     )
 
+    grouping_fn = varbar.add(
+        "grouping_fn",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: row["output.model"]
+        ),
+        hidden=True,
+    )
+
     filtered_data = varbar.add(
         "filtered_data", augmented_data.filter(filter_fn), hidden=True
     )
@@ -241,25 +249,6 @@ def board(
     bin_range = varbar.add(
         "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
     )
-
-    # clean_data = varbar.add(
-    #     "clean_data",
-    #     dataset.map(
-    #         lambda row: ops.dict_(
-    #             id=row["output"]["id"],
-    #             object=row["output"]["object"],
-    #             model=row["output"]["model"],
-    #             messages=row["inputs"]["messages"],
-    #             usage=row["output"]["usage"],
-    #             completion=row["output"]["choices"][0]["message"],
-    #             finish_reason=row["output"]["choices"][0]["finish_reason"],
-    #             timestamp=row["timestamp"],
-    #             latency_ms=row["end_time_ms"] - row["start_time_ms"],
-    #         )
-    #     ),
-    #     hidden=True,
-    # )
-
     # Derive the windowed data to use in the plots as a function of bin_range
 
     window_data = varbar.add(
@@ -282,22 +271,9 @@ def board(
         "filtered_window_data", window_data.filter(filter_fn), hidden=True
     )
 
-    groupby = varbar.add("groupby", "output.model", hidden=True)
     grouping = varbar.add(
         "grouping",
-        weave.panels.Dropdown(
-            groupby,
-            choices=weave.ops.List.concat(
-                weave.ops.make_list(
-                    a=weave_internal.const(["output.model"]),
-                    b=source_data["attributes"]
-                    .keys()
-                    .flatten()
-                    .unique()
-                    .map(lambda k: weave_internal.const("attributes.") + k),
-                )
-            ),
-        ),
+        weave.panels.GroupingEditor(grouping_fn, node=window_data),
     )
 
     height = 5
@@ -311,13 +287,16 @@ def board(
     )  # , showExpressions="titleBar")
     overview_tab.add(
         "request_count",
-        panel_autoboard.timeseries_count_bar(
+        panel_autoboard.timeseries(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            groupby_key=groupby,
+            y_expr=lambda row: row.count(),
+            y_title="request count",
+            color_expr=lambda row: grouping_fn(row),
             x_domain=user_zoom_range,
             n_bins=100,
+            mark="bar",
         ),
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=height),
     )
@@ -330,14 +309,13 @@ def board(
             x_axis_key="timestamp",
             y_expr=lambda row: row["summary.cost"].sum(),
             y_title="total cost ($)",
-            groupby_key=groupby,
+            color_expr=lambda row: grouping_fn(row),
             x_domain=user_zoom_range,
             n_bins=50,
         ),
         layout=weave.panels.GroupPanelLayout(x=0, y=height, w=12, h=height),
     )
 
-    # latency
     overview_tab.add(
         "latency",
         panel_autoboard.timeseries(
@@ -346,7 +324,7 @@ def board(
             x_axis_key="timestamp",
             y_expr=lambda row: row["summary.latency_s"].avg(),
             y_title="avg latency (s)",
-            groupby_key=groupby,
+            color_expr=lambda row: grouping_fn(row),
             x_domain=user_zoom_range,
             n_bins=50,
         ),

@@ -13,8 +13,6 @@ import {
   opUnique,
   NodeOrVoidNode,
   opAnd,
-  isAssignableTo,
-  maybe,
   Type,
   opStringNotEqual,
   opNumberEqual,
@@ -44,6 +42,7 @@ import {PanelContextProvider} from './PanelContext';
 import {Popup} from 'semantic-ui-react';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
+import {VisualEditorMode, getSimpleKeyType} from './visualEditors';
 
 const inputType = {
   type: 'function' as const,
@@ -124,16 +123,6 @@ const visualClauseIsValid = (
     return false;
   }
   return true;
-};
-
-const getSimpleKeyType = (keyType: Type) => {
-  return isAssignableTo(keyType, maybe('string'))
-    ? 'string'
-    : isAssignableTo(keyType, maybe('number'))
-    ? 'number'
-    : isAssignableTo(keyType, maybe('boolean'))
-    ? 'boolean'
-    : 'other';
 };
 
 const getOpChoices = (
@@ -616,7 +605,6 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     value.nodeType === 'const'
       ? filterExpressionToVisualClauses(value.val)
       : null;
-  const actualMode = visualClauses == null ? 'expression' : mode;
 
   if (!isFunctionLiteral(value)) {
     throw new Error('Expected function literal');
@@ -672,33 +660,11 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
 
   return (
     <div style={{width: '100%', height: '100%', padding: '0 16px'}}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          marginBottom: '8px',
-          gap: '4px',
-          // This puts the buttons equal with the header
-          right: '16px',
-          top: '-30px',
-          position: 'absolute',
-        }}>
-        <Button
-          variant="ghost"
-          size="small"
-          disabled={visualClauses == null}
-          onClick={() => visualClauses != null && setMode('visual')}
-          active={actualMode === 'visual'}>
-          Visual
-        </Button>
-        <Button
-          variant="ghost"
-          size="small"
-          onClick={() => setMode('expression')}
-          active={actualMode === 'expression'}>
-          Expression
-        </Button>
-      </div>
+      <VisualEditorMode
+        mode={mode}
+        visualAvailable={visualClauses != null}
+        setMode={setMode}
+      />
       {mode === 'expression' || visualClauses == null ? (
         <div
           style={{
