@@ -764,6 +764,13 @@ def compile_merge_by_node_id(
 def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     if not isinstance(node, graph.OutputNode):
         return None
+
+    # weavified ops are expanded here.
+    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+    if op_def.weave_fn is not None:
+        return weave_internal.call_fn(op_def.weave_fn, node.from_op.inputs)
+
+    # otherwise we expand this hard-coded list
     if node.from_op.name not in [
         "RunChain-history",
         "panel_table-active_data",
