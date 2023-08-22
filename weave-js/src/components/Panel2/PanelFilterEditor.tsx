@@ -634,6 +634,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     if (value.nodeType === 'const') {
       setTempVisualClauses(filterExpressionToVisualClauses(value.val));
     }
+    setEditingFilterIndex(null);
   }, [setTempVisualClauses, value.val, value.nodeType]);
 
   React.useEffect(() => {
@@ -678,10 +679,16 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
   );
 
   const pushTempVisualClauses = useCallback(() => {
-    if (tempVisualClauses !== null) {
+    if (
+      visualClauses &&
+      tempVisualClauses !== null &&
+      tempVisualClauses.length > visualClauses.length &&
+      !_.isEqual(tempVisualClauses, visualClauses)
+    ) {
       updateValFromVisualClauses(tempVisualClauses);
     }
-  }, [tempVisualClauses, updateValFromVisualClauses]);
+    setEditingFilterIndex(null);
+  }, [tempVisualClauses, updateValFromVisualClauses, visualClauses]);
 
   const paramVars = useMemo(
     () => _.mapValues(inputTypes, (type, name) => varNode(type, name)),
@@ -733,30 +740,14 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                 />
               }
               on="click"
-              onClose={() => {
-                if (
-                  tempVisualClauses !== null &&
-                  !_.isEqual(tempVisualClauses, visualClauses)
-                ) {
-                  updateValFromVisualClauses(tempVisualClauses);
-                }
-                setEditingFilterIndex(null);
-              }}
+              onClose={() => pushTempVisualClauses()}
               open={editingFilterIndex === i}
               content={
                 <SingleFilterVisualEditor
                   listNode={props.config!.node}
                   clause={tempVisualClauses?.[i] ?? clause}
-                  onCancel={() => {
-                    resetTempVisualClauses();
-                    setEditingFilterIndex(null);
-                  }}
-                  onOK={() => {
-                    setEditingFilterIndex(null);
-                    if (tempVisualClauses?.[i]) {
-                      pushTempVisualClauses();
-                    }
-                  }}
+                  onCancel={() => resetTempVisualClauses()}
+                  onOK={() => pushTempVisualClauses()}
                   setTempClause={newClause =>
                     setTempVisualClauses(
                       setVisualClauseIndex(visualClauses, i, newClause)
@@ -774,23 +765,13 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               },
             }}
             on="click"
-            onClose={() => {
-              if (
-                tempVisualClauses !== null &&
-                !_.isEqual(tempVisualClauses, visualClauses)
-              ) {
-                pushTempVisualClauses();
-              }
-              setEditingFilterIndex(null);
-            }}
+            onClose={() => pushTempVisualClauses()}
             open={editingFilterIndex === -1}
             trigger={
               <div>
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    setEditingFilterIndex(-1);
-                  }}>
+                  onClick={() => setEditingFilterIndex(-1)}>
                   + New filter
                 </Button>
               </div>
@@ -799,19 +780,8 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               <SingleFilterVisualEditor
                 listNode={props.config!.node}
                 clause={null}
-                onCancel={() => {
-                  resetTempVisualClauses();
-                  setEditingFilterIndex(null);
-                }}
-                onOK={() => {
-                  setEditingFilterIndex(null);
-                  if (
-                    tempVisualClauses &&
-                    tempVisualClauses.length > visualClauses.length
-                  ) {
-                    pushTempVisualClauses();
-                  }
-                }}
+                onCancel={() => resetTempVisualClauses()}
+                onOK={() => pushTempVisualClauses()}
                 setTempClause={newClause =>
                   setTempVisualClauses(
                     addVisualClause(visualClauses, newClause)
