@@ -11,6 +11,7 @@ The `examples/` folder contains:
 - `apps`: Example applications
 - `guides (future)`: Guides to use specific features for advanced users
 
+
 ## Running examples
 
 ### Locally with Jupyter notebook
