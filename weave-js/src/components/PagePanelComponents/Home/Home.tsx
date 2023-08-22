@@ -221,7 +221,8 @@ const HomeComp: FC<HomeProps> = props => {
     ...REDIRECT_WANDB,
     ...REDIRECT_LOCAL,
   ];
-  const {pathname} = window.location;
+  let {pathname} = window.location;
+  pathname = pathname.substring(window.WEAVE_CONFIG.PREFIX.length);
   if (!loading && REDIRECT_ANY.includes(pathname)) {
     // If we have Recent enabled, go for that!
     if (REDIRECT_RECENTS.includes(pathname)) {
