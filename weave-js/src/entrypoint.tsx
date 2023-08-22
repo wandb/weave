@@ -9,7 +9,6 @@ import PagePanel from './components/PagePanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {URL_BROWSE, URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
-import getConfig from './config';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -60,9 +59,8 @@ const Main = ({browserType}: MainProps) => (
   </React.Suspense>
 );
 
-const basename = getConfig().PREFIX;
 ReactDOM.render(
-  <Router basename={basename}>
+  <Router>
     <Switch>
       <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
         <Main browserType={URL_RECENT} />
