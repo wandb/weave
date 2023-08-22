@@ -40,7 +40,6 @@ import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
-import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
 import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
@@ -219,7 +218,6 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const weave = useWeaveContext();
   const {stack, path: parentPath} = usePanelContext();
 
-  panelInputExpr = useNodeWithServerType(panelInputExpr).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,
     panelId,

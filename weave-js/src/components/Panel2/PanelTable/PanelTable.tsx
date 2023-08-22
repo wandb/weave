@@ -49,7 +49,7 @@ import {
 } from 'semantic-ui-react';
 
 import {WeaveActionContextProvider} from '../../../actions';
-import {useWeaveContext} from '../../../context';
+import {useWeaveContext, useWeaveDashUiEnable} from '../../../context';
 import {WeaveApp} from '../../../index';
 import * as LLReact from '../../../react';
 import {ControlFilter} from '../ControlFilter';
@@ -128,7 +128,12 @@ export const PanelTable: React.FC<
 > = props => {
   const {input, config, updateConfig} = props;
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
+  const dashEnabled = useWeaveDashUiEnable();
+  const typedInputNodeUse = LLReact.useNodeWithServerType(
+    inputNode,
+    undefined,
+    {skip: dashEnabled}
+  );
   const typedInputNode = typedInputNodeUse.loading
     ? undefined
     : typedInputNodeUse.result;

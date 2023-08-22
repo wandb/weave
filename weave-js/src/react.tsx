@@ -912,8 +912,10 @@ export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
 
 export const useNodeWithServerType = (
   node: NodeOrVoidNode,
-  paramFrame?: Frame
+  paramFrame?: Frame,
+  options?: {skip?: boolean}
 ): {loading: boolean; result: NodeOrVoidNode} => {
+  const skip = options?.skip;
   const stack = usePanelContext().stack;
   if (paramFrame != null) {
     for (const [name, value] of Object.entries(paramFrame)) {
@@ -936,6 +938,9 @@ export const useNodeWithServerType = (
   const promiseRef = useRef<Promise<any> | null>(null);
   useEffect(() => {
     let isMounted = true;
+    if (skip) {
+      return;
+    }
     if (node.nodeType === 'const') {
       setResult({node, value: node});
     }
@@ -958,9 +963,12 @@ export const useNodeWithServerType = (
     return () => {
       isMounted = false;
     };
-  }, [weave, node, dereffedNode]);
+  }, [weave, node, dereffedNode, skip]);
 
   const finalResult = useMemo(() => {
+    if (skip) {
+      return {loading: false, result: node};
+    }
     if (error != null) {
       // rethrow in render thread
       const message =
@@ -972,7 +980,7 @@ export const useNodeWithServerType = (
       loading: node !== result.node,
       result: node === result.node ? result.value : node,
     };
-  }, [result, node, error]);
+  }, [skip, result, node, error]);
   return finalResult;
 };
 
