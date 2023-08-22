@@ -1,0 +1,45 @@
+name: upload-frontend-assets
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-assets:
+    name: Build frontend assets
+    runs-on: ubuntu-8core
+    timeout-minutes: 10
+    environment: 
+      name: release
+    permissions:
+      content: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "16.x"
+      - id: 'build'
+        run: |
+          ./weave/frontend/build.sh
+          if [[ -z "$(git status weave/frontent/sha1.txt --porcelain)" ]]
+          then
+            echo "Frontend assets has not changed, skipping publishing"
+            echo "UPLOAD_ASSETS=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Frontend assets changed, pushing updates"
+            git diff
+            echo "UPLOAD_ASSETS=true" >> "$GITHUB_OUTPUT"
+          fi
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        if: ${{ steps.build.outputs.UPLOAD_ASSERTS }}
+        uses: 'google-github-actions/auth@v1'
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.WORKLOAD_SERVICE_ACCOUNT }}
+      - id: 'upload'
+        if: ${{ steps.build.outputs.UPLOAD_ASSERTS }}
+        run: ./weave/frontend/bundle.sh
+
