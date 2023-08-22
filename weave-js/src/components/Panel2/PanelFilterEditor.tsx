@@ -95,7 +95,12 @@ interface VisualClauseWorkingState {
   key?: string | undefined;
   simpleKeyType?: 'number' | 'string' | 'boolean' | 'other';
   op?: string | undefined;
-  value?: string | number | boolean | (string | number | boolean)[] | undefined;
+  value?:
+    | string
+    | number
+    | boolean
+    | Array<string | number | boolean>
+    | undefined;
 }
 
 const visualClauseIsValid = (
@@ -159,13 +164,13 @@ const SingleFilterVisualEditor: React.FC<{
   onCancel: () => void;
   onOK: () => void;
   setTempClause: (clause: VisualClauseWorkingState) => void;
-}> = props => {
-  const defaultKey = props.clause?.key;
-  const defaultOp = props.clause?.op;
-  const defaultValue = props.clause?.value;
+}> = ({listNode, clause, onCancel, onOK, setTempClause}) => {
+  const defaultKey = clause?.key;
+  const defaultOp = clause?.op;
+  const defaultValue = clause?.value;
 
   const listItem = opIndex({
-    arr: props.listNode,
+    arr: listNode,
     index: varNode('number', 'n'),
   });
   const keyChoices = pickSuggestions(listItem.type)
@@ -198,7 +203,7 @@ const SingleFilterVisualEditor: React.FC<{
   //   key != null
   //     ? opLimit({
   //         arr: opUnique({
-  //           arr: opPick({obj: props.listNode, key: constString(key)}),
+  //           arr: opPick({obj: listNode, key: constString(key)}),
   //         }),
   //         limit: constNumber(500),
   //       })
@@ -206,7 +211,7 @@ const SingleFilterVisualEditor: React.FC<{
   const valueQuery =
     key != null && simpleKeyType === 'string'
       ? opUnique({
-          arr: opPick({obj: props.listNode, key: constString(key)}),
+          arr: opPick({obj: listNode, key: constString(key)}),
         })
       : voidNode();
   const valueChoices = useNodeValue(valueQuery).result ?? [];
@@ -218,13 +223,16 @@ const SingleFilterVisualEditor: React.FC<{
       key: v.toString(),
     }));
 
-  const curClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
+  const curClause: VisualClauseWorkingState = useMemo(
+    () => ({key, simpleKeyType, op, value}),
+    [key, simpleKeyType, op, value]
+  );
   const valid = visualClauseIsValid(curClause);
   const handleSetClause = useCallback(
     (partialClause: VisualClauseWorkingState) => {
-      props.setTempClause({...curClause, ...partialClause});
+      setTempClause({...curClause, ...partialClause});
     },
-    []
+    [curClause, setTempClause]
   );
 
   return (
@@ -296,17 +304,17 @@ const SingleFilterVisualEditor: React.FC<{
           justifyContent: 'flex-end',
           marginTop: '4px',
         }}>
-        <Button onClick={props.onCancel} variant="secondary">
+        <Button onClick={onCancel} variant="secondary">
           Cancel
         </Button>
         <Button
           disabled={!valid}
           onClick={() => {
             if (valid) {
-              props.onOK();
+              onOK();
             } else {
               // Shouldn't really happen since we filter above.
-              props.onCancel();
+              onCancel();
             }
           }}>
           OK
@@ -609,12 +617,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     ? constFunction({}, () => voidNode() as any)
     : valueQuery.result;
   const setVal = useMutation(valueNode, 'set');
-  const [mode, setMode] = React.useState<'visual' | 'expression'>('visual');
-  const [editingFilterIndex, setEditingFilterIndex] = React.useState<
-    number | null
-  >(null);
+  const [mode, setMode] = useState<'visual' | 'expression'>('visual');
+  const [editingFilterIndex, setEditingFilterIndex] = useState<number | null>(
+    null
+  );
   const [editingFilter, setEditingFilter] =
-    React.useState<VisualClauseWorkingState | null>(null);
+    useState<VisualClauseWorkingState | null>(null);
 
   const visualClauses =
     value.nodeType === 'const'
@@ -687,7 +695,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     }
     setEditingFilterIndex(null);
     setEditingFilter(null);
-  }, [editingFilter, updateValFromVisualClauses, visualClauses]);
+  }, [
+    editingFilter,
+    editingFilterIndex,
+    updateValFromVisualClauses,
+    visualClauses,
+  ]);
 
   const paramVars = useMemo(
     () => _.mapValues(inputTypes, (type, name) => varNode(type, name)),
