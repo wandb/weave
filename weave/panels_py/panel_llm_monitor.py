@@ -16,13 +16,13 @@ ops = weave.ops
 
 
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.
-BOARD_ID = "open_ai_completions_monitor"
+BOARD_ID = "llm_completions_monitor"
 
 # BOARD_DISPLAY_NAME is the name that will be displayed in the UI
-BOARD_DISPLAY_NAME = "OpenAI Monitor Board"
+BOARD_DISPLAY_NAME = "LLM Monitor Board"
 
 # BOARD_DESCRIPTION is the description that will be displayed in the UI
-BOARD_DESCRIPTION = "Monitor OpenAI Completions"
+BOARD_DESCRIPTION = "Monitor LLM Completions"
 
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 BOARD_INPUT_WEAVE_TYPE = types.List(
