@@ -64,10 +64,7 @@ def register_vectorized_gql_prop_op(
         self = typing.cast(ArrowWeaveList, inputs[first_arg_name])
         object_type = typing.cast(partial_object.PartialObjectType, self.object_type)
         return ArrowWeaveList(
-            # keep things dictionary encoded
-            pa.DictionaryArray.from_arrays(
-                self._arrow_data.indices, self._arrow_data.dictionary.field(prop_name)
-            ),
+            self._arrow_data.field(prop_name),
             object_type.keys[prop_name],
             self._artifact,
         )

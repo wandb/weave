@@ -50,7 +50,15 @@ class PartialObjectTypeGeneratorType(types.ObjectType):
 class PartialObject:
     keys: list[str]
 
-    def __init__(self, **keys: typing.Any):
+    def __init__(
+        self, keys: typing.Optional[dict[str, typing.Any]] = None, **attrs: typing.Any
+    ):
+        if keys is not None and len(attrs) > 0:
+            raise ValueError(
+                "PartialObject cannot be initialized with both keys and attrs"
+            )
+
+        keys = keys if keys is not None else attrs
         self.keys = list(keys.keys())
         for key in keys:
             setattr(self, key, keys[key])
