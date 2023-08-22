@@ -182,7 +182,9 @@ def recursively_build_pyarrow_array(
                             indices.append(new_index)
 
                     dictionary = [
-                        mapper.apply(v[1]) if v[1] is not None else None
+                        mapper._property_serializers[field.name].apply(v[1][field.name])
+                        if v[1] is not None and v[1][field.name] is not None
+                        else None
                         for v in _dictionary.values()
                     ]
                     array = recursively_build_pyarrow_array(

@@ -50,15 +50,14 @@ class PartialObjectTypeGeneratorType(types.ObjectType):
 class PartialObject:
     keys: list[str]
 
-    def __init__(self, keys: list[str]):
-        self.keys = keys
+    def __init__(self, **keys: typing.Any):
+        self.keys = list(keys.keys())
+        for key in keys:
+            setattr(self, key, keys[key])
 
     @classmethod
     def from_keys(cls: typing.Type[T], key_dict: dict) -> T:
-        base = cls(list(key_dict.keys()))
-        for key in key_dict:
-            setattr(base, key, key_dict[key])
-        return base
+        return cls(**key_dict)
 
     def to_dict(self) -> dict[str, typing.Any]:
         return {key: getattr(self, key) for key in self.keys}

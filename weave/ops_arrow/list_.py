@@ -18,6 +18,8 @@ from .. import graph
 from ..language_features.tagging import (
     tagged_value_type,
 )
+
+from .. import partial_object
 from .. import artifact_base
 from .. import node_ref
 from ..language_features.tagging import tag_store
@@ -1040,12 +1042,18 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
 
         for path, obj_type in obj_type_paths.items():
+            try:
+                instance_class = obj_type.instance_class
+            except IndexError:
+                assert isinstance(obj_type, partial_object.PartialObjectType)
+                instance_class = obj_type.keyless_weave_type_class.instance_class
+
             # print("OBJ TYPE PATH", path)
             set_path(
                 value_py,
                 value_awl._arrow_data,
                 (PathItemOuterList(),) + path,
-                lambda v, j: None if v is None else obj_type.instance_class(**v),
+                lambda v, j: None if v is None else instance_class(**v),
             )
         # Dictionary decode the value, and add the tags to the tag store,
         # in a single pass.
