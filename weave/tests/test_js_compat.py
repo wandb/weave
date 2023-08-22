@@ -23,7 +23,7 @@ def test_const_serialization():
     assert f_type2.extension.val == "png"
 
 
-def test_gql_haskeys_stripping():
+def test_partialobject_type_stripping():
     instance = wb_domain_types.Run({"a": types.String()})
     type = types.TypeRegistry.type_of(instance)
     assert isinstance(type, partial_object.PartialObjectType)
