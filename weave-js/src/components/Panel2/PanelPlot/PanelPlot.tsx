@@ -3466,7 +3466,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   }, [
     config.series,
     toolTipPos.value,
-    listOfTableNodes,
+    flatResultNode,
     vegaReadyTables,
     weave.client.opStore,
     tooltipLineData,
