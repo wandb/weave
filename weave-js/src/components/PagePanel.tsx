@@ -136,7 +136,7 @@ function useEnablePageAnalytics() {
 
     // Track initial page view
     const initialPath = `${history.location.pathname}${history.location.search}`;
-    const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+    const fullURL = `${window.location.protocol}//${window.location.host}${history.location.pathname}${history.location.search}${history.location.hash}`;
     if (pathRef.current !== initialPath) {
       trackPage({url: fullURL}, options);
       pathRef.current = initialPath;
@@ -145,7 +145,7 @@ function useEnablePageAnalytics() {
     return () => {
       unlisten();
     };
-  }, []);
+  }, [history]);
 }
 
 // Simple function that forces rerender when URL changes.
