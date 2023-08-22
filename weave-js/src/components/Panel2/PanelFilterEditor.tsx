@@ -630,14 +630,11 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
 
   const inputTypes = value.type.inputTypes;
 
-  const resetTempVisualClauses = useMemo(
-    () => () => {
-      if (value.nodeType === 'const') {
-        setTempVisualClauses(filterExpressionToVisualClauses(value.val));
-      }
-    },
-    [setTempVisualClauses, value.val, value.nodeType]
-  );
+  const resetTempVisualClauses = useCallback(() => {
+    if (value.nodeType === 'const') {
+      setTempVisualClauses(filterExpressionToVisualClauses(value.val));
+    }
+  }, [setTempVisualClauses, value.val, value.nodeType]);
 
   React.useEffect(() => {
     resetTempVisualClauses();
@@ -679,6 +676,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     },
     [listItem.type, updateVal]
   );
+
+  const pushTempVisualClauses = useCallback(() => {
+    if (tempVisualClauses !== null) {
+      updateValFromVisualClauses(tempVisualClauses);
+    }
+  }, [tempVisualClauses, updateValFromVisualClauses]);
 
   const paramVars = useMemo(
     () => _.mapValues(inputTypes, (type, name) => varNode(type, name)),
@@ -751,13 +754,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                   onOK={() => {
                     setEditingFilterIndex(null);
                     if (tempVisualClauses?.[i]) {
-                      updateValFromVisualClauses(
-                        setVisualClauseIndex(
-                          visualClauses,
-                          i,
-                          tempVisualClauses?.[i]
-                        )
-                      );
+                      pushTempVisualClauses();
                     }
                   }}
                   setTempClause={newClause =>
@@ -782,7 +779,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                 tempVisualClauses !== null &&
                 !_.isEqual(tempVisualClauses, visualClauses)
               ) {
-                updateValFromVisualClauses(tempVisualClauses);
+                pushTempVisualClauses();
               }
               setEditingFilterIndex(null);
             }}
@@ -812,12 +809,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                     tempVisualClauses &&
                     tempVisualClauses.length > visualClauses.length
                   ) {
-                    updateValFromVisualClauses(
-                      addVisualClause(
-                        visualClauses,
-                        tempVisualClauses?.[tempVisualClauses.length - 1]
-                      )
-                    );
+                    pushTempVisualClauses();
                   }
                 }}
                 setTempClause={newClause =>
