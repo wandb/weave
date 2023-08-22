@@ -227,7 +227,7 @@ const SingleFilterVisualEditor: React.FC<{
     if (visualClauseIsValid(tempClause)) {
       props.setTempClause(tempClause);
     }
-  }, [key, simpleKeyType, op, value]);
+  }, [props.setTempClause, key, simpleKeyType, op, value]);
 
   return (
     <div style={{gap: '4px', display: 'flex', flexDirection: 'column'}}>
@@ -622,6 +622,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
 
   const inputTypes = value.type.inputTypes;
 
+  React.useEffect(() => {
+    if (value.nodeType === 'const') {
+      setTempVal( filterExpressionToVisualClauses(value.val));
+    }
+  }, [value]);
+
   const updateVal = useCallback(
     (newVal: any) => {
       // console.log('SET VAL NEW VAL', newVal);
@@ -709,7 +715,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                 />
               }
               on="click"
-              onClose={() => setEditingFilterIndex(null)}
+              onClose={() => {
+                if(tempVal !== visualClauses && tempVal !== null) {
+                  updateValFromVisualClauses(tempVal)
+                }
+                setEditingFilterIndex(null);
+              }}
               open={editingFilterIndex === i}
               content={
                 <SingleFilterVisualEditor
