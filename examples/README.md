@@ -3,7 +3,6 @@
 ## Examples structure
 
 The `examples/` folder contains:
-
 - `get_started.ipynb`: a quick interactive notebook overview of Weave
 - `getting_started`: Learn how to build interactive data applications
 - `reference`: Syntax and usage for Weave types, ops, and panels

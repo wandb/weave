@@ -49,10 +49,11 @@ If you specify a wandb entity to which you do not have access, no data will be l
 
 The last header type, `X-Wandb-Attribute-`, lets you add custom attribute fields and values to any call. For example, logging `X-Wandb-Attribute-my_attr` : "my_attr_value" will add a column named `attributes.my_attr` to the stream table and store `my_attr_value` in the row for this call.
 
-| Header name        | Description                                                      | SDK Example                                                                                  | CURL Example                                                                             | Default setting                          |
-| ------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------- | --- |
-| X-Wandb-Entity     | set the wandb entity for this call                               | {"X-Wandb-Entity" : "my_dream_team"}                                                         | `-H X-Wandb-Entity: my_dream_team`                                                       | your default entity on your W&B instance |
-| X-Wandb-Project    | set the wandb project name for this call (creates this project   | {"X-Wandb-Project" : "my_dream_llm"}                                                         | `-H X-Wandb-Project: my_dream_llm`                                                       | `monitoring`                             |
-| X-Wandb-Stream     | set the StreamTable name for this call                           | {"X-Wandb-Stream" : "my_chatbot_test"}                                                       | `-H X-Wandb-Stream: my_chatbot_test`                                                     | `openai`                                 |
-| X-Wandb-Client-Id  | set this to group related requests together                      | {"X-Wandb-Client-Id" : "user_A_bottest"}                                                     | `-H X-Wandb-Client: user_A_bottest`                                                      | unique Client Id for each request        |
-| X-Wandb-Atrribute- | add custom attributes as extra columns in your data stream table | {"X-Wandb-Attribute-chatbot_name": "wandbot", "X-Wandb-Attribute-chatbot_version" : "0.0.0"} | `-H X-Wandb-Attribute-chatbot_name: wandbot -H X-Wandb-Attribute-chatbot_version: 0.0.0` | none                                     |     |
+
+| Header name | Description | SDK Example | CURL Example | Default setting |
+|-------------|-------------|-------------|--------------|-----------------|
+|X-Wandb-Entity| set the wandb entity for this call | {"X-Wandb-Entity" : "my_dream_team"}| `-H X-Wandb-Entity: my_dream_team`| your default entity on your W&B instance |
+|X-Wandb-Project| set the wandb project name for this call (creates this project | {"X-Wandb-Project" : "my_dream_llm"}| `-H X-Wandb-Project: my_dream_llm`| `monitoring` |
+|X-Wandb-Stream| set the StreamTable name for this call | {"X-Wandb-Stream" : "my_chatbot_test"}| `-H X-Wandb-Stream: my_chatbot_test` | `openai` |
+|X-Wandb-Client-Id| set this to group related requests together | {"X-Wandb-Client-Id" : "user_A_bottest"}| `-H X-Wandb-Client: user_A_bottest` | unique Client Id for each request |
+|X-Wandb-Atrribute-| add custom attributes as extra columns in your data stream table | {"X-Wandb-Attribute-chatbot_name": "wandbot", "X-Wandb-Attribute-chatbot_version" : "0.0.0"}| `-H X-Wandb-Attribute-chatbot_name: wandbot -H X-Wandb-Attribute-chatbot_version: 0.0.0` | none ||
