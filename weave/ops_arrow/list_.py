@@ -614,6 +614,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             pass
         elif isinstance(self.object_type, types.TypedDict):
             arr = self._arrow_data
+            is_dictionary_encoded = pa.types.is_dictionary(arr.type)
+
+            if is_dictionary_encoded:
+                indices = arr.indices
+                arr = arr.dictionary
+
+            else:
+                indices = None
+
             properties: dict[str, ArrowWeaveList] = {
                 k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
                     fn, pre_fn, path + (PathItemStructField(k),)
@@ -634,6 +643,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             invalid_reason = first_non_none(
                 v._invalid_reason for v in properties.values()
             )
+
+            if is_dictionary_encoded:
+                result_arr = pa.DictionaryArray.from_arrays(indices, result_arr)
 
             with_mapped_children = ArrowWeaveList(
                 result_arr,
