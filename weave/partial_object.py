@@ -38,9 +38,6 @@ class PartialObjectTypeGeneratorType(types._PlainStringNamedType):
 
     @classmethod
     def type_of_instance(cls, obj: "PartialObject") -> types.Type:
-        if obj.keys == []:
-            return cls()
-
         keys_type = typing.cast(
             types.TypedDict, types.TypeRegistry.type_of(obj.to_dict())
         )

@@ -3,7 +3,6 @@ from .. import weave_types as types
 from ..decorator_type import type as weave_type
 from ..partial_object import (
     PartialObject,
-    PartialObjectType,
     PartialObjectTypeGeneratorType,
 )
 
@@ -79,7 +78,7 @@ class Org(GQLBase):
 
 
 OrgType = Org.WeaveType()  # type: ignore
-OrgType = typing.cast(PartialObjectType, OrgType)
+OrgType = typing.cast(PartialObjectTypeGeneratorType, OrgType)
 
 
 @gql_type("entity")
@@ -91,7 +90,7 @@ class Entity(GQLBase):
 
 
 EntityType = Entity.WeaveType()  # type: ignore
-EntityType = typing.cast(PartialObjectType, EntityType)
+EntityType = typing.cast(PartialObjectTypeGeneratorType, EntityType)
 
 
 @gql_type("user")
@@ -103,7 +102,7 @@ class User(GQLBase):
 
 
 UserType = User.WeaveType()  # type: ignore
-UserType = typing.cast(PartialObjectType, UserType)
+UserType = typing.cast(PartialObjectTypeGeneratorType, UserType)
 
 
 @gql_type("project")
@@ -115,7 +114,7 @@ class Project(GQLBase):
 
 
 ProjectType = Project.WeaveType()  # type: ignore
-ProjectType = typing.cast(PartialObjectType, ProjectType)
+ProjectType = typing.cast(PartialObjectTypeGeneratorType, ProjectType)
 
 
 @gql_type("run")
@@ -127,7 +126,7 @@ class Run(GQLBase):
 
 
 RunType = Run.WeaveType()  # type: ignore
-RunType = typing.cast(PartialObjectType, RunType)
+RunType = typing.cast(PartialObjectTypeGeneratorType, RunType)
 
 
 @gql_type("artifactType")
@@ -139,7 +138,7 @@ class ArtifactType(GQLBase):
 
 
 ArtifactTypeType = ArtifactType.WeaveType()  # type: ignore
-ArtifactTypeType = typing.cast(PartialObjectType, ArtifactTypeType)
+ArtifactTypeType = typing.cast(PartialObjectTypeGeneratorType, ArtifactTypeType)
 
 
 @gql_type("artifact")  # Name and Class mismatch intention due to weave0
@@ -151,7 +150,9 @@ class ArtifactCollection(GQLBase):
 
 
 ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
-ArtifactCollectionType = typing.cast(PartialObjectType, ArtifactCollectionType)
+ArtifactCollectionType = typing.cast(
+    PartialObjectTypeGeneratorType, ArtifactCollectionType
+)
 
 
 @gql_type("artifactVersion")
@@ -162,7 +163,7 @@ class ArtifactVersion(GQLBase):
 
 
 ArtifactVersionType = ArtifactVersion.WeaveType()  # type: ignore
-ArtifactVersionType = typing.cast(PartialObjectType, ArtifactVersionType)
+ArtifactVersionType = typing.cast(PartialObjectTypeGeneratorType, ArtifactVersionType)
 
 
 @gql_type("artifactMembership")  # Name and Class mismatch intention due to weave0
@@ -174,7 +175,7 @@ class ArtifactCollectionMembership(GQLBase):
 
 ArtifactCollectionMembershipType = ArtifactCollectionMembership.WeaveType()  # type: ignore
 ArtifactCollectionMembershipType = typing.cast(
-    PartialObjectType, ArtifactCollectionMembershipType
+    PartialObjectTypeGeneratorType, ArtifactCollectionMembershipType
 )
 
 
@@ -186,7 +187,7 @@ class ArtifactAlias(GQLBase):
 
 
 ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
-ArtifactAliasType = typing.cast(PartialObjectType, ArtifactAliasType)
+ArtifactAliasType = typing.cast(PartialObjectTypeGeneratorType, ArtifactAliasType)
 
 
 @gql_type("report")
@@ -197,7 +198,7 @@ class Report(GQLBase):
 
 
 ReportType = Report.WeaveType()  # type: ignore
-ReportType = typing.cast(PartialObjectType, ReportType)
+ReportType = typing.cast(PartialObjectTypeGeneratorType, ReportType)
 
 
 @gql_type("runQueue")
@@ -208,7 +209,7 @@ class RunQueue(GQLBase):
 
 
 RunQueueType = RunQueue.WeaveType()  # type: ignore
-RunQueueType = typing.cast(PartialObjectType, RunQueueType)
+RunQueueType = typing.cast(PartialObjectTypeGeneratorType, RunQueueType)
 
 
 # Simple types (maybe should be put into primitives?)

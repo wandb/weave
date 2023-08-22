@@ -264,7 +264,7 @@ def test_keytypes_tagged():
         {"key": "c", "type": types.String()},
     ]
     assert kt_node.type == tagged_value_type.TaggedValueType(
-        types.TypedDict({"run": RunType}),
+        types.TypedDict({"run": RunType.with_attrs({})}),
         types.List(
             object_type=types.TypedDict(
                 property_types={
@@ -290,7 +290,7 @@ def test_keytypes_tagged():
 )
 def test_list_tags_accessible_to_map_elements(list_data):
     run = Run()
-    tag_type = types.TypedDict({"run": RunType})
+    tag_type = types.TypedDict({"run": RunType.with_attrs({})})
     tagged = tag_store.add_tags(list_data(), {"run": run})
     saved_node = weave.save(tagged)
     map_fn = lambda row: run_tag_getter_op(row)
