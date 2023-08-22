@@ -167,37 +167,6 @@ def recursively_build_pyarrow_array(
                     if i == 0:
                         mask.append(py_obj is None)
 
-                if any(isinstance(v, partial_object.PartialObject) for v in py_objs):
-                    _dictionary: dict[
-                        typing.Optional[str], typing.Tuple[int, typing.Any]
-                    ] = {}
-                    indices: list[typing.Optional[int]] = []
-                    for py_obj in py_objs:
-                        id = py_obj["id"] if py_obj is not None else None
-                        if id in _dictionary:
-                            indices.append(_dictionary[id][0])
-                        else:
-                            new_index = len(_dictionary)
-                            _dictionary[id] = (new_index, py_obj)
-                            indices.append(new_index)
-
-                    dictionary = [
-                        mapper._property_serializers[field.name].apply(v[1][field.name])
-                        if v[1] is not None and v[1][field.name] is not None
-                        else None
-                        for v in _dictionary.values()
-                    ]
-                    array = recursively_build_pyarrow_array(
-                        dictionary,
-                        field.type,
-                        mapper._property_serializers[field.name],
-                        True,
-                    )
-
-                    indices = pa.array(indices, type=pa.int32())
-                    array = pa.DictionaryArray.from_arrays(indices, array)
-
-                else:
                     array = recursively_build_pyarrow_array(
                         data,
                         field.type,
@@ -297,6 +266,30 @@ def recursively_build_pyarrow_array(
     values = [mapper.apply(o) if o is not None else None for o in py_objs]
 
     # These are plain values.
+
+    """
+    if any(isinstance(v, partial_object.PartialObject) for v in py_objs):
+        _dictionary: dict[typing.Optional[str], typing.Tuple[int, typing.Any]] = {}
+        indices: list[typing.Optional[int]] = []
+        for py_obj in py_objs:
+            id = py_obj["id"] if py_obj is not None else None
+            if id in _dictionary:
+                indices.append(_dictionary[id][0])
+            else:
+                new_index = len(_dictionary)
+                _dictionary[id] = (new_index, py_obj)
+                indices.append(new_index)
+
+        dictionary = [
+            mapper._property_serializers[field.name].apply(v[1][field.name])
+            if v[1] is not None and v[1][field.name] is not None
+            else None
+            for v in _dictionary.values()
+        ]
+
+        indices = pa.array(indices, type=pa.int32())
+        return pa.DictionaryArray.from_arrays(indices, array)
+    """
 
     if mapper.type == types.Number():
         # Let pyarrow infer this type.
