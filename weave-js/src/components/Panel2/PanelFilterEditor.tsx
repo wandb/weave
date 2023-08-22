@@ -222,12 +222,18 @@ const SingleFilterVisualEditor: React.FC<{
   const curClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
   const valid = visualClauseIsValid(curClause);
 
-  React.useEffect(() => { 
-    const tempClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
+  React.useEffect(() => {
+    const tempClause: VisualClauseWorkingState = {
+      key,
+      simpleKeyType,
+      op,
+      value,
+    };
     if (visualClauseIsValid(tempClause)) {
       props.setTempClause(tempClause);
     }
-  }, [props.setTempClause, key, simpleKeyType, op, value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, simpleKeyType, op, value]);
 
   return (
     <div style={{gap: '4px', display: 'flex', flexDirection: 'column'}}>
@@ -608,13 +614,15 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
   const [editingFilterIndex, setEditingFilterIndex] = React.useState<
     number | null
   >(null);
-  
+
   const visualClauses =
     value.nodeType === 'const'
       ? filterExpressionToVisualClauses(value.val)
       : null;
 
-  const [tempVal, setTempVal] = React.useState<VisualClause[] | null>(visualClauses);
+  const [tempVal, setTempVal] = React.useState<VisualClause[] | null>(
+    visualClauses
+  );
 
   if (!isFunctionLiteral(value)) {
     throw new Error('Expected function literal');
@@ -622,11 +630,18 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
 
   const inputTypes = value.type.inputTypes;
 
+  const resetTempVal = useMemo(
+    () => () => {
+      if (value.nodeType === 'const') {
+        setTempVal(filterExpressionToVisualClauses(value.val));
+      }
+    },
+    [setTempVal, value.val, value.nodeType]
+  );
+
   React.useEffect(() => {
-    if (value.nodeType === 'const') {
-      setTempVal( filterExpressionToVisualClauses(value.val));
-    }
-  }, [value]);
+    resetTempVal();
+  }, [value.val, resetTempVal]);
 
   const updateVal = useCallback(
     (newVal: any) => {
@@ -716,8 +731,8 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               }
               on="click"
               onClose={() => {
-                if(tempVal !== visualClauses && tempVal !== null) {
-                  updateValFromVisualClauses(tempVal)
+                if (tempVal !== null && !_.isEqual(tempVal, visualClauses)) {
+                  updateValFromVisualClauses(tempVal);
                 }
                 setEditingFilterIndex(null);
               }}
@@ -726,14 +741,21 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                 <SingleFilterVisualEditor
                   listNode={props.config!.node}
                   clause={clause}
-                  onCancel={() => setEditingFilterIndex(null)}
+                  onCancel={() => {
+                    resetTempVal();
+                    setEditingFilterIndex(null);
+                  }}
                   onOK={newClause => {
                     setEditingFilterIndex(null);
                     updateValFromVisualClauses(
                       setVisualClauseIndex(visualClauses, i, newClause)
                     );
                   }}
-                  setTempClause={newClause => setTempVal(setVisualClauseIndex(visualClauses, i, newClause))}
+                  setTempClause={newClause =>
+                    setTempVal(
+                      setVisualClauseIndex(visualClauses, i, newClause)
+                    )
+                  }
                 />
               }
             />
@@ -747,8 +769,8 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             }}
             on="click"
             onClose={() => {
-              if(tempVal !== visualClauses && tempVal !== null) {
-                updateValFromVisualClauses(tempVal)
+              if (tempVal !== null && !_.isEqual(tempVal, visualClauses)) {
+                updateValFromVisualClauses(tempVal);
               }
               setEditingFilterIndex(null);
             }}
@@ -768,14 +790,19 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               <SingleFilterVisualEditor
                 listNode={props.config!.node}
                 clause={null}
-                onCancel={() => setEditingFilterIndex(null)}
+                onCancel={() => {
+                  resetTempVal();
+                  setEditingFilterIndex(null);
+                }}
                 onOK={newClause => {
                   setEditingFilterIndex(null);
                   updateValFromVisualClauses(
                     addVisualClause(visualClauses, newClause)
                   );
                 }}
-                setTempClause={newClause => setTempVal(addVisualClause(visualClauses, newClause))}
+                setTempClause={newClause =>
+                  setTempVal(addVisualClause(visualClauses, newClause))
+                }
               />
             }
           />
