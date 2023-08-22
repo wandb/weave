@@ -263,7 +263,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 "References to the following variables were not resolved at paths: %s"
                 % missing_vars
             )
-        return weave_internal.make_var_node(weave.type_of(node_or_panel), name)  # type: ignore
+        return weave_internal.make_var_for_value(node_or_panel, name)  # type: ignore
 
     def finalize(self):
         missing_vars = self._normalize()

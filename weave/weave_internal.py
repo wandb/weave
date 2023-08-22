@@ -103,6 +103,15 @@ def const(val: typing.Any, type: typing.Optional[types.Type] = None) -> graph.Co
     return make_const_node(type, val)
 
 
+def make_var_for_value(v: typing.Any, name: str) -> graph.VarNode:
+    """Make a VarNode whose value is v."""
+    if not isinstance(v, graph.Node):
+        v = const(v)
+    new_var = make_var_node(v.type, name)
+    new_var._var_val = v
+    return new_var
+
+
 def make_output_node(
     type_: types.Type, op_name: str, op_params: dict[str, graph.Node]
 ) -> graph.OutputNode:
