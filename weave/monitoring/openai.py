@@ -83,19 +83,22 @@ def openai_create_postprocess(span: monitor.SpanWithInputsAndOutput) -> typing.A
                     choices[index]["finish_reason"] = choice_update["finish_reason"]
             yield item
 
-        encoding = tiktoken.encoding_for_model(record["model"])
+        if record is not None:
+            encoding = tiktoken.encoding_for_model(record["model"])
 
-        prompt_tokens = (encoding.encode(m["content"]) for m in span.inputs["messages"])
-        span.summary["prompt_tokens"] = sum(len(c) for c in prompt_tokens)
+            prompt_tokens = (
+                encoding.encode(m["content"]) for m in span.inputs["messages"]
+            )
+            span.summary["prompt_tokens"] = sum(len(c) for c in prompt_tokens)
 
-        completion_tokens = (
-            encoding.encode(c["message"]["content"]) for c in record["choices"]
-        )
-        span.summary["completion_tokens"] = sum(len(c) for c in completion_tokens)
+            completion_tokens = (
+                encoding.encode(c["message"]["content"]) for c in record["choices"]
+            )
+            span.summary["completion_tokens"] = sum(len(c) for c in completion_tokens)
 
-        span.summary["total_tokens"] = (
-            span.summary["prompt_tokens"] + span.summary["completion_tokens"]
-        )
+            span.summary["total_tokens"] = (
+                span.summary["prompt_tokens"] + span.summary["completion_tokens"]
+            )
 
         span.output = record
         span.close()
