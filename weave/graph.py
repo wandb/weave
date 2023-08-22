@@ -152,6 +152,11 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
 class VarNode(Node):
     name: str
 
+    # This is used to store the value node that the var is pointing at.
+    # Used when constructing panels to track var values so we can correctly
+    # perform refinement.
+    _var_val: typing.Optional["Node"] = None
+
     def __init__(self, type: weave_types.Type, name: str) -> None:
         self.type = type
         self.name = name
