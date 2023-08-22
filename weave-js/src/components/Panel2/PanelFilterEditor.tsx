@@ -157,7 +157,7 @@ const SingleFilterVisualEditor: React.FC<{
   listNode: Node;
   clause: VisualClause | null;
   onCancel: () => void;
-  onOK: (clause: VisualClause) => void;
+  onOK: () => void;
   setTempClause: (clause: VisualClause) => void;
 }> = props => {
   const defaultKey = props.clause?.key;
@@ -304,7 +304,7 @@ const SingleFilterVisualEditor: React.FC<{
           disabled={!valid}
           onClick={() => {
             if (valid) {
-              props.onOK(curClause);
+              props.onOK();
             } else {
               // Shouldn't really happen since we filter above.
               props.onCancel();
@@ -740,16 +740,18 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               content={
                 <SingleFilterVisualEditor
                   listNode={props.config!.node}
-                  clause={clause}
+                  clause={tempVal?.[i] ?? clause}
                   onCancel={() => {
                     resetTempVal();
                     setEditingFilterIndex(null);
                   }}
-                  onOK={newClause => {
+                  onOK={() => {
                     setEditingFilterIndex(null);
-                    updateValFromVisualClauses(
-                      setVisualClauseIndex(visualClauses, i, newClause)
-                    );
+                    if (tempVal?.[i]) {
+                      updateValFromVisualClauses(
+                        setVisualClauseIndex(visualClauses, i, tempVal?.[i])
+                      );
+                    }
                   }}
                   setTempClause={newClause =>
                     setTempVal(
@@ -794,11 +796,16 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                   resetTempVal();
                   setEditingFilterIndex(null);
                 }}
-                onOK={newClause => {
+                onOK={() => {
                   setEditingFilterIndex(null);
-                  updateValFromVisualClauses(
-                    addVisualClause(visualClauses, newClause)
-                  );
+                  if (tempVal && tempVal.length > visualClauses.length) {
+                    updateValFromVisualClauses(
+                      addVisualClause(
+                        visualClauses,
+                        tempVal?.[tempVal.length - 1]
+                      )
+                    );
+                  }
                 }}
                 setTempClause={newClause =>
                   setTempVal(addVisualClause(visualClauses, newClause))
