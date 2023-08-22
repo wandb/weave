@@ -200,7 +200,7 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
 
 
 # TODO: preserve arrow for empty list
-def _get_rows_node(self: Table) -> Node:
+def _get_rows_node(self: Table, apply_sort: bool = True) -> Node:
     # Apply Filters
     data_node = self.input_node
     if (
@@ -258,7 +258,7 @@ def _get_rows_node(self: Table) -> Node:
     )
 
     # Apply Sorting
-    if self.config and self.config.tableState.sort:
+    if self.config and self.config.tableState.sort and apply_sort:
         sort_defs = self.config.tableState.sort
 
         def make_sort_fn(sort_def, row_node):
@@ -362,7 +362,9 @@ def pinned_data(self: typing.Union[Table, Query]):
     refine_output_type=rows_refine,
 )
 def pinned_rows(self: Table):
-    rows_node = _get_rows_node(self)
+    # _get_active_node uses an "activeRowForGrouping" which is relative to the unsorted table.
+    # for the index to be correct, we need to use the unsorted table.
+    rows_node = _get_rows_node(self, apply_sort=False)
     pinned_data_node = _get_pinned_node(self, rows_node)
     return weave.use(pinned_data_node)
 
@@ -385,6 +387,8 @@ def active_data(self: Table) -> typing.Optional[dict]:
     refine_output_type=rows_single_refine,
 )
 def active_row(self: Table):
-    rows_node = _get_rows_node(self)
+    # _get_active_node uses an "activeRowForGrouping" which is relative to the unsorted table.
+    # for the index to be correct, we need to use the unsorted table.
+    rows_node = _get_rows_node(self, apply_sort=False)
     data_node = _get_active_node(self, rows_node)
     return data_node
