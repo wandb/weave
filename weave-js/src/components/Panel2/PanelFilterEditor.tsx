@@ -158,6 +158,7 @@ const SingleFilterVisualEditor: React.FC<{
   clause: VisualClause | null;
   onCancel: () => void;
   onOK: (clause: VisualClause) => void;
+  setTempClause: (clause: VisualClause) => void;
 }> = props => {
   const defaultKey = props.clause?.key;
   const defaultOp = props.clause?.op;
@@ -220,6 +221,13 @@ const SingleFilterVisualEditor: React.FC<{
 
   const curClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
   const valid = visualClauseIsValid(curClause);
+
+  React.useEffect(() => { 
+    const tempClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
+    if (visualClauseIsValid(tempClause)) {
+      props.setTempClause(tempClause);
+    }
+  }, [key, simpleKeyType, op, value]);
 
   return (
     <div style={{gap: '4px', display: 'flex', flexDirection: 'column'}}>
@@ -600,11 +608,13 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
   const [editingFilterIndex, setEditingFilterIndex] = React.useState<
     number | null
   >(null);
-
+  
   const visualClauses =
     value.nodeType === 'const'
       ? filterExpressionToVisualClauses(value.val)
       : null;
+
+  const [tempVal, setTempVal] = React.useState<VisualClause[] | null>(visualClauses);
 
   if (!isFunctionLiteral(value)) {
     throw new Error('Expected function literal');
@@ -712,6 +722,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                       setVisualClauseIndex(visualClauses, i, newClause)
                     );
                   }}
+                  setTempClause={newClause => setTempVal(setVisualClauseIndex(visualClauses, i, newClause))}
                 />
               }
             />
@@ -724,7 +735,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               },
             }}
             on="click"
-            onClose={() => setEditingFilterIndex(null)}
+            onClose={() => {
+              if(tempVal !== visualClauses && tempVal !== null) {
+                updateValFromVisualClauses(tempVal)
+              }
+              setEditingFilterIndex(null);
+            }}
             open={editingFilterIndex === -1}
             trigger={
               <div>
@@ -748,6 +764,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                     addVisualClause(visualClauses, newClause)
                   );
                 }}
+                setTempClause={newClause => setTempVal(addVisualClause(visualClauses, newClause))}
               />
             }
           />
