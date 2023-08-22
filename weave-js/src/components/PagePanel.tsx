@@ -118,7 +118,6 @@ function useEnablePageAnalytics() {
   const history = useHistory();
   const pathRef = useRef('');
   const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
-  const [userId, setUserId] = useState('');
 
   // fetch user
   useEffect(() => {
@@ -143,15 +142,14 @@ function useEnablePageAnalytics() {
       })
       .then(json => {
         const serverUserId = json?.user_id ?? '';
-        if (serverUserId !== userId) {
-          setUserId(serverUserId);
+        if (serverUserId !== '') {
           (window.analytics as any).identify(serverUserId);
         }
       })
       .catch(err => {
         console.error(err);
       });
-  }, [userId, urlPrefixed, backendWeaveViewerUrl]);
+  }, [urlPrefixed, backendWeaveViewerUrl]);
 
   useEffect(() => {
     const options = {
