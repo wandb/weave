@@ -1299,7 +1299,7 @@ def test_vectorized_prop_op_gql_pick():
         wdt.Run({"id": "C", "key2": 1}),
     ]
     for run in runs:
-        tag_store.add_tags(run, {"mytag": "test" + run.gql["id"]})
+        tag_store.add_tags(run, {"mytag": "test" + run["id"]})
     awl = arrow.to_arrow(runs)
     l = weave.save(awl)
 
@@ -1323,7 +1323,7 @@ def test_cant_vectorize_without_keys():
         wdt.Run({"id": "C", "key2": 1}),
     ]
     for run in runs:
-        tag_store.add_tags(run, {"mytag": "test" + run.gql["id"]})
+        tag_store.add_tags(run, {"mytag": "test" + run["id"]})
     awl = arrow.to_arrow(runs)
 
     fn = weave_internal.define_fn(

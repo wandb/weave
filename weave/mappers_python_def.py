@@ -16,6 +16,7 @@ from . import mappers_python
 from . import val_const
 from . import artifact_fs
 from . import timestamp as weave_timestamp
+from . import partial_object
 from .language_features.tagging import tagged_value_type
 
 
@@ -59,10 +60,17 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         result_type = self._obj_type
 
         # TODO: I think these are hacks in my branch. What do they do?
-        instance_class = result_type._instance_classes()[0]
+
+        if isinstance(result_type, partial_object.PartialObjectType):
+            instance_class = result_type.keyless_weave_type_class.instance_class
+        else:
+            instance_class = result_type._instance_classes()[0]
+
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
-            if k in constructor_sig.parameters:
+            if k in constructor_sig.parameters or isinstance(
+                result_type, partial_object.PartialObjectType
+            ):
                 # None haxxx
                 # TODO: remove
                 obj_val = obj.get(k)
@@ -77,7 +85,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         if "artifact" in constructor_sig.parameters and "artifact" not in result:
             result["artifact"] = self._artifact
         try:
-            return instance_class(**result)
+            return (
+                instance_class(**result)
+                if not issubclass(instance_class, partial_object.PartialObject)
+                else instance_class.from_keys(result)
+            )
         except:
             raise errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)

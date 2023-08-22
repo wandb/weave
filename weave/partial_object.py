@@ -64,7 +64,10 @@ class PartialObject:
         return {key: getattr(self, key) for key in self.keys}
 
     def __getitem__(self, key: str) -> typing.Any:
-        return getattr(self, key)
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
 
     def __setitem__(self, key: str, value: typing.Any) -> None:
         return setattr(self, key, value)
