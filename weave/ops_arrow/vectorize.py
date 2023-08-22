@@ -682,7 +682,7 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     from .. import graph_debug
 
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
-    logging.info("Vectorizing. Vectorized: %s", fn)
+    logging.info("Vectorizing. Vectorized: %s", vecced)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     vec_time = time.time()
     # print("CALLED ", called)

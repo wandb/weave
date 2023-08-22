@@ -55,9 +55,10 @@ def listindex(self, index):
     end_indexes = a.offsets[1:]
     if isinstance(index, int) and index < 0:
         take_indexes = pa.compute.add(end_indexes, index)
+        oob = pa.compute.less(take_indexes, start_indexes)
     else:
         take_indexes = pa.compute.add(start_indexes, index)
-    oob = pa.compute.greater_equal(take_indexes, end_indexes)
+        oob = pa.compute.greater_equal(take_indexes, end_indexes)
     take_indexes = pa.compute.if_else(oob, None, take_indexes)
     result = a.flatten().take(take_indexes)
     return ArrowWeaveList(
