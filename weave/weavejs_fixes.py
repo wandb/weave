@@ -213,7 +213,7 @@ def remove_gql_haskeys_from_types(data):
         for key in data:
             if key == "type":
                 if data[key] == "PartialObject":
-                    return data["keyless_weave_type_class"]["type"]
+                    return data["keyless_weave_type_class"]
     return data
 
 
