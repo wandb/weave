@@ -2,7 +2,7 @@ import analytics
 import socket
 
 from . import context_state
-from . import env
+from . import environment
 
 analytics.write_key = "uJ8vZgKqTBVH6ZdhD4GZGZYsR7ucfJmb"
 
@@ -24,7 +24,7 @@ def _identify():
 
 def analytics_enabled():
     context_enabled = context_state.analytics_enabled()
-    env_enabled = env.usage_analytics_enabled
+    env_enabled = environment.usage_analytics_enabled
 
     return context_enabled and env_enabled
 
