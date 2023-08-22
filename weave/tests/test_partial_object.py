@@ -348,7 +348,7 @@ def test_op_with_refiner(fake_wandb):
                         "type": "typedDict",
                         "propertyTypes": {
                             "project": {
-                                "type": "GQLHasKeys",
+                                "type": "PartialObject",
                                 "keys": {
                                     "id": "string",
                                     "name": "string",
@@ -393,7 +393,7 @@ def test_op_with_refiner(fake_wandb):
                         },
                     },
                     "value": {
-                        "type": "GQLHasKeys",
+                        "type": "PartialObject",
                         "keys": {
                             "id": "string",
                             "name": "string",
@@ -417,7 +417,7 @@ def test_op_with_refiner(fake_wandb):
                     },
                 },
                 "project": {
-                    "type": "GQLHasKeys",
+                    "type": "PartialObject",
                     "keys": {
                         "id": "string",
                         "name": "string",
@@ -495,7 +495,7 @@ def test_gql_connection_op():
             "type": "typedDict",
             "propertyTypes": {
                 "project": {
-                    "type": "GQLHasKeys",
+                    "type": "PartialObject",
                     "keys": {
                         "id": "string",
                         "name": "string",
@@ -562,7 +562,7 @@ def test_gql_connection_op():
             },
         },
         "value": {
-            "type": "GQLHasKeys",
+            "type": "PartialObject",
             "keys": {"id": "string"},
             "keyless_weave_type_class": "artifactVersion",
         },

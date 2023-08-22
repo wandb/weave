@@ -265,6 +265,9 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     @classproperty
     def _name(cls) -> str:
+        if hasattr(cls, "name"):
+            if isinstance(cls.name, str):
+                return cls.name
         if cls == Type:
             return "type"
         return typing.cast(str, cls.__name__).removesuffix("Type")

@@ -220,9 +220,12 @@ def gql_direct_edge_op(
             if param_str_fn:
                 param_str = param_str_fn(InputProvider(additional_inputs))
                 name = partial_object._make_alias(param_str, prefix=prop_name)
+
+            assert issubclass(output_type.instance_class, partial_object.PartialObject)
+
             if is_many:
                 return [
-                    output_type.instance_class.from_gql(item)
+                    output_type.instance_class.from_keys(item)
                     for item in getattr(gql_obj, name)
                 ]
             if (
@@ -232,7 +235,7 @@ def gql_direct_edge_op(
             gql_val = gql_obj[name]
             if gql_val is None:
                 return None
-            return output_type.instance_class.from_gql(gql_val)
+            return output_type.instance_class.from_keys(gql_val)
 
     sig = signature(gql_relationship_getter_op)
     base_params = (
