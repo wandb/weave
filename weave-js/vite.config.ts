@@ -70,6 +70,7 @@ export default defineConfig(({mode, command}) => {
       replacement: `${__dirname}/node_modules/type/plain-function/is`,
     },
     {find: 'type', replacement: `component-type`},
+    {find: 'each', replacement: `${__dirname}/node_modules/@ndhoule/each`},
     {find: 'unserialize', replacement: 'yields-unserialize'},
   ];
 
@@ -142,7 +143,7 @@ export default defineConfig(({mode, command}) => {
           target: 'http://localhost:9994',
           secure: false,
           changeOrigin: true,
-        }
+        },
       },
     },
     preview: {
