@@ -159,6 +159,7 @@ function useEnablePageAnalytics() {
       },
     };
 
+    // TODO: Make this DRY-er
     const unlisten = history.listen(location => {
       const currentPath = `${location.pathname}${location.search}`;
       const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
@@ -170,9 +171,9 @@ function useEnablePageAnalytics() {
 
     // Track initial page view
     const initialPath = `${history.location.pathname}${history.location.search}`;
-    const fullURL = `${window.location.protocol}//${window.location.host}${history.location.pathname}${history.location.search}${history.location.hash}`;
+    const entireURL = `${window.location.protocol}//${window.location.host}${history.location.pathname}${history.location.search}${history.location.hash}`;
     if (pathRef.current !== initialPath) {
-      trackPage({url: fullURL}, options);
+      trackPage({url: entireURL}, options);
       pathRef.current = initialPath;
     }
 
