@@ -76,6 +76,10 @@ jobs:
           yarn install --frozen-lockfile
           yarn eslint --max-warnings=0
           yarn tslint
+          yarn prettier-fix
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git diff --quiet && git diff --staged --quiet || (git commit -am "Format code" && git push)
           yarn prettier
           yarn run tsc
 
