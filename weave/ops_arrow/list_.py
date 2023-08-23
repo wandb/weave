@@ -662,14 +662,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             pass
         elif isinstance(self.object_type, types.TypedDict):
             arr = self._arrow_data
-            is_dictionary_encoded = pa.types.is_dictionary(arr.type)
-
-            if is_dictionary_encoded:
-                indices = arr.indices
-                arr = arr.dictionary
-
-            else:
-                indices = None
 
             properties: dict[str, ArrowWeaveList] = {
                 k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
@@ -692,9 +684,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 v._invalid_reason for v in properties.values()
             )
 
-            if is_dictionary_encoded:
-                result_arr = pa.DictionaryArray.from_arrays(indices, result_arr)
-
             with_mapped_children = ArrowWeaveList(
                 result_arr,
                 types.TypedDict({k: v.object_type for k, v in properties.items()}),
@@ -703,6 +692,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )
         elif isinstance(self.object_type, types.ObjectType):
             arr = self._arrow_data
+
+            is_dictionary_encoded = pa.types.is_dictionary(arr.type)
+
+            if is_dictionary_encoded:
+                indices = arr.indices
+                arr = arr.dictionary
+            else:
+                indices = None
+
             attrs: dict[str, ArrowWeaveList] = {
                 k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
                     fn, pre_fn, path + (PathItemObjectField(k),)
@@ -710,16 +708,21 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 for k, v in self.object_type.property_types().items()
             }
 
+            result_arr = pa.StructArray.from_arrays(
+                [v._arrow_data for v in attrs.values()],
+                list(attrs.keys()),
+                mask=pa.compute.is_null(arr),
+            )
+
+            if is_dictionary_encoded:
+                result_arr = pa.DictionaryArray.from_arrays(indices, result_arr)
+
             # Types of some of the attrs may have changed. But some property types on object
             # types are no variable, and it is invalid to change them from our type system's
             # perspective. So the result here is invalid ArrowWeaveList. The results should
             # only be used in cirumstances where this is acceptable.
             with_mapped_children = ArrowWeaveList(
-                pa.StructArray.from_arrays(
-                    [v._arrow_data for v in attrs.values()],
-                    list(attrs.keys()),
-                    mask=pa.compute.is_null(arr),
-                ),
+                result_arr,
                 self.object_type,
                 self._artifact,
                 invalid_reason="mapped_column on ObjectType can produce invalid ArrowWeaveList",
@@ -987,13 +990,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         function_type_paths = reverse_dict(function_type_paths)
         return function_type_paths
 
-    def obj_type_paths(
+    def non_dict_obj_type_paths(
         self,
     ) -> dict[PathType, types.Type]:
         obj_type_paths: dict[PathType, types.Type] = {}
 
         def _save_obj_type_path(list: ArrowWeaveList, path: PathType) -> None:
-            if isinstance(list.object_type, types.ObjectType):
+            if isinstance(
+                list.object_type, types.ObjectType
+            ) and not pa.types.is_dictionary(list._arrow_data.type):
                 obj_type_paths[path] = list.object_type
             return None
 
@@ -1094,12 +1099,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         custom_type_paths = value.custom_type_paths()
         function_type_paths = value.function_type_paths()
-        obj_type_paths = value.obj_type_paths()
+        obj_type_paths = value.non_dict_obj_type_paths()
 
         value_awl, dict_columns = value.separate_dictionaries()
         value_py = value_awl._arrow_data.to_pylist()
 
-        dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
+        dict_columns = {
+            p: (c._arrow_data.to_pylist(), c.object_type)
+            for p, c in dict_columns.items()
+        }
 
         for path, obj_type in obj_type_paths.items():
             try:
@@ -1117,12 +1125,22 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )
         # Dictionary decode the value, and add the tags to the tag store,
         # in a single pass.
-        for path2, dict_col in dict_columns.items():
+        for path2, (dict_col, obj_type) in dict_columns.items():
+            try:
+                instance_class = obj_type.instance_class
+            except IndexError:
+                assert isinstance(obj_type, partial_object.PartialObjectType)
+                instance_class = obj_type.keyless_weave_type_class.instance_class
+
             set_path(
                 value_py,
                 value_awl._arrow_data,
                 (PathItemOuterList(),) + path2,
-                lambda v, j: None if v == None else dict_col[v],
+                lambda v, j: None
+                if v == None
+                else dict_col[v]
+                if isinstance(dict_col[v], str)
+                else instance_class(dict_col[v]),
             )
 
         for path, type_ in custom_type_paths.items():
