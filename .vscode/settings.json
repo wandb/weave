@@ -1,12 +1,12 @@
 {
-  "python.linting.mypyEnabled": false,
-  "python.linting.enabled": true,
-  "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true,
-  "python.testing.cwd": "./weave",
-  "python.formatting.provider": "black",
-  "search.exclude": {
-    "weave/frontend": true
-  },
-  "black-formatter.importStrategy": "fromEnvironment"
+    "python.linting.mypyEnabled": true,
+    "python.linting.enabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.cwd": "./weave",
+    "python.formatting.provider": "black",
+    "search.exclude": {
+        "weave/frontend": true
+    },
+    "black-formatter.importStrategy": "fromEnvironment"
 }
