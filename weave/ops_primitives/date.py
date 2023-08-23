@@ -47,7 +47,7 @@ def datetimetd_sub(lhs, rhs):
     output_type=types.optional(types.Timestamp()),
 )
 def datetime_add(lhs, rhs):
-    if rhs == None:
+    if rhs == None or rhs < 0:
         return None
     return lhs + datetime.timedelta(milliseconds=rhs)
 
