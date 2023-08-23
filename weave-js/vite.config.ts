@@ -98,7 +98,7 @@ export default defineConfig(({mode, command}) => {
 
   return {
     plugins,
-    base:
+    base: 
       mode === 'production' && command !== 'serve'
         ? // eslint-disable-next-line node/no-process-env
           process.env.URL_BASE ?? '/__frontend/'
@@ -140,7 +140,7 @@ export default defineConfig(({mode, command}) => {
           changeOrigin: true,
         },
         // This ensures our dynamic env.js file is served from the backend
-        '^.*/__frontend/env.js': {
+        '^.*/__frontend/.*': {
           target: 'http://localhost:9994',
           secure: false,
           changeOrigin: true,
