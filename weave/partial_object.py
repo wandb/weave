@@ -24,7 +24,7 @@ class PartialObjectTypeGeneratorType(types._PlainStringNamedType):
     """
 
     @classmethod
-    def with_attrs(cls, attrs: dict[str, types.Type]) -> "PartialObjectType":
+    def with_keys(cls, attrs: dict[str, types.Type]) -> "PartialObjectType":
         """Creates a new Weave Type that is assignable to the original Weave Type, but
         also has the specified keys. This is used during the compile pass for creating a Weave Type
         to represent the exact shape of a PartialObject, and for communicating that shape to arrow.
@@ -35,7 +35,7 @@ class PartialObjectTypeGeneratorType(types._PlainStringNamedType):
     @classmethod
     def type_of_instance(cls, obj: "PartialObject") -> types.Type:
         keys_type = typing.cast(types.TypedDict, types.TypeRegistry.type_of(obj.keys))
-        return cls.with_attrs(keys_type.property_types)
+        return cls.with_keys(keys_type.property_types)
 
 
 @dataclass

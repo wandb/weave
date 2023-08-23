@@ -37,7 +37,7 @@ def test_gql_compilation_with_keys():
     expected = TaggedValueType(
         types.TypedDict(
             {
-                "project": wdt.ProjectType.with_attrs(
+                "project": wdt.ProjectType.with_keys(
                     {
                         "id": types.String(),
                         "name": types.String(),
@@ -49,7 +49,7 @@ def test_gql_compilation_with_keys():
         types.List(
             TaggedValueType(
                 types.TypedDict(
-                    {"run": wdt.RunType.with_attrs(run_type_keys.property_types)}
+                    {"run": wdt.RunType.with_keys(run_type_keys.property_types)}
                 ),
                 types.String(),
             )
@@ -63,8 +63,8 @@ def test_gql_compilation_root_op_custom_key_fn():
     root = root_all_projects().limit(1)[0].runs().id()
     compiled_node = compile.compile([root])[0]
 
-    run_type = wdt.RunType.with_attrs({"id": types.String(), "name": types.String()})
-    project_type = wdt.ProjectType.with_attrs(
+    run_type = wdt.RunType.with_keys({"id": types.String(), "name": types.String()})
+    project_type = wdt.ProjectType.with_keys(
         {
             "id": types.String(),
             "name": types.String(),
@@ -92,7 +92,7 @@ def test_project_artifacts():
     expected = TaggedValueType(
         types.TypedDict(
             {
-                "project": wdt.ProjectType.with_attrs(
+                "project": wdt.ProjectType.with_keys(
                     {
                         "id": types.String(),
                         "name": types.String(),
@@ -143,7 +143,7 @@ def test_typename():
     expected = TaggedValueType(
         types.TypedDict(
             {
-                "project": wdt.ProjectType.with_attrs(
+                "project": wdt.ProjectType.with_keys(
                     {
                         "id": types.String(),
                         "name": types.String(),
@@ -198,7 +198,7 @@ def test_last_membership():
     expected = TaggedValueType(
         types.TypedDict(
             {
-                "project": wdt.ProjectType.with_attrs(
+                "project": wdt.ProjectType.with_keys(
                     {
                         "id": types.String(),
                         "name": types.String(),
@@ -253,7 +253,7 @@ def test_last_membership():
             }
         ),
         types.optional(
-            wdt.ArtifactCollectionMembershipType.with_attrs({"id": types.String()})
+            wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()})
         ),
     )
 
@@ -266,7 +266,7 @@ def test_mapped_last_membership():
     expected = TaggedValueType(
         types.TypedDict(
             {
-                "project": wdt.ProjectType.with_attrs(
+                "project": wdt.ProjectType.with_keys(
                     {
                         "id": types.String(),
                         "name": types.String(),
@@ -322,7 +322,7 @@ def test_mapped_last_membership():
         ),
         types.List(
             types.optional(
-                wdt.ArtifactCollectionMembershipType.with_attrs({"id": types.String()})
+                wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()})
             )
         ),
     )
@@ -620,7 +620,7 @@ def test_early_termination_of_gql_key_propagation(fake_wandb):
         TaggedValueType(
             types.TypedDict(
                 {
-                    "project": wdt.ProjectType.with_attrs(
+                    "project": wdt.ProjectType.with_keys(
                         {"id": types.String(), "name": types.String()}
                     )
                 }

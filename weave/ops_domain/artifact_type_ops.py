@@ -64,7 +64,7 @@ first_100_artifacts_alias = _make_alias("first: 100", prefix="artifacts")
             }}
         }}
     }}""",
-        gql_op_output_type=lambda inputs, input_type: wdt.ArtifactVersionType.with_attrs(
+        gql_op_output_type=lambda inputs, input_type: wdt.ArtifactVersionType.with_keys(
             typing.cast(typing.Any, input_type)
             .keys[first_100_collections_alias]["edges"]
             .object_type["node"][first_100_artifacts_alias]["edges"]

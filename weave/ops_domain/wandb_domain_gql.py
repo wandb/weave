@@ -87,7 +87,7 @@ def register_vectorized_gql_prop_op(
     assert isinstance(
         original_scalar_input_type, partial_object.PartialObjectTypeGeneratorType
     )
-    scalar_input_type = original_scalar_input_type.with_attrs(
+    scalar_input_type = original_scalar_input_type.with_keys(
         {prop_name: scalar_output_type}
     )
 
@@ -229,7 +229,7 @@ def gql_direct_edge_op(
             if is_many:
                 new_keys = typing.cast(weave_types.List, new_keys).object_type
             new_keys = typing.cast(weave_types.TypedDict, new_keys)
-            ret_type = output_type.with_attrs(new_keys.property_types)
+            ret_type = output_type.with_keys(new_keys.property_types)
 
         if is_many:
             ret_type = weave_types.List(ret_type)
@@ -361,7 +361,7 @@ def gql_connection_op(
                     ).object_type,
                 ).property_types["node"],
             )
-            return weave_types.List(output_type.with_attrs(new_keys.property_types))
+            return weave_types.List(output_type.with_keys(new_keys.property_types))
 
         return weave_types.List(output_type)
 
@@ -436,7 +436,7 @@ def make_root_op_gql_op_output_type(
             if isinstance(key_type, weave_types.TypedDict):
                 key_type = key_type.property_types[key]
 
-        object_type = output_type.with_attrs(
+        object_type = output_type.with_keys(
             typing.cast(weave_types.TypedDict, key_type).property_types
         )
         return weave_types.List(object_type)

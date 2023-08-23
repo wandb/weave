@@ -557,7 +557,7 @@ def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node
 
                 key = gql_to_weave.get_outermost_alias(inner_fragment)
                 subtype = typing.cast(types.TypedDict, key_type.property_types[key])
-                output_type = output_type.with_attrs(subtype.property_types)
+                output_type = output_type.with_keys(subtype.property_types)
 
                 return graph.OutputNode(
                     output_type,
