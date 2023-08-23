@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import os
 import typing
 
 from weave.client_interface import ClientInterface
@@ -78,7 +79,7 @@ def get_client() -> typing.Optional[ClientInterface]:
 
 
 def get_frontend_url():
-    url = context_state.get_frontend_url()
+    url = os.environ.get("WEAVE_FRONTEND_URL", context_state.get_frontend_url())
     if url is None:
         client = get_client()
         if isinstance(client, server.HttpServerClient):
