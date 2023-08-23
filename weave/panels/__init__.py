@@ -44,6 +44,7 @@ from .panel_object_picker import ObjectPicker, ObjectPickerConfig
 
 # basic
 from .panel_basic import *
+from .panel_string import PanelString
 
 # domain
 from .panel_domain import *
