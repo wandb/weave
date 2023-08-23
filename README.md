@@ -4,7 +4,7 @@
 
 ---
 
-Hello 👋 and welcome to Weave!
+Hello from the outside (of the organization) 👋 and welcome to Weave!
 
 Weave, developed by the team at Weights and Biases, is a new open-source toolkit designed for performant, interactive data exploration.
 Our mission is to equip Machine Learning practitioners with the best tools to turn data into insights quickly and easily.
@@ -16,7 +16,7 @@ Whether you are a seasoned data scientist, an aspiring ML practitioner, or just 
 [Run in a Google Colab ->](https://colab.research.google.com/drive/1TwlhvvoWIHKDtRUu6eW0NMRq0GzGZ9oX)
 [Run in a Jupyter notebook ->](./examples/get_started.ipynb)
 
-Install via `pip install weave`, `import weave` in your notebook, and explore your data  with one line of code!
+Install via `pip install weave`, `import weave` in your notebook, and explore your data with one line of code!
 
 **1. View a dataframe**
 
