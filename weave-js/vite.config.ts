@@ -138,8 +138,7 @@ export default defineConfig(({mode, command}) => {
           secure: false,
           changeOrigin: true,
         },
-        // This ensures our dynamic env.js file is served from the backend
-        '^.*/__frontend/env.js': {
+        '^.*/__frontend/.*': {
           target: 'http://localhost:9994',
           secure: false,
           changeOrigin: true,
