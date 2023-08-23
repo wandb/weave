@@ -110,6 +110,7 @@ export {
   IconOrchestrationLaunch,
   IconOrganizationCorporate,
   IconOverflowHorizontal,
+  IconOverflowVertical,
   IconPanTool,
   IconPanTool1,
   IconPanel,

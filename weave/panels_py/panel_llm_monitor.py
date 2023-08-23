@@ -294,6 +294,7 @@ def board(
             y_expr=lambda row: row.count(),
             y_title="request count",
             color_expr=lambda row: grouping_fn(row),
+            color_title="group",
             x_domain=user_zoom_range,
             n_bins=100,
             mark="bar",
@@ -310,6 +311,7 @@ def board(
             y_expr=lambda row: row["summary.cost"].sum(),
             y_title="total cost ($)",
             color_expr=lambda row: grouping_fn(row),
+            color_title="group",
             x_domain=user_zoom_range,
             n_bins=50,
         ),
@@ -325,6 +327,7 @@ def board(
             y_expr=lambda row: row["summary.latency_s"].avg(),
             y_title="avg latency (s)",
             color_expr=lambda row: grouping_fn(row),
+            color_title="group",
             x_domain=user_zoom_range,
             n_bins=50,
         ),
@@ -369,11 +372,11 @@ def board(
     requests_table = panels.Table(filtered_window_data)  # type: ignore
     requests_table.add_column(lambda row: row["output.model"], "Model")
     requests_table.add_column(
-        lambda row: row["inputs.messages"][-1]["content"], "inputs.messages[-1].content"
+        lambda row: row["inputs.messages"][-1]["content"], "Last Prompt"
     )
     requests_table.add_column(
         lambda row: row["output.choices"][-1]["message.content"],
-        "output.choices[-1].message.content",
+        "Completion",
     )
     requests_table.add_column(lambda row: row["summary.prompt_tokens"], "Prompt Tokens")
     requests_table.add_column(

@@ -92,10 +92,15 @@ type VisualClause =
   | VisualClauseNumber;
 
 interface VisualClauseWorkingState {
-  key: string | undefined;
-  simpleKeyType: 'number' | 'string' | 'boolean' | 'other';
-  op: string | undefined;
-  value: string | string[] | number | boolean | undefined;
+  key?: string | undefined;
+  simpleKeyType?: 'number' | 'string' | 'boolean' | 'other';
+  op?: string | undefined;
+  value?:
+    | string
+    | number
+    | boolean
+    | Array<string | number | boolean>
+    | undefined;
 }
 
 const visualClauseIsValid = (
@@ -155,16 +160,17 @@ const keySortOrder = (key: string) => {
 
 const SingleFilterVisualEditor: React.FC<{
   listNode: Node;
-  clause: VisualClause | null;
+  clause: VisualClause | VisualClauseWorkingState | null;
   onCancel: () => void;
-  onOK: (clause: VisualClause) => void;
-}> = props => {
-  const defaultKey = props.clause?.key;
-  const defaultOp = props.clause?.op;
-  const defaultValue = props.clause?.value;
+  onOK: () => void;
+  setTempClause: (clause: VisualClauseWorkingState) => void;
+}> = ({listNode, clause, onCancel, onOK, setTempClause}) => {
+  const defaultKey = clause?.key;
+  const defaultOp = clause?.op;
+  const defaultValue = clause?.value;
 
   const listItem = opIndex({
-    arr: props.listNode,
+    arr: listNode,
     index: varNode('number', 'n'),
   });
   const keyChoices = pickSuggestions(listItem.type)
@@ -176,9 +182,8 @@ const SingleFilterVisualEditor: React.FC<{
     .sort((a, b) => keySortOrder(a) - keySortOrder(b) || a.localeCompare(b));
   const keyOptions = keyChoices.map(k => ({text: k, value: k, k}));
 
-  const [key, setKey] = useState<string | undefined>(
-    defaultKey ?? keyChoices[0]
-  );
+  const key = defaultKey ?? keyChoices[0];
+
   const simpleKeyType = getSimpleKeyType(
     opPick({
       obj: listItem,
@@ -189,8 +194,8 @@ const SingleFilterVisualEditor: React.FC<{
   const opChoices = getOpChoices(simpleKeyType);
   const opOptions = opChoices.map(k => ({text: k, value: k, k}));
 
-  const [op, setOp] = useState<string | undefined>(defaultOp ?? opChoices[0]);
-  const [value, setValue] = useState<any | undefined>(defaultValue);
+  const op = defaultOp ?? opChoices[0];
+  const value = defaultValue;
 
   // const valueQuery =
   // TODO: opLimit is broken in weave python when we have an ArrowWeaveList...
@@ -198,7 +203,7 @@ const SingleFilterVisualEditor: React.FC<{
   //   key != null
   //     ? opLimit({
   //         arr: opUnique({
-  //           arr: opPick({obj: props.listNode, key: constString(key)}),
+  //           arr: opPick({obj: listNode, key: constString(key)}),
   //         }),
   //         limit: constNumber(500),
   //       })
@@ -206,7 +211,7 @@ const SingleFilterVisualEditor: React.FC<{
   const valueQuery =
     key != null && simpleKeyType === 'string'
       ? opUnique({
-          arr: opPick({obj: props.listNode, key: constString(key)}),
+          arr: opPick({obj: listNode, key: constString(key)}),
         })
       : voidNode();
   const valueChoices = useNodeValue(valueQuery).result ?? [];
@@ -218,8 +223,17 @@ const SingleFilterVisualEditor: React.FC<{
       key: v.toString(),
     }));
 
-  const curClause: VisualClauseWorkingState = {key, simpleKeyType, op, value};
+  const curClause: VisualClauseWorkingState = useMemo(
+    () => ({key, simpleKeyType, op, value}),
+    [key, simpleKeyType, op, value]
+  );
   const valid = visualClauseIsValid(curClause);
+  const handleSetClause = useCallback(
+    (partialClause: VisualClauseWorkingState) => {
+      setTempClause({...curClause, ...partialClause});
+    },
+    [curClause, setTempClause]
+  );
 
   return (
     <div style={{gap: '4px', display: 'flex', flexDirection: 'column'}}>
@@ -234,9 +248,12 @@ const SingleFilterVisualEditor: React.FC<{
             }).type
           );
           const newOpChoices = getOpChoices(newSimpleKeyType);
-          setKey(newKey);
-          setOp(newOpChoices[0]);
-          setValue(undefined);
+          handleSetClause({
+            key: newKey,
+            simpleKeyType: newSimpleKeyType,
+            op: newOpChoices[0],
+            value: undefined,
+          });
         }}
         options={keyOptions}
         selection
@@ -245,24 +262,28 @@ const SingleFilterVisualEditor: React.FC<{
         value={op}
         onChange={(e, {value: v}) => {
           if (v === 'in') {
-            if (op === '=') {
-              setValue([value]);
+            if (
+              op === '=' &&
+              typeof value !== 'object' &&
+              typeof value !== 'undefined'
+            ) {
+              handleSetClause({value: [value]});
             } else {
-              setValue([]);
+              handleSetClause({value: []});
             }
           } else {
-            setValue(undefined);
+            handleSetClause({value: undefined});
           }
-          setOp(v as string);
+          handleSetClause({op: v as string});
         }}
         options={opOptions}
         selection
       />
       {simpleKeyType === 'number' ? (
         <NumberInput
-          value={value}
+          value={value as number | undefined}
           onChange={newVal => {
-            setValue(newVal);
+            handleSetClause({value: newVal});
           }}
         />
       ) : (
@@ -270,7 +291,7 @@ const SingleFilterVisualEditor: React.FC<{
           value={value}
           multiple={op === 'in'}
           onChange={(e, {value: v}) => {
-            setValue(v);
+            handleSetClause({value: v});
           }}
           options={valueOptions}
           selection
@@ -283,17 +304,17 @@ const SingleFilterVisualEditor: React.FC<{
           justifyContent: 'flex-end',
           marginTop: '4px',
         }}>
-        <Button onClick={props.onCancel} variant="secondary">
+        <Button onClick={onCancel} variant="secondary">
           Cancel
         </Button>
         <Button
           disabled={!valid}
           onClick={() => {
             if (valid) {
-              props.onOK(curClause);
+              onOK();
             } else {
               // Shouldn't really happen since we filter above.
-              props.onCancel();
+              onCancel();
             }
           }}>
           OK
@@ -596,10 +617,12 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     ? constFunction({}, () => voidNode() as any)
     : valueQuery.result;
   const setVal = useMutation(valueNode, 'set');
-  const [mode, setMode] = React.useState<'visual' | 'expression'>('visual');
-  const [editingFilterIndex, setEditingFilterIndex] = React.useState<
-    number | null
-  >(null);
+  const [mode, setMode] = useState<'visual' | 'expression'>('visual');
+  const [editingFilterIndex, setEditingFilterIndex] = useState<number | null>(
+    null
+  );
+  const [editingFilter, setEditingFilter] =
+    useState<VisualClauseWorkingState | null>(null);
 
   const visualClauses =
     value.nodeType === 'const'
@@ -611,7 +634,6 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
   }
 
   const inputTypes = value.type.inputTypes;
-
   const updateVal = useCallback(
     (newVal: any) => {
       // console.log('SET VAL NEW VAL', newVal);
@@ -648,6 +670,37 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
     },
     [listItem.type, updateVal]
   );
+
+  const resetEditedFilter = useCallback(() => {
+    setEditingFilterIndex(null);
+    setEditingFilter(null);
+  }, [setEditingFilterIndex, setEditingFilter]);
+
+  const commitEditedFilter = useCallback(() => {
+    if (
+      visualClauses &&
+      editingFilter !== null &&
+      visualClauseIsValid(editingFilter) &&
+      editingFilterIndex != null
+    ) {
+      if (editingFilterIndex === -1) {
+        updateValFromVisualClauses(
+          addVisualClause(visualClauses, editingFilter)
+        );
+      } else if (!_.isEqual(editingFilter, visualClauses[editingFilterIndex])) {
+        updateValFromVisualClauses(
+          setVisualClauseIndex(visualClauses, editingFilterIndex, editingFilter)
+        );
+      }
+    }
+    setEditingFilterIndex(null);
+    setEditingFilter(null);
+  }, [
+    editingFilter,
+    editingFilterIndex,
+    updateValFromVisualClauses,
+    visualClauses,
+  ]);
 
   const paramVars = useMemo(
     () => _.mapValues(inputTypes, (type, name) => varNode(type, name)),
@@ -699,19 +752,15 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
                 />
               }
               on="click"
-              onClose={() => setEditingFilterIndex(null)}
+              onClose={commitEditedFilter}
               open={editingFilterIndex === i}
               content={
                 <SingleFilterVisualEditor
                   listNode={props.config!.node}
-                  clause={clause}
-                  onCancel={() => setEditingFilterIndex(null)}
-                  onOK={newClause => {
-                    setEditingFilterIndex(null);
-                    updateValFromVisualClauses(
-                      setVisualClauseIndex(visualClauses, i, newClause)
-                    );
-                  }}
+                  clause={editingFilter ?? clause}
+                  onCancel={resetEditedFilter}
+                  onOK={commitEditedFilter}
+                  setTempClause={setEditingFilter}
                 />
               }
             />
@@ -724,15 +773,13 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
               },
             }}
             on="click"
-            onClose={() => setEditingFilterIndex(null)}
+            onClose={commitEditedFilter}
             open={editingFilterIndex === -1}
             trigger={
               <div>
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    setEditingFilterIndex(-1);
-                  }}>
+                  onClick={() => setEditingFilterIndex(-1)}>
                   + New filter
                 </Button>
               </div>
@@ -740,14 +787,10 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
             content={
               <SingleFilterVisualEditor
                 listNode={props.config!.node}
-                clause={null}
-                onCancel={() => setEditingFilterIndex(null)}
-                onOK={newClause => {
-                  setEditingFilterIndex(null);
-                  updateValFromVisualClauses(
-                    addVisualClause(visualClauses, newClause)
-                  );
-                }}
+                clause={editingFilter || null}
+                onCancel={resetEditedFilter}
+                onOK={commitEditedFilter}
+                setTempClause={setEditingFilter}
               />
             }
           />

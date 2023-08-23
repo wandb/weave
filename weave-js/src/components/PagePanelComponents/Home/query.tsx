@@ -230,15 +230,25 @@ const projectRunLoggedTablesNode = (
 };
 
 const opProjectRunLoggedTableArtifacts = ({project}: {project: w.Node}) => {
-  const artifactTypesNode = w.opProjectArtifactType({
-    project,
-    artifactType: w.constString('run_table'),
-  });
-  const artifactsNode = w.opArtifactTypeArtifacts({
-    artifactType: artifactTypesNode,
-  });
+  return w.constNode(w.list('artifact'), []);
+  // There is currently a bug with RunLoggedTables in preview panel
+  // temporarily disabling them. This bug is documented here:
+  // https://wandb.atlassian.net/browse/WB-15157.
+  //
+  // The bug originated from
+  // https://github.com/wandb/weave/commit/d34cf7af93dc06f32e1c931b2aec571c969304d5
+  // which fixes board generation for StreamTables but broke for logged tables.
+  //
+  //
+  // const artifactTypesNode = w.opProjectArtifactType({
+  //   project,
+  //   artifactType: w.constString('run_table'),
+  // });
+  // const artifactsNode = w.opArtifactTypeArtifacts({
+  //   artifactType: artifactTypesNode,
+  // });
 
-  return artifactsNode;
+  // return artifactsNode;
 };
 
 // Bad Weave-form... just materializing the data
