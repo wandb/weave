@@ -913,9 +913,9 @@ export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
 export const useNodeWithServerType = (
   node: NodeOrVoidNode,
   paramFrame?: Frame,
-  options?: {async?: boolean; callSite?: string}
+  options?: {skip?: boolean; callSite?: string}
 ): {loading: boolean; result: NodeOrVoidNode} => {
-  const async = options?.async;
+  const skip = options?.skip;
   const stack = usePanelContext().stack;
   if (paramFrame != null) {
     for (const [name, value] of Object.entries(paramFrame)) {
@@ -937,6 +937,9 @@ export const useNodeWithServerType = (
 
   const promiseRef = useRef<Promise<any> | null>(null);
   useEffect(() => {
+    if (skip) {
+      return;
+    }
     let isMounted = true;
     if (node.nodeType === 'const') {
       setResult({node, value: node});
@@ -952,7 +955,7 @@ export const useNodeWithServerType = (
           return;
         }
         if (isMounted) {
-          if (async) {
+          if (skip) {
             const currentType = (result.value ?? dereffedNode).type;
             const nextType = newNode.type;
             if (!_.isEqual(currentType, nextType)) {
@@ -980,11 +983,11 @@ export const useNodeWithServerType = (
     // off a refinement request if nodes in the graph have changed, but not
     // their types!
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weave, dereffedNode, async]);
+  }, [weave, dereffedNode, skip]);
 
   const finalResult = useMemo(() => {
-    if (async) {
-      return {loading: false, result: result.value ?? node};
+    if (skip) {
+      return {loading: false, result: node};
     }
     if (error != null) {
       // rethrow in render thread
@@ -997,7 +1000,7 @@ export const useNodeWithServerType = (
       loading: node !== result.node,
       result: node === result.node ? result.value : node,
     };
-  }, [async, result, node, error]);
+  }, [skip, result, node, error]);
   return finalResult;
 };
 

@@ -309,6 +309,7 @@ export const addChild = (
 
 // Must match the variables that the rest of the UI
 // pushes onto the stack!
+// Implementation should exactly match mapPanelsAsync
 export const mapPanels = (
   node: PanelTreeNode,
   stack: Stack,
@@ -337,6 +338,57 @@ export const mapPanels = (
     const children: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
       children[key] = mapPanels(fullNode.config[key], stack, fn);
+    }
+    withMappedChildren = {
+      ...fullNode,
+      config: {...fullNode.config, ...children},
+    };
+  } else if (isTableStatePanel(fullNode.id)) {
+    // TODO: not yet handled
+  }
+  // TODO: This doesn't create "input" variables like ChildPanel does. But I think that's ok
+  // becuase it only happens at render time?
+
+  return fn(withMappedChildren, stack);
+};
+
+// Implementation should exactly match mapPanels (the sync version!)
+export const mapPanelsAsync = async (
+  node: PanelTreeNode,
+  stack: Stack,
+  fn: (
+    node: ChildPanelFullConfig,
+    stack: Stack
+  ) => Promise<ChildPanelFullConfig>
+): Promise<ChildPanelFullConfig> => {
+  const fullNode = getFullChildPanel(node);
+  let withMappedChildren: ChildPanelFullConfig = fullNode;
+  if (isGroupNode(fullNode)) {
+    const items: {[key: string]: ChildPanelFullConfig} = {};
+    let childFrame: Frame = {};
+    for (const key of Object.keys(fullNode.config.items)) {
+      const childItem = fullNode.config.items[key];
+      items[key] = await mapPanelsAsync(
+        fullNode.config.items[key],
+        pushFrame(stack, childFrame),
+        fn
+      );
+      const childVars = getItemVars(
+        key,
+        childItem,
+        stack,
+        fullNode.config.allowedPanels
+      );
+      childFrame = {...childFrame, ...childVars};
+    }
+    withMappedChildren = {
+      ...fullNode,
+      config: {...fullNode.config, items},
+    };
+  } else if (isStandardPanel(fullNode.id)) {
+    const children: {[key: string]: ChildPanelFullConfig} = {};
+    for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
+      children[key] = await mapPanelsAsync(fullNode.config[key], stack, fn);
     }
     withMappedChildren = {
       ...fullNode,

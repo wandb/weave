@@ -221,7 +221,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 
   const dashEnabled = useWeaveDashUiEnable();
   panelInputExpr = useNodeWithServerType(panelInputExpr, undefined, {
-    async: dashEnabled,
+    skip: dashEnabled,
   }).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,

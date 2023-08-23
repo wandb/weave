@@ -1,6 +1,11 @@
-import {constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
+import {
+  constNodeUnsafe,
+  NodeOrVoidNode,
+  refineEditingNode,
+  Stack,
+} from '@wandb/weave/core';
 import {produce} from 'immer';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import _ from 'lodash';
 import {useWeaveContext} from '../../context';
@@ -28,7 +33,7 @@ import {
 } from './PanelInteractContext';
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
-import {getConfigForPath} from './panelTree';
+import {getConfigForPath, mapPanels, mapPanelsAsync} from './panelTree';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {PanelPanelContextProvider} from './PanelPanelContextProvider';
@@ -73,45 +78,65 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
 
   const setPanelConfig = updateConfig2;
 
+  const loaded = useRef(false);
+
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
-        const loadedPanel = getFullChildPanel(panelQuery.result);
+        let loadedPanel = getFullChildPanel(panelQuery.result);
+        loadedPanel = mapPanels(
+          loadedPanel,
+          stack,
+          (panel, childStack) => panel
+        );
 
-        // Hydration is not totally correct yet and results in invalid states.
-        // Turning it off for now. This means the UI can be consistent in other
-        // ways: panels which expect to always have a config may have undefined.
-        // Python may mass us unitialized panels (panels that don't have
-        // configs, or even just expressions). We walk through and initialize
-        // them here to make sure our panel state is valid.
-        // let hydratedPanel: ChildPanelFullConfig;
-        // try {
-        //   hydratedPanel = await mapPanels(
-        //     loadedPanel,
-        //     stack,
-        //     async (panel: ChildPanelFullConfig, childStack: Stack) => {
-        //       if (panel.config != null) {
-        //         return panel;
-        //       }
-        //       const {id, config} = await initPanel(
-        //         weave,
-        //         panel.input_node,
-        //         panel.id,
-        //         undefined,
-        //         childStack
-        //       );
-        //       return {...panel, id, config};
-        //     }
-        //   );
-        // } catch (e) {
-        //   console.error('Error hydrating panel', e);
-        //   return;
-        // }
+        // We walk all panels, refining all input_nodes.
+        // Don't this can actually happen asynchronously because the document should
+        // already have correct types. It should be much less common that the type
+        // refinement results have changed (like when a user adds a new column to a
+        // table). But if we don't block rendering on this, we'll get a flash and extra
+        // expensive requests if the types do change. Currently the types can change
+        // because of implementation differences between JS and Python. We need to fix
+        // those before doing it truly asynchronously.
+        const hydratedPanel = await mapPanelsAsync(
+          loadedPanel,
+          stack,
+          async (panel: ChildPanelFullConfig, childStack: Stack) => {
+            if (panel.config != null) {
+              return panel;
+            }
+            const refinedInputNode = (await refineEditingNode(
+              weave.client,
+              panel.input_node,
+              childStack
+            )) as NodeOrVoidNode;
+            return {...panel, input_node: refinedInputNode};
 
-        const hydratedPanel = loadedPanel;
+            // A former attempt at hydration also initialized all the panels.
+            // This is still more correct, but I haven't tried to get it fully working yet.
+            // We want to do this because Python code doesn't always hydrate panels, for
+            // example it may just set an input_node and expect js to figure out an auto
+            // panel.
+            // const {id, config} = await initPanel(
+            //   weave,
+            //   panel.input_node,
+            //   panel.id,
+            //   undefined,
+            //   childStack
+            // );
+            // return {...panel, id, config};
+          }
+        );
+        // console.log('ORIG PANEL', loadedPanel);
+        // console.log('HYRDATED PANEL', loadedPanel);
+        // console.log('DIFFERENCE', difference(loadedPanel, hydratedPanel));
+
         setPanelConfig(() => hydratedPanel);
       };
-      doLoad();
+      if (!loaded.current) {
+        loaded.current = true;
+        doLoad();
+      }
       return;
     }
   }, [
