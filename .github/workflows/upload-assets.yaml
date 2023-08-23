@@ -50,5 +50,5 @@ jobs:
           ./weave/frontend/bundle.sh
           git config --global user.name 'Weave Build Bot'
           git config --global user.email weave@wandb.com
-          git commit -a -m 'chore(bot): update frontend bundle sha'
+          git commit -a -m 'chore(bot): update frontend bundle sha [no ci]'
           git push
