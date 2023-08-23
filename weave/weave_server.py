@@ -9,6 +9,7 @@ import base64
 import typing
 import zlib
 import urllib.parse
+import requests
 from flask import json
 from werkzeug.exceptions import HTTPException
 
@@ -16,7 +17,7 @@ from flask import Flask, Blueprint, Response
 from flask import request
 from flask import abort
 from flask_cors import CORS
-from flask import send_from_directory
+from flask import send_from_directory, make_response, redirect
 import wandb
 
 from weave import context_state, graph, server, value_or_error
@@ -379,6 +380,17 @@ def frontend(path):
 @blueprint.route("/", defaults={"path": None})
 @blueprint.route("/<path:path>")
 def root_frontend(path):
+    if request.args.get("unsetBetaVersion") is not None:
+        resp = redirect_without_qs_param("unsetBetaVersion")
+        resp.set_cookie("betaVersion", "", max_age=0)
+        return resp
+
+    new_beta_version = request.args.get("betaVersion")
+    if new_beta_version is not None:
+        resp = redirect_without_qs_param("betaVersion")
+        resp.set_cookie("betaVersion", new_beta_version)
+        return resp
+
     # To support server cases where we're mounted under an existing path, i.e.
     # /wandb/weave, then index.html will load something like /wandb/weave/.../env.js
     if path is not None:
@@ -386,7 +398,27 @@ def root_frontend(path):
     if path == "env.js":
         js = f"window.WEAVE_CONFIG = {json.dumps(frontend_env())}"
         return Response(js, mimetype="application/javascript")
+
+    beta_version = request.cookies.get("betaVersion")
+    if beta_version is not None:
+        beta_version = beta_version[:9]
+        content = requests.get(
+            f"https://cdn.wandb.ai/weave/{beta_version}/index.html",
+            stream=True,
+        ).content
+        return Response(content, mimetype="text/html")
+
     return send_from_directory(blueprint.static_folder, "index.html")
+
+
+def redirect_without_qs_param(param: str):
+    qs_pairs = []
+    for k, v in request.args.items():
+        if k != param:
+            qs_pairs.append(f"{k}={v}")
+    qs = "&".join(qs_pairs)
+    resp = redirect(f"{request.path}?{qs}")
+    return resp
 
 
 @blueprint.route("/__weave/hello")
