@@ -8,7 +8,7 @@
   // We're turning off that default behavior and loading our own updated version of JQuery instead.
   // We must ensure that JQuery is fully loaded before inserting the OneTrust script
   // to avoid potential timing issues.
-  insertScript('/__frontend/jquery-3.6.0.min.js').then(() =>
+  insertScript('/jquery-3.6.0.min.js').then(() =>
     insertScript(
       'https://cdn.cookielaw.org/consent/da0f7ab4-835a-42da-beeb-767dcff7d1cc.js'
     )
@@ -124,12 +124,12 @@
       // this is segment's analytics.js library (https://github.com/segmentio/analytics.js-core) bundled with all of our integrations and settings.
       // it can be retrieved from https://cdn.segment.com/analytics.js/v1/WmJvIs1MTqNjKAeQmEyw6TvqyRI5Su2z/analytics.min.js
       // we serve it locally since cdn.segment.com is usually blocked by ad-blockers.
-      insertCookieControlledScript('/__frontend/sa.min.js', 2, () =>
+      insertCookieControlledScript('/sa.min.js', 2, () =>
         analyticsCallback()
       );
 
       // autotrack.js provides the trackers required below
-      insertCookieControlledScript('/__frontend/autotrack.js', 2);
+      insertCookieControlledScript('/autotrack.js', 2);
       window.ga =
         window.ga ||
         function () {
