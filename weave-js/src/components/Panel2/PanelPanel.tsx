@@ -1,5 +1,6 @@
 import {
   constNodeUnsafe,
+  EditingNode,
   NodeOrVoidNode,
   refineEditingNode,
   Stack,
@@ -87,6 +88,9 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
+        // not sure if providing this refine cache really helps anything, but why not.
+
+        const refineCache = new Map<EditingNode, EditingNode>();
         let loadedPanel = getFullChildPanel(panelQuery.result);
 
         // We walk all panels, refining all input_nodes.
@@ -104,7 +108,8 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
             const refinedInputNode = (await refineEditingNode(
               weave.client,
               panel.input_node,
-              childStack
+              childStack,
+              refineCache
             )) as NodeOrVoidNode;
             return {...panel, input_node: refinedInputNode};
 
