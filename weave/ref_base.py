@@ -29,7 +29,7 @@ class Ref:
     ):
         self._type = type
         self.extra = extra
-        if obj is not None and type is not None and type._name != "tagged":
+        if obj is not None and type is not None and type.name != "tagged":
             obj = box.box(obj)
             _put_ref(obj, self)
         self._obj = obj
@@ -51,7 +51,7 @@ class Ref:
         obj = self._get()
 
         obj = box.box(obj)
-        if self.type._name != "tagged":
+        if self.type.name != "tagged":
             _put_ref(obj, self)
         self._obj = obj
 

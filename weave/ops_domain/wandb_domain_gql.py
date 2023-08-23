@@ -128,7 +128,7 @@ def gql_prop_op(
     output_type: weave_types.Type,
     hidden: bool = False,
 ):
-    first_arg_name = input_type._name
+    first_arg_name = input_type.name
 
     def gql_property_getter_op_fn(**inputs):
         return getattr(inputs[first_arg_name], prop_name)
@@ -190,7 +190,7 @@ def gql_direct_edge_op(
     is_many: bool = False,
 ):
     is_root = input_type is None
-    first_arg_name = "gql_obj" if input_type is None else input_type._name
+    first_arg_name = "gql_obj" if input_type is None else input_type.name
     if not output_type.instance_class or isinstance(
         output_type.instance_class, wb_domain_types.PartialObject
     ):
@@ -311,7 +311,7 @@ def gql_connection_op(
     additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
     param_str_fn: typing.Optional[typing.Callable[[InputProvider], str]] = None,
 ):
-    first_arg_name = "gql_obj" if input_type is None else input_type._name
+    first_arg_name = "gql_obj" if input_type is None else input_type.name
     if not output_type.instance_class or isinstance(
         output_type.instance_class, wb_domain_types.PartialObject
     ):

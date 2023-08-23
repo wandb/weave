@@ -7,8 +7,6 @@ from ..partial_object import (
 )
 
 
-from ..decorator_class import weave_class
-
 """
 This file contains all the "W&B Domain Types". Each domain type should
 correspond to exactly 1 type/interface in the WB GQL schema. Not all types are
@@ -42,27 +40,29 @@ require changing a few of the ops to fetch such info as well
 def gql_type(
     name: str,
 ) -> typing.Callable[[typing.Type["GQLBase"]], typing.Type[PartialObject]]:
-    """Decorator that emits a Weave Type for the decorated PartialObject instance type. Classes decorated
+    """Decorator that emits a Weave Type for the decorated GQL instance type. Classes decorated
     with this decorator also emit a keyless weavetype. E.g.,
 
-    @gql_weave_type("project")
-    class Project(GQLTypeMixin):
+    @gql_type("project")
+    class Project(GQLBase):
         ...
 
     will emit a Weave Type for projectType(). Instances of projectType() have a method called
     with_keys() that allows them to generate instances of projectTypeWithKeys({...}).
     """
 
-    def _gql_type(_instance_class: typing.Type[GQLBase]) -> typing.Type[PartialObject]:
-        TargetType = type(f"{name}Type", (PartialObjectTypeGeneratorType,), {})
-        TargetType._name = name  # type: ignore
+    def _gql_weave_type(
+        _instance_class: typing.Type["GQLBase"],
+    ) -> typing.Type[PartialObject]:
+        decorator = weave_type(
+            name,
+            True,
+            None,
+            [PartialObjectTypeGeneratorType],
+        )
+        return decorator(_instance_class)
 
-        decorator = weave_class(TargetType)
-        FinalInstanceClass = decorator(_instance_class)
-        FinalInstanceClass.WeaveType = TargetType  # type: ignore
-        return FinalInstanceClass
-
-    return _gql_type
+    return _gql_weave_type
 
 
 class GQLBase(PartialObject):

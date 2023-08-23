@@ -107,7 +107,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         first_arg = named_args[0]
 
         # Enforce the disallow list
-        if first_arg.type._name in disallow_mapping_type_name_list:
+        if first_arg.type.name in disallow_mapping_type_name_list:
             return False
 
         # Here, we check if the first_arg is unknown. If it is, then we cannot tell

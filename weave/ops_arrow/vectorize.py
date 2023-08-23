@@ -33,7 +33,7 @@ def make_vectorized_object_constructor(constructor_op_name: str) -> None:
             "Unexpected. All object type constructors have fixed return types."
         )
 
-    type_name = constructor_op.raw_output_type._name
+    type_name = constructor_op.raw_output_type.name
     vectorized_constructor_op_name = f'ArrowWeaveList-{type_name.replace("-", "_")}'
     if registry_mem.memory_registry.have_op(vectorized_constructor_op_name):
         return

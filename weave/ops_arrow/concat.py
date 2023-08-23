@@ -123,7 +123,7 @@ def _concatenate_objects(
     l2: ArrowWeaveListGeneric[types.ObjectType],
     depth: int = 0,
 ) -> ArrowWeaveList:
-    assert l1.object_type._name == l2.object_type._name
+    assert l1.object_type.name == l2.object_type.name
     attrs: dict[str, ArrowWeaveList] = {}
     merged_type = typing.cast(
         types.ObjectType, types.merge_types(l1.object_type, l2.object_type)
@@ -219,7 +219,7 @@ def _concatenate_non_unions(
     if is_typedict_arrowweavelist(self) and is_typedict_arrowweavelist(other):
         return _concatenate_typeddicts(self, other, depth=depth)
     elif is_object_arrowweavelist(self) and is_object_arrowweavelist(other):
-        if self.object_type._name == other.object_type._name:
+        if self.object_type.name == other.object_type.name:
             return _concatenate_objects(self, other, depth=depth)
     elif is_taggedvalue_arrowweavelist(self) and is_taggedvalue_arrowweavelist(other):
         return _concatenate_taggedvalues(self, other, depth=depth)

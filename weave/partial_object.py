@@ -85,7 +85,7 @@ class PartialObject:
         return getattr(self, key, default)
 
 
-class PartialObjectType(types.ObjectType):
+class PartialObjectType(types.Type):
     """Base class for types like projectTypeWithKeys({...}), runTypeWithKeys({...}), etc.
 
     Assignability rules:

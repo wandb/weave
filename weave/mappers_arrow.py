@@ -16,6 +16,8 @@ from . import artifact_base
 from .language_features.tagging import tagged_value_type
 import contextvars
 
+from . import partial_object
+
 
 _in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
 
@@ -251,7 +253,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
         # Or we'll use save_instance which return a RefType (which we encode
         #     as a pyarrow string).
 
-        if self.type._name == "run":
+        if self.type.name == "run":
             return pa.struct(
                 (
                     pa.field("entity_name", pa.string()),
@@ -259,7 +261,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
                     pa.field("run_id", pa.string()),
                 )
             )
-        elif self.type._name == "artifact":
+        elif self.type.name == "artifact":
             return pa.struct(
                 (
                     pa.field("entity_name", pa.string()),
@@ -268,7 +270,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
                     pa.field("artifact_name", pa.string()),
                 )
             )
-        elif self.type._name == "panel":
+        elif self.type.name == "panel":
             return pa.struct(
                 (
                     pa.field("id", pa.string()),
@@ -277,22 +279,22 @@ class DefaultToArrow(mappers_python.DefaultToPy):
                 )
             )
         elif (
-            self.type._name == "WeaveNDArray"
-            or self.type._name == "pil_image"
-            or self.type._name == "ArrowArray"
-            or self.type._name == "ArrowTable"
-            or self.type._name == "FilesystemArtifact"
-            or self.type._name == "file"
+            self.type.name == "WeaveNDArray"
+            or self.type.name == "pil_image"
+            or self.type.name == "ArrowArray"
+            or self.type.name == "ArrowTable"
+            or self.type.name == "FilesystemArtifact"
+            or self.type.name == "file"
         ):
             # Ref type
             return pa.string()
-        elif self.type._name == "timestamp":
+        elif self.type.name == "timestamp":
             return pa.timestamp("ms", tz="+00:00")
-        elif self.type._name == "date":
+        elif self.type.name == "date":
             return pa.timestamp("ms", tz="+00:00")
-        elif self.type._name == "type":
+        elif self.type.name == "type":
             return pa.string()
-        elif self.type._name == "ndarray":
+        elif self.type.name == "ndarray":
             return pa.null()
 
         raise errors.WeaveInternalError(
@@ -302,7 +304,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
     def apply(self, obj):
         # Hacking... when its a panel, we need to json dump the node and config
         res = super().apply(obj)
-        if self.type._name == "panel":
+        if self.type.name == "panel":
             res["input"] = json.dumps(res["input"])
             res["config"] = json.dumps(res["config"])
         return res
@@ -311,7 +313,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
 class DefaultFromArrow(mappers_python.DefaultFromPy):
     def apply(self, obj):
         # Hacking... when its a panel, we need to json load the node and config
-        if self.type._name == "panel":
+        if self.type.name == "panel":
             obj["input"] = json.loads(obj["input"])
             obj["config"] = json.loads(obj["config"])
         return super().apply(obj)
@@ -326,6 +328,22 @@ class ArrowToArrowWeaveListOrPylist(mappers_python.ListToPyList):
             return obj
 
         return super().apply(obj)
+
+
+class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
+    def result_type(self):
+        return pa.struct(
+            [
+                pa.field(key, self._property_serializers[key].result_type())
+                for key in self.type.keys
+            ]
+        )
+
+    def as_typeddict_mapper(self):
+        typed_dict_type = types.TypedDict(self.type.keys)
+        return TypedDictToArrowStruct(
+            typed_dict_type, self.mapper, self._artifact, self.path
+        )
 
 
 class DictSavedAsStringToArrowString(mappers.Mapper):
@@ -346,6 +364,8 @@ def map_to_arrow_(
         return ListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return UnionToArrowUnion(type, mapper, artifact, path)
+    elif isinstance(type, partial_object.PartialObjectType):
+        return GQLHasKeysToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):
@@ -379,6 +399,8 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
         return ArrowToArrowWeaveListOrPylist(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return ArrowUnionToUnion(type, mapper, artifact, path)
+    elif isinstance(type, partial_object.PartialObjectType):
+        return mappers_python.GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return mappers_python.ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):

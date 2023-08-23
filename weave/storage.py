@@ -34,13 +34,13 @@ def split_path_dotfile(path, dotfile_name):
 
 
 def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
-    return wb_type._name
+    return wb_type.name
     # This tries to figure out which variable references obj.
     # But it is slow when there are a lot of references. If we want to do
     # something like this, we'll need to do it somewhere closer to user
     # interaction.
     # obj_names = util.find_names(obj)
-    # return f"{wb_type._name}-{obj_names[-1]}"
+    # return f"{wb_type.name}-{obj_names[-1]}"
 
 
 def _get_weave_type(obj: typing.Any):
@@ -120,7 +120,7 @@ def _direct_publish(
 
     wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
     name = name or _get_name(weave_type, obj)
-    wb_artifact_type_name = wb_artifact_type_name or weave_type._name
+    wb_artifact_type_name = wb_artifact_type_name or weave_type.name
 
     _assert_valid_artifact_name(name)
     _assert_valid_project_name(wb_project_name)
@@ -316,7 +316,7 @@ def recursively_unwrap_arrow(obj):
 def _default_ref_persister_artifact(
     type: types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
 ) -> artifact_base.Artifact:
-    fs_art = artifact_local.LocalArtifact(type._name, "latest")
+    fs_art = artifact_local.LocalArtifact(type.name, "latest")
     # Save all the reffed objects into the new artifact.
     for mem_ref in refs:
         if mem_ref.path is not None and mem_ref._type is not None:

@@ -82,7 +82,7 @@ def type_name_to_type_map():
     res = {}
     type_classes = get_type_classes()
     for type_class in type_classes:
-        name = type_class._name
+        name = type_class.name
         if name is not None:
             res[name] = type_class
     return res
@@ -124,7 +124,7 @@ class TypeRegistry:
         #
         # TODO: Its a small that we need to hardcode here. Fix this.
         potential_types = instance_class_to_potential_type(type(obj))  # type: ignore
-        if "function" in (t._name for t in potential_types):
+        if "function" in (t.name for t in potential_types):
             potential_types = [Function]
 
         for type_ in reversed(potential_types):
@@ -264,13 +264,10 @@ class Type(metaclass=_TypeSubclassWatcher):
         return cls()
 
     @classproperty
-    def _name(cls) -> str:
-        if hasattr(cls, "name"):
-            if isinstance(cls.name, str):
-                return cls.name
+    def name(cls):
         if cls == Type:
             return "type"
-        return typing.cast(str, cls.__name__).removesuffix("Type")
+        return cls.__name__.removesuffix("Type")
 
     @property  # type: ignore
     def instance_class(self):
@@ -281,7 +278,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         # throughout this code path, like checking for class equality instead of using isinstance
 
         # Unions or union-like things (tagged unions) must be handled first
-        if next_type._name == "tagged":
+        if next_type.name == "tagged":
             next_type = next_type._assignment_form  # type: ignore
 
         is_assignable_to = next_type._is_assignable_to(self)
@@ -321,13 +318,13 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     @classmethod
     def class_to_dict(cls) -> dict[str, typing.Any]:
-        d = {"type": cls._name}
+        d = {"type": cls.name}
         if cls._base_type is not None:
             d["_base_type"] = cls._base_type.class_to_dict()
         return d
 
     def to_dict(self) -> typing.Union[dict, str]:
-        d = {"type": self._name}
+        d = {"type": self.name}
         d.update(self._to_dict())
         return d
 
@@ -335,7 +332,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         fields = dataclasses.fields(self.__class__)
         type_props = {}
         if self._base_type is not None:
-            type_props["_base_type"] = {"type": self._base_type._name}
+            type_props["_base_type"] = {"type": self._base_type.name}
         for field in fields:
             # TODO: I really don't like this change. Only needed because
             # FileType has optional fields... Remove?
@@ -402,7 +399,7 @@ class Type(metaclass=_TypeSubclassWatcher):
 class _PlainStringNamedType(Type):
     def to_dict(self):
         # A basic type is serialized as just its string name.
-        return self._name
+        return self.name
 
 
 class BasicType(_PlainStringNamedType):
@@ -1314,7 +1311,7 @@ def merge_types(a: Type, b: Type) -> Type:
             next_prop_types[key] = merge_types(self_prop_type, other_prop_type)
         return TypedDict(next_prop_types)
     if isinstance(a, ObjectType) and isinstance(b, ObjectType):
-        if a._name == b._name:
+        if a.name == b.name:
             next_type_attrs = {}
             for key in a.type_attrs():
                 next_type_attrs[key] = merge_types(getattr(a, key), getattr(b, key))
@@ -1544,7 +1541,7 @@ def is_custom_type(t: Type) -> bool:
         or isinstance(t, List)
         or isinstance(t, UnionType)
         or isinstance(t, Timestamp)
-        or t._name == "tagged"
+        or t.name == "tagged"
     )
 
 

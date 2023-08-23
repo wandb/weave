@@ -4,7 +4,7 @@ import weave
 types = weave.types.get_type_classes()
 
 
-@pytest.mark.parametrize("type_name, type_cls", [(t._name, t) for t in types])
+@pytest.mark.parametrize("type_name, type_cls", [(t.name, t) for t in types])
 def test_const_assignment(type_name, type_cls):
     from ..ops_domain import wb_domain_types as wdt
 

@@ -257,7 +257,7 @@ def _make_auto_op_map_fn(when_type: typing.Callable[[types.Type], bool], call_op
                 or (
                     isinstance(op_def.concrete_output_type, types.Type)
                     and op_def.concrete_output_type._base_type is not None
-                    and op_def.concrete_output_type._base_type._name == "Panel"
+                    and op_def.concrete_output_type._base_type.name == "Panel"
                 )
             ):
                 # These are supposed to be a passthrough op, we don't want to convert

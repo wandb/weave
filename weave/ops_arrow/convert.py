@@ -12,7 +12,6 @@ from .. import artifact_mem
 from .. import errors
 from .. import arrow_util
 from .. import api
-from .. import partial_object
 
 
 from .arrow import (
@@ -126,20 +125,15 @@ def recursively_build_pyarrow_array(
                 mappers_arrow.TypedDictToArrowStruct,
                 mappers_arrow.TaggedValueToArrowStruct,
                 mappers_arrow.ObjectToArrowStruct,
+                mappers_arrow.GQLHasKeysToArrowStruct,
             ),
         )
 
-        # handle empty struct case - the case where the struct has no fields
-        if len(pyarrow_type) == 0:
-            return pa.array(py_objs, type=pyarrow_type)
-
-        if isinstance(mapper, mappers_arrow.ObjectToArrowStruct) and any(
-            isinstance(obj, partial_object.PartialObject) for obj in py_objs
-        ):
+        if isinstance(mapper, mappers_arrow.GQLHasKeysToArrowStruct):
             _dictionary: dict[typing.Optional[str], typing.Tuple[int, typing.Any]] = {}
             indices: list[typing.Optional[int]] = []
             for py_obj in py_objs:
-                id = py_obj["id"] if py_obj is not None else None
+                id = py_obj.gql["id"] if py_obj is not None else None
                 if id in _dictionary:
                     indices.append(_dictionary[id][0])
                 else:
@@ -154,7 +148,7 @@ def recursively_build_pyarrow_array(
             array = recursively_build_pyarrow_array(
                 dictionary,
                 pyarrow_type,
-                mapper,
+                mapper.as_typeddict_mapper(),
                 True,
             )
 
@@ -162,6 +156,10 @@ def recursively_build_pyarrow_array(
             return pa.DictionaryArray.from_arrays(indices, array)
 
         else:
+            # handle empty struct case - the case where the struct has no fields
+            if len(pyarrow_type) == 0:
+                return pa.array(py_objs, type=pyarrow_type)
+
             for i, field in enumerate(pyarrow_type):
                 data: list[typing.Any] = []
                 if isinstance(
@@ -234,6 +232,25 @@ def recursively_build_pyarrow_array(
                             mapper._value_serializer,
                             py_objs_already_mapped,
                         )
+                else:
+                    assert isinstance(
+                        mapper,
+                        mappers_arrow.GQLHasKeysToArrowStruct,
+                    )
+                    for py_obj in py_objs:
+                        if py_obj is None:
+                            data.append(None)
+                        else:
+                            data.append(mapper.apply(py_obj))
+                        if i == 0:
+                            mask.append(py_obj is None)
+
+                    array = recursively_build_pyarrow_array(
+                        data,
+                        field.type,
+                        mapper._property_serializers[field.name],
+                        False,
+                    )
 
                 arrays.append(array)
                 keys.append(field.name)
