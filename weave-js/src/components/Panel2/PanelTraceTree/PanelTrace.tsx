@@ -10,6 +10,7 @@ import {
   opDict,
   opLimit,
   opMap,
+  opNumberMult,
   opPick,
 } from '@wandb/weave/core';
 import {Loader} from 'semantic-ui-react';
@@ -67,11 +68,20 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
         ({row, index}) =>
           opDict({
             name: opPick({obj: row, key: constString('name')}),
-            start_time_s: opPick({
-              obj: row,
-              key: constString('start_time_s'),
+            start_time_ms: opNumberMult({
+              lhs: opPick({
+                obj: row,
+                key: constString('start_time_s'),
+              }),
+              rhs: constNumber(1000),
             }),
-            end_time_s: opPick({obj: row, key: constString('end_time_s')}),
+            end_time_ms: opNumberMult({
+              lhs: opPick({
+                obj: row,
+                key: constString('end_time_s'),
+              }),
+              rhs: constNumber(1000),
+            }),
             trace_id: opPick({obj: row, key: constString('trace_id')}),
             span_id: opPick({obj: row, key: constString('span_id')}),
             parent_id: opPick({obj: row, key: constString('parent_id')}),

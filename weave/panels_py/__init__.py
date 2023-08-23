@@ -5,3 +5,4 @@ from . import generator_templates
 # This is just an example, uncomment to enable
 # from . import panel_example_custom_board
 from . import panel_llm_monitor
+from . import panel_trace_monitor
