@@ -16,7 +16,7 @@ if (!window.WEAVE_CONFIG) {
     ANALYTICS_DISABLED: false,
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
-  };
+                                                                                          };
 }
 
 interface Config {
