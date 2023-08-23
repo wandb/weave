@@ -222,13 +222,6 @@ class FakeClient:
         )
 
 
-def hold_out_keys_from_traversal(d):
-    held_out_from_traversal = {}
-    held_out_from_traversal["summaryMetricsSubset"] = d.pop("summaryMetricsSubset")
-    held_out_from_traversal["summaryMetrics"] = d.pop("summaryMetrics")
-    return held_out_from_traversal
-
-
 class FakeApi:
     client = FakeClient()
     run = mock.Mock(return_value=FakeRun())
