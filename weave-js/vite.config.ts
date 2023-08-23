@@ -72,6 +72,7 @@ export default defineConfig(({mode, command}) => {
     {find: 'type', replacement: `component-type`},
     {find: 'each', replacement: `${__dirname}/node_modules/@ndhoule/each`},
     {find: 'unserialize', replacement: 'yields-unserialize'},
+    {find: 'each', replacement: 'component-each'},
   ];
 
   const plugins: any = [svgr(), blockCjsPlugin, fileUrls];
