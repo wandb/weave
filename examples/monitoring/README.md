@@ -7,7 +7,9 @@ Maintain data privacy and control by leveraging W&B's [hosting options](https://
 ## Notebooks
 
 - [OpenAI Monitoring Demo](../monitoring/openai_client_quickstart.ipynb): create, explore, and share OpenAI Monitoring Boards in Weave
-- [OpenAI Proxy Quickstart](../monitoring/openai_proxy_quickstart.ipynb): set up a proxy to monitor OpenAI API calls
+- OpenAI Proxy Quickstart: set up a proxy to monitor OpenAI API calls
+  - [Enterprise Mode OpenAI Proxy Quickstart](../monitoring/openai_proxy_quickstart_enterprise_mode.ipynb) - Quickstart designed for enterprise users
+  - [General OpenAI Proxy Quickstart](../monitoring/openai_proxy_quickstart.ipynb) - Quickstart designed for non-enterprise / free users
 - [Weave Monitoring API](../monitoring/weave_monitor_api.ipynb): understand the Weave monitoring API
 
 <img src="../../docs/assets/mini_prodmon_overview.gif" width="65%">
