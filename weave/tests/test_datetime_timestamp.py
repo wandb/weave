@@ -9,17 +9,17 @@ import weave
 def assert_date_string(
     diff: typing.Union[float, int],
     unit: str,
-    suffix: typing.Literal["ago", "from now"],
     actual: str,
 ):
     if diff == 1:
         unit = unit[:-1]
 
-    diff = round(diff, 2)
+    round_unit = 1 if unit == "years" or unit == "months" else 0
+    diff = round(diff, round_unit)
     if int(diff) == diff:
         diff = int(diff)
 
-    expected = f"{diff} {unit} {suffix}"
+    expected = f"{diff} {unit}"
     assert actual == expected
 
 
@@ -38,8 +38,8 @@ def test_relative_string_autoformat(multiplier, unit, num_ms):
     from_now_result = weave.use(date.auto_format_relative_string(ts1, ts2))
     ago_result = weave.use(date.auto_format_relative_string(ts2, ts1))
 
-    assert_date_string(multiplier, unit, "from now", from_now_result)
-    assert_date_string(multiplier, unit, "ago", ago_result)
+    assert_date_string(multiplier, unit, from_now_result)
+    assert_date_string(multiplier, unit, ago_result)
 
 
 @pytest.mark.parametrize("diff_ms", [0, 0.5, -0.5])
@@ -48,10 +48,4 @@ def test_relative_string_autoformat_edge_cases(diff_ms):
     ts2 = ts1 + datetime.timedelta(milliseconds=diff_ms)
 
     result = weave.use(date.auto_format_relative_string(ts1, ts2))
-
-    if diff_ms == 0:
-        assert result == "less than 1 ms from now"
-    elif diff_ms > 0:
-        assert result == "less than 1 ms from now"
-    elif diff_ms < 0:
-        assert result == "less than 1 ms ago"
+    assert result == "less than 1 ms"

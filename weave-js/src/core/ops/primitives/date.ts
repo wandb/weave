@@ -46,9 +46,9 @@ const momentDurations: moment.unitOfTime.DurationConstructor[] = [
   'milliseconds',
 ];
 
-export const opTimestampDiffStringFormat = makeDateOp({
+export const opTimestampRelativeStringAutoFormat = makeDateOp({
   hidden: true,
-  name: 'date-diffDaysStringFormat',
+  name: 'timestamp-relativeStringAutoFormat',
   argTypes: {lhs: {type: 'timestamp'}, rhs: {type: 'timestamp'}},
   description: `Returns the difference between two millisecond ${docType(
     'timestamp',
@@ -72,29 +72,33 @@ export const opTimestampDiffStringFormat = makeDateOp({
       return null;
     }
     const timestampDiff =
-      moment.utc(inputs.lhs).valueOf() - moment.utc(inputs.rhs).valueOf();
+      moment(inputs.lhs).valueOf() - moment(inputs.rhs).valueOf();
     for (const unit of momentDurations) {
       const duration = moment.duration(1, unit).asMilliseconds();
       const diff = timestampDiff / duration;
 
       if (diff >= 1) {
-        if (unit === 'years' || unit === 'months') {
+        // years and months get rounded to the tenth. Get rid of trailing 0 ie. 7.0 -> 7
+        if (
+          (unit === 'years' || unit === 'months') &&
+          Math.round(diff) != Math.round(diff * 10) / 10
+        ) {
           return diff.toFixed(1) + ' ' + unit;
         } else {
           if (Math.floor(diff) === 1) {
-            return '1' + ' ' + unit.slice(0, -1);
+            return '1 ' + unit.slice(0, -1) + ' ';
           }
-          return Math.floor(diff) + ' ' + unit;
+          return diff.toFixed() + ' ' + unit;
         }
       }
     }
-    return 'less than 1 millisecond';
+    return 'less than 1 ms';
   },
 });
 
-export const opDatetimeAddDuration = makeDateOp({
+export const opDatetimeAddMs = makeDateOp({
   hidden: true,
-  name: 'datetime-add',
+  name: 'datetime-addms',
   argTypes: {lhs: {type: 'timestamp'}, rhs: 'number'},
   description: `Returns the sum between a ${docType(
     'timestamp'
@@ -113,7 +117,12 @@ export const opDatetimeAddDuration = makeDateOp({
     if (inputs.lhs == null || inputs.rhs == null || inputs.rhs <= 0) {
       return null;
     }
-    return moment.utc(inputs.lhs).valueOf() + inputs.rhs;
+    // Use moment.utc here incase the incoming datetime doesn't have a timezone.
+    // Not ideal but example of usecase:
+    // opArtifactVersionCreatedAt can be an input which is a date(in utc) with no timezone
+    return moment
+      .utc(inputs.lhs)
+      .add(moment.duration(inputs.rhs, 'milliseconds'));
   },
 });
 
