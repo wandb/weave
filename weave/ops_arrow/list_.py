@@ -1486,7 +1486,9 @@ def is_typedict_arrowweavelist(
 def is_object_arrowweavelist(
     val: ArrowWeaveList,
 ) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.ObjectType]]:
-    return isinstance(val.object_type, types.ObjectType)
+    return isinstance(val.object_type, types.ObjectType) and not isinstance(
+        val.object_type, partial_object.PartialObjectType
+    )
 
 
 def is_taggedvalue_arrowweavelist(
