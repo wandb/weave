@@ -17,7 +17,7 @@ from flask import Flask, Blueprint, Response
 from flask import request
 from flask import abort
 from flask_cors import CORS
-from flask import send_from_directory, make_response, redirect
+from flask import send_from_directory, redirect
 import wandb
 
 from weave import context_state, graph, server, value_or_error
