@@ -913,9 +913,9 @@ export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
 export const useNodeWithServerType = (
   node: NodeOrVoidNode,
   paramFrame?: Frame,
-  options?: {skip?: boolean; callSite?: string}
+  options?: {async?: boolean; callSite?: string}
 ): {loading: boolean; result: NodeOrVoidNode} => {
-  const skip = options?.skip;
+  const async = options?.async;
   const stack = usePanelContext().stack;
   if (paramFrame != null) {
     for (const [name, value] of Object.entries(paramFrame)) {
@@ -952,10 +952,11 @@ export const useNodeWithServerType = (
           return;
         }
         if (isMounted) {
-          if (skip) {
+          if (async) {
             const currentType = (result.value ?? dereffedNode).type;
             const nextType = newNode.type;
             if (!_.isEqual(currentType, nextType)) {
+              // Only update if the type has changed.
               // console.log(
               //   'REFINE NOT EQUAL',
               //   options.callSite ?? '',
@@ -975,10 +976,14 @@ export const useNodeWithServerType = (
     return () => {
       isMounted = false;
     };
-  }, [weave, dereffedNode, skip]);
+    // we purposely don't depend on result.value here. We only want to fire
+    // off a refinement request if nodes in the graph have changed, but not
+    // their types!
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weave, dereffedNode, async]);
 
   const finalResult = useMemo(() => {
-    if (skip) {
+    if (async) {
       return {loading: false, result: result.value ?? node};
     }
     if (error != null) {
@@ -992,7 +997,7 @@ export const useNodeWithServerType = (
       loading: node !== result.node,
       result: node === result.node ? result.value : node,
     };
-  }, [skip, result, node, error]);
+  }, [async, result, node, error]);
   return finalResult;
 };
 

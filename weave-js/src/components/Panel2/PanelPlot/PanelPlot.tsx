@@ -266,7 +266,7 @@ const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
   const typedInputNodeUse = LLReact.useNodeWithServerType(
     inputNode,
     undefined,
-    {skip: dashEnabled}
+    {async: dashEnabled}
   );
   const newProps = useMemo(() => {
     return {
@@ -3628,7 +3628,7 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   const typedInputNodeUse = LLReact.useNodeWithServerType(
     inputNode,
     undefined,
-    {skip: dashEnabled}
+    {async: dashEnabled}
   );
   const newProps = useMemo(() => {
     return {

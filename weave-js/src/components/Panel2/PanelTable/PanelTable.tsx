@@ -132,7 +132,7 @@ export const PanelTable: React.FC<
   const typedInputNodeUse = LLReact.useNodeWithServerType(
     inputNode,
     undefined,
-    {skip: dashEnabled}
+    {async: dashEnabled}
   );
   const typedInputNode = typedInputNodeUse.loading
     ? undefined
