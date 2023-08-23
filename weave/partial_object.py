@@ -1,6 +1,6 @@
 import json
 import typing
-
+from dataclasses import dataclass, field
 
 from . import weave_types as types
 from . import artifact_fs
@@ -34,55 +34,23 @@ class PartialObjectTypeGeneratorType(types._PlainStringNamedType):
 
     @classmethod
     def type_of_instance(cls, obj: "PartialObject") -> types.Type:
-        keys_type = typing.cast(
-            types.TypedDict, types.TypeRegistry.type_of(obj.to_dict())
-        )
+        keys_type = typing.cast(types.TypedDict, types.TypeRegistry.type_of(obj.keys))
         return cls.with_attrs(keys_type.property_types)
 
 
+@dataclass
 class PartialObject:
-    keys: list[str]
-
-    def __init__(
-        self, keys: typing.Optional[dict[str, typing.Any]] = None, **attrs: typing.Any
-    ):
-        if keys is not None and len(attrs) > 0:
-            raise ValueError(
-                "PartialObject cannot be initialized with both keys and attrs"
-            )
-
-        keys = keys if keys is not None else attrs
-        self.keys = list(keys.keys())
-        for key in keys:
-            setattr(self, key, keys[key])
+    keys: dict = field(default_factory=dict)
 
     @classmethod
     def from_keys(cls: typing.Type[T], key_dict: dict) -> T:
-        return cls(**key_dict)
-
-    def to_dict(self) -> dict[str, typing.Any]:
-        return {key: getattr(self, key) for key in self.keys}
+        return cls(key_dict)
 
     def __getitem__(self, key: str) -> typing.Any:
-        try:
-            return getattr(self, key)
-        except AttributeError:
-            raise KeyError(key)
-
-    def __setitem__(self, key: str, value: typing.Any) -> None:
-        return setattr(self, key, value)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({json.dumps(self.to_dict())})"
-
-    def __str__(self) -> str:
-        return self.__repr__()
-
-    def __eq__(self, other: typing.Any) -> bool:
-        return isinstance(other, PartialObject) and self.to_dict() == other.to_dict()
+        return self.keys[key]
 
     def get(self, key: str, default: typing.Any = None) -> typing.Any:
-        return getattr(self, key, default)
+        return self.keys.get(key, default)
 
 
 class PartialObjectType(types.Type):
@@ -97,16 +65,17 @@ class PartialObjectType(types.Type):
 
     # e.g., Project.WeaveType. Note: this property is the class itself, not an instance of the class.
     keyless_weave_type_class: typing.Type[types.Type]
+    keys: dict[str, types.Type]
 
     def __init__(
         self,
         keyless_weave_type_class: typing.Type[types.Type],
-        attrs: typing.Union[dict[str, types.Type], types.TypedDict],
+        keys: typing.Union[dict[str, types.Type], types.TypedDict],
     ):
         self.keyless_weave_type_class = keyless_weave_type_class
-        if isinstance(attrs, types.TypedDict):
-            attrs = attrs.property_types
-        super().__init__(**attrs)
+        if isinstance(keys, types.TypedDict):
+            keys = keys.property_types
+        self.keys = keys
 
     def _assign_type_inner(self, other_type: types.Type) -> bool:
         return (
@@ -128,18 +97,6 @@ class PartialObjectType(types.Type):
             return other_td.assign_type(self_td)
 
         return False
-
-    def property_types(self) -> dict[str, types.Type]:
-        # we can't use the default implementation of property_types() because it
-        # assumes that the types fields are specified as dataclass fields, which
-        # doesn't work for anonymously generated object types
-
-        return self.attr_types  # type: ignore
-
-    @property
-    def keys(self) -> dict[str, types.Type]:
-        # this attribute is inherited from ObjectType
-        return self.attr_types  # type: ignore
 
     def _str_repr(self) -> str:
         keys_repr = dict(sorted([(k, v.__repr__()) for k, v in self.keys.items()]))
@@ -208,7 +165,7 @@ class PartialObjectType(types.Type):
         return typing.cast(PartialObject, mapped_result)
 
     def instance_to_dict(self, obj: PartialObject) -> dict[str, typing.Any]:
-        return obj.to_dict()
+        return obj.keys
 
     def instance_from_dict(self, d: dict[str, typing.Any]) -> PartialObject:
         instance_class = typing.cast(

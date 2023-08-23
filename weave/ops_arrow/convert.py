@@ -133,7 +133,7 @@ def recursively_build_pyarrow_array(
             _dictionary: dict[typing.Optional[str], typing.Tuple[int, typing.Any]] = {}
             indices: list[typing.Optional[int]] = []
             for py_obj in py_objs:
-                id = py_obj.gql["id"] if py_obj is not None else None
+                id = py_obj["id"] if py_obj is not None else None
                 if id in _dictionary:
                     indices.append(_dictionary[id][0])
                 else:

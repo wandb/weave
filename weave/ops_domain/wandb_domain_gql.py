@@ -131,7 +131,7 @@ def gql_prop_op(
     first_arg_name = input_type.name
 
     def gql_property_getter_op_fn(**inputs):
-        return getattr(inputs[first_arg_name], prop_name)
+        return inputs[first_arg_name][prop_name]
 
     sig = signature(gql_property_getter_op_fn)
     params = [Parameter(first_arg_name, Parameter.POSITIONAL_OR_KEYWORD)]
@@ -260,8 +260,7 @@ def gql_direct_edge_op(
 
             if is_many:
                 return [
-                    output_type.instance_class.from_keys(item)
-                    for item in getattr(gql_obj, name)
+                    output_type.instance_class.from_keys(item) for item in gql_obj[name]
                 ]
             if (
                 len(gql_obj.keys) is None
