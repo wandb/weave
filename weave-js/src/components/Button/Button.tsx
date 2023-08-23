@@ -86,8 +86,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             classNames(
               'night-aware',
               "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
-              'disabled:pointer-events-none disabled:bg-oblivion/[0.03] disabled:text-moon-350',
-              'dark:disabled:bg-moonbeam/[0.03] dark:disabled:text-moon-650',
+              'disabled:pointer-events-none disabled:opacity-40',
               {
                 // small
                 'gap-6 px-6 py-3 text-sm leading-[18px]': isSmall,
@@ -109,7 +108,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
                 // secondary & ghost
                 'bg-oblivion/[0.05] dark:bg-moonbeam/[0.05]': isSecondary,
-                'disabled:bg-transparent dark:disabled:bg-transparent': isGhost,
                 'text-moon-800 dark:text-moon-200': isSecondary || isGhost,
                 'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400':
                   isSecondary || isGhost,

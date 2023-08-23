@@ -215,7 +215,7 @@ type Template = {
 };
 
 export const SEED_BOARD_OP_NAME = 'py_board-seed_board';
-const OPEN_AI_OP_NAME = 'py_board-open_ai_completions_monitor';
+const OPEN_AI_OP_NAME = 'py_board-llm_completions_monitor';
 const RECOMMENDED_TEMPLATES = [OPEN_AI_OP_NAME];
 const FALL_BACK_TEMPLATE = SEED_BOARD_OP_NAME;
 
