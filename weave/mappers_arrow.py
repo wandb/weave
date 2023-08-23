@@ -346,11 +346,6 @@ class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
         )
 
 
-class DictSavedAsStringToArrowString(mappers.Mapper):
-    def result_type(self):
-        return pa.string()
-
-
 def map_to_arrow_(
     type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
 ):
