@@ -322,10 +322,15 @@ class OpDef:
                 return n._var_val
             return None
 
-        refine_params = {
-            k: graph.map_nodes_full([n], _replace_var_with_val)[0]
-            for k, n in bound_params.items()
-        }
+        refine_params = {k: graph.resolve_vars(n) for k, n in bound_params.items()}
+        # if refine_enabled():
+        #     for arg_name, arg_node in refine_params.items():
+        #         graph_vars = graph.expr_vars(arg_node)
+        #         if graph_vars:
+        #             raise ValueError(
+        #                 "arg contained graph vars (%s): %s"
+        #                 % (arg_name, [v.name for v in graph_vars])
+        #             )
 
         if (
             refine_enabled()

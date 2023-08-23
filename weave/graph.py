@@ -424,6 +424,18 @@ def expr_vars(node: Node) -> list[VarNode]:
     )
 
 
+def resolve_vars(node: Node) -> Node:
+    """Replace all VarNodes with the value they point to."""
+
+    def _replace_var_with_val(n: Node) -> typing.Optional[Node]:
+        if isinstance(n, VarNode) and hasattr(n, "_var_val") and n._var_val is not None:
+            # Recursively replace vars in the value node.
+            return resolve_vars(n._var_val)
+        return None
+
+    return map_nodes_full([node], _replace_var_with_val)[0]
+
+
 def is_open(node: Node) -> bool:
     """A Node is 'open' (as in open function) if there are one or more VarNodes"""
     return len(filter_nodes_top_level([node], lambda n: isinstance(n, VarNode))) > 0

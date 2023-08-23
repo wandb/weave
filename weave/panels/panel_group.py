@@ -223,9 +223,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             all_missing_vars.update(missing_vars)
             if not all_missing_vars:
                 partial_config = dataclasses.replace(self.config, items=items)
-                config_var = weave_internal.make_var_node(
-                    weave.type_of(partial_config), "self"
-                )
+                config_var = weave_internal.make_var_for_value(partial_config, "self")
                 frame[name] = config_var.items[name]  # type: ignore
 
         config.items = items

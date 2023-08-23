@@ -127,7 +127,10 @@ def define_fn(
 ) -> graph.ConstNode:
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
     try:
-        fnNode = body(*var_nodes)
+        from . import op_def
+
+        with op_def.no_refine():
+            fnNode = body(*var_nodes)
     except errors.WeaveExpectedConstError as e:
         raise errors.WeaveMakeFunctionError("function body expected const node.")
     if not isinstance(fnNode, graph.Node):

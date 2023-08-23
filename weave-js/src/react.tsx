@@ -913,7 +913,7 @@ export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
 export const useNodeWithServerType = (
   node: NodeOrVoidNode,
   paramFrame?: Frame,
-  options?: {skip?: boolean}
+  options?: {skip?: boolean; callSite?: string}
 ): {loading: boolean; result: NodeOrVoidNode} => {
   const skip = options?.skip;
   const stack = usePanelContext().stack;
@@ -938,9 +938,6 @@ export const useNodeWithServerType = (
   const promiseRef = useRef<Promise<any> | null>(null);
   useEffect(() => {
     let isMounted = true;
-    if (skip) {
-      return;
-    }
     if (node.nodeType === 'const') {
       setResult({node, value: node});
     }
@@ -955,7 +952,22 @@ export const useNodeWithServerType = (
           return;
         }
         if (isMounted) {
-          setResult({node, value: {...node, type: newNode.type}});
+          if (skip) {
+            const currentType = (result.value ?? dereffedNode).type;
+            const nextType = newNode.type;
+            if (!_.isEqual(currentType, nextType)) {
+              // console.log(
+              //   'REFINE NOT EQUAL',
+              //   options.callSite ?? '',
+              //   dereffedNode,
+              //   currentType,
+              //   newNode.type
+              // );
+              setResult({node, value: {...node, type: newNode.type}});
+            }
+          } else {
+            setResult({node, value: {...node, type: newNode.type}});
+          }
         }
       })
       .catch(e => setError(e));
@@ -963,11 +975,11 @@ export const useNodeWithServerType = (
     return () => {
       isMounted = false;
     };
-  }, [weave, node, dereffedNode, skip]);
+  }, [weave, dereffedNode, skip]);
 
   const finalResult = useMemo(() => {
     if (skip) {
-      return {loading: false, result: node};
+      return {loading: false, result: result.value ?? node};
     }
     if (error != null) {
       // rethrow in render thread

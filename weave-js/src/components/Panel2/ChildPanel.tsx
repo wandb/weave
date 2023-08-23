@@ -38,7 +38,7 @@ import React, {
 } from 'react';
 import styled from 'styled-components';
 
-import {useWeaveContext} from '../../context';
+import {useWeaveContext, useWeaveDashUiEnable} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {consoleLog} from '../../util';
 import {Tooltip} from '../Tooltip';
@@ -72,6 +72,7 @@ import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {getConfigForPath} from './panelTree';
 import {usePanelPanelContext} from './PanelPanelContextProvider';
 import {Button} from '../Button';
+import {useNodeWithServerType} from '@wandb/weave/react';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -214,10 +215,14 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const updateConfig2 = useUpdateConfig2(props);
   const config = useChildPanelConfig(props.config);
   const {id: panelId, config: panelConfig} = config;
-  const {input_node: panelInputExpr} = config;
+  let {input_node: panelInputExpr} = config;
   const weave = useWeaveContext();
   const {stack, path: parentPath} = usePanelContext();
 
+  const dashEnabled = useWeaveDashUiEnable();
+  panelInputExpr = useNodeWithServerType(panelInputExpr, undefined, {
+    skip: dashEnabled,
+  }).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,
     panelId,
