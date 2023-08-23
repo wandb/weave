@@ -33,7 +33,11 @@ import {
 } from './PanelInteractContext';
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
-import {getConfigForPath, mapPanels, mapPanelsAsync} from './panelTree';
+import {
+  getConfigForPath,
+  mapPanelsAsync,
+  updateExpressionVarTypes,
+} from './panelTree';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {PanelPanelContextProvider} from './PanelPanelContextProvider';
@@ -84,11 +88,6 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
         let loadedPanel = getFullChildPanel(panelQuery.result);
-        loadedPanel = mapPanels(
-          loadedPanel,
-          stack,
-          (panel, childStack) => panel
-        );
 
         // We walk all panels, refining all input_nodes.
         // Don't this can actually happen asynchronously because the document should
@@ -98,13 +97,10 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         // expensive requests if the types do change. Currently the types can change
         // because of implementation differences between JS and Python. We need to fix
         // those before doing it truly asynchronously.
-        const hydratedPanel = await mapPanelsAsync(
+        loadedPanel = await mapPanelsAsync(
           loadedPanel,
           stack,
           async (panel: ChildPanelFullConfig, childStack: Stack) => {
-            if (panel.config != null) {
-              return panel;
-            }
             const refinedInputNode = (await refineEditingNode(
               weave.client,
               panel.input_node,
@@ -127,11 +123,12 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
             // return {...panel, id, config};
           }
         );
-        // console.log('ORIG PANEL', loadedPanel);
-        // console.log('HYRDATED PANEL', loadedPanel);
-        // console.log('DIFFERENCE', difference(loadedPanel, hydratedPanel));
 
-        setPanelConfig(() => hydratedPanel);
+        // Variables have .type attached, but what they refer to may now have a difference
+        // type, so go through and update them.
+        loadedPanel = updateExpressionVarTypes(loadedPanel, stack);
+
+        setPanelConfig(() => loadedPanel);
       };
       if (!loaded.current) {
         loaded.current = true;

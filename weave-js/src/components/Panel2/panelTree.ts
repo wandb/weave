@@ -13,9 +13,11 @@ The UI state is a tree of panels. There are three types of non-leaf panels:
 
 import {
   Frame,
+  isNodeOrVoidNode,
   NodeOrVoidNode,
   pushFrame,
   Stack,
+  updateVarTypes,
   voidNode,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
@@ -321,13 +323,17 @@ export const mapPanels = (
     const items: {[key: string]: ChildPanelFullConfig} = {};
     let childFrame: Frame = {};
     for (const key of Object.keys(fullNode.config.items)) {
-      const childItem = fullNode.config.items[key];
       items[key] = mapPanels(
         fullNode.config.items[key],
         pushFrame(stack, childFrame),
         fn
       );
-      const childVars = getItemVars(key, childItem, stack, undefined);
+      const childVars = getItemVars(
+        key,
+        items[key],
+        stack,
+        fullNode.config.allowedPanels
+      );
       childFrame = {...childFrame, ...childVars};
     }
     withMappedChildren = {
@@ -367,7 +373,6 @@ export const mapPanelsAsync = async (
     const items: {[key: string]: ChildPanelFullConfig} = {};
     let childFrame: Frame = {};
     for (const key of Object.keys(fullNode.config.items)) {
-      const childItem = fullNode.config.items[key];
       items[key] = await mapPanelsAsync(
         fullNode.config.items[key],
         pushFrame(stack, childFrame),
@@ -375,7 +380,7 @@ export const mapPanelsAsync = async (
       );
       const childVars = getItemVars(
         key,
-        childItem,
+        items[key],
         stack,
         fullNode.config.allowedPanels
       );
@@ -567,4 +572,44 @@ export const ensureSimpleDashboard = (
       disableDeletePanel: true,
     }
   );
+};
+
+// Map a function over a panel config
+const mapConfig = (c: any, mapFn: (v: any) => any) => {
+  if (_.isArray(c)) {
+    return c.map(mapFn);
+  } else if (_.isObject(c)) {
+    return _.mapValues(c, mapFn);
+  } else {
+    return mapFn(c);
+  }
+};
+
+// Walk through all panels, updating VarNode types to match the types of
+// the nodes they reference.
+export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
+  return mapPanels(node, stack, (child, childStack) => {
+    const newInputNode = updateVarTypes(child.input_node, childStack);
+    const newVars = _.mapValues(child.vars, (varNode, varName) =>
+      updateVarTypes(varNode, childStack)
+    );
+    let config = child.config;
+    if (
+      // Filter out these panels, since the map code walks them, correctly pushing
+      // stuff onto stack as it goes.
+      child.id !== 'Group' &&
+      !isStandardPanel(child.id) &&
+      !isTableStatePanel(child.id)
+    ) {
+      config = mapConfig(config, v =>
+        isNodeOrVoidNode(v) ? updateVarTypes(v, childStack) : v
+      );
+    }
+    return {
+      vars: newVars,
+      input_node: newInputNode,
+      id: child.id,
+      config,
+    } as ChildPanelFullConfig;
+  });
 };
