@@ -4,7 +4,7 @@
 
 ---
 
-Hello from the outside (of the organization) 👋 and welcome to Weave!
+🎵Hello from the outside🎵 (of the organization) 👋 and welcome to Weave!
 
 Weave, developed by the team at Weights and Biases, is a new open-source toolkit designed for performant, interactive data exploration.
 Our mission is to equip Machine Learning practitioners with the best tools to turn data into insights quickly and easily.
