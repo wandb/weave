@@ -9,8 +9,9 @@ from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
+    make_root_op_gql_op_output_type,
 )
-from .. import partial_object
+
 from .. import errors
 
 # Section 1/6: Tag Getters
@@ -50,7 +51,7 @@ def root_all_artifacts_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_artifacts_gql_resolver,
-        gql_op_output_type=partial_object.make_root_op_gql_op_output_type(
+        gql_op_output_type=make_root_op_gql_op_output_type(
             "artifacts_500", lambda inputs: "", wdt.ArtifactCollectionType
         ),
     ),

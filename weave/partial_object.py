@@ -1,13 +1,9 @@
 import json
 import typing
-import hashlib
+
 
 from . import weave_types as types
 from . import artifact_fs
-from . import gql_op_plugin
-
-
-from .input_provider import InputProvider
 
 
 T = typing.TypeVar("T", bound="PartialObject")
@@ -31,8 +27,8 @@ class PartialObjectTypeGeneratorType(types._PlainStringNamedType):
     def with_attrs(cls, attrs: dict[str, types.Type]) -> "PartialObjectType":
         """Creates a new Weave Type that is assignable to the original Weave Type, but
         also has the specified keys. This is used during the compile pass for creating a Weave Type
-        to represent the exact output type of a specific GQL query, and for communicating the
-        data shape to arrow."""
+        to represent the exact shape of a PartialObject, and for communicating that shape to arrow.
+        """
 
         return PartialObjectType(cls, attrs)
 
@@ -113,7 +109,6 @@ class PartialObjectType(types.ObjectType):
         super().__init__(**attrs)
 
     def _assign_type_inner(self, other_type: types.Type) -> bool:
-        # TODO: think more about how this will work with tags - might need to be modified
         return (
             isinstance(other_type, PartialObjectType)
             and self.keyless_weave_type_class == other_type.keyless_weave_type_class
@@ -220,68 +215,3 @@ class PartialObjectType(types.ObjectType):
             typing.Type[PartialObject], self.keyless_weave_type_class.instance_class
         )
         return instance_class.from_keys(d)
-
-
-ParamStrFn = typing.Callable[[InputProvider], str]
-
-
-def _make_alias(*args: str, prefix: str = "alias") -> str:
-    inputs = "_".join([str(arg) for arg in args])
-    digest = hashlib.md5(inputs.encode()).hexdigest()
-    return f"{prefix}_{digest}"
-
-
-def _param_str(inputs: InputProvider, param_str_fn: typing.Optional[ParamStrFn]) -> str:
-    param_str = ""
-    if param_str_fn:
-        param_str = param_str_fn(inputs)
-    return param_str
-
-
-def _alias(
-    inputs: InputProvider,
-    param_str_fn: typing.Optional[ParamStrFn],
-    prop_name: str,
-) -> str:
-    alias = ""
-    param_str = _param_str(inputs, param_str_fn)
-    if param_str_fn:
-        alias = f"{_make_alias(param_str, prefix=prop_name)}"
-    return alias
-
-
-def make_root_op_gql_op_output_type(
-    prop_name: str,
-    param_str_fn: ParamStrFn,
-    output_type: PartialObjectTypeGeneratorType,
-    use_alias: bool = False,
-) -> gql_op_plugin.GQLOutputTypeFn:
-    """Creates a GQLOutputTypeFn for a root op that returns a list of objects with keys."""
-
-    def _root_op_gql_op_output_type(
-        inputs: InputProvider, input_type: types.Type
-    ) -> types.Type:
-        key = (
-            prop_name
-            if not use_alias
-            else _alias(
-                inputs,
-                param_str_fn,
-                prop_name,
-            )
-        )
-
-        key_type: types.Type = typing.cast(types.TypedDict, input_type)
-        keys = ["instance", key, "edges", "node"]
-        for key in keys:
-            if isinstance(key_type, types.List):
-                key_type = key_type.object_type
-            if isinstance(key_type, types.TypedDict):
-                key_type = key_type.property_types[key]
-
-        object_type = output_type.with_attrs(
-            typing.cast(types.TypedDict, key_type).property_types
-        )
-        return types.List(object_type)
-
-    return _root_op_gql_op_output_type

@@ -5,11 +5,12 @@ from ..api import op
 from .. import errors
 from .. import weave_types as types
 from . import wb_domain_types as wdt
-from ..partial_object import _make_alias
+
 from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
+    _make_alias,
 )
 
 

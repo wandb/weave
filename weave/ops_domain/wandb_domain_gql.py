@@ -10,6 +10,13 @@ from ..decorator_arrow_op import arrow_op
 from .. import op_def
 from .. import partial_object
 from ..input_provider import InputProvider
+import hashlib
+
+from .. import gql_op_plugin
+
+
+from ..input_provider import InputProvider
+
 
 import pyarrow as pa
 
@@ -35,6 +42,34 @@ logic - these are just wrappers since these cases are so common.
 
 Please see `project_ops.py` for examples of all the above cases.
 """
+
+
+ParamStrFn = typing.Callable[[InputProvider], str]
+
+
+def _make_alias(*args: str, prefix: str = "alias") -> str:
+    inputs = "_".join([str(arg) for arg in args])
+    digest = hashlib.md5(inputs.encode()).hexdigest()
+    return f"{prefix}_{digest}"
+
+
+def _param_str(inputs: InputProvider, param_str_fn: typing.Optional[ParamStrFn]) -> str:
+    param_str = ""
+    if param_str_fn:
+        param_str = param_str_fn(inputs)
+    return param_str
+
+
+def _alias(
+    inputs: InputProvider,
+    param_str_fn: typing.Optional[ParamStrFn],
+    prop_name: str,
+) -> str:
+    alias = ""
+    param_str = _param_str(inputs, param_str_fn)
+    if param_str_fn:
+        alias = f"{_make_alias(param_str, prefix=prop_name)}"
+    return alias
 
 
 def register_vectorized_gql_prop_op(
@@ -151,7 +186,7 @@ def gql_direct_edge_op(
     prop_name: str,
     output_type: weave_types.Type,
     additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
-    param_str_fn: typing.Optional[partial_object.ParamStrFn] = None,
+    param_str_fn: typing.Optional[ParamStrFn] = None,
     is_many: bool = False,
 ):
     is_root = input_type is None
@@ -167,8 +202,8 @@ def gql_direct_edge_op(
         alias = ""
         param_str = ""
         if param_str_fn is not None:
-            param_str = partial_object._param_str(inputs, param_str_fn)
-            alias = partial_object._alias(inputs, param_str_fn, prop_name)
+            param_str = _param_str(inputs, param_str_fn)
+            alias = _alias(inputs, param_str_fn, prop_name)
             param_str = f"({param_str})"
             alias = f"{alias}:"
         return f"""
@@ -181,7 +216,7 @@ def gql_direct_edge_op(
     def key_fn(
         input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
-        alias = partial_object._alias(input_provider, param_str_fn, prop_name)
+        alias = _alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
         ret_type = output_type
@@ -219,7 +254,7 @@ def gql_direct_edge_op(
             name = prop_name
             if param_str_fn:
                 param_str = param_str_fn(InputProvider(additional_inputs))
-                name = partial_object._make_alias(param_str, prefix=prop_name)
+                name = _make_alias(param_str, prefix=prop_name)
 
             assert issubclass(output_type.instance_class, partial_object.PartialObject)
 
@@ -288,8 +323,8 @@ def gql_connection_op(
         alias = ""
         param_str = ""
         if param_str_fn:
-            alias = partial_object._alias(inputs, param_str_fn, prop_name)
-            param_str = partial_object._param_str(inputs, param_str_fn)
+            alias = _alias(inputs, param_str_fn, prop_name)
+            param_str = _param_str(inputs, param_str_fn)
             param_str = f"({param_str})"
             alias = alias + ":"
 
@@ -307,7 +342,7 @@ def gql_connection_op(
     def key_fn(
         input_provider: InputProvider, self_type: weave_types.Type
     ) -> weave_types.Type:
-        alias = partial_object._alias(input_provider, param_str_fn, prop_name)
+        alias = _alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
         if isinstance(self_type, partial_object.PartialObjectType):
@@ -341,7 +376,7 @@ def gql_connection_op(
         name = prop_name
         if param_str_fn:
             param_str = param_str_fn(InputProvider(additional_inputs))
-            name = partial_object._make_alias(param_str, prefix=prop_name)
+            name = _make_alias(param_str, prefix=prop_name)
         # If we have a None argument, return an empty list.
         if (
             gql_obj.keys == []
@@ -371,3 +406,40 @@ def gql_connection_op(
     )(gql_connection_walker_op)
 
     return gql_connection_walker_op
+
+
+def make_root_op_gql_op_output_type(
+    prop_name: str,
+    param_str_fn: ParamStrFn,
+    output_type: partial_object.PartialObjectTypeGeneratorType,
+    use_alias: bool = False,
+) -> gql_op_plugin.GQLOutputTypeFn:
+    """Creates a GQLOutputTypeFn for a root op that returns a list of objects with keys."""
+
+    def _root_op_gql_op_output_type(
+        inputs: InputProvider, input_type: weave_types.Type
+    ) -> weave_types.Type:
+        key = (
+            prop_name
+            if not use_alias
+            else _alias(
+                inputs,
+                param_str_fn,
+                prop_name,
+            )
+        )
+
+        key_type: weave_types.Type = typing.cast(weave_types.TypedDict, input_type)
+        keys = ["instance", key, "edges", "node"]
+        for key in keys:
+            if isinstance(key_type, weave_types.List):
+                key_type = key_type.object_type
+            if isinstance(key_type, weave_types.TypedDict):
+                key_type = key_type.property_types[key]
+
+        object_type = output_type.with_attrs(
+            typing.cast(weave_types.TypedDict, key_type).property_types
+        )
+        return weave_types.List(object_type)
+
+    return _root_op_gql_op_output_type
