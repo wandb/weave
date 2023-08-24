@@ -865,6 +865,7 @@ const nextVarName = (vars: {[key: string]: any}) => {
 const MinimalEditableField = styled(EditableField)`
   margin: 0;
 `;
+MinimalEditableField.displayName = 'S.MinimalEditableField';
 
 export const VariableEditor: React.FC<{
   config: ChildPanelFullConfig;
@@ -1007,6 +1008,7 @@ const EditorBarContent = styled.div`
   border-bottom: 1px solid ${GRAY_350};
   line-height: 20px;
 `;
+EditorBarContent.displayName = 'S.EditorBarContent';
 
 const EditorPath = styled.div`
   white-space: nowrap;
@@ -1016,6 +1018,7 @@ const EditorPath = styled.div`
     font-family: inherit;
   }
 `;
+EditorPath.displayName = 'S.EditorPath';
 
 const EditorExpression = styled.div`
   flex-grow: 1;
@@ -1025,6 +1028,7 @@ const EditorExpression = styled.div`
     background-color: ${GRAY_50};
   }
 `;
+EditorExpression.displayName = 'S.EditorExpression';
 
 const EditorIcons = styled.div<{visible: boolean}>`
   height: 20px;
@@ -1033,11 +1037,13 @@ const EditorIcons = styled.div<{visible: boolean}>`
   margin-left: 8px;
   visibility: ${p => (p.visible ? `visible` : `hidden`)};
 `;
+EditorIcons.displayName = 'S.EditorIcons';
 
 const PanelContainer = styled.div<{overflowVisible?: boolean}>`
   flex-grow: 1;
   overflow-y: ${p => (p.overflowVisible ? 'visible' : 'auto')};
 `;
+PanelContainer.displayName = 'S.PanelContainer';
 
 type ElementWidth<T> = {
   ref: RefObject<T>;
