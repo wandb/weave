@@ -81,7 +81,7 @@ export const opTimestampRelativeStringAutoFormat = makeDateOp({
         // years and months get rounded to the tenth. Get rid of trailing 0 ie. 7.0 -> 7
         if (
           (unit === 'years' || unit === 'months') &&
-          Math.round(diff) != Math.round(diff * 10) / 10
+          Math.round(diff) !== Math.round(diff * 10) / 10
         ) {
           return diff.toFixed(1) + ' ' + unit;
         } else {
