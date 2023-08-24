@@ -262,8 +262,9 @@ const SingleFilterVisualEditor: React.FC<{
             } else {
               handleSetClause({value: [], op: v as string});
             }
+          } else {
+            handleSetClause({value: undefined, op: v as string});
           }
-          handleSetClause({value: undefined, op: v as string});
         }}
         options={opOptions}
         selection
