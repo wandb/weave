@@ -95,12 +95,7 @@ interface VisualClauseWorkingState {
   key?: string | undefined;
   simpleKeyType?: 'number' | 'string' | 'boolean' | 'other';
   op?: string | undefined;
-  value?:
-    | string
-    | number
-    | boolean
-    | Array<string | number | boolean>
-    | undefined;
+  value?: string | number | boolean | string[] | undefined;
 }
 
 const visualClauseIsValid = (
@@ -262,19 +257,14 @@ const SingleFilterVisualEditor: React.FC<{
         value={op}
         onChange={(e, {value: v}) => {
           if (v === 'in') {
-            if (
-              op === '=' &&
-              typeof value !== 'object' &&
-              typeof value !== 'undefined'
-            ) {
-              handleSetClause({value: [value]});
+            if (op === '=' && typeof value === 'string') {
+              handleSetClause({value: [value], op: v as string});
             } else {
-              handleSetClause({value: []});
+              handleSetClause({value: [], op: v as string});
             }
           } else {
-            handleSetClause({value: undefined});
+            handleSetClause({value: undefined, op: v as string});
           }
-          handleSetClause({op: v as string});
         }}
         options={opOptions}
         selection
@@ -291,7 +281,7 @@ const SingleFilterVisualEditor: React.FC<{
           value={value}
           multiple={op === 'in'}
           onChange={(e, {value: v}) => {
-            handleSetClause({value: v});
+            handleSetClause({value: v as VisualClauseWorkingState['value']});
           }}
           options={valueOptions}
           selection
