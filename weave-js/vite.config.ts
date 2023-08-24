@@ -53,24 +53,7 @@ export default defineConfig(({mode, command}) => {
     },
     {find: /^react-vis$/, replacement: 'react-vis/dist/index.js'},
     {find: 'dagre', replacement: 'dagre/dist/dagre.min.js'},
-    {
-      find: 'type/value/is',
-      replacement: `${__dirname}/node_modules/type/value/is`,
-    },
-    {
-      find: 'type/value/ensure',
-      replacement: `${__dirname}/node_modules/type/value/ensure`,
-    },
-    {
-      find: 'type/plain-function/ensure',
-      replacement: `${__dirname}/node_modules/type/plain-function/ensure`,
-    },
-    {
-      find: 'type/plain-function/is',
-      replacement: `${__dirname}/node_modules/type/plain-function/is`,
-    },
-    {find: 'type', replacement: `component-type`},
-    {find: 'each', replacement: `component-each`},
+
     {find: 'unserialize', replacement: 'yields-unserialize'},
   ];
 
@@ -116,11 +99,6 @@ export default defineConfig(({mode, command}) => {
         'is-buffer',
         'mdast-util-to-hast',
       ],
-      esbuildOptions: {
-        define: {
-          global: 'globalThis',
-        },
-      },
     },
     server: {
       host,
@@ -138,11 +116,12 @@ export default defineConfig(({mode, command}) => {
           secure: false,
           changeOrigin: true,
         },
-        '^.*/__frontend/.*': {
+        // This ensures our dynamic env.js file is served from the backend
+        '^.*/__frontend/env.js': {
           target: 'http://localhost:9994',
           secure: false,
           changeOrigin: true,
-        },
+        }
       },
     },
     preview: {

@@ -4,7 +4,6 @@ declare global {
       PREFIX: string;
       ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
-      ONPREM: boolean;
     };
   }
 }
@@ -14,7 +13,6 @@ if (!window.WEAVE_CONFIG) {
   window.WEAVE_CONFIG = {
     PREFIX: '',
     ANALYTICS_DISABLED: false,
-    ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
   };
 }
@@ -22,7 +20,6 @@ if (!window.WEAVE_CONFIG) {
 interface Config {
   ENABLE_DEBUG_FEATURES: boolean;
   ANALYTICS_DISABLED: boolean;
-  ONPREM: boolean;
   PREFIX: string;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
@@ -63,7 +60,6 @@ const DEFAULT_CONFIG: Config = {
   backendWeaveViewerUrl,
   PREFIX: window.WEAVE_CONFIG.PREFIX,
   ENABLE_DEBUG_FEATURES: false,
-  ONPREM: window.WEAVE_CONFIG.ONPREM,
   ANALYTICS_DISABLED: window.WEAVE_CONFIG.ANALYTICS_DISABLED,
 } as const;
 
