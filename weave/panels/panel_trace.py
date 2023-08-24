@@ -35,7 +35,7 @@ class PanelTraceConfig:
 
 @weave.type("tracePanel")
 class Trace(panel.Panel):
-    id = "Trace"
+    id = "tracePanel"
     config: typing.Optional[PanelTraceConfig] = dataclasses.field(
         default_factory=lambda: None
     )
@@ -54,4 +54,5 @@ class Trace(panel.Panel):
     output_type=weave.types.optional(span_typed_dict_type),
 )
 def active_span(self: Trace):
-    return self.input_node[self.config.selectedSpanIndex]
+    index = 0 if self.config is None else self.config.selectedSpanIndex
+    return weave.ops_arrow.list_ops.index(self.input_node, index)

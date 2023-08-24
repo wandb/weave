@@ -122,7 +122,7 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
 };
 
 export const Spec: Panel2.PanelSpec = {
-  id: 'Trace',
+  id: 'tracePanel',
   canFullscreen: true,
   Component: PanelTraceRender,
   inputType,

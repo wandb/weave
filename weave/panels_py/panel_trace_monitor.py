@@ -88,19 +88,38 @@ def board(
         lambda row: row["trace_id"] == traces_table_var.active_data()["trace_id"]
     )
 
-    trace_viewer = panels.Trace(trace_spans)
+    trace_viewer = panels.Trace(trace_spans)  # type: ignore
 
     trace_viewer_var = overview_tab.add(
         "trace_viewer",
         trace_viewer,
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=8, w=16, h=8),
     )
 
-    # selected_trace_obj = overview_tab.add(
-    #     "selected_trace_obj",
-    #     selected_trace,
-    #     layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=8),
-    # )
+    active_span = trace_viewer_var.active_span()
+
+    selected_trace_obj = overview_tab.add(
+        "selected_trace_obj",
+        active_span,
+        layout=weave.panels.GroupPanelLayout(x=16, y=8, w=8, h=8),
+    )
+
+    similar_spans = all_spans.filter(lambda row: row["name"] == active_span["name"])
+
+    similar_spans_table = panels.Table(similar_spans)  # type: ignore
+    similar_spans_table.add_column(lambda row: row["name"], "Span Name")
+    similar_spans_table.add_column(lambda row: row["trace_id"], "Trace ID")
+    similar_spans_table.add_column(lambda row: row["summary.latency_s"], "Latency")
+    similar_spans_table.add_column(lambda row: row["inputs"], "Inputs")
+    similar_spans_table.add_column(lambda row: row["output"], "Output")
+    similar_spans_table.add_column(
+        lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
+    )
+    similar_spans_table_var = overview_tab.add(
+        "similar_spans_table",
+        similar_spans_table,
+        layout=weave.panels.GroupPanelLayout(x=0, y=16, w=24, h=8),
+    )
 
     return panels.Board(vars=varbar, panels=overview_tab)
 

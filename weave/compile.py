@@ -50,7 +50,7 @@ def _dispatch_error_is_client_error(
             "concat",
             "string-isNumeric",
             "project-artifacts",
-            "panel-table",
+            "panel_trace-active_span",
         )
     ):
         # All the cases we've seen of this lately are clearly client errors, so
@@ -569,6 +569,7 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
         "panel_plot-selected_data",
         "panel_table-all_rows",
         "stream_table-rows",
+        "panel_trace-active_span",
     ]:
         return None
     new_node = typing.cast(graph.Node, weave_internal.use(node))
