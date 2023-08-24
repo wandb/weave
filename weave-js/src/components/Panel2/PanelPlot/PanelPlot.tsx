@@ -2719,7 +2719,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.color = {
           datum: PlotState.defaultSeriesName(series, weave),
           title: 'series',
-          legend: {...defaultFontStyleDict},
+          legend: concreteConfig.legendSettings.color.noLegend
+            ? false
+            : {...defaultFontStyleDict},
         };
       }
 
@@ -2749,7 +2751,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           } else {
             newSpec.encoding.size = {
               field: fixKeyForVega(dims.pointSize),
-              legend: {...defaultFontStyleDict},
+              legend: concreteConfig.legendSettings.pointSize.noLegend
+                ? false
+                : {...defaultFontStyleDict},
             };
 
             if (isAssignableTo(dimTypes.pointSize, maybe('number'))) {
@@ -2772,7 +2776,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           );
 
           newSpec.encoding.shape = {
-            legend: {...defaultFontStyleDict},
+            legend: concreteConfig.legendSettings.pointShape.noLegend
+              ? false
+              : {...defaultFontStyleDict},
             field: fixKeyForVega(dims.pointShape),
           };
 
@@ -2786,7 +2792,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             newSpec.mark.shape = series.constants.pointShape;
           } else {
             newSpec.encoding.shape = {
-              legend: {...defaultFontStyleDict},
+              legend: concreteConfig.legendSettings.pointShape.noLegend
+                ? false
+                : {...defaultFontStyleDict},
               datum: PlotState.defaultSeriesName(series, weave),
               title: 'series',
             };
@@ -2802,7 +2810,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           encoding: {
             strokeDash: {
               datum: PlotState.defaultSeriesName(series, weave),
-              legend: {...defaultFontStyleDict},
+              legend:
+                concreteConfig.series.length > 1 &&
+                !concreteConfig.legendSettings.lineStyle.noLegend
+                  ? {...defaultFontStyleDict}
+                  : false,
               title: 'series',
               scale: lineStyleScale,
             },
@@ -2990,6 +3002,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     isOrgDashboard,
     concreteConfig.series,
     concreteConfig?.vegaOverlay,
+    concreteConfig.legendSettings,
     isDashboard,
     hasLine,
     brushableAxes,
@@ -3426,7 +3439,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
 
     const row = opIndex({
-      arr: listOfTableNodes[tooltipSeriesIndex],
+      arr: opIndex({
+        arr: flatResultNode,
+        index: constNumber(tooltipSeriesIndex),
+      }),
       index: constNumber(valueResultIndex),
     });
     const toolTipFn =
@@ -3450,7 +3466,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   }, [
     config.series,
     toolTipPos.value,
-    listOfTableNodes,
+    flatResultNode,
     vegaReadyTables,
     weave.client.opStore,
     tooltipLineData,
@@ -3495,6 +3511,15 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   }, [config.series, updateConfig, isLineTooltip, toolTipPos]);
 
   const loaderComp = <Panel2Loader />;
+
+  // Hardcode plot colors for now.
+  if (vegaSpec.encoding.color == null) {
+    vegaSpec.encoding.color = {};
+  }
+  if (vegaSpec.encoding.color.scale == null) {
+    vegaSpec.encoding.color.scale = {};
+  }
+  vegaSpec.encoding.color.scale.range = globals.WB_RUN_COLORS;
 
   return (
     <div

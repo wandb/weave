@@ -12,25 +12,13 @@ from . import errors
 from .ops import get as op_get
 
 
-# class PanelType(types.Type):
-#     name = "panel"
-
-#     def instance_to_dict(self, obj):
-#         res = {
-#             "id": obj.id,
-#             "input": weavejs_fixes.fixup_node(obj.input_node).to_json(),
-#             "config": weavejs_fixes.fixup_data(obj.config),
-#         }
-#         return res
-
-#     def instance_from_dict(self, d):
-#         obj = Panel(graph.Node.node_from_json(d["input"]))
-#         obj.id = d["id"]
-#         obj.config = d["config"]
-#         return obj
-
-
-def run_variable_lambdas(obj, vars):
+def run_variable_lambdas(
+    obj: typing.Any,
+    vars: dict[str, graph.Node],
+    path: list[typing.Union[str, int]] = [],
+) -> typing.Tuple[typing.Any, dict[str, list[typing.Union[str, int]]]]:
+    """Returns a tuple of (obj, var_names) where var_names is a dict of
+    {var_name: [path_to_var_name]} for each missing variable"""
     if not isinstance(obj, graph.Node) and callable(obj):
         sig = inspect.signature(obj)
         param_nodes = {}
@@ -38,34 +26,34 @@ def run_variable_lambdas(obj, vars):
             try:
                 param_type = vars[param].type
             except KeyError:
-                raise errors.WeaveDefinitionError(
-                    "Variable '%s' not available in frame: %s" % (param, vars)
-                )
+                return obj, {param: path}
             if isinstance(param_type, types.Function):
                 param_type = param_type.output_type
             param_nodes[param] = weave_internal.make_var_node(param_type, param)
         injected = obj(**param_nodes)
         return run_variable_lambdas(injected, vars)
     if isinstance(obj, list):
-        return [run_variable_lambdas(v, vars) for v in obj]
+        item_results = [
+            run_variable_lambdas(v, vars, path + [i]) for i, v in enumerate(obj)
+        ]
+        new_obj = [r[0] for r in item_results]
+        new_missing_vars = {}
+        for r in item_results:
+            for k, v in r[1].items():
+                new_missing_vars[k] = v
+        return new_obj, new_missing_vars
     elif isinstance(obj, dict):
-        return {k: run_variable_lambdas(v, vars) for k, v in obj.items()}
+        d_item_results = {
+            k: run_variable_lambdas(v, vars, path + [k]) for k, v in obj.items()
+        }
+        d_new_obj = {k: r[0] for k, r in d_item_results.items()}
+        new_missing_vars = {}
+        for r in d_item_results.values():
+            for k, v in r[1].items():
+                new_missing_vars[k] = v
+        return d_new_obj, new_missing_vars
     else:
-        return obj
-
-
-# So this needs to take:
-# user can pass
-#   - input
-#   - user assignments
-#   - settings (initial state, not 1to1 with config)
-# internal
-#   - config
-#   - scope assignments
-
-
-# @weave.weave_class(weave_type=PanelType)
-# @dataclasses.dataclass
+        return obj, {}
 
 
 class ConfigDescriptor:
@@ -114,7 +102,7 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
                 self.vars[name] = panel_util.make_node(val)
 
         self.input_node = input_node
-        self.input_node = run_variable_lambdas(self.input_node, self.vars)
+        self.input_node, _ = run_variable_lambdas(self.input_node, self.vars)
 
         if not isinstance(self.input_node, graph.Node):
             self.input_node = storage.to_safe_const(self.input_node)
@@ -159,7 +147,7 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
                 self._renderAsPanel = render_as_panel_class()
 
     def _normalize(self, frame=None):
-        pass
+        return {}
 
     def to_json(self):
         return {

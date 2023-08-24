@@ -244,9 +244,11 @@ export const useNodeValue = <T extends Type>(
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
   const client = context.client;
-  const {stack, inPanelMaybe} = usePanelContext();
+  const {stack, panelMaybeNode} = usePanelContext();
 
   // consoleLog('USE NODE VALUE PRE CLIENT EVAL', weave.expToString(node), stack);
+
+  const origNode = node;
 
   node = useMemo(() => {
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
@@ -290,7 +292,11 @@ export const useNodeValue = <T extends Type>(
     }
     if (isConstNode(node)) {
       // See the "Mixing functions and expression" comment above.
-      setResult({node, value: node.val});
+      if (isFunction(node.type)) {
+        setResult({node, value: node});
+      } else {
+        setResult({node, value: node.val});
+      }
       return;
     }
 
@@ -308,15 +314,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
-      if (callSite != null) {
-        // console.log('useNodeValue subscribe', callSite, node);
-      }
+      // if (callSite != null) {
+      //   console.log('useNodeValue subscribe', callSite, node);
+      // }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
-          if (callSite != null) {
-            // console.log('useNodeValue resolve', callSite, node);
-          }
+          // if (callSite != null) {
+          //   console.log('useNodeValue resolve', callSite, node);
+          // }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -334,7 +340,6 @@ export const useNodeValue = <T extends Type>(
   //   memoCacheId,
   //   callSite,
   // });
-
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
@@ -345,7 +350,11 @@ export const useNodeValue = <T extends Type>(
       throw new Error(message);
     }
     if (isConstNode(node)) {
-      return {loading: false, result: node.val};
+      if (isFunction(node.type)) {
+        return {loading: false, result: node};
+      } else {
+        return {loading: false, result: node.val};
+      }
     }
     const loading = result.node.nodeType === 'void' || node !== result.node;
     return {
@@ -353,7 +362,11 @@ export const useNodeValue = <T extends Type>(
       result: result.value,
     };
   }, [error, node, result.node, result.value]);
-  if (!finalResult.loading && inPanelMaybe && finalResult.result == null) {
+  if (
+    !finalResult.loading &&
+    panelMaybeNode === origNode &&
+    finalResult.result == null
+  ) {
     // Throw NullResult for PanelMaybe to catch.
     throw new NullResult(result.node);
   }
@@ -526,7 +539,15 @@ export const makeCallAction = (
         // pass
       } else if (mutationStyle === 'clientRef') {
         consoleLog('clientRef useAction result', final);
-        let newRootNode: Node = constNodeUnsafe(toWeaveType(final), final);
+        let newRootNode: Node;
+        if (isNodeOrVoidNode(final)) {
+          if (final.nodeType !== 'const') {
+            throw new Error('Unexpected mutation result');
+          }
+          newRootNode = final;
+        } else {
+          newRootNode = constNodeUnsafe(toWeaveType(final), final);
+        }
 
         // This is a gnarly hack. final is a json value, we don't know its True
         // Weave type. This generally works for basic json types, but in particular

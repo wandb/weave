@@ -32,29 +32,6 @@ export default defineConfig(({mode, command}) => {
     : undefined;
   /* eslint-enable */
 
-  const modifyEnvPlugin = (): Plugin => {
-    let config;
-
-    return {
-      name: 'modify-env-js',
-
-      configResolved(resolvedConfig) {
-        // store the resolved config
-        config = resolvedConfig;
-      },
-
-      // use stored config in other hooks
-      transform(code, id) {
-        if (config.command === 'serve') {
-          // build: plugin invoked by Rollup
-          if (/env.js$/.test(id)) {
-            return code.replace('/__weave', `http://localhost:9994/__weave`);
-          }
-        }
-      },
-    };
-  };
-
   const alias = [
     // Allow absolute imports inside this package
     {
@@ -76,11 +53,28 @@ export default defineConfig(({mode, command}) => {
     },
     {find: /^react-vis$/, replacement: 'react-vis/dist/index.js'},
     {find: 'dagre', replacement: 'dagre/dist/dagre.min.js'},
-
+    {
+      find: 'type/value/is',
+      replacement: `${__dirname}/node_modules/type/value/is`,
+    },
+    {
+      find: 'type/value/ensure',
+      replacement: `${__dirname}/node_modules/type/value/ensure`,
+    },
+    {
+      find: 'type/plain-function/ensure',
+      replacement: `${__dirname}/node_modules/type/plain-function/ensure`,
+    },
+    {
+      find: 'type/plain-function/is',
+      replacement: `${__dirname}/node_modules/type/plain-function/is`,
+    },
+    {find: 'type', replacement: `component-type`},
+    {find: 'each', replacement: `component-each`},
     {find: 'unserialize', replacement: 'yields-unserialize'},
   ];
 
-  const plugins: any = [svgr(), blockCjsPlugin, fileUrls, modifyEnvPlugin()];
+  const plugins: any = [svgr(), blockCjsPlugin, fileUrls];
 
   // enable the react plugin in dev only, for fast refresh
 
@@ -104,7 +98,10 @@ export default defineConfig(({mode, command}) => {
   return {
     plugins,
     base:
-      mode === 'production' && command !== 'serve' ? '/__frontend/' : undefined,
+      mode === 'production' && command !== 'serve'
+        ? // eslint-disable-next-line node/no-process-env
+          process.env.URL_BASE ?? '/__frontend/'
+        : undefined,
     resolve: {
       alias,
       dedupe: ['react', '@material-ui/styles', 'mdast-util-to-hast'],
@@ -119,6 +116,11 @@ export default defineConfig(({mode, command}) => {
         'is-buffer',
         'mdast-util-to-hast',
       ],
+      esbuildOptions: {
+        define: {
+          global: 'globalThis',
+        },
+      },
     },
     server: {
       host,
@@ -132,6 +134,18 @@ export default defineConfig(({mode, command}) => {
       // I think this fixes direct_url_as_of in file.py
       proxy: {
         '^/__weave/.*': {
+          target: 'http://localhost:9994',
+          secure: false,
+          changeOrigin: true,
+        },
+        // Dynamically generated env.js
+        '^.*/__frontend/env.js': {
+          target: 'http://localhost:9994',
+          secure: false,
+          changeOrigin: true,
+        },
+        // General pattern matcher for static assets
+        '^.*/__frontend/(.*.js|.*.ico)': {
           target: 'http://localhost:9994',
           secure: false,
           changeOrigin: true,

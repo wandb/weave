@@ -1,3 +1,4 @@
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import styled from 'styled-components';
 
 const STYLE_DEBUG = false;
@@ -80,3 +81,14 @@ export const HBlock = styled.div`
   ${debugStyle}
 `;
 HBlock.displayName = 'S.HBlock';
+
+export const BlockHeader = styled.div`
+  color: ${MOON_500};
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 24px;
+
+  display: flex;
+  justify-content: space-between;
+`;
+BlockHeader.displayName = 'S.BlockHeader';

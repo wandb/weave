@@ -6,6 +6,8 @@ import {
   IconInfo,
   IconOpenNewTab,
   IconDelete,
+  IconFullScreenModeExpand,
+  IconAddNew,
 } from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
@@ -31,12 +33,13 @@ import {useNodeValue} from '@wandb/weave/react';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
   HomePreviewSidebarTemplate,
-  HomeBoardPreview,
   HomeExpressionPreviewParts,
+  SEED_BOARD_OP_NAME,
 } from './HomePreviewSidebar';
 import {useHistory, useParams} from 'react-router-dom';
 import {HomeParams} from './Home';
 import {setDocumentTitle} from '@wandb/weave/util/document';
+import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
 import {
   urlEntity,
   urlProject,
@@ -281,7 +284,7 @@ const rowToExpression = (
 
 const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
-> = props => {
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
   const browserTitle = 'Boards';
@@ -294,7 +297,7 @@ const CenterProjectBoardsBrowser: React.FC<
     );
   }, [params.entity, params.project, params.preview, browserTitle]);
 
-  const boards = query.useProjectBoards(props.entityName, props.projectName);
+  const boards = query.useProjectBoards(entityName, projectName);
   const browserData = useMemo(() => {
     return boards.result.map(b => ({
       _id: b.name,
@@ -305,41 +308,20 @@ const CenterProjectBoardsBrowser: React.FC<
     }));
   }, [boards]);
 
-  const {setPreviewNode, navigateToExpression} = props;
-
-  useEffect(() => {
-    if (params.preview) {
-      const expr = rowToExpression(
-        params.entity!,
-        params.project!,
-        params.preview
-      );
-      const node = (
-        <HomeBoardPreview
-          expr={expr}
-          name={params.preview}
-          setPreviewNode={setPreviewNode}
-          navigateToExpression={navigateToExpression}
-        />
-      );
-      setPreviewNode(node);
-    } else {
-      setPreviewNode(undefined);
-    }
-  }, [
-    history,
-    params.entity,
-    params.project,
-    params.preview,
-    setPreviewNode,
-    navigateToExpression,
-  ]);
-
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
     return [
       [
+        {
+          icon: IconOpenNewTab,
+          label: 'Open board',
+          onClick: row => {
+            navigateToExpression(
+              rowToExpression(params.entity!, params.project!, row._id)
+            );
+          },
+        },
         {
           icon: IconInfo,
           label: 'Board details',
@@ -357,52 +339,109 @@ const CenterProjectBoardsBrowser: React.FC<
       ],
       [
         {
-          icon: IconOpenNewTab,
-          label: 'Open Board',
-          onClick: row => {
-            props.navigateToExpression(
-              rowToExpression(params.entity!, params.project!, row._id)
-            );
-          },
-        },
-      ],
-      [
-        {
           icon: IconDelete,
           label: 'Delete board',
           onClick: row => {
-            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            const uri = `wandb-artifact:///${entityName}/${projectName}/${row._id}:latest/obj`;
             setDeletingId(uri);
           },
         },
       ],
     ];
-  }, [props, history, params.entity, params.project, params.assetType]);
+  }, [
+    history,
+    params.entity,
+    params.project,
+    params.assetType,
+    entityName,
+    projectName,
+    navigateToExpression,
+  ]);
+
+  const sidebarActions = useMemo(
+    () =>
+      browserActions.map((actionSection, index) => {
+        if (index === 0) {
+          return actionSection.filter(
+            action => action.label !== 'Board details'
+          );
+        }
+        return actionSection;
+      }),
+    [browserActions]
+  );
+
+  useEffect(() => {
+    if (params.preview) {
+      const row = browserData.find(b => b._id === params.preview);
+      if (!row) {
+        setPreviewNode(undefined);
+        return;
+      }
+      const expr = rowToExpression(
+        params.entity!,
+        params.project!,
+        params.preview
+      );
+      const node = (
+        <HomePreviewSidebarTemplate
+          title={params.preview}
+          row={row}
+          actions={sidebarActions}
+          setPreviewNode={setPreviewNode}
+          primaryAction={{
+            icon: IconOpenNewTab,
+            label: `Open board`,
+            onClick: () => {
+              navigateToExpression(expr);
+            },
+          }}>
+          <HomeExpressionPreviewParts
+            expr={expr}
+            navigateToExpression={navigateToExpression}
+          />
+        </HomePreviewSidebarTemplate>
+      );
+      setPreviewNode(node);
+    } else {
+      setPreviewNode(undefined);
+    }
+  }, [
+    history,
+    params.entity,
+    params.project,
+    params.preview,
+    setPreviewNode,
+    navigateToExpression,
+    sidebarActions,
+    browserData,
+  ]);
 
   return (
     <CenterBrowser
       allowSearch
       title={browserTitle}
       selectedRowId={params.preview}
-      setPreviewNode={props.setPreviewNode}
+      setPreviewNode={setPreviewNode}
       deletingId={deletingId}
       setDeletingId={setDeletingId}
-      noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
+      deleteTypeString="board"
+      noDataCTA={`No Weave boards found for project: ${entityName}/${projectName}`}
       breadcrumbs={[
         {
           key: 'entity',
-          text: props.entityName,
+          text: entityName,
           onClick: () => {
-            props.setPreviewNode(undefined);
-            history.push(urlEntity(props.entityName));
+            setPreviewNode(undefined);
+            history.push(urlEntity(entityName));
           },
         },
         {
           key: 'project',
-          text: props.projectName,
+          text: projectName,
           onClick: () => {
-            props.setPreviewNode(undefined);
-            history.push(urlProject(props.entityName, props.projectName));
+            setPreviewNode(undefined);
+            history.push(urlProject(entityName, projectName));
           },
         },
       ]}
@@ -461,10 +500,13 @@ const tableRowToNode = (
 
 const CenterProjectTablesBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
-> = props => {
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
   const weave = useWeaveContext();
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
+  const [deletingId, setDeletingId] = useState<string | undefined>();
+
   const browserTitle = 'Tables';
   useEffect(() => {
     if (params.preview) {
@@ -475,14 +517,8 @@ const CenterProjectTablesBrowser: React.FC<
     }
   }, [params.entity, params.project, params.preview, browserTitle]);
 
-  const runStreams = query.useProjectRunStreams(
-    props.entityName,
-    props.projectName
-  );
-  const loggedTables = query.useProjectRunLoggedTables(
-    props.entityName,
-    props.projectName
-  );
+  const runStreams = query.useProjectRunStreams(entityName, projectName);
+  const loggedTables = query.useProjectRunLoggedTables(entityName, projectName);
   const isLoading = runStreams.loading || loggedTables.loading;
   const browserData = useMemo(() => {
     if (isLoading) {
@@ -511,7 +547,98 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
-  const {setPreviewNode, navigateToExpression} = props;
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(
+    () => [
+      [
+        // Home Page TODO: Enable awesome previews
+        {
+          icon: IconInfo,
+          label: 'Table overview',
+          onClick: row => {
+            history.push(
+              urlProjectAssetPreview(entityName, projectName, 'table', row._id)
+            );
+          },
+        },
+        {
+          icon: IconFullScreenModeExpand,
+          label: 'Preview table',
+          onClick: row => {
+            navigateToExpression(
+              tableRowToNode(row.kind, entityName, projectName, row._id)
+            );
+          },
+        },
+        {
+          icon: IconCopy,
+          label: 'Copy Weave expression',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              entityName,
+              projectName,
+              row._id
+            );
+            const copyText = weave.expToString(node);
+            navigator.clipboard.writeText(copyText).then(() => {
+              // give user feedback
+            });
+          },
+        },
+      ],
+      [
+        {
+          icon: IconAddNew,
+          label: 'New board',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              entityName,
+              projectName,
+              row._id
+            );
+            makeBoardFromNode(SEED_BOARD_OP_NAME, node, newDashExpr => {
+              navigateToExpression(newDashExpr);
+            });
+          },
+        },
+      ],
+      [
+        {
+          icon: IconDelete,
+          label: 'Delete table',
+          onClick: row => {
+            const uri = `wandb-artifact:///${entityName}/${projectName}/${row._id}:latest/obj`;
+            setDeletingId(uri);
+          },
+        },
+      ],
+    ],
+    [
+      entityName,
+      projectName,
+      weave,
+      history,
+      makeBoardFromNode,
+      navigateToExpression,
+    ]
+  );
+
+  const sidebarActions = useMemo(
+    () =>
+      browserActions.map((actionSection, index) => {
+        if (index === 0) {
+          return actionSection.filter(
+            action => action.label !== 'Table overview'
+          );
+        }
+        return actionSection;
+      }),
+    [browserActions]
+  );
+
   useEffect(() => {
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
@@ -528,14 +655,9 @@ const CenterProjectTablesBrowser: React.FC<
       const node = (
         <HomePreviewSidebarTemplate
           title={row.name}
+          row={row}
           setPreviewNode={setPreviewNode}
-          primaryAction={{
-            icon: IconOpenNewTab,
-            label: 'Open Table',
-            onClick: () => {
-              navigateToExpression(expr);
-            },
-          }}>
+          actions={sidebarActions}>
           <HomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
@@ -547,6 +669,7 @@ const CenterProjectTablesBrowser: React.FC<
       setPreviewNode(undefined);
     }
   }, [
+    sidebarActions,
     browserData,
     history,
     params.entity,
@@ -556,86 +679,31 @@ const CenterProjectTablesBrowser: React.FC<
     navigateToExpression,
   ]);
 
-  const browserActions: Array<
-    CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(() => {
-    return [
-      [
-        // Home Page TODO: Enable awesome previews
-        {
-          icon: IconInfo,
-          label: 'Table details',
-          onClick: row => {
-            history.push(
-              urlProjectAssetPreview(
-                props.entityName,
-                props.projectName,
-                'table',
-                row._id
-              )
-            );
-          },
-        },
-      ],
-      [
-        {
-          icon: IconOpenNewTab,
-          label: 'Open Table',
-          onClick: row => {
-            props.navigateToExpression(
-              tableRowToNode(
-                row.kind,
-                props.entityName,
-                props.projectName,
-                row._id
-              )
-            );
-          },
-        },
-      ],
-      [
-        {
-          icon: IconCopy,
-          label: 'Copy Weave expression',
-          onClick: row => {
-            const node = tableRowToNode(
-              row.kind,
-              props.entityName,
-              props.projectName,
-              row._id
-            );
-            const copyText = weave.expToString(node);
-            navigator.clipboard.writeText(copyText).then(() => {
-              // give user feedback
-            });
-          },
-        },
-      ],
-    ];
-  }, [props, weave, history]);
-
   return (
     <>
       <CenterBrowser
         allowSearch
         title={browserTitle}
         selectedRowId={params.preview}
-        noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
+        deletingId={deletingId}
+        setDeletingId={setDeletingId}
+        deleteTypeString="table"
+        noDataCTA={`No Weave tables found for project: ${entityName}/${projectName}`}
         breadcrumbs={[
           {
             key: 'entity',
-            text: props.entityName,
+            text: entityName,
             onClick: () => {
-              props.setPreviewNode(undefined);
-              history.push(urlEntity(props.entityName));
+              setPreviewNode(undefined);
+              history.push(urlEntity(entityName));
             },
           },
           {
             key: 'project',
-            text: props.projectName,
+            text: projectName,
             onClick: () => {
-              props.setPreviewNode(undefined);
-              history.push(urlProject(props.entityName, props.projectName));
+              setPreviewNode(undefined);
+              history.push(urlProject(entityName, projectName));
             },
           },
         ]}

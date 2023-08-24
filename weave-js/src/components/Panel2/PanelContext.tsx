@@ -6,6 +6,7 @@ import {
   NodeOrVoidNode,
   pushFrame,
   resolveVar,
+  Node,
 } from '@wandb/weave/core';
 import {consoleGroup, consoleLog} from '@wandb/weave/util';
 import React, {ReactNode, useCallback, useContext, useMemo} from 'react';
@@ -110,7 +111,7 @@ export interface PanelContextState {
   selectedPath?: string[];
 
   // Use to inform useNodeValue that we're inside PanelMaybe.
-  inPanelMaybe: boolean;
+  panelMaybeNode: Node | null;
 
   triggerExpressionEvent: (
     target: NodeOrVoidNode,
@@ -136,7 +137,7 @@ const DEFAULT_CONTEXT: PanelContextState = {
   lastFrame: {},
   stack: [],
   path: [],
-  inPanelMaybe: false,
+  panelMaybeNode: null,
   triggerExpressionEvent: () => {},
 };
 
@@ -149,7 +150,7 @@ export const PanelContextProvider: React.FC<{
   newVars?: Frame;
   newPath?: string;
   selectedPath?: string[];
-  inPanelMaybe?: boolean;
+  panelMaybeNode?: Node | null;
   // Handle events that occur on consuming expressions of variables
   // added in this frame.
   handleVarEvent?: (
@@ -164,7 +165,7 @@ export const PanelContextProvider: React.FC<{
     newPath,
     selectedPath,
     children,
-    inPanelMaybe,
+    panelMaybeNode,
     handleVarEvent,
     dashboardConfigOptions,
   }) => {
@@ -215,7 +216,7 @@ export const PanelContextProvider: React.FC<{
         stack: childStack,
         path: childPath,
         selectedPath: selectedPath ?? prevSelectedPath,
-        inPanelMaybe: inPanelMaybe ?? false,
+        panelMaybeNode: panelMaybeNode ?? null,
         triggerExpressionEvent,
         dashboardConfigOptions,
       };
@@ -226,7 +227,7 @@ export const PanelContextProvider: React.FC<{
       childPath,
       selectedPath,
       prevSelectedPath,
-      inPanelMaybe,
+      panelMaybeNode,
       triggerExpressionEvent,
       dashboardConfigOptions,
     ]);

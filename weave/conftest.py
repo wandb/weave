@@ -93,6 +93,22 @@ def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
+def pytest_collection_modifyitems(config, items):
+    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
+    job_num = config.getoption("--job-num", default=None)
+    if job_num is None:
+        return
+
+    job_num = int(job_num)
+
+    selected_items = []
+    for index, item in enumerate(items):
+        if index % 2 == job_num:
+            selected_items.append(item)
+
+    items[:] = selected_items
+
+
 @pytest.fixture(autouse=True)
 def pre_post_each_test(test_artifact_dir, caplog):
     # TODO: can't get this to work. I was trying to setup pytest log capture

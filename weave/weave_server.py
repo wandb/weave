@@ -12,14 +12,14 @@ import urllib.parse
 from flask import json
 from werkzeug.exceptions import HTTPException
 
-from flask import Flask, Blueprint
+from flask import Flask, Blueprint, Response
 from flask import request
 from flask import abort
 from flask_cors import CORS
 from flask import send_from_directory
 import wandb
 
-from weave import graph, server, value_or_error
+from weave import context_state, graph, server, value_or_error
 from weave import storage
 from weave import registry_mem
 from weave import errors
@@ -34,6 +34,8 @@ from weave import storage
 from weave import wandb_api
 from weave.language_features.tagging import tag_store
 
+
+WEAVE_CLIENT_CACHE_KEY_HEADER = "x-weave-client-cache-key"
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -123,21 +125,38 @@ def make_app():
     return app
 
 
+class OpsCache(typing.TypedDict):
+    updated_at: float
+    ops_data: typing.Optional[dict]
+
+
+ops_cache: typing.Optional[OpsCache] = None
+
+
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
+    global ops_cache
     with wandb_api.from_environment():
         # TODO: this is super slow.
         if not environment.wandb_production():
             registry_mem.memory_registry.load_saved_ops()
-        ops = registry_mem.memory_registry.list_ops()
-        ret = []
-        for op in ops:
-            try:
-                serialized_op = op.to_dict()
-            except errors.WeaveSerializeError:
-                continue
-            ret.append(serialized_op)
-        return {"data": ret}
+        if (
+            ops_cache is None
+            or ops_cache["updated_at"] < registry_mem.memory_registry.updated_at()
+        ):
+            ops = registry_mem.memory_registry.list_ops()
+            ret = []
+            for op in ops:
+                try:
+                    serialized_op = op.to_dict()
+                except errors.WeaveSerializeError:
+                    continue
+                ret.append(serialized_op)
+            ops_cache = {
+                "updated_at": registry_mem.memory_registry.updated_at(),
+                "data": ret,
+            }
+    return ops_cache
 
 
 class ErrorDetailsDict(typing.TypedDict):
@@ -223,6 +242,14 @@ def _log_errors(
         logging.error(error_dict)
 
 
+def _get_client_cache_key_from_request(request):
+    # Uncomment to set default to 15 second cache duration
+    client_cache_key = None  # str(int(time.time() // 15))
+    if WEAVE_CLIENT_CACHE_KEY_HEADER in request.headers:
+        client_cache_key = request.headers[WEAVE_CLIENT_CACHE_KEY_HEADER]
+    return client_cache_key
+
+
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
@@ -254,10 +281,14 @@ def execute():
     }
     root_span = tracer.current_root_span()
     tag_store.record_current_tag_store_size()
+
+    client_cache_key = _get_client_cache_key_from_request(request)
+
     if not PROFILE_DIR:
         start_time = time.time()
         with client_safe_http_exceptions_as_werkzeug():
-            response = server.handle_request(**execute_args)
+            with context_state.set_client_cache_key(client_cache_key):
+                response = server.handle_request(**execute_args)
         elapsed = time.time() - start_time
     else:
         # Profile the request and add a link to local snakeviz to the trace.
@@ -265,7 +296,8 @@ def execute():
         start_time = time.time()
         try:
             with client_safe_http_exceptions_as_werkzeug():
-                response = profile.runcall(server.handle_request, **execute_args)
+                with context_state.set_client_cache_key(client_cache_key):
+                    response = profile.runcall(server.handle_request, **execute_args)
         finally:
             elapsed = time.time() - start_time
             profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
@@ -316,10 +348,24 @@ def send_local_file(path):
     return send_from_directory("/", path)
 
 
+def frontend_env():
+    """If you add vars here, make sure to define their types in weave-js/src/config.ts"""
+    return {
+        "PREFIX": environment.weave_link_prefix(),
+        "ANALYTICS_DISABLED": environment.analytics_disabled(),
+        "ONPREM": environment.weave_onprem(),
+        "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
+    }
+
+
 @blueprint.route("/__frontend", defaults={"path": None})
 @blueprint.route("/__frontend/<path:path>")
 def frontend(path):
     """Serve the frontend with a simple fileserver over HTTP."""
+    # We serve up a dynamic env.js file before all other js.
+    if path is not None and path.endswith("env.js"):
+        js = f"window.WEAVE_CONFIG = {json.dumps(frontend_env())}"
+        return Response(js, mimetype="application/javascript")
     full_path = pathlib.Path(blueprint.static_folder) / path
     # prevent path traversal
     if not full_path.resolve().is_relative_to(blueprint.static_folder):
@@ -333,6 +379,13 @@ def frontend(path):
 @blueprint.route("/", defaults={"path": None})
 @blueprint.route("/<path:path>")
 def root_frontend(path):
+    # To support server cases where we're mounted under an existing path, i.e.
+    # /wandb/weave, then index.html will load something like /wandb/weave/.../env.js
+    if path is not None:
+        path = path.split("/")[-1]
+    if path == "env.js":
+        js = f"window.WEAVE_CONFIG = {json.dumps(frontend_env())}"
+        return Response(js, mimetype="application/javascript")
     return send_from_directory(blueprint.static_folder, "index.html")
 
 
@@ -349,8 +402,8 @@ def wb_viewer():
         with wandb_api.from_environment():
             current_context = wandb_api.get_wandb_api_context()
     authenticated = current_context is not None
-
-    return {"authenticated": authenticated}
+    user_id = None if current_context is None else current_context.user_id
+    return {"authenticated": authenticated, "user_id": user_id}
 
 
 app = make_app()

@@ -11,9 +11,23 @@ from . import util
 from . import errors
 from urllib.parse import urlparse
 import netrc
+from distutils.util import strtobool
 
 if typing.TYPE_CHECKING:
     from . import logs
+
+WANDB_ERROR_REPORTING = "WANDB_ERROR_REPORTING"
+WEAVE_USAGE_ANALYTICS = "WEAVE_USAGE_ANALYTICS"
+
+
+def _env_as_bool(var: str, default: typing.Optional[str] = None) -> bool:
+    env = os.environ
+    val = env.get(var, default)
+    try:
+        val = bool(strtobool(val))  # type: ignore
+    except (AttributeError, ValueError):
+        pass
+    return val if isinstance(val, bool) else False
 
 
 class Settings:
@@ -80,6 +94,27 @@ def weave_log_format(default: "logs.LogFormat") -> "logs.LogFormat":
     from .logs import LogFormat
 
     return LogFormat(os.getenv("WEAVE_LOG_FORMAT", default))
+
+
+def weave_link_prefix() -> str:
+    """When running in server we mount index under /weave"""
+    if os.getenv("GORILLA_ONPREM") == "true":
+        return "/weave"
+    return ""
+
+
+def weave_onprem() -> bool:
+    return os.getenv("GORILLA_ONPREM") == "true"
+
+
+def weave_backend_host() -> str:
+    return os.getenv("WEAVE_BACKEND_HOST", "/__weave")
+
+
+def analytics_disabled() -> bool:
+    if os.getenv("WEAVE_DISABLE_ANALYTICS") == "true":
+        return True
+    return False
 
 
 def weave_server_url() -> str:
@@ -177,3 +212,9 @@ def num_gql_timeout_retries() -> int:
     if raw is None:
         return 0
     return int(raw)
+
+
+def usage_analytics_enabled() -> bool:
+    return _env_as_bool(WANDB_ERROR_REPORTING, default="True") and _env_as_bool(
+        WEAVE_USAGE_ANALYTICS, default="True"
+    )

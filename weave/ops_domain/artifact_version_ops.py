@@ -373,6 +373,9 @@ def _get_history_metrics(
     entity_name = created_by["project"]["entity"]["name"]
     history_step = artifactVersion.gql["historyStep"]
 
+    if history_step is None:
+        return {}
+
     node = OutputNode(
         types.TypedDict({}),
         "run-historyAsOf",

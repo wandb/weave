@@ -183,7 +183,7 @@ class _StreamTableSync:
             self._artifact.set_file_pusher(self._lite_run.pusher)
         if print_url:
             base_url = environment.weave_server_url()
-            url = f"{base_url}/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
+            url = f"{base_url}/browse/wandb/{self._entity_name}/{self._project_name}/table/{self._table_name}"
             printer = get_printer(_get_python_type() != "python")
             printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
@@ -255,6 +255,7 @@ class StreamTable(_StreamTableSync):
         self._thread.start()
 
     def log(self, row_or_rows: ROW_TYPE) -> None:
+        # weave_types.TypeRegistry.type_of(row_or_rows)
         self.queue.put(row_or_rows)
 
     def _flush(self) -> None:

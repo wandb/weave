@@ -143,7 +143,7 @@ def flow_tags(
     return output
 
 
-# This function is responcible for post-processing the results of a resolve_fn.
+# This function is responsible for post-processing the results of a resolve_fn.
 # Specifically, it will take one of 3 actions:
 # 1. If `_should_tag_op_def_outputs` is true, then it will tag the output with the input.
 # 2. Else If `_should_flow_tags`, then it will flow the tags from the input to the output.

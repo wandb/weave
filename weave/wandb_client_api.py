@@ -68,3 +68,33 @@ def reset_wandb_thread_local_api_settings() -> None:
     _thread_local_api_settings.api_key = None
     _thread_local_api_settings.cookies = None
     _thread_local_api_settings.headers = None
+
+
+_WANDB_CLIENT_PATCHED = False
+
+
+def do_patch() -> None:
+    global _WANDB_CLIENT_PATCHED
+    if _WANDB_CLIENT_PATCHED:
+        return
+
+    ### Start _parse_artifact_path Patch ###
+    # Can be removed after https://github.com/wandb/wandb/pull/6083 is merged and deployed.
+    orig_parse_artifact_path = public.Api._parse_artifact_path
+
+    def new_parse_artifact_path(self, path):  # type: ignore
+        # Adding this short circuit skips the potential access of
+        # self.default_entity which incurs a network call. However, if the path
+        # is fully qualified, then this `entity` is thrown away.
+        parts = [] if path is None else path.split("/")
+        if len(parts) == 3:
+            return parts
+        return orig_parse_artifact_path(self, path)
+
+    public.Api._parse_artifact_path = new_parse_artifact_path  # type: ignore
+    ### End _parse_artifact_path Patch ###
+
+    _WANDB_CLIENT_PATCHED = True
+
+
+do_patch()

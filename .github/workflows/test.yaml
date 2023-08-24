@@ -39,24 +39,12 @@ jobs:
       - name: Build integration test image
         run: python3 docker_build.py build weave-integration-test . Dockerfile.test
 
-  TestContainerStatusReport:
-    name: Test Container Status Report
-    timeout-minutes: 5
-    needs:
-      - build-container
-    # runs-on: [self-hosted, runner]
-    runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
-    steps:
-      - uses: actions/checkout@v2
-      - run: source /root/venv/bin/activate &&  pip freeze
-
   lint:
     name: Python lint
     timeout-minutes: 7
     needs:
       - build-container
-    # runs-on: [self-hosted, runner]
+    # runs-on: [self-hosted, gke-runner]
     runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
@@ -73,6 +61,7 @@ jobs:
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
     runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -87,10 +76,6 @@ jobs:
           yarn install --frozen-lockfile
           yarn eslint --max-warnings=0
           yarn tslint
-          yarn prettier-fix
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git diff --quiet && git diff --staged --quiet || (git commit -am "Format code" && git push)
           yarn prettier
           yarn run tsc
 
@@ -99,9 +84,14 @@ jobs:
     timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
     needs:
       - build-container
-    # runs-on: [self-hosted, runner]
+    # runs-on: [self-hosted, gke-runner]
+    strategy:
+      fail-fast: false
+      matrix:
+        job_num: [0, 1]
+
     runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
@@ -128,26 +118,7 @@ jobs:
           DD_SERVICE: weave-python
           DD_ENV: ci
           # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
-        run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --timeout=90 ./tests ./ops_arrow --ddtrace --durations=5
-
-  ecosystem-tests:
-    name: Python ecosystem unit tests
-    timeout-minutes: 10
-    needs:
-      - build-container
-    # runs-on: [self-hosted, runner]
-    runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
-    steps:
-      # - uses: datadog/agent-github-action@v1.3
-      #   with:
-      #     api_key: ${{ secrets.DD_API_KEY }}
-      - uses: actions/checkout@v2
-      - name: Run tests
-        env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
-        run: source /root/venv/bin/activate && cd weave && pytest --timeout=90 ./ecosystem --ddtrace --durations=5
+        run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests ./ops_arrow ./ecosystem  --ddtrace --durations=5
 
   # nbmake:
   #   name: Run notebooks with nbmake
@@ -173,7 +144,7 @@ jobs:
       # - lint
       # - test
     if: always()
-    # runs-on: [self-hosted, runner]
+    # runs-on: [self-hosted, gke-runner]
     runs-on: ubuntu-latest
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
@@ -181,7 +152,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # run copies of the current job in parallel
         containers: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v3
@@ -207,7 +177,7 @@ jobs:
         # Use the following to run just a single test
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
-        run: export PYTHONPATH=$(pwd) && cd integration_test && npx ds run --record --parallel --browser chrome
+        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx ds run --record --parallel --browser chrome
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_testG

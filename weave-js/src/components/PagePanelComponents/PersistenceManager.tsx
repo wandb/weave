@@ -630,6 +630,47 @@ const HeaderLogoControls: React.FC<{
 }> = ({inputNode, headerEl, goHome, updateNode, inputConfig}) => {
   const [anchorHomeEl, setAnchorHomeEl] = useState<HTMLElement | null>(null);
   const expandedHomeControls = Boolean(anchorHomeEl);
+
+  return (
+    <>
+      <HeaderLeftControls
+        onClick={e => {
+          setAnchorHomeEl(headerEl);
+        }}>
+        <WeaveLogo open={anchorHomeEl != null} />
+        {expandedHomeControls ? <IconUp /> : <IconDown />}
+      </HeaderLeftControls>
+      <CustomPopover
+        open={expandedHomeControls}
+        anchorEl={anchorHomeEl}
+        onClose={() => setAnchorHomeEl(null)}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}>
+        <HeaderLogoPopoverContent
+          inputNode={inputNode}
+          inputConfig={inputConfig}
+          updateNode={updateNode}
+          goHome={goHome}
+          onClose={() => setAnchorHomeEl(null)}
+        />
+      </CustomPopover>
+    </>
+  );
+};
+
+const HeaderLogoPopoverContent: React.FC<{
+  inputNode: NodeOrVoidNode;
+  inputConfig: any;
+  updateNode: (node: NodeOrVoidNode) => void;
+  goHome?: () => void;
+  onClose: () => void;
+}> = ({inputNode, goHome, updateNode, inputConfig, onClose}) => {
   const inputType = useNodeWithServerType(inputNode).result?.type;
   const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
   const isGroup = weaveTypeIsPanelGroup(inputType);
@@ -721,70 +762,48 @@ const HeaderLogoControls: React.FC<{
   const versionValue = useNodeValue(versionNode);
 
   return (
-    <>
-      <HeaderLeftControls
-        onClick={e => {
-          setAnchorHomeEl(headerEl);
+    <CustomMenu>
+      {seedItems != null && (
+        <MenuItem
+          onClick={() => {
+            onClose();
+            newDashboard();
+          }}>
+          <MenuIcon>
+            <IconAddNew />
+          </MenuIcon>
+          <MenuText>Seed new board</MenuText>
+        </MenuItem>
+      )}
+      <MenuItem
+        onClick={() => {
+          onClose();
+          goHome?.();
         }}>
-        <WeaveLogo open={anchorHomeEl != null} />
-        {expandedHomeControls ? <IconUp /> : <IconDown />}
-      </HeaderLeftControls>
-      <CustomPopover
-        open={expandedHomeControls}
-        anchorEl={anchorHomeEl}
-        onClose={() => setAnchorHomeEl(null)}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'center',
+        <MenuIcon>
+          <IconBack />
+        </MenuIcon>
+        <MenuText>Back to home</MenuText>
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          onClose();
+          window.open('https://github.com/wandb/weave', '_blank');
         }}>
-        <CustomMenu>
-          {seedItems != null && (
-            <MenuItem
-              onClick={() => {
-                setAnchorHomeEl(null);
-                newDashboard();
-              }}>
-              <MenuIcon>
-                <IconAddNew />
-              </MenuIcon>
-              <MenuText>Seed new board</MenuText>
-            </MenuItem>
-          )}
-          <MenuItem
-            onClick={() => {
-              setAnchorHomeEl(null);
-              goHome?.();
-            }}>
-            <MenuIcon>
-              <IconBack />
-            </MenuIcon>
-            <MenuText>Back to home</MenuText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setAnchorHomeEl(null);
-              window.open('https://github.com/wandb/weave', '_blank');
-            }}>
-            <MenuIcon>
-              <IconDocs />
-            </MenuIcon>
-            <MenuText>Weave documentation</MenuText>
-          </MenuItem>
-          <MenuDivider />
-          <MenuItem disabled>
-            <MenuText>
-              Weave {versionValue.result}
-              <br />
-              by Weights & Biases
-            </MenuText>
-          </MenuItem>
-        </CustomMenu>
-      </CustomPopover>
-    </>
+        <MenuIcon>
+          <IconDocs />
+        </MenuIcon>
+        <MenuText>Weave documentation</MenuText>
+      </MenuItem>
+      <MenuDivider />
+      <MenuItem disabled>
+        <MenuText>
+          Weave {versionValue.result}
+          <br />
+          by Weights & Biases
+        </MenuText>
+      </MenuItem>
+    </CustomMenu>
   );
 };
 
