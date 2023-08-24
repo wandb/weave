@@ -7,6 +7,7 @@ from .. import weave_types as types
 from .. import weave_internal
 from ..panels import panel_group
 from ..panels import panel_board
+from ..panels import panel_trace
 from ..panels_py import panel_autoboard
 from .generator_templates import template_registry
 
@@ -27,31 +28,7 @@ BOARD_DESCRIPTION = "Monitor Traces"
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 
 
-BOARD_INPUT_WEAVE_TYPE = types.List(
-    types.TypedDict(
-        {
-            "name": types.optional(types.String()),
-            "span_id": types.optional(types.String()),
-            "parent_id": types.optional(types.String()),
-            "trace_id": types.optional(types.String()),
-            "start_time_s": types.optional(types.Number()),
-            "end_time_s": types.optional(types.Number()),
-            "status_code": types.optional(types.String()),
-            "inputs": types.optional(types.TypedDict({})),
-            "output": types.optional(types.Any()),
-            # "exception": types.optional(types.String()), # maybe use not_required_keys?
-            "attributes": types.optional(types.TypedDict({})),
-            "summary": types.optional(
-                types.TypedDict(
-                    {
-                        "latency_s": types.optional(types.Number()),
-                    }
-                )
-            ),
-            "timestamp": types.optional(types.Timestamp()),
-        }
-    )
-)
+BOARD_INPUT_WEAVE_TYPE = types.List(panel_trace.span_typed_dict_type)
 
 
 board_name = "py_board-" + BOARD_ID
@@ -77,7 +54,11 @@ def board(
     # Add the input node as raw data
     varbar = panel_board.varbar(editable=False)
 
-    source_data = varbar.add("source_data", input_node)
+    all_spans = varbar.add("all_spans", input_node)
+
+    trace_roots = all_spans.filter(lambda row: row["parent_id"].isNone())
+
+    trace_roots_var = varbar.add("trace_roots", trace_roots, True)
 
     height = 5
 
@@ -89,31 +70,37 @@ def board(
         enableAddPanel=True,
     )
 
-    requests_table = panels.Table(source_data)  # type: ignore
-    # requests_table.add_column(lambda row: row["output.model"], "Model")
-    # requests_table.add_column(
-    #     lambda row: row["inputs.messages"][-1]["content"], "Last Prompt"
-    # )
-    # requests_table.add_column(
-    #     lambda row: row["output.choices"][-1]["message.content"],
-    #     "Completion",
-    # )
-    # requests_table.add_column(lambda row: row["summary.prompt_tokens"], "Prompt Tokens")
-    # requests_table.add_column(
-    #     lambda row: row["summary.completion_tokens"], "Completion Tokens"
-    # )
-    # requests_table.add_column(lambda row: row["summary.total_tokens"], "Total Tokens")
-    # requests_table.add_column(lambda row: row["summary.latency_s"], "Latency")
-    # requests_table.add_column(lambda row: row["summary.cost"], "Cost")
-    # requests_table.add_column(
-    #     lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
-    # )
+    traces_table = panels.Table(trace_roots_var)  # type: ignore
+    traces_table.add_column(lambda row: row["name"], "Span Name")
+    traces_table.add_column(lambda row: row["trace_id"], "Trace ID")
+    traces_table.add_column(lambda row: row["summary.latency_s"], "Latency")
+    traces_table.add_column(lambda row: row["inputs"], "Inputs")
+    traces_table.add_column(lambda row: row["output"], "Output")
+    traces_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
 
-    requests_table_var = overview_tab.add(
-        "table",
-        requests_table,
+    traces_table_var = overview_tab.add(
+        "traces_table",
+        traces_table,
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=8),
     )
+
+    trace_spans = all_spans.filter(
+        lambda row: row["trace_id"] == traces_table_var.active_data()["trace_id"]
+    )
+
+    trace_viewer = panels.Trace(trace_spans)
+
+    trace_viewer_var = overview_tab.add(
+        "trace_viewer",
+        trace_viewer,
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=8),
+    )
+
+    # selected_trace_obj = overview_tab.add(
+    #     "selected_trace_obj",
+    #     selected_trace,
+    #     layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=8),
+    # )
 
     return panels.Board(vars=varbar, panels=overview_tab)
 

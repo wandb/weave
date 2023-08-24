@@ -1,5 +1,5 @@
 import * as Panel2 from '../panel';
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {TraceTreeSpanViewer} from './PanelTraceTreeTrace';
 import {useNodeValue} from '@wandb/weave/react';
 import {
@@ -56,7 +56,12 @@ const inputType = {
   },
 };
 
-type PanelTraceTreeTraceProps = Panel2.PanelProps<typeof inputType>;
+type PanelTraceTreeTraceProps = Panel2.PanelProps<
+  typeof inputType,
+  {
+    selectedSpanIndex?: number;
+  }
+>;
 
 const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
   const query = useMemo(() => {
@@ -95,10 +100,25 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
       nodeValue.loading ? null : unifyRoots(flatToTrees(nodeValue.result)),
     [nodeValue.loading, nodeValue.result]
   );
+  const setSelectedSpanIndex = useCallback(
+    (selectedSpanIndex: number) => {
+      props.updateConfig({selectedSpanIndex});
+    },
+    [props]
+  );
+
   if (tree == null) {
     return <Loader />;
   }
-  return <TraceTreeSpanViewer span={tree} />;
+
+  return (
+    <TraceTreeSpanViewer
+      span={tree}
+      selectedSpanIndex={props.config?.selectedSpanIndex}
+      onSelectSpanIndex={setSelectedSpanIndex}
+      hideDetail={true}
+    />
+  );
 };
 
 export const Spec: Panel2.PanelSpec = {

@@ -5,13 +5,14 @@ export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
   const roots: SpanType[] = [];
   const unrooted: SpanType[] = [];
   const map: {[id: string]: SpanType} = {};
-  flat.forEach(span => {
+  flat.forEach((span, index) => {
     map[span.span_id] = {
       name: span.name,
       start_time_ms: span.start_time_ms,
       end_time_ms: span.end_time_ms,
       attributes: span.attributes,
       child_spans: [],
+      '_span_index': index,
     };
   });
   flat.forEach(span => {

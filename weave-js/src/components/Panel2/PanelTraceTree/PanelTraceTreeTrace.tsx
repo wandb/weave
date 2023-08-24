@@ -1,6 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {SpanKindType, SpanType} from '@wandb/weave/core/model/media/traceTree';
-import React, {ReactNode, useMemo} from 'react';
+import React, {ReactNode, useCallback, useMemo} from 'react';
 import {Loader} from 'semantic-ui-react';
 import styled from 'styled-components';
 
@@ -118,6 +118,9 @@ const PanelTraceTreeTrace: React.FC<PanelTraceTreeTraceProps> = props => {
 
 export const TraceTreeSpanViewer: React.FC<{
   span: SpanType;
+  hideDetail?: boolean;
+  onSelectSpanIndex?: (spanIndex: number) => void;
+  selectedSpanIndex?: number | null;
 }> = props => {
   const {isFullscreen} = React.useContext(PanelFullscreenContext);
   const split = isFullscreen ? `horizontal` : `vertical`;
@@ -134,8 +137,40 @@ export const TraceTreeSpanViewer: React.FC<{
   const {timelineRef, timelineStyle, scale} = useTimelineZoomAndPan({
     onHittingMinZoom: showTipOverlay,
   });
-  const [selectedSpan, setSelectedSpan] =
+
+  const [selectedSpanUncontrolled, setSelectedSpanUncontrolled] =
     useUpdatingState<LayedOutSpanType | null>(layedOutSpan);
+
+  const setSelectedSpan = useCallback(
+    (span: LayedOutSpanType | null) => {
+      if (props.onSelectSpanIndex != null) {
+        if (span != null && span._span_index != null) {
+          props.onSelectSpanIndex(span._span_index);
+        }
+      } else {
+        setSelectedSpanUncontrolled(span);
+      }
+    },
+    [props, setSelectedSpanUncontrolled]
+  );
+
+  const selectedSpan = useMemo(() => {
+    if (props.onSelectSpanIndex != null) {
+      if (props.selectedSpanIndex != null) {
+        return flatSpans.find(
+          span => span._span_index === props.selectedSpanIndex
+        );
+      }
+      return flatSpans[0];
+    } else {
+      return selectedSpanUncontrolled;
+    }
+  }, [
+    flatSpans,
+    props.onSelectSpanIndex,
+    props.selectedSpanIndex,
+    selectedSpanUncontrolled,
+  ]);
 
   return (
     <S.TraceWrapper split={split}>
@@ -161,7 +196,7 @@ export const TraceTreeSpanViewer: React.FC<{
         </S.TraceTimeline>
         {tipOverlay}
       </S.TraceTimelineWrapper>
-      {selectedSpan && (
+      {selectedSpan && !props.hideDetail && (
         <S.TraceDetail>
           <SpanTreeDetail span={selectedSpan} />
         </S.TraceDetail>
