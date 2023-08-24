@@ -77,7 +77,7 @@ export const opTimestampRelativeStringAutoFormat = makeDateOp({
       const duration = moment.duration(1, unit).asMilliseconds();
       const diff = timestampDiff / duration;
 
-      if (diff >= 1) {
+      if (Math.abs(diff) >= 1) {
         // years and months get rounded to the tenth. Get rid of trailing 0 ie. 7.0 -> 7
         if (
           (unit === 'years' || unit === 'months') &&
@@ -114,7 +114,7 @@ export const opDatetimeAddMs = makeDateOp({
     return {type: 'timestamp'};
   },
   resolver: inputs => {
-    if (inputs.lhs == null || inputs.rhs == null || inputs.rhs <= 0) {
+    if (inputs.lhs == null || inputs.rhs == null) {
       return null;
     }
     // Use moment.utc here incase the incoming datetime doesn't have a timezone.
@@ -172,6 +172,33 @@ export const opDatesMax = makeDimDownDateOp({
   resolver: inputs => {
     const dates = inputs.dates as number[];
     return dates.reduce((a, b) => (a > b ? a : b));
+  },
+});
+
+export const opTimestampMax = makeDimDownDateOp({
+  hidden: true,
+  name: 'timestamp-max',
+  argTypes: {
+    timestamps: {
+      type: 'union',
+      members: [
+        {
+          type: 'list',
+          objectType: {type: 'union', members: ['none', {type: 'timestamp'}]},
+        },
+      ],
+    },
+  },
+  description: `Returns the largest ${docType('timestamp')}`,
+  argDescriptions: {timestamps: 'List of timestamps'},
+  returnValueDescription: `The largest ${docType('timestamp')}`,
+  returnType: inputTypes => {
+    const objType = listObjectType(inputTypes.timestamps);
+    return maybe({type: 'timestamp'});
+  },
+  resolver: inputs => {
+    const timestamps = inputs.timestamps as number[];
+    return timestamps.reduce((a, b) => (a > b ? a : b));
   },
 });
 
