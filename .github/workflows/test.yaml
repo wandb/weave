@@ -144,8 +144,8 @@ jobs:
       # - lint
       # - test
     if: always()
-    runs-on: [self-hosted, gke-runner]
-    # runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
 
