@@ -12,10 +12,15 @@ The UI state is a tree of panels. There are three types of non-leaf panels:
 */
 
 import {
+  Client,
+  Definition,
+  dereferenceAllVars,
+  EditingNode,
   Frame,
   isNodeOrVoidNode,
   NodeOrVoidNode,
-  pushFrame,
+  pushFrameDefs,
+  refineEditingNode,
   Stack,
   updateVarTypes,
   voidNode,
@@ -29,8 +34,14 @@ import {
   ChildPanelFullConfig,
   getFullChildPanel,
 } from './ChildPanel';
-import {getItemVars, PANEL_GROUP2_ID, PanelGroupConfig} from './PanelGroup';
+import {
+  getItemVarPaths,
+  getItemVars,
+  PANEL_GROUP2_ID,
+  PanelGroupConfig,
+} from './PanelGroup';
 import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
+import {difference} from '@wandb/weave/common/util/hooks';
 
 export type PanelTreeNode = ChildPanelConfig;
 
@@ -309,32 +320,71 @@ export const addChild = (
   });
 };
 
+type DefinitionWithDirtyHandler = Definition & {
+  dirty?: boolean;
+};
+
+function updateStackForItem(
+  key: string,
+  panel: ChildPanelFullConfig,
+  stack: DefinitionWithDirtyHandler[],
+  allowedPanels: string[] | undefined,
+  path: string[] = [],
+  dirtyAction?: Action
+): DefinitionWithDirtyHandler[] {
+  const childVars = getItemVars(key, panel, stack, allowedPanels);
+  const childVarPaths = getItemVarPaths(key, panel);
+  for (const varName of Object.keys(childVars)) {
+    const varPath = [...path, ...childVarPaths[varName]];
+    let dirty = false;
+    if (dirtyAction != null && _.isEqual(varPath, dirtyAction.path)) {
+      dirty = true;
+    }
+    stack = pushFrameDefs(stack, [
+      {
+        name: varName,
+        value: childVars[varName],
+        dirty,
+      },
+    ]);
+  }
+  return stack;
+}
+
 // Must match the variables that the rest of the UI
 // pushes onto the stack!
 // Implementation should exactly match mapPanelsAsync
 export const mapPanels = (
   node: PanelTreeNode,
   stack: Stack,
-  fn: (node: ChildPanelFullConfig, stack: Stack) => ChildPanelFullConfig
+  fn: (node: ChildPanelFullConfig, stack: Stack) => ChildPanelFullConfig,
+
+  // path and dirtyAction are optional. They are used for special behavior where
+  // we mark a variable as dirty when we encounter it, based on whatever is specified
+  // in dirtyAction.
+  dirtyAction?: Action,
+  path: string[] = []
 ): ChildPanelFullConfig => {
   const fullNode = getFullChildPanel(node);
   let withMappedChildren: ChildPanelFullConfig = fullNode;
   if (isGroupNode(fullNode)) {
     const items: {[key: string]: ChildPanelFullConfig} = {};
-    let childFrame: Frame = {};
     for (const key of Object.keys(fullNode.config.items)) {
       items[key] = mapPanels(
         fullNode.config.items[key],
-        pushFrame(stack, childFrame),
-        fn
+        stack,
+        fn,
+        dirtyAction,
+        [...path, key]
       );
-      const childVars = getItemVars(
+      stack = updateStackForItem(
         key,
         items[key],
         stack,
-        fullNode.config.allowedPanels
+        fullNode.config.allowedPanels,
+        path,
+        dirtyAction
       );
-      childFrame = {...childFrame, ...childVars};
     }
     withMappedChildren = {
       ...fullNode,
@@ -343,7 +393,10 @@ export const mapPanels = (
   } else if (isStandardPanel(fullNode.id)) {
     const children: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
-      children[key] = mapPanels(fullNode.config[key], stack, fn);
+      children[key] = mapPanels(fullNode.config[key], stack, fn, dirtyAction, [
+        ...path,
+        key,
+      ]);
     }
     withMappedChildren = {
       ...fullNode,
@@ -365,26 +418,30 @@ export const mapPanelsAsync = async (
   fn: (
     node: ChildPanelFullConfig,
     stack: Stack
-  ) => Promise<ChildPanelFullConfig>
+  ) => Promise<ChildPanelFullConfig>,
+  dirtyAction?: Action,
+  path: string[] = []
 ): Promise<ChildPanelFullConfig> => {
   const fullNode = getFullChildPanel(node);
   let withMappedChildren: ChildPanelFullConfig = fullNode;
   if (isGroupNode(fullNode)) {
     const items: {[key: string]: ChildPanelFullConfig} = {};
-    let childFrame: Frame = {};
     for (const key of Object.keys(fullNode.config.items)) {
       items[key] = await mapPanelsAsync(
         fullNode.config.items[key],
-        pushFrame(stack, childFrame),
-        fn
+        stack,
+        fn,
+        dirtyAction,
+        [...path, key]
       );
-      const childVars = getItemVars(
+      stack = updateStackForItem(
         key,
         items[key],
         stack,
-        fullNode.config.allowedPanels
+        fullNode.config.allowedPanels,
+        path,
+        dirtyAction
       );
-      childFrame = {...childFrame, ...childVars};
     }
     withMappedChildren = {
       ...fullNode,
@@ -393,7 +450,13 @@ export const mapPanelsAsync = async (
   } else if (isStandardPanel(fullNode.id)) {
     const children: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
-      children[key] = await mapPanelsAsync(fullNode.config[key], stack, fn);
+      children[key] = await mapPanelsAsync(
+        fullNode.config[key],
+        stack,
+        fn,
+        dirtyAction,
+        [...path, key]
+      );
     }
     withMappedChildren = {
       ...fullNode,
@@ -612,4 +675,109 @@ export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
       config,
     } as ChildPanelFullConfig;
   });
+};
+
+export const refineAllExpressions = async (
+  client: Client,
+  panel: PanelTreeNode,
+  stack: Stack
+) => {
+  // We walk all panels, refining all input_nodes.
+
+  // not sure if providing this refine cache really helps anything, but why not.
+  const refineCache = new Map<EditingNode, EditingNode>();
+
+  const refined = await mapPanelsAsync(
+    panel,
+    stack,
+    async (panel: ChildPanelFullConfig, childStack: Stack) => {
+      const refinedInputNode = (await refineEditingNode(
+        client,
+        panel.input_node,
+        childStack,
+        refineCache
+      )) as NodeOrVoidNode;
+      return {...panel, input_node: refinedInputNode};
+
+      // A former attempt at hydration also initialized all the panels.
+      // This is still more correct, but I haven't tried to get it fully working yet.
+      // We want to do this because Python code doesn't always hydrate panels, for
+      // example it may just set an input_node and expect js to figure out an auto
+      // panel.
+      // const {id, config} = await initPanel(
+      //   weave,
+      //   panel.input_node,
+      //   panel.id,
+      //   undefined,
+      //   childStack
+      // );
+      // return {...panel, id, config};
+    }
+  );
+
+  // Variables have .type attached, but what they refer to may now have a difference
+  // type, so go through and update them.
+  return updateExpressionVarTypes(refined, stack);
+};
+
+type PanelConfigUpdateAction = {
+  type: 'PanelConfigUpdate';
+  path: string[];
+};
+
+type Action = PanelConfigUpdateAction;
+
+const getPathFromDelta = (delta: any): string[] => {
+  if (delta.config == null || delta.config.items == null) {
+    return [];
+  }
+  const keys = Object.keys(delta.config.items);
+  if (keys.length === 0) {
+    return [];
+  }
+  return [keys[0], ...getPathFromDelta(delta.config.items[keys[0]])];
+};
+
+const getActionFromDelta = (delta: any): Action => {
+  const path = getPathFromDelta(delta);
+  return {
+    type: 'PanelConfigUpdate',
+    path,
+  };
+};
+
+// Given a prior config and a new config, first figure out what the change was.
+// Then only refine the expressions that depend on any variables that changed.
+export const refineForUpdate = async (
+  client: Client,
+  oldConfig: PanelTreeNode,
+  newConfig: PanelTreeNode
+) => {
+  const delta = difference(oldConfig, newConfig);
+  const dirtyAction = getActionFromDelta(delta);
+  const refineCache = new Map<EditingNode, EditingNode>();
+  return mapPanelsAsync(
+    newConfig,
+    [],
+    async (panel, childStack) => {
+      // Get all the variables used by this panel's input_node
+      const res = dereferenceAllVars(panel.input_node, childStack);
+      for (const def of res.usedStack) {
+        if ((def as any).dirty) {
+          // if any of those variables are dirty, refine the input_node
+          const refinedInputNode = (await refineEditingNode(
+            client,
+            panel.input_node,
+            childStack,
+            refineCache
+          )) as NodeOrVoidNode;
+          return {...panel, input_node: refinedInputNode};
+        }
+      }
+      return panel;
+    },
+    // We pass dirtyAction into mapNodesAsync, mapNodesAsync will mark the appropriate
+    // variable as dirty when it encounters it.
+    dirtyAction
+  );
 };

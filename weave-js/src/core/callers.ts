@@ -116,7 +116,7 @@ export function dereferenceAllVars(node: EditingNode, stack: Stack) {
         if (closure.value == null) {
           throw new Error('HOW!!!!');
         }
-        usedStack.splice(0, 0, {name: n.varName, value: closure.value});
+        usedStack.splice(0, 0, resolved.entry);
         if (
           closure.value.nodeType === 'var' &&
           closure.value.varName === VAR_NODE_NAME

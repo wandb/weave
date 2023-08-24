@@ -1,10 +1,4 @@
-import {
-  constNodeUnsafe,
-  EditingNode,
-  NodeOrVoidNode,
-  refineEditingNode,
-  Stack,
-} from '@wandb/weave/core';
+import {constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
@@ -36,8 +30,8 @@ import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {
   getConfigForPath,
-  mapPanelsAsync,
-  updateExpressionVarTypes,
+  refineAllExpressions,
+  refineForUpdate,
 } from './panelTree';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
@@ -88,52 +82,22 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
-        // not sure if providing this refine cache really helps anything, but why not.
-
-        const refineCache = new Map<EditingNode, EditingNode>();
         let loadedPanel = getFullChildPanel(panelQuery.result);
 
-        // We walk all panels, refining all input_nodes.
-        // Don't this can actually happen asynchronously because the document should
+        // This can actually happen asynchronously because the document should
         // already have correct types. It should be much less common that the type
         // refinement results have changed (like when a user adds a new column to a
         // table). But if we don't block rendering on this, we'll get a flash and extra
         // expensive requests if the types do change. Currently the types can change
         // because of implementation differences between JS and Python. We need to fix
         // those before doing it truly asynchronously.
-        loadedPanel = await mapPanelsAsync(
+        const refined = await refineAllExpressions(
+          weave.client,
           loadedPanel,
-          stack,
-          async (panel: ChildPanelFullConfig, childStack: Stack) => {
-            const refinedInputNode = (await refineEditingNode(
-              weave.client,
-              panel.input_node,
-              childStack,
-              refineCache
-            )) as NodeOrVoidNode;
-            return {...panel, input_node: refinedInputNode};
-
-            // A former attempt at hydration also initialized all the panels.
-            // This is still more correct, but I haven't tried to get it fully working yet.
-            // We want to do this because Python code doesn't always hydrate panels, for
-            // example it may just set an input_node and expect js to figure out an auto
-            // panel.
-            // const {id, config} = await initPanel(
-            //   weave,
-            //   panel.input_node,
-            //   panel.id,
-            //   undefined,
-            //   childStack
-            // );
-            // return {...panel, id, config};
-          }
+          stack
         );
 
-        // Variables have .type attached, but what they refer to may now have a difference
-        // type, so go through and update them.
-        loadedPanel = updateExpressionVarTypes(loadedPanel, stack);
-
-        setPanelConfig(() => loadedPanel);
+        setPanelConfig(() => refined);
       };
       if (!loaded.current) {
         loaded.current = true;
@@ -165,12 +129,22 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     (newConfig: any) => {
       consoleLog('PANEL PANEL CONFIG UPDATE', newConfig);
       consoleLog('PANEL PANEL CONFIG UPDATE TYPE', toWeaveType(newConfig));
-      setPanelConfig(origConfig => ({...origConfig, ...newConfig}));
-      // Uncomment to enable panel state saving
-      updateConfigForPanelNode(newConfig);
+      const fullConfig = {...panelConfig, ...newConfig};
+      // TODO: Updates are not sequenced and can be out of order!
+      const doUpdate = async () => {
+        const refined = await refineForUpdate(
+          weave.client,
+          panelConfig,
+          newConfig
+        );
+        setPanelConfig(origConfig => refined);
+        updateConfigForPanelNode(fullConfig);
+      };
+      doUpdate();
     },
-    [setPanelConfig, updateConfigForPanelNode]
+    [panelConfig, setPanelConfig, updateConfigForPanelNode, weave.client]
   );
+  // TODO: Not yet handling refinement in panelUpdateConfig2
   const panelUpdateConfig2 = useCallback(
     (change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig) => {
       setPanelConfig((currentConfig: ChildPanelFullConfig) => {

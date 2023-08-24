@@ -915,6 +915,8 @@ export const useNodeWithServerType = (
   paramFrame?: Frame,
   options?: {skip?: boolean; callSite?: string}
 ): {loading: boolean; result: NodeOrVoidNode} => {
+  // TODO: There is a bug in here with skip, we return the ref equal
+  // original node without types, so we don't pass type updates through!
   const skip = options?.skip;
   const stack = usePanelContext().stack;
   if (paramFrame != null) {

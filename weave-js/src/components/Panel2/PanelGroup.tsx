@@ -281,6 +281,25 @@ export function getItemVars(
   };
 }
 
+export function getItemVarPaths(
+  varName: string,
+  item: ChildPanelConfig
+): {[name: string]: string[]} {
+  const fullItem = getFullChildPanel(item);
+  if (isGroupNode(fullItem)) {
+    // Recursive group variables are hoisted
+    const varPaths: {[name: string]: string[]} = {};
+    for (const key of Object.keys(fullItem.config.items)) {
+      varPaths[key] = [varName, key];
+    }
+    varPaths[varName] = [varName];
+    return varPaths;
+  }
+  return {
+    [varName]: [varName],
+  };
+}
+
 export const addPanelToGroupConfig = (
   currentConfig: PanelGroupConfig,
   allowedPanels?: string[],

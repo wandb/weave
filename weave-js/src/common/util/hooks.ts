@@ -14,7 +14,7 @@ import {
 
 import {SetState} from './types';
 
-function difference(origObj: any, newObj: any) {
+export function difference(origObj: any, newObj: any) {
   const changes = (objA: any, objB: any) => {
     let arrayIndexCounter = 0;
     return _.transform(objA, (result: any, value: any, key: any) => {
