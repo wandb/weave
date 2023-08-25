@@ -10,7 +10,7 @@ import textwrap
 
 py_type = type
 
-from .. import mappers_python
+from .. import partial_object
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
@@ -260,6 +260,9 @@ class ArrowWeaveListType(types.Type):
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_artifact):
+    if isinstance(object_type, partial_object.PartialObjectType):
+        # PartialObject is a leaf type
+        return arrow_data
     if _object_type_has_props(object_type):
         prop_types = _object_type_prop_types(object_type)
 

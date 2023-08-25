@@ -9,7 +9,6 @@ import getConfig from '../config';
 
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
-import {consoleLog} from '../util';
 import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
@@ -50,6 +49,9 @@ import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import Inspector from './Sidebar/Inspector';
 import {useWeaveAutomation} from './automation';
+import {consoleLog} from '../util';
+import {trackPage} from '../util/events';
+import {getCookie} from '../common/util/cookie';
 import {useHistory} from 'react-router-dom';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
@@ -110,6 +112,77 @@ const JupyterControlsIcon = styled.div`
   }
 `;
 
+const HOST_SESSION_ID_COOKIE = `host_session_id`;
+
+// TODO: This should be merged with useIsAuthenticated and refactored to useWBViewer()
+function useEnablePageAnalytics() {
+  const history = useHistory();
+  const pathRef = useRef('');
+  const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
+
+  // fetch user
+  useEffect(() => {
+    const anonApiKey = getCookie('anon_api_key');
+    const additionalHeaders: Record<string, string> = {};
+    if (anonApiKey != null && anonApiKey !== '') {
+      additionalHeaders['x-wandb-anonymous-auth-id'] = btoa(anonApiKey);
+    }
+    fetch(urlPrefixed(backendWeaveViewerUrl()), {
+      credentials: 'include',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...additionalHeaders,
+      },
+    })
+      .then(res => {
+        if (res.status === 200) {
+          return res.json();
+        }
+        return;
+      })
+      .then(json => {
+        const serverUserId = json?.user_id ?? '';
+        if (serverUserId !== '') {
+          (window.analytics as any).identify(serverUserId);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+      });
+  }, [urlPrefixed, backendWeaveViewerUrl]);
+
+  useEffect(() => {
+    const options = {
+      context: {
+        hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
+      },
+    };
+
+    // TODO: Make this DRY-er
+    const unlisten = history.listen(location => {
+      const currentPath = `${location.pathname}${location.search}`;
+      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+      if (pathRef.current !== currentPath) {
+        trackPage({url: fullURL}, options);
+        pathRef.current = currentPath;
+      }
+    });
+
+    // Track initial page view
+    const initialPath = `${history.location.pathname}${history.location.search}`;
+    const entireURL = `${window.location.protocol}//${window.location.host}${history.location.pathname}${history.location.search}${history.location.hash}`;
+    if (pathRef.current !== initialPath) {
+      trackPage({url: entireURL}, options);
+      pathRef.current = initialPath;
+    }
+
+    return () => {
+      unlisten();
+    };
+  }, [history]);
+}
+
 // Simple function that forces rerender when URL changes.
 const usePoorMansLocation = () => {
   const [location, setLocation] = useState(window.location.toString());
@@ -133,6 +206,7 @@ type PagePanelProps = {
 };
 
 const PagePanel = ({browserType}: PagePanelProps) => {
+  useEnablePageAnalytics();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
   const history = useHistory();

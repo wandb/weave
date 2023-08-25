@@ -48,6 +48,7 @@ def varbar(editable=True, items=None) -> panel_group.Group:
                 "Dropdown",
                 "DateRange",
                 "FilterEditor",
+                "GroupingEditor",
             ],
             enableAddPanel=editable,
             childNameBase="var",

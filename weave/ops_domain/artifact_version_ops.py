@@ -1,22 +1,25 @@
 import json
 
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .. import errors
 from .. import weave_types as types
 from . import wb_domain_types as wdt
+
 from .wandb_domain_gql import (
-    _make_alias,
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
+    _make_alias,
 )
+
 
 import typing
 from . import wb_util
 from urllib.parse import quote
 from .. import artifact_fs
 from .. import artifact_wandb
+from .. import input_provider
 
 
 static_art_file_gql = """
@@ -79,7 +82,7 @@ def root_artifact_version_gql_resolver(
         gql_result, [project_alias, artifact_type_alias, artifact_alias]
     )
     if artifact_alias_data is not None:
-        return wdt.ArtifactType.from_gql(artifact_alias_data)
+        return wdt.ArtifactType.from_keys(artifact_alias_data)
     return None
 
 
@@ -105,6 +108,23 @@ def _root_artifact_version_plugin(inputs, inner):
     """
 
 
+def _gql_op_output_type_for_root_artifact_version(
+    inputs: input_provider.InputProvider, input_type: types.Type
+) -> types.Type:
+    project_alias = _make_alias(
+        inputs.raw["entityName"], inputs.raw["projectName"], prefix="project"
+    )
+    artifact_type_alias = _make_alias(
+        inputs.raw["artifactTypeName"], prefix="artifactType"
+    )
+    artifact_alias = _make_alias(inputs.raw["artifactVersionName"], prefix="artifact")
+    return types.optional(
+        typing.cast(typing.Any, input_type)[project_alias][artifact_type_alias][
+            artifact_alias
+        ]
+    )
+
+
 @op(
     name="root-artifactVersion",
     input_type={
@@ -118,6 +138,7 @@ def _root_artifact_version_plugin(inputs, inner):
         _root_artifact_version_plugin,
         is_root=True,
         root_resolver=root_artifact_version_gql_resolver,
+        gql_op_output_type=_gql_op_output_type_for_root_artifact_version,
     ),
 )
 def root_artifact_version(
@@ -166,7 +187,7 @@ def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
 ) -> types.Type:
     return wb_util.process_run_dict_type(
-        json.loads(artifactVersion.gql["metadata"] or "{}")
+        json.loads(artifactVersion["metadata"] or "{}")
     )
 
 
@@ -178,9 +199,7 @@ def refine_metadata(
 def metadata(
     artifactVersion: wdt.ArtifactVersion,
 ) -> dict[str, typing.Any]:
-    return wb_util.process_run_dict_obj(
-        json.loads(artifactVersion.gql["metadata"] or "{}")
-    )
+    return wb_util.process_run_dict_obj(json.loads(artifactVersion["metadata"] or "{}"))
 
 
 # Section 4/6: Direct Relationship Ops
@@ -224,8 +243,8 @@ gql_direct_edge_op(
 def artifact_version_created_by(
     artifactVersion: wdt.ArtifactVersion,
 ) -> typing.Optional[wdt.Run]:
-    if artifactVersion.gql["createdBy"]["__typename"] == "Run":
-        return wdt.Run.from_gql(artifactVersion.gql["createdBy"])
+    if artifactVersion["createdBy"]["__typename"] == "Run":
+        return wdt.Run.from_keys(artifactVersion["createdBy"])
     return None
 
 
@@ -246,8 +265,8 @@ def artifact_version_created_by(
 def artifact_version_created_by_user(
     artifactVersion: wdt.ArtifactVersion,
 ) -> typing.Optional[wdt.User]:
-    if artifactVersion.gql["createdBy"]["__typename"] == "User":
-        return wdt.User.from_gql(artifactVersion.gql["createdBy"])
+    if artifactVersion["createdBy"]["__typename"] == "User":
+        return wdt.User.from_keys(artifactVersion["createdBy"])
     return None
 
 
@@ -290,7 +309,7 @@ gql_connection_op(
 def op_artifact_version_name(
     artifact: wdt.ArtifactVersion,
 ) -> str:
-    return f'{artifact.gql["artifactSequence"]["name"]}:v{artifact.gql["versionIndex"]}'
+    return f'{artifact["artifactSequence"]["name"]}:v{artifact["versionIndex"]}'
 
 
 @op(
@@ -320,15 +339,15 @@ def op_artifact_version_name(
 def artifact_version_link(
     artifactVersion: wdt.ArtifactVersion,
 ) -> wdt.Link:
-    home_sequence_name = artifactVersion.gql["artifactSequence"]["name"]
-    home_sequence_version_index = artifactVersion.gql["versionIndex"]
-    type_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"]["name"]
-    project_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"][
+    home_sequence_name = artifactVersion["artifactSequence"]["name"]
+    home_sequence_version_index = artifactVersion["versionIndex"]
+    type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
+    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"][
         "project"
     ]["name"]
-    entity_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"][
-        "project"
-    ]["entity"]["name"]
+    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"][
+        "entity"
+    ]["name"]
     return wdt.Link(
         f"{home_sequence_name}:v{home_sequence_version_index}",
         f"/{entity_name}/{project_name}/artifacts/{quote(type_name)}/{quote(home_sequence_name)}/v{home_sequence_version_index}",
@@ -346,7 +365,7 @@ def artifact_version_link(
 def artifact_version_is_weave_object(
     artifactVersion: wdt.ArtifactVersion,
 ) -> bool:
-    raw_meta = artifactVersion.gql.get("metadata") or "{}"
+    raw_meta = artifactVersion.get("metadata") or "{}"
     raw_meta_dict = json.loads(raw_meta)
     return raw_meta_dict.get("_weave_meta", {}).get("is_weave_obj", False)
 
@@ -371,14 +390,14 @@ def _get_history_metrics(
     from . import wb_domain_types
     from .. import weave_internal
 
-    created_by = artifactVersion.gql["createdBy"]
+    created_by = artifactVersion["createdBy"]
     if created_by["__typename"] != "Run":
         return {}
 
     run_name = created_by["name"]
     project_name = created_by["project"]["name"]
     entity_name = created_by["project"]["entity"]["name"]
-    history_step = artifactVersion.gql["historyStep"]
+    history_step = artifactVersion["historyStep"]
 
     if history_step is None:
         return {}
@@ -479,15 +498,15 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
-    entity_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"][
-        "project"
-    ]["entity"]["name"]
-    project_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"][
+    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"][
+        "entity"
+    ]["name"]
+    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"][
         "project"
     ]["name"]
-    type_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"]["name"]
-    home_sequence_name = artifactVersion.gql["artifactSequence"]["name"]
-    commit_hash = artifactVersion.gql["commitHash"]
+    type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
+    home_sequence_name = artifactVersion["artifactSequence"]["name"]
+    commit_hash = artifactVersion["commitHash"]
     return artifact_wandb.WandbArtifact(
         name=home_sequence_name,
         type=type_name,

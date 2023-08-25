@@ -16,13 +16,13 @@ ops = weave.ops
 
 
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.
-BOARD_ID = "open_ai_completions_monitor"
+BOARD_ID = "llm_completions_monitor"
 
 # BOARD_DISPLAY_NAME is the name that will be displayed in the UI
-BOARD_DISPLAY_NAME = "OpenAI Monitor Board"
+BOARD_DISPLAY_NAME = "LLM Monitor Board"
 
 # BOARD_DESCRIPTION is the description that will be displayed in the UI
-BOARD_DESCRIPTION = "Monitor OpenAI Completions"
+BOARD_DESCRIPTION = "Monitor LLM Completions"
 
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 BOARD_INPUT_WEAVE_TYPE = types.List(
@@ -108,9 +108,64 @@ board_name = "py_board-" + BOARD_ID
 #         # table.add_column(lambda row: row["messages"][-1]["content"], "Message")
 #         return table
 
+API_COST_INPUT_TYPE = types.TypedDict(
+    {
+        "output": types.optional(
+            types.TypedDict(
+                {
+                    "model": types.optional(types.String()),
+                }
+            )
+        ),
+        "summary": types.optional(
+            types.TypedDict(
+                {
+                    "prompt_tokens": types.optional(types.Number()),
+                    "completion_tokens": types.optional(types.Number()),
+                }
+            )
+        ),
+    }
+)
 
-def cost(row: dispatch.RuntimeOutputNode) -> dispatch.RuntimeOutputNode:
-    return row["summary.total_tokens"] * 0.0015e-3
+
+@weave.op(weavify=True, input_type={"record": API_COST_INPUT_TYPE})  # type: ignore
+def openai_request_cost(record) -> float:  # type: ignore
+    model = record["output.model"]
+    pt = record["summary.prompt_tokens"]
+    ct = record["summary.completion_tokens"]
+    cost_per_1000 = weave.ops.case(
+        [
+            # finetuned
+            {"when": model.startsWith("ada:"), "then": pt * 0.0016 + ct * 0.0016},
+            {"when": model.startsWith("babbage:"), "then": pt * 0.0024 + ct * 0.0024},
+            {"when": model.startsWith("curie:"), "then": pt * 0.012 + ct * 0.012},
+            {"when": model.startsWith("davinci:"), "then": pt * 0.12 + ct * 0.12},
+            # non-finetuned
+            {"when": model == "gpt-4-32k-0314", "then": pt * 0.06 + ct * 0.12},
+            {"when": model == "gpt-4-32k-0613", "then": pt * 0.06 + ct * 0.12},
+            {"when": model == "gpt-3.5-turbo-0613", "then": pt * 0.0015 + ct * 0.002},
+            {
+                "when": model == "gpt-3.5-turbo-16k-0613",
+                "then": pt * 0.003 + ct * 0.004,
+            },
+            {
+                "when": model == "text-embedding-ada-002-v2",
+                "then": pt * 0.0001 + ct * 0.0001,
+            },
+            {"when": model == "ada", "then": pt * 0.0004 + ct * 0.0004},
+            {"when": model == "babbage", "then": pt * 0.0005 + ct * 0.0005},
+            {"when": model == "curie", "then": pt * 0.002 + ct * 0.002},
+            {"when": model == "davinci", "then": pt * 0.02 + ct * 0.02},
+            {
+                "when": model.startsWith("gpt-3.5-turbo"),
+                "then": pt * 0.002 + ct * 0.002,
+            },
+            {"when": model.startsWith("gpt-4"), "then": pt * 0.03 + ct * 0.06},
+            {"when": True, "then": 0},
+        ]
+    )
+    return cost_per_1000 / 1000  # type: ignore
 
 
 @weave.op(  # type: ignore
@@ -135,13 +190,47 @@ def board(
 
     source_data = varbar.add("source_data", input_node)
 
+    augmented_data = varbar.add(
+        "augmented_data",
+        source_data.with_columns(
+            weave.ops.dict_(
+                **{
+                    "summary.cost": source_data.map(
+                        lambda row: openai_request_cost(row)
+                    )
+                }
+            )
+        ),
+        hidden=True,
+    )
+
+    filter_fn = varbar.add(
+        "filter_fn",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: weave_internal.const(True)
+        ),
+        hidden=True,
+    )
+
+    grouping_fn = varbar.add(
+        "grouping_fn",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: row["output.model"]
+        ),
+        hidden=True,
+    )
+
+    filtered_data = varbar.add(
+        "filtered_data", augmented_data.filter(filter_fn), hidden=True
+    )
+
     # Setup date range variables:
     ## 1. raw_data_range is derived from raw_data
-    dataset_range = varbar.add(
-        "dataset_range",
+    filtered_range = varbar.add(
+        "filtered_range",
         weave.ops.make_list(
-            a=source_data[timestamp_col_name].min(),
-            b=source_data[timestamp_col_name].max(),
+            a=filtered_data[timestamp_col_name].min(),
+            b=filtered_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -158,32 +247,13 @@ def board(
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
     ##    the range of data that will be displayed in the charts.
     bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(dataset_range), hidden=True
+        "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
     )
-
-    # clean_data = varbar.add(
-    #     "clean_data",
-    #     dataset.map(
-    #         lambda row: ops.dict_(
-    #             id=row["output"]["id"],
-    #             object=row["output"]["object"],
-    #             model=row["output"]["model"],
-    #             messages=row["inputs"]["messages"],
-    #             usage=row["output"]["usage"],
-    #             completion=row["output"]["choices"][0]["message"],
-    #             finish_reason=row["output"]["choices"][0]["finish_reason"],
-    #             timestamp=row["timestamp"],
-    #             latency_ms=row["end_time_ms"] - row["start_time_ms"],
-    #         )
-    #     ),
-    #     hidden=True,
-    # )
-
     # Derive the windowed data to use in the plots as a function of bin_range
 
     window_data = varbar.add(
         "window_data",
-        source_data.filter(
+        augmented_data.filter(
             lambda row: weave.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
@@ -192,42 +262,18 @@ def board(
         hidden=True,
     )
 
-    filter_fn = varbar.add(
-        "filter_fn",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: weave_internal.const(True)
-        ),
-        hidden=True,
-    )
     filters = varbar.add(
         "filters",
         weave.panels.FilterEditor(filter_fn, node=window_data),
-    )
-
-    filtered_data = varbar.add(
-        "filtered_data", source_data.filter(filter_fn), hidden=True
     )
 
     filtered_window_data = varbar.add(
         "filtered_window_data", window_data.filter(filter_fn), hidden=True
     )
 
-    groupby = varbar.add("groupby", "output.model", hidden=True)
     grouping = varbar.add(
         "grouping",
-        weave.panels.Dropdown(
-            groupby,
-            choices=weave.ops.List.concat(
-                weave.ops.make_list(
-                    a=weave_internal.const(["output.model"]),
-                    b=source_data["attributes"]
-                    .keys()
-                    .flatten()
-                    .unique()
-                    .map(lambda k: weave_internal.const("attributes.") + k),
-                )
-            ),
-        ),
+        weave.panels.GroupingEditor(grouping_fn, node=window_data),
     )
 
     height = 5
@@ -241,13 +287,17 @@ def board(
     )  # , showExpressions="titleBar")
     overview_tab.add(
         "request_count",
-        panel_autoboard.timeseries_count_bar(
+        panel_autoboard.timeseries(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            groupby_key=groupby,
+            y_expr=lambda row: row.count(),
+            y_title="request count",
+            color_expr=lambda row: grouping_fn(row),
+            color_title="group",
             x_domain=user_zoom_range,
             n_bins=100,
+            mark="bar",
         ),
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=height),
     )
@@ -258,16 +308,16 @@ def board(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_expr=lambda row: cost(row).sum(),
+            y_expr=lambda row: row["summary.cost"].sum(),
             y_title="total cost ($)",
-            groupby_key=groupby,
+            color_expr=lambda row: grouping_fn(row),
+            color_title="group",
             x_domain=user_zoom_range,
             n_bins=50,
         ),
         layout=weave.panels.GroupPanelLayout(x=0, y=height, w=12, h=height),
     )
 
-    # latency
     overview_tab.add(
         "latency",
         panel_autoboard.timeseries(
@@ -276,7 +326,8 @@ def board(
             x_axis_key="timestamp",
             y_expr=lambda row: row["summary.latency_s"].avg(),
             y_title="avg latency (s)",
-            groupby_key=groupby,
+            color_expr=lambda row: grouping_fn(row),
+            color_title="group",
             x_domain=user_zoom_range,
             n_bins=50,
         ),
@@ -285,7 +336,7 @@ def board(
 
     overview_tab.add(
         "avg_cost_per_req",
-        cost(filtered_window_data).avg(),  # type: ignore
+        filtered_window_data["summary.cost"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=0, y=height * 2, w=6, h=3),
     )
     overview_tab.add(
@@ -321,10 +372,11 @@ def board(
     requests_table = panels.Table(filtered_window_data)  # type: ignore
     requests_table.add_column(lambda row: row["output.model"], "Model")
     requests_table.add_column(
-        lambda row: row["inputs.messages"][-1]["content"], "Message"
+        lambda row: row["inputs.messages"][-1]["content"], "Last Prompt"
     )
     requests_table.add_column(
-        lambda row: row["output.choices"][-1]["message.content"], "Completion"
+        lambda row: row["output.choices"][-1]["message.content"],
+        "Completion",
     )
     requests_table.add_column(lambda row: row["summary.prompt_tokens"], "Prompt Tokens")
     requests_table.add_column(
@@ -332,7 +384,10 @@ def board(
     )
     requests_table.add_column(lambda row: row["summary.total_tokens"], "Total Tokens")
     requests_table.add_column(lambda row: row["summary.latency_s"], "Latency")
-    requests_table.add_column(lambda row: row["timestamp"], "Timestamp")
+    requests_table.add_column(lambda row: row["summary.cost"], "Cost")
+    requests_table.add_column(
+        lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
+    )
 
     requests_table_var = overview_tab.add(
         "table",

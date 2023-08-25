@@ -8,6 +8,9 @@
 #     weave Python code that I haven't documented here.
 
 from .. import weave_types as types
+from .. import weavejs_fixes
+from ..ops_domain import wb_domain_types
+from .. import partial_object
 
 
 def test_const_serialization():
@@ -18,3 +21,11 @@ def test_const_serialization():
     assert isinstance(f_type2, types.FileType)
     assert isinstance(f_type2.extension, types.Const)
     assert f_type2.extension.val == "png"
+
+
+def test_partialobject_type_stripping():
+    instance = wb_domain_types.Run({"a": types.String()})
+    type = types.TypeRegistry.type_of(instance)
+    assert isinstance(type, partial_object.PartialObjectType)
+    serialized = type.to_dict()
+    assert weavejs_fixes.remove_gql_haskeys_from_types(serialized) == "run"
