@@ -147,16 +147,16 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     (newConfig: any) => {
       consoleLog('PANEL PANEL CONFIG UPDATE', newConfig);
       consoleLog('PANEL PANEL CONFIG UPDATE TYPE', toWeaveType(newConfig));
-      const fullConfig = {...panelConfig, ...newConfig};
+      const fullNewConfig = {...panelConfig, ...newConfig};
       // TODO: Updates are not sequenced and can be out of order!
       const doUpdate = async () => {
         const refined = await refineForUpdate(
           weave.client,
           panelConfig,
-          newConfig
+          fullNewConfig
         );
         setPanelConfig(origConfig => refined);
-        updateConfigForPanelNode(fullConfig);
+        updateConfigForPanelNode(refined);
       };
       doUpdate();
     },
