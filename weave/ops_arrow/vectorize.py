@@ -320,6 +320,7 @@ def vectorize(
     weave_fn,
     with_respect_to: typing.Optional[typing.Iterable[graph.VarNode]] = None,
     stack_depth: int = 0,
+    strict=False,
 ):
     """Convert a Weave Function of T to a Weave Function of ArrowWeaveList[T]
 
@@ -533,29 +534,34 @@ def vectorize(
             pick_op = registry_mem.memory_registry.get_op("typedDict-pick")
             return map_each_op(input_vals[0], lambda x: pick_op(x, *input_vals[1:]))
 
-        # Final Fallback: We have no choice anymore. We must bail out completely to mapping
-        # over all the vectorized inputs and calling the function directly.
-        # If we hit this, then it means our vectorization has
-        # created inputs which have no matching op. For example,
-        # if we are doing a pick operation and the key is a
-        # vectorized VarNode. This happens when picking a run
-        # color using a vectorized list of runs for a table
-        # (since pick(dict, list<string>) is not implemented).
-        # This can happen for other ops like `add` and `mul` as
-        # well (imagine `row => 1 + row`)
-        #
-        # In order to safely handle this case, we need to simply map
-        # the original op over all the vectorized inputs.
-        res = _create_manually_mapped_op(
-            node_name,
-            node_inputs,
-            vectorized_keys,
-        )
-        message = f"Encountered non-dispatchable op ({node_name}) during vectorization."
-        message += "This is likely due to vectorization path of the function not leading to the"
-        message += "first parameter. Bailing out to manual mapping"
-        logging.warning(message)
-        return res
+        if strict:
+            raise errors.WeaveVectorizationError(f"Could not vectorize op {node_name}")
+        else:
+            # Final Fallback: We have no choice anymore. We must bail out completely to mapping
+            # over all the vectorized inputs and calling the function directly.
+            # If we hit this, then it means our vectorization has
+            # created inputs which have no matching op. For example,
+            # if we are doing a pick operation and the key is a
+            # vectorized VarNode. This happens when picking a run
+            # color using a vectorized list of runs for a table
+            # (since pick(dict, list<string>) is not implemented).
+            # This can happen for other ops like `add` and `mul` as
+            # well (imagine `row => 1 + row`)
+            #
+            # In order to safely handle this case, we need to simply map
+            # the original op over all the vectorized inputs.
+            res = _create_manually_mapped_op(
+                node_name,
+                node_inputs,
+                vectorized_keys,
+            )
+            message = (
+                f"Encountered non-dispatchable op ({node_name}) during vectorization."
+            )
+            message += "This is likely due to vectorization path of the function not leading to the"
+            message += "first parameter. Bailing out to manual mapping"
+            logging.warning(message)
+            return res
 
     # Vectorize is "with respect to" (wrt) specific variable nodes in the graph.
     # vectorize_along_wrt_paths keeps track of nodes that have already
