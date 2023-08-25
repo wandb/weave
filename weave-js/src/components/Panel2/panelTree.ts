@@ -17,6 +17,7 @@ import {
   dereferenceAllVars,
   EditingNode,
   Frame,
+  isAssignableTo,
   isNodeOrVoidNode,
   NodeOrVoidNode,
   pushFrameDefs,
@@ -41,7 +42,7 @@ import {
   PanelGroupConfig,
 } from './PanelGroup';
 import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
-import {difference} from '@wandb/weave/common/util/hooks';
+import {difference} from '@wandb/weave/common/util/data';
 
 export type PanelTreeNode = ChildPanelConfig;
 
@@ -677,6 +678,22 @@ export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
   });
 };
 
+const removeListTypeMinMax = (t: any): any => {
+  if (_.isArray(t)) {
+    return t.map(removeListTypeMinMax);
+  }
+  if (_.isObject(t)) {
+    const res: {[key: string]: any} = {};
+    for (const [key, value] of Object.entries(t)) {
+      if (key !== 'minLength' && key !== 'maxLength') {
+        res[key] = removeListTypeMinMax(value);
+      }
+    }
+    return res;
+  }
+  return t;
+};
+
 export const refineAllExpressions = async (
   client: Client,
   panel: PanelTreeNode,
@@ -697,7 +714,26 @@ export const refineAllExpressions = async (
         childStack,
         refineCache
       )) as NodeOrVoidNode;
-      return {...panel, input_node: refinedInputNode};
+
+      const newInputNodeType = removeListTypeMinMax(refinedInputNode.type);
+      // Refining can produce a narrower type, like when a column is added  to table.
+      // It can also produce a wider type, like when a column is removed from a table or
+      //   when a string becomes Union<string, number>.
+      // In either case, we need to make the update.
+      if (
+        !isAssignableTo(panel.input_node.type, newInputNodeType) ||
+        !isAssignableTo(newInputNodeType, panel.input_node.type)
+      ) {
+        console.log(
+          'REFINED INPUT NODE FOR PANEL',
+          panel.id,
+          panel.input_node.type,
+          newInputNodeType
+        );
+        // we refined to a narrower type, so make the update
+        return {...panel, input_node: refinedInputNode};
+      }
+      return panel;
 
       // A former attempt at hydration also initialized all the panels.
       // This is still more correct, but I haven't tried to get it fully working yet.

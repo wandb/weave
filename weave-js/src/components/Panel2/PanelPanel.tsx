@@ -32,6 +32,7 @@ import {
   getConfigForPath,
   refineAllExpressions,
   refineForUpdate,
+  updateExpressionVarTypes,
 } from './panelTree';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
@@ -82,19 +83,38 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
-        let loadedPanel = getFullChildPanel(panelQuery.result);
+        // Always ensure vars have correct types first. This is syncrhonoous.
+        let loadedPanel = updateExpressionVarTypes(panelQuery.result, stack);
 
-        // We should be able to do this, immediately render the loadedState, while
-        // refining in parallel. But currently there are some slight differences
-        // between python refined documents and what js expects, so we get some flashing.
-        // setPanelConfig(() => loadedPanel);
+        // Immediately render the document
+        setPanelConfig(() => loadedPanel);
 
+        // Asynchronously refine all the expressions in the document.
         const refined = await refineAllExpressions(
           weave.client,
           loadedPanel,
           stack
         );
 
+        // Set the newly refined document. This is usually a no-op,
+        // unless:
+        // - the document was not correctly refined already (
+        //   e.g. if Python code is buggy and doesn't refine everything
+        //   when constructing panels)
+        // - the type of a data node changed, for example a new column
+        //   was added to a table.
+        // In the case where this does make changes, we may make some
+        // new queries and rerender, causing a flash.
+        //
+        // TODO: store the newly refined state in the persisted document
+        //   if there are changes, so that we don't have to do this again
+        //   on reload.
+
+        // Use the following logging to debug flashing and unexpected
+        // post refinement changes.
+        // console.log('ORIG', loadedPanel);
+        // console.log('REFINED', refined);
+        // console.log('DIFF', difference(loadedPanel, refined));
         setPanelConfig(() => refined);
       };
       if (!loaded.current) {

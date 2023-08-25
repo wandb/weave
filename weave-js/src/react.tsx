@@ -622,7 +622,15 @@ export const makeCallAction = (
       }
 
       // refreshAll so that queries rerun.
-      refreshAll();
+      //
+      // Actually, don't do this! UI changes should already by in the DOM,
+      // mutations just persist them back to the original object.
+      //
+      // If we find we need something like this, it needs to be more selective.
+      // It should definitely not happen when we use a mutation to update a panel
+      // document.
+      //
+      // refreshAll();
 
       // We actually get the mutated object back right now.
       // But don't send this to the user! For one reason, we shouldn't
@@ -910,7 +918,11 @@ export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
   return useDeepMemo(node, compareNodesWithoutTypes);
 };
 
-export const useNodeWithServerType = (
+// This is exported because we need it in one place: PagePanel
+// needs to load the type of it's input expression before it can render
+// a child. We can remove that callsite too once we ensure PagePanel
+// always has the initial type information it needs to continue loading.
+export const useNodeWithServerTypeDoNotCallMeDirectly = (
   node: NodeOrVoidNode,
   paramFrame?: Frame,
   options?: {skip?: boolean; callSite?: string}
@@ -1005,6 +1017,28 @@ export const useNodeWithServerType = (
   }, [skip, result, node, error]);
   return finalResult;
 };
+
+// Non-dashUI Weave use this during the render cycle in some panels, to get
+// up to date type information. That is a problem because it blocks loading
+// and causes sequences of data loading requests instead of rolling them all up into
+// one shot. In dashUi, we refine as needed upon panel construction or user action
+// instead of during rendering.
+export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirectly =
+  (node, paramFrame, options) => {
+    const dashEnabled = useWeaveDashUiEnable();
+    // In dashUI, no-op. We manage document refinement in panelTree
+    if (dashEnabled) {
+      return {
+        initialLoading: false,
+        loading: false,
+        result: node,
+      };
+    }
+
+    // We can ignore this, dashUi is a feature flag that doesn't change during a session
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useNodeWithServerTypeDoNotCallMeDirectly(node, paramFrame, options);
+  };
 
 export const useExpandedNode = (
   node: NodeOrVoidNode

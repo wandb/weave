@@ -13,22 +13,7 @@ import {
 } from 'react';
 
 import {SetState} from './types';
-
-export function difference(origObj: any, newObj: any) {
-  const changes = (objA: any, objB: any) => {
-    let arrayIndexCounter = 0;
-    return _.transform(objA, (result: any, value: any, key: any) => {
-      if (!_.isEqual(value, objB[key])) {
-        const resultKey = _.isArray(objB) ? arrayIndexCounter++ : key;
-        result[resultKey] =
-          _.isObject(value) && _.isObject(objB[key])
-            ? changes(value, objB[key])
-            : value;
-      }
-    });
-  };
-  return changes(newObj, origObj);
-}
+import {difference} from './data';
 
 // This hook is used in development for debugging state changes
 // It shouldn't be used in production

@@ -262,12 +262,7 @@ const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
   const {input} = props;
 
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const dashEnabled = useWeaveDashUiEnable();
-  const typedInputNodeUse = LLReact.useNodeWithServerType(
-    inputNode,
-    undefined,
-    {skip: dashEnabled}
-  );
+  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
   const newProps = useMemo(() => {
     return {
       ...props,
@@ -3624,12 +3619,7 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   const {input} = props;
 
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
-  const dashEnabled = useWeaveDashUiEnable();
-  const typedInputNodeUse = LLReact.useNodeWithServerType(
-    inputNode,
-    undefined,
-    {skip: dashEnabled}
-  );
+  const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
   const newProps = useMemo(() => {
     return {
       ...props,
