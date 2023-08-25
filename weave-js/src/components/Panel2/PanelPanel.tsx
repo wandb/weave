@@ -1,6 +1,13 @@
-import {constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
-import {produce} from 'immer';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Client, constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
+import React, {
+  Dispatch,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 
 import _ from 'lodash';
 import {useWeaveContext} from '../../context';
@@ -38,6 +45,7 @@ import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {PanelPanelContextProvider} from './PanelPanelContextProvider';
 import {Button} from '../Button';
+import produce from 'immer';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -45,7 +53,88 @@ type PanelPanelProps = Panel2.PanelProps<
   ChildPanelFullConfig
 >;
 
-export const useUpdateConfigForPanelNode = (
+interface State {
+  dispatch: React.Dispatch<Action>;
+  client: Client;
+  root: ChildPanelFullConfig;
+}
+interface ActionInit {
+  type: 'init';
+  dispatch: React.Dispatch<Action>;
+  client: Client;
+  root: ChildPanelFullConfig;
+}
+
+interface ActionSetConfig {
+  type: 'setConfig';
+  newConfig: ChildPanelFullConfig;
+}
+
+interface ActionUpdateConfig {
+  type: 'updateConfig';
+  newConfig: ChildPanelFullConfig;
+}
+
+interface ActionUpdateConfig2 {
+  type: 'updateConfig2';
+  change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig;
+}
+
+type Action =
+  | ActionInit
+  | ActionSetConfig
+  | ActionUpdateConfig
+  | ActionUpdateConfig2;
+
+const doUpdate = async (
+  dispatch: Dispatch<Action>,
+  client: Client,
+  priorConfig: any,
+  newConfig: any
+) => {
+  const refined = await refineForUpdate(client, priorConfig, newConfig);
+  dispatch({type: 'setConfig', newConfig: refined});
+};
+
+const panelRootReducer = (
+  state: State | undefined,
+  action: Action
+): State | undefined => {
+  if (action.type === 'init') {
+    return {
+      dispatch: action.dispatch,
+      client: action.client,
+      root: action.root,
+    };
+  }
+  if (state == null) {
+    throw new Error(
+      'Must initialize with init action, before any other action.'
+    );
+  }
+  switch (action.type) {
+    case 'setConfig':
+      return produce(state, draft => {
+        draft.root = action.newConfig;
+      });
+    case 'updateConfig':
+      doUpdate(state.dispatch, state.client, state.root, action.newConfig);
+
+      return state;
+    case 'updateConfig2':
+      const configChanges = action.change(state.root);
+      const newConfig = produce(state, draft => {
+        for (const key of Object.keys(configChanges)) {
+          (draft as any)[key] = (configChanges as any)[key];
+        }
+      });
+      doUpdate(state.dispatch, state.client, state.root, newConfig);
+      return state;
+  }
+  throw new Error('should not arrive here');
+};
+
+export const useUpdateServerPanel = (
   input: NodeOrVoidNode,
   updateInput?: (newInput: NodeOrVoidNode) => void
 ) => {
@@ -72,13 +161,28 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   const panelQuery = CGReact.useNodeValue(props.input);
   const selectedPanel = useSelectedPath();
   const setSelectedPanel = useSetInspectingPanel();
-  const panelConfig = props.config;
-  const initialLoading = panelConfig == null;
+  // const panelConfig = props.config;
+  const [state, dispatch] = useReducer(panelRootReducer, undefined);
+  const initialLoading = state == null;
+  const panelConfig = state?.root;
   const {stack} = usePanelContext();
 
   const setPanelConfig = updateConfig2;
 
   const loaded = useRef(false);
+
+  const updateServerPanel = useUpdateServerPanel(
+    props.input,
+    updateInput as any
+  );
+
+  useEffect(() => {
+    // Mirror results to the server.
+    // We can put a debounce in here if this starts to seem bursty.
+    if (panelConfig) {
+      updateServerPanel(panelConfig);
+    }
+  }, [panelConfig, updateServerPanel]);
 
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
@@ -87,7 +191,12 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         let loadedPanel = updateExpressionVarTypes(panelQuery.result, stack);
 
         // Immediately render the document
-        setPanelConfig(() => loadedPanel);
+        dispatch({
+          type: 'init',
+          dispatch,
+          client: weave.client,
+          root: loadedPanel,
+        });
 
         // Asynchronously refine all the expressions in the document.
         const refined = await refineAllExpressions(
@@ -115,7 +224,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         // console.log('ORIG', loadedPanel);
         // console.log('REFINED', refined);
         // console.log('DIFF', difference(loadedPanel, refined));
-        setPanelConfig(() => refined);
+        dispatch({type: 'setConfig', newConfig: refined});
       };
       if (!loaded.current) {
         loaded.current = true;
@@ -138,49 +247,15 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
 
   useSetPanelRenderedConfig(panelConfig);
 
-  const updateConfigForPanelNode = useUpdateConfigForPanelNode(
-    props.input,
-    updateInput as any
-  );
-
-  const panelUpdateConfig = useCallback(
-    (newConfig: any) => {
-      consoleLog('PANEL PANEL CONFIG UPDATE', newConfig);
-      consoleLog('PANEL PANEL CONFIG UPDATE TYPE', toWeaveType(newConfig));
-      const fullNewConfig = {...panelConfig, ...newConfig};
-      // TODO: Updates are not sequenced and can be out of order!
-      const doUpdate = async () => {
-        const refined = await refineForUpdate(
-          weave.client,
-          panelConfig,
-          fullNewConfig
-        );
-        setPanelConfig(origConfig => refined);
-        updateConfigForPanelNode(refined);
-      };
-      doUpdate();
-    },
-    [panelConfig, setPanelConfig, updateConfigForPanelNode, weave.client]
-  );
+  const panelUpdateConfig = useCallback((newConfig: any) => {
+    dispatch({type: 'updateConfig', newConfig});
+  }, []);
   // TODO: Not yet handling refinement in panelUpdateConfig2
   const panelUpdateConfig2 = useCallback(
     (change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig) => {
-      setPanelConfig((currentConfig: ChildPanelFullConfig) => {
-        if (currentConfig == null) {
-          throw new Error('Cannot update config before it is loaded');
-        }
-        const configChanges = change(currentConfig);
-        const newConfig = produce(currentConfig, (draft: any) => {
-          for (const key of Object.keys(configChanges)) {
-            (draft as any)[key] = (configChanges as any)[key];
-          }
-        });
-        consoleLog('PANEL PANEL CONFIG UPDATE2', newConfig);
-        updateConfigForPanelNode(newConfig);
-        return newConfig;
-      });
+      dispatch({type: 'updateConfig2', change});
     },
-    [setPanelConfig, updateConfigForPanelNode]
+    []
   );
   consoleLog('PANEL PANEL RENDER CONFIG', panelConfig);
 
