@@ -8,7 +8,7 @@ import {
 } from '@wandb/weave/common/containers/DragDropContainer';
 import {produce} from 'immer';
 import * as _ from 'lodash';
-import React, {useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import Measure from 'react-measure';
 
 import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
@@ -51,8 +51,13 @@ interface PBSectionProps {
 }
 
 export const PBSection: React.FC<PBSectionProps> = props => {
-  const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
-    props;
+  const {
+    config,
+    groupPath,
+    enableAddPanel,
+    updateConfig2,
+    handleAddPanel: addPanel,
+  } = props;
   const selectedPath = useSelectedPath();
   const getPanelIsHovered = useGetPanelIsHoveredByGroupPath(groupPath ?? []);
   const getPanelIsHoveredInOutline = useGetPanelIsHoveredInOutlineByGroupPath(
@@ -71,6 +76,23 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   } = useScrollbarVisibility();
   const actionBarRef = useRef<HTMLDivElement | null>(null);
   const addPanelBarRef = useRef<HTMLDivElement | null>(null);
+
+  // On add panel, scroll to the new panel
+  const [shouldScrollToNewPanel, setShouldScrollToNewPanel] =
+    React.useState<boolean>(false);
+  const handleAddPanel = useCallback(() => {
+    addPanel?.();
+    setShouldScrollToNewPanel(true);
+  }, [addPanel, setShouldScrollToNewPanel]);
+  useEffect(() => {
+    if (shouldScrollToNewPanel && addPanelBarRef.current) {
+      addPanelBarRef.current.scrollIntoView({
+        behavior: 'smooth',
+      });
+      setShouldScrollToNewPanel(false);
+    }
+  }, [shouldScrollToNewPanel, setShouldScrollToNewPanel, addPanelBarRef]);
+
   return (
     <DragDropProvider>
       <div
