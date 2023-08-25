@@ -1,4 +1,4 @@
-import {constTimestamp} from '../../model';
+import {constNone, constTimestamp} from '../../model';
 import {testClient} from '../../testUtil';
 import {opTimestampMax, opTimestampRelativeStringAutoFormat} from './date';
 import {opArray} from './literals';
@@ -8,8 +8,9 @@ describe('date ops', () => {
   describe('relativeStringAutoFormat', () => {
     it('handles single unit pos', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment().add(moment.duration(1, 'days'));
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now).add(moment.duration(1, 'days'));
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp2.valueOf()),
         rhs: constTimestamp(timestamp1.valueOf()),
@@ -19,8 +20,9 @@ describe('date ops', () => {
 
     it('handles single unit neg', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment().add(moment.duration(1, 'days'));
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now).add(moment.duration(1, 'days'));
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp1.valueOf()),
         rhs: constTimestamp(timestamp2.valueOf()),
@@ -30,8 +32,9 @@ describe('date ops', () => {
 
     it('handles year unit pos', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment().add(moment.duration(400, 'days'));
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now).add(moment.duration(400, 'days'));
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp2.valueOf()),
         rhs: constTimestamp(timestamp1.valueOf()),
@@ -41,8 +44,9 @@ describe('date ops', () => {
 
     it('handles year unit neg', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment().add(moment.duration(400, 'days'));
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now).add(moment.duration(400, 'days'));
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp1.valueOf()),
         rhs: constTimestamp(timestamp2.valueOf()),
@@ -52,8 +56,9 @@ describe('date ops', () => {
 
     it('handles month unit expect tenth rounding', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment().add(moment.duration(305, 'days'));
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now).add(moment.duration(305, 'days'));
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp2.valueOf()),
         rhs: constTimestamp(timestamp1.valueOf()),
@@ -63,8 +68,9 @@ describe('date ops', () => {
 
     it('handles no diff', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment();
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now);
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp2.valueOf()),
         rhs: constTimestamp(timestamp1.valueOf()),
@@ -74,8 +80,9 @@ describe('date ops', () => {
 
     it('minutes check pos and round', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment().add(moment.duration(20.5, 'minutes'));
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now).add(moment.duration(20.5, 'minutes'));
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp2.valueOf()),
         rhs: constTimestamp(timestamp1.valueOf()),
@@ -85,8 +92,9 @@ describe('date ops', () => {
 
     it('hours check neg and round', async () => {
       const client = await testClient();
-      const timestamp1 = moment();
-      const timestamp2 = moment().add(moment.duration(20.5, 'hours'));
+      const now = moment();
+      const timestamp1 = moment(now);
+      const timestamp2 = moment(now).add(moment.duration(20.5, 'hours'));
       const expr = opTimestampRelativeStringAutoFormat({
         lhs: constTimestamp(timestamp1.valueOf()),
         rhs: constTimestamp(timestamp2.valueOf()),
@@ -98,7 +106,7 @@ describe('date ops', () => {
 
 describe('date ops', () => {
   describe('timestamp-max', () => {
-    it('handles getting max timestamp', async () => {
+    it('handles getting max timestamp and None', async () => {
       const client = await testClient();
       const timestamp1 = moment().valueOf();
       const timestamp2 = moment().add(moment.duration(1, 'days')).valueOf();
@@ -106,10 +114,10 @@ describe('date ops', () => {
         timestamps: opArray({
           0: constTimestamp(timestamp1),
           1: constTimestamp(timestamp2),
-          3: constTimestamp(timestamp1 + timestamp2),
+          3: constNone(),
         } as any),
       });
-      expect(await client.query(expr)).toEqual(timestamp1 + timestamp2);
+      expect(await client.query(expr)).toEqual(timestamp2);
     });
   });
 });
