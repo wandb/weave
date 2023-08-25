@@ -924,12 +924,8 @@ export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
 // always has the initial type information it needs to continue loading.
 export const useNodeWithServerTypeDoNotCallMeDirectly = (
   node: NodeOrVoidNode,
-  paramFrame?: Frame,
-  options?: {skip?: boolean; callSite?: string}
+  paramFrame?: Frame
 ): {loading: boolean; result: NodeOrVoidNode} => {
-  // TODO: There is a bug in here with skip, we return the ref equal
-  // original node without types, so we don't pass type updates through!
-  const skip = options?.skip;
   const stack = usePanelContext().stack;
   if (paramFrame != null) {
     for (const [name, value] of Object.entries(paramFrame)) {
@@ -951,9 +947,6 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
 
   const promiseRef = useRef<Promise<any> | null>(null);
   useEffect(() => {
-    if (skip) {
-      return;
-    }
     let isMounted = true;
     if (node.nodeType === 'const') {
       setResult({node, value: node});
@@ -969,23 +962,7 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
           return;
         }
         if (isMounted) {
-          if (skip) {
-            const currentType = (result.value ?? dereffedNode).type;
-            const nextType = newNode.type;
-            if (!_.isEqual(currentType, nextType)) {
-              // Only update if the type has changed.
-              // console.log(
-              //   'REFINE NOT EQUAL',
-              //   options.callSite ?? '',
-              //   dereffedNode,
-              //   currentType,
-              //   newNode.type
-              // );
-              setResult({node, value: {...node, type: newNode.type}});
-            }
-          } else {
-            setResult({node, value: {...node, type: newNode.type}});
-          }
+          setResult({node, value: {...node, type: newNode.type}});
         }
       })
       .catch(e => setError(e));
@@ -993,16 +970,9 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
     return () => {
       isMounted = false;
     };
-    // we purposely don't depend on result.value here. We only want to fire
-    // off a refinement request if nodes in the graph have changed, but not
-    // their types!
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weave, dereffedNode, skip]);
+  }, [weave, node, dereffedNode]);
 
   const finalResult = useMemo(() => {
-    if (skip) {
-      return {loading: false, result: node};
-    }
     if (error != null) {
       // rethrow in render thread
       const message =
@@ -1014,7 +984,7 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
       loading: node !== result.node,
       result: node === result.node ? result.value : node,
     };
-  }, [skip, result, node, error]);
+  }, [result, node, error]);
   return finalResult;
 };
 
@@ -1024,7 +994,7 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
 // one shot. In dashUi, we refine as needed upon panel construction or user action
 // instead of during rendering.
 export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirectly =
-  (node, paramFrame, options) => {
+  (node, paramFrame) => {
     const dashEnabled = useWeaveDashUiEnable();
     // In dashUI, no-op. We manage document refinement in panelTree
     if (dashEnabled) {
@@ -1037,7 +1007,7 @@ export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirec
 
     // We can ignore this, dashUi is a feature flag that doesn't change during a session
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useNodeWithServerTypeDoNotCallMeDirectly(node, paramFrame, options);
+    return useNodeWithServerTypeDoNotCallMeDirectly(node, paramFrame);
   };
 
 export const useExpandedNode = (
