@@ -2,6 +2,7 @@ import contextlib
 import logging
 import os
 import typing
+from urllib.parse import urlparse
 
 from weave.client_interface import ClientInterface
 
@@ -59,7 +60,17 @@ def _make_default_client():
     if util.is_notebook():
         serv = context_state.get_server()
         if serv is None:
-            serv = server.HttpServer()
+            frontend_url = os.environ.get("WEAVE_FRONTEND_URL")
+            if frontend_url is not None:
+                parsed_url = urlparse(frontend_url)
+                server_args = {}
+                if parsed_url.hostname is not None:
+                    server_args["host"] = parsed_url.hostname
+                if parsed_url.port is not None:
+                    server_args["port"] = parsed_url.port
+                serv = server.HttpServer(**server_args)
+            else:
+                serv = server.HttpServer()
             serv.start()
             context_state.set_server(serv)
         # Falling through here means the notebook kernel uses
