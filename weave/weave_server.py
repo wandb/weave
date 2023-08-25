@@ -354,6 +354,7 @@ def frontend_env():
     return {
         "PREFIX": environment.weave_link_prefix(),
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
+        "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
     }
 
@@ -433,8 +434,8 @@ def wb_viewer():
         with wandb_api.from_environment():
             current_context = wandb_api.get_wandb_api_context()
     authenticated = current_context is not None
-
-    return {"authenticated": authenticated}
+    user_id = None if current_context is None else current_context.user_id
+    return {"authenticated": authenticated, "user_id": user_id}
 
 
 app = make_app()
