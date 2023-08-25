@@ -8,11 +8,6 @@ class PanelNumber(panel.Panel):
 
 
 @weave.type()
-class PanelString(panel.Panel):
-    id = "string"
-
-
-@weave.type()
 class PanelBoolean(panel.Panel):
     id = "boolean"
 

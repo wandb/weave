@@ -34,6 +34,7 @@ from .panel_slider import Slider, SliderConfig
 from .panel_select import SelectEditor, SelectEditorConfig
 from .panel_dropdown import Dropdown, DropdownConfig
 from .panel_filter_editor import FilterEditor
+from .panel_grouping_editor import GroupingEditor
 from .panel_daterange import DateRange
 from .panel_string_editor import StringEditor
 from .panel_function_editor import FunctionEditor, FunctionEditorConfig
@@ -43,6 +44,7 @@ from .panel_object_picker import ObjectPicker, ObjectPickerConfig
 
 # basic
 from .panel_basic import *
+from .panel_string import PanelString
 
 # domain
 from .panel_domain import *

@@ -21,6 +21,7 @@ import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Redirect, useHistory, useParams} from 'react-router-dom';
 import {
+  URL_BROWSE,
   URL_LOCAL,
   URL_RECENT,
   URL_WANDB,
@@ -29,6 +30,7 @@ import {
   urlRecentBoards,
   urlRecentTables,
 } from '../../../urls';
+import getConfig from '../../../config';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -198,20 +200,31 @@ const HomeComp: FC<HomeProps> = props => {
   }, [localSection, recentSection, wandbSection]);
 
   const loading = userName.loading || isAuthenticated === undefined;
-  const REDIRECT_RECENTS = [`/${URL_RECENT}`, `/${URL_RECENT}/`];
-  const REDIRECT_WANDB = [`/${URL_WANDB}`, `/${URL_WANDB}/`];
-  const REDIRECT_LOCAL = [`/${URL_LOCAL}`, `/${URL_LOCAL}/`];
+  const REDIRECT_RECENTS = [
+    `/${URL_BROWSE}/${URL_RECENT}`,
+    `/${URL_BROWSE}/${URL_RECENT}/`,
+  ];
+  const REDIRECT_WANDB = [
+    `/${URL_BROWSE}/${URL_WANDB}`,
+    `/${URL_BROWSE}/${URL_WANDB}/`,
+  ];
+  const REDIRECT_LOCAL = [
+    `/${URL_BROWSE}/${URL_LOCAL}`,
+    `/${URL_BROWSE}/${URL_LOCAL}/`,
+  ];
   if (RECENTS_SUPPORTED) {
-    REDIRECT_RECENTS.push('/');
+    REDIRECT_RECENTS.push('/', `/${URL_BROWSE}`, `/${URL_BROWSE}/`);
   } else {
-    REDIRECT_WANDB.push('/');
+    REDIRECT_WANDB.push('/', `/${URL_BROWSE}`, `/${URL_BROWSE}/`);
   }
   const REDIRECT_ANY = [
     ...REDIRECT_RECENTS,
     ...REDIRECT_WANDB,
     ...REDIRECT_LOCAL,
   ];
-  const {pathname} = window.location;
+  let {pathname} = window.location;
+  const basename = getConfig().PREFIX;
+  pathname = pathname.substring(basename.length);
   if (!loading && REDIRECT_ANY.includes(pathname)) {
     // If we have Recent enabled, go for that!
     if (REDIRECT_RECENTS.includes(pathname)) {

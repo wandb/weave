@@ -176,6 +176,7 @@ class Registry:
     #    for type in types:
     #        if type.name == name:
     #            return type
+
     #    raise Exception("type not found")
 
 
