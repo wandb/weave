@@ -724,12 +724,6 @@ export const refineAllExpressions = async (
         !isAssignableTo(panel.input_node.type, newInputNodeType) ||
         !isAssignableTo(newInputNodeType, panel.input_node.type)
       ) {
-        console.log(
-          'REFINED INPUT NODE FOR PANEL',
-          panel.id,
-          panel.input_node.type,
-          newInputNodeType
-        );
         // we refined to a narrower type, so make the update
         return {...panel, input_node: refinedInputNode};
       }
