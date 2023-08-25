@@ -61,6 +61,9 @@ export interface VarNode<T extends Type = Type> extends BaseNode<T> {
 export interface ConstNode<T extends Type = Type> extends BaseNode<T> {
   nodeType: 'const';
   val: TypeToTSTypeInner<T>;
+
+  // This is a 
+  _frozen?: boolean
 }
 
 export type Node<T extends Type = Type> =

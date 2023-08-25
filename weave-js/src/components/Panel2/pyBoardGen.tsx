@@ -1,6 +1,7 @@
 // This file provides utilities for generating dashboards.
 import {
   callOpVeryUnsafe,
+  constNodeUnsafe,
   constNone,
   constString,
   dereferenceAllVars,
@@ -58,6 +59,17 @@ export const useBoardGeneratorsForNode = (
   }, [allowConfig, res.loading, res.result]);
 };
 
+const makeFrozenConstFunction = (node: Node) => {
+  console.log('FREEXING', node);
+  return node;
+  const innerType: Type = {
+    type: 'function',
+    inputTypes: {},
+    outputType: node.type,
+  };
+  return constNodeUnsafe(innerType, node, true);
+};
+
 export const useMakeLocalBoardFromNode = () => {
   const simpleSetter = useMakeSimpleSetMutation();
   return useCallback(
@@ -75,7 +87,7 @@ export const useMakeLocalBoardFromNode = () => {
         `local-artifact:///${boardName}:latest/obj`,
         callOpVeryUnsafe(
           boardGenOpName,
-          {input_node: inputNode, config},
+          {input_node: makeFrozenConstFunction(inputNode), config},
           'any' as const
         ) as any,
         onCreated

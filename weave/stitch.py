@@ -148,12 +148,12 @@ def stitch(
             # of stitch right now (eg. gql compile) should explicitly NOT mutate static lambdas. So
             # it might be a foot-gun to allow this code to run, even if it is correct. Let's find a
             # use case for this code before we uncomment it.
-            # is_static_lambda = (
-            #     isinstance(node.type, types.Function)
-            #     and len(node.type.input_types) == 0
-            # )
-            # if is_static_lambda:
-            #     sg.add_result(node, subgraph_stitch(node.val, {}, sg))
+            is_static_lambda = (
+                isinstance(node.type, types.Function)
+                and len(node.type.input_types) == 0
+            )
+            if is_static_lambda:
+                sg.add_result(node, subgraph_stitch(node.val, {}, sg))
             sg.add_result(node, ObjectRecorder(node, val=node.val))
         elif isinstance(node, graph.VarNode):
             if var_values and node.name in var_values:

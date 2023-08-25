@@ -166,10 +166,17 @@ class VarNode(Node):
 
 class ConstNode(Node):
     val: typing.Any
+    _frozen: typing.Optional[bool] = None
 
-    def __init__(self, type: weave_types.Type, val: typing.Any) -> None:
+    def __init__(
+        self,
+        type: weave_types.Type,
+        val: typing.Any,
+        _frozen: typing.Optional[bool] = None,
+    ) -> None:
         self.type = type
         self.val = val
+        self._frozen = _frozen
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
@@ -183,7 +190,8 @@ class ConstNode(Node):
         t = weave_types.TypeRegistry.type_from_dict(obj["type"])
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
-        return cls(t, val)
+
+        return cls(t, val, obj.get("_frozen"))
 
     def to_json(self) -> dict:
         val = storage.to_python(self.val)["_val"]  # type: ignore
@@ -193,7 +201,10 @@ class ConstNode(Node):
         # val = self.val
         # if isinstance(self.type, weave_types.Function):
         #     val = val.to_json()
-        return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
+        res = {"nodeType": "const", "type": self.type.to_dict(), "val": val}
+        if self._frozen is not None:
+            res["_frozen"] = self._frozen
+        return res
 
 
 class VoidNode(Node):
@@ -315,7 +326,7 @@ def _map_nodes(
             walk_lambdas
             and isinstance(curr_node, ConstNode)
             and isinstance(curr_node.type, weave_types.Function)
-            and (len(curr_node.type.input_types) > 0 or not skip_static_lambdas)
+            and not curr_node._frozen
         ):
             if curr_node.val not in already_mapped:
                 to_consider.append(curr_node.val)

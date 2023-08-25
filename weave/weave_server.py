@@ -109,7 +109,7 @@ def import_ecosystem():
 
 def make_app():
     logs.configure_logger()
-    import_ecosystem()
+    # import_ecosystem()
 
     app = Flask(__name__)
     app.register_blueprint(blueprint)
@@ -138,7 +138,7 @@ def list_ops():
     global ops_cache
     with wandb_api.from_environment():
         # TODO: this is super slow.
-        if not environment.wandb_production():
+        if False and not environment.wandb_production():
             registry_mem.memory_registry.load_saved_ops()
         if (
             ops_cache is None
