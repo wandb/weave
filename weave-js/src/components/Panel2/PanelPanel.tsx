@@ -57,6 +57,8 @@ interface State {
   dispatch: React.Dispatch<Action>;
   client: Client;
   root: ChildPanelFullConfig;
+  inFlight: boolean;
+  nextActions: Action[];
 }
 interface ActionInit {
   type: 'init';
@@ -67,6 +69,11 @@ interface ActionInit {
 
 interface ActionSetConfig {
   type: 'setConfig';
+  newConfig: ChildPanelFullConfig;
+}
+
+interface ActionFinishUpdateConfig {
+  type: 'finishUpdateConfig';
   newConfig: ChildPanelFullConfig;
 }
 
@@ -84,7 +91,8 @@ type Action =
   | ActionInit
   | ActionSetConfig
   | ActionUpdateConfig
-  | ActionUpdateConfig2;
+  | ActionUpdateConfig2
+  | ActionFinishUpdateConfig;
 
 const doUpdate = async (
   dispatch: Dispatch<Action>,
@@ -93,7 +101,7 @@ const doUpdate = async (
   newConfig: any
 ) => {
   const refined = await refineForUpdate(client, priorConfig, newConfig);
-  dispatch({type: 'setConfig', newConfig: refined});
+  dispatch({type: 'finishUpdateConfig', newConfig: refined});
 };
 
 const panelRootReducer = (
@@ -102,9 +110,15 @@ const panelRootReducer = (
 ): State | undefined => {
   if (action.type === 'init') {
     return {
-      dispatch: action.dispatch,
+      dispatch: (innerAction: Action) =>
+        // Ensure this is async so it happens after the reducer runs!
+        setTimeout(() => {
+          action.dispatch(innerAction);
+        }, 1),
       client: action.client,
       root: action.root,
+      inFlight: false,
+      nextActions: [],
     };
   }
   if (state == null) {
@@ -116,12 +130,35 @@ const panelRootReducer = (
     case 'setConfig':
       return produce(state, draft => {
         draft.root = action.newConfig;
+        draft.inFlight = false;
       });
-    case 'updateConfig':
-      doUpdate(state.dispatch, state.client, state.root, action.newConfig);
 
-      return state;
+    // Both updateConfig actions trigger an async flow, where we may refine
+    // some expressions. While this is happening, we queue up new update
+    // actions instead of firing them immediately.
+
+    // Note, this doesn't actually work! Why? Because panels we do not receive
+    // delta updates from updateConfig calls, we receive the whole config. Since
+    // we don't immediately update the config, if a user makes a second change
+    // while one is in flight, the second completion will restore the first change.
+    // Accept this more now until we switch to delta updates.
+    case 'updateConfig':
+      if (state.inFlight) {
+        return produce(state, draft => {
+          draft.nextActions.push(action);
+        });
+      }
+      doUpdate(state.dispatch, state.client, state.root, action.newConfig);
+      return {
+        ...state,
+        inFlight: true,
+      };
     case 'updateConfig2':
+      if (state.inFlight) {
+        return produce(state, draft => {
+          draft.nextActions.push(action);
+        });
+      }
       const configChanges = action.change(state.root);
       const newConfig = produce(state, draft => {
         for (const key of Object.keys(configChanges)) {
@@ -129,7 +166,23 @@ const panelRootReducer = (
         }
       });
       doUpdate(state.dispatch, state.client, state.root, newConfig);
-      return state;
+      return {
+        ...state,
+        inFlight: true,
+      };
+    // This is the end of the async update config flow. We set the new config
+    // and dispatch the next queued action if there is one.
+    case 'finishUpdateConfig':
+      const nextActions = [...state.nextActions];
+      if (nextActions.length > 0) {
+        const nextAction = nextActions.splice(0, 1)[0];
+        state.dispatch(nextAction);
+      }
+      return produce(state, draft => {
+        draft.root = action.newConfig;
+        draft.inFlight = false;
+        draft.nextActions = nextActions;
+      });
   }
   throw new Error('should not arrive here');
 };
