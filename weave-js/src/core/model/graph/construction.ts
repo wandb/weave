@@ -24,20 +24,16 @@ export function constType<VT extends Type>(
 // Sometimes, Typescript cannot calculate the type of ConstNode.val correctly
 // This is an escape hatch to allow value to bet set w/ loose typing, but this
 // is unsafe because in most cases this can hide genuine type mistakes.
-export function constNodeUnsafe<T extends Type>(type: T, value: any, _frozen?:boolean): ConstNode<T> {
+export function constNodeUnsafe<T extends Type>(type: T, value: any) {
   if (typeof value === 'undefined') {
     throw new Error(`Cannot create const node undefined value`);
   }
 
-  const res: ConstNode<T> = {
+  return {
     nodeType: 'const' as const,
     type,
     val: value,
   };
-  if (_frozen) {
-    res._frozen = true;
-  }
-  return res;
 }
 
 export function constNode<T extends Type>(

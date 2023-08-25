@@ -41,7 +41,6 @@ interface SerializedConst {
       }
     | {type: 'list'; objectType: Type};
   val: any;
-  _frozen?: boolean;
 }
 
 interface SerializedOp {
@@ -263,7 +262,6 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
           nodeType: node.nodeType,
           type: node.type,
           val: null,
-          _frozen: node._frozen,
         } as any;
         if (
           node.val !== null &&
