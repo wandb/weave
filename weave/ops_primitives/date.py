@@ -79,14 +79,14 @@ def auto_format_relative_string(timestamp1, timestamp2):
     diff_ms = delta.total_seconds() * 1000
 
     for unit, unit_ms in AUTO_FORMAT_UNITS_AND_NUM_MS:
-        if diff_ms >= unit_ms:
+        if abs(diff_ms) >= unit_ms:
             rounding_unit = 1 if unit == "years" or unit == "months" else 0
             diff = round(diff_ms / unit_ms, rounding_unit)
 
             if int(diff) == diff:
                 diff = int(diff)
 
-            if diff == 1:
+            if abs(diff) == 1:
                 unit = unit[:-1]
 
             return f"{diff} {unit}"

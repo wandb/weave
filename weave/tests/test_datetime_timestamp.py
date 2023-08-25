@@ -11,7 +11,7 @@ def assert_date_string(
     unit: str,
     actual: str,
 ):
-    if diff == 1:
+    if abs(diff) == 1:
         unit = unit[:-1]
 
     round_unit = 1 if unit == "years" or unit == "months" else 0
@@ -35,11 +35,11 @@ def test_relative_string_autoformat(multiplier, unit, num_ms):
     ts1 = datetime.datetime.now()
     ts2 = ts1 + datetime.timedelta(milliseconds=num_ms * multiplier)
 
-    from_now_result = weave.use(date.auto_format_relative_string(ts1, ts2))
-    ago_result = weave.use(date.auto_format_relative_string(ts2, ts1))
+    negative_result = weave.use(date.auto_format_relative_string(ts1, ts2))
+    positive_result = weave.use(date.auto_format_relative_string(ts2, ts1))
 
-    assert_date_string(multiplier, unit, from_now_result)
-    assert_date_string(multiplier, unit, ago_result)
+    assert_date_string(multiplier, unit, positive_result)
+    assert_date_string(-1 * multiplier, unit, negative_result)
 
 
 @pytest.mark.parametrize("diff_ms", [0, 0.5, -0.5])
