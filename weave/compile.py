@@ -87,12 +87,12 @@ def _quote_node(node: graph.Node, into_node: graph.OutputNode) -> graph.Node:
     # Special case for ops that want to preserve the exact user-defined node chain
     from .panels_py import generator_templates
 
-    no_compile = into_node.from_op.name in [
+    compile_time_literal = into_node.from_op.name in [
         spec.op_name
         for spec in generator_templates.template_registry.get_specs().values()
     ]
 
-    return weave_internal.const(node, no_compile=no_compile)
+    return weave_internal.const(node, _compile_time_literal=compile_time_literal)
 
 
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:

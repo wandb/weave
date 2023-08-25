@@ -166,17 +166,28 @@ class VarNode(Node):
 
 class ConstNode(Node):
     val: typing.Any
-    no_compile: bool = False
+
+    # `_compile_time_literal` is a flag that is used at compile time to indicate
+    # to the compiler that we should not modify the internal value of this node.
+    # It is particularly used when the const node is a function and we want to
+    # preserve the function as-is. In the application, this is desireable for
+    # template generation. This is because we want to pass the literal function
+    # defined by the user to the generation function, as opposed to some
+    # arbitrary compiled representation of the function. Practically, we want a
+    # generation function to receive `get("stream_table").rows()``, not the
+    # compiled representation of that, which is something like
+    # `gqlroot-wbgqlquery(...).run(...).history3_with_columns().rows()`.
+    _compile_time_literal: bool = False
 
     def __init__(
         self,
         type: weave_types.Type,
         val: typing.Any,
-        no_compile: bool = False,
+        _compile_time_literal: bool = False,
     ) -> None:
         self.type = type
         self.val = val
-        self.no_compile = no_compile
+        self._compile_time_literal = _compile_time_literal
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
@@ -191,7 +202,7 @@ class ConstNode(Node):
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
 
-        return cls(t, val, obj.get("no_compile", False))
+        return cls(t, val, obj.get("_compile_time_literal", False))
 
     def to_json(self) -> dict:
         val = storage.to_python(self.val)["_val"]  # type: ignore
@@ -202,8 +213,8 @@ class ConstNode(Node):
         # if isinstance(self.type, weave_types.Function):
         #     val = val.to_json()
         res = {"nodeType": "const", "type": self.type.to_dict(), "val": val}
-        if self.no_compile is not None:
-            res["no_compile"] = self.no_compile
+        if self._compile_time_literal is not None:
+            res["_compile_time_literal"] = self._compile_time_literal
         return res
 
 
@@ -330,7 +341,7 @@ def _map_nodes(
             # lambdas that are intended to be preserved exactly as they are.
             from .compile import _is_compiling
 
-            if not (_is_compiling() and curr_node.no_compile):
+            if not (_is_compiling() and curr_node._compile_time_literal):
                 if curr_node.val not in already_mapped:
                     to_consider.append(curr_node.val)
                     continue
