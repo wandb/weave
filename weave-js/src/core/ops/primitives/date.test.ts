@@ -1,6 +1,7 @@
 import {constTimestamp} from '../../model';
 import {testClient} from '../../testUtil';
-import {opTimestampRelativeStringAutoFormat} from './date';
+import {opTimestampMax, opTimestampRelativeStringAutoFormat} from './date';
+import {opArray} from './literals';
 import moment from 'moment';
 
 describe('date ops', () => {
@@ -35,7 +36,7 @@ describe('date ops', () => {
         lhs: constTimestamp(timestamp2.valueOf()),
         rhs: constTimestamp(timestamp1.valueOf()),
       });
-      expect(await client.query(expr)).toEqual('1.1 year');
+      expect(await client.query(expr)).toEqual('1.1 years');
     });
 
     it('handles year unit neg', async () => {
@@ -46,7 +47,7 @@ describe('date ops', () => {
         lhs: constTimestamp(timestamp1.valueOf()),
         rhs: constTimestamp(timestamp2.valueOf()),
       });
-      expect(await client.query(expr)).toEqual('-1.1 year');
+      expect(await client.query(expr)).toEqual('-1.1 years');
     });
 
     it('handles month unit expect tenth rounding', async () => {
@@ -91,6 +92,24 @@ describe('date ops', () => {
         rhs: constTimestamp(timestamp2.valueOf()),
       });
       expect(await client.query(expr)).toEqual('-21 hours');
+    });
+  });
+});
+
+describe('date ops', () => {
+  describe('timestamp-max', () => {
+    it('handles getting max timestamp', async () => {
+      const client = await testClient();
+      const timestamp1 = moment().valueOf();
+      const timestamp2 = moment().add(moment.duration(1, 'days')).valueOf();
+      const expr = opTimestampMax({
+        timestamps: opArray({
+          0: constTimestamp(timestamp1),
+          1: constTimestamp(timestamp2),
+          3: constTimestamp(timestamp1 + timestamp2),
+        } as any),
+      });
+      expect(await client.query(expr)).toEqual(timestamp1 + timestamp2);
     });
   });
 });
