@@ -6,6 +6,7 @@ import {
   constFunction,
   constNumber,
   constString,
+  dereferenceAllVars,
   escapeDots,
   isAssignableTo,
   isOutputNode,
@@ -84,7 +85,6 @@ import {
   useUpdateConfigKey,
 } from './util';
 import {Link} from './Link';
-import {MaybeWrapper} from '../PanelMaybe';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -233,14 +233,6 @@ const PanelTableInnerConfigSetter: React.FC<
       showColumnSelect={showColumnSelect}
       setShowColumnSelect={setShowColumnSelect}
     />
-  );
-};
-
-const GrowingMaybeWrapper = ({children}: {children: React.ReactNode}) => {
-  return (
-    <GrowToParent>
-      <MaybeWrapper>{children}</MaybeWrapper>
-    </GrowToParent>
   );
 };
 
@@ -545,7 +537,7 @@ const PanelTableInner: React.FC<
       // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
         return (
-          <GrowingMaybeWrapper>
+          <GrowToParent>
             <Value
               table={tableState}
               colId={colId}
@@ -561,11 +553,11 @@ const PanelTableInner: React.FC<
               panelContext={props.context}
               updatePanelContext={updateContext}
             />
-          </GrowingMaybeWrapper>
+          </GrowToParent>
         );
       } else {
         return (
-          <GrowingMaybeWrapper>
+          <GrowToParent>
             <Cell
               table={tableState}
               colId={colId}
@@ -580,7 +572,7 @@ const PanelTableInner: React.FC<
               updateInput={props.updateInput}
               simpleTable={props.config.simpleTable}
             />
-          </GrowingMaybeWrapper>
+          </GrowToParent>
         );
       }
     },
@@ -662,23 +654,21 @@ const PanelTableInner: React.FC<
         // the type doesn't say so. This is sort of a hard-coded way to ensure we
         // don't error when we get nulls back for small tables
         return (
-          <MaybeWrapper>
-            <IndexCell
-              runNode={runNode}
-              rowNode={rowData.rowNode}
-              setRowAsPinned={(index: number) => {
-                if (!props.config.simpleTable) {
-                  if (shiftIsPressed) {
-                    setRowAsPinned(index, !rowData.isPinned);
-                  } else {
-                    setRowAsActive(index);
-                  }
+          <IndexCell
+            runNode={runNode}
+            rowNode={rowData.rowNode}
+            setRowAsPinned={(index: number) => {
+              if (!props.config.simpleTable) {
+                if (shiftIsPressed) {
+                  setRowAsPinned(index, !rowData.isPinned);
+                } else {
+                  setRowAsActive(index);
                 }
-              }}
-              activeRowIndex={activeRowIndex}
-              simpleTable={props.config.simpleTable}
-            />
-          </MaybeWrapper>
+              }
+            }}
+            activeRowIndex={activeRowIndex}
+            simpleTable={props.config.simpleTable}
+          />
         );
       },
       headerRenderer: ({headerIndex}) => {
@@ -1381,7 +1371,9 @@ export const TableSpec: Panel2.PanelSpec = {
       TableType.normalizeTableLike(inputNode),
       stack
     );
-    return getTableConfig(tableNormInput, undefined, weave);
+    const dereffedInput = dereferenceAllVars(tableNormInput, stack)
+      .node as Node;
+    return getTableConfig(dereffedInput, undefined, weave);
   },
   Component: PanelTable,
   inputType,

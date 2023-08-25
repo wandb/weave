@@ -21,6 +21,7 @@ from . import file_util
 from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
+from . import memo
 from .wandb_interface import wandb_artifact_pusher
 
 from urllib import parse
@@ -89,6 +90,7 @@ class WandbArtifactManifest:
 
 # TODO: Get rid of this, we have the new wandb api service! But this
 # is still used in a couple places.
+@memo.memo  # Per-request memo reduces duplicate calls to the API
 def get_wandb_read_artifact(path: str):
     return wandb_client_api.wandb_public_api().artifact(path)
 

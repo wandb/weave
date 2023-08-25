@@ -58,9 +58,9 @@ class InMemoryLazyLiteRun:
         # heeding Shawn's advice, we should be explicit about what we're doing.
         # We can always move to the default later, but we can't go back.
         if entity_name is None or entity_name == "":
-            raise ValueError(f"Must specify entity_name")
+            raise ValueError("Must specify entity_name")
         elif project_name is None or project_name == "":
-            raise ValueError(f"Must specify project_name")
+            raise ValueError("Must specify project_name")
 
         self._entity_name = entity_name
         self._project_name = project_name

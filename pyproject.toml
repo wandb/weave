@@ -68,6 +68,7 @@ show-fixes = true
 select = [
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",
+  "F541",
 ]
 
 [tool.flake8]

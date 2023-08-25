@@ -307,6 +307,11 @@ class OpDef:
         )
         return self.output_type(new_input_type)
 
+    def is_gql_root_resolver(self):
+        from . import gql_op_plugin
+
+        return self in gql_op_plugin._ROOT_RESOLVERS
+
     def lazy_call(_self, *args, **kwargs):
         bound_params = _self.bind_params(args, kwargs)
         # Don't try to refine if there are variable nodes, we are building a

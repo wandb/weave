@@ -58,9 +58,16 @@ In order to develop against Weave, you will want 3 terminal sessions:
 
 ### Testing & Style
 
-Style and lint is enforced using pre-commit hooks.
+Style and lint is enforced using pre-commit hooks. All tests can be run via `cd weave && pytest`
 
-All tests can be run via `cd weave && pytest`
+### Notebook Style & Tests
+
+To successfully commit a Jupyter notebook:
+* make sure the notebook runs end-to-end-locally
+* make sure there is no empty cell at the end of the notebook (remove it if it appeared)
+* merge any sequences of consecutive markdown/non-code cells into a single markdown cell
+* reset kernel and clear output
+* then save the notebook and commit
 
 ## How Can I Contribute?
 

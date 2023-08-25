@@ -1,4 +1,5 @@
 import typing
+import datetime
 
 from weave.op_args import OpNamedArgs
 
@@ -26,13 +27,26 @@ class Registry:
 
     _op_versions: typing.Dict[typing.Tuple[str, str], op_def.OpDef]
 
+    # Maintains a timestamp of when the registry was last updated.
+    # This is useful for caching the ops dictionary when serving
+    # the registry over HTTP.
+    _updated_at: float
+
     def __init__(self):
         self._types = {}
         self._ops = {}
         self._ops_by_common_name = {}
         self._op_versions = {}
+        self.mark_updated()
+
+    def mark_updated(self) -> None:
+        self._updated_at = datetime.datetime.now().timestamp()
+
+    def updated_at(self) -> float:
+        return self._updated_at
 
     def register_op(self, op: op_def.OpDef):
+        self.mark_updated()
         # Always save OpDefs any time they are declared
         location = context_state.get_loading_op_location()
         is_loading = location is not None
@@ -130,6 +144,7 @@ class Registry:
 
     def rename_op(self, name, new_name):
         """Internal use only, used during op bootstrapping at decorator time"""
+        self.mark_updated()
         op = self._ops.pop(name)
         op.name = new_name
         self._ops[new_name] = op
@@ -161,6 +176,7 @@ class Registry:
     #    for type in types:
     #        if type.name == name:
     #            return type
+
     #    raise Exception("type not found")
 
 

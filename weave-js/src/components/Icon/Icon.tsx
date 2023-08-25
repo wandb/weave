@@ -49,6 +49,7 @@ import {ReactComponent as ImportExpandRight} from '../../assets/icons/icon-expan
 import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-expand-uncollapse.svg';
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
+import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
 import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
 import {ReactComponent as ImportFolderAlt} from '../../assets/icons/icon-folder-alt.svg';
 import {ReactComponent as ImportFolderProject} from '../../assets/icons/icon-folder-project.svg';
@@ -109,6 +110,7 @@ import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-n
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
+import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
@@ -116,6 +118,7 @@ import {ReactComponent as ImportPause} from '../../assets/icons/icon-pause.svg';
 import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg';
 import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil-edit.svg';
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
+import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
 import {ReactComponent as ImportPrivacyOpen} from '../../assets/icons/icon-privacy-open.svg';
 import {ReactComponent as ImportPythonLogo} from '../../assets/icons/icon-python-logo.svg';
@@ -127,6 +130,7 @@ import {ReactComponent as ImportRandomizeAlt} from '../../assets/icons/icon-rand
 import {ReactComponent as ImportRecentClock} from '../../assets/icons/icon-recent-clock.svg';
 import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-reddit-social.svg';
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
+import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
@@ -180,7 +184,9 @@ import {ReactComponent as ImportVertexGCP} from '../../assets/icons/icon-vertex-
 import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-play.svg';
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
+import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
+import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
 import {ReactComponent as ImportZoomInTool} from '../../assets/icons/icon-zoom-in-tool.svg';
@@ -344,6 +350,9 @@ export const IconFacebookSocial = (props: SVGIconProps) => (
 );
 export const IconFailed = (props: SVGIconProps) => (
   <ImportFailed {...updateIconProps(props)} />
+);
+export const IconFilterAlt = (props: SVGIconProps) => (
+  <ImportFilterAlt {...updateIconProps(props)} />
 );
 export const IconFlashBolt = (props: SVGIconProps) => (
   <ImportFlashBolt {...updateIconProps(props)} />
@@ -525,6 +534,9 @@ export const IconOrganizationCorporate = (props: SVGIconProps) => (
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportOverflowHorizontal {...updateIconProps(props)} />
 );
+export const IconOverflowVertical = (props: SVGIconProps) => (
+  <ImportOverflowVertical {...updateIconProps(props)} />
+);
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
 );
@@ -545,6 +557,9 @@ export const IconPencilEdit = (props: SVGIconProps) => (
 );
 export const IconPhoto = (props: SVGIconProps) => (
   <ImportPhoto {...updateIconProps(props)} />
+);
+export const IconPin = (props: SVGIconProps) => (
+  <ImportPin {...updateIconProps(props)} />
 );
 export const IconPlay = (props: SVGIconProps) => (
   <ImportPlay {...updateIconProps(props)} />
@@ -578,6 +593,9 @@ export const IconRedditSocial = (props: SVGIconProps) => (
 );
 export const IconRedo = (props: SVGIconProps) => (
   <ImportRedo {...updateIconProps(props)} />
+);
+export const IconRemove = (props: SVGIconProps) => (
+  <ImportRemove {...updateIconProps(props)} />
 );
 export const IconReport = (props: SVGIconProps) => (
   <ImportReport {...updateIconProps(props)} />
@@ -738,8 +756,14 @@ export const IconWandb = (props: SVGIconProps) => (
 export const IconWarning = (props: SVGIconProps) => (
   <ImportWarning {...updateIconProps(props)} />
 );
+export const IconWarningAlt = (props: SVGIconProps) => (
+  <ImportWarningAlt {...updateIconProps(props)} />
+);
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
+);
+export const IconXAxiAlt = (props: SVGIconProps) => (
+  <ImportXAxiAlt {...updateIconProps(props)} />
 );
 export const IconXAxis = (props: SVGIconProps) => (
   <ImportXAxis {...updateIconProps(props)} />
@@ -801,6 +825,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'expand-uncollapse': IconExpandUncollapse,
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
+  'filter-alt': IconFilterAlt,
   'flash-bolt': IconFlashBolt,
   'folder-alt': IconFolderAlt,
   'folder-project': IconFolderProject,
@@ -861,6 +886,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
+  'overflow-vertical': IconOverflowVertical,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
@@ -868,6 +894,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   paused: IconPaused,
   'pencil-edit': IconPencilEdit,
   photo: IconPhoto,
+  pin: IconPin,
   play: IconPlay,
   'privacy-open': IconPrivacyOpen,
   'python-logo': IconPythonLogo,
@@ -879,6 +906,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'recent-clock': IconRecentClock,
   'reddit-social': IconRedditSocial,
   redo: IconRedo,
+  remove: IconRemove,
   report: IconReport,
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
@@ -932,7 +960,9 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'video-play': IconVideoPlay,
   wandb: IconWandb,
   warning: IconWarning,
+  'warning-alt': IconWarningAlt,
   webhook: IconWebhook,
+  'x-axi-alt': IconXAxiAlt,
   'x-axis': IconXAxis,
   'youtube-social': IconYoutubeSocial,
   'zoom-in-tool': IconZoomInTool,

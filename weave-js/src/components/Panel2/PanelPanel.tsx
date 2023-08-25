@@ -1,4 +1,4 @@
-import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
+import {constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
@@ -7,15 +7,15 @@ import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
 import {consoleLog} from '../../util';
-import {Outline} from '../Sidebar/Outline';
+import {Outline, shouldDisablePanelDelete} from '../Sidebar/Outline';
 import {
   ChildPanel,
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
+  CHILD_PANEL_DEFAULT_CONFIG,
 } from './ChildPanel';
-import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
 import {Panel2Loader, useUpdateConfig2} from './PanelComp';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
@@ -29,10 +29,10 @@ import {
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {getConfigForPath} from './panelTree';
-import {IconButton} from '../IconButton';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {PanelPanelContextProvider} from './PanelPanelContextProvider';
+import {Button} from '../Button';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -44,21 +44,7 @@ export const useUpdateConfigForPanelNode = (
   input: NodeOrVoidNode,
   updateInput?: (newInput: NodeOrVoidNode) => void
 ) => {
-  const weave = useWeaveContext();
-  const handleRootUpdate = useCallback(
-    (newVal: Node) => {
-      consoleLog('PANEL PANEL HANDLE ROOT UPDATE', newVal);
-      if (
-        weave.expToString(input) !== weave.expToString(newVal) &&
-        updateInput
-      ) {
-        updateInput(newVal as any);
-      }
-    },
-    [input, updateInput, weave]
-  );
-
-  const setServerPanelConfig = useMutation(input, 'set', handleRootUpdate);
+  const setServerPanelConfig = useMutation(input, 'set');
 
   const updateConfigForPanelNode = useCallback(
     (newConfig: any) => {
@@ -206,20 +192,23 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     onMouseMove: onBodyMouseMove,
   } = useScrollbarVisibility();
 
-  const [inspectingRoot, setInspectingRoot] = useState(false);
   const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
   const selectedIsRoot = useMemo(
     () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
   );
-  const showOutline = useMemo(
-    () => selectedIsRoot && !inspectingRoot,
-    [selectedIsRoot, inspectingRoot]
+
+  const localConfig = getConfigForPath(
+    panelConfig || CHILD_PANEL_DEFAULT_CONFIG,
+    selectedPanel
+  );
+  const shouldShowOutline = shouldDisablePanelDelete(
+    localConfig,
+    selectedPanel
   );
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
-    setInspectingRoot(false);
   }, [setSelectedPanel]);
 
   if (loading) {
@@ -229,7 +218,8 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     throw new Error('Panel config is null after loading');
   }
 
-  if (showOutline) {
+  // show outline instead of config panel if root, main, or varbar
+  if (selectedIsRoot || shouldShowOutline) {
     return (
       <SidebarConfig.Container>
         <SidebarConfig.Header>
@@ -238,9 +228,12 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
               <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
             </SidebarConfig.HeaderTopLeft>
             <SidebarConfig.HeaderTopRight>
-              <IconButton onClick={closeEditor}>
-                <IconClose />
-              </IconButton>
+              <Button
+                icon="close"
+                variant="ghost"
+                size="small"
+                onClick={closeEditor}
+              />
             </SidebarConfig.HeaderTopRight>
           </SidebarConfig.HeaderTop>
         </SidebarConfig.Header>
@@ -250,7 +243,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
           updateConfig2={panelUpdateConfig2}
           setSelected={setSelectedPanel}
           selected={selectedPanel}
-          setInspectingRoot={setInspectingRoot}
         />
       </SidebarConfig.Container>
     );
@@ -261,33 +253,36 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
       <SidebarConfig.Header>
         <SidebarConfig.HeaderTop lessLeftPad>
           <SidebarConfig.HeaderTopLeft canGoBack onClick={goBackToOutline}>
-            <IconButton>
-              <IconBack />
-            </IconButton>
+            <Button icon="back" variant="ghost" size="small" />
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            {!selectedIsRoot && (
+            {!selectedIsRoot && !shouldShowOutline && (
               <OutlineItemPopupMenu
                 config={panelConfig}
-                localConfig={getConfigForPath(panelConfig, selectedPanel)}
+                localConfig={localConfig}
                 path={selectedPanel}
                 updateConfig={panelUpdateConfig}
                 updateConfig2={panelUpdateConfig2}
                 goBackToOutline={goBackToOutline}
                 trigger={
-                  <IconButton>
-                    <IconOverflowHorizontal />
-                  </IconButton>
+                  <Button
+                    icon="overflow-horizontal"
+                    variant="ghost"
+                    size="small"
+                  />
                 }
                 isOpen={isOutlineMenuOpen}
                 onOpen={() => setIsOutlineMenuOpen(true)}
                 onClose={() => setIsOutlineMenuOpen(false)}
               />
             )}
-            <IconButton onClick={closeEditor}>
-              <IconClose />
-            </IconButton>
+            <Button
+              icon="close"
+              variant="ghost"
+              size="small"
+              onClick={closeEditor}
+            />
           </SidebarConfig.HeaderTopRight>
         </SidebarConfig.HeaderTop>
         {!selectedIsRoot && (

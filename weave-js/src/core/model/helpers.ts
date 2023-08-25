@@ -983,7 +983,10 @@ export function isFile(t: Type): t is File {
 }
 
 export function isFileLike(t: Type): t is File {
-  t = nullableTaggableValue(t);
+  if (isTaggedValue(t)) {
+    t = taggedValueValueType(t);
+  }
+
   return isFile(t);
 }
 

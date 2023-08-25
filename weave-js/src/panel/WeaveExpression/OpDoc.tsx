@@ -5,8 +5,7 @@ import React from 'react';
 import {useWeaveContext} from '../../context';
 
 import * as S from './OpDoc.styles';
-import {IconClose} from '../../components/Panel2/Icons';
-import {IconButton} from '../../components/IconButton';
+import {Button} from '../../components/Button';
 
 export interface OpDocProps {
   opName: string;
@@ -77,10 +76,13 @@ const OpDoc: React.FC<OpDocProps> = ({
           <S.Code>{displayName}</S.Code>
         </S.OpName>
         {onClose && (
-          <S.OpClose>
-            <IconButton onClick={onClose}>
-              <IconClose />
-            </IconButton>
+          <S.OpClose data-mode="dark">
+            <Button
+              variant="ghost"
+              size="small"
+              icon="close"
+              onClick={onClose}
+            />
           </S.OpClose>
         )}
       </S.OpNameRow>

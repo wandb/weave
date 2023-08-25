@@ -199,20 +199,22 @@ def test_compile_lambda_uniqueness():
     assert count_nodes(compiled) == 15
 
 
-def test_compile_through_execution(user_by_api_key_in_env):
-    run = wandb.init(project="project_exists")
-    for i in range(10):
-        run.log({"val": i, "cat": i % 2})
-    run.finish()
+# We actually don't want this to work because it would require
+# mutating a static lambda function!
+# def test_compile_through_execution(user_by_api_key_in_env):
+#     run = wandb.init(project="project_exists")
+#     for i in range(10):
+#         run.log({"val": i, "cat": i % 2})
+#     run.finish()
 
-    """
-    This test demonstrates successful execution when there is an explicit
-    const function instead of a direct node (resulting in an intermediate execution op)
-    """
-    history_node = weave.ops.project(run.entity, run.project).run(run.id).history2()
-    pick = const(history_node).pick("val")
-    res = weave.use(pick)
-    assert res.to_pylist_notags() == list(range(10))
+#     """
+#     This test demonstrates successful execution when there is an explicit
+#     const function instead of a direct node (resulting in an intermediate execution op)
+#     """
+#     history_node = weave.ops.project(run.entity, run.project).run(run.id).history2()
+#     pick = const(history_node).pick("val")
+#     res = weave.use(pick)
+#     assert res.to_pylist_notags() == list(range(10))
 
 
 def test_compile_through_function_call(user_by_api_key_in_env):

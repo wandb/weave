@@ -7,19 +7,13 @@ import styled from 'styled-components';
 import {GRAY_350} from '../../common/css/globals.styles';
 import {useWeaveContext} from '../../context';
 import {useNodeWithServerType} from '../../react';
-import {IconButton} from '../IconButton';
 import {
   ChildPanelConfig,
   ChildPanelFullConfig,
   useChildPanelConfig,
 } from '../Panel2/ChildPanel';
 import * as ConfigPanel from '../Panel2/ConfigPanel';
-import {
-  IconAddNew,
-  IconDelete,
-  IconOverflowHorizontal,
-  IconPencilEdit,
-} from '../Panel2/Icons';
+import {IconDelete} from '../Panel2/Icons';
 import {
   ExpressionEvent,
   PanelContextProvider,
@@ -30,6 +24,7 @@ import {useSetInspectingChildPanel} from '../Panel2/PanelInteractContext';
 import {Tooltip} from '../Tooltip';
 import * as SidebarConfig from './Config';
 import {PopupMenu} from './PopupMenu';
+import {Button} from '../Button';
 
 type VarBarProps = {
   config: PanelGroupConfig;
@@ -61,11 +56,7 @@ const VarBarComp: FC<VarBarProps> = props => {
             <SidebarConfig.HeaderTopRight>
               <Tooltip
                 position="top center"
-                trigger={
-                  <IconButton onClick={handleAddVar}>
-                    <IconAddNew />
-                  </IconButton>
-                }>
+                trigger={<Button icon="add-new" onClick={handleAddVar} />}>
                 New variable
               </Tooltip>
             </SidebarConfig.HeaderTopRight>
@@ -208,17 +199,16 @@ const VarComp: FC<VarProps> = ({
           <Tooltip
             position="top center"
             trigger={
-              <IconButton onClick={() => setInspectingPanel(name)}>
-                <IconPencilEdit />
-              </IconButton>
+              <Button
+                icon="pencil-edit"
+                onClick={() => setInspectingPanel(name)}
+              />
             }>
             Open panel editor
           </Tooltip>
           <PopupMenu
             trigger={
-              <IconButton>
-                <IconOverflowHorizontal />
-              </IconButton>
+              <Button variant="ghost" size="small" icon="overflow-horizontal" />
             }
             position={`bottom right`}
             items={menuItems}

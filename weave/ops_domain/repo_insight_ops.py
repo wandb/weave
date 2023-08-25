@@ -1,10 +1,12 @@
 import datetime
 import json
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .wandb_domain_gql import (
     _make_alias,
 )
+
+from ..gql_json_cache import use_json
 from .. import weave_types as types
 from .. import errors
 
@@ -105,8 +107,10 @@ def make_rpt_op(plot_name, output_row_type):
             prefix="repoInsightsPlotData",
         )
         res = gql_result[alias]
-        raw_rows = [edge["node"]["row"] for edge in res["edges"]]
-        schema = json.loads(res.get("schema", "[]"))
+        raw_rows = [use_json(edge["node"]["row"]) for edge in res["edges"]]
+        schema_str = res.get("schema", "[]")
+        schema = use_json(schema_str)
+
         is_normalized_user_count = res.get("isNormalizedUserCount", False)
 
         if not schema:

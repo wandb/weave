@@ -22,26 +22,21 @@ import {
   GRAY_350,
   GRAY_400,
   GRAY_500,
+  MOON_50,
   PANEL_HOVERED_SHADOW,
   SCROLLBAR_STYLES,
   WHITE,
 } from '../../common/css/globals.styles';
-import {
-  IconAddNew as IconAddNewUnstyled,
-  IconPencilEdit,
-} from '../Panel2/Icons';
+import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {inJupyterCell} from '../PagePanelComponents/util';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
-import {Tooltip} from '../Tooltip';
-import {IconButton} from '../IconButton';
-import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {
   useGetPanelIsHoveredByGroupPath,
   useGetPanelIsHoveredInOutlineByGroupPath,
   useSelectedPath,
-  useSetInspectingPanel,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
+import {Button} from '../Button';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -59,7 +54,6 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
     props;
   const selectedPath = useSelectedPath();
-  const setInspectingPanel = useSetInspectingPanel();
   const getPanelIsHovered = useGetPanelIsHoveredByGroupPath(groupPath ?? []);
   const getPanelIsHoveredInOutline = useGetPanelIsHoveredInOutlineByGroupPath(
     groupPath ?? []
@@ -79,7 +73,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const addPanelBarRef = useRef<HTMLDivElement | null>(null);
   return (
     <DragDropProvider>
-      <div className="panel-bank" style={{height: '100%'}}>
+      <div
+        className="panel-bank"
+        // We set the background color for the main area of the board here
+        // for now... Maybe this will work for all uses of PB in Weave
+        style={{height: '100%', backgroundColor: MOON_50}}>
         <Measure
           bounds
           onResize={contentRect => {
@@ -106,21 +104,28 @@ export const PBSection: React.FC<PBSectionProps> = props => {
               <div className="panel-bank__section">
                 {!inJupyter && groupPath != null && handleAddPanel != null && (
                   <ActionBar ref={actionBarRef}>
-                    <Tooltip
+                    {/* This opens the editor at the outline level on the main board.
+                    The button was always shown on the page, but it leads to a kind
+                    of confusing place, so I'm just disabling it. */}
+
+                    {/* <Tooltip
                       position="bottom right"
                       trigger={
-                        <IconButton
-                          onClick={() => setInspectingPanel(groupPath)}>
-                          <IconPencilEdit />
-                        </IconButton>
+                        <Button
+                          variant="ghost"
+                          icon="pencil-edit"
+                          onClick={() => setInspectingPanel(groupPath)}
+                        />
                       }>
                       Open panel editor
-                    </Tooltip>
+                    </Tooltip> */}
                     {enableAddPanel && (
-                      <WBButton onClick={handleAddPanel}>
-                        <IconAddNew $marginRight={6} />
+                      <Button
+                        variant="ghost"
+                        onClick={handleAddPanel}
+                        icon="add-new">
                         New panel
-                      </WBButton>
+                      </Button>
                     )}
                   </ActionBar>
                 )}
@@ -235,6 +240,7 @@ export const getSectionConfig = (
 const Sections = styled.div`
   ${SCROLLBAR_STYLES}
 `;
+Sections.displayName = 'S.Sections';
 
 const ActionBar = styled.div`
   height: 48px;
@@ -243,6 +249,7 @@ const ActionBar = styled.div`
   justify-content: flex-end;
   align-items: center;
 `;
+ActionBar.displayName = 'S.ActionBar';
 
 const AddPanelBar = styled.div`
   height: 48px;
@@ -255,6 +262,7 @@ const AddPanelBar = styled.div`
   font-weight: 600;
   color: ${GRAY_500};
 `;
+AddPanelBar.displayName = 'S.AddPanelBar';
 
 const AddPanelBarContainer = styled.div`
   padding: 8px 32px 16px;
@@ -264,12 +272,14 @@ const AddPanelBarContainer = styled.div`
     opacity: 0;
   }
 `;
+AddPanelBarContainer.displayName = 'S.AddPanelBarContainer';
 
 const IconAddNew = styled(IconAddNewUnstyled)<{$marginRight?: number}>`
   width: 18px;
   height: 18px;
   margin-right: ${p => p.$marginRight ?? 8}px;
 `;
+IconAddNew.displayName = 'S.IconAddNew';
 
 const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
   &&&&& {
@@ -294,3 +304,4 @@ const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
       `}
   }
 `;
+EditablePanel.displayName = 'S.EditablePanel';

@@ -84,5 +84,5 @@ def test_async_op_expr():
 
     assert (
         str(saved_model)
-        == f'get("local-artifact:///list:54643291a9d1a0f06a45/obj").train().model().save("model")'
+        == 'get("local-artifact:///list:54643291a9d1a0f06a45/obj").train().model().save("model")'
     )

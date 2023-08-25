@@ -28,11 +28,14 @@ export const inJupyterCell = () => {
 // TODO: currently deprecated, but works in all browsers
 declare function btoa(s: string): string;
 
-export const useIsAuthenticated = () => {
+export const useIsAuthenticated = (skip: boolean = false) => {
   const [isAuth, setIsAuth] = useState<boolean | undefined>(undefined);
   const anonApiKey = getCookie('anon_api_key');
 
   useEffect(() => {
+    if (skip) {
+      setIsAuth(false);
+    }
     const additionalHeaders: Record<string, string> = {};
     if (anonApiKey != null && anonApiKey !== '') {
       additionalHeaders['x-wandb-anonymous-auth-id'] = btoa(anonApiKey);
@@ -61,7 +64,7 @@ export const useIsAuthenticated = () => {
       .catch(err => {
         setIsAuth(false);
       });
-  }, [anonApiKey]);
+  }, [anonApiKey, skip]);
   return isAuth;
 };
 

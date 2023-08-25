@@ -191,6 +191,7 @@ export const SORTABLE_TYPES: Type[] = [
   'number',
   'boolean',
   'none',
+  {type: 'timestamp', unit: 'ms'},
 ];
 
 export const TYPES_WITH_DIGEST: Type[] = [

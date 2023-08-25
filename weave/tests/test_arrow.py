@@ -392,7 +392,7 @@ def test_custom_groupby_intermediate_save():
     saved_node = weave.save(node, "test_custom_groupby_intermediate_save:latest")
     weave.use(saved_node)
     loaded_node = ops.get(
-        f"local-artifact:///test_custom_groupby_intermediate_save:latest/obj"
+        "local-artifact:///test_custom_groupby_intermediate_save:latest/obj"
     )
     assert weave.use(loaded_node.pick("im").offset(0)[0].width_()) == 256
 
@@ -623,6 +623,36 @@ def test_arrow_unnest():
         {"a": 4, "b": "d"},
         {"a": 5, "b": "d"},
         {"a": 6, "b": "d"},
+    ]
+
+
+def test_arrow_unnest_two_list_cols():
+    data = arrow.to_arrow(
+        [
+            {"a": [1, 2, 3], "b": "c", "c": ["a", "b", "c"]},
+            {"a": [4, 5, 6], "b": "d", "c": ["d", "e", "f"]},
+        ]
+    )
+    assert weave.type_of(data) == arrow.ArrowWeaveListType(
+        types.TypedDict(
+            {
+                "a": types.List(types.Int()),
+                "b": types.String(),
+                "c": types.List(types.String()),
+            }
+        )
+    )
+    unnest_node = weave.weave(data).unnest()
+    assert unnest_node.type == arrow.ArrowWeaveListType(
+        types.TypedDict({"a": types.Int(), "b": types.String(), "c": types.String()})
+    )
+    assert weave.use(weave.weave(data).unnest()).to_pylist_raw() == [
+        {"a": 1, "b": "c", "c": "a"},
+        {"a": 2, "b": "c", "c": "b"},
+        {"a": 3, "b": "c", "c": "c"},
+        {"a": 4, "b": "d", "c": "d"},
+        {"a": 5, "b": "d", "c": "e"},
+        {"a": 6, "b": "d", "c": "f"},
     ]
 
 
@@ -1558,7 +1588,7 @@ def test_encode_decode_list_of_dictionary_encoded_strings():
 
 
 def test_pushdown_of_gql_tags_on_awls(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([1, 2, 3])
@@ -1607,7 +1637,7 @@ def test_groupby_concat():
 
 
 def test_conversion_of_domain_types_to_awl_values(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([project] * 3)
@@ -1704,3 +1734,53 @@ def test_arrow_op_decorator_handles_optional_tagged_type():
     actual = weave.use(toTimestamp)
 
     assert actual.to_pylist_raw() == expected.to_pylist_raw()
+
+
+def test_flatten_handles_tagged_lists():
+    data = [[1], [2, 3], [4, 5, 6]]
+    for i in range(len(data)):
+        data[i] = box.box(data[i])
+        tag_store.add_tags(data[i], {"outer": "outer"})
+        for j in range(len(data[i])):
+            data[i][j] = box.box(data[i][j])
+            tag_store.add_tags(data[i][j], {"inner": "inner"})
+
+    awl = arrow.to_arrow(data)
+    node = weave.save(awl)
+    flattened = node.flatten()
+
+    assert flattened.type == arrow.ArrowWeaveListType(
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"outer": types.String(), "inner": types.String()}),
+            types.Int(),
+        )
+    )
+
+    expected = [1, 2, 3, 4, 5, 6]
+    assert weave.use(flattened).to_pylist_notags() == expected
+    assert weave.use(flattened).to_pylist_raw() == [
+        {
+            "_tag": {
+                "outer": "outer",
+                "inner": "inner",
+            },
+            "_value": i,
+        }
+        for i in expected
+    ]
+
+
+def test_keys_ops():
+    awl = arrow.to_arrow([{"a": 1}, {"a": 1, "b": 2, "c": 2}, {"c": 3}])
+    node = weave.save(awl)
+    keys_node = node.keys()
+    # Unfortunately, we lose specific info about key presence in AWL.
+    assert weave.use(keys_node).to_pylist_raw() == [
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+    ]
+
+    all_keys_node = keys_node.flatten().unique()
+
+    assert weave.use(all_keys_node).to_pylist_raw() == ["a", "b", "c"]

@@ -1,3 +1,6 @@
+/**
+ * KEEP THIS FILE IN SYNC WITH THE ONE IN WEAVE-JS
+ */
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
@@ -43,6 +46,9 @@ module.exports = {
       72: '4.5rem',
       80: '5rem',
       96: '6rem',
+      // Breakpoints
+      768: '48rem',
+      1024: '64rem',
     },
     /**
      * Keep these colors in sync with what is in color.styles.ts
