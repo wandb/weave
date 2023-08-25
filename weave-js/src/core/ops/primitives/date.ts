@@ -36,6 +36,93 @@ export const opDateSub = makeDateOp({
   },
 });
 
+const momentDurations: moment.unitOfTime.DurationConstructor[] = [
+  'years',
+  'months',
+  'days',
+  'hours',
+  'minutes',
+  'seconds',
+  'milliseconds',
+];
+
+export const opTimestampRelativeStringAutoFormat = makeDateOp({
+  hidden: true,
+  name: 'timestamp-relativeStringAutoFormat',
+  argTypes: {lhs: {type: 'timestamp'}, rhs: {type: 'timestamp'}},
+  description: `Returns the difference between two millisecond ${docType(
+    'timestamp',
+    {
+      plural: true,
+    }
+  )} in days in a nice string form`,
+  argDescriptions: {
+    lhs: `First ${docType('timestamp')}`,
+    rhs: `Second ${docType('timestamp')}`,
+  },
+  returnValueDescription: `The difference between the two ${docType(
+    'timestamp',
+    {
+      plural: true,
+    }
+  )} in days in a nice string form`,
+  returnType: inputTypes => 'string',
+  resolver: inputs => {
+    if (inputs.lhs == null || inputs.rhs == null) {
+      return null;
+    }
+    const timestampDiff =
+      moment(inputs.lhs).valueOf() - moment(inputs.rhs).valueOf();
+    for (const unit of momentDurations) {
+      const duration = moment.duration(1, unit).asMilliseconds();
+      const diff = timestampDiff / duration;
+      if (Math.abs(diff) >= 1) {
+        const unitString = Math.abs(diff) === 1 ? unit.slice(0, -1) : unit;
+        // years and months get rounded to the tenth. Get rid of trailing 0 ie. 7.0 -> 7
+        if (
+          (unit === 'years' || unit === 'months') &&
+          Math.round(diff) !== Math.round(diff * 10) / 10
+        ) {
+          return diff.toFixed(1) + ' ' + unitString;
+        } else {
+          return diff.toFixed() + ' ' + unitString;
+        }
+      }
+    }
+    return 'less than 1 ms';
+  },
+});
+
+export const opDatetimeAddMs = makeDateOp({
+  hidden: true,
+  name: 'datetime-addms',
+  argTypes: {lhs: {type: 'timestamp'}, rhs: 'number'},
+  description: `Returns the sum between a ${docType(
+    'timestamp'
+  )} and duration in milliseconds ${docType('number')}`,
+  argDescriptions: {
+    lhs: `An ISO timestamp`,
+    rhs: `Duration ${docType('number')}`,
+  },
+  returnValueDescription: `The sum between the a ${docType(
+    'timestamp'
+  )} and duration in milliseconds ${docType('number')}`,
+  returnType: inputs => {
+    return {type: 'timestamp'};
+  },
+  resolver: inputs => {
+    if (inputs.lhs == null || inputs.rhs == null) {
+      return null;
+    }
+    // Use moment.utc here incase the incoming datetime doesn't have a timezone.
+    // Not ideal but example of usecase:
+    // opArtifactVersionCreatedAt can be an input which is a date(in utc) with no timezone
+    return moment
+      .utc(inputs.lhs)
+      .add(moment.duration(inputs.rhs, 'milliseconds'));
+  },
+});
+
 export const opDateToNumber = makeDateOp({
   hidden: true,
   name: `date-toNumber`,
@@ -82,6 +169,32 @@ export const opDatesMax = makeDimDownDateOp({
   resolver: inputs => {
     const dates = inputs.dates as number[];
     return dates.reduce((a, b) => (a > b ? a : b));
+  },
+});
+
+export const opTimestampMax = makeDimDownDateOp({
+  hidden: true,
+  name: 'timestamp-max',
+  argTypes: {
+    timestamps: {
+      type: 'union',
+      members: [
+        {
+          type: 'list',
+          objectType: {type: 'union', members: ['none', {type: 'timestamp'}]},
+        },
+      ],
+    },
+  },
+  description: `Returns the largest ${docType('timestamp')}`,
+  argDescriptions: {timestamps: 'List of timestamps'},
+  returnValueDescription: `The largest ${docType('timestamp')}`,
+  returnType: inputTypes => {
+    return maybe({type: 'timestamp'});
+  },
+  resolver: inputs => {
+    const timestamps = inputs.timestamps as number[];
+    return timestamps.reduce((a, b) => (a > b ? a : b));
   },
 });
 
