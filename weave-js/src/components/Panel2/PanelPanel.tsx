@@ -84,13 +84,11 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
       const doLoad = async () => {
         let loadedPanel = getFullChildPanel(panelQuery.result);
 
-        // This can actually happen asynchronously because the document should
-        // already have correct types. It should be much less common that the type
-        // refinement results have changed (like when a user adds a new column to a
-        // table). But if we don't block rendering on this, we'll get a flash and extra
-        // expensive requests if the types do change. Currently the types can change
-        // because of implementation differences between JS and Python. We need to fix
-        // those before doing it truly asynchronously.
+        // We should be able to do this, immediately render the loadedState, while
+        // refining in parallel. But currently there are some slight differences
+        // between python refined documents and what js expects, so we get some flashing.
+        // setPanelConfig(() => loadedPanel);
+
         const refined = await refineAllExpressions(
           weave.client,
           loadedPanel,
