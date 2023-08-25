@@ -112,7 +112,7 @@ def refine_runs2_with_columns_type(
 ) -> weave.types.Type:
     # TODO: only reading type from archived runs right now. There is a bunch of logic we need
     # to get this right
-    schema = ds.dataset(f"/tmp/runs.{project.gql['name']}.parquet").schema
+    schema = ds.dataset(f"/tmp/runs.{project['name']}.parquet").schema
     full_run_type = typing.cast(
         weave.types.TypedDict, arrow_schema_to_weave_type(schema)
     )
@@ -144,19 +144,19 @@ def runs2_with_columns(
     project: wb_domain_types.Project, config_cols: list[str], summary_cols: list[str]
 ) -> weave.ops.ArrowWeaveList[Run2]:
     return read_runs(
-        project.gql["name"], columns=get_runs_ds_columns(config_cols, summary_cols)
+        project["name"], columns=get_runs_ds_columns(config_cols, summary_cols)
     )
 
 
 @weave.op(render_info={"type": "function"}, hidden=True)
 def refine_runs2_type(project: wb_domain_types.Project) -> weave.types.Type:
-    schema = ds.dataset(f"/tmp/runs.{project.gql['name']}.parquet").schema
+    schema = ds.dataset(f"/tmp/runs.{project['name']}.parquet").schema
     return ArrowWeaveListType(arrow_schema_to_weave_type(schema))
 
 
 @weave.op(name="project-runs2", refine_output_type=refine_runs2_type)
 def runs2(project: wb_domain_types.Project) -> weave.ops.ArrowWeaveList[Run2]:
-    return read_runs(project.gql["name"])
+    return read_runs(project["name"])
 
 
 # Defines a panel with all columns shown for the runs

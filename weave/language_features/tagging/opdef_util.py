@@ -6,6 +6,7 @@ from . import tagged_value_type
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
 
+
 # Determines if the op_def should ftag the output with the input. Currently, this is true
 # as long as the op does not consume tags and the input of the op is an ObjectType. This
 # may evolve over time.

@@ -1588,7 +1588,7 @@ def test_encode_decode_list_of_dictionary_encoded_strings():
 
 
 def test_pushdown_of_gql_tags_on_awls(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([1, 2, 3])
@@ -1637,7 +1637,7 @@ def test_groupby_concat():
 
 
 def test_conversion_of_domain_types_to_awl_values(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([project] * 3)
