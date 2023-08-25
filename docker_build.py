@@ -187,7 +187,7 @@ def build(
         # development tooling sometimes looks for service:latest, so we should
         # make sure that we tag newly-built images that way when building for
         # local development
-        print_green(f"Because CI==False, image will also be tagged `latest`")
+        print_green("Because CI==False, image will also be tagged `latest`")
         full_name = qualified_image_name(image, "latest")
         command += f" \ \n  --tag={full_name}"
 
@@ -268,7 +268,7 @@ def manifest(manifest_list_name: str, manifest_names: List[str]):
     for write_tag in WRITE_TAGS:
         print_green(f"Creating manifest for tag {write_tag}")
         manifest_list_full_name = qualified_image_name(manifest_list_name, write_tag)
-        create_command = f"docker manifest create " + f"{manifest_list_full_name}"
+        create_command = "docker manifest create " + f"{manifest_list_full_name}"
 
         for manifest_name in manifest_names:
             manifest_full_name = qualified_image_name(manifest_name, write_tag)

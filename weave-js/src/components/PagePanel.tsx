@@ -9,7 +9,6 @@ import getConfig from '../config';
 
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
-import {consoleLog} from '../util';
 import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
@@ -50,6 +49,10 @@ import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import Inspector from './Sidebar/Inspector';
 import {useWeaveAutomation} from './automation';
+import {consoleLog} from '../util';
+import {trackPage} from '../util/events';
+import {getCookie} from '../common/util/cookie';
+import {useHistory} from 'react-router-dom';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -109,6 +112,77 @@ const JupyterControlsIcon = styled.div`
   }
 `;
 
+const HOST_SESSION_ID_COOKIE = `host_session_id`;
+
+// TODO: This should be merged with useIsAuthenticated and refactored to useWBViewer()
+function useEnablePageAnalytics() {
+  const history = useHistory();
+  const pathRef = useRef('');
+  const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
+
+  // fetch user
+  useEffect(() => {
+    const anonApiKey = getCookie('anon_api_key');
+    const additionalHeaders: Record<string, string> = {};
+    if (anonApiKey != null && anonApiKey !== '') {
+      additionalHeaders['x-wandb-anonymous-auth-id'] = btoa(anonApiKey);
+    }
+    fetch(urlPrefixed(backendWeaveViewerUrl()), {
+      credentials: 'include',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...additionalHeaders,
+      },
+    })
+      .then(res => {
+        if (res.status === 200) {
+          return res.json();
+        }
+        return;
+      })
+      .then(json => {
+        const serverUserId = json?.user_id ?? '';
+        if (serverUserId !== '') {
+          (window.analytics as any).identify(serverUserId);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+      });
+  }, [urlPrefixed, backendWeaveViewerUrl]);
+
+  useEffect(() => {
+    const options = {
+      context: {
+        hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
+      },
+    };
+
+    // TODO: Make this DRY-er
+    const unlisten = history.listen(location => {
+      const currentPath = `${location.pathname}${location.search}`;
+      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+      if (pathRef.current !== currentPath) {
+        trackPage({url: fullURL}, options);
+        pathRef.current = currentPath;
+      }
+    });
+
+    // Track initial page view
+    const initialPath = `${history.location.pathname}${history.location.search}`;
+    const entireURL = `${window.location.protocol}//${window.location.host}${history.location.pathname}${history.location.search}${history.location.hash}`;
+    if (pathRef.current !== initialPath) {
+      trackPage({url: entireURL}, options);
+      pathRef.current = initialPath;
+    }
+
+    return () => {
+      unlisten();
+    };
+  }, [history]);
+}
+
 // Simple function that forces rerender when URL changes.
 const usePoorMansLocation = () => {
   const [location, setLocation] = useState(window.location.toString());
@@ -127,9 +201,15 @@ const usePoorMansLocation = () => {
   return window.location;
 };
 
-const PagePanel: React.FC = props => {
+type PagePanelProps = {
+  browserType: string | undefined;
+};
+
+const PagePanel = ({browserType}: PagePanelProps) => {
+  useEnablePageAnalytics();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
+  const history = useHistory();
   const urlParams = new URLSearchParams(location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
@@ -146,6 +226,7 @@ const PagePanel: React.FC = props => {
   const inJupyter = inJupyterCell();
   const authed = useIsAuthenticated();
   const isLocal = isServedLocally();
+  const transparentlyMountExpString = useRef('');
 
   const setUrlExp = useCallback(
     (exp: NodeOrVoidNode) => {
@@ -156,31 +237,33 @@ const PagePanel: React.FC = props => {
 
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
+      const pathname = inJupyterCell() ? window.location.pathname : '/';
 
-      if (newExpStr.startsWith('get') && expString?.startsWith('get')) {
-        // In the specific case that we are updating a get with another get
-        // which happens when we transition between published and local states,
-        // then don't retain the history. We used to always do a replace and
-        // it was super confusing
-        window.history.replaceState(
-          null,
-          '',
-          `${window.location.pathname}?${searchParams}`
-        );
-      } else {
-        window.history.pushState(
-          null,
-          '',
-          `${window.location.pathname}?${searchParams}`
-        );
+      if (
+        newExpStr.startsWith('get') &&
+        expString?.startsWith('get') &&
+        newExpStr.includes('local-artifact') &&
+        expString.includes('wandb-artifact')
+      ) {
+        transparentlyMountExpString.current = newExpStr;
       }
+      history.push(`${pathname}?${searchParams}`);
     },
-    [expString, weave]
+    [expString, history, weave]
   );
 
   const [config, setConfig] = useState<ChildPanelFullConfig>(
     CHILD_PANEL_DEFAULT_CONFIG
   );
+
+  // If the exp string has gone away, perhaps by back button navigation,
+  // reset the config.
+  useEffect(() => {
+    if (!expString) {
+      setConfig(CHILD_PANEL_DEFAULT_CONFIG);
+    }
+  }, [expString]);
+
   const updateConfig = useCallback(
     (newConfig: Partial<ChildPanelFullConfig>) => {
       setConfig(currentConfig => ({...currentConfig, ...newConfig}));
@@ -230,15 +313,23 @@ const PagePanel: React.FC = props => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    consoleLog('PAGE PANEL MOUNT');
-    setLoading(true);
+    consoleLog('PAGE PANEL MOUNT', window.location.href);
+    const doTransparently =
+      expString != null && transparentlyMountExpString.current === expString;
+    setLoading(!doTransparently);
     if (expString != null) {
       weave.expression(expString, []).then(res => {
-        updateConfig({
-          input_node: res.expr as any,
-          id: panelId,
-          config: panelConfig,
-        } as any);
+        if (doTransparently) {
+          updateConfig({
+            input_node: res.expr as any,
+          });
+        } else {
+          updateConfig({
+            input_node: res.expr as any,
+            id: panelId,
+            config: panelConfig,
+          } as any);
+        }
         setLoading(false);
       });
     } else if (expNode != null) {
@@ -249,11 +340,6 @@ const PagePanel: React.FC = props => {
       } as any);
       setLoading(false);
     } else {
-      updateConfig({
-        input_node: voidNode(),
-        id: panelId,
-        config: panelConfig,
-      } as any);
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,7 +395,11 @@ const PagePanel: React.FC = props => {
         <PanelInteractContextProvider>
           <WeaveRoot className="weave-root" fullScreen={fullScreen}>
             {config.input_node.nodeType === 'void' ? (
-              <Home updateConfig={updateConfig} inJupyter={inJupyter} />
+              <Home
+                updateConfig={updateConfig}
+                inJupyter={inJupyter}
+                browserType={browserType}
+              />
             ) : (
               <div
                 style={{

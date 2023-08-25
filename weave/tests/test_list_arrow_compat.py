@@ -498,6 +498,7 @@ algos = [
 ]
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.parametrize(
     "li, algo, options",
     [

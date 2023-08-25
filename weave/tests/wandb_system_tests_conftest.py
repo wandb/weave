@@ -189,6 +189,13 @@ def pytest_addoption(parser):
         default="function",  # or "function" or "session" or "module"
         help='cli to set scope of fixture "user-scope"',
     )
+
+    parser.addoption(
+        "--job-num",
+        default=None,
+        help='cli to set "job-num"',
+    )
+
     parser.addoption(
         "--base-url",
         default=f"{wandb_server_host}:{LOCAL_BASE_PORT}",
@@ -322,7 +329,7 @@ def check_server_up(
             "--platform",
             "linux/amd64",
             (
-                f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:tim-franken_branch_parquet"
+                "us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:tim-franken_branch_parquet"
                 if os.environ.get("PARQUET_ENABLED")
                 else f"us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:{wandb_server_tag}"
             ),

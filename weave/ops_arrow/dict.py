@@ -13,6 +13,7 @@ from ..language_features.tagging import (
     process_opdef_output_type,
 )
 from .arrow_tags import direct_add_arrow_tags
+from . import convert
 
 from .constructors import (
     vectorized_container_constructor_preprocessor,
@@ -406,3 +407,83 @@ def awl_projection_2d(
         ),
         table._artifact,
     )
+
+
+@op(
+    name="ArrowWeaveListTypedDict-keys",
+    input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
+    output_type=lambda input_types: ArrowWeaveListType(types.List(types.String())),
+)
+def keys(self):
+    keys = list(self.object_type.property_types.keys())
+    return convert.to_arrow(
+        [keys] * len(self), types.List(types.List(types.String())), self._artifact
+    )
+
+
+@op(
+    name="ArrowWeaveListTypedDict-columnNames",
+    hidden=True,
+    input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
+    output_type=lambda input_types: ArrowWeaveListType(types.String()),
+)
+def columnNames(self):
+    return convert.to_arrow(
+        list(self.object_type.property_types.keys()),
+        types.List(types.String()),
+        self._artifact,
+    )
+
+
+def _with_column_type(cur_type: types.Type, key: str, new_col_type: types.Type):
+    if not isinstance(cur_type, types.TypedDict):
+        cur_type = types.TypedDict()
+    path = _dict_utils.split_escaped_string(key)
+
+    property_types = {**cur_type.property_types}
+
+    if len(path) > 1:
+        return _with_column_type(
+            cur_type,
+            path[0],
+            _with_column_type(
+                property_types[path[0]], ".".join(path[1:]), new_col_type
+            ),
+        )
+
+    col_names = list(property_types.keys())
+    try:
+        key_index = col_names.index(key)
+    except ValueError:
+        key_index = None
+    if key_index is not None:
+        property_types.pop(key)
+        col_names.pop(key_index)
+    property_types[key] = new_col_type
+    return types.TypedDict(property_types)
+
+
+def _with_columns_output_type(input_type):
+    new_col_types = input_type["cols"]
+    obj_type = input_type["self"].object_type
+    for k, v in new_col_types.property_types.items():
+        # added column type is optional, because we may need to extend with None
+        # if it is too short.
+        obj_type = _with_column_type(obj_type, k, v.object_type)
+    return ArrowWeaveListType(obj_type)
+
+
+@op(
+    name="ArrowWeaveListTypedDict-with_columns",
+    hidden=True,
+    input_type={
+        "self": ArrowWeaveListType(types.TypedDict({})),
+        "cols": types.Dict(types.String(), ArrowWeaveListType()),
+    },
+    output_type=_with_columns_output_type,
+)
+def with_columns(self, cols):
+    for col_val in cols.values():
+        if len(self) != len(col_val):
+            return None
+    return self.with_columns(cols)

@@ -1,5 +1,6 @@
+import typing
 import json
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from . import wb_domain_types as wdt
 from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
@@ -8,9 +9,12 @@ from .wandb_domain_gql import (
     gql_direct_edge_op,
     gql_connection_op,
     gql_root_op,
+    make_root_op_gql_op_output_type,
 )
+
 from .. import weave_types as types
 from .. import errors
+from .. import input_provider
 
 # Section 1/6: Tag Getters
 get_project_tag = make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
@@ -38,7 +42,7 @@ project = gql_root_op(
 )
 def root_all_projects_gql_resolver(gql_result):
     return [
-        wdt.Project.from_gql(project["node"])
+        wdt.Project.from_keys(project["node"])
         for project in gql_result["instance"]["projects_500"]["edges"]
     ]
 
@@ -62,6 +66,9 @@ def root_all_projects_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_projects_gql_resolver,
+        gql_op_output_type=make_root_op_gql_op_output_type(
+            "projects_500", lambda inputs: "", wdt.ProjectType
+        ),
     ),
 )
 def root_all_projects():
@@ -71,7 +78,7 @@ def root_all_projects():
 
 
 # Section 3/6: Attribute Getters
-gql_prop_op("project-name", wdt.ProjectType, "name", types.String())
+name = gql_prop_op("project-name", wdt.ProjectType, "name", types.String())
 gql_prop_op(
     "project-createdAt",
     wdt.ProjectType,
@@ -201,13 +208,26 @@ gql_connection_op(
     ),
 )
 def link(project: wdt.Project) -> wdt.Link:
-    return wdt.Link(
-        project.gql["name"], f"{project.gql['entity']['name']}/{project.gql['name']}"
+    return wdt.Link(project["name"], f"{project['entity']['name']}/{project['name']}")
+
+
+def _project_artifacts_gql_op_output_type(
+    inputs: input_provider.InputProvider, input_type: types.Type
+) -> types.Type:
+    return types.List(
+        wdt.ArtifactCollectionType.with_keys(
+            typing.cast(typing.Any, input_type)
+            .keys["artifactTypes_100"]["edges"]
+            .object_type["node"]["artifactCollections_100"]["edges"]
+            .object_type["node"]
+            .property_types
+        )
     )
 
 
 @op(
     name="project-artifacts",
+    output_type=lambda input_types: types.List(wdt.ArtifactCollectionType),
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
             artifactTypes_100: artifactTypes(first: 100) {{
@@ -226,13 +246,14 @@ def link(project: wdt.Project) -> wdt.Link:
                 }}
             }}
         """,
+        gql_op_output_type=_project_artifacts_gql_op_output_type,
     ),
 )
 def artifacts(
     project: wdt.Project,
-) -> list[wdt.ArtifactCollection]:
+):
     return [
-        wdt.ArtifactCollection.from_gql(edge["node"])
-        for typeEdge in project.gql["artifactTypes_100"]["edges"]
+        wdt.ArtifactCollection.from_keys(edge["node"])
+        for typeEdge in project["artifactTypes_100"]["edges"]
         for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
     ]

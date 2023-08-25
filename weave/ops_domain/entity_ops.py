@@ -1,4 +1,4 @@
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
@@ -28,7 +28,7 @@ entity = gql_root_op(
 # Section 3/6: Attribute Getters
 @op(name="entity-name")
 def entity_name(entity: wdt.Entity) -> str:
-    return entity.gql["name"]
+    return entity["name"]
 
 
 gql_prop_op(
@@ -53,7 +53,7 @@ gql_connection_op(
     "artifactCollections",
     wdt.ArtifactCollectionType,
     {},
-    lambda inputs: f"collectionTypes: [PORTFOLIO]",
+    lambda inputs: "collectionTypes: [PORTFOLIO]",
 )
 
 gql_connection_op(
@@ -65,7 +65,8 @@ gql_connection_op(
     # lambda inputs: f"first: 100",
 )
 
+
 # Section 6/6: Non Standard Business Logic Ops
 @op(name="entity-link")
 def entity_link(entity: wdt.Entity) -> wdt.Link:
-    return wdt.Link(entity.gql["name"], f"/{entity.gql['name']}")
+    return wdt.Link(entity["name"], f"/{entity['name']}")

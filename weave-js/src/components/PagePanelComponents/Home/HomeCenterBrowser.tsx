@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import styled from 'styled-components';
 import {IconOverflowHorizontal, IconWeaveLogoGray} from '../../Panel2/Icons';
@@ -7,6 +7,11 @@ import * as LayoutElements from './LayoutElements';
 import _ from 'lodash';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {DeleteActionModal} from '../DeleteActionModal';
+import {constString, opGet} from '@wandb/weave/core';
+import {useMakeMutation} from '@wandb/weave/react';
+import {SetPreviewNodeType} from './common';
+import {useHistory} from 'react-router-dom';
 
 const TableRow = styled.tr<{$highlighted?: boolean}>`
   background-color: ${props => (props.$highlighted ? '#f8f9fa' : '')};
@@ -140,7 +145,9 @@ const CenterSpaceHeader = styled(LayoutElements.VBlock)`
 `;
 CenterSpaceHeader.displayName = 'S.CenterSpaceHeader';
 
-type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
+export type CenterBrowserDataType<
+  E extends {[key: string]: string | number} = {}
+> = {
   _id: string;
 } & E;
 
@@ -159,6 +166,9 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
   data: RT[];
   selectedRowId?: string;
+  setSelectedRowId?: Dispatch<SetStateAction<string | undefined>>;
+  setPreviewNode?: SetPreviewNodeType;
+
   noDataCTA?: string;
   breadcrumbs?: Array<{
     key: string;
@@ -174,11 +184,20 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
       placeholder: string;
     };
   };
+
+  // id of an artifact that is pending deletion
+  deletingId?: string;
+  setDeletingId?: Dispatch<SetStateAction<string | undefined>>;
+
+  isModalActing?: boolean;
+  setIsModalActing?: Dispatch<SetStateAction<boolean>>;
+  deleteTypeString?: string;
 };
 
 export const CenterBrowser = <RT extends CenterBrowserDataType>(
   props: CenterBrowserProps<RT>
 ) => {
+  const history = useHistory();
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<{
     [key: string]: string | null | undefined;
@@ -246,8 +265,33 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
     return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
   }, [props.columns, props.data]);
   const hasOverflowActions = allActions.length > 1;
+
+  const makeMutation = useMakeMutation();
+
   return (
     <>
+      <DeleteActionModal
+        open={props.deletingId != null}
+        onClose={() => props.setDeletingId?.(undefined)}
+        acting={props.isModalActing ?? false}
+        onDelete={async () => {
+          props.setIsModalActing?.(true);
+          const artifactNode = opGet({
+            uri: constString(props.deletingId!),
+          });
+          await makeMutation(artifactNode, 'delete_artifact', {});
+          props.setDeletingId?.(undefined);
+          props.setIsModalActing?.(false);
+          // If the user is deleting the selected row, navigate up a level
+          if (
+            props.deletingId?.endsWith(`/${props.selectedRowId}:latest/obj`)
+          ) {
+            history.push('.');
+          }
+        }}
+        deleteTypeString={props.deleteTypeString}
+      />
+
       <CenterSpaceHeader>
         <CenterSpaceTitle>
           <span

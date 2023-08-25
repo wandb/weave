@@ -264,7 +264,7 @@ export const TextInputConfigField: React.FC<
   return wrap(<TextInput {...props} />);
 };
 
-const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
+export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
   flex: 1 1 auto;
   display: flex;
   width: 100%;
@@ -287,7 +287,7 @@ const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
   }
 `;
 
-const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
+export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
   &&& {
     width: 100%;
     display: inline-flex;
@@ -299,6 +299,12 @@ const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
     input {
       height: 100%;
       width: 100% !important;
+    }
+    && > input {
+      cursor: pointer;
+    }
+    && > .text {
+      cursor: pointer;
     }
 
     &.active svg {

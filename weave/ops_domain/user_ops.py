@@ -1,4 +1,4 @@
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
@@ -55,10 +55,11 @@ gql_connection_op(
     "teams",
     wdt.EntityType,
     {},
-    lambda inputs: f"first: 100",
+    lambda inputs: "first: 100",
 )
+
 
 # Section 6/6: Non Standard Business Logic Ops
 @op(name="user-link")
-def link(project: wdt.User) -> wdt.Link:
-    return wdt.Link(project.gql["name"], project.gql["name"])
+def link(user: wdt.User) -> wdt.Link:
+    return wdt.Link(user["name"], user["name"])

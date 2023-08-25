@@ -17,7 +17,7 @@ export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
   flat.forEach(span => {
     // We use '' as the parent_id for root spans for now, reading null columns
     // is currently broken for StreamTable liveset.
-    if (span.parent_id === '') {
+    if (span.parent_id === '' || span.parent_id == null) {
       roots.push(map[span.span_id]);
     } else if (map[span.parent_id] == null) {
       unrooted.push(map[span.span_id]);
