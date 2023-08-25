@@ -76,19 +76,16 @@ export const opTimestampRelativeStringAutoFormat = makeDateOp({
     for (const unit of momentDurations) {
       const duration = moment.duration(1, unit).asMilliseconds();
       const diff = timestampDiff / duration;
-
       if (Math.abs(diff) >= 1) {
+        const unitString = Math.abs(Math.trunc(diff)) === 1 ? unit.slice(0, -1) : unit
         // years and months get rounded to the tenth. Get rid of trailing 0 ie. 7.0 -> 7
         if (
           (unit === 'years' || unit === 'months') &&
           Math.round(diff) !== Math.round(diff * 10) / 10
         ) {
-          return diff.toFixed(1) + ' ' + unit;
+          return diff.toFixed(1) + ' ' + unitString;
         } else {
-          if (Math.floor(diff) === 1) {
-            return '1 ' + unit.slice(0, -1) + ' ';
-          }
-          return diff.toFixed() + ' ' + unit;
+          return diff.toFixed() + ' ' + unitString;
         }
       }
     }
