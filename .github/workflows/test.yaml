@@ -14,7 +14,7 @@ on:
 jobs:
   build-container:
     name: Build test container
-    timeout-minutes: 20
+    timeout-minutes: 30
     runs-on: [self-hosted, builder]
     # runs-on: ubuntu-latest
     env:
