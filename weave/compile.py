@@ -584,7 +584,7 @@ def compile_initialize_gql_types(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _initialize_gql_types_map_fn, on_error, True)
+    return graph.map_nodes_full(nodes, _initialize_gql_types_map_fn, on_error)
 
 
 def _call_gql_propagate_keys(

@@ -177,13 +177,13 @@ class ConstNode(Node):
     # generation function to receive `get("stream_table").rows()``, not the
     # compiled representation of that, which is something like
     # `gqlroot-wbgqlquery(...).run(...).history3_with_columns().rows()`.
-    _compile_time_literal: bool = False
+    _compile_time_literal: typing.Optional[bool] = None
 
     def __init__(
         self,
         type: weave_types.Type,
         val: typing.Any,
-        _compile_time_literal: bool = False,
+        _compile_time_literal: typing.Optional[bool] = None,
     ) -> None:
         self.type = type
         self.val = val
@@ -202,7 +202,7 @@ class ConstNode(Node):
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
 
-        return cls(t, val, obj.get("_compile_time_literal", False))
+        return cls(t, val, obj.get("_compile_time_literal"))
 
     def to_json(self) -> dict:
         val = storage.to_python(self.val)["_val"]  # type: ignore
@@ -213,7 +213,7 @@ class ConstNode(Node):
         # if isinstance(self.type, weave_types.Function):
         #     val = val.to_json()
         res = {"nodeType": "const", "type": self.type.to_dict(), "val": val}
-        if self._compile_time_literal is not None:
+        if self._compile_time_literal is not None and self._compile_time_literal:
             res["_compile_time_literal"] = self._compile_time_literal
         return res
 
