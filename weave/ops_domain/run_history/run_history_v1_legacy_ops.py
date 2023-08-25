@@ -1,19 +1,15 @@
 import json
-import typing
-from ...compile_domain import wb_gql_op_plugin
+from ...gql_op_plugin import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
-from ..wandb_domain_gql import (
-    _make_alias,
-)
 from .. import wb_util
 from ... import engine_trace
-
 
 import pyarrow as pa
 
 from . import history_op_common
+from ... import gql_json_cache
 
 
 tracer = engine_trace.tracer()
@@ -81,7 +77,9 @@ def _get_history(run: wdt.Run, columns=None):
         ) or pa.table([])
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = run.gql["sampledParquetHistory"]["liveData"]
+    live_data = [
+        gql_json_cache.use_json(row) for row in run["sampledParquetHistory"]["liveData"]
+    ]
 
     with tracer.trace("liveSet.impute"):
         for row in live_data:
@@ -99,6 +97,8 @@ def _get_history(run: wdt.Run, columns=None):
 
     # deserialize json
     with tracer.trace("json.loads"):
+        # These fields are not cached, beacuse they are read from parquet and not from GQL.
+        # So we actually use json.loads here.
         for field in binary_fields:
             for row in parquet_history:
                 if row[field] is not None:
@@ -115,9 +115,9 @@ def _get_history(run: wdt.Run, columns=None):
             wb_util.process_run_dict_obj(
                 row,
                 wb_util.RunPath(
-                    run.gql["project"]["entity"]["name"],
-                    run.gql["project"]["name"],
-                    run.gql["name"],
+                    run["project"]["entity"]["name"],
+                    run["project"]["name"],
+                    run["name"],
                 ),
             )
             for row in history

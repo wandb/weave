@@ -29,6 +29,7 @@ from . import wandb_api
 from . import util
 from . import graph
 from .language_features.tagging import tag_store
+from . import gql_json_cache
 
 
 # A function to monkeypatch the request post method
@@ -74,7 +75,9 @@ def handle_request(
     with tracer.trace("request:execute"):
         with execute.top_level_stats() as stats:
             with context.execution_client():
-                result = nodes.batch_map(execute.execute_nodes)
+                with gql_json_cache.gql_json_cache_context():
+                    result = nodes.batch_map(execute.execute_nodes)
+
     with tracer.trace("request:deref"):
         if deref:
             result = result.zip(nodes).safe_map(

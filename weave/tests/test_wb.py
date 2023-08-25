@@ -30,6 +30,8 @@ from ..ops_domain import table
 from ..ops_domain import wb_util
 import wandb
 
+from .. import compile
+
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -62,64 +64,108 @@ artifact_browser_response = {
     }
 }
 
-
-workspace_response = {
-    "project_518fa79465d8ffaeb91015dce87e092f": {
-        **fwb.project_payload,  # type: ignore
-        "runs_c1233b7003317090ab5e2a75db4ad965": {
-            "edges": [
-                {
-                    "node": {
-                        **fwb.run_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                },
-                                "legacy_table": {
-                                    "_type": "table-file",
-                                    "path": "media/tables/legacy_table.table.json",
-                                },
-                                "image": {
-                                    "height": 64,
-                                    "sha256": "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025",
-                                    "path": "media/images/random_image_9_440fab0d6f537b4557a1.png",
-                                    "size": 4228,
-                                    "_type": "image-file",
-                                    "width": 64,
-                                    "format": "png",
-                                },
-                            }
-                        ),
-                        "displayName": "amber-glade-100",
-                    },
-                },
-                {
-                    "node": {
-                        **fwb.run2_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps({}),
-                        "displayName": "run2-display_name",
-                    },
-                },
-                {
-                    "node": {
-                        **fwb.run3_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
-                                },
-                            }
-                        ),
-                        "displayName": "run3-display_name",
-                    },
-                },
-            ]
+workspace_response_run1_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+        },
+        "legacy_table": {
+            "_type": "table-file",
+            "path": "media/tables/legacy_table.table.json",
+        },
+        "image": {
+            "height": 64,
+            "sha256": "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025",
+            "path": "media/images/random_image_9_440fab0d6f537b4557a1.png",
+            "size": 4228,
+            "_type": "image-file",
+            "width": 64,
+            "format": "png",
         },
     }
-}
+)
+
+
+workspace_response_run3_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
+        },
+    }
+)
+
+
+def workspace_response(include_display_name=True):
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_c1233b7003317090ab5e2a75db4ad965": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.run_payload,  # type: ignore
+                            "summaryMetricsSubset": workspace_response_run1_summary_metrics,
+                            "summaryMetrics": workspace_response_run1_summary_metrics,
+                            **(
+                                {"displayName": "amber-glade-100"}
+                                if include_display_name
+                                else {}
+                            ),
+                        },
+                    },
+                    {
+                        "node": {
+                            **fwb.run2_payload,  # type: ignore
+                            "summaryMetricsSubset": json.dumps({}),
+                            "summaryMetrics": json.dumps({}),
+                            **(
+                                {"displayName": "run2-display_name"}
+                                if include_display_name
+                                else {}
+                            ),
+                        },
+                    },
+                    {
+                        "node": {
+                            **fwb.run3_payload,  # type: ignore
+                            "summaryMetricsSubset": workspace_response_run3_summary_metrics,
+                            "summaryMetrics": workspace_response_run3_summary_metrics,
+                            **(
+                                {"displayName": "run3-display_name"}
+                                if include_display_name
+                                else {}
+                            ),
+                        },
+                    },
+                ]
+            },
+        }
+    }
+
+
+workspace_response_no_run_displayname_run1_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+        },
+        "legacy_table": {
+            "_type": "table-file",
+            "path": "media/tables/legacy_table.table.json",
+        },
+    }
+)
+
+workspace_response_no_run_displayname_run3_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
+        },
+    }
+)
 
 workspace_response_no_run_displayname = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -129,37 +175,22 @@ workspace_response_no_run_displayname = {
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                },
-                                "legacy_table": {
-                                    "_type": "table-file",
-                                    "path": "media/tables/legacy_table.table.json",
-                                },
-                            }
-                        ),
+                        "summaryMetricsSubset": workspace_response_no_run_displayname_run1_summary_metrics,
+                        "summaryMetrics": workspace_response_no_run_displayname_run1_summary_metrics,
                     },
                 },
                 {
                     "node": {
                         **fwb.run2_payload,  # type: ignore
                         "summaryMetricsSubset": json.dumps({}),
+                        "summaryMetrics": json.dumps({}),
                     },
                 },
                 {
                     "node": {
                         **fwb.run3_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
-                                },
-                            }
-                        ),
+                        "summaryMetricsSubset": workspace_response_no_run_displayname_run3_summary_metrics,
+                        "summaryMetrics": workspace_response_no_run_displayname_run3_summary_metrics,
                     },
                 },
             ]
@@ -175,6 +206,15 @@ empty_workspace_response = {
     }
 }
 
+workspace_response_filtered_run1_summary_metrics = json.dumps(
+    {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+        }
+    }
+)
+
 workspace_response_filtered = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
@@ -183,14 +223,8 @@ workspace_response_filtered = {
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "summaryMetricsSubset": json.dumps(
-                            {
-                                "table": {
-                                    "_type": "table-file",
-                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                }
-                            }
-                        ),
+                        "summaryMetricsSubset": workspace_response_filtered_run1_summary_metrics,
+                        "summaryMetrics": workspace_response_filtered_run1_summary_metrics,
                         "displayName": "amber-glade-100",
                     }
                 },
@@ -283,13 +317,13 @@ def test_avfile_type(fake_wandb):
         .file("test_results.table.json")
     )
     t = weavejs_ops.file_type(f)
-    assert weave.use(t) == TaggedValueType(
+    assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         artifact_fs.FilesystemArtifactFileType(
             extension=types.Const(types.String(), "json"),
             wbObjectType=ops.TableType(),
         ),
-    )
+    ).assign_type(weave.use(t))
 
 
 def test_table_col_order_and_unknown_types(fake_wandb):
@@ -319,14 +353,21 @@ def test_missing_file(fake_wandb):
 
 def table_mock1(q, ndx):
     if q["gql"].definitions[0].name.value == "WeavePythonCG":
-        return workspace_response
+        return workspace_response()
+    else:
+        return artifact_version_sdk_response
+
+
+def table_mock1_no_display_name(q, ndx):
+    if q["gql"].definitions[0].name.value == "WeavePythonCG":
+        return workspace_response(False)
     else:
         return artifact_version_sdk_response
 
 
 def table_mock2(q, ndx):
     if q["gql"].definitions[0].name.value == "WeavePythonCG":
-        return workspace_response
+        return workspace_response()
     else:
         return artifact_version_sdk_response
 
@@ -424,7 +465,7 @@ def test_workspace_table_type(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock2)
     summary_node = ops.project("stacey", "mendeleev").runs().summary()
     cell_node = summary_node["table"].table()
-    assert cell_node.type == TaggedValueType(
+    assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         types.List(
             object_type=types.optional(
@@ -434,7 +475,7 @@ def test_workspace_table_type(fake_wandb):
                 )
             )
         ),
-    )
+    ).assign_type(cell_node.type)
 
 
 def test_workspace_table_rows_type(fake_wandb):
@@ -442,7 +483,7 @@ def test_workspace_table_rows_type(fake_wandb):
     cell_node = (
         ops.project("stacey", "mendeleev").runs().summary()["table"].table().rows()
     )
-    assert cell_node.type == TaggedValueType(
+    assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         types.List(
             object_type=types.optional(
@@ -473,7 +514,7 @@ def test_workspace_table_rows_type(fake_wandb):
                 )
             )
         ),
-    )
+    ).assign_type(cell_node.type)
 
 
 def test_table_tags_column_first(fake_wandb):
@@ -582,7 +623,7 @@ def test_domain_gql_fragments(fake_wandb):
 
 
 def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project_name_node = project_node.name()
     entity_node = project_node.entity()
@@ -615,7 +656,7 @@ def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
 
 
 def test_domain_gql_around_fn_nodes(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     runs_node = project_node.runs()
     sorted_runs = runs_node.sort(lambda row: ops.make_list(a=row.createdAt()), ["asc"])
@@ -838,7 +879,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
-                    "artifactMembership_a9aa34b91abdb163475121bd51290fcb": {
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
                         **fwb.artifactMembership_payload
                     },
                 },
@@ -1432,8 +1473,8 @@ def run_history_as_of_mocker(q, ndx):
                     {
                         "node": {
                             **fwb.run_payload,  # type: ignore
-                            "history_c81e728d9d4c2f636f067f89cc14862c": example_history[
-                                2
+                            "history_c81e728d9d4c2f636f067f89cc14862c": [
+                                example_history[2]
                             ],
                         }
                     }

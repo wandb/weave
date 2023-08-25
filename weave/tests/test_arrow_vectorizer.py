@@ -8,12 +8,17 @@ from .. import ops
 from .. import weave_types as types
 from .. import weave_internal
 from ..ops_primitives import dict_, list_
+from .. import errors
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
 from .. import ops_arrow as arrow
 from ..ops_arrow import arraylist_ops
 from ..ops_arrow import convert_ops
+
+from ..ops_domain import wb_domain_types as wdt
+
+from ..ops_domain import run_ops
 
 
 string_ops_test_cases = [
@@ -1285,3 +1290,48 @@ def test_list_numbers_equal_notequal():
     assert weave.use(l4 == l5).to_pylist_notags() == [False, True, True]
     assert weave.use(l6 == l2).to_pylist_notags() == [True, False, True]
     assert weave.use(l6 == l7).to_pylist_notags() == [False, True, True]
+
+
+def test_vectorized_prop_op_gql_pick():
+    runs = [
+        wdt.Run({"id": "A", "key2": 1}),
+        wdt.Run({"id": "B", "key2": 1}),
+        wdt.Run({"id": "C", "key2": 1}),
+    ]
+    for run in runs:
+        tag_store.add_tags(run, {"mytag": "test" + run["id"]})
+    awl = arrow.to_arrow(runs)
+    l = weave.save(awl)
+
+    fn = weave_internal.define_fn(
+        {"x": awl.object_type}, lambda x: run_ops.run_id(x)
+    ).val
+    vec_fn = arrow.vectorize(fn, strict=True)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == ["A", "B", "C"]
+    assert weave.use(called).to_pylist_raw() == [
+        {"_tag": {"mytag": "testA"}, "_value": "A"},
+        {"_tag": {"mytag": "testB"}, "_value": "B"},
+        {"_tag": {"mytag": "testC"}, "_value": "C"},
+    ]
+
+
+def test_cant_vectorize_without_keys():
+    runs = [
+        wdt.Run({"id": "A", "key2": 1}),
+        wdt.Run({"id": "B", "key2": 1}),
+        wdt.Run({"id": "C", "key2": 1}),
+    ]
+    for run in runs:
+        tag_store.add_tags(run, {"mytag": "test" + run["id"]})
+    awl = arrow.to_arrow(runs)
+
+    fn = weave_internal.define_fn(
+        {"x": awl.object_type}, lambda x: run_ops.run_name(x)
+    ).val
+
+    vec_fn = arrow.vectorize(fn, strict=True)
+
+    # it finds a mapped list op, but not an AWL op
+    assert "ArrowWeaveList" not in vec_fn.from_op.name
+    assert "mapped" in vec_fn.from_op.name

@@ -1,7 +1,7 @@
 import typing
 import urllib
 
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
@@ -9,11 +9,14 @@ from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
+    make_root_op_gql_op_output_type,
 )
+
 from .. import errors
 
 # Section 1/6: Tag Getters
 # None
+
 
 # Section 2/6: Root Ops
 @op(
@@ -24,7 +27,7 @@ from .. import errors
 )
 def root_all_artifacts_gql_resolver(gql_result):
     return [
-        wdt.ArtifactCollection.from_gql(artifact_collection["node"])
+        wdt.ArtifactCollection.from_keys(artifact_collection["node"])
         for artifact_collection in gql_result["instance"]["artifacts_500"]["edges"]
     ]
 
@@ -48,6 +51,9 @@ def root_all_artifacts_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_artifacts_gql_resolver,
+        gql_op_output_type=make_root_op_gql_op_output_type(
+            "artifacts_500", lambda inputs: "", wdt.ArtifactCollectionType
+        ),
     ),
 )
 def root_all_artifacts():
@@ -131,13 +137,16 @@ gql_connection_op(
     {},
 )
 
+
 # Section 6/6: Non Standard Business Logic Ops
 @op(
     name="artifact-isPortfolio",
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "__typename"),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: "__typename",
+    ),
 )
 def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
-    return artifact.gql["__typename"] == "ArtifactPortfolio"
+    return artifact["__typename"] == "ArtifactPortfolio"
 
 
 @op(
@@ -153,15 +162,23 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
                 }}
             }}
         """,
+        gql_op_output_type=lambda inputs, input_type: types.optional(
+            wdt.ArtifactCollectionMembershipType.with_keys(
+                typing.cast(typing.Any, input_type)
+                .keys["artifactMemberships_first_1"]["edges"]
+                .object_type["node"]
+                .property_types
+            )
+        ),
     ),
 )
 def last_membership(
     artifact: wdt.ArtifactCollection,
 ) -> typing.Optional[wdt.ArtifactCollectionMembership]:
-    edges = artifact.gql["artifactMemberships_first_1"]["edges"]
+    edges = artifact["artifactMemberships_first_1"]["edges"]
     if len(edges) == 0:
         return None
-    return wdt.ArtifactCollectionMembership.from_gql(edges[0]["node"])
+    return wdt.ArtifactCollectionMembership.from_keys(edges[0]["node"])
 
 
 @op(
@@ -186,15 +203,15 @@ def last_membership(
 def link(
     artifact: wdt.ArtifactCollection,
 ) -> wdt.Link:
-    artifact_type = artifact.gql["defaultArtifactType"]
+    artifact_type = artifact["defaultArtifactType"]
     project = artifact_type["project"]
     entity = project["entity"]
     entity_name = entity["name"]
     project_name = project["name"]
     artifact_type_name = artifact_type["name"]
-    artifact_name = artifact.gql["name"]
+    artifact_name = artifact["name"]
     return wdt.Link(
-        artifact.gql["name"],
+        artifact["name"],
         f"/{entity_name}/{project_name}/artifacts/{urllib.parse.quote(artifact_type_name)}/{urllib.parse.quote(artifact_name)}",
     )
 
@@ -227,4 +244,4 @@ def link(
     ),
 )
 def raw_tags(artifact: wdt.ArtifactCollection):
-    return [n["node"] for n in artifact.gql["tags"]["edges"]]
+    return [n["node"] for n in artifact["tags"]["edges"]]
