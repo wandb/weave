@@ -145,7 +145,7 @@ export default defineConfig(({mode, command}) => {
           changeOrigin: true,
         },
         // General pattern matcher for static assets
-        '^.*/__frontend/(.*.js|.*.ico)': {
+        '^.*/__frontend/(.*.js|.*.ico|.*.js.map)': {
           target: 'http://localhost:9994',
           secure: false,
           changeOrigin: true,
