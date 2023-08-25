@@ -177,7 +177,6 @@ def _deserialize_node(
             parsed_node = graph.ConstNode(
                 types.TypeRegistry.type_from_dict(node["type"]),
                 parsed_fn_body_node,
-                _frozen=node.get("_frozen"),
             )
         else:
             parsed_node = graph.ConstNode.from_json(node)

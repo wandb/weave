@@ -166,17 +166,17 @@ class VarNode(Node):
 
 class ConstNode(Node):
     val: typing.Any
-    _frozen: typing.Optional[bool] = None
+    no_compile: bool = False
 
     def __init__(
         self,
         type: weave_types.Type,
         val: typing.Any,
-        _frozen: typing.Optional[bool] = None,
+        no_compile: bool = False,
     ) -> None:
         self.type = type
         self.val = val
-        self._frozen = _frozen
+        self.no_compile = no_compile
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
@@ -191,7 +191,7 @@ class ConstNode(Node):
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
 
-        return cls(t, val, obj.get("_frozen"))
+        return cls(t, val, obj.get("no_compile", False))
 
     def to_json(self) -> dict:
         val = storage.to_python(self.val)["_val"]  # type: ignore
@@ -202,8 +202,8 @@ class ConstNode(Node):
         # if isinstance(self.type, weave_types.Function):
         #     val = val.to_json()
         res = {"nodeType": "const", "type": self.type.to_dict(), "val": val}
-        if self._frozen is not None:
-            res["_frozen"] = self._frozen
+        if self.no_compile is not None:
+            res["no_compile"] = self.no_compile
         return res
 
 
@@ -298,7 +298,6 @@ def _map_nodes(
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
-    skip_static_lambdas: bool = False,
 ) -> Node:
     # This is an iterative implemenation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
@@ -326,13 +325,19 @@ def _map_nodes(
             walk_lambdas
             and isinstance(curr_node, ConstNode)
             and isinstance(curr_node.type, weave_types.Function)
-            and not curr_node._frozen
         ):
-            if curr_node.val not in already_mapped:
-                to_consider.append(curr_node.val)
-                continue
-            if curr_node.val is not already_mapped[curr_node.val]:
-                result_node = ConstNode(curr_node.type, already_mapped[curr_node.val])
+            # Sort of a hack... but if we are compiling, we don't want to walk into
+            # lambdas that are intended to be preserved exactly as they are.
+            from .compile import _is_compiling
+
+            if not (_is_compiling() and curr_node.no_compile):
+                if curr_node.val not in already_mapped:
+                    to_consider.append(curr_node.val)
+                    continue
+                if curr_node.val is not already_mapped[curr_node.val]:
+                    result_node = ConstNode(
+                        curr_node.type, already_mapped[curr_node.val]
+                    )
 
         to_consider.pop()
         mapped_node = map_fn(result_node)
@@ -369,16 +374,13 @@ def map_nodes_full(
     leaf_nodes: list[Node],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     on_error: OnErrorFnType = None,
-    skip_static_lambdas: bool = False,
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
     results: list[Node] = []
     for node_ndx, node in enumerate(leaf_nodes):
         try:
-            results.append(
-                _map_nodes(node, map_fn, already_mapped, True, skip_static_lambdas)
-            )
+            results.append(_map_nodes(node, map_fn, already_mapped, True))
         except Exception as e:
             if on_error:
                 results.append(on_error(node_ndx, e))

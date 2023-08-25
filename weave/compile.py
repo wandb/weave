@@ -83,8 +83,16 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     )
 
 
-def _quote_node(node: graph.Node) -> graph.Node:
-    return weave_internal.const(node)
+def _quote_node(node: graph.Node, into_node: graph.OutputNode) -> graph.Node:
+    # Special case for ops that want to preserve the exact user-defined node chain
+    from .panels_py import generator_templates
+
+    no_compile = into_node.from_op.name in [
+        spec.op_name
+        for spec in generator_templates.template_registry.get_specs().values()
+    ]
+
+    return weave_internal.const(node, no_compile=no_compile)
 
 
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
@@ -346,7 +354,8 @@ def _make_inverse_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
                 if callable(op_input_type):
                     continue
                 if isinstance(op_input_type, when_type):
-                    new_inputs[k] = call_op_fn(input_node)
+                    new_inputs[k] = call_op_fn(input_node, node)
+
             return graph.OutputNode(node.type, node.from_op.name, new_inputs)
         return None
 
@@ -594,7 +603,7 @@ def compile_node_ops(
     # Mission critical that we do not map into static lambdas. We do
     # not want to expand nodes that are meant by the caller to be interpreted
     # as their exact node.
-    return graph.map_nodes_full(nodes, _node_ops, on_error, True)
+    return graph.map_nodes_full(nodes, _node_ops, on_error)
 
 
 # This compile pass using the `top_level` mapper since we recurse manually. We can't use

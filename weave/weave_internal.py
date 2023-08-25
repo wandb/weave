@@ -90,17 +90,21 @@ def make_var_node(type_: types.Type, name: str) -> graph.VarNode:
     return dispatch.RuntimeVarNode(type_, name)
 
 
-def make_const_node(type_: types.Type, val: typing.Any) -> graph.ConstNode:
+def make_const_node(
+    type_: types.Type, val: typing.Any, no_compile: bool = False
+) -> graph.ConstNode:
     # Circular import. TODO: fix
     from . import dispatch
 
-    return dispatch.RuntimeConstNode(type_, val)
+    return dispatch.RuntimeConstNode(type_, val, no_compile)
 
 
-def const(val: typing.Any, type: typing.Optional[types.Type] = None) -> graph.ConstNode:
+def const(
+    val: typing.Any, type: typing.Optional[types.Type] = None, no_compile: bool = False
+) -> graph.ConstNode:
     if type is None:
         type = types.TypeRegistry.type_of(val)
-    return make_const_node(type, val)
+    return make_const_node(type, val, no_compile)
 
 
 def make_output_node(

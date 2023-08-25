@@ -106,7 +106,7 @@ def apply_domain_op_gql_translation(
                 },
             )
 
-    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error, True)
+    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error)
 
     combined_query_fragment = "\n".join(fragments)
     query_str = f"query WeavePythonCG {{ {combined_query_fragment} }}"
