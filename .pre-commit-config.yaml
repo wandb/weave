@@ -1,4 +1,3 @@
-default_install_hook_types: [pre-push]
 default_stages: [pre-push]
 
 repos:
