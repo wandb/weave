@@ -451,8 +451,9 @@ export const useSuggestionVisualState = ({
     trace(`SuggestionVisualState: showing`);
     element.style.opacity = '1';
 
-    const editorRootEl = ReactEditor.toDOMNode(editor, editor.children[0]);
-    computePosition(editorRootEl, element, {
+    const lastChild = editor.children[editor.children.length - 1];
+    const lastChildNode = ReactEditor.toDOMNode(editor, lastChild);
+    computePosition(lastChildNode, element, {
       placement: 'bottom-start',
       middleware: [
         offset(4),

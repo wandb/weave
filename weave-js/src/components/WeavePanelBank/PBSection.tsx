@@ -240,6 +240,7 @@ export const getSectionConfig = (
 const Sections = styled.div`
   ${SCROLLBAR_STYLES}
 `;
+Sections.displayName = 'S.Sections';
 
 const ActionBar = styled.div`
   height: 48px;
@@ -248,6 +249,7 @@ const ActionBar = styled.div`
   justify-content: flex-end;
   align-items: center;
 `;
+ActionBar.displayName = 'S.ActionBar';
 
 const AddPanelBar = styled.div`
   height: 48px;
@@ -260,6 +262,7 @@ const AddPanelBar = styled.div`
   font-weight: 600;
   color: ${GRAY_500};
 `;
+AddPanelBar.displayName = 'S.AddPanelBar';
 
 const AddPanelBarContainer = styled.div`
   padding: 8px 32px 16px;
@@ -269,12 +272,14 @@ const AddPanelBarContainer = styled.div`
     opacity: 0;
   }
 `;
+AddPanelBarContainer.displayName = 'S.AddPanelBarContainer';
 
 const IconAddNew = styled(IconAddNewUnstyled)<{$marginRight?: number}>`
   width: 18px;
   height: 18px;
   margin-right: ${p => p.$marginRight ?? 8}px;
 `;
+IconAddNew.displayName = 'S.IconAddNew';
 
 const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
   &&&&& {
@@ -299,3 +304,4 @@ const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
       `}
   }
 `;
+EditablePanel.displayName = 'S.EditablePanel';

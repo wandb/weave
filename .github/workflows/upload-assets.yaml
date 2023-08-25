@@ -2,6 +2,9 @@ name: upload-frontend-assets
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - master
 
 jobs:
   build-assets:
@@ -11,7 +14,7 @@ jobs:
     environment: 
       name: release
     permissions:
-      content: 'read'
+      contents: 'write'
       id-token: 'write'
     steps:
       - uses: actions/checkout@v3
@@ -23,7 +26,7 @@ jobs:
       - id: 'build'
         run: |
           ./weave/frontend/build.sh
-          if [[ -z "$(git status weave/frontent/sha1.txt --porcelain)" ]]
+          if [[ -z "$(git status weave/frontend/sha1.txt --porcelain)" ]]
           then
             echo "Frontend assets has not changed, skipping publishing"
             echo "UPLOAD_ASSETS=false" >> "$GITHUB_OUTPUT"
@@ -34,12 +37,18 @@ jobs:
           fi
       - id: 'auth'
         name: 'Authenticate to Google Cloud'
-        if: ${{ steps.build.outputs.UPLOAD_ASSETS }}
         uses: 'google-github-actions/auth@v1'
+        if: ${{ steps.build.outputs.UPLOAD_ASSETS == 'true' }}
         with:
           workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.WORKLOAD_SERVICE_ACCOUNT }}
-      - id: 'upload'
-        if: ${{ steps.build.outputs.UPLOAD_ASSETS }}
-        run: ./weave/frontend/bundle.sh
-
+          # the service account secret format is wrong, hard coding it until it is fixed in core
+          #service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
+          service_account: tf-github-ci-weave@wandb-production.iam.gserviceaccount.com
+      - id: 'upload-and-push'
+        if: ${{ steps.build.outputs.UPLOAD_ASSETS == 'true' }}
+        run: |
+          ./weave/frontend/bundle.sh
+          git config --global user.name 'Weave Build Bot'
+          git config --global user.email weave@wandb.com
+          git commit -a -m 'chore(bot): update frontend bundle sha [no ci]'
+          git push

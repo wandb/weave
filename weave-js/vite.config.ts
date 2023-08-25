@@ -116,12 +116,18 @@ export default defineConfig(({mode, command}) => {
           secure: false,
           changeOrigin: true,
         },
-        // This ensures our dynamic env.js file is served from the backend
+        // Dynamically generated env.js
         '^.*/__frontend/env.js': {
           target: 'http://localhost:9994',
           secure: false,
           changeOrigin: true,
-        }
+        },
+        // General pattern matcher for static assets
+        '^.*/__frontend/(.*.js|.*.ico)': {
+          target: 'http://localhost:9994',
+          secure: false,
+          changeOrigin: true,
+        },
       },
     },
     preview: {
