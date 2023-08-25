@@ -78,8 +78,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const addPanelBarRef = useRef<HTMLDivElement | null>(null);
 
   // On add panel, scroll to the new panel
-  const [shouldScrollToNewPanel, setShouldScrollToNewPanel] =
-    React.useState<boolean>(false);
+  const [shouldScrollToNewPanel, setShouldScrollToNewPanel] = useState(false);
   const handleAddPanel = useCallback(() => {
     addPanel?.();
     setShouldScrollToNewPanel(true);
