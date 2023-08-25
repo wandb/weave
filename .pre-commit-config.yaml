@@ -1,3 +1,6 @@
+default_install_hook_types: [pre-push]
+default_stages: [push]
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.0.275
