@@ -248,7 +248,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
         // Always ensure vars have correct types first. This is syncrhonoous.
-        let loadedPanel = updateExpressionVarTypes(panelQuery.result, stack);
+        const loadedPanel = updateExpressionVarTypes(panelQuery.result, stack);
 
         // Immediately render the document
         dispatch({
