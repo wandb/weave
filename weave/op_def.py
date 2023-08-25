@@ -328,6 +328,9 @@ class OpDef:
             return None
 
         refine_params = {k: graph.resolve_vars(n) for k, n in bound_params.items()}
+
+        # Turn this on to debug scenarios where we don't correctly refine during
+        # panel construction (will throw an error instead of letting it happen).
         # if refine_enabled():
         #     for arg_name, arg_node in refine_params.items():
         #         graph_vars = graph.expr_vars(arg_node)
