@@ -17,13 +17,17 @@ import {
   usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
+import {IconLockClosed} from '../Icon';
+import {Tooltip} from '../Tooltip';
 
 const OutlineItem = styled.div``;
+OutlineItem.displayName = 'S.OutlineItem';
 
 const OutlineItemMenuButton = styled(IconButton).attrs({small: true})`
   flex-shrink: 0;
   margin: 0 8px 0 4px;
 `;
+OutlineItemMenuButton.displayName = 'S.OutlineItemMenuButton';
 
 const OutlineItemTitle = styled.div<{level: number; panelIsHovered: boolean}>`
   display: flex;
@@ -48,6 +52,7 @@ const OutlineItemTitle = styled.div<{level: number; panelIsHovered: boolean}>`
     visibility: hidden;
   }
 `;
+OutlineItemTitle.displayName = 'S.OutlineItemTitle';
 
 const OutlineItemToggle = styled.div<{expanded: boolean}>`
   flex-shrink: 0;
@@ -63,18 +68,21 @@ const OutlineItemToggle = styled.div<{expanded: boolean}>`
     background-color: ${globals.GRAY_50};
   }
 `;
+OutlineItemToggle.displayName = 'S.OutlineItemToggle';
 
 const OutlineItemIcon = styled.div`
   flex-shrink: 0;
   display: flex;
   margin-right: 8px;
 `;
+OutlineItemIcon.displayName = 'S.OutlineItemIcon';
 
 const OutlineItemName = styled.div`
   flex-shrink: 0;
   max-width: 100px;
   overflow-wrap: break-word;
 `;
+OutlineItemName.displayName = 'S.OutlineItemName';
 
 const OutlineItemPanelID = styled.div`
   color: ${globals.GRAY_500};
@@ -86,20 +94,27 @@ const OutlineItemPanelID = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
 `;
+OutlineItemPanelID.displayName = 'S.OutlineItemPanelID';
 
 const iconStyles = css`
   height: 18px;
   width: 18px;
 `;
+
 const IconCaret = styled(IconCaretUnstyled)`
   ${iconStyles}
 `;
+IconCaret.displayName = 'S.IconCaret';
+
 const IconOverflowHorizontal = styled(IconOverflowHorizontalUnstyled)`
   ${iconStyles}
 `;
+IconOverflowHorizontal.displayName = 'S.IconOverflowHorizontal';
+
 const IconWeave = styled(IconWeaveUnstyled)`
   ${iconStyles}
 `;
+IconWeave.displayName = 'S.IconWeave';
 
 export type OutlinePanelProps = OutlineProps & {
   name: string;
@@ -181,7 +196,16 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
 
         <OutlineItemName>{name}</OutlineItemName>
         <OutlineItemPanelID>{curPanelId}</OutlineItemPanelID>
-        {!shouldHideMenu && (
+        {shouldHideMenu ? (
+          <Tooltip
+            content={`The ${name} panel is a structural component of the board and cannot be edited.`}
+            trigger={
+              <OutlineItemMenuButton>
+                <IconLockClosed />
+              </OutlineItemMenuButton>
+            }
+          />
+        ) : (
           <OutlineItemPopupMenu
             config={config}
             localConfig={localConfig}
@@ -251,3 +275,4 @@ export const Outline: React.FC<OutlineProps> = props => {
 const OutlineContainer = styled.div`
   padding: 8px 0;
 `;
+OutlineContainer.displayName = 'S.OutlineContainer';
