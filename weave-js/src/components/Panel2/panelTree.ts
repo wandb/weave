@@ -707,10 +707,10 @@ export const refineAllExpressions = async (
   const refined = await mapPanelsAsync(
     panel,
     stack,
-    async (panel: ChildPanelFullConfig, childStack: Stack) => {
+    async (p: ChildPanelFullConfig, childStack: Stack) => {
       const refinedInputNode = (await refineEditingNode(
         client,
-        panel.input_node,
+        p.input_node,
         childStack,
         refineCache
       )) as NodeOrVoidNode;
@@ -721,13 +721,13 @@ export const refineAllExpressions = async (
       //   when a string becomes Union<string, number>.
       // In either case, we need to make the update.
       if (
-        !isAssignableTo(panel.input_node.type, newInputNodeType) ||
-        !isAssignableTo(newInputNodeType, panel.input_node.type)
+        !isAssignableTo(p.input_node.type, newInputNodeType) ||
+        !isAssignableTo(newInputNodeType, p.input_node.type)
       ) {
         // we refined to a narrower type, so make the update
-        return {...panel, input_node: refinedInputNode};
+        return {...p, input_node: refinedInputNode};
       }
-      return panel;
+      return p;
 
       // A former attempt at hydration also initialized all the panels.
       // This is still more correct, but I haven't tried to get it fully working yet.
