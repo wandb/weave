@@ -17,6 +17,7 @@ class TableConfig:
     tableState: table_state.TableState
     rowSize: int = dataclasses.field(default_factory=lambda: 1)
     pinnedRows: dict[str, list[int]] = dataclasses.field(default_factory=dict)
+    pinnedColumns: list[str] = dataclasses.field(default_factory=list)
     activeRowForGrouping: dict[str, int] = dataclasses.field(default_factory=dict)
 
 
