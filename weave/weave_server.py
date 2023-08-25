@@ -381,13 +381,13 @@ def frontend(path):
 @blueprint.route("/<path:path>")
 def root_frontend(path):
     if request.args.get("unsetBetaVersion") is not None:
-        resp = redirect_without_qs_param("unsetBetaVersion")
+        resp = redirect_without_query_param("unsetBetaVersion")
         resp.set_cookie("betaVersion", "", max_age=0)
         return resp
 
     new_beta_version = request.args.get("betaVersion")
     if new_beta_version is not None:
-        resp = redirect_without_qs_param("betaVersion")
+        resp = redirect_without_query_param("betaVersion")
         resp.set_cookie("betaVersion", new_beta_version)
         return resp
 
@@ -411,7 +411,7 @@ def root_frontend(path):
     return send_from_directory(blueprint.static_folder, "index.html")
 
 
-def redirect_without_qs_param(param: str):
+def redirect_without_query_param(param: str):
     qs_pairs = []
     for k, v in request.args.items():
         if k != param:
