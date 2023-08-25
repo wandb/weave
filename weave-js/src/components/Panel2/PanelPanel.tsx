@@ -56,6 +56,7 @@ type PanelPanelProps = Panel2.PanelProps<
 interface State {
   dispatch: React.Dispatch<Action>;
   client: Client;
+  persist: (root: ChildPanelFullConfig) => void;
   root: ChildPanelFullConfig;
   inFlight: boolean;
   nextActions: Action[];
@@ -64,6 +65,7 @@ interface ActionInit {
   type: 'init';
   dispatch: React.Dispatch<Action>;
   client: Client;
+  persist: (root: ChildPanelFullConfig) => void;
   root: ChildPanelFullConfig;
 }
 
@@ -117,6 +119,7 @@ const panelRootReducer = (
         }, 1),
       client: action.client,
       root: action.root,
+      persist: action.persist,
       inFlight: false,
       nextActions: [],
     };
@@ -128,6 +131,10 @@ const panelRootReducer = (
   }
   switch (action.type) {
     case 'setConfig':
+      // Note: we don't persist here. This is used after our initial async refining
+      // at load time. We don't want to persist until the user makes a change for now
+      // as it causes extra churn. We could detect if anything meaningful changed
+      // and only persist if so.
       return produce(state, draft => {
         draft.root = action.newConfig;
         draft.inFlight = false;
@@ -177,6 +184,8 @@ const panelRootReducer = (
       if (nextActions.length > 0) {
         const nextAction = nextActions.splice(0, 1)[0];
         state.dispatch(nextAction);
+      } else {
+        state.persist(action.newConfig);
       }
       return produce(state, draft => {
         draft.root = action.newConfig;
@@ -229,14 +238,6 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     updateInput as any
   );
 
-  useEffect(() => {
-    // Mirror results to the server.
-    // We can put a debounce in here if this starts to seem bursty.
-    if (panelConfig) {
-      updateServerPanel(panelConfig);
-    }
-  }, [panelConfig, updateServerPanel]);
-
   // Unfortunately we currently do this twice, in parallel!
   // That happens because we render the Panel's regular render component
   // and its config component (hidden by the sidebar) in parallel.
@@ -256,6 +257,8 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
           dispatch,
           client: weave.client,
           root: loadedPanel,
+          persist: (newRoot: ChildPanelFullConfig) =>
+            updateServerPanel(newRoot),
         });
 
         // Asynchronously refine all the expressions in the document.
