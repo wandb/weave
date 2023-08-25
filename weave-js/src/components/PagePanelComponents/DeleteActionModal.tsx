@@ -25,16 +25,22 @@ export const DeleteActionModal = ({
       closeOnDimmerClick={false}
       size="small">
       <Modal.Content>
-        <M.Title>{`Are you sure you want to delete this ${deleteTypeString}?`}</M.Title>
+        <M.Title>
+          Are you sure you want to delete this {deleteTypeString}?
+        </M.Title>
         <M.Description>
-          {`Warning - this is a permanent action - it will break any links
-          referencing this ${deleteTypeString}.`}
+          Warning - this is a permanent action - it will break any links
+          referencing this {deleteTypeString}.
         </M.Description>
         <M.Buttons>
-          <Button disabled={acting} onClick={onDelete}>
+          <Button
+            variant="destructive"
+            size="large"
+            disabled={acting}
+            onClick={onDelete}>
             {`Delete ${deleteTypeString}`}
           </Button>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" size="large" onClick={onClose}>
             Cancel
           </Button>
         </M.Buttons>
