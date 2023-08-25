@@ -1,7 +1,7 @@
 -r requirements.txt
 types-requests>=2.28.11.8
 types-setuptools>=65.7.0.3
-pre-commit>=3.0.2
+pre-commit>=3.3.3
 black==22.3.0
 types-aiofiles>=22.1.0.6
 types-all>=1.0.0

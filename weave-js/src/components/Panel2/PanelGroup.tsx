@@ -45,7 +45,6 @@ import {
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
-// import {VarBar} from '../Sidebar/VarBar';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
 // import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';

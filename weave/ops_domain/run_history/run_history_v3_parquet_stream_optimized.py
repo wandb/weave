@@ -7,7 +7,7 @@ import pyarrow as pa
 
 from ... import artifact_fs
 from .context import get_error_on_non_vectorized_history_transform
-from ...compile_domain import wb_gql_op_plugin
+from ...gql_op_plugin import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
 from .. import trace_tree, wb_domain_types as wdt
@@ -22,11 +22,9 @@ from . import history_op_common
 from ... import artifact_base, io_service
 from .. import wbmedia
 from ...ops_domain.table import _patch_legacy_image_file_types
-from ...ops_arrow.list_ import (
-    PathItemType,
-    PathType,
-    weave_arrow_type_check,
-)
+from ...ops_arrow.list_ import weave_arrow_type_check, PathType, PathItemType
+from ... import gql_json_cache
+
 
 tracer = engine_trace.tracer()
 
@@ -138,9 +136,9 @@ def _get_history3(run: wdt.Run, columns=None):
     ]
 
     run_path = wb_util.RunPath(
-        run.gql["project"]["entity"]["name"],
-        run.gql["project"]["name"],
-        run.gql["name"],
+        run["project"]["entity"]["name"],
+        run["project"]["name"],
+        run["name"],
     )
     (
         live_columns,
@@ -522,11 +520,14 @@ def _drop_types_from_encoded_types(awl: ArrowWeaveList) -> ArrowWeaveList:
 
 
 def _get_live_data_from_run(run: wdt.Run, columns=None):
-    raw_live_data = run.gql["sampledParquetHistory"]["liveData"]
+    raw_live_data = run["sampledParquetHistory"]["liveData"]
     if columns is None:
         return raw_live_data
     column_set = set(columns)
-    return [{k: v for k, v in row.items() if k in column_set} for row in raw_live_data]
+    return [
+        {k: v for k, v in gql_json_cache.use_json(row).items() if k in column_set}
+        for row in raw_live_data
+    ]
 
 
 def _extract_column_from_live_data(live_data: list[dict], column_name: str):
@@ -577,7 +578,7 @@ def _read_raw_history_awl_tables(
 ) -> list[ArrowWeaveList]:
     io = io_service.get_sync_client()
     tables = []
-    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+    for url in run["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
