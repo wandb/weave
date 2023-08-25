@@ -237,6 +237,13 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     }
   }, [panelConfig, updateServerPanel]);
 
+  // Unfortunately we currently do this twice, in parallel!
+  // That happens because we render the Panel's regular render component
+  // and its config component (hidden by the sidebar) in parallel.
+  // Fortunately the Weave backend requests for these two parallel initializations
+  // are deduped.
+  // TODO: fix, this should really be the true UI root.
+
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
