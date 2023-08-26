@@ -88,6 +88,7 @@
     "rehype-raw": "^6.1.1",
     "rehype-sanitize": "^3.0.0",
     "rehype-stringify": "^9.0.2",
+    "reinspect": "^1.1.0",
     "remark-emoji": "^2.0.2",
     "remark-math": "^2.0.0",
     "remark-parse": "^7.0.1",
