@@ -252,7 +252,7 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
     const specWithFields = injectFields(spec, fieldRefs, userSettings);
     const withPatches = patchWBVegaSpec(specWithFields);
     return produce(withPatches, draft => {
-      draft.autosize = 'fit';
+      draft.autosize = {type: 'fit', contains: 'padding'};
     });
   }, [spec, userSettings]);
 
@@ -337,11 +337,6 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
   if (dimensions) {
     width = dimensions.width;
     height = dimensions.height;
-    if (vegaView) {
-      const padding = vegaView.padding() as any;
-      width -= padding.left + padding.right;
-      height -= padding.top + padding.bottom;
-    }
   }
 
   return (

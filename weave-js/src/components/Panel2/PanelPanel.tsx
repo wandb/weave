@@ -4,10 +4,12 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useReducer,
   useRef,
   useState,
 } from 'react';
+// Import from reinspect instead of react. This is the same as the react useReducer
+// but it hooks us up to redux devtools.
+import {useReducer} from 'reinspect';
 
 import _ from 'lodash';
 import {useWeaveContext} from '../../context';
@@ -159,6 +161,7 @@ const panelRootReducer = (
       return {
         ...state,
         inFlight: true,
+        root: action.newConfig,
       };
     case 'updateConfig2':
       if (state.inFlight) {
@@ -167,7 +170,7 @@ const panelRootReducer = (
         });
       }
       const configChanges = action.change(state.root);
-      const newConfig = produce(state, draft => {
+      const newConfig = produce(state.root, draft => {
         for (const key of Object.keys(configChanges)) {
           (draft as any)[key] = (configChanges as any)[key];
         }
@@ -176,6 +179,7 @@ const panelRootReducer = (
       return {
         ...state,
         inFlight: true,
+        root: newConfig,
       };
     // This is the end of the async update config flow. We set the new config
     // and dispatch the next queued action if there is one.
@@ -224,7 +228,12 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   const selectedPanel = useSelectedPath();
   const setSelectedPanel = useSetInspectingPanel();
   // const panelConfig = props.config;
-  const [state, dispatch] = useReducer(panelRootReducer, undefined);
+  const [state, dispatch] = useReducer(
+    panelRootReducer,
+    undefined,
+    () => undefined,
+    'PanelRoot'
+  );
   const initialLoading = state == null;
   const panelConfig = state?.root;
   const {stack} = usePanelContext();
