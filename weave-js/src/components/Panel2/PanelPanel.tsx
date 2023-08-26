@@ -301,6 +301,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     panelQuery.result,
     setPanelConfig,
     stack,
+    updateServerPanel,
     weave,
   ]);
   // useTraceUpdate('panelQuery', {
