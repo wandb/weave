@@ -1,9 +1,9 @@
 import './globalStyleImports';
 
 import React from 'react';
-import ReactDOM from 'react-dom';
 import {BrowserRouter as Router, Switch, Route} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
+import {createRoot} from 'react-dom/client';
 
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
@@ -64,7 +64,8 @@ const Main = ({browserType}: MainProps) => (
 );
 
 const basename = getConfig().PREFIX;
-ReactDOM.render(
+const root = createRoot(document.getElementById('root')!);
+root.render(
   <Router basename={basename}>
     <Switch>
       <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
@@ -86,6 +87,5 @@ ReactDOM.render(
         <Main />
       </Route>
     </Switch>
-  </Router>,
-  document.getElementById('root')
+  </Router>
 );
