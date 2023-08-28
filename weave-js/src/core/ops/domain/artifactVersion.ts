@@ -114,6 +114,22 @@ export const opArtifactVersionSize = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.size,
 });
 
+export const opArtifactVersionTTLDurationSeconds = makeArtifactVersionOp({
+  name: 'artifactVersion-ttlDurationSeconds',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns the original duration in seconds that a ${docType(
+    'artifactVersion'
+  )} is expected to live for before it gets deleted`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `The original duration in seconds that an ${docType(
+    'artifactVersion'
+  )} is expected to live for before it gets deleted`,
+  returnType: inputTypes => 'number',
+  resolver: ({artifactVersion}) => artifactVersion.ttlDurationSeconds,
+});
+
 export const opArtifactVersionCreatedAt = makeArtifactVersionOp({
   name: 'artifactVersion-createdAt',
   argTypes: artifactVersionArgTypes,
