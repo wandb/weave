@@ -94,8 +94,7 @@ def _is_lambda(node: graph.Node):
 
 @memo.memo
 def node_id(node: graph.Node):
-    # hashable = {"type": node.type.to_dict()}
-    hashable = {}
+    hashable: dict[str, typing.Any] = {}
     if isinstance(node, graph.OutputNode):
         hashable["op_name"] = node.from_op.name
         hashable["inputs"] = {
@@ -103,6 +102,8 @@ def node_id(node: graph.Node):
             for arg_name, arg_node in node.from_op.inputs.items()
         }
     elif isinstance(node, graph.VarNode):
+        # Must include type here, Const and OutputNode types can
+        # be inferred from the graph, but VarNode types cannot.
         hashable["type"] = node.type.to_dict()
         hashable["name"] = node.name
     elif isinstance(node, graph.ConstNode):
