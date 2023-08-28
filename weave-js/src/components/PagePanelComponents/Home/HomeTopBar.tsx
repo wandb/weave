@@ -7,7 +7,7 @@ export const HomeTopBar: React.FC = () => {
     <TopBar>
       <TopBarLeft>
         <WeaveLogo />
-        Weave
+        Weave Test HIIII
       </TopBarLeft>
     </TopBar>
   );
