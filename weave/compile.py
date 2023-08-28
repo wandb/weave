@@ -949,23 +949,18 @@ def _compile(
         # the expanded nodes.
         results = results.batch_map(_track_errors(compile_simple_optimizations))
 
-    import time
-
-    start_time = time.time()
-    print("PRE DEDUPE", results._items[0].unwrap())
-    pre_dedupe = results._items[0].unwrap()
+    # The node ops phase above can expand nodes, leading to new nodes in the graph
+    # that are potentially duplicates of others. dedupe will merge these nodes.
     with tracer.trace("compile:dedupe"):
         results = results.batch_map(_track_errors(compile_dedupe))
-    post_dedupe = results._items[0].unwrap()
-    print("POST DEDUPE", results._items[0].unwrap())
+
+    # Stitch is used in stages following this one. Stitch requires that lambdas
+    # are unique in memory if they are arguments to unique ops. We can receive
+    # graphs that violate this requirement, and dedupe will happily merge lambdas
+    # even if they are used in different ops. lambda_uniqueness pulls them back
+    # apart.
     with tracer.trace("compile:lambda_uniqueness"):
         results = results.batch_map(_track_errors(compile_lambda_uniqueness))
-
-    print("DEDUPE TIME", time.time() - start_time)
-
-    import sys
-
-    # sys.exit(1)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
