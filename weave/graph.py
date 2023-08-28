@@ -172,27 +172,9 @@ class VarNode(Node):
 class ConstNode(Node):
     val: typing.Any
 
-    # `_compile_time_literal` is a flag that is used at compile time to indicate
-    # to the compiler that we should not modify the internal value of this node.
-    # It is particularly used when the const node is a function and we want to
-    # preserve the function as-is. In the application, this is desireable for
-    # template generation. This is because we want to pass the literal function
-    # defined by the user to the generation function, as opposed to some
-    # arbitrary compiled representation of the function. Practically, we want a
-    # generation function to receive `get("stream_table").rows()``, not the
-    # compiled representation of that, which is something like
-    # `gqlroot-wbgqlquery(...).run(...).history3_with_columns().rows()`.
-    _compile_time_literal: typing.Optional[bool] = None
-
-    def __init__(
-        self,
-        type: weave_types.Type,
-        val: typing.Any,
-        _compile_time_literal: typing.Optional[bool] = None,
-    ) -> None:
+    def __init__(self, type: weave_types.Type, val: typing.Any) -> None:
         self.type = type
         self.val = val
-        self._compile_time_literal = _compile_time_literal
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
@@ -206,8 +188,7 @@ class ConstNode(Node):
         t = weave_types.TypeRegistry.type_from_dict(obj["type"])
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
-
-        return cls(t, val, obj.get("_compile_time_literal"))
+        return cls(t, val)
 
     def to_json(self) -> dict:
         val = storage.to_python(self.val)["_val"]  # type: ignore
@@ -217,10 +198,7 @@ class ConstNode(Node):
         # val = self.val
         # if isinstance(self.type, weave_types.Function):
         #     val = val.to_json()
-        res = {"nodeType": "const", "type": self.type.to_dict(), "val": val}
-        if self._compile_time_literal is not None and self._compile_time_literal:
-            res["_compile_time_literal"] = self._compile_time_literal
-        return res
+        return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
 
 class VoidNode(Node):
@@ -314,6 +292,7 @@ def _map_nodes(
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
+    skip_static_lambdas: bool = False,
 ) -> Node:
     # This is an iterative implemenation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
@@ -341,19 +320,13 @@ def _map_nodes(
             walk_lambdas
             and isinstance(curr_node, ConstNode)
             and isinstance(curr_node.type, weave_types.Function)
+            and (len(curr_node.type.input_types) > 0 or not skip_static_lambdas)
         ):
-            # Sort of a hack... but if we are compiling, we don't want to walk into
-            # lambdas that are intended to be preserved exactly as they are.
-            from .compile import _is_compiling
-
-            if not (_is_compiling() and curr_node._compile_time_literal):
-                if curr_node.val not in already_mapped:
-                    to_consider.append(curr_node.val)
-                    continue
-                if curr_node.val is not already_mapped[curr_node.val]:
-                    result_node = ConstNode(
-                        curr_node.type, already_mapped[curr_node.val]
-                    )
+            if curr_node.val not in already_mapped:
+                to_consider.append(curr_node.val)
+                continue
+            if curr_node.val is not already_mapped[curr_node.val]:
+                result_node = ConstNode(curr_node.type, already_mapped[curr_node.val])
 
         to_consider.pop()
         mapped_node = map_fn(result_node)
@@ -390,13 +363,16 @@ def map_nodes_full(
     leaf_nodes: list[Node],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     on_error: OnErrorFnType = None,
+    skip_static_lambdas: bool = False,
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
     results: list[Node] = []
     for node_ndx, node in enumerate(leaf_nodes):
         try:
-            results.append(_map_nodes(node, map_fn, already_mapped, True))
+            results.append(
+                _map_nodes(node, map_fn, already_mapped, True, skip_static_lambdas)
+            )
         except Exception as e:
             if on_error:
                 results.append(on_error(node_ndx, e))

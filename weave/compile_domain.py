@@ -78,7 +78,7 @@ def apply_domain_op_gql_translation(
                 },
             )
 
-    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error)
+    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error, True)
 
     combined_query_fragment = "\n".join(fragments)
     query_str = fragment_to_query(combined_query_fragment)
