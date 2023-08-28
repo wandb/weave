@@ -513,6 +513,7 @@ type Artifact {
   ): RunConnection!
   currentManifest: ArtifactManifest
   historyStep: Int64
+  ttlDurationSeconds: Int64!
 }
 
 type ArtifactManifestConnection {
