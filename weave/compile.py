@@ -417,7 +417,7 @@ def compile_apply_column_pushdown(
 def compile_dedupe(
     leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
 ) -> list[graph.Node]:
-    nodes = {}
+    nodes: dict[str, graph.Node] = {}
 
     def _dedupe(node: graph.Node) -> graph.Node:
         from . import serialize
@@ -774,33 +774,6 @@ def compile_refine_and_propagate_gql(
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
-def compile_merge_by_node_id(
-    nodes: typing.List[graph.Node],
-    on_error: graph.OnErrorFnType = None,
-) -> typing.List[graph.Node]:
-    seen_nodes: dict[str, graph.Node] = {}
-
-    def _merge_by_node_id(node: graph.Node) -> graph.Node:
-        try:
-            nid = serialize.node_id(node)
-        except TypeError:
-            nid = str(random.random())
-        if nid in seen_nodes:
-            return seen_nodes[nid]
-        if isinstance(node, graph.OutputNode):
-            node = dispatch.RuntimeOutputNode(
-                node.type, node.from_op.name, node.from_op.inputs
-            )
-        elif isinstance(node, graph.VarNode):
-            node = dispatch.RuntimeVarNode(node.type, node.name)
-        elif isinstance(node, graph.ConstNode):
-            node = dispatch.RuntimeConstNode(node.type, node.val)
-        seen_nodes[nid] = node
-        return node
-
-    return graph.map_nodes_full(nodes, _merge_by_node_id, on_error)
-
-
 def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     if not isinstance(node, graph.OutputNode):
         return None
@@ -828,13 +801,8 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     # by deserialize/compile yet.
     new_node_fixed_calls = compile_fix_calls([new_node])[0]
 
-    # This last line dedupes nodes that are identical. But it doesn't
-    # globally dedupe against the graph we've already compiled.
-    # There is still some duplication left in Weave execution...
-    new_node_merged = compile_merge_by_node_id([new_node_fixed_calls])[0]
-
     # Do it again to handle nested calls
-    return compile_node_ops([new_node_merged])[0]
+    return compile_node_ops([new_node_fixed_calls])[0]
 
 
 def compile_node_ops(
@@ -1047,7 +1015,7 @@ def _is_compiling() -> bool:
 
 
 @contextlib.contextmanager
-def _compiling():
+def disable_compile():
     token = _compile_disabled.set(True)
     try:
         yield
@@ -1076,5 +1044,5 @@ def compile(
     # graph.
     if _is_compiling():
         return value_or_error.ValueOrErrors.from_values(nodes)
-    with _compiling():
+    with disable_compile():
         return _compile(nodes)

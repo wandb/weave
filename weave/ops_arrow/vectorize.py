@@ -609,7 +609,7 @@ def _call_and_ensure_awl(
 ) -> ArrowWeaveList:
     from .. import compile
 
-    with compile._compiling():
+    with compile.disable_compile():
         res = use(called)
     # Since it is possible that the result of `use` bails out of arrow due to a
     # mismatch in the types / op support. This is most likely due to gap in the
