@@ -35,6 +35,7 @@ def should_flow_tags(op_def: "OpDef.OpDef") -> bool:
         not op_def_consumes_tags(op_def)
         and len(named_args) > 0
         and not isinstance(named_args[0].type, types.Function)
+        and not op_def.name.endswith("dropTags")
     )
 
 
