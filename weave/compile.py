@@ -90,15 +90,7 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
 
 
 def _quote_node(node: graph.Node, into_node: graph.OutputNode) -> graph.Node:
-    # Special case for ops that want to preserve the exact user-defined node chain
-    from .panels_py import generator_templates
-
-    compile_time_literal = into_node.from_op.name in [
-        spec.op_name
-        for spec in generator_templates.template_registry.get_specs().values()
-    ]
-
-    return weave_internal.const(node, _compile_time_literal=compile_time_literal)
+    return weave_internal.const(node)
 
 
 def _remove_optional(t: types.Type) -> types.Type:
@@ -334,7 +326,7 @@ def _make_inverse_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
                 if callable(op_input_type):
                     continue
                 if isinstance(op_input_type, when_type):
-                    new_inputs[k] = call_op_fn(input_node, node)
+                    new_inputs[k] = call_op_fn(input_node)
 
             return graph.OutputNode(node.type, node.from_op.name, new_inputs)
         return None

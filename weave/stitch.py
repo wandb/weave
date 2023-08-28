@@ -140,12 +140,20 @@ def stitch(
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
             sg.add_result(node, stitch_node(node, input_dict, sg))
         elif isinstance(node, graph.ConstNode):
-            is_static_lambda = (
-                isinstance(node.type, types.Function)
-                and len(node.type.input_types) == 0
-            )
-            if is_static_lambda:
-                sg.add_result(node, subgraph_stitch(node.val, {}, sg))
+            # Note from Tim: I believe this block of code should be correct (ie. stitching inside
+            # of static lambdas). I wrote it while implementing a fix but it ended up not being needed.
+            # Stitch is a particularly touchy part of the code base. So i would rather leave this
+            # code commented out for now, but not delete it. My gut tells me that any static lambda
+            # will be re-executed if needed and therefore re-stitched. And furthermore, any caller
+            # of stitch right now (eg. gql compile) should explicitly NOT mutate static lambdas. So
+            # it might be a foot-gun to allow this code to run, even if it is correct. Let's find a
+            # use case for this code before we uncomment it.
+            # is_static_lambda = (
+            #     isinstance(node.type, types.Function)
+            #     and len(node.type.input_types) == 0
+            # )
+            # if is_static_lambda:
+            #     sg.add_result(node, subgraph_stitch(node.val, {}, sg))
             sg.add_result(node, ObjectRecorder(node, val=node.val))
         elif isinstance(node, graph.VarNode):
             if var_values and node.name in var_values:

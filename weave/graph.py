@@ -172,27 +172,9 @@ class VarNode(Node):
 class ConstNode(Node):
     val: typing.Any
 
-    # `_compile_time_literal` is a flag that is used at compile time to indicate
-    # to the compiler that we should not modify the internal value of this node.
-    # It is particularly used when the const node is a function and we want to
-    # preserve the function as-is. In the application, this is desireable for
-    # template generation. This is because we want to pass the literal function
-    # defined by the user to the generation function, as opposed to some
-    # arbitrary compiled representation of the function. Practically, we want a
-    # generation function to receive `get("stream_table").rows()``, not the
-    # compiled representation of that, which is something like
-    # `gqlroot-wbgqlquery(...).run(...).history3_with_columns().rows()`.
-    _compile_time_literal: typing.Optional[bool] = None
-
-    def __init__(
-        self,
-        type: weave_types.Type,
-        val: typing.Any,
-        _compile_time_literal: typing.Optional[bool] = None,
-    ) -> None:
+    def __init__(self, type: weave_types.Type, val: typing.Any) -> None:
         self.type = type
         self.val = val
-        self._compile_time_literal = _compile_time_literal
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
@@ -207,7 +189,7 @@ class ConstNode(Node):
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
 
-        return cls(t, val, obj.get("_compile_time_literal"))
+        return cls(t, val)
 
     def to_json(self) -> dict:
         val = storage.to_python(self.val)["_val"]  # type: ignore
@@ -217,10 +199,7 @@ class ConstNode(Node):
         # val = self.val
         # if isinstance(self.type, weave_types.Function):
         #     val = val.to_json()
-        res = {"nodeType": "const", "type": self.type.to_dict(), "val": val}
-        if self._compile_time_literal is not None and self._compile_time_literal:
-            res["_compile_time_literal"] = self._compile_time_literal
-        return res
+        return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
 
 class VoidNode(Node):
@@ -342,11 +321,8 @@ def _map_nodes(
             and isinstance(curr_node, ConstNode)
             and isinstance(curr_node.type, weave_types.Function)
         ):
-            # Sort of a hack... but if we are compiling, we don't want to walk into
-            # lambdas that are intended to be preserved exactly as they are.
-            from .compile import _is_compiling
-
-            if not (_is_compiling() and curr_node._compile_time_literal):
+            is_static_lambda = len(curr_node.type.input_types) == 0
+            if not is_static_lambda:
                 if curr_node.val not in already_mapped:
                     to_consider.append(curr_node.val)
                     continue
