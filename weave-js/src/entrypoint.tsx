@@ -3,7 +3,7 @@ import './globalStyleImports';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import {BrowserRouter as Router, Switch, Route} from 'react-router-dom';
-
+import {StateInspector} from 'reinspect';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
@@ -54,7 +54,9 @@ const Main = ({browserType}: MainProps) => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
-        <PagePanel browserType={browserType} />
+        <StateInspector name="WeaveApp">
+          <PagePanel browserType={browserType} />
+        </StateInspector>
       </NotebookComputeGraphContextProvider>
     </ErrorBoundary>
   </React.Suspense>

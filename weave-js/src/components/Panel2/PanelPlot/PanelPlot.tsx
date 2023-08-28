@@ -3553,7 +3553,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           )}
           <div
             data-test-weave-id="plot"
-            style={{width: '100%', height: '100%'}}>
+            // Use overflow hidden so we don't get scrollbars during resizing,
+            // which cause measurement changes and flashes.
+            style={{width: '100%', height: '100%', overflow: 'hidden'}}>
             {toolTipsEnabled && (
               <Portal>
                 <div

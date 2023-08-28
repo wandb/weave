@@ -20,7 +20,7 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
 import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
@@ -67,19 +67,6 @@ export const nodeIsValidList = (
   return isListLike(nonMaybeType) && listObjectType(nonMaybeType) !== 'invalid';
 };
 
-// useLoadOnce returns true only for the first loading state, and false thereafter
-function useLoadOnce(isLoading: boolean) {
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
-  useEffect(() => {
-    if (isLoading && !hasLoadedOnce) {
-      setHasLoadedOnce(true);
-    }
-  }, [hasLoadedOnce, isLoading]);
-
-  return {hasLoadedOnce};
-}
-
 export const useAutomatedTableState = (
   input: Node,
   currentTableState: Table.TableState | undefined,
@@ -100,14 +87,11 @@ export const useAutomatedTableState = (
       ? autoTable
       : currentTableState;
 
-  const {loading, result: state} = useTableStateWithRefinedExpressions(
-    tableState,
-    input,
-    stack,
-    weave
-  );
-
-  const {hasLoadedOnce} = useLoadOnce(loading);
+  const {
+    initialLoading,
+    loading,
+    result: state,
+  } = useTableStateWithRefinedExpressions(tableState, input, stack, weave);
 
   const tableIsDefault = useMemo(() => {
     return (
@@ -119,12 +103,12 @@ export const useAutomatedTableState = (
   return React.useMemo(
     () => ({
       loading,
-      hasLoadedOnce,
+      hasLoadedOnce: !initialLoading,
       tableState: state,
       autoTable,
       tableIsDefault,
     }),
-    [loading, hasLoadedOnce, state, autoTable, tableIsDefault]
+    [loading, initialLoading, state, autoTable, tableIsDefault]
   );
 };
 

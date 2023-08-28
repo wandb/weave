@@ -109,6 +109,15 @@ def const(
     return make_const_node(type, val, _compile_time_literal)
 
 
+def make_var_for_value(v: typing.Any, name: str) -> graph.VarNode:
+    """Make a VarNode whose value is v."""
+    if not isinstance(v, graph.Node):
+        v = const(v)
+    new_var = make_var_node(v.type, name)
+    new_var._var_val = v
+    return new_var
+
+
 def make_output_node(
     type_: types.Type, op_name: str, op_params: dict[str, graph.Node]
 ) -> graph.OutputNode:
@@ -124,7 +133,10 @@ def define_fn(
 ) -> graph.ConstNode:
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
     try:
-        fnNode = body(*var_nodes)
+        from . import op_def
+
+        with op_def.no_refine():
+            fnNode = body(*var_nodes)
     except errors.WeaveExpectedConstError as e:
         raise errors.WeaveMakeFunctionError("function body expected const node.")
     if not isinstance(fnNode, graph.Node):

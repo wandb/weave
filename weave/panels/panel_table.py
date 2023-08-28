@@ -325,12 +325,17 @@ def data_refine(self: Table) -> weave.types.Type:
 
 @weave.op(name="panel_table-data_single_refine", hidden=True)
 def data_single_refine(self: Table) -> weave.types.Type:
-    if not hasattr(self.input_node.type, "object_type"):
+    self_input_node_type = self.input_node.type
+    # TODO: not sure why I need to defunction the type in the panel
+    # construction case, but not when this is called from JS
+    if isinstance(self_input_node_type, weave.types.Function):
+        self_input_node_type = self_input_node_type.output_type
+    if not hasattr(self_input_node_type, "object_type"):
         return weave.types.Any()
     # input_node.type should be FunctionType (since its a Node)
     # but for some reason its not.
     # TODO: fix
-    return weave.types.optional(self.input_node.type.object_type)  # type: ignore
+    return weave.types.optional(self_input_node_type.object_type)  # type: ignore
 
 
 # TODO: keep type in arrow

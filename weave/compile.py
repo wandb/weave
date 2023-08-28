@@ -143,7 +143,21 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         # new op's `unrefined_output_type_for_params` output type - rather than
         # blindly trusting the client type.
         if not node.from_op.name.startswith("local-artifact://") and (
-            node.from_op.name != op.name
+            # Why do we have to whitelist ops? Because we may have changed the input
+            # types to, e.g. dict, which pass their inputs types through to their output
+            # This solution doesn't feel generic, but it solves the boostrapping refinement
+            # case on the LLM monitoring board. We refine all input nodes in the document.
+            # Some of the refinement, like opMap, happens on the client side, rewriting the
+            # type to be a regular list instead of ArrowWeaveList. When we get back here
+            # to Python, we need that type to be ArrowWeaveList so it can be passed to withColumns.
+            # If we don't whitelist dict and list, we'll pass the client type through here, which
+            # is List, which will cause a dispatch error when we go to dispatch withColumns
+            node.from_op.name == "dict"
+            or node.from_op.name == "list"
+            # We have to do this check because we do want to trust the client types in
+            # many cases, like we have a get() that has already been refined. If we overwrite
+            # that type here it would be "Any" and we won't be able to dispatch the next op.
+            or node.from_op.name != op.name
         ):
             output_type = op.unrefined_output_type_for_params(params)
 

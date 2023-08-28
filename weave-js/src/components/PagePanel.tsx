@@ -45,7 +45,7 @@ import {
   useEditorIsOpen,
   useSetInspectingPanel,
 } from './Panel2/PanelInteractContext';
-import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
+import {useUpdateServerPanel} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import Inspector from './Sidebar/Inspector';
 import {useWeaveAutomation} from './automation';
@@ -601,7 +601,7 @@ const JupyterPageControls: React.FC<
     },
     [props]
   );
-  const updateConfigForPanelNode = useUpdateConfigForPanelNode(
+  const updateConfigForPanelNode = useUpdateServerPanel(
     props.config.input_node,
     updateInput
   );

@@ -152,6 +152,11 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
 class VarNode(Node):
     name: str
 
+    # This is used to store the value node that the var is pointing at.
+    # Used when constructing panels to track var values so we can correctly
+    # perform refinement.
+    _var_val: typing.Optional["Node"] = None
+
     def __init__(self, type: weave_types.Type, name: str) -> None:
         self.type = type
         self.name = name
@@ -441,6 +446,18 @@ def expr_vars(node: Node) -> list[VarNode]:
     return typing.cast(
         list[VarNode], filter_nodes_top_level([node], lambda n: isinstance(n, VarNode))
     )
+
+
+def resolve_vars(node: Node) -> Node:
+    """Replace all VarNodes with the value they point to."""
+
+    def _replace_var_with_val(n: Node) -> typing.Optional[Node]:
+        if isinstance(n, VarNode) and hasattr(n, "_var_val") and n._var_val is not None:
+            # Recursively replace vars in the value node.
+            return resolve_vars(n._var_val)
+        return None
+
+    return map_nodes_full([node], _replace_var_with_val)[0]
 
 
 def is_open(node: Node) -> bool:
