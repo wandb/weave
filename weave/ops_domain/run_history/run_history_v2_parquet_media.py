@@ -84,7 +84,7 @@ def _get_history2(run: wdt.Run, columns=None):
     _history_type = types.List(_object_type)
 
     run_path = wb_util.RunPath(
-        run["project"]["entity"]["name"],
+        run["project"]["entity"]["name"],   
         run["project"]["name"],
         run["name"],
     )
