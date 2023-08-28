@@ -414,6 +414,23 @@ def compile_apply_column_pushdown(
     return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown, on_error)
 
 
+def compile_dedupe(
+    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
+) -> list[graph.Node]:
+    nodes = {}
+
+    def _dedupe(node: graph.Node) -> graph.Node:
+        from . import serialize
+
+        node_id = serialize.node_id(node)
+        if node_id in nodes:
+            return nodes[node_id]
+        nodes[node_id] = node
+        return node
+
+    return graph.map_nodes_full(leaf_nodes, _dedupe, on_error)
+
+
 def compile_fix_calls(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
@@ -917,9 +934,6 @@ def _compile(
     with tracer.trace("compile:fix_calls"):
         results = results.batch_map(_track_errors(compile_fix_calls))
 
-    with tracer.trace("compile:lambda_uniqueness"):
-        results = results.batch_map(_track_errors(compile_lambda_uniqueness))
-
     # Auto-transforms, where we insert operations to convert between types
     # as needed.
     # TODO: is it ok to have this before final refine?
@@ -966,6 +980,24 @@ def _compile(
         # Simple Optimizations should happen after `node_ops` to ensure we operate on
         # the expanded nodes.
         results = results.batch_map(_track_errors(compile_simple_optimizations))
+
+    import time
+
+    start_time = time.time()
+    print("PRE DEDUPE", results._items[0].unwrap())
+    pre_dedupe = results._items[0].unwrap()
+    with tracer.trace("compile:dedupe"):
+        results = results.batch_map(_track_errors(compile_dedupe))
+    post_dedupe = results._items[0].unwrap()
+    print("POST DEDUPE", results._items[0].unwrap())
+    with tracer.trace("compile:lambda_uniqueness"):
+        results = results.batch_map(_track_errors(compile_lambda_uniqueness))
+
+    print("DEDUPE TIME", time.time() - start_time)
+
+    import sys
+
+    # sys.exit(1)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
