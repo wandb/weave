@@ -89,7 +89,7 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     )
 
 
-def _quote_node(node: graph.Node, into_node: graph.OutputNode) -> graph.Node:
+def _quote_node(node: graph.Node) -> graph.Node:
     return weave_internal.const(node)
 
 
