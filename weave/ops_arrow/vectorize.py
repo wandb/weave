@@ -677,9 +677,6 @@ def _ensure_variadic_fn(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    import time
-
-    start_time = time.time()
     logging.info("Vectorizing: %s", fn)
     from .. import execute_fast
 
@@ -690,9 +687,4 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
     logging.info("Vectorizing. Vectorized: %s", vecced)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
-    vec_time = time.time()
-    # print("CALLED ", called)
-    res = _call_and_ensure_awl(awl, called)
-    res_time = time.time()
-    print("VEC TIMES", vec_time - start_time, res_time - vec_time)
-    return res
+    return _call_and_ensure_awl(awl, called)
