@@ -169,9 +169,11 @@ def fake_wandb():
 @pytest.fixture()
 def use_server_gql_schema():
     old_schema_path = environment.gql_schema_path()
-    del os.environ["WEAVE_GQL_SCHEMA_PATH"]
+    if old_schema_path is not None:
+        del os.environ["WEAVE_GQL_SCHEMA_PATH"]
     yield
-    os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path or ""
+    if old_schema_path is not None:
+        os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path
 
 
 @pytest.fixture()
