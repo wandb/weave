@@ -199,8 +199,22 @@ export const useWeaveExpressionState = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [externalState, setExternalState] =
+  const [externalState, setExternalStateUnsafe] =
     React.useState<WeaveExpressionState>(internalState);
+
+  const isMounted = React.useRef(true);
+
+  React.useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, [])
+
+  const setExternalState = React.useCallback<typeof setExternalStateUnsafe>((args) => {
+    if (isMounted.current) {
+      setExternalStateUnsafe(args);
+    }
+  }, [])
 
   const onChange = React.useCallback(
     (newValue: SlateNode[], newStack: Stack) => {

@@ -253,7 +253,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   // Fortunately the Weave backend requests for these two parallel initializations
   // are deduped.
   // TODO: fix, this should really be the true UI root.
-
+  const isMounted = useRef(true);
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
       const doLoad = async () => {
@@ -296,14 +296,18 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         // console.log('ORIG', loadedPanel);
         // console.log('REFINED', refined);
         // console.log('DIFF', difference(loadedPanel, refined));
-        dispatch({type: 'setConfig', newConfig: refined});
+        if (isMounted.current) {
+          dispatch({type: 'setConfig', newConfig: refined});
+        }
       };
       if (!loaded.current) {
         loaded.current = true;
         doLoad();
       }
-      return;
     }
+    return () => {
+      isMounted.current = false;
+    };
   }, [
     initialLoading,
     panelQuery.loading,
