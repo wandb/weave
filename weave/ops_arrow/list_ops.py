@@ -981,6 +981,7 @@ def _drop_tags_output_type(input_type):
     name="ArrowWeaveList-dropTags",
     input_type={"arr": ArrowWeaveListType()},
     output_type=_drop_tags_output_type,
+    hidden=True,
 )
 def drop_tags(arr):
     return arr.without_tags()
