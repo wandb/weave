@@ -1,4 +1,5 @@
 import * as Op from '@wandb/weave/core';
+import {isFile, taggableValue} from '@wandb/weave/core';
 import numeral from 'numeral';
 import Prism from 'prismjs';
 import React, {useEffect, useMemo, useRef} from 'react';
@@ -23,9 +24,9 @@ const PanelFileTextRenderInner: React.FC<PanelFileTextProps> = props => {
   });
 
   const fileNode = props.input;
-  const unwrappedType = Op.taggableValue(fileNode.type);
+  const unwrappedType = taggableValue(fileNode.type);
   const fileExtension =
-    Op.isFile(unwrappedType) && unwrappedType.extension
+    isFile(unwrappedType) && unwrappedType.extension
       ? unwrappedType.extension
       : '';
 
