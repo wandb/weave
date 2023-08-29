@@ -208,13 +208,16 @@ export const useWeaveExpressionState = (
     return () => {
       isMounted.current = false;
     };
-  }, [])
+  }, []);
 
-  const setExternalState = React.useCallback<typeof setExternalStateUnsafe>((args) => {
-    if (isMounted.current) {
-      setExternalStateUnsafe(args);
-    }
-  }, [])
+  const setExternalState = React.useCallback<typeof setExternalStateUnsafe>(
+    args => {
+      if (isMounted.current) {
+        setExternalStateUnsafe(args);
+      }
+    },
+    []
+  );
 
   const onChange = React.useCallback(
     (newValue: SlateNode[], newStack: Stack) => {

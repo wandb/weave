@@ -78,7 +78,7 @@ export const useIsAuthenticated = (skip: boolean = false) => {
 
     return () => {
       isMounted.current = false;
-    }
+    };
   }, [anonApiKey, skip]);
   return isAuth;
 };
