@@ -90,6 +90,11 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
 
 
 def _quote_node(node: graph.Node) -> graph.Node:
+    if isinstance(node, graph.OutputNode):
+        compiled_node = _compile([node])[0]
+        node = weave_internal.make_output_node(
+            compiled_node.type, node.from_op.name, node.from_op.inputs
+        )
     return weave_internal.const(node)
 
 
@@ -113,16 +118,35 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             # TODO: does this work for mapped case?
             return node
         from_op = node.from_op
+        op = None
         try:
             op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
         except errors.WeaveDispatchError as e:
-            if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
-                raise errors.WeaveBadRequest(
-                    "Error while dispatching (no refine phase): %s. This is most likely a client error"
-                    % from_op.name
-                )
-            else:
-                raise
+            # With the new DashUI implementation, we are not allowed to refine
+            # nodes on the client. As a result, it is perfectly possible to
+            # construct a graph manually (as is done when generating a template
+            # from a table) where the nodes are under-typed. The result of this
+            # is that we will fail to dispatch in this phase which short
+            # circuits and errors early. This call to
+            # `registry_mem.memory_registry.get_op(node.from_op.name)` is a
+            # last-resort that blindly accepts the op by name (trusting that the
+            # developer client-side constructed a good graph). Importantly, if
+            # this is an invalid assumption, and the graph is truly incorrect,
+            # the error will be thrown in the `compile_refine_and_propagate_gql`
+            # step. This just permits the compilation to continue, given that
+            # the above circumstance happens more frequently now.
+            try:
+                op = registry_mem.memory_registry.get_op(node.from_op.name)
+            except errors.WeaveInternalError:
+                pass
+            if op is None:
+                if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
+                    raise errors.WeaveBadRequest(
+                        "Error while dispatching (no refine phase): %s. This is most likely a client error"
+                        % from_op.name
+                    )
+                else:
+                    raise
 
         params = from_op.inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
