@@ -4,6 +4,20 @@
 // If we do depend on current config state, everything in the UI will re-render
 // all the time, because everything depends on stack.
 
+// *Group configuration*
+// There are a bunch of options to Group that have been tacked on as we've developed. We'll
+// want to go through and clean up / migrate the config state once this stabilizes.
+// Here is the current design:
+//   - Group has a layoutMode which can be one of LAYOUT_MODES
+//   - enableAddPanel is used to mean "editable". This enables the add panel button or buttons
+//     (which are rendered in different places depending on layoutMode), as well as the edit
+//     controls on ChildPanel. We do not actually use it to lock the panel yet, so you can
+//     still go in the Editor and add children etc.
+//     TODO: We should expose this state as an editable field in the Editor, and disallow
+//       adding and removing children when it is True.
+//   - Otherwise we determine how to render the ControlBar (top bar) on ChildPanels, based
+//     on the current layoutMode.
+
 import {
   constNodeUnsafe,
   dereferenceAllVars,
@@ -35,7 +49,7 @@ import {
 } from './ChildPanel';
 import * as ConfigPanel from './ConfigPanel';
 import {IconAddNew as IconAddNewUnstyled} from './Icons';
-import {LayoutSections} from './LayoutSections';
+// import {LayoutSections} from './LayoutSections';
 import {LayoutTabs} from './LayoutTabs';
 import * as Panel2 from './panel';
 import {
@@ -63,7 +77,8 @@ const LAYOUT_MODES = [
   'grid' as const,
   'flow' as const,
   'tab' as const,
-  'section' as const,
+  // This is not very nice yet and may not be necessary.
+  // 'section' as const,
   'layer' as const,
 ];
 
@@ -71,14 +86,34 @@ interface PanelInfo {
   hidden?: boolean;
 }
 export interface PanelGroupConfig {
+  // Determines how to lay out children, and also how to render each child's ControlBar
+  // (ie whether ControlBar is off, or show's the title only, or a fully editable var name, panel
+  // id, and expression).
   layoutMode: (typeof LAYOUT_MODES)[number];
+  // Determines if we use equal sizing for horizontal and vertical layouts.
   equalSize?: boolean;
+
+  // This is totally ignored now!
   showExpressions?: boolean | 'titleBar';
+  // Applied to some children, a hack that lets us configure width of the VarBar in a horizontal
+  // layout.
+  // TODO: need to make this parameterized instead.
   style?: string;
+  // Children
   items: {[key: string]: ChildPanelConfig};
+  // Should stick panel specific information here.
   panelInfo?: {[key: string]: PanelInfo};
+  // Grid and Flow layout information.
   gridConfig: PanelBankSectionConfig;
+
+  // Specifies which panels are allowed to be chosen by the panel picker for children of this
+  // group. This is only used to restrict the VarBar to controls.
+  // TODO: remove this! It is really annoying that this is part of the board state. We have to
+  // keep it synchronized for new board creation in panelTree.ts and panel_board.py.
+  // We should probably hardcode the allowed panels just for the varbar instead.
   allowedPanels?: string[];
+
+  // This actually means "editable"
   enableAddPanel?: boolean;
   childNameBase?: string;
 }
@@ -86,6 +121,8 @@ export interface PanelGroupConfig {
 export const PANEL_GROUP_DEFAULT_CONFIG = (): PanelGroupConfig => ({
   layoutMode: 'vertical',
   equalSize: true,
+
+  // This is totally ignored now!
   showExpressions: true,
   items: {},
   gridConfig: getSectionConfig([], undefined),
@@ -645,8 +682,8 @@ export const PanelGroupItem: React.FC<{
     controlBar = 'off';
   } else if (
     config.layoutMode === 'vertical' ||
-    config.layoutMode === 'horizontal' ||
-    config.layoutMode === 'section'
+    config.layoutMode === 'horizontal'
+    // config.layoutMode === 'section'
   ) {
     controlBar = 'titleBar';
   } else if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
@@ -897,17 +934,17 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     );
   }
 
-  if (config.layoutMode === 'section') {
-    const sectionNames = Object.keys(config.items);
-    return (
-      <div>
-        <LayoutSections
-          sectionNames={sectionNames}
-          renderPanel={renderSectionPanel}
-        />
-      </div>
-    );
-  }
+  // if (config.layoutMode === 'section') {
+  //   const sectionNames = Object.keys(config.items);
+  //   return (
+  //     <div>
+  //       <LayoutSections
+  //         sectionNames={sectionNames}
+  //         renderPanel={renderSectionPanel}
+  //       />
+  //     </div>
+  //   );
+  // }
 
   return (
     <Group
