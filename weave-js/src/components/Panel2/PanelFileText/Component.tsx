@@ -23,7 +23,11 @@ const PanelFileTextRenderInner: React.FC<PanelFileTextProps> = props => {
   });
 
   const fileNode = props.input;
-  const fileExtension = fileNode.type.extension;
+  const unwrappedType = Op.taggableValue(fileNode.type);
+  const fileExtension =
+    Op.isFile(unwrappedType) && unwrappedType.extension
+      ? unwrappedType.extension
+      : '';
 
   const contentsNode = useMemo(
     () => Op.opFileContents({file: props.input}),
