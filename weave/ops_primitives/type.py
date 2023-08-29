@@ -20,7 +20,7 @@ def _cast_output_type(input_type):
 # This is not yet supported in js. The right argument needs to be Const,
 # but we don't have a way to construct const objects in js yet.
 @op(
-    input_type={"to_type": types.Const(types.Type(), types.NoneType())},
+    input_type={"to_type": types.Const(types.Type(), None)},
     output_type=_cast_output_type,
 )
 def cast(obj: typing.Any, to_type):

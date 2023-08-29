@@ -94,24 +94,23 @@ def _is_lambda(node: graph.Node):
 
 @memo.memo
 def node_id(node: graph.Node):
-    hashable = {"type": node.type.to_dict()}
+    hashable: dict[str, typing.Any] = {}
     if isinstance(node, graph.OutputNode):
         hashable["op_name"] = node.from_op.name
         hashable["inputs"] = {
             arg_name: node_id(arg_node)
-            if not _is_lambda(arg_node)
-            else json.dumps(arg_node.to_json())
             for arg_name, arg_node in node.from_op.inputs.items()
         }
     elif isinstance(node, graph.VarNode):
-        # Ensure we don't share var nodes. That's invalid!
-        hashable["name"] = str(random.random())
+        # Must include type here, Const and OutputNode types can
+        # be inferred from the graph, but VarNode types cannot.
+        hashable["type"] = node.type.to_dict()
+        hashable["name"] = node.name
     elif isinstance(node, graph.ConstNode):
         if isinstance(node.val, graph.OutputNode) or isinstance(
             node.val, graph.VarNode
         ):
-            # Ensure we don't share function nodes. That's invalid!
-            hashable["val"] = str(random.random())
+            hashable["val"] = {"lambda": True, "body": node_id(node.val)}
         else:
             hashable["val"] = storage.to_python(node.val)
     else:

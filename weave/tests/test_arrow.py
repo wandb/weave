@@ -1054,7 +1054,12 @@ def test_arrow_concat_degenerate_types():
 @pytest.mark.parametrize("li", lath.ListInterfaces)
 def test_arrow_timestamp_conversion(li):
     dates = [
-        datetime.datetime(2020, 1, 2, 3, 4, 5),
+        # Ensure these two are actually different date times! The timezone is utc in
+        # our ci environment, so serializing these results in the same thing if the
+        # timestamps match. We use the serialized representation for graph deduplication,
+        # meaning we end up with the same node for both of these, which breaks the test
+        # (but not the actual behavior of the code).
+        datetime.datetime(2020, 1, 2, 3, 4, 6),
         datetime.datetime(2020, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
     ]
     utc_dates = [d.astimezone(datetime.timezone.utc) for d in dates]

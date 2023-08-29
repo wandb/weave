@@ -607,7 +607,10 @@ def vectorize(
 def _call_and_ensure_awl(
     awl: ArrowWeaveList, called: graph.OutputNode
 ) -> ArrowWeaveList:
-    res = use(called)
+    from .. import compile
+
+    with compile.disable_compile():
+        res = use(called)
     # Since it is possible that the result of `use` bails out of arrow due to a
     # mismatch in the types / op support. This is most likely due to gap in the
     # implementation of vectorized ops. However, there are cases where it is
@@ -684,5 +687,4 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
     logging.info("Vectorizing. Vectorized: %s", vecced)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
-    # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)

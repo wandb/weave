@@ -465,17 +465,15 @@ def is_open(node: Node) -> bool:
     return len(filter_nodes_top_level([node], lambda n: isinstance(n, VarNode))) > 0
 
 
-def _all_nodes(node: Node) -> set[Node]:
-    if not isinstance(node, OutputNode):
-        return set((node,))
-    res: set[Node] = set((node,))
-    for input in node.from_op.inputs.values():
-        res.update(_all_nodes(input))
-    return res
-
-
 def count(node: Node) -> int:
-    return len(_all_nodes(node))
+    counter = 0
+
+    def inc(n: Node) -> None:
+        nonlocal counter
+        counter += 1
+
+    map_nodes_full([node], inc)
+    return counter
 
 
 def _linearize(node: OutputNode) -> list[OutputNode]:
