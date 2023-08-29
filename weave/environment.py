@@ -18,6 +18,7 @@ if typing.TYPE_CHECKING:
 
 WANDB_ERROR_REPORTING = "WANDB_ERROR_REPORTING"
 WEAVE_USAGE_ANALYTICS = "WEAVE_USAGE_ANALYTICS"
+WEAVE_GQL_SCHEMA_PATH = ""  # "" means introspect
 
 
 def _env_as_bool(var: str, default: typing.Optional[str] = None) -> bool:
@@ -218,3 +219,7 @@ def usage_analytics_enabled() -> bool:
     return _env_as_bool(WANDB_ERROR_REPORTING, default="True") and _env_as_bool(
         WEAVE_USAGE_ANALYTICS, default="True"
     )
+
+
+def gql_schema_path() -> typing.Optional[str]:
+    return os.environ.get(WEAVE_GQL_SCHEMA_PATH, default=None)

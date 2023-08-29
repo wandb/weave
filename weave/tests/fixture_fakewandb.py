@@ -10,10 +10,12 @@ from weave import util
 from .tag_test_util import op_add_tag
 from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI, WandbArtifactManifest
 from .. import wandb_client_api
+from .. import gql_schema
 from unittest import mock
 import shutil
 import weave
 import wandb
+import pathlib
 
 from urllib import parse
 
@@ -320,6 +322,7 @@ class SetupResponse:
     old_wandb_api_wandb_public_api: typing.Callable
     orig_io_service_client: FakeIoServiceClient
     token: Token
+    original_gql_schema_env_value: str
 
     def mock_artifact_as_node(
         self,
@@ -382,12 +385,19 @@ def setup():
     # patch wandb artifact to allow us to generate a commit hash before we log the artifact
     wandb.Artifact = PatchedSDKArtifact
 
+    # use the test schema from the ops domain
+    original_gql_schema_env_value = os.environ.get("WEAVE_GQL_SCHEMA_PATH", "")
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = (
+        pathlib.Path(__file__).parent / "ops_domain/wb_schema.gql"
+    )
+
     return SetupResponse(
         fake_api,
         fake_io_service_client,
         old_wandb_api_wandb_public_api,
         orig_io_service_client,
         token,
+        original_gql_schema_env_value,
     )
 
 
@@ -399,6 +409,7 @@ def teardown(setup_response: SetupResponse):
     wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
     io_service.get_sync_client = setup_response.orig_io_service_client  # type: ignore
     wandb.Artifact = OriginalArtifactSymbol
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = setup_response.original_gql_schema_env_value
 
 
 entity_payload = {
