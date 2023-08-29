@@ -514,17 +514,6 @@ export const PageContent: FC<PageContentProps> = props => {
         }}>
         <ChildPanel
           controlBar={!isPanel && !props.previewMode ? 'editable' : 'off'}
-          prefixHeader={
-            inJupyter ? (
-              <Icon
-                style={{cursor: 'pointer', color: '#555'}}
-                name="home"
-                onClick={goHome}
-              />
-            ) : (
-              <></>
-            )
-          }
           prefixButtons={
             <>
               {inJupyter && (

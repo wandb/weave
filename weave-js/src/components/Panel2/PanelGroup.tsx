@@ -583,13 +583,28 @@ export const PanelGroupItem: React.FC<{
   );
 
   let controlBar: ChildPanelProps['controlBar'] = 'off';
-  if (config.layoutMode === 'layer' || !config.showExpressions) {
+  if (
+    config.layoutMode === 'layer' ||
+    config.layoutMode === 'tab' ||
+    // Hardcode off off for Board top level items
+    name === 'sidebar' ||
+    name === 'varbar' ||
+    name === 'main'
+  ) {
     controlBar = 'off';
-  } else if (config.showExpressions === 'titleBar') {
+  } else if (
+    config.layoutMode === 'vertical' ||
+    config.layoutMode === 'horizontal' ||
+    config.layoutMode === 'section'
+  ) {
     controlBar = 'titleBar';
-  } else {
+  } else if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     controlBar = 'editable';
   }
+  // We use enableAddPanel to mean the Group children are editable. If not editable,
+  const editable = !!config.enableAddPanel;
+  // If not editable, we don't want to show the editor icons in the ControlBar
+  const noEditorIcons = !editable;
   // This makes it so controls in the varbar can overflow the parent container
   // correctly. For example, without this PanelDropdown renders its dropdown menu
   // within the parent, creating a scrollbar.
@@ -602,6 +617,7 @@ export const PanelGroupItem: React.FC<{
       newVars={siblingVars}
       handleVarEvent={handleSiblingVarEvent}>
       <ChildPanel
+        noEditorIcons={noEditorIcons}
         overflowVisible={overflowVisible}
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
