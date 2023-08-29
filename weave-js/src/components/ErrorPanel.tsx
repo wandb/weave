@@ -58,6 +58,7 @@ Title.displayName = 'Title';
 export const Subtitle = styled.div`
   color: ${MOON_600};
   font-size: 15px;
+  line-height: 140%;
 `;
 Subtitle.displayName = 'Subtitle';
 
@@ -74,7 +75,7 @@ export const ErrorPanelSmall = ({
       position="top center"
       trigger={
         <Circle $size={22} $hoverHighlight={true}>
-          <Icon name="warning-alt" width={16} height={16} />
+          <Icon name="warning" width={16} height={16} />
         </Circle>
       }>
       <b>{titleStr}</b> {subtitleStr} {subtitle2Str}
@@ -90,7 +91,7 @@ export const ErrorPanelLarge = forwardRef<HTMLDivElement, ErrorPanelProps>(
     return (
       <Large ref={ref}>
         <Circle $size={40} $hoverHighlight={false}>
-          <Icon name="warning-alt" width={24} height={24} />
+          <Icon name="warning" width={24} height={24} />
         </Circle>
         <Title>{titleStr}</Title>
         <Subtitle>{subtitleStr}</Subtitle>
