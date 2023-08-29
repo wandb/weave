@@ -529,6 +529,12 @@ const CenterProjectTablesBrowser: React.FC<
       _updatedAt: b.updatedAt,
       name: b.name,
       kind: 'Stream Table',
+      // Here we make the assumption that the run creating this artifact
+      // is the underlying stream table pointed to by the artifact. This is
+      // not strictly true, but is always true for the current implementation.
+      // This approach saves us from having to execute multiple queries
+      // since we don't need to load the stream table files to determine
+      // the run id.
       'updated at': moment.utc(b.createdByUpdatedAt).local().calendar(),
       'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
