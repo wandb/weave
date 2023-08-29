@@ -5,7 +5,7 @@ import {isTruthy, Struct} from './types';
 export const getCookie = (cookieName: string): string => {
   const cookieStrs = getCookieStrs();
   for (const cookieStr of cookieStrs) {
-    const keyVal = cookieStrToKeyVal(cookieStr);
+    const keyVal = cookieStrToKeyVal(cookieStr, false);
     if (keyVal == null) {
       continue;
     }
@@ -58,10 +58,11 @@ const getCookieStrs = () => {
     .map(s => s.trim());
 };
 
-const cookieStrToKeyVal = (cookieStr: string) => {
+const cookieStrToKeyVal = (cookieStr: string, warn: boolean = true) => {
   const sepI = cookieStr.indexOf('=');
   if (sepI < 1) {
-    console.log('Invalid cookie', cookieStr);
+    if (warn)
+    {console.warn('Invalid cookie', cookieStr);}
     return null;
   }
   const key = cookieStr.slice(0, sepI);
