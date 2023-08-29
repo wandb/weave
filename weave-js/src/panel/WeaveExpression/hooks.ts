@@ -25,7 +25,7 @@ import {usePanelContext} from '../../components/Panel2/PanelContext';
 import {WeaveExpressionState} from './state';
 import type {SuggestionProps, WeaveExpressionProps} from './types';
 import {getIndexForPoint, moveToNextMissingArg, trace} from './util';
-import { useIsMounted } from '@wandb/weave/common/util/hooks';
+import {useIsMounted} from '@wandb/weave/common/util/hooks';
 
 // Provides the decorate callback to pass to Slate's Editable
 // component and implements syntax highlighting and styling
