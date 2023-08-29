@@ -265,7 +265,7 @@ class _MergeSpec:
 def get_merge_spec_uri(uri: str) -> typing.Optional[_MergeSpec]:
     try:
         return _get_merge_spec_unsafe(uri)
-    except errors.WeaveInternalError:
+    except errors.WeaveMergeArtifactSpecError:
         return None
 
 
@@ -276,14 +276,14 @@ def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
         obj_uri,
         (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
     ):
-        raise errors.WeaveInternalError(
+        raise errors.WeaveMergeArtifactSpecError(
             "Cannot merge artifact of type %s" % type(obj_uri)
         )
 
     head_ref = obj_uri.to_ref()
     obj_metadata = head_ref.artifact.read_metadata()
     if "branch_point" not in obj_metadata:
-        raise errors.WeaveInternalError(
+        raise errors.WeaveMergeArtifactSpecError(
             "Cannot merge into artifact without branch_point"
         )
 
@@ -293,7 +293,7 @@ def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
         to_uri,
         (artifact_local.WeaveLocalArtifactURI, artifact_wandb.WeaveWBArtifactURI),
     ):
-        raise errors.WeaveInternalError(
+        raise errors.WeaveMergeArtifactSpecError(
             "Cannot merge into artifact of type %s" % type(obj_uri)
         )
 
