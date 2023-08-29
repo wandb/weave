@@ -80,10 +80,10 @@ def _get_history(run: wdt.Run, columns=None):
     live_data = gql_json_cache.use_json(run["sampledParquetHistory"]["liveData"])
 
     with tracer.trace("liveSet.impute"):
-        for row in live_data:
-            for colname in columns:
-                if colname not in row:
-                    row[colname] = None
+        live_data = [
+            {**row, **{colname: None for colname in columns if colname not in row}}
+            for row in live_data
+        ]
 
     # get binary fields from history schema - these are serialized json
     binary_fields = [

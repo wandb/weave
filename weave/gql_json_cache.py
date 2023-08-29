@@ -41,9 +41,7 @@ def use_json(key: str) -> typing.Any:
     if result is None:
         result = json.loads(key)
         cache_json(key, result)
-
-    # deepcopy ensures we never modify the cached object.
-    return copy.deepcopy(result)
+    return result
 
 
 # This should only be called in two places. In use_json above,
