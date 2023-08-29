@@ -48,8 +48,8 @@ const PanelFileTextRenderInner: React.FC<PanelFileTextProps> = props => {
     return <div></div>;
   }
 
-  const truncatedTotalLines = processedResults?.truncatedLineLength;
-  const truncatedLineLength = processedResults?.truncatedTotalLines;
+  const truncatedTotalLines = processedResults?.truncatedTotalLines;
+  const truncatedLineLength = processedResults?.truncatedLineLength;
   const text = processedResults?.text;
   const language = languageFromFileName(fileExtension);
 
