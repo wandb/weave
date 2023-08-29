@@ -525,8 +525,8 @@ def _get_live_data_from_run(run: wdt.Run, columns=None):
         return raw_live_data
     column_set = set(columns)
     return [
-        {k: v for k, v in gql_json_cache.use_json(row).items() if k in column_set}
-        for row in raw_live_data
+        {k: v for k, v in row.items() if k in column_set}
+        for row in gql_json_cache.use_json(raw_live_data)
     ]
 
 

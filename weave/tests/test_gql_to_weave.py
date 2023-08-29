@@ -311,3 +311,93 @@ def test_inline_fragments():
     )
 
     assert return_type == expected
+
+
+def test_json_array():
+    query = """query WeavePythonCG {
+  project_23045de0d7920e9b08772d538b4b9da9: project(
+    name: "oai-mon-syn-1"
+    entityName: "shawn"
+  ) {
+    id
+    name
+    run_1dbf019d4314adc6f3bc206824769929: run(name: "table100-2") {
+      id
+      name
+      historyKeys
+      sampledParquetHistory: parquetHistory(
+        liveKeys: [
+          "output.id"
+          "output.object"
+          "timestamp"
+          "output.model"
+          "output.choices"
+          "_step"
+          "summary.prompt_tokens"
+          "output.created"
+          "summary.completion_tokens"
+          "summary.latency_s"
+          "summary.total_tokens"
+        ]
+      ) {
+        liveData
+        parquetUrls
+      }
+      project {
+        id
+        name
+        entity {
+          id
+          name
+        }
+      }
+    }
+  }
+}"""
+    return_type = gql_to_weave.get_query_weave_type(query)
+    expected = types.TypedDict(
+        {
+            "project_23045de0d7920e9b08772d538b4b9da9": types.TypedDict(
+                property_types={
+                    "id": types.String(),
+                    "name": types.String(),
+                    "run_1dbf019d4314adc6f3bc206824769929": types.TypedDict(
+                        property_types={
+                            "id": types.String(),
+                            "name": types.String(),
+                            "historyKeys": types.optional(types.String()),
+                            "sampledParquetHistory": types.TypedDict(
+                                property_types={
+                                    # important that liveData is a string
+                                    "liveData": types.String(),
+                                    "parquetUrls": types.List(
+                                        object_type=types.String()
+                                    ),
+                                },
+                                not_required_keys=set(),
+                            ),
+                            "project": types.TypedDict(
+                                property_types={
+                                    "id": types.String(),
+                                    "name": types.String(),
+                                    "entity": types.TypedDict(
+                                        property_types={
+                                            "id": types.String(),
+                                            "name": types.String(),
+                                        },
+                                        not_required_keys=set(),
+                                    ),
+                                },
+                                not_required_keys=set(),
+                            ),
+                        },
+                        not_required_keys=set(),
+                    ),
+                },
+                not_required_keys=set(),
+            )
+        },
+        not_required_keys=set(),
+    )
+
+    assert return_type == expected
