@@ -84,10 +84,10 @@ class Registry:
             res = self._ops[object_uri.name]
         else:
             if not ":" in uri:
-                raise errors.WeaveInternalError("Op not registered: %s" % uri)
+                raise errors.WeaveMissingOpDefError("Op not registered: %s" % uri)
             res = storage.get(uri)
         if res is None:
-            raise errors.WeaveInternalError("Op not registered: %s" % uri)
+            raise errors.WeaveMissingOpDefError("Op not registered: %s" % uri)
         return res
 
     def find_op_by_fn(self, lazy_local_fn):

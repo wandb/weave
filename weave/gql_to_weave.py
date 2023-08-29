@@ -89,7 +89,14 @@ def gql_type_to_weave_type(
         return types.TypedDict(property_types)
 
     elif isinstance(gql_type, GraphQLList):
-        return types.List(gql_type_to_weave_type(gql_type.of_type, selection_set))
+        # Coerce JSON[] to JSON - JSON[] is bad for performance
+        of_type = gql_type.of_type
+        if isinstance(of_type, GraphQLNonNull):
+            if of_type.of_type.name == "JSON":
+                return types.String()
+        elif of_type.name == "JSON":
+            return types.String()
+        return types.List(gql_type_to_weave_type(of_type, selection_set))
     elif isinstance(gql_type, GraphQLNonNull):
         return types.non_none(gql_type_to_weave_type(gql_type.of_type, selection_set))
     elif isinstance(gql_type, graphql.GraphQLUnionType):

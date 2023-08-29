@@ -55,6 +55,15 @@ _context.clear_loading_built_ins(_loading_builtins_token)
 
 
 def assert_valid_node(node):
+    _assert_valid_node_raw(node)
+
+    # This part of the test simulates what happens when JS makes
+    # a request since it is not guaranteed to know the correct type.
+    node.type = weave.types.Any()
+    _assert_valid_node_raw(node)
+
+
+def _assert_valid_node_raw(node):
     templates_node = generator_templates.get_board_templates_for_node(node)
 
     templates = weave.use(templates_node)

@@ -89,16 +89,33 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     )
 
 
-def _quote_node(node: graph.Node, into_node: graph.OutputNode) -> graph.Node:
-    # Special case for ops that want to preserve the exact user-defined node chain
-    from .panels_py import generator_templates
+def _quote_node(node: graph.Node) -> graph.Node:
+    return weave_internal.const(node)
 
-    compile_time_literal = into_node.from_op.name in [
-        spec.op_name
-        for spec in generator_templates.template_registry.get_specs().values()
-    ]
 
-    return weave_internal.const(node, _compile_time_literal=compile_time_literal)
+def _static_function_types(node: graph.Node) -> typing.Optional[graph.Node]:
+    # This compile time transform looks at all const-functions which have 0
+    # inputs (we call these static lambdas). If it is a static lambda, then we
+    # want to update the output type of the inner node and the function such
+    # that the rest of the system has the correct types. This is needed because
+    # we do not map into static lambdas and do not compile their inner contents
+    # as it should be treated as a literal, quoted graph.
+    if (
+        isinstance(node, graph.ConstNode)
+        and isinstance(node.type, types.Function)
+        and len(node.type.input_types) == 0
+    ):
+        inner_node = node.val
+        if isinstance(inner_node, graph.OutputNode):
+            compiled_node = _compile([inner_node])[0]
+            return weave_internal.const(
+                weave_internal.make_output_node(
+                    compiled_node.type,
+                    inner_node.from_op.name,
+                    inner_node.from_op.inputs,
+                )
+            )
+    return None
 
 
 def _remove_optional(t: types.Type) -> types.Type:
@@ -121,16 +138,35 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             # TODO: does this work for mapped case?
             return node
         from_op = node.from_op
+        op = None
         try:
             op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
         except errors.WeaveDispatchError as e:
-            if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
-                raise errors.WeaveBadRequest(
-                    "Error while dispatching (no refine phase): %s. This is most likely a client error"
-                    % from_op.name
-                )
-            else:
-                raise
+            # With the new DashUI implementation, we are not allowed to refine
+            # nodes on the client. As a result, it is perfectly possible to
+            # construct a graph manually (as is done when generating a template
+            # from a table) where the nodes are under-typed. The result of this
+            # is that we will fail to dispatch in this phase which short
+            # circuits and errors early. This call to
+            # `registry_mem.memory_registry.get_op(node.from_op.name)` is a
+            # last-resort that blindly accepts the op by name (trusting that the
+            # developer client-side constructed a good graph). Importantly, if
+            # this is an invalid assumption, and the graph is truly incorrect,
+            # the error will be thrown in the `compile_refine_and_propagate_gql`
+            # step. This just permits the compilation to continue, given that
+            # the above circumstance happens more frequently now.
+            try:
+                op = registry_mem.memory_registry.get_op(node.from_op.name)
+            except errors.WeaveMissingOpDefError:
+                pass
+            if op is None:
+                if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
+                    raise errors.WeaveBadRequest(
+                        "Error while dispatching (no refine phase): %s. This is most likely a client error"
+                        % from_op.name
+                    )
+                else:
+                    raise
 
         params = from_op.inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
@@ -334,7 +370,7 @@ def _make_inverse_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
                 if callable(op_input_type):
                     continue
                 if isinstance(op_input_type, when_type):
-                    new_inputs[k] = call_op_fn(input_node, node)
+                    new_inputs[k] = call_op_fn(input_node)
 
             return graph.OutputNode(node.type, node.from_op.name, new_inputs)
         return None
@@ -521,6 +557,13 @@ def compile_quote(
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
     return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
+
+
+def compile_static_function_types(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _static_function_types, on_error)
 
 
 def _needs_gql_propagation(node: graph.OutputNode) -> bool:
@@ -934,6 +977,9 @@ def _compile(
         # Instead, we want the raw node that the caller intended. For this
         # reason we should always call compile:quote before any node re-writing.
         results = results.batch_map(_track_errors(compile_quote))
+
+    with tracer.trace("compile:static_function_types"):
+        results = results.batch_map(_track_errors(compile_static_function_types))
 
     # Some ops require const input nodes. This pass executes any branches necessary
     # to ensure that requirement holds.

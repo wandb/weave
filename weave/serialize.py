@@ -174,8 +174,7 @@ def _deserialize_node(
                     "invalid function node encountered in deserialize"
                 )
             parsed_node = graph.ConstNode(
-                types.TypeRegistry.type_from_dict(node["type"]),
-                parsed_fn_body_node,
+                types.TypeRegistry.type_from_dict(node["type"]), parsed_fn_body_node
             )
         else:
             parsed_node = graph.ConstNode.from_json(node)

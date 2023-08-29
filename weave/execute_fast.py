@@ -96,7 +96,7 @@ def _resolve_static_branches(map_fn):
 def op_can_be_async(op_name: str) -> bool:
     try:
         op = registry_mem.memory_registry.get_op(op_name)
-    except errors.WeaveInternalError:
+    except errors.WeaveMissingOpDefError:
         return any(
             [
                 o.is_async
