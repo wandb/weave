@@ -597,7 +597,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                     }
                     maxLength={24}
                   />{' '}
-                  {controlBar === 'editable'}
                 </EditorPath>
               )}
               {/* Panel picker */}

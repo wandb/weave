@@ -30,8 +30,8 @@ import {
 import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
-import {Button} from 'semantic-ui-react';
-import {Button as NewButton} from '../Button';
+import {Button as OldButton} from 'semantic-ui-react';
+import {Button} from '../Button';
 import styled, {css} from 'styled-components';
 
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
@@ -87,7 +87,7 @@ interface PanelInfo {
 }
 export interface PanelGroupConfig {
   // Determines how to lay out children, and also how to render each child's ControlBar
-  // (ie whether ControlBar is off, or show's the title only, or a fully editable var name, panel
+  // (ie whether ControlBar is off, or shows the title only, or a fully editable var name, panel
   // id, and expression).
   layoutMode: (typeof LAYOUT_MODES)[number];
   // Determines if we use equal sizing for horizontal and vertical layouts.
@@ -591,9 +591,9 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
         </ConfigPanel.ChildConfigContainer>
       </ConfigPanel.ConfigSection>
       <ConfigPanel.ConfigSection>
-        <Button size="mini" onClick={handleAddPanel}>
+        <OldButton size="mini" onClick={handleAddPanel}>
           Add Child
-        </Button>
+        </OldButton>
       </ConfigPanel.ConfigSection>
     </>
   );
@@ -674,7 +674,7 @@ export const PanelGroupItem: React.FC<{
   if (
     config.layoutMode === 'layer' ||
     config.layoutMode === 'tab' ||
-    // Hardcode off off for Board top level items
+    // Hardcode off for Board top level items
     name === 'sidebar' ||
     name === 'varbar' ||
     name === 'main'
@@ -689,7 +689,7 @@ export const PanelGroupItem: React.FC<{
   } else if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     controlBar = 'editable';
   }
-  // We use enableAddPanel to mean the Group children are editable. If not editable,
+  // We use enableAddPanel to mean the Group children are editable.
   const editable = !!config.enableAddPanel;
   // If not editable, we don't want to show the editor icons in the ControlBar
   const noEditorIcons = !editable;
@@ -901,9 +901,9 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         }}>
         {!inJupyter && config.enableAddPanel && (
           <ActionBar>
-            <NewButton variant="ghost" onClick={handleAddPanel} icon="add-new">
+            <Button variant="ghost" onClick={handleAddPanel} icon="add-new">
               New panel
-            </NewButton>
+            </Button>
           </ActionBar>
         )}
         <PBSection
@@ -984,9 +984,9 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             <IconAddNew />
           </AddVarButton>
         ) : (
-          <Button onClick={handleAddPanel} size="tiny">
+          <OldButton onClick={handleAddPanel} size="tiny">
             Add {props.config?.childNameBase ?? 'panel'}
-          </Button>
+          </OldButton>
         ))}
     </Group>
   );
