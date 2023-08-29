@@ -658,7 +658,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       updateConfig2(currentConfig => {
         return produce(currentConfig, draft => {
           if (currentConfig.items[name] != null) {
-            console.log('HIGHLIGHT DIRECT CHILD');
+            // console.log('HIGHLIGHT DIRECT CHILD');
             mutateEnsureItemIsFullChildPanel(draft.items, name);
             applyFn(draft.items[name] as ChildPanelFullConfig);
           } else {
