@@ -56,8 +56,6 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     isBusy,
     applyPendingExpr,
     exprIsModified,
-    suppressSuggestions,
-    hideSuggestions,
     isFocused,
     onFocus,
     onBlur,
@@ -88,6 +86,10 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     };
   }, [applyPendingExpr, editor, editorId, onChange, stack]);
 
+  const [showSuggestions, setShowSuggestions] = useState(
+    props.expr?.nodeType === 'void'
+  );
+
   // Wrap onChange so that we reset suggestion index back to top
   // on any interaction
   const onChangeResetSuggestion = React.useCallback(
@@ -109,17 +111,6 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     [editor]
   );
 
-  // Don't show suggestions when the editor is first focused.
-  // A mouse down or key press will unsuppress them.
-  const [isFirstFocused, setIsFirstFocused] = useState(false);
-  const suppressingFocus = () => {
-    setIsFirstFocused(true);
-    onFocus();
-  };
-  const mouseDownHandler = () => {
-    setIsFirstFocused(false);
-  };
-
   // Certain keys have special behavior
   const keyDownHandler = React.useCallback(
     ev => {
@@ -127,7 +118,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
       // the suggestion panel suppression.
       const isPrintableCharacter = ev.key.length === 1;
       if (isPrintableCharacter) {
-        setIsFirstFocused(false);
+        setShowSuggestions(true);
       }
 
       if (ev.key === 'Enter' && !ev.shiftKey && !props.liveUpdate) {
@@ -138,7 +129,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
           applyPendingExpr();
           forceRender({});
         }
-        hideSuggestions(500);
+        setShowSuggestions(false);
       } else if (
         ev.key === 'Tab' &&
         !ev.shiftKey &&
@@ -182,7 +173,6 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
       applyPendingExpr,
       editor,
       exprIsModified,
-      hideSuggestions,
       isBusy,
       isValid,
       setSuggestionIndex,
@@ -204,9 +194,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     `suggestions`,
     suggestions,
     `isBusy`,
-    isBusy,
-    `suppressSuggestions`,
-    suppressSuggestions
+    isBusy
   );
 
   // Run button placement
@@ -229,10 +217,10 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
             // placeholder={<div>"Weave expression"</div>}
             className={isValid ? 'valid' : 'invalid'}
             onCopy={copyHandler}
-            onMouseDown={mouseDownHandler}
+            // onMouseDown={mouseDownHandler}
             onKeyDown={keyDownHandler}
             onBlur={onBlur}
-            onFocus={suppressingFocus}
+            onFocus={onFocus}
             decorate={decorate}
             renderLeaf={leafProps => <Leaf {...leafProps} />}
             style={{overflowWrap: 'anywhere'}}
@@ -262,7 +250,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
         </S.EditableContainer>
         {!props.frozen && (
           <Suggestions
-            forceHidden={suppressSuggestions || isBusy || isFirstFocused}
+            forceHidden={!showSuggestions}
             {...suggestions}
             suggestionIndex={suggestionIndex}
             setSuggestionIndex={setSuggestionIndex}
