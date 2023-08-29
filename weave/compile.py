@@ -154,7 +154,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             # the above circumstance happens more frequently now.
             try:
                 op = registry_mem.memory_registry.get_op(node.from_op.name)
-            except errors.WeaveInternalError:
+            except errors.WeaveMissingOpDefError:
                 pass
             if op is None:
                 if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
