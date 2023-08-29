@@ -18,7 +18,7 @@ if typing.TYPE_CHECKING:
 
 WANDB_ERROR_REPORTING = "WANDB_ERROR_REPORTING"
 WEAVE_USAGE_ANALYTICS = "WEAVE_USAGE_ANALYTICS"
-WEAVE_GQL_SCHEMA_PATH = ""  # "" means introspect
+WEAVE_GQL_SCHEMA_PATH = "WEAVE_GQL_SCHEMA_PATH"
 
 
 def _env_as_bool(var: str, default: typing.Optional[str] = None) -> bool:
