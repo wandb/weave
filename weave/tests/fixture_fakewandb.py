@@ -10,7 +10,6 @@ from weave import util
 from .tag_test_util import op_add_tag
 from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI, WandbArtifactManifest
 from .. import wandb_client_api
-from .. import gql_schema
 from unittest import mock
 import shutil
 import weave
@@ -385,7 +384,7 @@ def setup():
     # patch wandb artifact to allow us to generate a commit hash before we log the artifact
     wandb.Artifact = PatchedSDKArtifact
 
-    # use the test schema from the ops domain
+    # use the test schema
     original_gql_schema_env_value = os.environ.get("WEAVE_GQL_SCHEMA_PATH", "")
     os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
         pathlib.Path(__file__).parent / "wb_schema.gql"
