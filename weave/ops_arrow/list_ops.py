@@ -966,3 +966,22 @@ def flatten(arr):
         flatten_return_object_type(arr.object_type),
         arr._artifact,
     )
+
+
+def _drop_tags_output_type(input_type):
+    from ..op_def import map_type
+
+    return map_type(
+        input_type["arr"],
+        lambda t: isinstance(t, tagged_value_type.TaggedValueType) and t.value or t,
+    )
+
+
+@op(
+    name="ArrowWeaveList-dropTags",
+    input_type={"arr": ArrowWeaveListType()},
+    output_type=_drop_tags_output_type,
+    hidden=True,
+)
+def drop_tags(arr):
+    return arr.without_tags()
