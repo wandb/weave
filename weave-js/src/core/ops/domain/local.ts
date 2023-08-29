@@ -776,7 +776,11 @@ const withColumnsOutputType = (selfType: ListType, colsType: Type) => {
     }
     objType = withColumnType(objType, k, listObjectType(v));
   }
-  return list(objType);
+  return {
+    type: 'ArrowWeaveList',
+    objectType: objType,
+    _base_type: {type: 'list'},
+  } as Type;
 };
 
 export const opWithColumns = makeBasicOp({

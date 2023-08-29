@@ -90,17 +90,32 @@ def make_var_node(type_: types.Type, name: str) -> graph.VarNode:
     return dispatch.RuntimeVarNode(type_, name)
 
 
-def make_const_node(type_: types.Type, val: typing.Any) -> graph.ConstNode:
+def make_const_node(
+    type_: types.Type, val: typing.Any, _compile_time_literal: bool = False
+) -> graph.ConstNode:
     # Circular import. TODO: fix
     from . import dispatch
 
-    return dispatch.RuntimeConstNode(type_, val)
+    return dispatch.RuntimeConstNode(type_, val, _compile_time_literal)
 
 
-def const(val: typing.Any, type: typing.Optional[types.Type] = None) -> graph.ConstNode:
+def const(
+    val: typing.Any,
+    type: typing.Optional[types.Type] = None,
+    _compile_time_literal: bool = False,
+) -> graph.ConstNode:
     if type is None:
         type = types.TypeRegistry.type_of(val)
-    return make_const_node(type, val)
+    return make_const_node(type, val, _compile_time_literal)
+
+
+def make_var_for_value(v: typing.Any, name: str) -> graph.VarNode:
+    """Make a VarNode whose value is v."""
+    if not isinstance(v, graph.Node):
+        v = const(v)
+    new_var = make_var_node(v.type, name)
+    new_var._var_val = v
+    return new_var
 
 
 def make_output_node(
@@ -118,7 +133,10 @@ def define_fn(
 ) -> graph.ConstNode:
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
     try:
-        fnNode = body(*var_nodes)
+        from . import op_def
+
+        with op_def.no_refine():
+            fnNode = body(*var_nodes)
     except errors.WeaveExpectedConstError as e:
         raise errors.WeaveMakeFunctionError("function body expected const node.")
     if not isinstance(fnNode, graph.Node):

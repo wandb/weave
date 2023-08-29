@@ -17,6 +17,8 @@ from . import errors
 from . import weave_types as types
 from .partial_object import PartialObjectType
 
+from datetime import timedelta
+
 from . import gql_json_cache
 
 
@@ -80,6 +82,12 @@ class GQLConstToConst(mappers.Mapper):
         return obj
 
 
+class GQLTimeDeltaToTimeDelta(mappers.Mapper):
+    def apply(self, obj):
+        # duration is a number of seconds
+        return timedelta(seconds=obj)
+
+
 def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
     if isinstance(type, PartialObjectType):
         return DictToPyDict(type, mapper, artifact, path)
@@ -109,6 +117,8 @@ def map_from_gql_payload_(type, mapper, artifact, path=[], mapper_options=None):
         return GQLUnionToUnion(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return GQLConstToConst(type, mapper, artifact, path)
+    elif isinstance(type, types.TimeDelta):
+        return GQLTimeDeltaToTimeDelta(type, mapper, artifact, path)
     raise errors.WeaveValueError(f"Unknown type {type}")
 
 

@@ -6,6 +6,7 @@ import {
   vectorizePromiseFn,
 } from './hooks';
 import * as Table from './tableState';
+import {useWeaveDashUiEnable} from '@wandb/weave/context';
 
 // This refines all table state expressions when their input variable values
 // change. This is is complicated by the fact that grouped v. ungrouped
@@ -98,9 +99,53 @@ async function refineTableStateExpressions(
 const refineTableStatesExpressions = vectorizePromiseFn(
   refineTableStateExpressions
 );
-export const useTableStateWithRefinedExpressions = makePromiseUsable(
+const useTableStateWithRefinedExpressionsUnguarded = makePromiseUsable(
   refineTableStateExpressions
 );
-export const useTableStatesWithRefinedExpressions = makePromiseUsable(
+const useTableStatesWithRefinedExpressionsUnguarded = makePromiseUsable(
   refineTableStatesExpressions
 );
+
+export const useTableStateWithRefinedExpressions: typeof useTableStateWithRefinedExpressionsUnguarded =
+  (tableState, inputNode, stack, weave) => {
+    const dashEnabled = useWeaveDashUiEnable();
+    // In dashUI, no-op. We manage document refinement in panelTree
+    if (dashEnabled) {
+      return {
+        initialLoading: false,
+        loading: false,
+        result: tableState,
+      };
+    }
+
+    // We can ignore this, dashUi is a feature flag that doesn't change during a session
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useTableStateWithRefinedExpressionsUnguarded(
+      tableState,
+      inputNode,
+      stack,
+      weave
+    );
+  };
+
+export const useTableStatesWithRefinedExpressions: typeof useTableStatesWithRefinedExpressionsUnguarded =
+  (list, inputNode, stack, weave) => {
+    const dashEnabled = useWeaveDashUiEnable();
+    // In dashUI, no-op. We manage document refinement in panelTree
+    if (dashEnabled) {
+      return {
+        initialLoading: false,
+        loading: false,
+        result: list,
+      };
+    }
+
+    // We can ignore this, dashUi is a feature flag that doesn't change during a session
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useTableStatesWithRefinedExpressionsUnguarded(
+      list,
+      inputNode,
+      stack,
+      weave
+    );
+  };

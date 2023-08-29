@@ -13,6 +13,7 @@ const WeaveMessageWrapper = styled.div`
   align-content: space-around;
   justify-content: space-around;
 `;
+WeaveMessageWrapper.displayName = 'S.WeaveMessageWrapper';
 
 const WeaveMessageBody = styled.div`
   background: ${globals.errorBackground};
@@ -22,6 +23,7 @@ const WeaveMessageBody = styled.div`
     margin-bottom: 8px;
   }
 `;
+WeaveMessageBody.displayName = 'S.WeaveMessageBody';
 
 export const WeaveMessage: React.FC = ({children}) => {
   return (
