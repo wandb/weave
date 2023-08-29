@@ -872,7 +872,6 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           groupPath={groupPath}
           updateConfig2={updateGridConfig2}
           renderPanel={renderSectionPanel}
-          handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
         />
         {config.enableAddPanel != null && (
           <AddPanelBarContainer ref={addPanelBarRef}>
