@@ -222,4 +222,4 @@ def usage_analytics_enabled() -> bool:
 
 
 def gql_schema_path() -> typing.Optional[str]:
-    return os.environ.get(WEAVE_GQL_SCHEMA_PATH, default=None)
+    return os.environ.get(WEAVE_GQL_SCHEMA_PATH) or None
