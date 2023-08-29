@@ -576,57 +576,56 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {props.controlBar === 'titleBar' || !isHoverPanel ? (
+            {(props.controlBar === 'titleBar' || !isHoverPanel) &&
               props.pathEl != null && (
                 <EditorBarTitleOnly>
                   {varNameToTitle(props.pathEl)}
                 </EditorBarTitleOnly>
-              )
-            ) : (
-              <EditorBarHover isHovered={isHoverPanel}>
-                {/* Variable name */}
-                {props.pathEl != null && (
-                  <EditorPath>
-                    <ValidatingTextInput
-                      dataTest="panel-expression-path"
-                      onCommit={props.updateName ?? (() => {})}
-                      validateInput={validateName}
-                      initialValue={props.pathEl}
-                      maxWidth={
-                        editorBarWidth != null ? editorBarWidth / 3 : undefined
-                      }
-                      maxLength={24}
-                    />{' '}
-                    {controlBar === 'editable'}
-                  </EditorPath>
+              )}
+            <EditorBarHover
+              show={props.controlBar !== 'titleBar' && isHoverPanel}>
+              {/* Variable name */}
+              {props.pathEl != null && (
+                <EditorPath>
+                  <ValidatingTextInput
+                    dataTest="panel-expression-path"
+                    onCommit={props.updateName ?? (() => {})}
+                    validateInput={validateName}
+                    initialValue={props.pathEl}
+                    maxWidth={
+                      editorBarWidth != null ? editorBarWidth / 3 : undefined
+                    }
+                    maxLength={24}
+                  />{' '}
+                  {controlBar === 'editable'}
+                </EditorPath>
+              )}
+              {/* Panel picker */}
+              {controlBar === 'editable' &&
+                curPanelId !== 'Expression' &&
+                curPanelId !== 'RootBrowser' && (
+                  <PanelNameEditor
+                    value={curPanelId ?? ''}
+                    autocompleteOptions={panelOptions}
+                    setValue={handlePanelChange}
+                  />
                 )}
-                {/* Panel picker */}
-                {controlBar === 'editable' &&
-                  curPanelId !== 'Expression' &&
-                  curPanelId !== 'RootBrowser' && (
-                    <PanelNameEditor
-                      value={curPanelId ?? ''}
-                      autocompleteOptions={panelOptions}
-                      setValue={handlePanelChange}
-                    />
-                  )}
-                {/* Expression */}
-                {controlBar === 'editable' ? (
-                  <EditorExpression data-test="panel-expression-expression">
-                    <WeaveExpression
-                      expr={panelInputExpr}
-                      setExpression={updateExpression}
-                      noBox
-                      truncate={!expressionFocused}
-                      onFocus={onFocusExpression}
-                      onBlur={onBlurExpression}
-                    />
-                  </EditorExpression>
-                ) : (
-                  <div style={{width: '100%'}} />
-                )}
-              </EditorBarHover>
-            )}
+              {/* Expression */}
+              {controlBar === 'editable' ? (
+                <EditorExpression data-test="panel-expression-expression">
+                  <WeaveExpression
+                    expr={panelInputExpr}
+                    setExpression={updateExpression}
+                    noBox
+                    truncate={!expressionFocused}
+                    onFocus={onFocusExpression}
+                    onBlur={onBlurExpression}
+                  />
+                </EditorExpression>
+              ) : (
+                <div style={{width: '100%'}} />
+              )}
+            </EditorBarHover>
             {/* Control buttons */}
             <EditorIcons
               visible={!props.noEditorIcons && (isHoverPanel || isMenuOpen)}>
@@ -1005,8 +1004,8 @@ EditorBarTitleOnly.displayName = 'S.EditorBarTitleOnly';
 
 // If the mouse leaves the panel we want to keep these contents (e.g. unsubmitted
 // expression editor state) but just hide them.
-const EditorBarHover = styled.div<{isHovered: boolean}>`
-  display: ${props => (props.isHovered ? 'flex' : 'none')};
+const EditorBarHover = styled.div<{show: boolean}>`
+  display: ${props => (props.show ? 'flex' : 'none')};
   align-items: flex-start;
   flex-grow: 1;
 `;
