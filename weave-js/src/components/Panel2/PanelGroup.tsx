@@ -55,6 +55,7 @@ import {
 // import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
+import {inJupyterCell} from '../PagePanelComponents/util';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -851,6 +852,8 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   const isMain = _.isEqual(groupPath, [`main`]);
 
+  const inJupyter = inJupyterCell();
+
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
       <div
@@ -859,7 +862,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           height: !isMain ? '100%' : undefined,
           backgroundColor: isMain ? MOON_50 : undefined,
         }}>
-        {config.enableAddPanel && (
+        {!inJupyter && config.enableAddPanel && (
           <ActionBar>
             <NewButton variant="ghost" onClick={handleAddPanel} icon="add-new">
               New panel
@@ -873,7 +876,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           updateConfig2={updateGridConfig2}
           renderPanel={renderSectionPanel}
         />
-        {config.enableAddPanel != null && (
+        {!inJupyter && config.enableAddPanel != null && (
           <AddPanelBarContainer ref={addPanelBarRef}>
             <AddPanelBar onClick={handleAddPanel}>
               <IconAddNew />
