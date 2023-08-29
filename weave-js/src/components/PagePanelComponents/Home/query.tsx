@@ -267,6 +267,11 @@ const opArtifactsBasicMetadata = ({artifacts}: {artifacts: w.Node}) => {
         updatedAt: w.opArtifactVersionCreatedAt({
           artifactVersion: latestVersionNode,
         }),
+        createdByUpdatedAt: w.opRunUpdatedAt({
+          run: w.opArtifactVersionCreatedBy({
+            artifactVersion: latestVersionNode,
+          }),
+        }),
       } as any);
     }),
   });
@@ -281,6 +286,7 @@ export const useProjectBoards = (
     createdByUserName: string;
     createdAt: number;
     updatedAt: number;
+    createdByUpdatedAt: number;
   }>;
   loading: boolean;
 } => {
@@ -307,6 +313,7 @@ export const useProjectRunStreams = (
     createdByUserName: string;
     createdAt: number;
     updatedAt: number;
+    createdByUpdatedAt: number;
   }>;
   loading: boolean;
 } => {
@@ -333,6 +340,7 @@ export const useProjectRunLoggedTables = (
     createdByUserName: string;
     createdAt: number;
     updatedAt: number;
+    createdByUpdatedAt: number;
   }>;
   loading: boolean;
 } => {

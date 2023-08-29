@@ -130,6 +130,16 @@ export const opRunCreatedAt = makeRunOp({
   resolver: ({run}) => new Date(run.createdAt + 'Z'),
 });
 
+export const opRunUpdatedAt = makeRunOp({
+  name: 'run-updatedAt',
+  argTypes: runArgTypes,
+  description: `Returns the updated at datetime of the ${docType('run')}`,
+  argDescriptions: {run: runArgDescriptions},
+  returnValueDescription: `The updated at datetime of the ${docType('run')}`,
+  returnType: inputTypes => 'date',
+  resolver: ({run}) => new Date(run.updatedAt + 'Z'),
+});
+
 export const opRunHeartbeatAt = makeRunOp({
   name: 'run-heartbeatAt',
   argTypes: runArgTypes,
