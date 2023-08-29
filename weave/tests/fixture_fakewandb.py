@@ -386,9 +386,9 @@ def setup():
     wandb.Artifact = PatchedSDKArtifact
 
     # use the test schema from the ops domain
-    original_gql_schema_env_value = os.environ.get("WEAVE_GQL_SCHEMA_PATH")
-    os.environ["WEAVE_GQL_SCHEMA_PATH"] = (
-        pathlib.Path(__file__).parent / "/wb_schema.gql"
+    original_gql_schema_env_value = os.environ.get("WEAVE_GQL_SCHEMA_PATH", "")
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
+        pathlib.Path(__file__).parent / "wb_schema.gql"
     )
 
     return SetupResponse(
