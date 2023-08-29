@@ -82,10 +82,9 @@ def _get_history(run: wdt.Run, columns=None):
     ]
 
     with tracer.trace("liveSet.impute"):
-        for row in live_data:
-            for colname in columns:
-                if colname not in row:
-                    row[colname] = None
+        live_data = [
+            {**row, **{colname: None for colname in columns if colname not in row}}
+        ]
 
     # get binary fields from history schema - these are serialized json
     binary_fields = [
