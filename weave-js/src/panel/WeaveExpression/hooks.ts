@@ -233,15 +233,6 @@ export const useWeaveExpressionState = (
     internalState.dispatch({type: 'flushPendingExpr'});
   }, [internalState]);
 
-  const [suppressSuggestions, setSuppressSuggestions] = React.useState(false);
-  const hideSuggestions = React.useCallback(
-    (nMillis: number) => {
-      setSuppressSuggestions(true);
-      setTimeout(() => setSuppressSuggestions(false), nMillis);
-    },
-    [setSuppressSuggestions]
-  );
-
   trace(`${internalState.id}: useWeaveExpressionState render`, externalState);
 
   return {
@@ -268,12 +259,6 @@ export const useWeaveExpressionState = (
 
     // Flush pending expression in non-live-update mode
     applyPendingExpr,
-
-    // To hide suggestions momentarily
-    suppressSuggestions,
-
-    // Callback to hide suggestions for n milliseconds
-    hideSuggestions,
 
     // EE focus state
     isFocused,
