@@ -90,12 +90,23 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
 
 
 def _quote_node(node: graph.Node) -> graph.Node:
-    if isinstance(node, graph.OutputNode):
-        compiled_node = _compile([node])[0]
-        node = weave_internal.make_output_node(
-            compiled_node.type, node.from_op.name, node.from_op.inputs
-        )
     return weave_internal.const(node)
+
+
+def _static_function_types(node: graph.Node) -> typing.Optional[graph.Node]:
+    if (
+        isinstance(node, graph.ConstNode)
+        and isinstance(node.type, types.Function)
+        and len(node.type.input_types) == 0
+    ):
+        inner_node = node.val
+        compiled_node = _compile([inner_node])[0]
+        return weave_internal.const(
+            weave_internal.make_output_node(
+                compiled_node.type, inner_node.from_op.name, inner_node.from_op.inputs
+            )
+        )
+    return None
 
 
 def _remove_optional(t: types.Type) -> types.Type:
@@ -520,6 +531,13 @@ def compile_quote(
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
     return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
+
+
+def compile_static_function_types(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _static_function_types, on_error)
 
 
 def _needs_gql_propagation(node: graph.OutputNode) -> bool:
@@ -968,6 +986,9 @@ def _compile(
         # Instead, we want the raw node that the caller intended. For this
         # reason we should always call compile:quote before any node re-writing.
         results = results.batch_map(_track_errors(compile_quote))
+
+    with tracer.trace("compile:static_function_types"):
+        results = results.batch_map(_track_errors(compile_static_function_types))
 
     # Some ops require const input nodes. This pass executes any branches necessary
     # to ensure that requirement holds.
