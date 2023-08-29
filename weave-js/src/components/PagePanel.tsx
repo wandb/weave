@@ -144,7 +144,7 @@ function useEnablePageAnalytics() {
       .then(json => {
         const serverUserId = json?.user_id ?? '';
         if (serverUserId !== '') {
-          (window.analytics as any).identify(serverUserId);
+          (window.analytics as any)?.identify(serverUserId);
         }
       })
       .catch(err => {

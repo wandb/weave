@@ -25,8 +25,8 @@ export const setupAnalytics = () => {
           },
         };
         window.analytics = new (Analytics as any)();
-        (window.analytics as any).use(SegmentIntegration);
-        (window.analytics as any).init(integrationSettings);
+        (window.analytics as any)?.use(SegmentIntegration);
+        (window.analytics as any)?.init(integrationSettings);
       }
     }
   }
@@ -38,5 +38,5 @@ setupAnalytics();
  * TODO: Connect to router.
  */
 export function trackPage(properties: object, options: object) {
-  (window.analytics as any).page?.(properties, options);
+  (window.analytics as any)?.page?.(properties, options);
 }
