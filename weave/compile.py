@@ -94,6 +94,12 @@ def _quote_node(node: graph.Node) -> graph.Node:
 
 
 def _static_function_types(node: graph.Node) -> typing.Optional[graph.Node]:
+    # This compile time transform looks at all const-functions which have 0
+    # inputs (we call these static lambdas). If it is a static lambda, then we
+    # want to update the output type of the inner node and the function such
+    # that the rest of the system has the correct types. This is needed because
+    # we do not map into static lambdas and do not compile their inner contents
+    # as it should be treated as a literal, quoted graph.
     if (
         isinstance(node, graph.ConstNode)
         and isinstance(node.type, types.Function)
