@@ -17,6 +17,7 @@ import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
+import {Button as NewButton} from '../Button';
 import styled, {css} from 'styled-components';
 
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
@@ -45,7 +46,12 @@ import {
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
-import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
+import {
+  GRAY_350,
+  GRAY_500,
+  GRAY_800,
+  MOON_50,
+} from '../../common/css/globals.styles';
 // import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
@@ -87,6 +93,38 @@ export const PANEL_GROUP_DEFAULT_CONFIG = (): PanelGroupConfig => ({
 const inputType = 'any';
 
 type PanelGroupProps = Panel2.PanelProps<typeof inputType, PanelGroupConfig>;
+
+const ActionBar = styled.div`
+  height: 48px;
+  padding: 0 32px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+`;
+ActionBar.displayName = 'S.ActionBar';
+
+const AddPanelBar = styled.div`
+  height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  border-radius: 6px;
+  background-color: white;
+  font-weight: 600;
+  color: ${GRAY_500};
+`;
+AddPanelBar.displayName = 'S.AddPanelBar';
+
+const AddPanelBarContainer = styled.div`
+  padding: 8px 32px 16px;
+
+  transition: opacity 0.3s;
+  &:not(:hover) {
+    opacity: 0;
+  }
+`;
+AddPanelBarContainer.displayName = 'S.AddPanelBarContainer';
 
 export const Group = styled.div<{
   layered?: boolean;
@@ -340,6 +378,8 @@ export const addPanelToGroupConfig = (
 const usePanelGroupCommon = (props: PanelGroupProps) => {
   const updateConfig2 = useUpdateConfig2(props);
 
+  const addPanelBarRef = React.useRef<HTMLDivElement>(null);
+
   const handleAddPanel = useCallback(() => {
     updateConfig2(currentConfig => {
       return addPanelToGroupConfig(
@@ -348,9 +388,19 @@ const usePanelGroupCommon = (props: PanelGroupProps) => {
         props.config?.childNameBase
       );
     });
+    setTimeout(() => {
+      if (addPanelBarRef.current != null) {
+        addPanelBarRef.current.scrollIntoView({
+          behavior: 'smooth',
+        });
+      }
+    }, 1);
   }, [props.config?.allowedPanels, props.config?.childNameBase, updateConfig2]);
 
-  return useMemo(() => ({handleAddPanel}), [handleAddPanel]);
+  return useMemo(
+    () => ({handleAddPanel, addPanelBarRef}),
+    [handleAddPanel, addPanelBarRef]
+  );
 };
 
 export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
@@ -666,7 +716,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const {stack, path: groupPath} = usePanelContext();
   const {updateConfig} = props;
   const updateConfig2 = useUpdateConfig2(props);
-  const {handleAddPanel} = usePanelGroupCommon(props);
+  const {handleAddPanel, addPanelBarRef} = usePanelGroupCommon(props);
 
   const mutateItem = useCallback(
     (name: string, applyFn: (item: Draft<ChildPanelFullConfig>) => void) => {
@@ -799,29 +849,40 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   // const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
-  // if (isVarBar) {
-  //   return (
-  //     <VarBar
-  //       config={config}
-  //       updateConfig={updateConfig}
-  //       handleSiblingVarEvent={handleSiblingVarEvent}
-  //       stack={stack}
-  //       handleAddVar={handleAddPanel}
-  //     />
-  //   );
-  // }
+  const isMain = _.isEqual(groupPath, [`main`]);
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
-      <PBSection
-        mode={config.layoutMode}
-        config={gridConfig}
-        groupPath={groupPath}
-        enableAddPanel={config.enableAddPanel}
-        updateConfig2={updateGridConfig2}
-        renderPanel={renderSectionPanel}
-        handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
-      />
+      <div
+        style={{
+          minHeight: isMain ? '100%' : undefined,
+          height: !isMain ? '100%' : undefined,
+          backgroundColor: isMain ? MOON_50 : undefined,
+        }}>
+        {config.enableAddPanel && (
+          <ActionBar>
+            <NewButton variant="ghost" onClick={handleAddPanel} icon="add-new">
+              New panel
+            </NewButton>
+          </ActionBar>
+        )}
+        <PBSection
+          mode={config.layoutMode}
+          config={gridConfig}
+          groupPath={groupPath}
+          updateConfig2={updateGridConfig2}
+          renderPanel={renderSectionPanel}
+          handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
+        />
+        {config.enableAddPanel != null && (
+          <AddPanelBarContainer ref={addPanelBarRef}>
+            <AddPanelBar onClick={handleAddPanel}>
+              <IconAddNew />
+              New panel
+            </AddPanelBar>
+          </AddPanelBarContainer>
+        )}
+      </div>
     );
   }
 
