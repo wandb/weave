@@ -529,7 +529,7 @@ const CenterProjectTablesBrowser: React.FC<
       _updatedAt: b.updatedAt,
       name: b.name,
       kind: 'Stream Table',
-      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'updated at': moment.utc(b.createdByUpdatedAt).local().calendar(),
       'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
     }));
