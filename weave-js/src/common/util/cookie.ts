@@ -61,8 +61,9 @@ const getCookieStrs = () => {
 const cookieStrToKeyVal = (cookieStr: string, warn: boolean = true) => {
   const sepI = cookieStr.indexOf('=');
   if (sepI < 1) {
-    if (warn)
-    {console.warn('Invalid cookie', cookieStr);}
+    if (warn) {
+      console.warn('Invalid cookie', cookieStr);
+    }
     return null;
   }
   const key = cookieStr.slice(0, sepI);
