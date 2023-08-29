@@ -171,7 +171,7 @@ def use_server_gql_schema():
     old_schema_path = environment.gql_schema_path()
     del os.environ["WEAVE_GQL_SCHEMA_PATH"]
     yield
-    os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path or ""
 
 
 @pytest.fixture()
