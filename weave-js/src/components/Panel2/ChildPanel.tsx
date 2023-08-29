@@ -626,39 +626,40 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
               )}
             </EditorBarHover>
             {/* Control buttons */}
-            <EditorIcons
-              visible={!props.noEditorIcons && (isHoverPanel || isMenuOpen)}>
-              {props.prefixButtons}
-              <Tooltip
-                position="top center"
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    icon="pencil-edit"
-                    onClick={() => setInspectingPanel(props.pathEl ?? '')}
-                  />
-                }>
-                Open panel editor
-              </Tooltip>
-              <OutlineItemPopupMenu
-                config={fullConfig}
-                localConfig={getConfigForPath(fullConfig, fullPath)}
-                path={fullPath}
-                updateConfig={updateConfig}
-                updateConfig2={updateConfig2}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    icon="overflow-horizontal"
-                  />
-                }
-                onOpen={() => setIsMenuOpen(true)}
-                onClose={() => setIsMenuOpen(false)}
-                isOpen={isMenuOpen}
-              />
-            </EditorIcons>
+            {!props.noEditorIcons && (
+              <EditorIcons visible={isHoverPanel || isMenuOpen}>
+                {props.prefixButtons}
+                <Tooltip
+                  position="top center"
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      icon="pencil-edit"
+                      onClick={() => setInspectingPanel(props.pathEl ?? '')}
+                    />
+                  }>
+                  Open panel editor
+                </Tooltip>
+                <OutlineItemPopupMenu
+                  config={fullConfig}
+                  localConfig={getConfigForPath(fullConfig, fullPath)}
+                  path={fullPath}
+                  updateConfig={updateConfig}
+                  updateConfig2={updateConfig2}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      icon="overflow-horizontal"
+                    />
+                  }
+                  onOpen={() => setIsMenuOpen(true)}
+                  onClose={() => setIsMenuOpen(false)}
+                  isOpen={isMenuOpen}
+                />
+              </EditorIcons>
+            )}
           </EditorBarContent>
         </Styles.EditorBar>
       )}
