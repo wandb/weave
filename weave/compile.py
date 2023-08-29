@@ -106,12 +106,15 @@ def _static_function_types(node: graph.Node) -> typing.Optional[graph.Node]:
         and len(node.type.input_types) == 0
     ):
         inner_node = node.val
-        compiled_node = _compile([inner_node])[0]
-        return weave_internal.const(
-            weave_internal.make_output_node(
-                compiled_node.type, inner_node.from_op.name, inner_node.from_op.inputs
+        if isinstance(inner_node, graph.OutputNode):
+            compiled_node = _compile([inner_node])[0]
+            return weave_internal.const(
+                weave_internal.make_output_node(
+                    compiled_node.type,
+                    inner_node.from_op.name,
+                    inner_node.from_op.inputs,
+                )
             )
-        )
     return None
 
 
