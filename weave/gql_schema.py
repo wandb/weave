@@ -20,5 +20,6 @@ def gql_schema() -> graphql.GraphQLSchema:
         else:
             gql_schema = wandb_client_api.introspect_server_schema()
 
-    _GQL_SCHEMA_CACHE[schema_path] = gql_schema
+        _GQL_SCHEMA_CACHE[schema_path] = gql_schema
+
     return gql_schema
