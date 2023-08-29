@@ -654,7 +654,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   const mutateItem = useCallback(
     (name: string, applyFn: (item: Draft<ChildPanelFullConfig>) => void) => {
-      console.log('HIGHLIGHT ITEM NAME', name);
+      // console.log('HIGHLIGHT ITEM NAME', name);
       updateConfig2(currentConfig => {
         return produce(currentConfig, draft => {
           if (currentConfig.items[name] != null) {
@@ -668,7 +668,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
                 fullItem.id === 'Group' &&
                 fullItem.config.items[name] != null
               ) {
-                console.log('HIGHLIGHT GRAND CHILD');
+                // console.log('HIGHLIGHT GRAND CHILD');
                 mutateEnsureItemIsFullChildPanel(draft.items, itemName);
                 mutateEnsureItemIsFullChildPanel(
                   (draft.items[itemName] as ChildPanelFullConfig).config.items,
@@ -721,14 +721,14 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   const handleSiblingVarEvent = useCallback(
     (varName: string, target: NodeOrVoidNode, event: ExpressionEvent) => {
-      console.log('PG2 handleSiblingVarEvent', varName, target, event);
+      // console.log('PG2 handleSiblingVarEvent', varName, target, event);
       if (event.id === 'hover') {
         setItemIsHighlighted(varName, true);
       } else if (event.id === 'unhover') {
         setItemIsHighlighted(varName, false);
       } else if (event.id === 'mutate') {
         mutateItem(varName, item => {
-          console.log('PG2 mutate input expr');
+          // console.log('PG2 mutate input expr');
           item.input_node = replaceChainRoot(
             item.input_node,
             event.newRootNode
