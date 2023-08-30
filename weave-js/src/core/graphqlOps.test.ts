@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import {forwardOpInputs, newForwardGraph} from './engine/forwardGraph';
 import * as HL from './hl';
 import type {OutputNode} from './model';

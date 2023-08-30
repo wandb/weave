@@ -927,7 +927,7 @@ describe('opStringLevenshtein', () => {
       [4, 3, 4, 0, 4],
       [2, 2, 4, 4, 0],
     ];
-    const distances = [[], [], [], [], []];
+    const distances: any[][] = [[], [], [], [], []];
     // Take words list above and get the distance matrix
     for (let i = 0; i < WORDS.length; i++) {
       for (let j = 0; j < WORDS.length; j++) {

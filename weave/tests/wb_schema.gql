@@ -308,6 +308,7 @@ type ArtifactType {
   name: String!
   project: Project!
   artifactCollections(first: Int): ArtifactCollectionConnection
+  artifact(name: String!): Artifact
 }
 
 type ArtifactCollectionConnection {

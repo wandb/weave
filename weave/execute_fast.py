@@ -136,6 +136,10 @@ def _slow_map_fn(input_list, map_fn):
 
 def fast_map_fn(input_list, map_fn):
     """Maps a weave function over an input list, without using engine."""
+
+    if len(input_list) == 0:
+        return []
+
     # TODO: Perform this recursively in the main compile pass
     tracer = engine_trace.tracer()
 

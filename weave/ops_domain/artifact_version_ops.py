@@ -119,9 +119,11 @@ def _gql_op_output_type_for_root_artifact_version(
     )
     artifact_alias = _make_alias(inputs.raw["artifactVersionName"], prefix="artifact")
     return types.optional(
-        typing.cast(typing.Any, input_type)[project_alias][artifact_type_alias][
-            artifact_alias
-        ]
+        wdt.ArtifactVersionType.with_keys(
+            typing.cast(typing.Any, input_type)[project_alias][artifact_type_alias][
+                artifact_alias
+            ]
+        )
     )
 
 

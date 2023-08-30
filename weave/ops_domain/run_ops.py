@@ -129,7 +129,7 @@ gql_prop_op(
     types.Dict(types.String(), types.Any()),
 )
 
-gql_prop_op(
+runtime = gql_prop_op(
     "run-runtime",
     wdt.RunType,
     "computeSeconds",

@@ -69,7 +69,11 @@ def timestamp_bins_nice(arr, target_n_bins):
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     exact_bin_size = ((arr_max - arr_min) / target_n_bins).total_seconds()  # type: ignore
-    bin_size_s = min(NICE_BIN_SIZES_SEC, key=lambda x: abs(x / exact_bin_size - 1))
+    bin_size_s = (
+        min(NICE_BIN_SIZES_SEC, key=lambda x: abs(x / exact_bin_size - 1))
+        if exact_bin_size != 0
+        else 1
+    )
     return use(timestamp_bins_fixed(bin_size_s))
 
 
