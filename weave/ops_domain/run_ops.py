@@ -409,7 +409,7 @@ def run_logged_artifact_version(
 
 @op(
     name="run-runtime",
-    input_type=wdt.RunType,
+    input_type={"run": wdt.RunType},
     output_type=types.Number(),
     plugins=wb_gql_op_plugin(lambda inputs, inner: "computeSeconds"),
 )
@@ -419,9 +419,9 @@ def run_runtime(run):
 
 @arrow_op(
     name="ArrowWeaveListRun-runtime",
-    input_type=ArrowWeaveListType(
-        wdt.RunType.with_keys({"runtime": types.TimeDelta()})
-    ),
+    input_type={
+        "arr": ArrowWeaveListType(wdt.RunType.with_keys({"runtime": types.TimeDelta()}))
+    },
     output_type=ArrowWeaveListType(types.Number()),
 )
 def awl_run_runtime(arr):
