@@ -31,8 +31,27 @@ def test_resolve_static_branches():
 
 
 def test_empty_list():
-    data = weave.RuntimeConstNode(
-        types.List(types.Int()),
-        [],
+    arr = weave.RuntimeConstNode(types.List(types.TypedDict({})), [])
+    run_colors_dict = weave.RuntimeConstNode(
+        types.Dict(types.String(), types.String()),
+        {"toh8ox9k": "rgb(237, 183, 50)"},
     )
-    assert weave.use(data.map(lambda row: row + 1)) == []
+    map_fn = weave.define_fn(
+        {"row": arr.type.object_type, "index": types.Number()},
+        lambda row, index: row.merge(
+            weave.ops.dict_(
+                **{
+                    "100": 100,
+                    "target_class": row["target_class"],
+                    "entanglement": row["entanglement"],
+                    "runColors[output_classid]": run_colors_dict[
+                        row["output_class"].id()
+                    ],
+                    "output_classname": row["output_classname"],
+                    "circle": "circle",
+                    "_index": index,
+                }
+            )
+        ),
+    )
+    assert weave.use(arr.map(map_fn)) == []
