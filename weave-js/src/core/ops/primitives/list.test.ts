@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import {typeToString} from '../../language/js/print';
 import {
   constNumberList,

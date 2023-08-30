@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import {Options, pineapple, unpineapple} from './pineapple';
 
 describe('pineapple/unpineapple', () => {

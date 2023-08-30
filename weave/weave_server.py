@@ -140,7 +140,8 @@ def list_ops():
     with wandb_api.from_environment():
         # TODO: this is super slow.
         if not environment.wandb_production():
-            registry_mem.memory_registry.load_saved_ops()
+            # registry_mem.memory_registry.load_saved_ops()
+            pass
         if (
             ops_cache is None
             or ops_cache["updated_at"] < registry_mem.memory_registry.updated_at()
