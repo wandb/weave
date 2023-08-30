@@ -25,7 +25,6 @@ import {usePanelContext} from '../../components/Panel2/PanelContext';
 import {WeaveExpressionState} from './state';
 import type {SuggestionProps, WeaveExpressionProps} from './types';
 import {getIndexForPoint, moveToNextMissingArg, trace} from './util';
-import {useIsMounted} from '@wandb/weave/common/util/hooks';
 
 // Provides the decorate callback to pass to Slate's Editable
 // component and implements syntax highlighting and styling
@@ -200,23 +199,8 @@ export const useWeaveExpressionState = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [externalState, setExternalStateUnsafe] =
+  const [externalState, setExternalState] =
     React.useState<WeaveExpressionState>(internalState);
-
-  const isMounted = useIsMounted();
-
-  const setExternalState = React.useCallback<typeof setExternalStateUnsafe>(
-    args => {
-      // setExternalState is used by `WeaveExpressionState` to update the
-      // external state. `WeaveExpressionState` is not aware of the component
-      // mount state, nor does it need to be. This check is here to prevent
-      // a state update from being applied after the component has unmounted.
-      if (isMounted()) {
-        setExternalStateUnsafe(args);
-      }
-    },
-    [isMounted]
-  );
 
   const onChange = React.useCallback(
     (newValue: SlateNode[], newStack: Stack) => {
