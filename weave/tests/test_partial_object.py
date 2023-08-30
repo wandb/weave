@@ -638,3 +638,13 @@ def test_early_termination_of_gql_key_propagation(fake_wandb):
     arrow = projects_node.list_to_arrow()
     awl = weave.use(arrow)
     assert awl[0] == projects[0]
+
+
+def test_root_artifact_version_gql_propagation():
+    node = ops.artifact_version_ops.root_artifact_version(
+        "stacey", "mendeleev", "test_res_1fwmcd3q", "v0"
+    )
+    compiled_node = compile.compile([node])[0]
+
+    expected = types.optional(wdt.ArtifactVersionType.with_keys({"id": types.String()}))
+    assert compiled_node.type == expected
