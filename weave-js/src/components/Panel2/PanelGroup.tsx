@@ -69,11 +69,8 @@ import {
 // import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
-<<<<<<< Updated upstream
 import {inJupyterCell} from '../PagePanelComponents/util';
-=======
 import { usePanelPanelContext } from './PanelPanelContextProvider';
->>>>>>> Stashed changes
 
 const LAYOUT_MODES = [
   'horizontal' as const,

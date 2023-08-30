@@ -709,32 +709,32 @@ export const updateExpressionVarNames = (node: PanelTreeNode, stack: Stack, path
     let config = child.config;
   
     // This is for group config stuff
-    // if (child.id === 'Group') {
-    //   if (config.gridConfig) {
-    //     // This updates the grid config with the new name, since we use names as ids
-    //     // if we had unique ids, we wouldnt have to do this
-    //     const gridConfigIndex = config.gridConfig.panels.findIndex(
-    //       (p: any) => p.id === oldName
-    //     );
-    //     if (gridConfigIndex !== -1) {
-    //       config = {
-    //         ...config,
-    //         gridConfig: {
-    //           ...config.gridConfig,
-    //           panels: [...config.gridConfig.panels.map((p: any, i: number) => {
-    //             if (i === gridConfigIndex) {
-    //               return {
-    //                 ...p,
-    //                 id: newName,
-    //               };
-    //             }
-    //             return p;
-    //           })]
-    //         },
-    //       };
-    //     }
-    //   }
-    // }
+    if (child.id === 'Group') {
+      if (config.gridConfig) {
+        // This updates the grid config with the new name, since we use names as ids
+        // if we had unique ids, we wouldnt have to do this
+        const gridConfigIndex = config.gridConfig.panels.findIndex(
+          (p: any) => p.id === oldName
+        );
+        if (gridConfigIndex !== -1) {
+          config = {
+            ...config,
+            gridConfig: {
+              ...config.gridConfig,
+              panels: [...config.gridConfig.panels.map((p: any, i: number) => {
+                if (i === gridConfigIndex) {
+                  return {
+                    ...p,
+                    id: newName,
+                  };
+                }
+                return p;
+              })]
+            },
+          };
+        }
+      }
+    }
 
     if (
       // Filter out these panels, since the map code walks them, correctly pushing
