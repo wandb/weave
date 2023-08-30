@@ -109,7 +109,7 @@ def gql_type_to_weave_type(
         elif gql_type.name == "DateTime":
             t = types.Timestamp()
         elif gql_type.name == "Duration":
-            t = types.TimeDelta()
+            t = types.Number()  # duration is number of seconds
         else:
             raise ValueError(f"Unknown scalar type {gql_type.name}")
 

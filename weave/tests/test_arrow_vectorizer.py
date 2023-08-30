@@ -10,6 +10,8 @@ from .. import weave_internal
 from ..ops_primitives import dict_, list_
 from .. import errors
 
+import datetime
+
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
 from .. import ops_arrow as arrow
@@ -1335,3 +1337,27 @@ def test_cant_vectorize_without_keys():
     # it finds a mapped list op, but not an AWL op
     assert "ArrowWeaveList" not in vec_fn.from_op.name
     assert "mapped" in vec_fn.from_op.name
+
+
+def test_vectorize_run_runtime():
+    runs = [
+        wdt.Run({"id": "A", "computeSeconds": 1}),
+        wdt.Run({"id": "B", "computeSeconds": 2}),
+        wdt.Run({"id": "C", "computeSeconds": 3}),
+    ]
+
+    awl = arrow.to_arrow(runs)
+    l = weave.save(awl)
+
+    fn = weave_internal.define_fn(
+        {"x": awl.object_type}, lambda x: run_ops.runtime(x)
+    ).val
+
+    vec_fn = arrow.vectorize(fn, strict=True)
+
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == [1, 2, 3]
+
+    # it finds an AWL op
+    assert "ArrowWeaveList" in vec_fn.from_op.name
+    assert "mapped" not in vec_fn.from_op.name
