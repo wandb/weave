@@ -4,6 +4,8 @@ import {
   constNone,
   constString,
   dereferenceAllVars,
+  isConstNode,
+  isOutputNode,
   Node,
   opGet,
   Type,
@@ -58,6 +60,92 @@ export const useBoardGeneratorsForNode = (
   }, [allowConfig, res.loading, res.result]);
 };
 
+const getRootURIFromNode = (node: Node) => {
+  while (isOutputNode(node)) {
+    const inputs = Object.values(node.fromOp.inputs);
+    if (inputs.length === 0) {
+      return null;
+    } else if (
+      node.fromOp.name === 'get' &&
+      isConstNode(node.fromOp.inputs['uri'])
+    ) {
+      return '' + node.fromOp.inputs['uri'].val;
+    }
+    node = inputs[0];
+  }
+  return null;
+};
+
+const getNameFromURI = (uri: string) => {
+  let parts = uri.split('://');
+  if (parts.length !== 2) {
+    return null;
+  }
+  parts = parts[1].split(':')[0].split('/');
+  return parts[parts.length - 1];
+};
+
+const getNameFromRootURINode = (node: Node) => {
+  const uri = getRootURIFromNode(node);
+  if (uri) {
+    return getNameFromURI(uri);
+  }
+  return null;
+};
+
+const getNameFromRootArtifactNode = (node: Node) => {
+  while (isOutputNode(node)) {
+    const inputs = Object.values(node.fromOp.inputs);
+    if (inputs.length === 0) {
+      return null;
+    } else if (
+      node.fromOp.name === 'project-artifact' &&
+      isConstNode(node.fromOp.inputs['artifactName'])
+    ) {
+      let name = '' + node.fromOp.inputs['artifactName'].val;
+      if (name.startsWith('run-')) {
+        const parts = name.split('-');
+        return parts[parts.length - 1];
+      }
+    }
+    node = inputs[0];
+  }
+  return null;
+};
+
+const getNameFromNodeHeuristic = (node: Node) => {
+  let name = getNameFromRootURINode(node);
+  if (name == null) {
+    name = getNameFromRootArtifactNode(node);
+  }
+  if (name) {
+    name = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  }
+  return name;
+};
+
+const makeBoardName = (
+  boardGenOpName: string,
+  inputNode: Node,
+  boardName?: string
+) => {
+  if (boardName != null) {
+    return boardName;
+  }
+  let objectName = getNameFromNodeHeuristic(inputNode) ?? '';
+  if (objectName) {
+    objectName = objectName + '-';
+  }
+  const boardNameMap: {[name: string]: string} = {
+    'py_board-llm_completions_monitor': 'llm_completion_analysis',
+    'py_board-seed_autoboard': 'timeseries_analysis',
+  };
+  const prefix = boardNameMap[boardGenOpName] || 'board';
+
+  const suffix = moment().format('YY_MM_DD_hh_mm_ss');
+  return `${objectName}${prefix}-${suffix}`;
+};
+
 export const useMakeLocalBoardFromNode = () => {
   const simpleSetter = useMakeSimpleSetMutation();
   return useCallback(
@@ -68,9 +156,7 @@ export const useMakeLocalBoardFromNode = () => {
       boardName?: string,
       config: Node = constNone()
     ) => {
-      if (!boardName) {
-        boardName = 'board-' + moment().format('YY_MM_DD_hh_mm_ss');
-      }
+      boardName = makeBoardName(boardGenOpName, inputNode, boardName);
       simpleSetter(
         `local-artifact:///${boardName}:latest/obj`,
         callOpVeryUnsafe(
