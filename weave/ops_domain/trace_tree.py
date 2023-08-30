@@ -35,7 +35,7 @@ class Result:
 def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> None:
     """
     Set an attribute on an object with annotated attributes, but first check that
-    the value is of the correct type.
+    the value is of the correct type. If not, log a warning and set the attribute to None.
     """
 
     hints = typing.get_type_hints(obj.__class__)
