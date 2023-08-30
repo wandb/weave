@@ -522,7 +522,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   );
 
   const updateGroupBy = useCallback(
-    (
+    async (
       enabled: boolean,
       seriesIndex: number,
       dimName: keyof SeriesConfig['dims'],
@@ -531,20 +531,29 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       const fn = enabled
         ? TableState.enableGroupByCol
         : TableState.disableGroupByCol;
-      let newTable = fn(
+      let newTable = await fn(
         config.series[seriesIndex].table,
-        value
+        value,
+        inputNode,
+        weave,
+        stack
         // config.series[seriesIndex].dims[dimension.name as keyof SeriesConfig['dims']]
       );
       if (dimName === 'label') {
-        newTable = fn(newTable, config.series[seriesIndex].dims.color);
+        newTable = await fn(
+          newTable,
+          config.series[seriesIndex].dims.color,
+          inputNode,
+          weave,
+          stack
+        );
       }
       const newConfig = produce(config, draft => {
         draft.series[seriesIndex].table = newTable;
       });
       updateConfig(newConfig);
     },
-    [config, updateConfig]
+    [config, inputNode, stack, updateConfig, weave]
   );
 
   const newSeriesConfigDom = useMemo(() => {

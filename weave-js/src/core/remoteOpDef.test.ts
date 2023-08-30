@@ -27,7 +27,7 @@ describe('loading remote op store defs', () => {
       const subtests: Array<{
         inputs: {[key: string]: OutputNode};
         output: {type: Type; val: any};
-      }> = testData.op_defs[name].example_io ?? [];
+      }> = (testData.op_defs as any)[name].example_io ?? [];
       subtests.forEach((subtest, ndx) => {
         const inputTypes = Object.entries(subtest.inputs)
           .map(e => {
