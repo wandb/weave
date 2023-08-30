@@ -137,6 +137,7 @@ import {
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 import {Option} from '@wandb/weave/common/util/uihelpers';
+import {useIsMounted} from '@wandb/weave/common/util/hooks';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -1979,6 +1980,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     updateConfig: propsUpdateConfig,
     updateConfig2: propsUpdateConfig2,
   } = props;
+  const isMounted = useIsMounted();
 
   const [brushMode, setBrushMode] = useState<BrushMode>('zoom');
 
@@ -3402,6 +3404,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const handleTooltip = useCallback(
     (toolTipHandler: any, event: any, item: any, value: any) => {
+      if (!isMounted()) {
+        return;
+      }
       let {x, y}: {x?: number; y?: number} = {};
 
       if (value == null) {
@@ -3425,7 +3430,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         setTooltipPos({x, y, value});
       }
     },
-    [setTooltipPos]
+    [isMounted]
   );
 
   const isLineTooltip = useMemo(
