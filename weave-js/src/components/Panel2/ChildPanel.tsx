@@ -532,7 +532,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   } = useChildPanelCommon(props);
 
   const {frame} = usePanelContext();
-  const closePanel = useCloseEditor();
+  const closeEditor = useCloseEditor();
 
   const validateName = useCallback(
     (newName: string) => {
@@ -659,7 +659,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   onOpen={() => setIsMenuOpen(true)}
                   onClose={() => setIsMenuOpen(false)}
                   isOpen={isMenuOpen}
-                  goBackToOutline={closePanel}
+                  goBackToOutline={closeEditor}
                 />
               </EditorIcons>
             )}
