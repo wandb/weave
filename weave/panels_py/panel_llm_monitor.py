@@ -442,3 +442,10 @@ template_registry.register(
     instructions_md=instructions_md,
     thumbnail_url="https://raw.githubusercontent.com/wandb/weave/master/docs/assets/monitor-open-ai-api-usage.png",
 )
+
+
+# Can't just make our own types, server won't deserialize.
+# A fairly easy fix.
+@weave.type()
+class Dataset:
+    rows: list[typing.Any]
