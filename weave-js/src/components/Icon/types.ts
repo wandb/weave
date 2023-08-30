@@ -105,6 +105,7 @@ export const IconNames = {
   Model: 'model',
   MusicAudio: 'music-audio',
   Number: 'number',
+  OpenAi: 'openai',
   OpenNewTab: 'open-new-tab',
   OrchestrationLaunch: 'orchestration-launch',
   OrganizationCorporate: 'organization-corporate',

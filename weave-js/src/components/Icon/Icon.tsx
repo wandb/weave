@@ -106,6 +106,7 @@ import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-mini
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
+import {ReactComponent as ImportOpenAi} from '../../assets/icons/icon-openai.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
@@ -522,6 +523,9 @@ export const IconMusicAudio = (props: SVGIconProps) => (
 export const IconNumber = (props: SVGIconProps) => (
   <ImportNumber {...updateIconProps(props)} />
 );
+export const IconOpenAi = (props: SVGIconProps) => (
+  <ImportOpenAi {...updateIconProps(props)} />
+);
 export const IconOpenNewTab = (props: SVGIconProps) => (
   <ImportOpenNewTab {...updateIconProps(props)} />
 );
@@ -882,6 +886,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   model: IconModel,
   'music-audio': IconMusicAudio,
   number: IconNumber,
+  openai: IconOpenAi,
   'open-new-tab': IconOpenNewTab,
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
