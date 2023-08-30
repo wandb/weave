@@ -58,7 +58,7 @@ import {
   usePanelContext,
 } from './PanelContext';
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
-import {isGroupNode, nextPanelName} from './panelTree';
+import {isGroupNode, nextPanelName, updateExpressionVarNames} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 import {
   GRAY_350,
@@ -69,7 +69,11 @@ import {
 // import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
+<<<<<<< Updated upstream
 import {inJupyterCell} from '../PagePanelComponents/util';
+=======
+import { usePanelPanelContext } from './PanelPanelContextProvider';
+>>>>>>> Stashed changes
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -649,24 +653,37 @@ export const PanelGroupItem: React.FC<{
     [name, updateConfig2]
   );
 
+  const {path} = usePanelContext();
+
+  const {config: fullConfig, updateConfig: fullUpdateConfig} = usePanelPanelContext();
+
   const itemUpdateName = useCallback(
     (newName: string) => {
-      updateConfig(
-        produce(config, draft => {
-          draft.items[newName] = draft.items[name];
-          delete draft.items[name];
-
-          // This updates the grid config with the new name, since we use names as ids
-          // if we had unique ids, we wouldnt have to do this
-          const gridConfigIndex = config.gridConfig.panels.findIndex(
-            p => p.id === name
-          );
-          if (gridConfigIndex !== -1) {
-            draft.gridConfig.panels[gridConfigIndex].id = newName;
-          }
-        })
+      // this works
+    
+      fullUpdateConfig(
+        updateExpressionVarNames(fullConfig, [], [...path, name], name, newName)
       );
-    },
+
+      // this doesn't work
+      // updateConfig(
+      //   produce(config, draft => {
+      //     draft.items[newName] = draft.items[name];
+      //     delete draft.items[name];
+
+      //     if (config.gridConfig) {
+      //       // This updates the grid config with the new name, since we use names as ids
+      //       // if we had unique ids, we wouldnt have to do this
+      //       const gridConfigIndex = config.gridConfig.panels.findIndex(
+      //         p => p.id === name
+      //       );
+      //       if (gridConfigIndex !== -1) {
+      //         draft.gridConfig.panels[gridConfigIndex].id = newName;
+      //       }
+      //     }
+      //   })
+      // );
+    }, 
     [config, name, updateConfig]
   );
 
