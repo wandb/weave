@@ -643,7 +643,13 @@ export function setPage(ts: TableState, page: number) {
   });
 }
 
-export function enableGroupByCol(ts: TableState, colId: string) {
+export async function enableGroupByCol(
+  ts: TableState,
+  colId: string,
+  inputArrayNode: Node,
+  weave: WeaveInterface,
+  stack: Stack
+) {
   ts = produce(ts, draft => {
     draft.autoColumns = false;
     if (ts.columns[colId] == null) {
@@ -654,6 +660,7 @@ export function enableGroupByCol(ts: TableState, colId: string) {
     }
     draft.groupBy.push(colId);
   });
+  ts = await refreshSelectFunctions(ts, inputArrayNode, weave, stack);
   // Disable prior sort as it does not make sense to sort on lists of things
   ts = disableSort(ts);
   // we sort by the first group by key to ensure they stay together
@@ -663,7 +670,13 @@ export function enableGroupByCol(ts: TableState, colId: string) {
   return ts;
 }
 
-export function disableGroupByCol(ts: TableState, colId: string) {
+export async function disableGroupByCol(
+  ts: TableState,
+  colId: string,
+  inputArrayNode: Node,
+  weave: WeaveInterface,
+  stack: Stack
+) {
   const colIds = _.isArray(colId) ? colId : [colId];
   const groupBy = ts.groupBy;
   ts = produce(ts, draft => {
@@ -679,6 +692,7 @@ export function disableGroupByCol(ts: TableState, colId: string) {
       draft.groupBy.splice(orderIndex, 1);
     }
   });
+  ts = await refreshSelectFunctions(ts, inputArrayNode, weave, stack);
   if (ts.sort.find(s => s.columnId === colId) !== undefined) {
     ts = disableSortByCol(ts, colId);
   }

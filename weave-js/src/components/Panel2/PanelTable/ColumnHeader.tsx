@@ -23,7 +23,7 @@ import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
 import {PanelComp2} from '../PanelComp';
-import {PanelContextProvider} from '../PanelContext';
+import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import * as Table from './tableState';
@@ -143,6 +143,7 @@ export const ColumnHeader: React.FC<{
   simpleTable,
 }) => {
   const weave = useWeaveContext();
+  const {stack} = usePanelContext();
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
 
@@ -240,11 +241,25 @@ export const ColumnHeader: React.FC<{
       tableState.groupBy,
     ]
   );
-  const doUngroup = useCallback(() => {
-    const newTableState = disableGroup(tableState, colId);
+  const doUngroup = useCallback(async () => {
+    const newTableState = await disableGroup(
+      tableState,
+      colId,
+      inputArrayNode,
+      weave,
+      stack
+    );
     recordEvent('UNGROUP');
     updateTableState(newTableState);
-  }, [tableState, colId, disableGroup, updateTableState]);
+  }, [
+    disableGroup,
+    tableState,
+    colId,
+    inputArrayNode,
+    weave,
+    stack,
+    updateTableState,
+  ]);
 
   const selectedNode = useMemo(
     () =>
@@ -290,9 +305,15 @@ export const ColumnHeader: React.FC<{
         value: 'group',
         name: 'Group by',
         icon: 'group-runs',
-        onSelect: () => {
-          const newTableState = enableGroup(tableState, colId);
+        onSelect: async () => {
           recordEvent('GROUP');
+          const newTableState = await enableGroup(
+            tableState,
+            colId,
+            inputArrayNode,
+            weave,
+            stack
+          );
           updateTableState(newTableState);
         },
       });
@@ -389,19 +410,20 @@ export const ColumnHeader: React.FC<{
     }
     return menuItems;
   }, [
-    doUngroup,
-    columnTypeForGroupByChecks,
-    colId,
     isGroupCol,
-    enableGroup,
-    inputArrayNode,
-    tableState,
-    updateTableState,
+    columnTypeForGroupByChecks,
     workingSelectFunction.type,
     openColumnSettings,
+    enableGroup,
+    tableState,
+    colId,
+    inputArrayNode,
+    weave,
+    stack,
+    updateTableState,
+    doUngroup,
     isPinned,
     setColumnPinState,
-    weave,
   ]);
 
   const colIsSorted =

@@ -14,14 +14,11 @@ from graphql import (
     OperationDefinitionNode,
 )
 import graphql
-import pathlib
 import typing
 
 from . import errors
 from . import weave_types as types
-
-
-_GQL_SCHEMA: typing.Optional[graphql.GraphQLSchema] = None
+from . import gql_schema
 
 
 def get_outermost_alias(query_str: str) -> str:
@@ -39,16 +36,6 @@ def get_outermost_alias(query_str: str) -> str:
     if inner_selection.alias is not None:
         return inner_selection.alias.value
     return inner_selection.name.value
-
-
-def get_gql_schema() -> graphql.GraphQLSchema:
-    global _GQL_SCHEMA
-    if _GQL_SCHEMA is None:
-        with open(pathlib.Path(__file__).parent / "ops_domain/wb_schema.gql") as f:
-            schema_str = f.read()
-
-        _GQL_SCHEMA = graphql.build_schema(schema_str)
-    return _GQL_SCHEMA
 
 
 def gql_type_to_weave_type(
@@ -122,7 +109,7 @@ def gql_type_to_weave_type(
         elif gql_type.name == "DateTime":
             t = types.Timestamp()
         elif gql_type.name == "Duration":
-            t = types.TimeDelta()
+            t = types.Number()  # duration is number of seconds
         else:
             raise ValueError(f"Unknown scalar type {gql_type.name}")
 
@@ -153,7 +140,7 @@ def get_query_weave_type(query: str) -> types.Type:
     document = parse(query)
     for definition in document.definitions:
         if isinstance(definition, OperationDefinitionNode):
-            schema = get_gql_schema()
+            schema = gql_schema.gql_schema()
             root_operation_type = get_operation_root_type(schema, definition)
             return gql_type_to_weave_type(root_operation_type, definition.selection_set)
     raise ValueError("No operation found in query")
