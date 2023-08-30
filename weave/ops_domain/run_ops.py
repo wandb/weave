@@ -36,7 +36,10 @@
 
 import json
 import typing
+import datetime
+import pyarrow as pa
 
+from pyarrow import compute as pc
 
 from .. import compile_table
 from ..input_provider import InputAndStitchProvider
@@ -52,10 +55,13 @@ from .wandb_domain_gql import (
     _make_alias,
 )
 
+from ..ops_arrow import ArrowWeaveListType, ArrowWeaveList
+
 
 from . import wb_util
 from .. import engine_trace
 from .run_history import history_op_common
+from ..decorator_arrow_op import arrow_op
 
 
 # Important to re-export ops
@@ -121,13 +127,6 @@ gql_prop_op(
     wdt.RunType,
     "historyKeys",
     types.Dict(types.String(), types.Any()),
-)
-
-gql_prop_op(
-    "run-runtime",
-    wdt.RunType,
-    "computeSeconds",
-    types.Number(),
 )
 
 gql_prop_op(
@@ -406,3 +405,26 @@ def run_logged_artifact_version(
 ) -> wdt.ArtifactVersion:
     alias = _make_alias(artifactVersionName, prefix="artifact")
     return wdt.ArtifactVersion.from_keys(run["project"][alias])
+
+
+@op(
+    name="run-runtime",
+    input_type=wdt.RunType,
+    output_type=types.Number(),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "computeSeconds"),
+)
+def run_runtime(run):
+    return typing.cast(datetime.timedelta, run["computeSeconds"]).seconds
+
+
+@arrow_op(
+    name="ArrowWeaveListRun-runtime",
+    input_type=ArrowWeaveListType(
+        wdt.RunType.with_keys({"runtime": types.TimeDelta()})
+    ),
+    output_type=ArrowWeaveListType(types.Number()),
+)
+def awl_run_runtime(arr):
+    return ArrowWeaveList(
+        pc.divide(arr._arrow_data.cast(pa.int64()), 1000), types.Number(), arr._artifact
+    )
