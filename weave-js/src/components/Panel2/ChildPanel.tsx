@@ -1008,6 +1008,9 @@ const EditorBarHover = styled.div<{show: boolean}>`
   display: ${props => (props.show ? 'flex' : 'none')};
   align-items: flex-start;
   flex-grow: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `;
 EditorBarHover.displayName = 'S.EditorBarHover';
 
