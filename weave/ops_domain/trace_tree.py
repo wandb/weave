@@ -43,7 +43,7 @@ def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> Non
         raise ValueError(f"Object {obj} has no attribute {key}")
 
     try:
-        typeguard.check_type(f"{key} of {obj}", value, hints[key])
+        typeguard.check_type(value, hints[key])
     except TypeError as e:
         # warn
         logging.warning(
