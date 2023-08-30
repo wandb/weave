@@ -263,7 +263,7 @@ describe('pineapple/unpineapple', () => {
   describe('programming errors', () => {
     throwCase({foo: 'bar'}, null, 'key must be non-empty, non-numeric string', {
       key: null,
-    });
+    } as any);
     throwCase({foo: 'bar'}, null, 'key must be non-empty, non-numeric string', {
       key: '',
     });
