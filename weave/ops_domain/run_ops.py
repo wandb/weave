@@ -420,11 +420,21 @@ def run_runtime(run):
 @arrow_op(
     name="ArrowWeaveListRun-runtime",
     input_type={
-        "arr": ArrowWeaveListType(wdt.RunType.with_keys({"runtime": types.TimeDelta()}))
+        "arr": ArrowWeaveListType(
+            wdt.RunType.with_keys({"computeSeconds": types.TimeDelta()})
+        )
     },
     output_type=ArrowWeaveListType(types.Number()),
 )
 def awl_run_runtime(arr):
+    indices = arr._arrow_data.indices
+    dictionary = arr._arrow_data.dictionary
+    seconds = pa.DictionaryArray.from_arrays(
+        indices, pc.divide(dictionary.field("computeSeconds").cast(pa.int64()), 1000)
+    )
+
     return ArrowWeaveList(
-        pc.divide(arr._arrow_data.cast(pa.int64()), 1000), types.Number(), arr._artifact
+        seconds,
+        types.Number(),
+        arr._artifact,
     )
