@@ -420,8 +420,8 @@ const OverviewTab = ({
                           recommendedTemplateInfo.op_name,
                           refinedExpression.result as any,
                           newDashExpr => {
-                            setIsGenerating(false);
                             navigateToExpression(newDashExpr);
+                            setIsGenerating(false);
                           }
                         );
                       }}
@@ -442,8 +442,8 @@ const OverviewTab = ({
                     SEED_BOARD_OP_NAME,
                     refinedExpression.result as any,
                     newDashExpr => {
-                      setIsGenerating(false);
                       navigateToExpression(newDashExpr);
+                      setIsGenerating(false);
                     }
                   );
                 }}
@@ -510,8 +510,8 @@ const TemplateTab = ({
               recommendedTemplateInfo.op_name,
               refinedExpression.result as any,
               newDashExpr => {
-                setIsGenerating(false);
                 navigateToExpression(newDashExpr);
+                setIsGenerating(false);
               }
             );
           }}
@@ -540,8 +540,8 @@ const TemplateTab = ({
                 template.op_name,
                 refinedExpression.result as any,
                 newDashExpr => {
-                  setIsGenerating(false);
                   navigateToExpression(newDashExpr);
+                  setIsGenerating(false);
                 }
               );
             }}

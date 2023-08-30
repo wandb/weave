@@ -2,7 +2,7 @@ import getConfig from '../../config';
 import {getCookie} from '@wandb/weave/common/util/cookie';
 import {NodeOrVoidNode, Type, isAssignableTo} from '@wandb/weave/core';
 import fetch from 'isomorphic-unfetch';
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useState} from 'react';
 
 export const REMOTE_URI_PREFIX = 'wandb-artifact:///';
 export const LOCAL_URI_PREFIX = 'local-artifact:///';
@@ -32,8 +32,6 @@ export const useIsAuthenticated = (skip: boolean = false) => {
   const [isAuth, setIsAuth] = useState<boolean | undefined>(undefined);
   const anonApiKey = getCookie('anon_api_key');
 
-  const isMounted = useRef(true);
-
   useEffect(() => {
     if (skip) {
       setIsAuth(false);
@@ -52,9 +50,6 @@ export const useIsAuthenticated = (skip: boolean = false) => {
       },
     })
       .then(res => {
-        if (!isMounted.current) {
-          return;
-        }
         if (res.status !== 200) {
           setIsAuth(false);
           return;
@@ -63,22 +58,12 @@ export const useIsAuthenticated = (skip: boolean = false) => {
         }
       })
       .then(json => {
-        if (!isMounted.current) {
-          return;
-        }
         const auth = !!(json?.authenticated ?? false);
         setIsAuth(auth);
       })
       .catch(err => {
-        if (!isMounted.current) {
-          return;
-        }
         setIsAuth(false);
       });
-
-    return () => {
-      isMounted.current = false;
-    };
   }, [anonApiKey, skip]);
   return isAuth;
 };
