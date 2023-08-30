@@ -4,6 +4,8 @@ import logging
 import typing
 import dataclasses
 
+import typeguard
+
 from .. import api as weave
 
 
@@ -28,6 +30,28 @@ class Result:
     # this extra flexible type wouldn't be needed.
     inputs: typing.Optional[typing.Union[typing.Dict[str, typing.Any], list[str]]]
     outputs: typing.Optional[typing.Dict[str, typing.Any]]
+
+
+def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> None:
+    """
+    Set an attribute on an instance of a class with annotated class attributes, but first check that
+    the value is of the correct type. If not, log a warning and set the attribute to None.
+    """
+
+    hints = typing.get_type_hints(obj.__class__)
+    if key not in hints:
+        raise ValueError(f"Object {obj} has no attribute {key}")
+
+    try:
+        typeguard.check_type(value, hints[key])
+    except TypeError as e:
+        # warn
+        logging.warning(
+            f"Setting attribute {key} of {obj} to {value} failed typeguard check: {e}. Replacing with None."
+        )
+        value = None
+
+    setattr(obj, key, value)
 
 
 @weave.type()
@@ -57,10 +81,10 @@ class Span:
         root_span = cls()
         for key in dump_dict:
             if key == "name":
-                setattr(root_span, "_name", dump_dict[key])
+                _setattr_with_typeguard(root_span, "_name", dump_dict[key])
             elif key == "results":
                 results = dump_dict[key]
-                setattr(
+                _setattr_with_typeguard(
                     root_span,
                     key,
                     [Result(**r) if r is not None else None for r in results]
@@ -68,7 +92,7 @@ class Span:
                     else None,
                 )
             else:
-                setattr(root_span, key, dump_dict[key])
+                _setattr_with_typeguard(root_span, key, dump_dict[key])
 
         return root_span
 
