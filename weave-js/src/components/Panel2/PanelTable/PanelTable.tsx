@@ -27,6 +27,7 @@ import {
   opPick,
   opRunId,
   opRunName,
+  Stack,
   taggedValue,
   Type,
   typedDict,
@@ -477,9 +478,10 @@ const PanelTableInner: React.FC<
     pinnedRowsForCurrentGrouping,
     pinnableTotalRowCount
   );
+  const {stack} = usePanelContext();
   const downloadDataAsCSV = useCallback(() => {
-    downloadCSV(rowsNode, tableState, weave);
-  }, [rowsNode, tableState, weave]);
+    downloadCSV(rowsNode, tableState, weave, stack);
+  }, [rowsNode, stack, tableState, weave]);
 
   const headerRendererForColumn = useCallback(
     (colId: string, {headerIndex}: any) => {
@@ -1226,7 +1228,8 @@ const ActionCell: React.FC<{
 const downloadCSV = async (
   rowsNode: Node<Type>,
   tableState: Table.TableState,
-  weave: WeaveInterface
+  weave: WeaveInterface,
+  stack: Stack
 ) => {
   const safeTableState = makeCsvFriendlyTableState(tableState);
   const listDictNode = applyTableStateToRowsNode(
@@ -1234,7 +1237,10 @@ const downloadCSV = async (
     safeTableState,
     weave
   );
-  const listDictValue = await weave.client.query(listDictNode);
+
+  const listDictValue = await weave.client.query(
+    weave.dereferenceAllVars(listDictNode, stack)
+  );
   saveTableAsCSV({
     cols: listDictValue?.length > 0 ? Object.keys(listDictValue[0]) : [],
     data: listDictValue,
