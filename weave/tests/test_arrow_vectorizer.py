@@ -1341,16 +1341,16 @@ def test_cant_vectorize_without_keys():
 
 def test_vectorize_run_runtime():
     runs = [
-        wdt.Run({"id": "A", "computeSeconds": datetime.timedelta(seconds=1)}),
-        wdt.Run({"id": "B", "computeSeconds": datetime.timedelta(seconds=2)}),
-        wdt.Run({"id": "C", "computeSeconds": datetime.timedelta(seconds=3)}),
+        wdt.Run({"id": "A", "computeSeconds": 1}),
+        wdt.Run({"id": "B", "computeSeconds": 2}),
+        wdt.Run({"id": "C", "computeSeconds": 3}),
     ]
 
     awl = arrow.to_arrow(runs)
     l = weave.save(awl)
 
     fn = weave_internal.define_fn(
-        {"x": awl.object_type}, lambda x: run_ops.run_runtime(x)
+        {"x": awl.object_type}, lambda x: run_ops.runtime(x)
     ).val
 
     vec_fn = arrow.vectorize(fn, strict=True)

@@ -346,16 +346,6 @@ class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
         )
 
 
-class TimeDeltaToArrowTimeDelta(mappers.Mapper):
-    def result_type(self):
-        return pa.duration("ms")
-
-
-class ArrowTimeDeltaToTimeDelta(mappers.Mapper):
-    def apply(self, obj):
-        return obj
-
-
 def map_to_arrow_(
     type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
 ):
@@ -385,8 +375,6 @@ def map_to_arrow_(
         return StringToArrow(type, mapper, artifact, path)
     elif isinstance(type, types.Timestamp):
         return TimestampToArrowTimestamp(type, mapper, artifact, path)
-    elif isinstance(type, types.TimeDelta):
-        return TimeDeltaToArrowTimeDelta(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return FunctionToArrowFunction(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -424,8 +412,6 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
         return ArrowDateTimeToDateTime(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return ArrowFunctionToFunction(type, mapper, artifact, path)
-    elif isinstance(type, types.TimeDelta):
-        return ArrowTimeDeltaToTimeDelta(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
         return mappers_python.NoneToPyNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
