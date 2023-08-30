@@ -34,7 +34,7 @@ class Result:
 
 def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> None:
     """
-    Set an attribute on an object with annotated attributes, but first check that
+    Set an attribute on an instance of an object with annotated class attributes, but first check that
     the value is of the correct type. If not, log a warning and set the attribute to None.
     """
 
