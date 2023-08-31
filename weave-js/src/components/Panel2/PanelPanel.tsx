@@ -175,9 +175,9 @@ const panelRootReducer = (
         action.newConfig
       );
       return produce(state, draft => {
-        const panelRoot = draft.panelRoots[action.id];
-        panelRoot.inFlight = true;
-        panelRoot.root = action.newConfig;
+        const panelRootForId = draft.panelRoots[action.id];
+        panelRootForId.inFlight = true;
+        panelRootForId.root = action.newConfig;
       });
     case 'updateConfig2':
       if (panelRoot.inFlight) {
@@ -199,9 +199,9 @@ const panelRootReducer = (
         newConfig
       );
       return produce(state, draft => {
-        const panelRoot = draft.panelRoots[action.id];
-        panelRoot.inFlight = true;
-        panelRoot.root = newConfig;
+        const panelRootForId = draft.panelRoots[action.id];
+        panelRootForId.inFlight = true;
+        panelRootForId.root = newConfig;
       });
     // This is the end of the async update config flow. We set the new config
     // and dispatch the next queued action if there is one.
