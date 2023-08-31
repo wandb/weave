@@ -132,6 +132,7 @@ export const opRunCreatedAt = makeRunOp({
 
 export const opRunUpdatedAt = makeRunOp({
   name: 'run-updatedAt',
+  hidden: true,
   argTypes: runArgTypes,
   description: `Returns the updated at datetime of the ${docType('run')}`,
   argDescriptions: {run: runArgDescriptions},
