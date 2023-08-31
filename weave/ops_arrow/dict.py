@@ -111,23 +111,59 @@ def pick(self, key):
     return ArrowWeaveList(result, object_type, self._artifact)
 
 
+AnyTypedDict = types.TypedDict({})
+AWLTypedDictType = ArrowWeaveListType(AnyTypedDict)
+
+
+def _ensure_awl_for_merge(
+    ensure_target: typing.Union[dict, ArrowWeaveList],
+    compare_target: typing.Union[dict, ArrowWeaveList],
+) -> ArrowWeaveList:
+    if isinstance(ensure_target, dict):
+        assert isinstance(compare_target, ArrowWeaveList)
+        utility_awl = convert.to_arrow([ensure_target])
+        return ArrowWeaveList(
+            pa.repeat(ensure_target, len(compare_target)),
+            utility_awl.object_type,
+            utility_awl._artifact,
+        )
+    return ensure_target
+
+
 @arrow_op(
     name="ArrowWeaveListTypedDict-merge",
     input_type={
-        "self": ArrowWeaveListType(types.TypedDict({})),
-        "other": ArrowWeaveListType(types.TypedDict({})),
+        "self": types.union(AWLTypedDictType, AnyTypedDict),
+        "other": (
+            lambda self: AWLTypedDictType
+            if AnyTypedDict.assign_type(self)
+            else types.union(AWLTypedDictType, AnyTypedDict)
+        ),
     },
     output_type=lambda input_types: ArrowWeaveListType(
         _dict_utils.typeddict_merge_output_type(
             {
-                "self": input_types["self"].object_type,
-                "other": input_types["other"].object_type,
+                "self": input_types["self"]
+                if AnyTypedDict.assign_type(input_types["self"])
+                else input_types["self"].object_type,
+                "other": input_types["other"]
+                if AnyTypedDict.assign_type(input_types["self"])
+                else input_types["self"].object_type,
             }
         )
     ),
     all_args_nullable=False,
 )
 def merge(self, other):
+    # if either self or other is a typedDict, then we need to convert broadcast it to an AWL of the same
+    # shape as the other
+
+    self_ensured = _ensure_awl_for_merge(self, other)
+    other_ensured = _ensure_awl_for_merge(other, self)
+
+    self: ArrowWeaveList = self_ensured
+    other: ArrowWeaveList = other_ensured
+
     field_arrays: dict[str, pa.Array] = {}
     for arrow_weave_list in (self, other):
         for key in arrow_weave_list.object_type.property_types:
