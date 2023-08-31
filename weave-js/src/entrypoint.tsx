@@ -10,6 +10,7 @@ import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {URL_BROWSE, URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
 import getConfig from './config';
+import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -55,7 +56,9 @@ const Main = ({browserType}: MainProps) => (
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
         <StateInspector name="WeaveApp">
-          <PagePanel browserType={browserType} />
+          <PanelRootContextProvider>
+            <PagePanel browserType={browserType} />
+          </PanelRootContextProvider>
         </StateInspector>
       </NotebookComputeGraphContextProvider>
     </ErrorBoundary>
