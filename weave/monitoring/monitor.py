@@ -60,38 +60,96 @@ def get_function_name(fn: typing.Callable) -> str:
         return f"{module_name}.{fn.__name__}"
 
 
-class Span:
-    # When this is None, monitor is disabled
-    _streamtable: typing.Optional[StreamTable]
-
+# TODO: Probably want to make this a dataclass or even a TypedDict?
+# TODO: Field Validation
+class TraceSpanStruct:
     # These are OpenTelemetry standard
 
-    parent_id: typing.Optional[str]
-    trace_id: typing.Optional[str]
     id: str  # span_id
     name: str
     status_code: str = StatusCode.UNSET
     start_time: datetime.datetime
-    end_time: typing.Optional[datetime.datetime]
+    end_time: datetime.datetime
+
+    trace_id: str
+    parent_id: typing.Optional[str]
 
     # OpenTelemetry does not support these.
 
     # Arbitrary key/value pairs. Values can be any Weave type, as
     # opposed to opentelemetry where values can only be scalars or
     # lists of homoegenous scalar types.
-    attributes: dict[str, typing.Any]
+    attributes: typing.Optional[dict[str, typing.Any]] = None
     # The parameters to the function being traced.
-    inputs: typing.Optional[typing.Dict[str, typing.Any]]
+    inputs: typing.Optional[typing.Dict[str, typing.Any]] = None
     # The output of the function being traced.
-    output: typing.Optional[typing.Any]
+    output: typing.Optional[typing.Any] = None
     # If an exception occurred, this will be set.
-    exception: typing.Optional[Exception]
+    exception: typing.Optional[Exception] = None
     # Typically summary should contain metrics about resources used
     # during the function's execution (cpu, disk, tokens, api cost etc)
     # or other information created in the course of actually executing
     # the function.
-    summary: dict[str, typing.Any]
+    summary: dict[str, typing.Any] = None
 
+    def __init__(
+        self,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+        id: typing.Optional[str] = None,
+        name: typing.Optional[str] = None,
+        status_code: str = StatusCode.UNSET,
+        trace_id: typing.Optional[str] = None,
+        parent_id: typing.Optional[str] = None,
+        attributes: typing.Optional[dict[str, typing.Any]] = None,
+        inputs: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        output: typing.Optional[typing.Any] = None,
+        exception: typing.Optional[Exception] = None,
+        summary: typing.Optional[dict[str, typing.Any]] = None,
+    ):
+        self.start_time = start_time
+        self.end_time = end_time
+
+        self.id = id or str(uuid.uuid4())
+        self.name = name or ""
+        self.status_code = status_code
+
+        self.trace_id = trace_id or str(uuid.uuid4())
+        self.parent_id = parent_id
+
+        self.attributes = attributes
+        self.inputs = inputs
+        self.output = output
+        self.exception = exception
+        self.summary = summary or {}
+
+    def asdict(self) -> dict[str, typing.Any]:
+        start_time_s = self.start_time.timestamp()
+        end_time_s = self.end_time.timestamp()
+        self.summary["latency_s"] = end_time_s - start_time_s
+        return {
+            "parent_id": self.parent_id,
+            "trace_id": self.trace_id,
+            "span_id": self.id,
+            "name": self.name,
+            "status_code": self.status_code,
+            "start_time_s": start_time_s,
+            "end_time_s": end_time_s,
+            "inputs": self.inputs,
+            "output": self.output,
+            "exception": (
+                f"{type(self.exception).__name__}: {str(self.exception)}"
+                if self.exception is not None
+                else None
+            ),
+            "attributes": self.attributes,
+            "summary": self.summary,
+        }
+
+
+class Span(TraceSpanStruct):
+    # When this is None, monitor is disabled
+    _streamtable: typing.Optional[StreamTable]
     _autoclose: bool = True
 
     def __init__(
@@ -144,27 +202,7 @@ class Span:
             raise ValueError(
                 "Cannot log a span that has not been ended.  Call span.end() before logging."
             )
-        start_time_s = self.start_time.timestamp()
-        end_time_s = self.end_time.timestamp()
-        self.summary["latency_s"] = end_time_s - start_time_s
-        return {
-            "parent_id": self.parent_id,
-            "trace_id": self.trace_id,
-            "span_id": self.span_id,
-            "name": self.name,
-            "status_code": self.status_code,
-            "start_time_s": start_time_s,
-            "end_time_s": end_time_s,
-            "inputs": self.inputs,
-            "output": self.output,
-            "exception": (
-                f"{type(self.exception).__name__}: {str(self.exception)}"
-                if self.exception is not None
-                else None
-            ),
-            "attributes": self.attributes,
-            "summary": self.summary,
-        }
+        return super().asdict()
 
 
 # A type used to indicate that inputs is guaranteed to be set, for pre and post process callbacks.
