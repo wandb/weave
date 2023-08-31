@@ -40,7 +40,6 @@ import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
-import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
 import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
@@ -53,6 +52,7 @@ import {
 } from './PanelContext';
 import * as Styles from './PanelExpression/styles';
 import {
+  useCloseEditor,
   usePanelInputExprIsHighlightedByPath,
   useSelectedPath,
   useSetInspectingChildPanel,
@@ -196,10 +196,10 @@ export const useChildPanelConfig = (
 };
 
 export interface ChildPanelProps {
+  noEditorIcons?: boolean;
   controlBar?: 'off' | 'editable' | 'titleBar';
   passthroughUpdate?: boolean;
   pathEl?: string;
-  prefixHeader?: JSX.Element;
   prefixButtons?: JSX.Element;
   allowedPanels?: string[];
   overflowVisible?: boolean;
@@ -215,11 +215,10 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const updateConfig2 = useUpdateConfig2(props);
   const config = useChildPanelConfig(props.config);
   const {id: panelId, config: panelConfig} = config;
-  let {input_node: panelInputExpr} = config;
+  const {input_node: panelInputExpr} = config;
   const weave = useWeaveContext();
   const {stack, path: parentPath} = usePanelContext();
 
-  panelInputExpr = useNodeWithServerType(panelInputExpr).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,
     panelId,
@@ -507,7 +506,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 };
 
 const varNameToTitle = (varName: string) => {
-  return varName.replace(/_/g, ' ').replace(/\b\w/, char => char.toUpperCase());
+  return varName.replace(/_/g, ' ');
 };
 
 // This is the standard way to render subpanels. We should migrate
@@ -533,6 +532,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   } = useChildPanelCommon(props);
 
   const {frame} = usePanelContext();
+  const closeEditor = useCloseEditor();
 
   const validateName = useCallback(
     (newName: string) => {
@@ -541,7 +541,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     [frame]
   );
 
-  const [hoverPanel, setHoverPanel] = useState(false);
+  const [isHoverPanel, setIsHoverPanel] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [expressionFocused, setExpressionFocused] = useState(false);
@@ -564,6 +564,8 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
 
+  const controlBar = props.controlBar ?? 'off';
+
   return curPanelId == null || handler == null ? (
     <div>
       No panel for type {defaultLanguageBinding.printType(panelInput.type)}
@@ -571,110 +573,95 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   ) : (
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
-      onMouseEnter={() => setHoverPanel(true)}
-      onMouseLeave={() => setHoverPanel(false)}>
-      {props.controlBar === 'titleBar' && (
-        <div
-          style={{
-            fontWeight: '600',
-            padding: '0 16px 8px',
-            lineHeight: '20px',
-            marginTop: 16,
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-            overflow: 'hidden',
-          }}>
-          {props.pathEl != null && varNameToTitle(props.pathEl)}
-        </div>
-      )}
-      {props.controlBar === 'editable' && (
+      onMouseEnter={() => setIsHoverPanel(true)}
+      onMouseLeave={() => setIsHoverPanel(false)}>
+      {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {!hoverPanel ? (
+            {(props.controlBar === 'titleBar' || !isHoverPanel) &&
               props.pathEl != null && (
-                <div
-                  style={{
-                    whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis',
-                    overflow: 'hidden',
-                  }}>
+                <EditorBarTitleOnly>
                   {varNameToTitle(props.pathEl)}
-                </div>
-              )
-            ) : (
-              <>
-                {props.prefixHeader}
-                {props.pathEl != null && (
-                  <EditorPath>
-                    <ValidatingTextInput
-                      dataTest="panel-expression-path"
-                      onCommit={props.updateName ?? (() => {})}
-                      validateInput={validateName}
-                      initialValue={props.pathEl}
-                      maxWidth={
-                        editorBarWidth != null ? editorBarWidth / 3 : undefined
-                      }
-                      maxLength={24}
-                    />{' '}
-                    {props.controlBar === 'editable' && '= '}
-                  </EditorPath>
-                )}
-                {props.controlBar === 'editable' &&
-                  curPanelId !== 'Expression' &&
-                  curPanelId !== 'RootBrowser' && (
-                    <PanelNameEditor
-                      value={curPanelId ?? ''}
-                      autocompleteOptions={panelOptions}
-                      setValue={handlePanelChange}
-                    />
-                  )}
-                {props.controlBar === 'editable' ? (
-                  <EditorExpression data-test="panel-expression-expression">
-                    <WeaveExpression
-                      expr={panelInputExpr}
-                      setExpression={updateExpression}
-                      noBox
-                      truncate={!expressionFocused}
-                      onFocus={onFocusExpression}
-                      onBlur={onBlurExpression}
-                    />
-                  </EditorExpression>
-                ) : (
-                  <div style={{width: '100%'}} />
-                )}
-                <EditorIcons visible={hoverPanel || isMenuOpen}>
-                  {props.prefixButtons}
-                  <Tooltip
-                    position="top center"
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        icon="pencil-edit"
-                        onClick={() => setInspectingPanel(props.pathEl ?? '')}
-                      />
-                    }>
-                    Open panel editor
-                  </Tooltip>
-                  <OutlineItemPopupMenu
-                    config={fullConfig}
-                    localConfig={getConfigForPath(fullConfig, fullPath)}
-                    path={fullPath}
-                    updateConfig={updateConfig}
-                    updateConfig2={updateConfig2}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        icon="overflow-horizontal"
-                      />
+                </EditorBarTitleOnly>
+              )}
+            <EditorBarHover
+              show={props.controlBar !== 'titleBar' && isHoverPanel}>
+              {/* Variable name */}
+              {props.pathEl != null && (
+                <EditorPath>
+                  <ValidatingTextInput
+                    dataTest="panel-expression-path"
+                    onCommit={props.updateName ?? (() => {})}
+                    validateInput={validateName}
+                    initialValue={props.pathEl}
+                    maxWidth={
+                      editorBarWidth != null ? editorBarWidth / 3 : undefined
                     }
-                    onOpen={() => setIsMenuOpen(true)}
-                    onClose={() => setIsMenuOpen(false)}
-                    isOpen={isMenuOpen}
+                    maxLength={24}
+                  />{' '}
+                </EditorPath>
+              )}
+              {/* Panel picker */}
+              {controlBar === 'editable' &&
+                curPanelId !== 'Expression' &&
+                curPanelId !== 'RootBrowser' && (
+                  <PanelNameEditor
+                    value={curPanelId ?? ''}
+                    autocompleteOptions={panelOptions}
+                    setValue={handlePanelChange}
                   />
-                </EditorIcons>
-              </>
+                )}
+              {/* Expression */}
+              {controlBar === 'editable' ? (
+                <EditorExpression data-test="panel-expression-expression">
+                  <WeaveExpression
+                    expr={panelInputExpr}
+                    setExpression={updateExpression}
+                    noBox
+                    truncate={!expressionFocused}
+                    onFocus={onFocusExpression}
+                    onBlur={onBlurExpression}
+                  />
+                </EditorExpression>
+              ) : (
+                <div style={{width: '100%'}} />
+              )}
+            </EditorBarHover>
+            {/* Control buttons */}
+            {!props.noEditorIcons && (
+              <EditorIcons visible={isHoverPanel || isMenuOpen}>
+                {props.prefixButtons}
+                <Tooltip
+                  position="top center"
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      icon="pencil-edit"
+                      onClick={() => setInspectingPanel(props.pathEl ?? '')}
+                    />
+                  }>
+                  Open panel editor
+                </Tooltip>
+                <OutlineItemPopupMenu
+                  config={fullConfig}
+                  localConfig={getConfigForPath(fullConfig, fullPath)}
+                  path={fullPath}
+                  updateConfig={updateConfig}
+                  updateConfig2={updateConfig2}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      icon="overflow-horizontal"
+                    />
+                  }
+                  onOpen={() => setIsMenuOpen(true)}
+                  onClose={() => setIsMenuOpen(false)}
+                  isOpen={isMenuOpen}
+                  goBackToOutline={closeEditor}
+                />
+              </EditorIcons>
             )}
           </EditorBarContent>
         </Styles.EditorBar>
@@ -865,6 +852,7 @@ const nextVarName = (vars: {[key: string]: any}) => {
 const MinimalEditableField = styled(EditableField)`
   margin: 0;
 `;
+MinimalEditableField.displayName = 'S.MinimalEditableField';
 
 export const VariableEditor: React.FC<{
   config: ChildPanelFullConfig;
@@ -997,8 +985,6 @@ export const useChildPanelProps = (
 };
 
 const EditorBarContent = styled.div`
-  display: flex;
-  align-items: flex-start;
   width: calc(100% + 16px);
   flex-shrink: 0;
   position: relative;
@@ -1006,7 +992,30 @@ const EditorBarContent = styled.div`
   padding: 0 16px 8px;
   border-bottom: 1px solid ${GRAY_350};
   line-height: 20px;
+  display: flex;
 `;
+EditorBarContent.displayName = 'S.EditorBarContent';
+
+const EditorBarTitleOnly = styled.div`
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  padding-left: 2px;
+  flex-grow: 1;
+`;
+EditorBarTitleOnly.displayName = 'S.EditorBarTitleOnly';
+
+// If the mouse leaves the panel we want to keep these contents (e.g. unsubmitted
+// expression editor state) but just hide them.
+const EditorBarHover = styled.div<{show: boolean}>`
+  display: ${props => (props.show ? 'flex' : 'none')};
+  align-items: flex-start;
+  flex-grow: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+`;
+EditorBarHover.displayName = 'S.EditorBarHover';
 
 const EditorPath = styled.div`
   white-space: nowrap;
@@ -1016,6 +1025,7 @@ const EditorPath = styled.div`
     font-family: inherit;
   }
 `;
+EditorPath.displayName = 'S.EditorPath';
 
 const EditorExpression = styled.div`
   flex-grow: 1;
@@ -1025,6 +1035,7 @@ const EditorExpression = styled.div`
     background-color: ${GRAY_50};
   }
 `;
+EditorExpression.displayName = 'S.EditorExpression';
 
 const EditorIcons = styled.div<{visible: boolean}>`
   height: 20px;
@@ -1033,11 +1044,13 @@ const EditorIcons = styled.div<{visible: boolean}>`
   margin-left: 8px;
   visibility: ${p => (p.visible ? `visible` : `hidden`)};
 `;
+EditorIcons.displayName = 'S.EditorIcons';
 
 const PanelContainer = styled.div<{overflowVisible?: boolean}>`
   flex-grow: 1;
   overflow-y: ${p => (p.overflowVisible ? 'visible' : 'auto')};
 `;
+PanelContainer.displayName = 'S.PanelContainer';
 
 type ElementWidth<T> = {
   ref: RefObject<T>;

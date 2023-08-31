@@ -11,7 +11,7 @@ def test_graph_playback():
         res.results.unwrap()
 
 
-def test_zlib_playback():
+def test_zlib_playback(use_server_gql_schema):
     if zlib_str == "":
         return
     req_bytes = zlib.decompress(base64.b64decode(zlib_str.encode("ascii")))

@@ -1,27 +1,18 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
-import {callOpVeryUnsafe, NodeOrVoidNode, varNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
 import styled from 'styled-components';
 
 import {getFullChildPanel} from '../Panel2/ChildPanel';
-import {emptyTable} from '../Panel2/PanelTable/tableState';
 import {
   addChild,
-  ensureDashboard,
   getPath,
   isGroupNode,
   makePanel,
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
-import {
-  IconBack,
-  IconCopy,
-  IconDelete,
-  IconRetry,
-  IconSplit,
-} from '../Panel2/Icons';
+import {IconCopy, IconDelete, IconRetry, IconSplit} from '../Panel2/Icons';
 import {PopupMenu} from './PopupMenu';
 
 const Divider = styled.div`
@@ -155,41 +146,9 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     },
     [updateConfig2, goBackToOutline]
   );
-  const handleAddToQueryBar = useCallback(
-    (panelPath: string[]) => {
-      updateConfig2(oldConfig => {
-        oldConfig = getFullChildPanel(oldConfig);
-        const targetPanel = getPath(oldConfig, panelPath);
-        const input = targetPanel.input_node;
-        const queryPanel = makePanel(
-          'Query',
-          {tableState: emptyTable()},
-          input
-        );
-
-        const newTargetExpr = callOpVeryUnsafe('Query-selected', {
-          self: varNode('any', 'panel0'),
-        }) as NodeOrVoidNode;
-
-        let root = setPath(oldConfig, panelPath, {
-          ...targetPanel,
-          input_node: newTargetExpr,
-        });
-
-        root = ensureDashboard(root);
-
-        console.log('Query panel', queryPanel);
-
-        root = addChild(root, ['sidebar'], queryPanel);
-
-        return root;
-      });
-    },
-    [updateConfig2]
-  );
   const menuItems = useMemo(() => {
     const items = [];
-    if (localConfig.id === 'Group') {
+    if (localConfig?.id === 'Group') {
       items.push({
         key: 'unnest',
         content: 'Replace with first child',
@@ -203,18 +162,12 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       icon: <IconCopy />,
       onClick: () => handleDuplicate(path),
     });
-    items.push({
-      key: 'split',
-      content: 'Split',
-      icon: <IconSplit />,
-      onClick: () => handleSplit(path),
-    });
     if (path.find(p => p === 'main') != null && path.length > 1) {
       items.push({
-        key: 'queryBar',
-        content: 'Send to query bar',
-        icon: <IconBack />,
-        onClick: () => handleAddToQueryBar(path),
+        key: 'split',
+        content: 'Split',
+        icon: <IconSplit />,
+        onClick: () => handleSplit(path),
       });
     }
     items.push({
@@ -230,12 +183,11 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     });
     return items;
   }, [
-    handleAddToQueryBar,
     handleDelete,
     handleSplit,
     handleUnnest,
     handleDuplicate,
-    localConfig.id,
+    localConfig?.id,
     path,
   ]);
 

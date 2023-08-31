@@ -1,6 +1,9 @@
+# history2 is depcreated, don't use it. It's only used in RunChain,
+# which is just in demo form now. When we go back to working on RunChain
+# we'll remove history2
+
 import json
-import typing
-from ...compile_domain import wb_gql_op_plugin
+from ...gql_op_plugin import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
@@ -10,6 +13,7 @@ from ...ops_domain import wbmedia
 from ...ops_arrow.list_ops import concat
 from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
 from ... import engine_trace
+from ... import gql_json_cache
 
 from ...api import use
 
@@ -58,6 +62,10 @@ def history2_with_columns(run: wdt.Run, history_cols: list[str]):
     )
 
 
+# DEPRECATED: see comment at top.
+# There is a bug in history2 where we mutate gql results, which is not allowed.
+# now that we've removed deepcopy from gql_json_cache.use_json. But that's ok
+# because this is deprecated and only used in a demo notebook.
 @op(
     name="run-history2",
     refine_output_type=refine_history2_type,
@@ -84,13 +92,17 @@ def _get_history2(run: wdt.Run, columns=None):
     _history_type = types.List(_object_type)
 
     run_path = wb_util.RunPath(
-        run.gql["project"]["entity"]["name"],
-        run.gql["project"]["name"],
-        run.gql["name"],
+        run["project"]["entity"]["name"],
+        run["project"]["name"],
+        run["name"],
     )
 
-    # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = run.gql["sampledParquetHistory"]["liveData"]
+    # turn the liveset into an arrow table. the liveset is a list of json objects
+    # we read from the cache via use_json()
+    live_data = gql_json_cache.use_json(run["sampledParquetHistory"]["liveData"])
+
+    # This is a nono! Mutating the gql results. But that's ok because this is deprecated,
+    # see module comment at top.
     for row in live_data:
         for colname in columns:
             if colname not in row:

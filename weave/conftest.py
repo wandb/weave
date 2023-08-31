@@ -2,6 +2,7 @@ import os
 import random
 import numpy as np
 
+import pathlib
 import typing
 import pytest
 import shutil
@@ -17,6 +18,7 @@ from .language_features.tagging.tag_store import isolated_tagging_context
 from . import logs
 from . import io_service
 from . import logs
+from . import environment
 import logging
 
 from flask.testing import FlaskClient
@@ -116,6 +118,9 @@ def pre_post_each_test(test_artifact_dir, caplog):
     caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
+        pathlib.Path(__file__).parent / "tests/wb_schema.gql"
+    )
     try:
         shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):
@@ -159,6 +164,16 @@ def fake_wandb():
     setup_response = fixture_fakewandb.setup()
     yield setup_response
     fixture_fakewandb.teardown(setup_response)
+
+
+@pytest.fixture()
+def use_server_gql_schema():
+    old_schema_path = environment.gql_schema_path()
+    if old_schema_path is not None:
+        del os.environ["WEAVE_GQL_SCHEMA_PATH"]
+    yield
+    if old_schema_path is not None:
+        os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path
 
 
 @pytest.fixture()

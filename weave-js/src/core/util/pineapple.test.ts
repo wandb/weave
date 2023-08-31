@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import {Options, pineapple, unpineapple} from './pineapple';
 
 describe('pineapple/unpineapple', () => {
@@ -263,7 +265,7 @@ describe('pineapple/unpineapple', () => {
   describe('programming errors', () => {
     throwCase({foo: 'bar'}, null, 'key must be non-empty, non-numeric string', {
       key: null,
-    });
+    } as any);
     throwCase({foo: 'bar'}, null, 'key must be non-empty, non-numeric string', {
       key: '',
     });

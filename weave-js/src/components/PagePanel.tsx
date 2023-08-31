@@ -45,7 +45,7 @@ import {
   useEditorIsOpen,
   useSetInspectingPanel,
 } from './Panel2/PanelInteractContext';
-import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
+import {useUpdateServerPanel} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import Inspector from './Sidebar/Inspector';
 import {useWeaveAutomation} from './automation';
@@ -144,7 +144,7 @@ function useEnablePageAnalytics() {
       .then(json => {
         const serverUserId = json?.user_id ?? '';
         if (serverUserId !== '') {
-          (window.analytics as any).identify(serverUserId);
+          (window.analytics as any)?.identify(serverUserId);
         }
       })
       .catch(err => {
@@ -514,17 +514,6 @@ export const PageContent: FC<PageContentProps> = props => {
         }}>
         <ChildPanel
           controlBar={!isPanel && !props.previewMode ? 'editable' : 'off'}
-          prefixHeader={
-            inJupyter ? (
-              <Icon
-                style={{cursor: 'pointer', color: '#555'}}
-                name="home"
-                onClick={goHome}
-              />
-            ) : (
-              <></>
-            )
-          }
           prefixButtons={
             <>
               {inJupyter && (
@@ -601,7 +590,7 @@ const JupyterPageControls: React.FC<
     },
     [props]
   );
-  const updateConfigForPanelNode = useUpdateConfigForPanelNode(
+  const updateConfigForPanelNode = useUpdateServerPanel(
     props.config.input_node,
     updateInput
   );

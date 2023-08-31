@@ -17,6 +17,7 @@ from . import val_const
 from . import artifact_fs
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
+from .partial_object import PartialObjectType, PartialObject
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -82,6 +83,22 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             raise errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)
             )
+
+
+class GQLClassWithKeysToPyDict(mappers_weave.GQLMapper):
+    def apply(self, obj: PartialObject):
+        result = {}
+        for k, prop_serializer in self._property_serializers.items():
+            result[k] = prop_serializer.apply(obj.get(k, None))
+        return result
+
+
+class PyDictToGQLClassWithKeys(mappers_weave.GQLMapper):
+    def apply(self, obj: dict) -> PartialObject:
+        deserialized_obj = {}
+        for k, prop_serializer in self._property_serializers.items():
+            deserialized_obj[k] = prop_serializer.apply(obj.get(k, None))
+        return self.type.keyless_weave_type_class.instance_class(deserialized_obj)
 
 
 class ListToPyList(mappers_weave.ListMapper):
@@ -355,6 +372,8 @@ def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return TypeToPyType(type, mapper, artifact, path)
+    elif isinstance(type, PartialObjectType):
+        return GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
         return TypedDictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.Dict):
@@ -400,6 +419,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
+    elif isinstance(type, PartialObjectType):
+        return PyDictToGQLClassWithKeys(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):

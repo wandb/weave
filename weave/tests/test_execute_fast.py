@@ -1,6 +1,7 @@
 import weave
 
 from .. import weave_internal
+from .. import weave_types as types
 from . import weavejs_ops
 
 
@@ -27,3 +28,13 @@ def test_resolve_static_branches():
     d = weave.save({"a": 5})
     l = weave.save([1, 2])
     assert weave.use(l.map(lambda row: row + d["a"])) == [6, 7]
+
+
+def test_empty_list():
+    arr = weave.RuntimeConstNode(types.List(types.TypedDict({})), [])
+    map_fn = weave.define_fn(
+        {"row": arr.type.object_type},
+        lambda row: row.merge(weave.ops.dict_(output_classid=row["output_class"].id())),
+    )
+
+    assert weave.use(arr.map(map_fn)) == []

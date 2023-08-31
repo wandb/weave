@@ -2,6 +2,17 @@ import {Closure, Definition, Frame, Stack} from './types';
 
 export const emptyStack = (): Stack => [];
 
+export const pushFrameDefs = <D extends Definition>(
+  stack: D[],
+  frame: D[]
+): D[] => {
+  const res = [...stack];
+  for (const def of frame) {
+    res.splice(0, 0, def);
+  }
+  return res;
+};
+
 export const pushFrame = (
   stack: Stack,
   frame: Frame,

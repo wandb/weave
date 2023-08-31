@@ -945,6 +945,47 @@ export function allVarsWillResolve(node: EditingNode, stack: Stack): boolean {
   }
 }
 
+// Given an expression, update its VarNode's types to match the types of the
+// variables the types of the nodes they reference.
+export function updateVarTypes(node: EditingNode, stack: Stack): EditingNode {
+  switch (node.nodeType) {
+    case 'var':
+      const resolved = resolveVar(stack, node.varName);
+      if (resolved == null) {
+        return node;
+      }
+      return {...node, type: resolved.closure.value.type};
+    case 'output':
+      return {
+        ...node,
+        fromOp: {
+          ...node.fromOp,
+          inputs: mapValues(node.fromOp.inputs, input =>
+            updateVarTypes(input, stack)
+          ),
+        },
+      };
+    case 'const':
+      if (isFunction(node.type)) {
+        return {
+          ...node,
+          val: updateVarTypes(
+            node.val,
+            pushFrame(
+              stack,
+              // true indicates variable is a function argument, and will be
+              // populated at call-time
+              mapValues(node.type.inputTypes, (inputType, inputName) =>
+                varNode(inputType, inputName)
+              )
+            )
+          ),
+        };
+      }
+  }
+  return node;
+}
+
 export function couldBeReplacedByType(
   node: EditingNode,
   graph: EditingNode,
