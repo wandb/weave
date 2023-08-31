@@ -21,6 +21,7 @@ import {useCallback, useMemo} from 'react';
 
 import {usePanelContext} from './PanelContext';
 import moment from 'moment';
+import {uriFromNode} from '../PagePanelComponents/util';
 
 export const useBoardGeneratorsForNode = (
   node: Node,
@@ -65,18 +66,15 @@ const getRootURIFromNode = (node: Node) => {
     const inputs = Object.values(node.fromOp.inputs);
     if (inputs.length === 0) {
       return null;
-    } else if (
-      node.fromOp.name === 'get' &&
-      isConstNode(node.fromOp.inputs.uri)
-    ) {
-      return '' + node.fromOp.inputs.uri.val;
+    } else if (node.fromOp.name === 'get') {
+      return uriFromNode(node);
     }
     node = inputs[0];
   }
   return null;
 };
 
-export const getNameFromURI = (uri: string) => {
+export const getNamePartFromURI = (uri: string) => {
   let parts = uri.split('://');
   if (parts.length !== 2) {
     return null;
@@ -88,7 +86,7 @@ export const getNameFromURI = (uri: string) => {
 const getNameFromRootURINode = (node: Node) => {
   const uri = getRootURIFromNode(node);
   if (uri) {
-    return getNameFromURI(uri);
+    return getNamePartFromURI(uri);
   }
   return null;
 };
@@ -113,15 +111,19 @@ const getNameFromRootArtifactNode = (node: Node) => {
   return null;
 };
 
+const sanitizeName = (name: string) => {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+};
+
 const getNameFromNodeHeuristic = (node: Node) => {
   let name = getNameFromRootURINode(node);
   if (name == null) {
     name = getNameFromRootArtifactNode(node);
   }
   if (name) {
-    name = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    return sanitizeName(name);
   }
-  return name;
+  return null;
 };
 
 const makeBoardName = (
