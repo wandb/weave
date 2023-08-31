@@ -105,4 +105,4 @@ def test_tagged_awl_sum():
     node = weave.save(awl)
     value = weave.use(node.listnumbersum())
 
-    assert value.to_pylist_notags() == [1.4, 3.4, None]
+    assert value.to_pylist_notags() == [1.4, 3.4, 5]
