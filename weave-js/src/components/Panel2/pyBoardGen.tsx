@@ -67,16 +67,16 @@ const getRootURIFromNode = (node: Node) => {
       return null;
     } else if (
       node.fromOp.name === 'get' &&
-      isConstNode(node.fromOp.inputs['uri'])
+      isConstNode(node.fromOp.inputs.uri)
     ) {
-      return '' + node.fromOp.inputs['uri'].val;
+      return '' + node.fromOp.inputs.uri.val;
     }
     node = inputs[0];
   }
   return null;
 };
 
-const getNameFromURI = (uri: string) => {
+export const getNameFromURI = (uri: string) => {
   let parts = uri.split('://');
   if (parts.length !== 2) {
     return null;
@@ -100,9 +100,9 @@ const getNameFromRootArtifactNode = (node: Node) => {
       return null;
     } else if (
       node.fromOp.name === 'project-artifact' &&
-      isConstNode(node.fromOp.inputs['artifactName'])
+      isConstNode(node.fromOp.inputs.artifactName)
     ) {
-      let name = '' + node.fromOp.inputs['artifactName'].val;
+      const name = '' + node.fromOp.inputs.artifactName.val;
       if (name.startsWith('run-')) {
         const parts = name.split('-');
         return parts[parts.length - 1];
