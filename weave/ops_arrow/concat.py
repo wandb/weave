@@ -414,8 +414,7 @@ def _concatenate(
         for other_i in remaining_other_indexes:
             other_member_type = other_field_types[other_i]
             other_field = other_fields[other_i]
-            merged_type = types.merge_types(self_member_type, other_member_type)
-            if not isinstance(merged_type, types.UnionType):
+            if types.types_are_mergeable(self_member_type, other_member_type):
                 indent_print(
                     depth,
                     "SELF OTHER FIELD merge",

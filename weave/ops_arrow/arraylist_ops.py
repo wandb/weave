@@ -70,23 +70,23 @@ def listindex(self, index):
 
 def _list_op_output_object_type(input_types):
     self_type = input_types["self"]
-    object_type = typing.cast(types.List, self_type.object_type)
-    inner_object_type = object_type.object_type
-    # TODO: union
-    if isinstance(inner_object_type, tagged_value_type.TaggedValueType):
-        return inner_object_type.value
-    return inner_object_type
+    from .. import op_def
+
+    def _remove_tags(t):
+        if isinstance(t, tagged_value_type.TaggedValueType):
+            return t.value
+        return t
+
+    self_type_without_tags = op_def.map_type(self_type, _remove_tags)
+    return self_type_without_tags.object_type.object_type
 
 
 def list_dim_downresolver(
     self: ArrowWeaveList, arrow_operation_name: str, output_object_type=None
 ):
-    a = arrow_as_array(self._arrow_data)
+    without_tags = self.without_tags()
+    a = arrow_as_array(without_tags._arrow_data)
     values = a.flatten()
-
-    object_type = typing.cast(types.List, self.object_type)
-    if isinstance(object_type.object_type, tagged_value_type.TaggedValueType):
-        values = values.field("_value")
 
     start_indexes = a.offsets[:-1]
     end_indexes = a.offsets[1:]
@@ -101,9 +101,7 @@ def list_dim_downresolver(
         nulls, non_0len, non_0len_agged.combine_chunks()
     )
     if output_object_type == None:
-        output_object_type = _list_op_output_object_type(
-            {"self": ArrowWeaveListType(self.object_type)}
-        )
+        output_object_type = without_tags.object_type.object_type  # type: ignore
     return ArrowWeaveList(
         result,
         output_object_type,
