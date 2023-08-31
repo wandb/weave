@@ -43,6 +43,9 @@ export const treesToFlat = <S extends SpanType>(trees: S[]): S[] => {
 };
 
 export const unifyRoots = (roots: SpanType[]): SpanType => {
+  if (roots.length === 1) {
+    return roots[0];
+  }
   const traceStartTime = _.min(roots.map(r => r.start_time_ms ?? 0)) ?? 0;
   const traceEndTime =
     _.max(roots.map(r => r.end_time_ms ?? r.start_time_ms ?? 0)) ??
