@@ -108,14 +108,14 @@ describe('table', () => {
       [1, 'dog'],
       [9, 'dog'],
     ]);
-    ts = await Table.enableGroupByCol(ts, ts.order[1]);
+    ts = await Table.enableGroupByCol(ts, ts.order[1], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       ['cat', [14, 14]],
       ['dog', [14, 1, 9]],
     ]);
 
-    ts = await Table.disableGroupByCol(ts, ts.groupBy[0]);
+    ts = await Table.disableGroupByCol(ts, ts.groupBy[0], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       [14, 'cat'],
@@ -137,7 +137,7 @@ describe('table', () => {
       tableRowValue('string'),
     ]);
 
-    ts = await Table.enableGroupByCol(ts, ts.order[1]);
+    ts = await Table.enableGroupByCol(ts, ts.order[1], tableRows, weave, []);
     expect(getTableCellTypes(ts)).toEqual([
       tableRowValue('string'),
       withGroupTag(
@@ -148,7 +148,7 @@ describe('table', () => {
       ),
     ]);
 
-    ts = await Table.disableGroupByCol(ts, ts.groupBy[0]);
+    ts = await Table.disableGroupByCol(ts, ts.groupBy[0], tableRows, weave, []);
     expect(getTableCellTypes(ts)).toEqual([
       tableRowValue('number'),
       tableRowValue('string'),
@@ -178,7 +178,7 @@ describe('table', () => {
       [false, 'dog'],
       [true, 'dog'],
     ]);
-    ts = await Table.enableGroupByCol(ts, ts.order[0]);
+    ts = await Table.enableGroupByCol(ts, ts.order[0], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       [false, ['dog']],
@@ -212,7 +212,7 @@ describe('table', () => {
       [6, 'dog'],
       [6, 'dog'],
     ]);
-    ts = await Table.enableGroupByCol(ts, ts.order[0]);
+    ts = await Table.enableGroupByCol(ts, ts.order[0], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows, frame);
     expect(values).toEqual([
       [4, ['cat', 'cat']],
@@ -234,14 +234,14 @@ describe('table', () => {
       [5, 'cat', 'windowsill'],
       [6, 'cat', 'couch'],
     ]);
-    ts = await Table.enableGroupByCol(ts, ts.order[1]);
+    ts = await Table.enableGroupByCol(ts, ts.order[1], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       ['cat', [4, 5, 6], ['couch', 'windowsill', 'couch']],
       ['dog', [1, 2, 3], ['couch', 'bed', 'bed']],
       ['narwhal', [7], ['under the sea']],
     ]);
-    ts = await Table.enableGroupByCol(ts, ts.order[2]);
+    ts = await Table.enableGroupByCol(ts, ts.order[2], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     // note that we want to ensure that the first grouped columns stay together
     expect(values).toEqual([
@@ -251,7 +251,7 @@ describe('table', () => {
       ['dog', 'bed', [2, 3]],
       ['narwhal', 'under the sea', [7]],
     ]);
-    ts = await Table.disableGroupByCol(ts, ts.groupBy[1]);
+    ts = await Table.disableGroupByCol(ts, ts.groupBy[1], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       ['cat', [4, 5, 6], ['couch', 'windowsill', 'couch']],
@@ -259,7 +259,7 @@ describe('table', () => {
       ['narwhal', [7], ['under the sea']],
     ]);
 
-    ts = await Table.disableGroupByCol(ts, ts.groupBy[0]);
+    ts = await Table.disableGroupByCol(ts, ts.groupBy[0], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       [1, 'dog', 'couch'],
@@ -275,9 +275,9 @@ describe('table', () => {
     const weave = testWeave();
     const tableRows = await getTableRowsNode('groupby_examples.table.json');
     let ts = await initTable(weave, tableRows, ['id', 'species', 'napSpot']);
-    ts = await Table.enableGroupByCol(ts, ts.order[1]);
+    ts = await Table.enableGroupByCol(ts, ts.order[1], tableRows, weave, []);
     let values = await getTableCellValues(ts, tableRows);
-    ts = await Table.enableGroupByCol(ts, ts.order[2]);
+    ts = await Table.enableGroupByCol(ts, ts.order[2], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     // precondition
     expect(values).toEqual([
@@ -287,7 +287,7 @@ describe('table', () => {
       ['dog', 'bed', [2, 3]],
       ['narwhal', 'under the sea', [7]],
     ]);
-    ts = await Table.disableGroupByCol(ts, ts.groupBy[1]);
+    ts = await Table.disableGroupByCol(ts, ts.groupBy[1], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       ['cat', [4, 5, 6], ['couch', 'windowsill', 'couch']],
@@ -295,7 +295,7 @@ describe('table', () => {
       ['narwhal', [7], ['under the sea']],
     ]);
 
-    ts = await Table.disableGroupByCol(ts, ts.groupBy[0]);
+    ts = await Table.disableGroupByCol(ts, ts.groupBy[0], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     expect(values).toEqual([
       [1, 'dog', 'couch'],
@@ -311,9 +311,9 @@ describe('table', () => {
     const weave = testWeave();
     const tableRows = await getTableRowsNode('groupby_examples.table.json');
     let ts = await initTable(weave, tableRows, ['id', 'species', 'napSpot']);
-    ts = await Table.enableGroupByCol(ts, ts.order[1]);
+    ts = await Table.enableGroupByCol(ts, ts.order[1], tableRows, weave, []);
     let values = await getTableCellValues(ts, tableRows);
-    ts = await Table.enableGroupByCol(ts, ts.order[2]);
+    ts = await Table.enableGroupByCol(ts, ts.order[2], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     // precondition
     expect(values).toEqual([
@@ -338,9 +338,9 @@ describe('table', () => {
     const weave = testWeave();
     const tableRows = await getTableRowsNode('groupby_examples.table.json');
     let ts = await initTable(weave, tableRows, ['id', 'species', 'napSpot']);
-    ts = await Table.enableGroupByCol(ts, ts.order[1]);
+    ts = await Table.enableGroupByCol(ts, ts.order[1], tableRows, weave, []);
     let values = await getTableCellValues(ts, tableRows);
-    ts = await Table.enableGroupByCol(ts, ts.order[2]);
+    ts = await Table.enableGroupByCol(ts, ts.order[2], tableRows, weave, []);
     values = await getTableCellValues(ts, tableRows);
     // precondition
     expect(values).toEqual([
@@ -370,7 +370,7 @@ describe('table', () => {
     });
     const {table} = await Table.addColumnToTable(ts, rowCountSelectFn);
     ts = table;
-    ts = await Table.enableGroupByCol(ts, ts.order[1]);
+    ts = await Table.enableGroupByCol(ts, ts.order[1], tableRows, weave, []);
     const values = await getTableCellValues(ts, tableRows);
     // precondition
     expect(values).toEqual([

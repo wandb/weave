@@ -40,7 +40,6 @@ import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
-import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
 import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
@@ -196,10 +195,10 @@ export const useChildPanelConfig = (
 };
 
 export interface ChildPanelProps {
+  noEditorIcons?: boolean;
   controlBar?: 'off' | 'editable' | 'titleBar';
   passthroughUpdate?: boolean;
   pathEl?: string;
-  prefixHeader?: JSX.Element;
   prefixButtons?: JSX.Element;
   allowedPanels?: string[];
   overflowVisible?: boolean;
@@ -215,11 +214,10 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const updateConfig2 = useUpdateConfig2(props);
   const config = useChildPanelConfig(props.config);
   const {id: panelId, config: panelConfig} = config;
-  let {input_node: panelInputExpr} = config;
+  const {input_node: panelInputExpr} = config;
   const weave = useWeaveContext();
   const {stack, path: parentPath} = usePanelContext();
 
-  panelInputExpr = useNodeWithServerType(panelInputExpr).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,
     panelId,
@@ -507,7 +505,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 };
 
 const varNameToTitle = (varName: string) => {
-  return varName.replace(/_/g, ' ').replace(/\b\w/, char => char.toUpperCase());
+  return varName.replace(/_/g, ' ');
 };
 
 // This is the standard way to render subpanels. We should migrate
@@ -564,6 +562,8 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
 
+  const controlBar = props.controlBar ?? 'off';
+
   return curPanelId == null || handler == null ? (
     <div>
       No panel for type {defaultLanguageBinding.printType(panelInput.type)}
@@ -573,30 +573,18 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       data-weavepath={props.pathEl ?? 'root'}
       onMouseEnter={() => setIsHoverPanel(true)}
       onMouseLeave={() => setIsHoverPanel(false)}>
-      {props.controlBar === 'titleBar' && (
-        <div
-          style={{
-            fontWeight: '600',
-            padding: '0 16px 8px',
-            lineHeight: '20px',
-            marginTop: 16,
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-            overflow: 'hidden',
-          }}>
-          {props.pathEl != null && varNameToTitle(props.pathEl)}
-        </div>
-      )}
-      {props.controlBar === 'editable' && (
+      {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {!isHoverPanel && props.pathEl != null && (
-              <EditorBarTitleOnly>
-                {varNameToTitle(props.pathEl)}
-              </EditorBarTitleOnly>
-            )}
-            <EditorBarHover isHovered={isHoverPanel}>
-              {props.prefixHeader}
+            {(props.controlBar === 'titleBar' || !isHoverPanel) &&
+              props.pathEl != null && (
+                <EditorBarTitleOnly>
+                  {varNameToTitle(props.pathEl)}
+                </EditorBarTitleOnly>
+              )}
+            <EditorBarHover
+              show={props.controlBar !== 'titleBar' && isHoverPanel}>
+              {/* Variable name */}
               {props.pathEl != null && (
                 <EditorPath>
                   <ValidatingTextInput
@@ -609,10 +597,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                     }
                     maxLength={24}
                   />{' '}
-                  {props.controlBar === 'editable' && '= '}
                 </EditorPath>
               )}
-              {props.controlBar === 'editable' &&
+              {/* Panel picker */}
+              {controlBar === 'editable' &&
                 curPanelId !== 'Expression' &&
                 curPanelId !== 'RootBrowser' && (
                   <PanelNameEditor
@@ -621,7 +609,8 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                     setValue={handlePanelChange}
                   />
                 )}
-              {props.controlBar === 'editable' ? (
+              {/* Expression */}
+              {controlBar === 'editable' ? (
                 <EditorExpression data-test="panel-expression-expression">
                   <WeaveExpression
                     expr={panelInputExpr}
@@ -635,6 +624,9 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
               ) : (
                 <div style={{width: '100%'}} />
               )}
+            </EditorBarHover>
+            {/* Control buttons */}
+            {!props.noEditorIcons && (
               <EditorIcons visible={isHoverPanel || isMenuOpen}>
                 {props.prefixButtons}
                 <Tooltip
@@ -667,7 +659,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   isOpen={isMenuOpen}
                 />
               </EditorIcons>
-            </EditorBarHover>
+            )}
           </EditorBarContent>
         </Styles.EditorBar>
       )}
@@ -997,6 +989,7 @@ const EditorBarContent = styled.div`
   padding: 0 16px 8px;
   border-bottom: 1px solid ${GRAY_350};
   line-height: 20px;
+  display: flex;
 `;
 EditorBarContent.displayName = 'S.EditorBarContent';
 
@@ -1004,14 +997,20 @@ const EditorBarTitleOnly = styled.div`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+  padding-left: 2px;
+  flex-grow: 1;
 `;
 EditorBarTitleOnly.displayName = 'S.EditorBarTitleOnly';
 
 // If the mouse leaves the panel we want to keep these contents (e.g. unsubmitted
 // expression editor state) but just hide them.
-const EditorBarHover = styled.div<{isHovered: boolean}>`
-  display: ${props => (props.isHovered ? 'flex' : 'none')};
+const EditorBarHover = styled.div<{show: boolean}>`
+  display: ${props => (props.show ? 'flex' : 'none')};
   align-items: flex-start;
+  flex-grow: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `;
 EditorBarHover.displayName = 'S.EditorBarHover';
 

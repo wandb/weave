@@ -1,4 +1,5 @@
 import * as Op from '@wandb/weave/core';
+import {isFile, taggableValue} from '@wandb/weave/core';
 import numeral from 'numeral';
 import Prism from 'prismjs';
 import React, {useEffect, useMemo, useRef} from 'react';
@@ -23,7 +24,11 @@ const PanelFileTextRenderInner: React.FC<PanelFileTextProps> = props => {
   });
 
   const fileNode = props.input;
-  const fileExtension = fileNode.type.extension;
+  const unwrappedType = taggableValue(fileNode.type);
+  const fileExtension =
+    isFile(unwrappedType) && unwrappedType.extension
+      ? unwrappedType.extension
+      : '';
 
   const contentsNode = useMemo(
     () => Op.opFileContents({file: props.input}),
@@ -48,8 +53,8 @@ const PanelFileTextRenderInner: React.FC<PanelFileTextProps> = props => {
     return <div></div>;
   }
 
-  const truncatedTotalLines = processedResults?.truncatedLineLength;
-  const truncatedLineLength = processedResults?.truncatedTotalLines;
+  const truncatedTotalLines = processedResults?.truncatedTotalLines;
+  const truncatedLineLength = processedResults?.truncatedLineLength;
   const text = processedResults?.text;
   const language = languageFromFileName(fileExtension);
 

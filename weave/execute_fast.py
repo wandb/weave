@@ -78,7 +78,10 @@ def _resolve_static_branches(map_fn):
 
         if all(isinstance(v, graph.ConstNode) for v in inputs.values()):
             call_node = graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
-            res = weave_internal.use(call_node)
+
+            # Don't compile here, we've already compiled.
+            with compile.disable_compile():
+                res = weave_internal.use(call_node)
             result_store[map_fn] = res
             return graph.ConstNode(map_fn.type, res)
         return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
@@ -93,7 +96,7 @@ def _resolve_static_branches(map_fn):
 def op_can_be_async(op_name: str) -> bool:
     try:
         op = registry_mem.memory_registry.get_op(op_name)
-    except errors.WeaveInternalError:
+    except errors.WeaveMissingOpDefError:
         return any(
             [
                 o.is_async
@@ -133,6 +136,10 @@ def _slow_map_fn(input_list, map_fn):
 
 def fast_map_fn(input_list, map_fn):
     """Maps a weave function over an input list, without using engine."""
+
+    if len(input_list) == 0:
+        return []
+
     # TODO: Perform this recursively in the main compile pass
     tracer = engine_trace.tracer()
 

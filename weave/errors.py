@@ -150,3 +150,11 @@ class WeaveWBHistoryTranslationError(WeaveBaseError):
 
 class WeaveWandbAuthenticationException(Exception):
     pass
+
+
+class WeaveMissingOpDefError(WeaveBaseError):
+    pass
+
+
+class WeaveMergeArtifactSpecError(WeaveBaseError):
+    pass

@@ -532,7 +532,15 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
             raise ValueError(
                 f"Cannot explode table with list columns of different shapes: {value_lengths} != {value_lengths_0}"
             )
-        null_filled = pc.fill_null(table[column], [None])
+        if pc.any(pc.is_null(table[column])).as_py():
+            # Occurs if we have an optional<list> column. Due to the way flatten works, any rows where the
+            # list is null will be dropped. So we need to put the null inside a list, which causes flatten
+            # to keep it around. This doesn't always work for tables where the list item type is
+            # intricate (e.g., struct of dictionary encoded structs), but these are rare cases.
+            null_filled = pc.fill_null(table[column], [None])
+        else:
+            null_filled = table[column]
+
         flattened = pc.list_flatten(null_filled)
         other_columns.remove(column)
         flattened_list_columns[column] = flattened
@@ -958,3 +966,22 @@ def flatten(arr):
         flatten_return_object_type(arr.object_type),
         arr._artifact,
     )
+
+
+def _drop_tags_output_type(input_type):
+    from ..op_def import map_type
+
+    return map_type(
+        input_type["arr"],
+        lambda t: isinstance(t, tagged_value_type.TaggedValueType) and t.value or t,
+    )
+
+
+@op(
+    name="ArrowWeaveList-dropTags",
+    input_type={"arr": ArrowWeaveListType()},
+    output_type=_drop_tags_output_type,
+    hidden=True,
+)
+def drop_tags(arr):
+    return arr.without_tags()

@@ -10770,7 +10770,7 @@ readdirp@~3.6.0:
   dependencies:
     picomatch "^2.2.1"
 
-redux@^4.0.0, redux@^4.0.1:
+redux@^4.0.0, redux@^4.0.1, redux@^4.0.5:
   version "4.2.1"
   resolved "https://registry.yarnpkg.com/redux/-/redux-4.2.1.tgz#c08f4306826c49b5e9dc901dee0452ea8fce6197"
   integrity sha512-LAUYz4lc+Do8/g7aeRa8JkyDErK6ekstQaqWQrNRW//MY1TvCEpMtpTWvlQ+FPbWCx+Xixu/6SHt5N0HR+SB4w==
@@ -10967,6 +10967,13 @@ rehype-stringify@^9.0.2:
     "@types/hast" "^2.0.0"
     hast-util-to-html "^8.0.0"
     unified "^10.0.0"
+
+reinspect@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/reinspect/-/reinspect-1.1.0.tgz#e2cabeaf7d79a1e0295b483db1ebf88032aa4c1a"
+  integrity sha512-sYDAENbErxleBaDYuODWY8imD/ILvPCau8HV9XoGKWquYTmRMP9HRr32u9EqqjFu3no1MULYByRy6yABj61/+w==
+  dependencies:
+    redux "^4.0.5"
 
 remark-emoji@^2.0.2:
   version "2.2.0"

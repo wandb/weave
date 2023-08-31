@@ -1,5 +1,5 @@
 (async function () {
-  const ANALYTICS_DISABLED = window.CONFIG?.ANALYTICS_DISABLED ?? false;
+  const ANALYTICS_DISABLED = window.CONFIG?.ANALYTICS_DISABLED ?? window.WEAVE_CONFIG?.ANALYTICS_DISABLED ?? false;
   if (ANALYTICS_DISABLED) {
     return;
   }

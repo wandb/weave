@@ -17,11 +17,13 @@ export const IconButton = styled.div<{small?: boolean}>`
     width: 18px;
     height: 18px;
   }
+  padding: 3px;
+  border-radius: 3px;
 
-  color: ${globals.GRAY_500};
+  color: ${globals.MOON_500};
   &:hover {
-    color: ${globals.GRAY_600};
-    background-color: ${globals.GRAY_50};
+    color: ${globals.MOON_800};
+    background-color: ${globals.hexToRGB(globals.OBLIVION, 0.05)};
   }
 
   &:not(:last-child) {

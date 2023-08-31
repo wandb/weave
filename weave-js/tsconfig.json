@@ -36,5 +36,5 @@
     "noEmit": true
   },
   "include": ["src/**/*", "./*.d.ts"],
-  "exclude": ["**/*.test.ts", "node_modules/"]
+  "exclude": ["node_modules/"]
 }

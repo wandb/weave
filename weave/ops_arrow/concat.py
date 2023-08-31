@@ -9,6 +9,7 @@ import typing
 import dataclasses
 import numpy as np
 import pyarrow as pa
+from pyarrow import compute as pc
 
 from .. import weave_types as types
 from ..language_features.tagging import tagged_value_type
@@ -28,6 +29,10 @@ from .list_ import (
 
 DEBUG = False
 
+from .. import engine_trace
+
+tracer = engine_trace.tracer()
+
 
 @dataclasses.dataclass
 class UnionMember:
@@ -43,7 +48,27 @@ def indent_print(indent: int = 0, *args) -> None:
 
 def pa_concat_arrays(arrays: list[typing.Union[pa.Array, pa.ChunkedArray]]) -> pa.Array:
     arrays = [a if isinstance(a, pa.Array) else a.combine_chunks() for a in arrays]
-    return pa.concat_arrays(arrays)
+
+    with tracer.trace("pa_concat_arrays"):
+        try:
+            return pa.concat_arrays(arrays)
+        except pa.lib.ArrowNotImplementedError as e:
+            # pyarrow doesn't support concatenating all dictionaries, so we have to do it ourselves.
+            if all(isinstance(a, pa.DictionaryArray) for a in arrays):
+                # We can concatenate dictionaries by concatenating the indices and the dictionary
+                # values separately.
+
+                index_offset = 0
+                indices = []
+                for a in arrays:
+                    indices.append(pc.add(a.indices, index_offset).cast(pa.int32()))
+                    index_offset += len(a.dictionary)
+
+                indices = pa_concat_arrays(indices)
+                dictionary = pa_concat_arrays([a.dictionary for a in arrays])
+                return pa.DictionaryArray.from_arrays(indices, dictionary)
+            else:
+                raise
 
 
 def _concatenate_typeddicts(
