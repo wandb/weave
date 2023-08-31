@@ -87,29 +87,22 @@ def test_join2_different_types():
 
 
 def test_tagged_awl_sum():
-    #  ok so how do I make this
-    # it's a list of lists
-    boom = [[1.4, 0], [3.4, 0], [None, 5]]
-    for i, item in enumerate(boom):
+    data = [[1.4, 0], [3.4, 0], [None, 5]]
+    for i, item in enumerate(data):
         tag_store.add_tags(box.box(item[0]), {"mytag": f"{i}-abcd"})
-        
-    import pdb
+
     tagtype = tagged_value_type.TaggedValueType(
-        types.TypedDict(property_types={"mytag": types.String()}), 
-        types.UnionType(types.NoneType(), types.Number()))
-    awl = to_arrow(boom, wb_type= types.List(object_type=types.List(object_type=types.UnionType(tagtype, types.Int()))))
-    pdb.set_trace()
+        types.TypedDict(property_types={"mytag": types.String()}),
+        types.UnionType(types.NoneType(), types.Number()),
+    )
+    awl = to_arrow(
+        data,
+        wb_type=types.List(
+            object_type=types.List(object_type=types.UnionType(tagtype, types.Int()))
+        ),
+    )
+
     node = weave.save(awl)
     value = weave.use(node.listnumbersum())
-    assert 4 == 5
-    # where the first element of the list is a TaggedValueType over a float. 
-    # <ArrowWeaveList: List(object_type=UnionType(
-    #     members=[
-    #         TaggedValueType({['project', 'indexCheckpoint', 'run']}, 
-    #                         UnionType(members=[NoneType(), Number()])
-    #                         ), 
-    #         Int()
-    #     ]
-    # ))>
-    # 
-    # 
+
+    assert value.to_pylist_notags() == [1.4, 3.4, None]
