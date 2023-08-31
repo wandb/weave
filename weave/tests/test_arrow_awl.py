@@ -89,7 +89,7 @@ def test_join2_different_types():
 def test_tagged_awl_sum():
     data = [[1.4, 0], [3.4, 0], [None, 5]]
     for i, item in enumerate(data):
-        tag_store.add_tags(box.box(item[0]), {"mytag": f"{i}-abcd"})
+        item[0] = tag_store.add_tags(box.box(item[0]), {"mytag": f"{i}-abcd"})
 
     tagtype = tagged_value_type.TaggedValueType(
         types.TypedDict(property_types={"mytag": types.String()}),

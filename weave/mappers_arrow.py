@@ -135,8 +135,9 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
                 return self._type_codes[type]
             except KeyError:
                 for member_type, member_type_code in self._type_codes.items():
-                    merged_type = types.merge_types(member_type, type)
-                    if merged_type == member_type:
+                    if not isinstance(
+                        types.merge_types(member_type, type), types.UnionType
+                    ):
                         return member_type_code
                 raise errors.WeaveTypeError(f"Could not find type code for {type}")
 
