@@ -56,7 +56,8 @@ def _dispatch_error_is_client_error(
             "concat",
             "string-isNumeric",
             "project-artifacts",
-            "panel_trace-active_span",
+            "panel-table",
+            # "panel_trace-active_span",
         )
     ):
         # All the cases we've seen of this lately are clearly client errors, so
