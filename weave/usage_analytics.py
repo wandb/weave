@@ -24,7 +24,7 @@ def _identify():
 
 def analytics_enabled():
     context_enabled = context_state.analytics_enabled()
-    env_enabled = environment.usage_analytics_enabled
+    env_enabled = environment.usage_analytics_enabled()
 
     return context_enabled and env_enabled
 
