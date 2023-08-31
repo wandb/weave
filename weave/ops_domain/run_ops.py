@@ -117,6 +117,12 @@ gql_prop_op(
     types.Timestamp(),
 )
 gql_prop_op(
+    "run-updatedAt",
+    wdt.RunType,
+    "updatedAt",
+    types.Timestamp(),
+)
+gql_prop_op(
     "_run-historykeyinfo",
     wdt.RunType,
     "historyKeys",
