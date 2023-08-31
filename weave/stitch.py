@@ -265,12 +265,33 @@ def stitch_node_inner(
         return res
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
-            key = _dict_utils.unescape_dots(node.from_op.inputs["key"].val)
+            path = _dict_utils.split_escaped_string(node.from_op.inputs["key"].val)
+            key = _dict_utils.unescape_dots(path[0])
             if (
                 isinstance(inputs[0], LiteralDictObjectRecorder)
                 and key in inputs[0].val
             ):
-                return inputs[0].val[key]
+                val = inputs[0].val.get(key)
+                if val is not None:
+                    if len(path) == 1:
+                        return val
+                    # If there are further path elements, recursively stitch.
+                    sub_key = ".".join(path[1:])
+                    # We manually construct a typedDict-pick op with the next sub-key
+                    new_node = graph.OutputNode(
+                        node.type,
+                        "typedDict-pick",
+                        {
+                            # the first argument is unused by stitch_node_inner,
+                            # so just set it to None
+                            "arr": graph.ConstNode(types.NoneType(), None),
+                            "key": graph.ConstNode(types.String(), sub_key),
+                        },
+                    )
+                    # Make a new ObjectRecorder to hold the sub-key value.
+                    oj_key = ObjectRecorder(new_node, {}, sub_key)
+                    return stitch_node_inner(new_node, {"self": val, "key": oj_key}, sg)
+
             else:
                 # This is the case that the picked key is not found in the
                 # dictionary. In this case, we just ignore the pick and don't
@@ -307,6 +328,30 @@ def stitch_node_inner(
         inputs[0].tags["groupKey"] = groupkey
         # And we return the original object
         return inputs[0]
+    elif node.from_op.name.endswith("join"):
+        fn1 = inputs[2].val
+        fn2 = inputs[3].val
+        if fn1 is None:
+            raise errors.WeaveInternalError("non-const not yet supported")
+        if fn2 is None:
+            raise errors.WeaveInternalError("non-const not yet supported")
+        alias1 = inputs[4].val
+        alias2 = inputs[5].val
+        if alias1 is None:
+            raise errors.WeaveInternalError("non-const not yet supported")
+        if alias2 is None:
+            raise errors.WeaveInternalError("non-const not yet supported")
+        joinKey1 = subgraph_stitch(fn1, {"row": inputs[0]}, sg)
+        joinKey2 = subgraph_stitch(fn2, {"row": inputs[1]}, sg)
+        result = LiteralDictObjectRecorder(
+            node, val={alias1: inputs[0], alias2: inputs[1]}
+        )
+        # We only pass joinKey1 in as tag. I think this is ok, as stitch has already determined
+        # that everything in the tag is a necessary column (we needed those columns to produce
+        # the join key in the first place).
+        # But I'm not totally sure!
+        result.tags["joinObj"] = joinKey1
+        return result
     elif node.from_op.name.endswith("joinAll"):
         fn = inputs[1].val
         if fn is None:
