@@ -10,7 +10,6 @@ import tempfile
 
 from weave.panels import table_state
 from . import context_state
-from . import weave_server
 from .tests import fixture_fakewandb
 from . import serialize
 from . import client
@@ -187,6 +186,8 @@ def fixed_random_seed():
 
 @pytest.fixture()
 def app():
+    from . import weave_server
+
     app = weave_server.make_app()
     app.config.update(
         {
@@ -229,6 +230,8 @@ class HttpServerTestClient:
 
 @pytest.fixture()
 def http_server_test_client(app):
+    from . import weave_server
+
     app = weave_server.make_app()
     flask_client = app.test_client()
     return HttpServerTestClient(flask_client)
