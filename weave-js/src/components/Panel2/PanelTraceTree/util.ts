@@ -1,6 +1,72 @@
 import * as _ from 'lodash';
 import {FlatSpan, SpanType} from '@wandb/weave/core/model/media/traceTree';
 
+export const SpanWeaveType = {
+  type: 'typedDict' as const,
+  propertyTypes: {
+    trace_id: {
+      type: 'union' as const,
+      members: ['string' as const, 'none' as const],
+    },
+    span_id: {
+      type: 'union' as const,
+      members: ['string' as const, 'none' as const],
+    },
+    parent_id: {
+      type: 'union' as const,
+      members: ['string' as const, 'none' as const],
+    },
+    name: {
+      type: 'union' as const,
+      members: ['string' as const, 'none' as const],
+    },
+    start_time_s: {
+      type: 'union' as const,
+      members: ['number' as const, 'none' as const],
+    },
+    end_time_s: {
+      type: 'union' as const,
+      members: ['number' as const, 'none' as const],
+    },
+    attributes: {
+      type: 'union' as const,
+      members: [
+        {type: 'typedDict' as const, propertyTypes: {}},
+        'none' as const,
+      ],
+    },
+    // summary: {
+    //   type: 'union' as const,
+    //   members: [
+    //     {type: 'typedDict' as const, propertyTypes: {}},
+    //     'none' as const,
+    //   ],
+    // },
+    // inputs: {
+    //   type: 'union' as const,
+    //   members: [
+    //     {type: 'typedDict' as const, propertyTypes: {}},
+    //     'none' as const,
+    //   ],
+    // },
+    // outputs: {
+    //   type: 'union' as const,
+    //   members: [
+    //     {type: 'typedDict' as const, propertyTypes: {}},
+    //     'none' as const,
+    //   ],
+    // },
+    // status_code: {
+    //   type: 'union' as const,
+    //   members: ['string' as const, 'none' as const],
+    // },
+    // exception: {
+    //   type: 'union' as const,
+    //   members: ['string' as const, 'none' as const],
+    // },
+  },
+}
+
 export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
   const roots: SpanType[] = [];
   const unrooted: SpanType[] = [];
@@ -57,3 +123,4 @@ export const unifyRoots = (roots: SpanType[]): SpanType => {
     child_spans: roots,
   };
 };
+

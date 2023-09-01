@@ -212,7 +212,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
       expanded: !expanded,
     });
   }, [updateConfig, config, expanded]);
-  console.log({expanded, level, type: nonNullableInput});
+
   return (
     <KeyValTable.Table>
       {isObjectType(nonNullableInput) && (

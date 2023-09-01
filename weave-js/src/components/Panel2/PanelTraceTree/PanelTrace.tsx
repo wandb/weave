@@ -5,55 +5,17 @@ import {useNodeValue} from '@wandb/weave/react';
 import {
   constFunction,
   constNumber,
-  constString,
   listObjectType,
-  opDict,
   opLimit,
   opMap,
-  opNumberMult,
-  opPick,
 } from '@wandb/weave/core';
 import {Loader} from 'semantic-ui-react';
-import {flatToTrees, unifyRoots} from './util';
+import {SpanWeaveType, flatToTrees, unifyRoots} from './util';
+import {opSpanAsDictToLegacySpanShape} from './common';
 
 const inputType = {
   type: 'list' as const,
-  objectType: {
-    type: 'typedDict' as const,
-    propertyTypes: {
-      trace_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      span_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      parent_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      name: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      start_time_s: {
-        type: 'union' as const,
-        members: ['number' as const, 'none' as const],
-      },
-      end_time_s: {
-        type: 'union' as const,
-        members: ['number' as const, 'none' as const],
-      },
-      attributes: {
-        type: 'union' as const,
-        members: [
-          {type: 'typedDict' as const, propertyTypes: {}},
-          'none' as const,
-        ],
-      },
-    },
-  },
+  objectType: SpanWeaveType,
 };
 
 type PanelTraceTreeTraceProps = Panel2.PanelProps<
@@ -70,27 +32,7 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
       arr: limited as any,
       mapFn: constFunction(
         {row: listObjectType(props.input.type), index: 'number'},
-        ({row, index}) =>
-          opDict({
-            name: opPick({obj: row, key: constString('name')}),
-            start_time_ms: opNumberMult({
-              lhs: opPick({
-                obj: row,
-                key: constString('start_time_s'),
-              }),
-              rhs: constNumber(1000),
-            }),
-            end_time_ms: opNumberMult({
-              lhs: opPick({
-                obj: row,
-                key: constString('end_time_s'),
-              }),
-              rhs: constNumber(1000),
-            }),
-            trace_id: opPick({obj: row, key: constString('trace_id')}),
-            span_id: opPick({obj: row, key: constString('span_id')}),
-            parent_id: opPick({obj: row, key: constString('parent_id')}),
-          } as any)
+        ({row, index}) => opSpanAsDictToLegacySpanShape({spanDict: row})
       ),
     } as any);
   }, [props.input]);
