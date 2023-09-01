@@ -131,7 +131,7 @@ AWLMaybeTypedDictType = ArrowWeaveListType(MaybeTypedDictType)
 
 
 @op(
-    name="ArrowWeaveList-broadcast",
+    name="ArrowWeaveList-_preprocessMerge",
     input_type={
         "self": types.union(AWLMaybeTypedDictType, MaybeTypedDictType),
         "other": (
@@ -148,6 +148,7 @@ AWLMaybeTypedDictType = ArrowWeaveListType(MaybeTypedDictType)
     hidden=True,
 )
 def preprocess_merge(self, other):
+    "Preprocesses the merge operation to ensure that both inputs are ArrowWeaveLists."
     return _ensure_awl_for_merge(self, other)
 
 
