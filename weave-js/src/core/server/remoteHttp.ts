@@ -334,6 +334,13 @@ export class RemoteHttpServer implements Server {
           additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
         }
 
+        // Determine if weave requests are being made from App or Weave frontend.
+        if ("CONFIG" in window && (window.CONFIG as any).IS_WANDB_APP) {
+          additionalHeaders['x-weave-origin-wandb-app'] = 'true';
+        } else {
+          additionalHeaders['x-weave-origin-wandb-app'] = 'false';
+        }
+
         let respJson: any = {
           data: new Array(nodes.length).fill(null),
         };
