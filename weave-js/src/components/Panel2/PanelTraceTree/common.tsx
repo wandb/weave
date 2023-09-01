@@ -11,6 +11,8 @@ import {
   opNumberMult,
   constNumber,
   Node,
+  opMerge,
+  opArray,
 } from '@wandb/weave/core';
 
 export const chainColor = '#F59B1414';
@@ -119,10 +121,20 @@ export const opSpanAsDictToLegacySpanShape = ({spanDict}: {spanDict: Node}) => {
     parent_id: opPick({obj: spanDict, key: constString('parent_id')}),
     status_code: opPick({obj: spanDict, key: constString('status_code')}),
     status_message: opPick({obj: spanDict, key: constString('exception')}),
-    // attributes: opPick({obj: spanDict, key: constString('attributes')}),
-    // span_kind: opPick({
-    //   obj: spanDict,
-    //   key: constString('attributes.llm_span_kind'),
-    // }),
+    attributes: opMerge({
+      lhs: opPick({obj: spanDict, key: constString('attributes')}) as any,
+      rhs: opPick({obj: spanDict, key: constString('summary')}) as any,
+    }),
+    span_kind: opPick({
+      obj: spanDict,
+      // DO NOT MERGE THIS UGLY llm_span_kind ... fix this TIM!
+      key: constString('attributes.llm_span_kind'),
+    }),
+    results: opArray({
+      a: opDict({
+        inputs: opPick({obj: spanDict, key: constString('inputs')}),
+        outputs: opPick({obj: spanDict, key: constString('output')}),
+      } as any),
+    } as any),
   } as any);
 };

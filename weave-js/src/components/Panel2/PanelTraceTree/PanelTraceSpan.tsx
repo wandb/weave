@@ -37,6 +37,9 @@ const DetailKeyValueRow: React.FC<{
 }> = props => {
   const {label, value} = props;
   const textValue = safeValue(value);
+  if (textValue === 'null') {
+    return null;
+  }
   return (
     <tr style={props.style}>
       <S.KVDetailKeyTD>{'' + label}</S.KVDetailKeyTD>

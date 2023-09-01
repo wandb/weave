@@ -68,6 +68,7 @@ export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
   const map: {[id: string]: SpanType} = {};
   flat.forEach((span, index) => {
     map[span.span_id] = {
+      ...span,
       name: span.name,
       start_time_ms: span.start_time_ms,
       end_time_ms: span.end_time_ms,
