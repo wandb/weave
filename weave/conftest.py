@@ -28,6 +28,8 @@ from _pytest.config import Config
 from _pytest.reports import TestReport
 from typing import Tuple, Optional
 
+logs.configure_logger()
+
 
 def pytest_report_teststatus(
     report: TestReport, config: Config
