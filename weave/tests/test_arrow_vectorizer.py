@@ -578,6 +578,46 @@ def test_arrow_typeddict_nullable_merge(
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
+@pytest.mark.parametrize(
+    "name,input_data_vec,weave_func,expected_output",
+    [
+        (
+            "merge-scalar-vec",
+            [{"b": "c"}, None, {"b": "q"}],
+            lambda x: weave.RuntimeConstNode(
+                types.TypedDict({"c": types.Int()}), {"c": 4}
+            ).merge(x),
+            [{"b": "c", "c": 4}, None, {"b": "q", "c": 4}],
+        ),
+        (
+            "merge-vec-scalar",
+            [{"b": "c"}, None, {"b": "q"}],
+            lambda x: x.merge({"c": 4}),
+            [{"b": "c", "c": 4}, None, {"b": "q", "c": 4}],
+        ),
+    ],
+)
+def test_arrow_typeddict_nullable_scalar_vector_merge(
+    input_data_vec, name, weave_func, expected_output
+):
+    data = weave.save(arrow.to_arrow(input_data_vec))
+
+    fn = weave_internal.define_fn(
+        {
+            "x": weave.type_of(input_data_vec).object_type,
+        },
+        weave_func,
+    ).val
+    vec_fn = arrow.vectorize(fn, strict=True)
+    called = weave_internal.call_fn(vec_fn, {"x": data})
+    awl = weave.use(called)
+    assert awl.to_pylist_raw() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+    assert awl.object_type == weave.type_of(expected_output).object_type
+
+
 nullable_pick_cases = [
     (
         "pick",

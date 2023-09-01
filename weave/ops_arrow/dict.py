@@ -111,15 +111,11 @@ def pick(self, key):
     return ArrowWeaveList(result, object_type, self._artifact)
 
 
-AnyTypedDict = types.TypedDict({})
-AWLTypedDictType = ArrowWeaveListType(AnyTypedDict)
-
-
 def _ensure_awl_for_merge(
     ensure_target: typing.Union[dict, ArrowWeaveList],
     compare_target: typing.Union[dict, ArrowWeaveList],
 ) -> ArrowWeaveList:
-    if isinstance(ensure_target, dict):
+    if not isinstance(ensure_target, ArrowWeaveList):
         assert isinstance(compare_target, ArrowWeaveList)
         utility_awl = convert.to_arrow([ensure_target])
         return ArrowWeaveList(
@@ -130,40 +126,50 @@ def _ensure_awl_for_merge(
     return ensure_target
 
 
+MaybeTypedDictType = types.optional(types.TypedDict({}))
+AWLMaybeTypedDictType = ArrowWeaveListType(MaybeTypedDictType)
+
+
+@op(
+    name="ArrowWeaveList-broadcast",
+    input_type={
+        "self": types.union(AWLMaybeTypedDictType, MaybeTypedDictType),
+        "other": (
+            lambda input_types: types.union(AWLMaybeTypedDictType, MaybeTypedDictType)
+            if AWLMaybeTypedDictType.assign_type(input_types["self"])
+            else AWLMaybeTypedDictType
+            if MaybeTypedDictType.assign_type(input_types["self"])
+            else types.union(AWLMaybeTypedDictType, MaybeTypedDictType)
+        ),
+    },
+    output_type=(
+        lambda input_types: input_types["self"]
+        if ArrowWeaveListType().assign_type(input_types["self"])
+        else ArrowWeaveListType(input_types["self"])
+    ),
+    hidden=True,
+)
+def preprocess_merge(self, other):
+    return _ensure_awl_for_merge(self, other)
+
+
 @arrow_op(
     name="ArrowWeaveListTypedDict-merge",
     input_type={
-        "self": types.union(AWLTypedDictType, AnyTypedDict),
-        "other": (
-            lambda self: AWLTypedDictType
-            if AnyTypedDict.assign_type(self)
-            else types.union(AWLTypedDictType, AnyTypedDict)
-        ),
+        "self": ArrowWeaveListType(types.TypedDict({})),
+        "other": ArrowWeaveListType(types.TypedDict({})),
     },
     output_type=lambda input_types: ArrowWeaveListType(
         _dict_utils.typeddict_merge_output_type(
             {
-                "self": input_types["self"]
-                if AnyTypedDict.assign_type(input_types["self"])
-                else input_types["self"].object_type,
-                "other": input_types["other"]
-                if AnyTypedDict.assign_type(input_types["self"])
-                else input_types["self"].object_type,
+                "self": input_types["self"].object_type,
+                "other": input_types["other"].object_type,
             }
         )
     ),
     all_args_nullable=False,
 )
 def merge(self, other):
-    # if either self or other is a typedDict, then we need to convert broadcast it to an AWL of the same
-    # shape as the other
-
-    self_ensured = _ensure_awl_for_merge(self, other)
-    other_ensured = _ensure_awl_for_merge(other, self)
-
-    self: ArrowWeaveList = self_ensured
-    other: ArrowWeaveList = other_ensured
-
     field_arrays: dict[str, pa.Array] = {}
     for arrow_weave_list in (self, other):
         for key in arrow_weave_list.object_type.property_types:
