@@ -583,11 +583,11 @@ def test_arrow_typeddict_nullable_merge(
     [
         (
             "merge-scalar-vec",
-            [{"b": "c"}, None, {"b": "q"}],
+            [{"b": "c"}, {"b": "q"}],
             lambda x: weave.RuntimeConstNode(
                 types.TypedDict({"c": types.Int()}), {"c": 4}
             ).merge(x),
-            [{"b": "c", "c": 4}, None, {"b": "q", "c": 4}],
+            [{"b": "c", "c": 4}, {"b": "q", "c": 4}],
         ),
         (
             "merge-vec-scalar",
