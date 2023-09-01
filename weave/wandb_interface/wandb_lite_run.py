@@ -92,9 +92,9 @@ class InMemoryLazyLiteRun:
         if self._run is None:
             try:
                 # Ensure project exists
-                self.i_api.upsert_project(
-                    project=self._project_name, entity=self._entity_name
-                )
+                # self.i_api.upsert_project(
+                #     project=self._project_name, entity=self._entity_name
+                # )
 
                 # Produce a run
                 run_res, _, _ = self.i_api.upsert_run(
