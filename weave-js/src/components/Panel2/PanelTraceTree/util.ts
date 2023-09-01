@@ -35,31 +35,25 @@ export const SpanWeaveType = {
         'none' as const,
       ],
     },
-    // summary: {
-    //   type: 'union' as const,
-    //   members: [
-    //     {type: 'typedDict' as const, propertyTypes: {}},
-    //     'none' as const,
-    //   ],
-    // },
-    // inputs: {
-    //   type: 'union' as const,
-    //   members: [
-    //     {type: 'typedDict' as const, propertyTypes: {}},
-    //     'none' as const,
-    //   ],
-    // },
-    // outputs: {
-    //   type: 'union' as const,
-    //   members: [
-    //     {type: 'typedDict' as const, propertyTypes: {}},
-    //     'none' as const,
-    //   ],
-    // },
-    // status_code: {
-    //   type: 'union' as const,
-    //   members: ['string' as const, 'none' as const],
-    // },
+    summary: {
+      type: 'union' as const,
+      members: [
+        {type: 'typedDict' as const, propertyTypes: {}},
+        'none' as const,
+      ],
+    },
+    inputs: {
+      type: 'union' as const,
+      members: [
+        {type: 'typedDict' as const, propertyTypes: {}},
+        'none' as const,
+      ],
+    },
+    output: 'any' as const,
+    status_code: {
+      type: 'union' as const,
+      members: ['string' as const, 'none' as const],
+    },
     // exception: {
     //   type: 'union' as const,
     //   members: ['string' as const, 'none' as const],

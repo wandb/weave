@@ -119,5 +119,10 @@ export const opSpanAsDictToLegacySpanShape = ({spanDict}: {spanDict: Node}) => {
     parent_id: opPick({obj: spanDict, key: constString('parent_id')}),
     status_code: opPick({obj: spanDict, key: constString('status_code')}),
     status_message: opPick({obj: spanDict, key: constString('exception')}),
+    // attributes: opPick({obj: spanDict, key: constString('attributes')}),
+    // span_kind: opPick({
+    //   obj: spanDict,
+    //   key: constString('attributes.llm_span_kind'),
+    // }),
   } as any);
 };
