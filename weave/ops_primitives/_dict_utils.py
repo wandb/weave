@@ -32,8 +32,8 @@ class MergeInputTypes(typing.TypedDict):
 def typeddict_merge_output_type(
     input_types: MergeInputTypes,
 ) -> typing.Union[types.TypedDict, types.UnionType, types.NoneType, types.UnknownType]:
-    self = input_types["self"]
-    other = input_types["other"]
+    self: types.Type = input_types["self"]
+    other: types.Type = input_types["other"]
 
     if isinstance(self, types.Const):
         self = self.val_type
