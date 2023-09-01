@@ -34,6 +34,19 @@ BOARD_INPUT_WEAVE_TYPE = types.List(panel_trace.span_typed_dict_type)
 board_name = "py_board-" + BOARD_ID
 
 
+def make_span_table(input_node):
+    traces_table = panels.Table(input_node)  # type: ignore
+    traces_table.add_column(lambda row: row["status_code"].equal("SUCCESS"), "Success")
+    traces_table.add_column(lambda row: row["name"], "Span Name")
+    traces_table.add_column(lambda row: row["trace_id"], "Trace ID")
+    traces_table.add_column(lambda row: row["summary.latency_s"], "Latency")
+    traces_table.add_column(lambda row: row["inputs"], "Inputs", panel_def="object")
+    traces_table.add_column(lambda row: row["output"], "Output", panel_def="object")
+    traces_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
+
+    return traces_table
+
+
 @weave.op(  # type: ignore
     name=board_name,
     hidden=True,
@@ -70,13 +83,7 @@ def board(
         enableAddPanel=True,
     )
 
-    traces_table = panels.Table(trace_roots_var)  # type: ignore
-    traces_table.add_column(lambda row: row["name"], "Span Name")
-    traces_table.add_column(lambda row: row["trace_id"], "Trace ID")
-    traces_table.add_column(lambda row: row["summary.latency_s"], "Latency")
-    traces_table.add_column(lambda row: row["inputs"], "Inputs", panel_def="object")
-    traces_table.add_column(lambda row: row["output"], "Output", panel_def="object")
-    traces_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
+    traces_table = make_span_table(trace_roots_var)  # type: ignore
 
     traces_table_var = overview_tab.add(
         "traces_table",
@@ -101,28 +108,16 @@ def board(
     selected_trace_obj = overview_tab.add(
         "selected_trace_obj",
         active_span,
-        layout=weave.panels.GroupPanelLayout(x=16, y=8, w=8, h=8),
+        layout=weave.panels.GroupPanelLayout(x=16, y=8, w=8, h=16),
     )
 
     similar_spans = all_spans.filter(lambda row: row["name"] == active_span["name"])
 
-    similar_spans_table = panels.Table(similar_spans)  # type: ignore
-    similar_spans_table.add_column(lambda row: row["name"], "Span Name")
-    similar_spans_table.add_column(lambda row: row["trace_id"], "Trace ID")
-    similar_spans_table.add_column(lambda row: row["summary.latency_s"], "Latency")
-    similar_spans_table.add_column(
-        lambda row: row["inputs"], "Inputs", panel_def="object"
-    )
-    similar_spans_table.add_column(
-        lambda row: row["output"], "Output", panel_def="object"
-    )
-    similar_spans_table.add_column(
-        lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
-    )
+    similar_spans_table = make_span_table(similar_spans)
     similar_spans_table_var = overview_tab.add(
         "similar_spans_table",
         similar_spans_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=16, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=16, w=16, h=8),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)

@@ -214,17 +214,24 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
   }, [updateConfig, config, expanded]);
 
   return (
-    <KeyValTable.Table>
-      {isObjectType(nonNullableInput) && (
-        <div
-          style={{display: 'flex', alignItems: 'center'}}
-          onClick={() => toggleExpanded()}>
-          <Icon size="mini" name={`chevron ${expanded ? 'down' : 'right'}`} />
-          {nonNullableInput.type}
-        </div>
-      )}
-      {expanded && <tbody>{keyChildren}</tbody>}
-    </KeyValTable.Table>
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        overflowY: 'auto',
+      }}>
+      <KeyValTable.Table>
+        {isObjectType(nonNullableInput) && (
+          <div
+            style={{display: 'flex', alignItems: 'center'}}
+            onClick={() => toggleExpanded()}>
+            <Icon size="mini" name={`chevron ${expanded ? 'down' : 'right'}`} />
+            {nonNullableInput.type}
+          </div>
+        )}
+        {expanded && <tbody>{keyChildren}</tbody>}
+      </KeyValTable.Table>
+    </div>
   );
 };
 
