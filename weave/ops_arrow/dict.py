@@ -135,9 +135,9 @@ AWLMaybeTypedDictType = ArrowWeaveListType(MaybeTypedDictType)
     input_type={
         "self": types.union(AWLMaybeTypedDictType, MaybeTypedDictType),
         "other": (
-            lambda input_types: types.union(AWLMaybeTypedDictType, MaybeTypedDictType)
-            if AWLMaybeTypedDictType.assign_type(input_types["self"])
-            else AWLMaybeTypedDictType
+            lambda input_types: AWLMaybeTypedDictType
+            if MaybeTypedDictType.assign_type(input_types["self"])
+            else types.union(AWLMaybeTypedDictType, MaybeTypedDictType)
         ),
     },
     output_type=(
