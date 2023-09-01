@@ -576,14 +576,12 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {!isHoverPanel &&
-              props.pathEl != null && (
-                <EditorBarTitleOnly>
-                  {varNameToTitle(props.pathEl)}
-                </EditorBarTitleOnly>
-              )}
-            <EditorBarHover
-              show={isHoverPanel}>
+            {!isHoverPanel && props.pathEl != null && (
+              <EditorBarTitleOnly>
+                {varNameToTitle(props.pathEl)}
+              </EditorBarTitleOnly>
+            )}
+            <EditorBarHover show={isHoverPanel}>
               {/* Variable name */}
               {props.pathEl != null && (
                 <EditorPath>
