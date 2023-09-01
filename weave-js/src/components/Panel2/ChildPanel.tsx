@@ -1017,6 +1017,9 @@ const EditorPath = styled.div`
   margin-right: 8px;
 
   input {
+    :focus {
+      outline: none;
+    }
     font-family: inherit;
   }
 `;
