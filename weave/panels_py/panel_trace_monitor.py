@@ -74,8 +74,8 @@ def board(
     traces_table.add_column(lambda row: row["name"], "Span Name")
     traces_table.add_column(lambda row: row["trace_id"], "Trace ID")
     traces_table.add_column(lambda row: row["summary.latency_s"], "Latency")
-    traces_table.add_column(lambda row: row["inputs"], "Inputs")
-    traces_table.add_column(lambda row: row["output"], "Output")
+    traces_table.add_column(lambda row: row["inputs"], "Inputs", panel_def="object")
+    traces_table.add_column(lambda row: row["output"], "Output", panel_def="object")
     traces_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
 
     traces_table_var = overview_tab.add(
@@ -110,8 +110,12 @@ def board(
     similar_spans_table.add_column(lambda row: row["name"], "Span Name")
     similar_spans_table.add_column(lambda row: row["trace_id"], "Trace ID")
     similar_spans_table.add_column(lambda row: row["summary.latency_s"], "Latency")
-    similar_spans_table.add_column(lambda row: row["inputs"], "Inputs")
-    similar_spans_table.add_column(lambda row: row["output"], "Output")
+    similar_spans_table.add_column(
+        lambda row: row["inputs"], "Inputs", panel_def="object"
+    )
+    similar_spans_table.add_column(
+        lambda row: row["output"], "Output", panel_def="object"
+    )
     similar_spans_table.add_column(
         lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
     )

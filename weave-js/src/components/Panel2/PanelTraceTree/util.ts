@@ -54,11 +54,12 @@ export const SpanWeaveType = {
       type: 'union' as const,
       members: ['string' as const, 'none' as const],
     },
-    // exception: {
-    //   type: 'union' as const,
-    //   members: ['string' as const, 'none' as const],
-    // },
+    exception: {
+      type: 'union' as const,
+      members: ['string' as const, 'none' as const],
+    },
   },
+  notRequiredKeys: ['exception'],
 }
 
 export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
