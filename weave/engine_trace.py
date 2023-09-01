@@ -18,6 +18,7 @@ import time
 import json
 import dataclasses
 
+
 from . import logs
 
 
@@ -90,6 +91,9 @@ def weave_trace_stream():
     if _weave_trace_stream is None:
         from weave.wandb_interface.wandb_stream_table import StreamTable
 
+        logging.info(
+            "Setting up weave trace stream at %s", os.getenv("WEAVE_TRACE_STREAM")
+        )
         _weave_trace_stream = StreamTable(os.getenv("WEAVE_TRACE_STREAM"))
     return _weave_trace_stream
 
@@ -204,6 +208,12 @@ def dd_span_to_weave_span(dd_span):
 
 
 def send_proc(queue):
+    from .wandb_client_api import _thread_local_api_settings
+
+    logging.info(
+        "Starting weave trace stream writer, authenticated as %s with thread local api settings %s"
+        % (os.getenv("WANDB_API_KEY"), _thread_local_api_settings),
+    )
     while True:
         spans = queue.get()
         if spans is None:
@@ -247,7 +257,6 @@ class WeaveWriter:
 
 
 def tracer():
-
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
@@ -255,6 +264,7 @@ def tracer():
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
             # mirror DataDog trace info to W&B.
             # In this mode we log a table of spans, as opposed to traces.
+
             if not isinstance(ddtrace_tracer._writer, WeaveWriter):
                 ddtrace_tracer._writer = WeaveWriter(ddtrace_tracer._writer)
                 from ddtrace.internal.processor.trace import SpanAggregator
