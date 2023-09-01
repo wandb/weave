@@ -111,6 +111,47 @@ def pick(self, key):
     return ArrowWeaveList(result, object_type, self._artifact)
 
 
+def _ensure_awl_for_merge(
+    ensure_target: typing.Union[dict, ArrowWeaveList],
+    compare_target: typing.Union[dict, ArrowWeaveList],
+) -> ArrowWeaveList:
+    if not isinstance(ensure_target, ArrowWeaveList):
+        assert isinstance(compare_target, ArrowWeaveList)
+        utility_awl = convert.to_arrow([ensure_target])
+        return ArrowWeaveList(
+            pa.repeat(ensure_target, len(compare_target)),
+            utility_awl.object_type,
+            utility_awl._artifact,
+        )
+    return ensure_target
+
+
+MaybeTypedDictType = types.optional(types.TypedDict({}))
+AWLMaybeTypedDictType = ArrowWeaveListType(MaybeTypedDictType)
+
+
+@op(
+    name="ArrowWeaveList-_preprocessMerge",
+    input_type={
+        "self": types.union(AWLMaybeTypedDictType, MaybeTypedDictType),
+        "other": (
+            lambda input_types: AWLMaybeTypedDictType
+            if MaybeTypedDictType.assign_type(input_types["self"])
+            else types.union(AWLMaybeTypedDictType, MaybeTypedDictType)
+        ),
+    },
+    output_type=(
+        lambda input_types: input_types["self"]
+        if ArrowWeaveListType().assign_type(input_types["self"])
+        else ArrowWeaveListType(input_types["self"])
+    ),
+    hidden=True,
+)
+def preprocess_merge(self, other):
+    "Preprocesses the merge operation to ensure that both inputs are ArrowWeaveLists."
+    return _ensure_awl_for_merge(self, other)
+
+
 @arrow_op(
     name="ArrowWeaveListTypedDict-merge",
     input_type={

@@ -20,6 +20,7 @@ from . import arraylist_ops
 from . import convert_ops, convert
 from .arrow_tags import pushdown_list_tags
 from ..ops_primitives.dict import dict_
+from ..ops_arrow.dict import preprocess_merge
 
 
 class VectorizeError(errors.WeaveBaseError):
@@ -316,6 +317,16 @@ def _vectorize_list_special_case(node_name, node_inputs, vectorized_keys):
         )
 
 
+def _vectorize_merge_special_case(node_name, node_inputs, vectorized_keys):
+    self = node_inputs["lhs"]
+    other = node_inputs["rhs"]
+
+    self_ensured = preprocess_merge(self, other)
+    other_ensured = preprocess_merge(other, self)
+
+    return self_ensured.merge(other_ensured)
+
+
 def vectorize(
     weave_fn,
     with_respect_to: typing.Optional[typing.Iterable[graph.VarNode]] = None,
@@ -411,6 +422,11 @@ def vectorize(
             )
         if node_name == "list":
             return _vectorize_list_special_case(node_name, node_inputs, vectorized_keys)
+
+        if node_name == "merge":
+            return _vectorize_merge_special_case(
+                node_name, node_inputs, vectorized_keys
+            )
 
         # 3. In the case of `Object-__getattr__`, we need to special case it will only work when the first arg is AWL
         # and the second is a string:
