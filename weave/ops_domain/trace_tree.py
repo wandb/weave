@@ -44,7 +44,7 @@ def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> Non
 
     try:
         typeguard.check_type(value, hints[key])
-    except TypeError as e:
+    except typeguard.TypeCheckError as e:
         # warn
         logging.warning(
             f"Setting attribute {key} of {obj} to {value} failed typeguard check: {e}. Replacing with None."
