@@ -857,8 +857,11 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       input,
       rowsNode0,
       tableState0.groupBy,
+      tableState0.order,
+      tableState0.columnNames,
       tableState0.columnSelectFunctions,
-      config.series[0].dims.x
+      config.series[0].dims.x,
+      weave
     );
   }, [config.series, input, weave]);
 
@@ -1136,11 +1139,14 @@ const WeaveExpressionDimConfig: React.FC<{
           input,
           rowsNode,
           tableState.groupBy,
+          tableState.order,
+          tableState.columnNames,
           tableState.columnSelectFunctions,
-          colId
+          colId,
+          weave
         );
       }),
-    [rowsNodes, input, tableConfigs, colIds]
+    [rowsNodes, tableConfigs, colIds, input, weave]
   );
 
   return (
