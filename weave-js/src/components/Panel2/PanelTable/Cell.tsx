@@ -1,8 +1,11 @@
 import {
+  constNumber,
   defaultLanguageBinding,
   filterNodes,
   Node,
   NodeOrVoidNode,
+  opIndex,
+  varNode,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
 
@@ -53,11 +56,24 @@ export const Cell: React.FC<{
     table,
     colId
   );
-  // const selectedNode = useMemo(
-  //   () => Table.getCellValueNode(weave, rowNode, selectFunction),
-  //   [rowNode, selectFunction, weave]
-  // );
-  const selectedNode = selectFunction;
+
+  // TODO: a hack, we always index with a const prior to Cell
+  const rowIndex = (rowNode as any).fromOp.inputs.index.val;
+  const selectedNode = useMemo(() => {
+    const containsRowVar =
+      filterNodes(
+        selectFunction,
+        n =>
+          n.nodeType === 'var' && (n.varName === 'row' || n.varName === 'index')
+      ).length > 0;
+    if (containsRowVar) {
+      return selectFunction;
+    }
+    return opIndex({
+      arr: selectFunction as any,
+      index: varNode('number', 'index'),
+    });
+  }, [selectFunction]);
 
   const {handler, curPanelId} = usePanelStacksForType(
     selectedNode.type,
@@ -108,14 +124,36 @@ export const Cell: React.FC<{
     },
     [colId, selectFunction, table, updateTableState, updateInput, weave]
   );
+  const frame = useMemo(() => {
+    return Table.getCellFrame(
+      inputNode,
+      inputNode,
+      table.groupBy,
+      table.order,
+      table.columnNames,
+      table.columnSelectFunctions,
+      colId,
+      weave
+    );
+  }, [
+    colId,
+    inputNode,
+    table.columnNames,
+    table.columnSelectFunctions,
+    table.groupBy,
+    table.order,
+    weave,
+  ]);
   const newContextVars = useMemo(() => {
     return {
       // TODO: This is just plain wrong, callFunction doesn't adjust types!
+      ...frame,
       domain: weave.callFunction(selectFunction, {row: inputNode}),
       row: rowNode,
       input: selectFunction,
+      index: constNumber(rowIndex),
     };
-  }, [selectFunction, inputNode, rowNode, weave]);
+  }, [weave, frame, selectFunction, inputNode, rowNode, rowIndex]);
   return (
     <div
       ref={domRef}

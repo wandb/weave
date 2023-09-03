@@ -230,15 +230,21 @@ export const ColumnHeader: React.FC<{
         inputArrayNode,
         rowsNode,
         tableState.groupBy,
+        tableState.order,
+        tableState.columnNames,
         tableState.columnSelectFunctions,
-        colId
+        colId,
+        weave
       ),
     [
-      colId,
       inputArrayNode,
       rowsNode,
-      tableState.columnSelectFunctions,
       tableState.groupBy,
+      tableState.order,
+      tableState.columnNames,
+      tableState.columnSelectFunctions,
+      colId,
+      weave,
     ]
   );
   const doUngroup = useCallback(async () => {

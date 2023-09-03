@@ -48,8 +48,11 @@ async function refineTableStateExpressions(
           inputNode,
           rowsNode,
           tableState.groupBy,
+          tableState.order,
+          tableState.columnNames,
           tableState.columnSelectFunctions,
-          tableState.groupBy[0]
+          tableState.groupBy[0],
+          weave
         )
       : {};
   const groupedCellStack = pushFrame(stack, groupedCellFrame);
@@ -60,8 +63,11 @@ async function refineTableStateExpressions(
           inputNode,
           rowsNode,
           tableState.groupBy,
+          tableState.order,
+          tableState.columnNames,
           tableState.columnSelectFunctions,
-          ungroupedCols[0]
+          ungroupedCols[0],
+          weave
         )
       : {};
   const ungroupedCellStack = pushFrame(stack, ungroupedCellFrame);

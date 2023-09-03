@@ -915,8 +915,11 @@ export function getCellFrame(
   inputNode: Node,
   rowsNode: Node,
   groupByColumns: ColumnId[],
+  order: ColumnId[],
+  columnNames: {[colId: string]: string},
   columnSelectFunctions: ColumnSelectFunctions,
-  colId: string
+  colId: string,
+  weave: WeaveInterface
 ) {
   // In the normal case, we select from an example row from input.
   let exampleNode: Node;
@@ -929,7 +932,7 @@ export function getCellFrame(
   } else {
     exampleNode = getExampleRow(inputNode);
   }
-  const newFrame: Frame = isList(inputNode.type)
+  let newFrame: Frame = isList(inputNode.type)
     ? {
         row: exampleNode,
         index: varNode('number', 'index'),
@@ -942,6 +945,18 @@ export function getCellFrame(
         index: varNode('number', 'index'),
         // key: varNode('string', 'key'),
       };
+  for (const otherColId of order) {
+    if (otherColId === colId) {
+      break;
+    }
+    const otherColName = getTableColumnName(
+      columnNames,
+      columnSelectFunctions,
+      otherColId,
+      weave.client.opStore
+    );
+    newFrame[otherColName] = columnSelectFunctions[otherColId];
+  }
   return newFrame;
 }
 
