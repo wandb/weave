@@ -113,27 +113,46 @@ def _get_history3(run: wdt.Run, columns=None):
 
     artifact = artifact_mem.MemArtifact()
 
+    import time
+
+    print("T1", time.time())
+
     # 1. Get the flattened Weave-Type given HistoryKeys
     flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
     final_type = _unflatten_history_object_type(flattened_object_type)
+    print("T2", time.time())
 
     # 2. Read in the live set
-    raw_live_data = _get_live_data_from_run(run, columns=columns)
+    # raw_live_data = _get_live_data_from_run(run, columns=columns)
+
+    raw_live_data = []
+    live_data_table = _get_live_data_table_from_run(run, columns=columns)
+
+    print("T3", time.time())
 
     # 3.a: Raw-load each parquet file
     raw_history_awl_tables = _read_raw_history_awl_tables(
         run, columns=columns, artifact=artifact
     )
 
+    print("T4", time.time())
+
     # 3.b: Collapse unions
     union_collapsed_awl_tables = [
         _collapse_unions(awl) for awl in raw_history_awl_tables
     ]
 
+    print("T5", time.time())
+
     # 4. Process all the data
     raw_history_pa_tables = [
         history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
     ]
+
+    if live_data_table is not None:
+        raw_history_pa_tables.append(live_data_table)
+
+    print("T6", time.time())
 
     run_path = wb_util.RunPath(
         run["project"]["entity"]["name"],
@@ -147,19 +166,21 @@ def _get_history3(run: wdt.Run, columns=None):
     ) = _process_all_columns(
         flattened_object_type, raw_live_data, raw_history_pa_tables, run_path, artifact
     )
+    print("T7", time.time())
 
-    live_data_awl = _construct_live_data_awl(
-        live_columns,
-        live_columns_already_mapped,
-        flattened_object_type,
-        len(raw_live_data),
-        artifact,
-    )
+    # live_data_awl = _construct_live_data_awl(
+    #     live_columns,
+    #     live_columns_already_mapped,
+    #     flattened_object_type,
+    #     len(raw_live_data),
+    #     artifact,
+    # )
+    print("T8", time.time())
 
     # 5.a Now we concat the converted liveset and parquet files
     concatted_awl = history_op_common.concat_awls(
         [
-            live_data_awl,
+            # live_data_awl,
             *{
                 ArrowWeaveList(
                     table, object_type=flattened_object_type, artifact=artifact
@@ -168,6 +189,7 @@ def _get_history3(run: wdt.Run, columns=None):
             },
         ]
     )
+    print("T9", time.time())
 
     if len(concatted_awl) == 0:
         return convert.to_arrow([], types.List(final_type), artifact=artifact)
@@ -175,12 +197,15 @@ def _get_history3(run: wdt.Run, columns=None):
     sorted_table = history_op_common.sort_history_pa_table(
         history_op_common.awl_to_pa_table(concatted_awl)
     )
+    print("T10", time.time())
 
     # 6. Finally, unflatten the columns
     final_array = _unflatten_pa_table(sorted_table)
+    print("T11", time.time())
 
     # 7. Optionally: verify the AWL
     reason = weave_arrow_type_check(final_type, final_array)
+    print("T12", time.time())
 
     if reason != None:
         raise errors.WeaveWBHistoryTranslationError(
@@ -528,6 +553,21 @@ def _get_live_data_from_run(run: wdt.Run, columns=None):
         {k: v for k, v in row.items() if k in column_set}
         for row in gql_json_cache.use_json(raw_live_data)
     ]
+
+
+def _get_live_data_table_from_run(run: wdt.Run, columns=None):
+    raw_live_data = run["sampledParquetHistory"]["liveData"]
+    if len(raw_live_data) == 0:
+        return None
+    from io import BytesIO
+    import pyarrow.json as pj
+
+    f = BytesIO()
+    for row in raw_live_data:
+        f.write(row.encode("utf-8"))
+        f.write(b"\n")
+    f.seek(0)
+    return pj.read_json(f)
 
 
 def _extract_column_from_live_data(live_data: list[dict], column_name: str):
