@@ -655,9 +655,12 @@ export const PanelGroupItem: React.FC<{
       updateConfig(
         produce(config, draft => {
           // this updates the key of the item while mantaining the order, since it matters
-          draft.items = Object.fromEntries(Object.entries(draft.items).map(
-            ([key, value]) => [key === name ? newName: key, value]
-          ));
+          draft.items = Object.fromEntries(
+            Object.entries(draft.items).map(([key, value]) => [
+              key === name ? newName : key,
+              value,
+            ])
+          );
 
           if (config.gridConfig) {
             // This updates the grid config with the new name, since we use names as ids
