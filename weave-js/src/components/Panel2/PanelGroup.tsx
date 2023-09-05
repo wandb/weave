@@ -656,32 +656,11 @@ export const PanelGroupItem: React.FC<{
 
   const itemUpdateName = useCallback(
     (newName: string) => {
-      // this works
-    
       fullUpdateConfig(
         updateExpressionVarNames(fullConfig, [], [...path, name], name, newName)
       );
-
-      // this doesn't work
-      // updateConfig(
-      //   produce(config, draft => {
-      //     draft.items[newName] = draft.items[name];
-      //     delete draft.items[name];
-
-      //     if (config.gridConfig) {
-      //       // This updates the grid config with the new name, since we use names as ids
-      //       // if we had unique ids, we wouldnt have to do this
-      //       const gridConfigIndex = config.gridConfig.panels.findIndex(
-      //         p => p.id === name
-      //       );
-      //       if (gridConfigIndex !== -1) {
-      //         draft.gridConfig.panels[gridConfigIndex].id = newName;
-      //       }
-      //     }
-      //   })
-      // );
     }, 
-    [config, name, updateConfig]
+    [path, name, fullConfig, fullUpdateConfig]
   );
 
   let controlBar: ChildPanelProps['controlBar'] = 'off';
@@ -916,7 +895,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         {!inJupyter && config.enableAddPanel && (
           <ActionBar>
             <Button variant="ghost" onClick={handleAddPanel} icon="add-new">
-              New panel
+              New panel 1
             </Button>
           </ActionBar>
         )}
@@ -931,7 +910,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           <AddPanelBarContainer ref={addPanelBarRef}>
             <AddPanelBar onClick={handleAddPanel}>
               <IconAddNew />
-              New panel
+              New panel 2
             </AddPanelBar>
           </AddPanelBarContainer>
         )}

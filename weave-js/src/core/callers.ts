@@ -1,13 +1,13 @@
 import * as _ from 'lodash';
 
-import {pushFrame, resolveVar, varNode} from './model';
+import {pushFrame, resolveVar, varNode, voidNode} from './model';
 import type {
   EditingNode,
   EditingOpInputs,
   EditingOutputNode,
 } from './model/graph/editing';
 import {nodesEqual} from './model/graph/editing/helpers';
-import type {ConstNode, Node, NodeOrVoidNode, Stack} from './model/graph/types';
+import type {ConstNode, Definition, Node, NodeOrVoidNode, Stack} from './model/graph/types';
 import {isFunction, isFunctionType} from './model/helpers';
 import type {FunctionType, Type} from './model/types';
 
@@ -102,13 +102,17 @@ function dereferenceVariablesFromFrame(
 
 const VAR_NODE_NAME = '__funcParam__';
 
-export function dereferenceAllVars(node: EditingNode, stack: Stack) {
+export function dereferenceAllVars(node: EditingNode, stack: Stack, withNull:boolean | undefined = false) {
   const usedStack: Stack = [];
   const result = mapNodes(
     node,
     n => {
       if (n.nodeType === 'var') {
         const resolved = resolveVar(stack, n.varName);
+        if (withNull && resolved == null) {
+          usedStack.splice(0, 0, {name: n.varName, value: voidNode(), dirty: true} as Definition);
+        }
+        
         if (resolved == null) {
           return n;
         }

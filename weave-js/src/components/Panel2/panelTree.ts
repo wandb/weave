@@ -44,7 +44,6 @@ import {
 } from './PanelGroup';
 import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {difference} from '@wandb/weave/common/util/data';
-import { dir } from 'console';
 
 export type PanelTreeNode = ChildPanelConfig;
 
@@ -339,8 +338,10 @@ function updateStackForItem(
   const childVarPaths = getItemVarPaths(key, panel);
   for (const varName of Object.keys(childVars)) {
     const varPath = [...path, ...childVarPaths[varName]];
+    // console.log('varpaths', key, varName, varPath, dirtyAction?.path)
     let dirty = false;
     if (dirtyAction != null && _.isEqual(varPath, dirtyAction.path)) {
+      console.log('setting dirty', varPath)
       dirty = true;
     }
     stack = pushFrameDefs(stack, [
@@ -374,6 +375,7 @@ export const mapPanels = (
     const items: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(fullNode.config.items)) {
       if (dirtyAction?.type === 'VarRename' && _.isEqual([...path, key], dirtyAction?.path)) {
+        console.log('renaming', [...path, key], dirtyAction?.path)
         items[dirtyAction.newName] = mapPanels(
           fullNode.config.items[key],
           stack,
@@ -441,6 +443,7 @@ export const mapPanelsAsync = async (
     const items: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(fullNode.config.items)) {
       if (dirtyAction?.type === 'VarRename' && _.isEqual([...path, key], dirtyAction?.path)) {
+        console.log('renaming', [...path, key], dirtyAction?.path)
         items[dirtyAction.newName] = await mapPanelsAsync(
           fullNode.config.items[key],
           stack,
@@ -702,13 +705,22 @@ export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
 
 export const updateExpressionVarNames = (node: PanelTreeNode, stack: Stack, path: string[], oldName: string, newName: string) => {
   return mapPanels(node, stack, (child, childStack) => {
-    const newInputNode = updateVarNames(child.input_node, childStack, oldName, newName);
+    let newInputNode = child.input_node;
+    const res = dereferenceAllVars(child.input_node, childStack, true);
+    for (const def of res.usedStack) {
+      if ((def as any).dirty) {
+        // if any of those variables are dirty, update the input_node
+        newInputNode = updateVarNames(child.input_node, childStack, oldName, newName) as NodeOrVoidNode;
+        break;
+      }
+    }
+
     const newVars = _.mapValues(child.vars, (varNode, varName) =>
       updateVarNames(varNode, childStack, oldName, newName)
     );
-    let config = child.config;
   
-    // This is for group config stuff
+    // This is for grid config stuff
+    let config = child.config;
     if (child.id === 'Group') {
       if (config.gridConfig) {
         // This updates the grid config with the new name, since we use names as ids
@@ -858,7 +870,7 @@ const getPathFromDelta = (delta: any): string[] => {
   return [keys[0], ...getPathFromDelta(delta.config.items[keys[0]])];
 };
 
-const getActionFromDelta = (addedDelta: any, deletedDelta: any): Action => {
+const getActionFromDelta2 = (addedDelta: any, deletedDelta: any): Action => {
   const path = getPathFromDelta(addedDelta);
   const deletedPath = getPathFromDelta(deletedDelta);
   // TODO: figure out if we renamed a variable
@@ -875,6 +887,14 @@ const getActionFromDelta = (addedDelta: any, deletedDelta: any): Action => {
   };
 };
 
+const getActionFromDelta = (addedDelta: any): Action => {
+  const path = getPathFromDelta(addedDelta);
+  return {
+    type: 'PanelConfigUpdate',
+    path,
+  };
+};
+
 // Given a prior config and a new config, first figure out what the change was.
 // Then only refine the expressions that depend on any variables that changed.
 export const refineForUpdate = async (
@@ -883,16 +903,17 @@ export const refineForUpdate = async (
   newConfig: PanelTreeNode
 ) => {
   const addedDelta = difference(oldConfig, newConfig);
-  const deletedDelta2 = difference(newConfig, oldConfig);
-  const dirtyAction = getActionFromDelta(addedDelta, deletedDelta2);
+  // const deletedDelta2 = difference(newConfig, oldConfig);
+  // const dirtyAction = getActionFromDelta2(addedDelta, deletedDelta2);
+  const dirtyAction = getActionFromDelta(addedDelta);
   const refineCache = new Map<EditingNode, EditingNode>();
   return mapPanelsAsync(
     newConfig,
     [],
     async (panel, childStack) => {
-      if (dirtyAction.type === 'VarRename') {
-        return updateExpressionVarNames(panel, childStack, dirtyAction.path, dirtyAction.path[dirtyAction.path.length - 1], dirtyAction.newName);
-      }
+      // if (dirtyAction.type === 'VarRename') {
+      //   return updateExpressionVarNames(panel, childStack, dirtyAction.path, dirtyAction.path[dirtyAction.path.length - 1], dirtyAction.newName);
+      // }
 
       // Get all the variables used by this panel's input_node
       const res = dereferenceAllVars(panel.input_node, childStack);
