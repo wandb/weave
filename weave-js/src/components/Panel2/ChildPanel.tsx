@@ -564,7 +564,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
 
   const controlBar = props.controlBar ?? 'off';
   const isVarNameEditable = props.editable || controlBar === 'editable';
-  const noEditorIcons = !props.editable;
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -626,7 +625,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
               )}
             </EditorBarHover>
             {/* Control buttons */}
-            {!noEditorIcons && (
+            {props.editable && (
               <EditorIcons visible={isHoverPanel || isMenuOpen}>
                 {props.prefixButtons}
                 <Tooltip
