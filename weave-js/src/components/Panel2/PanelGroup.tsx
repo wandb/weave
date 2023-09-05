@@ -624,12 +624,13 @@ export const PanelGroupItem: React.FC<{
   handleSiblingVarEvent,
 }) => {
   const itemUpdateConfig = useCallback(
-    (newItemConfig: any) =>
+    (newItemConfig: any) => {
+      console.log(name)
       updateConfig(
         produce(config, draft => {
           draft.items[name] = newItemConfig;
         })
-      ),
+      )},
     [config, name, updateConfig]
   );
 
@@ -656,11 +657,33 @@ export const PanelGroupItem: React.FC<{
 
   const itemUpdateName = useCallback(
     (newName: string) => {
-      fullUpdateConfig(
+      // fullUpdateConfig(
         updateExpressionVarNames(fullConfig, [], [...path, name], name, newName)
+      // );
+
+
+  // console.log(config)
+      updateConfig(
+        produce(config, draft => {
+          draft.items[newName] = draft.items[name];
+          delete draft.items[name];
+
+          if (config.gridConfig) {
+            // This updates the grid config with the new name, since we use names as ids
+            // if we had unique ids, we wouldnt have to do this
+            const gridConfigIndex = config.gridConfig.panels.findIndex(
+              p => p.id === name
+            );
+            if (gridConfigIndex !== -1) {
+              draft.gridConfig.panels[gridConfigIndex].id = newName;
+            }
+          }
+        })
       );
+
     }, 
-    [path, name, fullConfig, fullUpdateConfig]
+    [config, name, updateConfig]
+    // [path, name, fullConfig, fullUpdateConfig]
   );
 
   let controlBar: ChildPanelProps['controlBar'] = 'off';

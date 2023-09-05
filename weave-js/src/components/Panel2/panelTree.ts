@@ -375,7 +375,7 @@ export const mapPanels = (
     const items: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(fullNode.config.items)) {
       if (dirtyAction?.type === 'VarRename' && _.isEqual([...path, key], dirtyAction?.path)) {
-        console.log('renaming', [...path, key], dirtyAction?.path)
+        console.log('renaming', key, dirtyAction?.newName)
         items[dirtyAction.newName] = mapPanels(
           fullNode.config.items[key],
           stack,
@@ -703,14 +703,46 @@ export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
   });
 };
 
+export const checkUpdateVarNames = (oldConfig:PanelTreeNode, newConfig:PanelTreeNode) => {
+  const addedDelta = difference(oldConfig, newConfig);
+  const deletedDelta = difference(newConfig, oldConfig);
+  const path = getPathFromDelta(addedDelta);
+  const deletedPath = getPathFromDelta(deletedDelta);
+
+  const oldName = deletedPath[deletedPath.length - 1];
+  const newName = path[path.length - 1];
+
+  console.log('args2',newConfig, [], deletedPath, oldName, newName)
+  return updateExpressionVarNames(oldConfig, [], deletedPath, oldName, newName);
+}
+
 export const updateExpressionVarNames = (node: PanelTreeNode, stack: Stack, path: string[], oldName: string, newName: string) => {
   return mapPanels(node, stack, (child, childStack) => {
     let newInputNode = child.input_node;
-    const res = dereferenceAllVars(child.input_node, childStack, true);
+    // marks null vars as dirty as well
+    // vars under the oldname will be null
+    let res = dereferenceAllVars(child.input_node, childStack, true);
     for (const def of res.usedStack) {
       if ((def as any).dirty) {
+
+        console.log('dirty', def.name, def.value, child)
         // if any of those variables are dirty, update the input_node
         newInputNode = updateVarNames(child.input_node, childStack, oldName, newName) as NodeOrVoidNode;
+
+        console.log('newInputNode', child.input_node, newInputNode)
+        break;
+      }
+    }
+
+    res = dereferenceAllVars(newInputNode, childStack, true);
+    for (const def of res.usedStack) {
+      if ((def as any).dirty) {
+
+        console.log('dirty', def.name, def.value, child)
+        // if any of those variables are dirty, update the input_node
+        newInputNode = updateVarNames(newInputNode, childStack, oldName, newName) as NodeOrVoidNode;
+
+        console.log('newInputNode', newInputNode, newInputNode)
         break;
       }
     }
@@ -718,35 +750,35 @@ export const updateExpressionVarNames = (node: PanelTreeNode, stack: Stack, path
     const newVars = _.mapValues(child.vars, (varNode, varName) =>
       updateVarNames(varNode, childStack, oldName, newName)
     );
+
+    // console.log(child, childStack)
   
     // This is for grid config stuff
     let config = child.config;
-    if (child.id === 'Group') {
-      if (config.gridConfig) {
-        // This updates the grid config with the new name, since we use names as ids
-        // if we had unique ids, we wouldnt have to do this
-        const gridConfigIndex = config.gridConfig.panels.findIndex(
-          (p: any) => p.id === oldName
-        );
-        if (gridConfigIndex !== -1) {
-          config = {
-            ...config,
-            gridConfig: {
-              ...config.gridConfig,
-              panels: [...config.gridConfig.panels.map((p: any, i: number) => {
-                if (i === gridConfigIndex) {
-                  return {
-                    ...p,
-                    id: newName,
-                  };
-                }
-                return p;
-              })]
-            },
-          };
-        }
-      }
-    }
+    // if (child.id === 'Group' && config.gridConfig ) {
+    //   // This updates the grid config with the new name, since we use names as ids
+    //   // if we had unique ids, we wouldnt have to do this
+    //   const gridConfigIndex = config.gridConfig.panels.findIndex(
+    //     (p: any) => p.id === oldName
+    //   );
+    //   if (gridConfigIndex !== -1) {
+    //     config = {
+    //       ...config,
+    //       gridConfig: {
+    //         ...config.gridConfig,
+    //         panels: [...config.gridConfig.panels.map((p: any, i: number) => {
+    //           if (i === gridConfigIndex) {
+    //             return {
+    //               ...p,
+    //               id: newName,
+    //             };
+    //           }
+    //           return p;
+    //         })]
+    //       },
+    //     };
+    //   }
+    // }
 
     if (
       // Filter out these panels, since the map code walks them, correctly pushing
@@ -768,7 +800,7 @@ export const updateExpressionVarNames = (node: PanelTreeNode, stack: Stack, path
   },
   {
     type: 'VarRename',
-    path,
+    path, //: path.slice(0, path.length - 1).concat(newName),
     newName
   }
   );

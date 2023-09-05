@@ -102,14 +102,14 @@ function dereferenceVariablesFromFrame(
 
 const VAR_NODE_NAME = '__funcParam__';
 
-export function dereferenceAllVars(node: EditingNode, stack: Stack, withNull:boolean | undefined = false) {
+export function dereferenceAllVars(node: EditingNode, stack: Stack, addNullVars:boolean | undefined = false) {
   const usedStack: Stack = [];
   const result = mapNodes(
     node,
     n => {
       if (n.nodeType === 'var') {
         const resolved = resolveVar(stack, n.varName);
-        if (withNull && resolved == null) {
+        if (addNullVars && resolved == null) {
           usedStack.splice(0, 0, {name: n.varName, value: voidNode(), dirty: true} as Definition);
         }
         
