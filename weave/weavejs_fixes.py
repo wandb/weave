@@ -194,7 +194,7 @@ def remove_nan_and_inf(obj):
     return obj
 
 
-def remove_gql_haskeys_from_types(data):
+def remove_partialobject_from_types(data):
     """Convert weave-internal types like
 
     {"type":"PartialObject","keys":{"name":"string"},"keyless_weave_type_class":"project"}
@@ -208,7 +208,7 @@ def remove_gql_haskeys_from_types(data):
     # TODO: check this
 
     if isinstance(data, list):
-        return [remove_gql_haskeys_from_types(d) for d in data]
+        return [remove_partialobject_from_types(d) for d in data]
     elif isinstance(data, dict):
         for key in data:
             if key == "type":
@@ -224,5 +224,5 @@ def fixup_data(data):
     # response right now.
     # TODO: fix. Encode as string and then interpret in js side.
     data = remove_nan_and_inf(data)
-    data = remove_gql_haskeys_from_types(data)
+    data = remove_partialobject_from_types(data)
     return convert_specific_ops_to_generic_ops_data(data)

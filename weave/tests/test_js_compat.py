@@ -28,4 +28,4 @@ def test_partialobject_type_stripping():
     type = types.TypeRegistry.type_of(instance)
     assert isinstance(type, partial_object.PartialObjectType)
     serialized = type.to_dict()
-    assert weavejs_fixes.remove_gql_haskeys_from_types(serialized) == "run"
+    assert weavejs_fixes.remove_partialobject_from_types(serialized) == "run"
