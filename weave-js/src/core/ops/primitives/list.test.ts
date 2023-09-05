@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import {typeToString} from '../../language/js/print';
 import {
   constNumberList,
@@ -264,7 +266,7 @@ describe('randomSample utility', () => {
     const sampleSize = 0;
     expect(randomlyDownsample(inputArray, sampleSize)).toEqual([]);
 
-    const inputArray2 = [];
+    const inputArray2: any[] = [];
     expect(randomlyDownsample(inputArray2, sampleSize)).toEqual([]);
   });
 
@@ -364,9 +366,10 @@ describe('opRandomGaussian', () => {
     });
     const client = await testClient();
     const samples = await client.query(node);
-    const sampleMean = samples.reduce((acc, val) => acc + val, 0) / n;
+    const sampleMean = samples.reduce((acc: any, val: any) => acc + val, 0) / n;
     const sampleStd = Math.sqrt(
-      samples.reduce((acc, val) => acc + (val - sampleMean) ** 2, 0) / n
+      samples.reduce((acc: any, val: any) => acc + (val - sampleMean) ** 2, 0) /
+        n
     );
     expect(sampleMean).toBeCloseTo(mean, 1);
     expect(sampleStd).toBeCloseTo(std, 1);

@@ -3,14 +3,15 @@
 import pytest
 
 import weave
+import weave.weave_types as types
 from .concrete_tagged_value import (
     TaggedValue,
     concrete_to_tagstore,
     concrete_from_tagstore,
 )
-from .. import ops_arrow
-from .. import ops_arrow as arrow
-from ..language_features.tagging import tagged_value_type
+from ..ops_arrow.convert import to_arrow
+from .. import ops_arrow, box
+from ..language_features.tagging import tag_store, tagged_value_type
 
 
 def to_awl(l: list) -> ops_arrow.ArrowWeaveList:
@@ -83,3 +84,25 @@ def test_join2_different_types():
         TaggedValue({"joinObj": 7}, {"a1": {"a": 7, "b": 8}, "a2": None}),
         TaggedValue(tag={"joinObj": 10}, value={"a1": None, "a2": {"a": 10, "b": 14}}),
     ]
+
+
+def test_tagged_awl_sum():
+    data = [[1.4, 0], [3.4, 0], [None, 5]]
+    for i, item in enumerate(data):
+        item[0] = tag_store.add_tags(box.box(item[0]), {"mytag": f"{i}-abcd"})
+
+    tagtype = tagged_value_type.TaggedValueType(
+        types.TypedDict(property_types={"mytag": types.String()}),
+        types.UnionType(types.NoneType(), types.Number()),
+    )
+    awl = to_arrow(
+        data,
+        wb_type=types.List(
+            object_type=types.List(object_type=types.UnionType(tagtype, types.Int()))
+        ),
+    )
+
+    node = weave.save(awl)
+    value = weave.use(node.listnumbersum())
+
+    assert value.to_pylist_notags() == [1.4, 3.4, 5]

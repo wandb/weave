@@ -52,6 +52,7 @@ import {
 } from './PanelContext';
 import * as Styles from './PanelExpression/styles';
 import {
+  useCloseEditor,
   usePanelInputExprIsHighlightedByPath,
   useSelectedPath,
   useSetInspectingChildPanel,
@@ -531,6 +532,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   } = useChildPanelCommon(props);
 
   const {frame} = usePanelContext();
+  const closeEditor = useCloseEditor();
 
   const validateName = useCallback(
     (newName: string) => {
@@ -657,6 +659,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   onOpen={() => setIsMenuOpen(true)}
                   onClose={() => setIsMenuOpen(false)}
                   isOpen={isMenuOpen}
+                  goBackToOutline={closeEditor}
                 />
               </EditorIcons>
             )}
@@ -1008,6 +1011,9 @@ const EditorBarHover = styled.div<{show: boolean}>`
   display: ${props => (props.show ? 'flex' : 'none')};
   align-items: flex-start;
   flex-grow: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `;
 EditorBarHover.displayName = 'S.EditorBarHover';
 
