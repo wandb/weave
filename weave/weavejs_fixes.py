@@ -212,9 +212,8 @@ def remove_partialobject_from_types(data):
     elif isinstance(data, dict):
         result = {}
         for key in data:
-            if key == "type":
-                if data[key] == "PartialObject":
-                    return data["keyless_weave_type_class"]
+            if key == "type" and data[key] == "PartialObject":
+                return data["keyless_weave_type_class"]
             result[key] = remove_partialobject_from_types(data[key])
         return result
     return data
