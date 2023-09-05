@@ -986,12 +986,16 @@ export function updateVarTypes(node: EditingNode, stack: Stack): EditingNode {
   return node;
 }
 
-// Given an expression, update its variable names to match the new name 
-export function updateVarNames(node: EditingNode, stack: Stack, oldName: string, newName: string): EditingNode {
+// Given an expression, update its variable names to match the new name
+export function updateVarNames(
+  node: EditingNode,
+  stack: Stack,
+  oldName: string,
+  newName: string
+): EditingNode {
   switch (node.nodeType) {
     case 'var':
       if (node.varName === oldName) {
-        console.log('UPDATE VAR NAME', oldName, newName)
         return {...node, varName: newName};
       }
       return node;
@@ -1018,7 +1022,7 @@ export function updateVarNames(node: EditingNode, stack: Stack, oldName: string,
               mapValues(node.type.inputTypes, (inputType, inputName) =>
                 varNode(inputType, inputName)
               )
-            ), 
+            ),
             oldName,
             newName
           ),

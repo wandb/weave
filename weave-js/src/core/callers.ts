@@ -7,7 +7,13 @@ import type {
   EditingOutputNode,
 } from './model/graph/editing';
 import {nodesEqual} from './model/graph/editing/helpers';
-import type {ConstNode, Definition, Node, NodeOrVoidNode, Stack} from './model/graph/types';
+import type {
+  ConstNode,
+  Definition,
+  Node,
+  NodeOrVoidNode,
+  Stack,
+} from './model/graph/types';
 import {isFunction, isFunctionType} from './model/helpers';
 import type {FunctionType, Type} from './model/types';
 
@@ -102,7 +108,11 @@ function dereferenceVariablesFromFrame(
 
 const VAR_NODE_NAME = '__funcParam__';
 
-export function dereferenceAllVars(node: EditingNode, stack: Stack, addNullVars:boolean | undefined = false) {
+export function dereferenceAllVars(
+  node: EditingNode,
+  stack: Stack,
+  addNullVars: boolean | undefined = false
+) {
   const usedStack: Stack = [];
   const result = mapNodes(
     node,
@@ -110,9 +120,13 @@ export function dereferenceAllVars(node: EditingNode, stack: Stack, addNullVars:
       if (n.nodeType === 'var') {
         const resolved = resolveVar(stack, n.varName);
         if (addNullVars && resolved == null) {
-          usedStack.splice(0, 0, {name: n.varName, value: voidNode(), dirty: true} as Definition);
+          usedStack.splice(0, 0, {
+            name: n.varName,
+            value: voidNode(),
+            dirty: true,
+          } as Definition);
         }
-        
+
         if (resolved == null) {
           return n;
         }

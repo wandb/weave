@@ -58,7 +58,11 @@ import {
   usePanelContext,
 } from './PanelContext';
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
-import {isGroupNode, nextPanelName, updateExpressionVarNames} from './panelTree';
+import {
+  isGroupNode,
+  nextPanelName,
+  updateExpressionVarNames,
+} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 import {
   GRAY_350,
@@ -70,7 +74,7 @@ import {
 import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {inJupyterCell} from '../PagePanelComponents/util';
-import { usePanelPanelContext } from './PanelPanelContextProvider';
+import {usePanelPanelContext} from './PanelPanelContextProvider';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -625,12 +629,12 @@ export const PanelGroupItem: React.FC<{
 }) => {
   const itemUpdateConfig = useCallback(
     (newItemConfig: any) => {
-      console.log(name)
       updateConfig(
         produce(config, draft => {
           draft.items[name] = newItemConfig;
         })
-      )},
+      );
+    },
     [config, name, updateConfig]
   );
 
@@ -653,19 +657,17 @@ export const PanelGroupItem: React.FC<{
 
   const {path} = usePanelContext();
 
-  const {config: fullConfig, updateConfig: fullUpdateConfig} = usePanelPanelContext();
+  const {config: fullConfig, updateConfig: fullUpdateConfig} =
+    usePanelPanelContext();
 
   const itemUpdateName = useCallback(
     (newName: string) => {
-      // fullUpdateConfig(
-        updateExpressionVarNames(fullConfig, [], [...path, name], name, newName)
-      // );
-
-
-  // console.log(config)
       updateConfig(
         produce(config, draft => {
-          draft.items[newName] = draft.items[name];
+          draft.items = {
+            [newName]: draft.items[name],
+            ...draft.items,
+          };
           delete draft.items[name];
 
           if (config.gridConfig) {
@@ -680,10 +682,8 @@ export const PanelGroupItem: React.FC<{
           }
         })
       );
-
-    }, 
+    },
     [config, name, updateConfig]
-    // [path, name, fullConfig, fullUpdateConfig]
   );
 
   let controlBar: ChildPanelProps['controlBar'] = 'off';
@@ -706,9 +706,8 @@ export const PanelGroupItem: React.FC<{
     controlBar = 'editable';
   }
   // We use enableAddPanel to mean the Group children are editable.
-  const editable = !!config.enableAddPanel;
   // If not editable, we don't want to show the editor icons in the ControlBar
-  const noEditorIcons = !editable;
+  const editable = !!config.enableAddPanel;
   // This makes it so controls in the varbar can overflow the parent container
   // correctly. For example, without this PanelDropdown renders its dropdown menu
   // within the parent, creating a scrollbar.
@@ -721,7 +720,7 @@ export const PanelGroupItem: React.FC<{
       newVars={siblingVars}
       handleVarEvent={handleSiblingVarEvent}>
       <ChildPanel
-        noEditorIcons={noEditorIcons}
+        editable={editable}
         overflowVisible={overflowVisible}
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}

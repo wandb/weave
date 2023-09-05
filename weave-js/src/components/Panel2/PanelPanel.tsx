@@ -163,13 +163,14 @@ const panelRootReducer = (
     // while one is in flight, the second completion will restore the first change.
     // Accept this more now until we switch to delta updates.
     case 'updateConfig':
-      console.log('updateConfig')
-
-      const renamedConfig = checkUpdateVarNames(panelRoot.root, action.newConfig);
+      const renamedConfig = checkUpdateVarNames(
+        panelRoot.root,
+        action.newConfig
+      );
       const newAction = {
         ...action,
         newConfig: renamedConfig,
-      }
+      };
       if (state.panelRoots[newAction.id].inFlight) {
         return produce(state, draft => {
           draft.panelRoots[newAction.id].nextActions.push(newAction);
