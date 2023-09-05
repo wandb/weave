@@ -61,7 +61,6 @@ import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {
   isGroupNode,
   nextPanelName,
-  updateExpressionVarNames,
 } from './panelTree';
 import {toWeaveType} from './toWeaveType';
 import {
@@ -654,11 +653,6 @@ export const PanelGroupItem: React.FC<{
     },
     [name, updateConfig2]
   );
-
-  const {path} = usePanelContext();
-
-  const {config: fullConfig, updateConfig: fullUpdateConfig} =
-    usePanelPanelContext();
 
   const itemUpdateName = useCallback(
     (newName: string) => {
