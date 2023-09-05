@@ -563,7 +563,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
-
+  const isVarNameEditable = !props.noEditorIcons;
   return curPanelId == null || handler == null ? (
     <div>
       No panel for type {defaultLanguageBinding.printType(panelInput.type)}
@@ -576,19 +576,12 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {((props.controlBar === 'titleBar' &&
-              curPanelId !== 'Expression') ||
-              !isHoverPanel) &&
-              props.pathEl != null && (
-                <EditorBarTitleOnly>
-                  {varNameToTitle(props.pathEl)}
-                </EditorBarTitleOnly>
-              )}
-            <EditorBarHover
-              show={
-                isHoverPanel &&
-                (props.controlBar !== 'titleBar' || curPanelId === 'Expression')
-              }>
+            {(isVarNameEditable || !isHoverPanel) && props.pathEl != null && (
+              <EditorBarTitleOnly>
+                {varNameToTitle(props.pathEl)}
+              </EditorBarTitleOnly>
+            )}
+            <EditorBarHover show={isHoverPanel && !isVarNameEditable}>
               {/* Variable name */}
               {props.pathEl != null && (
                 <EditorPath>
