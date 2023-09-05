@@ -58,10 +58,7 @@ import {
   usePanelContext,
 } from './PanelContext';
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
-import {
-  isGroupNode,
-  nextPanelName,
-} from './panelTree';
+import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 import {
   GRAY_350,
@@ -73,7 +70,6 @@ import {
 import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {inJupyterCell} from '../PagePanelComponents/util';
-import {usePanelPanelContext} from './PanelPanelContextProvider';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -911,7 +907,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         {!inJupyter && config.enableAddPanel && (
           <ActionBar>
             <Button variant="ghost" onClick={handleAddPanel} icon="add-new">
-              New panel 1
+              New panel
             </Button>
           </ActionBar>
         )}
@@ -926,7 +922,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           <AddPanelBarContainer ref={addPanelBarRef}>
             <AddPanelBar onClick={handleAddPanel}>
               <IconAddNew />
-              New panel 2
+              New panel
             </AddPanelBar>
           </AddPanelBarContainer>
         )}

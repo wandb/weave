@@ -679,7 +679,7 @@ export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
   });
 };
 
-export const checkUpdateVarNames = (
+export const updateExpressionVarNamesFromConfig = (
   oldConfig: PanelTreeNode,
   newConfig: PanelTreeNode
 ) => {
@@ -851,8 +851,8 @@ const getPathFromDelta = (delta: any): string[] => {
   return [keys[0], ...getPathFromDelta(delta.config.items[keys[0]])];
 };
 
-const getActionFromDelta = (addedDelta: any): Action => {
-  const path = getPathFromDelta(addedDelta);
+const getActionFromDelta = (delta: any): Action => {
+  const path = getPathFromDelta(delta);
   return {
     type: 'PanelConfigUpdate',
     path,

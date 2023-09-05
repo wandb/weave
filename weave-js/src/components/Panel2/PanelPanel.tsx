@@ -39,7 +39,7 @@ import {
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {
-  checkUpdateVarNames,
+  updateExpressionVarNamesFromConfig,
   getConfigForPath,
   refineAllExpressions,
   refineForUpdate,
@@ -163,7 +163,7 @@ const panelRootReducer = (
     // while one is in flight, the second completion will restore the first change.
     // Accept this more now until we switch to delta updates.
     case 'updateConfig':
-      const renamedConfig = checkUpdateVarNames(
+      const renamedConfig = updateExpressionVarNamesFromConfig(
         panelRoot.root,
         action.newConfig
       );
