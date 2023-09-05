@@ -1,3 +1,4 @@
+import {ChildPanelFullConfig} from './ChildPanel';
 import * as PanelTree from './panelTree';
 
 describe('PanelTree', () => {
@@ -19,6 +20,14 @@ describe('PanelTree', () => {
   });
 
   describe('updateExpressionVarNames', () => {
+    const getVarInputNode = (config: ChildPanelFullConfig, path: string[]) => {
+      const leaf = PanelTree.getPath(config, path);
+      if (leaf.input_node.nodeType !== 'var') {
+        fail("input_node wasn't a var");
+      }
+      return leaf.input_node;
+    };
+
     it('updates Panels that refer to a var', () => {
       const root = PanelTree.makeGroup({
         sidebar: PanelTree.makeGroup({
@@ -53,11 +62,11 @@ describe('PanelTree', () => {
         'var1'
       );
 
-      const leaf = PanelTree.getPath(newRoot, ['main', 'panel0']);
-      expect(leaf.input_node.varName).toEqual('var1');
+      const leaf = getVarInputNode(newRoot, ['main', 'panel0']);
+      expect(leaf.varName).toEqual('var1');
     });
 
-    const root = PanelTree.makeGroup({
+    const commonRoot = PanelTree.makeGroup({
       main: PanelTree.makeGroup({
         panel0: PanelTree.makePanel('a', {
           type: 'const',
@@ -94,35 +103,35 @@ describe('PanelTree', () => {
 
     it('does not update nested variables of the same name', () => {
       const newRoot = PanelTree.updateExpressionVarNames(
-        root,
+        commonRoot,
         [],
         ['main', 'panel0'],
         'panel0',
         'var1'
       );
-      const leaf = PanelTree.getPath(newRoot, ['main', 'panel1']);
-      expect(leaf.input_node.varName).toEqual('var1');
-      const leaf2 = PanelTree.getPath(newRoot, ['main', 'panel2', 'panel0']);
+      const leaf = getVarInputNode(newRoot, ['main', 'panel1']);
+      const leaf2 = getVarInputNode(newRoot, ['main', 'panel2', 'panel0']);
+      const leaf3 = getVarInputNode(newRoot, ['main', 'panel2', 'panel1']);
+      expect(leaf.varName).toEqual('var1');
       expect(leaf2).toBeDefined();
-      const leaf3 = PanelTree.getPath(newRoot, ['main', 'panel2', 'panel1']);
-      expect(leaf3.input_node.varName).toEqual('panel0');
+      expect(leaf3.varName).toEqual('panel0');
     });
 
-    it('does not update nested variables of the same name', () => {
+    it('does not update higher level variables of the same name', () => {
       const newRoot = PanelTree.updateExpressionVarNames(
-        root,
+        commonRoot,
         [],
         ['main', 'panel2', 'panel0'],
         'panel0',
         'var1'
       );
 
-      const leaf = PanelTree.getPath(newRoot, ['main', 'panel1']);
-      expect(leaf.input_node.varName).toEqual('panel0');
-      const leaf2 = PanelTree.getPath(newRoot, ['main', 'panel0']);
+      const leaf = getVarInputNode(newRoot, ['main', 'panel1']);
+      const leaf2 = getVarInputNode(newRoot, ['main', 'panel0']);
+      const leaf3 = getVarInputNode(newRoot, ['main', 'panel2', 'panel1']);
+      expect(leaf.varName).toEqual('panel0');
       expect(leaf2).toBeDefined();
-      const leaf3 = PanelTree.getPath(newRoot, ['main', 'panel2', 'panel1']);
-      expect(leaf3.input_node.varName).toEqual('var1');
+      expect(leaf3.varName).toEqual('var1');
     });
   });
 });

@@ -691,7 +691,24 @@ export const updateExpressionVarNamesFromConfig = (
   const oldName = deletedPath[deletedPath.length - 1];
   const newName = path[path.length - 1];
 
-  return updateExpressionVarNames(newConfig, [], deletedPath, oldName, newName);
+  if (
+    // If the paths are the same, and the configs are the same except for the varName, we rename
+    path.slice(0, path.length - 1).join('.') ===
+      deletedPath.slice(0, deletedPath.length - 1).join('.') &&
+    _.isEqual(
+      getConfigForPath(getFullChildPanel(newConfig), path),
+      getConfigForPath(getFullChildPanel(oldConfig), deletedPath)
+    )
+  ) {
+    return updateExpressionVarNames(
+      newConfig,
+      [],
+      deletedPath,
+      oldName,
+      newName
+    );
+  }
+  return newConfig;
 };
 
 export const updateExpressionVarNames = (
