@@ -37,7 +37,7 @@ const DetailKeyValueRow: React.FC<{
 }> = props => {
   const {label, value} = props;
   const textValue = safeValue(value);
-  if (textValue === 'null') {
+  if (textValue === 'null' || label.startsWith('_')) {
     return null;
   }
   return (
