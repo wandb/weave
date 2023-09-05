@@ -195,7 +195,7 @@ export const useChildPanelConfig = (
 };
 
 export interface ChildPanelProps {
-  noEditorIcons?: boolean;
+  editable?: boolean;
   controlBar?: 'off' | 'editable' | 'titleBar';
   passthroughUpdate?: boolean;
   pathEl?: string;
@@ -563,7 +563,9 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
-  const isVarNameEditable = !props.noEditorIcons;
+  const isVarNameEditable = props.editable || controlBar === 'editable';
+  const noEditorIcons = !props.editable;
+
   return curPanelId == null || handler == null ? (
     <div>
       No panel for type {defaultLanguageBinding.printType(panelInput.type)}
@@ -624,7 +626,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
               )}
             </EditorBarHover>
             {/* Control buttons */}
-            {!props.noEditorIcons && (
+            {!noEditorIcons && (
               <EditorIcons visible={isHoverPanel || isMenuOpen}>
                 {props.prefixButtons}
                 <Tooltip

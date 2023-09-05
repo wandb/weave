@@ -692,9 +692,8 @@ export const PanelGroupItem: React.FC<{
     controlBar = 'editable';
   }
   // We use enableAddPanel to mean the Group children are editable.
-  const editable = !!config.enableAddPanel;
   // If not editable, we don't want to show the editor icons in the ControlBar
-  const noEditorIcons = !editable;
+  const editable = !!config.enableAddPanel;
   // This makes it so controls in the varbar can overflow the parent container
   // correctly. For example, without this PanelDropdown renders its dropdown menu
   // within the parent, creating a scrollbar.
@@ -707,7 +706,7 @@ export const PanelGroupItem: React.FC<{
       newVars={siblingVars}
       handleVarEvent={handleSiblingVarEvent}>
       <ChildPanel
-        noEditorIcons={noEditorIcons}
+        editable={editable}
         overflowVisible={overflowVisible}
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
