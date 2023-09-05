@@ -148,7 +148,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   );
   const menuItems = useMemo(() => {
     const items = [];
-    if (localConfig.id === 'Group') {
+    if (localConfig?.id === 'Group') {
       items.push({
         key: 'unnest',
         content: 'Replace with first child',
@@ -187,7 +187,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     handleSplit,
     handleUnnest,
     handleDuplicate,
-    localConfig.id,
+    localConfig?.id,
     path,
   ]);
 
