@@ -708,7 +708,7 @@ export const updateExpressionVarNamesFromConfig = (
       newName
     );
   }
-  return newConfig;
+  return getFullChildPanel(newConfig);
 };
 
 export const updateExpressionVarNames = (
