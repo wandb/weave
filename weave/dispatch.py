@@ -111,7 +111,8 @@ def _subtype_sorting_ambiguity_resolution_rule_cmp(
     a_is_subtype = _op_args_is_subtype(b.input_type, a.input_type)
     if a_is_subtype and b_is_subtype:
         raise errors.WeaveDispatchError(
-            "Ambiguous ops %s, %s. Ops' input types are equivalent" % (a.name, b.name)
+            "Ambiguous ops %s, %s. Ops' input types are equivalent" % (a.name, b.name),
+            f"{a.name}, {b.name}"
         )
     if a_is_subtype:
         return -1
@@ -119,7 +120,8 @@ def _subtype_sorting_ambiguity_resolution_rule_cmp(
         return 1
     raise errors.WeaveDispatchError(
         "Ambiguous ops %s, %s. Ops' input types first arguments must be subset in one direction or the other."
-        % (a.name, b.name)
+        % (a.name, b.name),
+        f"{a.name}, {b.name}"
     )
 
 
@@ -238,14 +240,16 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
         ops = _get_ops_by_name(name)
         if not ops:
             err = errors.WeaveDispatchError(
-                f'Cannot dispatch op "{name}"; no matching op found'
+                f'Cannot dispatch op "{name}"; no matching op found',
+                name
             )
-            util.raise_exception_with_sentry_if_available(err, [name])
+            util.raise_exception_with_sentry_if_available(err)
         elif len(ops) > 1:
             err = errors.WeaveDispatchError(
-                f'Cannot dispatch zero-arg op "{name}"; multiple matching ops found'
+                f'Cannot dispatch zero-arg op "{name}"; multiple matching ops found',
+                name
             )
-            util.raise_exception_with_sentry_if_available(err, [name])
+            util.raise_exception_with_sentry_if_available(err)
         return ops[0]
 
     if (
@@ -282,18 +286,20 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
     if not ops:
         logging.info('No ops found for "%s" with first arg "%s"', name, input_types[0])
         err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}'
+            f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}',
+            name
         )
-        util.raise_exception_with_sentry_if_available(err, [name])
+        util.raise_exception_with_sentry_if_available(err)
 
     final_ops = _dispatch_remaining_args(
         ops, dict(zip(input_keys[1:], input_types[1:]))
     )
     if not final_ops:
         err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; ops {ops} matched first arg type, but no matching ops found for remaining arg types: {input_types[1:]}'
+            f'Cannot dispatch op "{name}"; ops {ops} matched first arg type, but no matching ops found for remaining arg types: {input_types[1:]}',
+            name
         )
-        util.raise_exception_with_sentry_if_available(err, [name])
+        util.raise_exception_with_sentry_if_available(err)
 
     return _resolve_op_ambiguity(final_ops, input_types[0])
 
@@ -351,11 +357,10 @@ class BoundPotentialOpDefs:
                 ops = self.potential_ops
             else:
                 err = errors.WeaveDispatchError(
-                    f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found'
+                    f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found',
+                    str(self.potential_ops)
                 )
-                util.raise_exception_with_sentry_if_available(
-                    err, [str(self.potential_ops)]
-                )
+                util.raise_exception_with_sentry_if_available(err)
         op = _resolve_op_ambiguity(ops, input_types[0])
         params = op.input_type.create_param_dict([self.self_node] + list(args), kwargs)
         return op(**params)
@@ -409,7 +414,8 @@ class DispatchMixin:
         if possible_prop_node is not None:
             return possible_prop_node
         raise errors.WeaveDispatchError(
-            'No ops called "%s" available on type "%s"' % (attr, node_self.type)
+            'No ops called "%s" available on type "%s"' % (attr, node_self.type),
+            attr
         )
 
     # This implementation is not directly inside of __getattr__ so that
@@ -445,7 +451,8 @@ class DispatchMixin:
             else:
                 raise errors.WeaveDispatchError(
                     'No attributes called "%s" available on Object "%s"'
-                    % (attr, node_self.type)
+                    % (attr, node_self.type),
+                    attr
                 )
         return None
 

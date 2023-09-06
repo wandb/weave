@@ -1,9 +1,20 @@
+from typing import Optional
+
 class WeaveUnmergableArtifactsError(Exception):
     pass
 
 
 class WeaveBaseError(Exception):
-    pass
+    def __init__(self, message: str, fingerprint: Optional[str] = None) -> None:
+        super().__init__(message)
+        self.fingerprint = fingerprint
+
+    
+    def __str__(self) -> str:
+        message = super().__str__()
+        if self.fingerprint:
+            return f"{message} __fp:{self.fingerprint}"
+        return message
 
 
 class WeaveBaseWarning(Warning):

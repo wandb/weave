@@ -4,9 +4,25 @@ import socket
 import string
 import gc, inspect
 import ipynbname
+import re
 import typing
 
 sentry_inited = False
+
+def before_send(event, hint):
+    if 'exception' in event:
+        exceptions = event['exception'].get('values', [])
+        if exceptions:
+            # Grab the first exception and extract fingerprint if it exists
+            exc_info = exceptions[0]
+            message = exc_info.get('value', '')
+            match = re.search(r'__fp:([\w]+)', message)
+            if match:
+                fingerprint = match.group(1)
+                new_message = re.sub(r'__fp:[\w]+', '', message).strip()
+                event['fingerprint'] = [fingerprint]
+                exc_info['value'] = new_message
+    return event
 
 
 def init_sentry():
@@ -21,25 +37,36 @@ def init_sentry():
     except ImportError:
         return
     # Disable logs going to Sentry. Its slow
-    sentry_sdk.init(integrations=[LoggingIntegration(level=None, event_level=None)])
+    sentry_sdk.init(integrations=[LoggingIntegration(level=None, event_level=None)], before_send=before_send)
 
 
 def raise_exception_with_sentry_if_available(
-    err: Exception, fingerprint: typing.Any
+    err: Exception
 ) -> typing.NoReturn:
     init_sentry()
     try:
         import sentry_sdk
     except ImportError:
         raise err
-    else:
-        with sentry_sdk.push_scope() as scope:
-            scope.fingerprint = fingerprint
-            # I (Tim) don't think we need to explicitly capture the exception
-            # here, since we're raising it anyway. Explicitly capturing it
-            # ends dropping the stack trace in Sentry.
-            # sentry_sdk.capture_exception(err)
-            raise err
+    raise err
+
+    # Note: It seems like you only get one or the other with Sentry: either the fingerprint
+    # or the full stack trace. If you set the fingerprint and explicitly capture it, 
+    # the stack trace gets dropped. This seems to happen even if you use the `fingerprint`
+    # arg in `capture_exception` or raise the error & catch it before capturing it in Sentry.
+    # I also tried raising outside of the with block with the same results. 
+    # So instead, we attach the fingerprint in the before_send hook at sentry init. 
+    # I'm leaving the code block below as a record of what was tried with Sentry's APIs,
+    # since it's not intuitive that it doesn't work. 
+    # else:
+    #     with sentry_sdk.push_scope() as scope:
+    #         scope.fingerprint = fingerprint
+    #         scope.set_extra("manual_traceback", tb_str)
+    #         # I (Tim) don't think we need to explicitly capture the exception
+    #         # here, since we're raising it anyway. Explicitly capturing it
+    #         # ends dropping the stack trace in Sentry.
+    #         # sentry_sdk.capture_exception(err)
+    #         raise err
 
 
 def capture_exception_with_sentry_if_available(
