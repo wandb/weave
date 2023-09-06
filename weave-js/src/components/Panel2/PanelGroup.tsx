@@ -661,10 +661,10 @@ export const PanelGroupItem: React.FC<{
               value,
             ])
           );
-
-          if (config.gridConfig) {
-            // This updates the grid config with the new name, since we use names as ids
-            // if we had unique ids, we wouldnt have to do this
+          
+          // This updates the grid config with the new name, since we use names as ids
+          // if we had unique ids, we wouldnt have to do this
+          if (config.gridConfig != null) {
             const gridConfigIndex = config.gridConfig.panels.findIndex(
               p => p.id === name
             );
