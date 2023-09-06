@@ -15,6 +15,7 @@ export const ControlWrapper = styled.div<ControlWrapperProps>`
     padding: ${hovering ? '0px' : '1px'};
   `} */
 `;
+ControlWrapper.displayName = 'S.ControlWrapper';
 
 interface ControlWrapperBarProps {
   hovering: boolean;
@@ -26,6 +27,7 @@ export const ControlWrapperBar = styled.div<ControlWrapperBarProps>`
   display: flex;
   justify-content: flex-end;
 `;
+ControlWrapperBar.displayName = 'S.ControlWrapperBar';
 
 interface ControlWrapperContentProps {
   canFullscreen?: boolean;
@@ -39,6 +41,7 @@ export const ControlWrapperContent = styled.div<ControlWrapperContentProps>`
       overflow: hidden;
     `}
 `;
+ControlWrapperContent.displayName = 'S.ControlWrapperContent';
 
 export const IconButton = styled.span`
   width: 22px;
@@ -56,14 +59,17 @@ export const IconButton = styled.span`
     margin: 0;
   }
 `;
+IconButton.displayName = 'S.IconButton';
 
 export const FullscreenButton = styled(LegacyWBIcon).attrs({
   name: 'fullscreen',
   role: 'button',
   tabindex: 0,
 })``;
+FullscreenButton.displayName = 'S.FullscreenButton';
 
 export const DevQueryIcon = styled(Icon).attrs({name: 'chart area'})``;
+DevQueryIcon.displayName = 'S.DevQueryIcon';
 
 export const DevQueryPopupContent = styled.div`
   max-height: 400;
@@ -72,10 +78,12 @@ export const DevQueryPopupContent = styled.div`
   font-size: 14;
   white-space: nowrap;
 `;
+DevQueryPopupContent.displayName = 'S.DevQueryPopupContent';
 
 export const DevQueryPopupLabel = styled.span`
   font-weight: bold;
 `;
+DevQueryPopupLabel.displayName = 'S.DevQueryPopupLabel';
 
 const gradient = keyframes`
   {
@@ -88,6 +96,7 @@ export const Panel2SizeBoundary = styled.div`
   width: 100%;
   height: 100%;
 `;
+Panel2SizeBoundary.displayName = 'S.Panel2SizeBoundary';
 
 export const Panel2FullScreen = styled.div`
   height: calc(90vh - 73px);
@@ -98,14 +107,17 @@ export const Panel2FullScreen = styled.div`
   justifycontent: stretch;
   alignitems: stretch;
 `;
+Panel2FullScreen.displayName = 'S.Panel2FullScreen';
 
 export const Panel2FullScreenMain = styled.div`
   flex: 1 1 auto;
 `;
+Panel2FullScreenMain.displayName = 'S.Panel2FullScreenMain';
 
 export const Panel2FullScreenConfig = styled.div`
   flex: 1 1 auto;
 `;
+Panel2FullScreenConfig.displayName = 'S.Panel2FullScreenConfig';
 
 export const Panel2LoaderStyle = styled.div`
   background: repeating-linear-gradient(to right, #fff 0%, #ddd 50%, #fff 100%);
@@ -119,6 +131,7 @@ export const Panel2LoaderStyle = styled.div`
   border-radius: 0.3em;
   margin: 3px 0px 0px 3px;
 `;
+Panel2LoaderStyle.displayName = 'S.Panel2LoaderStyle';
 
 export const GrowToParent = styled.div`
   flex: 1 1 auto;
@@ -136,3 +149,4 @@ export const FullScreenModal = styled(Modal.Content)`
   justify-content: stretch;
   alignitems: stretch;
 `;
+FullScreenModal.displayName = 'S.FullScreenModal';

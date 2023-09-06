@@ -53,11 +53,13 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
 `;
+Container.displayName = 'S.Container';
 
 const Content = styled.div`
   flex: 1 1 auto;
   overflow: hidden;
 `;
+Content.displayName = 'S.Content';
 
 const TabsContainer = styled.div`
   position: relative;
@@ -77,6 +79,7 @@ const TabsContainer = styled.div`
     background-color: ${GRAY_350};
   }
 `;
+TabsContainer.displayName = 'S.TabsContainer';
 
 const Tab = styled.div<{active: boolean}>`
   position: relative;
@@ -116,3 +119,4 @@ const Tab = styled.div<{active: boolean}>`
           }
         `}
 `;
+Tab.displayName = 'S.Tab';

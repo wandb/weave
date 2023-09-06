@@ -44,8 +44,10 @@ const MenuWrapper = styled.div<{position: {x: number; y: number}}>`
     font-size: 1em;
   }
 `;
+MenuWrapper.displayName = 'S.MenuWrapper';
 
 const MiniExpression = styled.pre``;
+MiniExpression.displayName = 'S.MiniExpression';
 
 const SmallCheckbox = styled(Checkbox)`
   &&& {
@@ -53,6 +55,7 @@ const SmallCheckbox = styled(Checkbox)`
     margin-left: -1.4em;
   }
 `;
+SmallCheckbox.displayName = 'S.SmallCheckbox';
 
 interface MenuContentProps {
   // HTMLElement, or any other type that implements getBoundingClientRect
@@ -227,6 +230,7 @@ const InnerTriggerWrapper = styled.div`
   width: 100%;
   height: 100%;
 `;
+InnerTriggerWrapper.displayName = 'S.InnerTriggerWrapper';
 
 const TriggerWrapper: React.FC<
   PropsWithChildren<{onClick: React.MouseEventHandler}>

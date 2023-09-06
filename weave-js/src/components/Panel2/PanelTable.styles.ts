@@ -24,6 +24,7 @@ export const ColumnHeader = styled.div`
     color: ${globals.primary};
   }
 `;
+ColumnHeader.displayName = 'S.ColumnHeader';
 
 export const ColumnName = styled.div`
   cursor: pointer;
@@ -35,12 +36,14 @@ export const ColumnName = styled.div`
   overflow: hidden;
   text-align: center;
 `;
+ColumnName.displayName = 'S.ColumnName';
 
 export const ColumnNameText = styled.span`
   width: 100%;
   height: 100%;
   text-align: center;
 `;
+ColumnNameText.displayName = 'S.ColumnNameText';
 
 export const IndexColumnVal = styled.div`
   width: 100%;
@@ -54,6 +57,7 @@ export const IndexColumnVal = styled.div`
     background-color: #eee;
   }
 `;
+IndexColumnVal.displayName = 'S.IndexColumnVal';
 
 export const IndexColumnText = styled.div`
   text-align: center;
@@ -65,6 +69,7 @@ export const IndexColumnText = styled.div`
   align-items: center;
   font-weight: 600;
 `;
+IndexColumnText.displayName = 'S.IndexColumnText';
 
 export const IndexColumnDrag = styled.div`
   flex: 0 0 auto;
@@ -81,6 +86,7 @@ export const IndexColumnDrag = styled.div`
     background: rgb(51, 153, 255);
   }
 `;
+IndexColumnDrag.displayName = 'S.IndexColumnDrag';
 
 export const FilterIcon = styled(WBIcon)`
   cursor: pointer;
@@ -90,6 +96,7 @@ export const FilterIcon = styled(WBIcon)`
     border-radius: 2px;
   }
 `;
+FilterIcon.displayName = 'S.FilterIcon';
 
 export const ColumnAction = styled.div`
   cursor: pointer;
@@ -100,6 +107,7 @@ export const ColumnAction = styled.div`
   background: white;
   font-size: 20px;
 `;
+ColumnAction.displayName = 'S.ColumnAction';
 
 export const TableAction = styled.div<{highlight?: boolean}>`
   cursor: pointer;
@@ -117,12 +125,14 @@ export const TableAction = styled.div<{highlight?: boolean}>`
   }
   box-shadow: #f8f8f8 -2px 0px 8px 4px;
 `;
+TableAction.displayName = 'S.TableAction';
 
 export const EllipsisIcon = styled(WBIcon)`
   width: 100%;
   height: 100%;
   padding-top: 4px;
 `;
+EllipsisIcon.displayName = 'S.EllipsisIcon';
 
 export const TableIcon = styled(WBIcon)<{highlight?: boolean}>`
   cursor: pointer;
@@ -134,6 +144,7 @@ export const TableIcon = styled(WBIcon)<{highlight?: boolean}>`
     border-radius: 2px;
   }
 `;
+TableIcon.displayName = 'S.TableIcon';
 
 export const TableActionText = styled.span`
   cursor: pointer;
@@ -145,12 +156,14 @@ export const TableActionText = styled.span`
     border-radius: 2px;
   }
 `;
+TableActionText.displayName = 'S.TableActionText';
 
 export const ControlIcon = styled(WBIcon)`
   cursor: pointer;
   color: ${globals.primary};
   margin: auto;
 `;
+ControlIcon.displayName = 'S.ControlIcon';
 
 export const SortIcon = styled(WBIcon)`
   cursor: pointer;
@@ -160,34 +173,41 @@ export const SortIcon = styled(WBIcon)`
     border-radius: 2px;
   }
 `;
+SortIcon.displayName = 'S.SortIcon';
 
 export const ColumnEditorSection = styled.div`
   margin-bottom: 24px;
 `;
+ColumnEditorSection.displayName = 'S.ColumnEditorSection';
 
 export const ColumnEditorSectionLabel = styled.div`
   margin-bottom: 8px;
   font-weight: 600;
 `;
+ColumnEditorSectionLabel.displayName = 'S.ColumnEditorSectionLabel';
 
 export const ColumnEditorColumnName = styled.div`
   display: flex;
   align-items: center;
   color: ${globals.gray500};
 `;
+ColumnEditorColumnName.displayName = 'S.ColumnEditorColumnName';
 
 export const ColumnEditorFieldLabel = styled.div`
   margin-right: 8px;
 `;
+ColumnEditorFieldLabel.displayName = 'S.ColumnEditorFieldLabel';
 
 export const AssignmentWrapper = styled.div`
   display: flex;
   align-items: center;
 `;
+AssignmentWrapper.displayName = 'S.AssignmentWrapper';
 
 export const PanelNameEditor = styled.div`
   margin-bottom: 12px;
 `;
+PanelNameEditor.displayName = 'S.PanelNameEditor';
 
 export const PanelSettings = styled.div`
   padding: 8px 24px;
@@ -200,6 +220,7 @@ export const PanelSettings = styled.div`
   overflow: visible;
   // max-height: 300px;
 `;
+PanelSettings.displayName = 'S.PanelSettings';
 
 export const CellWrapper = styled.div`
   scrollbar-width: thin;
@@ -213,9 +234,11 @@ export const CellWrapper = styled.div`
   width: 100%;
   height: 100%;
 `;
+CellWrapper.displayName = 'S.CellWrapper';
 
 export const CloseIconButton = styled(IconButton)`
   position: absolute;
   right: 8px;
   top: 12px;
 `;
+CloseIconButton.displayName = 'S.CloseIconButton';
