@@ -73,6 +73,8 @@ class Facet(panel.Panel):
             self.set_y(options["y"])
             self.config.table.enable_groupby(self.config.dims.x)
             self.config.table.enable_groupby(self.config.dims.y)
+            self.config.table.enable_sort(self.config.dims.x)
+            self.config.table.enable_sort(self.config.dims.y)
             if "select" in options:
                 self.set_select(options["select"])
             if "detail" in options:
