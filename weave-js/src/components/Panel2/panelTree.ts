@@ -679,6 +679,9 @@ export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
   });
 };
 
+// This is called on an old config and new config, gets the delta
+// if the delta lines up with a VarNameChange it updates the references to said VarName
+// Note this function cannot be run to change a VarName, it can only be run to update the references
 export const updateExpressionVarNamesFromConfig = (
   oldConfig: PanelTreeNode,
   newConfig: PanelTreeNode
@@ -711,6 +714,7 @@ export const updateExpressionVarNamesFromConfig = (
   return getFullChildPanel(newConfig);
 };
 
+// Note this function cannot be run to change a VarName, it can only be run to update the references
 export const updateExpressionVarNames = (
   node: PanelTreeNode,
   stack: Stack,
