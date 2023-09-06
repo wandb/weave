@@ -661,7 +661,7 @@ export const PanelGroupItem: React.FC<{
               value,
             ])
           );
-          
+
           // This updates the grid config with the new name, since we use names as ids
           // if we had unique ids, we wouldnt have to do this
           if (config.gridConfig != null) {
