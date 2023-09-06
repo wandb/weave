@@ -1348,6 +1348,15 @@ def merge_types(a: Type, b: Type) -> Type:
     return union(a, b)
 
 
+def types_are_mergeable(a: Type, b: Type) -> bool:
+    """True if merge_types actually merges a and b.
+
+    This is used to maintain the invariant that types should not be mergeable
+    within a union inside an ArrowWeaveList.
+    """
+    return not isinstance(split_none(merge_types(a, b))[1], UnionType)
+
+
 def unknown_coalesce(in_type: Type) -> Type:
     """
     Recursively removes unknowns from a type. Whenever a union is encountered,

@@ -1247,6 +1247,8 @@ export const toGqlField = (
     return [gqlObjectField(forwardGraph, forwardOp, 'user')];
   } else if (forwardOp.op.name === 'run-createdAt') {
     return gqlBasicField('createdAt');
+  } else if (forwardOp.op.name === 'run-updatedAt') {
+    return gqlBasicField('updatedAt');
   } else if (forwardOp.op.name === 'run-heartbeatAt') {
     return gqlBasicField('heartbeatAt');
   } else if (forwardOp.op.name === 'run-project') {

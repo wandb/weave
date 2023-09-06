@@ -107,6 +107,7 @@ import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
+import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai-logo.svg';
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
@@ -525,6 +526,9 @@ export const IconNumber = (props: SVGIconProps) => (
 export const IconOpenNewTab = (props: SVGIconProps) => (
   <ImportOpenNewTab {...updateIconProps(props)} />
 );
+export const IconOpenaiLogo = (props: SVGIconProps) => (
+  <ImportOpenaiLogo {...updateIconProps(props)} />
+);
 export const IconOrchestrationLaunch = (props: SVGIconProps) => (
   <ImportOrchestrationLaunch {...updateIconProps(props)} />
 );
@@ -883,6 +887,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'music-audio': IconMusicAudio,
   number: IconNumber,
   'open-new-tab': IconOpenNewTab,
+  'openai-logo': IconOpenaiLogo,
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,

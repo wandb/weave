@@ -182,12 +182,12 @@ def test_compile_lambda_uniqueness():
     assert graph.count(concatted) == 12
 
     # However, after lambda compilation, we should get
-    # 3 more nodes (new row, add, and fn), but lose one
-    # because we dedupe the const "1", for a total of
-    # 14 nodes
+    # 3 more nodes (new row, add, and fn), the const 1
+    # is not deduped because in one case (inside the lambda function),
+    # it is an int and in the other, it is a number
     compiled = compile.compile([concatted])[0]
 
-    assert graph.count(compiled) == 14
+    assert graph.count(compiled) == 15
 
 
 # We actually don't want this to work because it would require

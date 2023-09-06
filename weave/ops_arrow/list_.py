@@ -801,11 +801,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                         if (
                             member_i is not None
                             and member_j is not None
-                            and not isinstance(
-                                types.merge_types(
-                                    member_i.object_type, member_j.object_type
-                                ),
-                                types.UnionType,
+                            and types.types_are_mergeable(
+                                member_i.object_type, member_j.object_type
                             )
                         ):
                             merged = True

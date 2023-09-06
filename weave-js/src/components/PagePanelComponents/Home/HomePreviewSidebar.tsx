@@ -222,7 +222,7 @@ const FALL_BACK_TEMPLATE = SEED_BOARD_OP_NAME;
 // Returns a recommended template in order of recommendation if they exist
 // else returns any template thats not the fallback as recommended
 // else returns fallback
-const getReccomendedTemplateInfo = (generators: Template[]) => {
+const getRecommendedTemplateInfo = (generators: Template[]) => {
   for (const templateOpName of RECOMMENDED_TEMPLATES) {
     const recommendedTemplate = generators.find(
       template => template.op_name === templateOpName
@@ -249,7 +249,7 @@ export const HomeExpressionPreviewParts: React.FC<{
   const isLoadingTemplates =
     generators.loading || refinedExpression.loading || isGenerating;
   const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
-  const recommendedTemplateInfo = getReccomendedTemplateInfo(generators.result);
+  const recommendedTemplateInfo = getRecommendedTemplateInfo(generators.result);
 
   useEffect(() => {
     setTabValue('Overview');
