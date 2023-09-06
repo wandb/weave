@@ -106,6 +106,7 @@ export const IconNames = {
   MusicAudio: 'music-audio',
   Number: 'number',
   OpenNewTab: 'open-new-tab',
+  OpenaiLogo: 'openai-logo',
   OrchestrationLaunch: 'orchestration-launch',
   OrganizationCorporate: 'organization-corporate',
   OverflowHorizontal: 'overflow-horizontal',

@@ -107,6 +107,7 @@ export {
   IconMusicAudio,
   IconNumber,
   IconOpenNewTab,
+  IconOpenaiLogo,
   IconOrchestrationLaunch,
   IconOrganizationCorporate,
   IconOverflowHorizontal,
