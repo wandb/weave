@@ -24,6 +24,7 @@ import {
   refineEditingNode,
   Stack,
   updateVarTypes,
+  updateVarNames,
   voidNode,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
@@ -678,6 +679,103 @@ export const updateExpressionVarTypes = (node: PanelTreeNode, stack: Stack) => {
   });
 };
 
+// This is called on an old config and new config, gets the delta
+// if the delta lines up with a VarNameChange it updates the references to said VarName
+// Note this function cannot be run to change a VarName, it can only be run to update the references
+export const updateExpressionVarNamesFromConfig = (
+  oldConfig: PanelTreeNode,
+  newConfig: PanelTreeNode
+) => {
+  const addedDelta = difference(oldConfig, newConfig);
+  const deletedDelta = difference(newConfig, oldConfig);
+  const path = getPathFromDelta(addedDelta);
+  const deletedPath = getPathFromDelta(deletedDelta);
+
+  const oldName = deletedPath[deletedPath.length - 1];
+  const newName = path[path.length - 1];
+
+  if (
+    // If the paths are the same, and the configs are the same except for the varName, we rename
+    path.slice(0, path.length - 1).join('.') ===
+      deletedPath.slice(0, deletedPath.length - 1).join('.') &&
+    _.isEqual(
+      getConfigForPath(getFullChildPanel(newConfig), path),
+      getConfigForPath(getFullChildPanel(oldConfig), deletedPath)
+    )
+  ) {
+    return updateExpressionVarNames(
+      newConfig,
+      [],
+      deletedPath,
+      oldName,
+      newName
+    );
+  }
+  return getFullChildPanel(newConfig);
+};
+
+// Note this function cannot be run to change a VarName, it can only be run to update the references
+export const updateExpressionVarNames = (
+  node: PanelTreeNode,
+  stack: Stack,
+  path: string[],
+  oldName: string,
+  newName: string
+) => {
+  return mapPanels(
+    node,
+    stack,
+    (child, childStack) => {
+      let newInputNode = child.input_node;
+      // marks null vars as dirty as well
+      // vars under the oldname will be null
+      const res = dereferenceAllVars(child.input_node, childStack, true);
+      for (const def of res.usedStack) {
+        if ((def as any).dirty) {
+          // if any of those variables are dirty, update the input_node
+          newInputNode = updateVarNames(
+            child.input_node,
+            childStack,
+            oldName,
+            newName
+          ) as NodeOrVoidNode;
+          break;
+        }
+      }
+
+      const newVars = _.mapValues(child.vars, (varNode, varName) =>
+        updateVarNames(varNode, childStack, oldName, newName)
+      );
+
+      let config = child.config;
+      if (
+        // Filter out these panels, since the map code walks them, correctly pushing
+        // stuff onto stack as it goes.
+        child.id !== 'Group' &&
+        !isStandardPanel(child.id) &&
+        !isTableStatePanel(child.id)
+      ) {
+        config = mapConfig(config, v =>
+          isNodeOrVoidNode(v)
+            ? updateVarNames(v, childStack, oldName, newName)
+            : v
+        );
+      }
+      return {
+        vars: newVars,
+        input_node: newInputNode,
+        id: child.id,
+        config,
+      } as ChildPanelFullConfig;
+    },
+    {
+      type: 'VarRename',
+      path,
+      newName,
+    }
+  );
+};
+
 const removeListTypeMinMax = (t: any): any => {
   if (_.isArray(t)) {
     return t.map(removeListTypeMinMax);
@@ -755,7 +853,13 @@ type PanelConfigUpdateAction = {
   path: string[];
 };
 
-type Action = PanelConfigUpdateAction;
+type VarRenameAction = {
+  type: 'VarRename';
+  path: string[];
+  newName: string;
+};
+
+type Action = PanelConfigUpdateAction | VarRenameAction;
 
 const getPathFromDelta = (delta: any): string[] => {
   if (delta.config == null || delta.config.items == null) {

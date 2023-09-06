@@ -623,12 +623,13 @@ export const PanelGroupItem: React.FC<{
   handleSiblingVarEvent,
 }) => {
   const itemUpdateConfig = useCallback(
-    (newItemConfig: any) =>
+    (newItemConfig: any) => {
       updateConfig(
         produce(config, draft => {
           draft.items[name] = newItemConfig;
         })
-      ),
+      );
+    },
     [config, name, updateConfig]
   );
 
@@ -653,8 +654,13 @@ export const PanelGroupItem: React.FC<{
     (newName: string) => {
       updateConfig(
         produce(config, draft => {
-          draft.items[newName] = draft.items[name];
-          delete draft.items[name];
+          // this updates the key of the item while mantaining the order, since it matters
+          draft.items = Object.fromEntries(
+            Object.entries(draft.items).map(([key, value]) => [
+              key === name ? newName : key,
+              value,
+            ])
+          );
 
           // This updates the grid config with the new name, since we use names as ids
           // if we had unique ids, we wouldnt have to do this
