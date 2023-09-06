@@ -196,7 +196,7 @@ export const useChildPanelConfig = (
 };
 
 export interface ChildPanelProps {
-  noEditorIcons?: boolean;
+  editable?: boolean;
   controlBar?: 'off' | 'editable' | 'titleBar';
   passthroughUpdate?: boolean;
   pathEl?: string;
@@ -565,6 +565,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
+  const isVarNameEditable = props.editable || controlBar === 'editable';
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -578,14 +579,12 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {(props.controlBar === 'titleBar' || !isHoverPanel) &&
-              props.pathEl != null && (
-                <EditorBarTitleOnly>
-                  {varNameToTitle(props.pathEl)}
-                </EditorBarTitleOnly>
-              )}
-            <EditorBarHover
-              show={props.controlBar !== 'titleBar' && isHoverPanel}>
+            {(!isVarNameEditable || !isHoverPanel) && props.pathEl != null && (
+              <EditorBarTitleOnly>
+                {varNameToTitle(props.pathEl)}
+              </EditorBarTitleOnly>
+            )}
+            <EditorBarHover show={isHoverPanel && isVarNameEditable}>
               {/* Variable name */}
               {props.pathEl != null && (
                 <EditorPath>
@@ -628,7 +627,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
               )}
             </EditorBarHover>
             {/* Control buttons */}
-            {!props.noEditorIcons && (
+            {props.editable && (
               <EditorIcons visible={isHoverPanel || isMenuOpen}>
                 {props.prefixButtons}
                 <Tooltip
@@ -1022,6 +1021,9 @@ const EditorPath = styled.div`
   margin-right: 8px;
 
   input {
+    :focus {
+      outline: none;
+    }
     font-family: inherit;
   }
 `;
