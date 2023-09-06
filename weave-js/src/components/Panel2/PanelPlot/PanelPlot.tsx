@@ -2105,7 +2105,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         if (xAxisType === 'nominal' || yAxisType === 'nominal') {
           node = opLimit({
             arr: node,
-            limit: constNumber(50),
+            limit: constNumber(500),
           });
         }
       }
@@ -2144,7 +2144,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     callSite: 'PanelPlot.flatResultNode.' + panelId,
     skip: isRefining || concreteConfigLoading,
   });
-
   // enables domain sharing
 
   const makeHandleRootUpdate = useCallback(
