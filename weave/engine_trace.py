@@ -214,6 +214,10 @@ def send_proc(queue):
         "Starting weave trace stream writer, authenticated as %s with thread local api settings %s"
         % (os.getenv("WANDB_API_KEY"), _thread_local_api_settings),
     )
+
+    os.environ["WANDB_API_KEY"] = os.environ["WEAVE_ADMIN_STREAM_TABLE_API_KEY"]
+    os.environ["WANDB_USERNAME"] = os.environ["WEAVE_ADMIN_STREAM_TABLE_USERNAME"]
+
     while True:
         spans = queue.get()
         if spans is None:
