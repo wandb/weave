@@ -2,6 +2,7 @@ import dataclasses
 import typing
 import weave
 from .. import panel
+from .. import panel_util
 from . import table_state
 
 from .. import graph
@@ -81,6 +82,11 @@ class Facet(panel.Panel):
                 self.set_detail(options["detail"])
             if "cell_size" in options:
                 self.set_cell_size(*options["cell_size"])
+            # x_title and y_title to match plot
+            if "x_title" in options:
+                self.config.xAxisLabel = panel_util.make_node(options["x_title"])
+            if "y_title" in options:
+                self.config.yAxisLabel = panel_util.make_node(options["y_title"])
 
     def debug_dim_select_functions(self):
         for dim in ["x", "y", "select", "detail"]:

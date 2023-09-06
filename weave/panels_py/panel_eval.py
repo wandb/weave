@@ -1,14 +1,5 @@
-import typing
-
 import weave
-from .. import dispatch
-from .. import weave_internal as internal
-from .. import weave_types as types
-from .. import weave_internal
-from ..panels import panel_group
 from ..panels import panel_board
-from ..panels_py import panel_autoboard
-from .generator_templates import template_registry
 
 
 # This is not yet general, it describes a board for a specific
@@ -18,37 +9,37 @@ from .generator_templates import template_registry
 def eval_board(dataset, eval_result0, eval_result1):
     varbar = panel_board.varbar()
     dataset_var = varbar.add("dataset", dataset)
-    eval_result0_var = varbar.add("eval_result0", eval_result0)
-    eval_result1_var = varbar.add("eval_result1", eval_result1)
+    baseline_eval_result = varbar.add("baseline_eval_result", eval_result0)
+    candidate_eval_result = varbar.add("candidate_eval_result", eval_result1)
 
     summary = varbar.add(
         "summary",
         weave.ops.make_list(
             a=weave.ops.TypedDict.merge(
-                weave.ops.dict_(name="res0"), eval_result0_var["summary"]
+                weave.ops.dict_(name="baseline"), baseline_eval_result["summary"]
             ),
             b=weave.ops.TypedDict.merge(
-                weave.ops.dict_(name="res1"), eval_result1_var["summary"]
+                weave.ops.dict_(name="candidate"), candidate_eval_result["summary"]
             ),
         ),
     )
 
     weave.ops.make_list(
-        a=eval_result0_var["eval_table"], b=eval_result0_var["eval_table"]
+        a=baseline_eval_result["eval_table"], b=baseline_eval_result["eval_table"]
     )
 
     concatted_evals = varbar.add(
         "concatted_evals",
         weave.ops.List.concat(
             weave.ops.make_list(
-                a=eval_result0_var["eval_table"].map(
+                a=baseline_eval_result["eval_table"].map(
                     lambda row: weave.ops.TypedDict.merge(
-                        weave.ops.dict_(name="res0"), row
+                        weave.ops.dict_(name="baseline"), row
                     )
                 ),
-                b=eval_result1_var["eval_table"].map(
+                b=candidate_eval_result["eval_table"].map(
                     lambda row: weave.ops.TypedDict.merge(
-                        weave.ops.dict_(name="res1"), row
+                        weave.ops.dict_(name="candidate"), row
                     )
                 ),
             )
@@ -60,7 +51,8 @@ def eval_board(dataset, eval_result0, eval_result1):
         "joined_evals",
         weave.ops.join_all(
             weave.ops.make_list(
-                a=eval_result0_var["eval_table"], b=eval_result1_var["eval_table"]
+                a=baseline_eval_result["eval_table"],
+                b=candidate_eval_result["eval_table"],
             ),
             lambda row: row["dataset_id"],
             False,
@@ -175,7 +167,9 @@ def eval_board(dataset, eval_result0, eval_result1):
     facet_correct = weave.panels.Facet(
         dataset_evals,
         x=lambda row: row["evals.summary"][0]["correct"],
+        x_title="baseline correct",
         y=lambda row: row["evals.summary"][1]["correct"],
+        y_title="candidate correct",
         select=lambda row: row.count(),
     )
 
@@ -186,14 +180,22 @@ def eval_board(dataset, eval_result0, eval_result1):
     )
 
     main.add(
-        "example_latencies",
-        weave.panels.Plot(
-            dataset_evals,
-            x=lambda row: row["evals.summary"]["latency"][0],
-            y=lambda row: row["evals.summary"]["latency"][1],
+        "help",
+        weave.panels.PanelString(
+            "Click a cell in in the panel to the left to load examples for that cell.\n\nClick a row number in the table below to see details for that row.",
+            mode="markdown",
         ),
         layout=weave.panels.GroupPanelLayout(x=12, y=8, w=12, h=6),
     )
+    # main.add(
+    #     "example_latencies",
+    #     weave.panels.Plot(
+    #         dataset_evals,
+    #         x=lambda row: row["evals.summary"]["latency"][0],
+    #         y=lambda row: row["evals.summary"]["latency"][1],
+    #     ),
+    #     layout=weave.panels.GroupPanelLayout(x=12, y=8, w=12, h=6),
+    # )
 
     sel_ex_table = weave.panels.Table(correct_comparison.selected())
     sel_ex_table.config.rowSize = 2
@@ -202,15 +204,16 @@ def eval_board(dataset, eval_result0, eval_result1):
     sel_ex_table.add_column(lambda row: row["dataset.label.name"], "label.name")
     sel_ex_table.add_column(
         lambda row: weave.ops.dict_(
-            res0=row["evals.result"][0]["name"], res1=row["evals.result"][1]["name"]
+            baseline=row["evals.result"][0]["name"],
+            candidate=row["evals.result"][1]["name"],
         ),
         "result.name",
     )
     sel_ex_table.add_column(lambda row: row["dataset.label.shares"], "label.shares")
     sel_ex_table.add_column(
         lambda row: weave.ops.dict_(
-            res0=row["evals.result"][0]["shares"].toString(),
-            res1=row["evals.result"][1]["shares"].toString(),
+            baseilne=row["evals.result"][0]["shares"].toString(),
+            candidate=row["evals.result"][1]["shares"].toString(),
         ),
         "result.shares",
     )
@@ -219,15 +222,15 @@ def eval_board(dataset, eval_result0, eval_result1):
     )
     sel_ex_table.add_column(
         lambda row: weave.ops.dict_(
-            res0=row["evals.result"][0]["directors"].toString(),
-            res1=row["evals.result"][1]["directors"].toString(),
+            baseilne=row["evals.result"][0]["directors"].toString(),
+            candidate=row["evals.result"][1]["directors"].toString(),
         ),
         "result.directors",
     )
     sel_ex_table.add_column(
         lambda row: weave.ops.dict_(
-            res0=row["evals.summary"][0]["latency"],
-            res1=row["evals.summary"][1]["latency"],
+            baseilne=row["evals.summary"][0]["latency"],
+            candidate=row["evals.summary"][1]["latency"],
         ),
         "latency",
     )
@@ -239,13 +242,13 @@ def eval_board(dataset, eval_result0, eval_result1):
     )
 
     main.add(
-        "res0_detail",
+        "baseilne_detail",
         selected_examples.active_data()["evals.summary"][0],
         layout=weave.panels.GroupPanelLayout(x=0, y=26, w=12, h=8),
     )
 
     main.add(
-        "res1_detail",
+        "candidate_detail",
         selected_examples.active_data()["evals.summary"][1],
         layout=weave.panels.GroupPanelLayout(x=12, y=26, w=12, h=8),
     )
