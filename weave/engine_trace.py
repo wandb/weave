@@ -16,10 +16,12 @@ import multiprocessing
 import logging
 import time
 import json
+import random
 import dataclasses
 from ddtrace.internal import service
 
 from . import logs
+from . import environment
 
 
 # Thanks co-pilot!
@@ -227,6 +229,8 @@ def send_proc(queue):
 # My guess is this is because logging to StreamTable uses gql, which is wrapped
 # by datadog, so we have some kind of re-entrancy/deadlock. Putting in a separate
 # process fixes.
+
+
 class WeaveWriter:
     def __init__(self, orig_writer):
         self._orig_writer = orig_writer
@@ -249,10 +253,27 @@ class WeaveWriter:
         if not self._proc.is_alive():
             self._proc.start()
 
+    @staticmethod
+    def apply_sampling(spans):
+        # Here we apply sampling to the spans, so we don't send too much data to W&B.
+        # We do this by generating a random number between 0 and 1, and only sending
+        # the full trace if the number is less than the sampling rate.
+        # Otherwise, we send a single span, which is the root span of the trace.
+
+        random_number = random.random()
+        trace_sampling_rate = environment.trace_sampling_rate()
+
+        if random_number >= trace_sampling_rate:
+            spans = list(filter(lambda s: s.parent_id is None, spans))
+
+        return spans
+
     def write(self, spans):
         if len(spans) == 1:
             return
         self._ensure_started()
+
+        spans = self.apply_sampling(spans)
         self._queue.put([dd_span_to_weave_span(s) for s in spans])
         self._orig_writer.write(spans)
 
