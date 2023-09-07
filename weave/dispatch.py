@@ -353,9 +353,7 @@ class BoundPotentialOpDefs:
                 err = errors.WeaveDispatchError(
                     f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found'
                 )
-                util.raise_exception_with_sentry_if_available(
-                    err, [str(self.potential_ops)]
-                )
+                util.raise_exception_with_sentry_if_available(err, [str(self.potential_ops)])
         op = _resolve_op_ambiguity(ops, input_types[0])
         params = op.input_type.create_param_dict([self.self_node] + list(args), kwargs)
         return op(**params)

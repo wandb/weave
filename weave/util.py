@@ -5,9 +5,9 @@ import string
 import gc, inspect
 import ipynbname
 import typing
+from .errors import WeaveFingerprintErrorMixin
 
 sentry_inited = False
-
 
 def init_sentry():
     global sentry_inited
@@ -25,21 +25,13 @@ def init_sentry():
 
 
 def raise_exception_with_sentry_if_available(
-    err: Exception, fingerprint: typing.Any
+    err: Exception,
+    fingerprint: typing.Any
 ) -> typing.NoReturn:
     init_sentry()
-    try:
-        import sentry_sdk
-    except ImportError:
-        raise err
-    else:
-        with sentry_sdk.push_scope() as scope:
-            scope.fingerprint = fingerprint
-            # I (Tim) don't think we need to explicitly capture the exception
-            # here, since we're raising it anyway. Explicitly capturing it
-            # ends dropping the stack trace in Sentry.
-            # sentry_sdk.capture_exception(err)
-            raise err
+    if isinstance(err, WeaveFingerprintErrorMixin):
+        err.fingerprint = fingerprint
+    raise err
 
 
 def capture_exception_with_sentry_if_available(
@@ -52,7 +44,10 @@ def capture_exception_with_sentry_if_available(
         pass
     else:
         with sentry_sdk.push_scope() as scope:
-            scope.fingerprint = fingerprint
+            if fingerprint:
+                scope.fingerprint = fingerprint
+            elif isinstance(err, WeaveFingerprintErrorMixin):
+                scope.fingerprint = err.fingerprint
             return sentry_sdk.capture_exception(err)
     return None
 
