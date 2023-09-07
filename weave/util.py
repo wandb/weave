@@ -9,6 +9,7 @@ from .errors import WeaveFingerprintErrorMixin
 
 sentry_inited = False
 
+
 def init_sentry():
     global sentry_inited
     if sentry_inited:
@@ -25,8 +26,7 @@ def init_sentry():
 
 
 def raise_exception_with_sentry_if_available(
-    err: Exception,
-    fingerprint: typing.Any
+    err: Exception, fingerprint: typing.Any
 ) -> typing.NoReturn:
     init_sentry()
     if isinstance(err, WeaveFingerprintErrorMixin):
