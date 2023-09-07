@@ -462,7 +462,12 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         # but the SDK add_reference call requires something like:
         # wandb-artifact://41727469666163743a353432353830303535/obj.object.json
         assert uri.startswith("wandb-artifact:///")
-        uri_path = "/".join(uri.split("/")[3:-1])  # Trim off protocol and /obj
+        uri_parts = uri.split("/")
+        if len(uri_parts) == 7:
+            uri_parts = uri_parts[3:-1]  # Trim off protocol and trailing /obj
+        else:
+            uri_parts = uri_parts[3:]  # Just trim off protocol
+        uri_path = "/".join(uri_parts)
         ref_artifact = get_wandb_read_artifact(uri_path)
 
         # A reference needs to point to a specific existing file in the other artifact.
