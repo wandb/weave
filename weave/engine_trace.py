@@ -17,7 +17,7 @@ import logging
 import time
 import json
 import dataclasses
-
+from ddtrace.internal import service
 
 from . import logs
 
@@ -214,6 +214,9 @@ def send_proc(queue):
         "Starting weave trace stream writer, authenticated as %s with thread local api settings %s"
         % (os.getenv("WANDB_API_KEY"), _thread_local_api_settings),
     )
+
+    os.environ["WANDB_API_KEY"] = os.getenv("WEAVE_ADMIN_STREAM_TABLE_API_KEY")
+
     while True:
         spans = queue.get()
         if spans is None:
@@ -233,13 +236,19 @@ class WeaveWriter:
     def __init__(self, orig_writer):
         self._orig_writer = orig_writer
         self._queue = multiprocessing.Queue()
-        self._proc = multiprocessing.Process(target=send_proc, args=(self._queue,))
+        self._proc = multiprocessing.Process(
+            target=send_proc, args=(self._queue,), name="WeaveTraceWriter"
+        )
 
     def recreate(self):
         return WeaveWriter(self._orig_writer.recreate())
 
     def stop(self, timeout=None):
-        self._orig_writer.stop(timeout)
+        try:
+            self._orig_writer.stop(timeout)
+        except service.ServiceStatusError:
+            # its already stopped
+            pass
 
     def _ensure_started(self):
         if not self._proc.is_alive():
