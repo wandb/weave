@@ -4,18 +4,20 @@ class WeaveUnmergableArtifactsError(Exception):
     pass
 
 
-class WeaveBaseError(Exception):
-    def __init__(self, message: Optional[str] = None) -> None:
-        super().__init__(message)
-        self._fingerprint = None
-    
+class WeaveFingerprintErrorMixin():
     @property
     def fingerprint(self) -> Optional[Iterable]:
+        if not hasattr(self, "_fingerprint"):
+            self._fingerprint = None
         return self._fingerprint
 
     @fingerprint.setter
     def fingerprint(self, value: Optional[Iterable]) -> None:
         self._fingerprint = value
+
+
+class WeaveBaseError(Exception, WeaveFingerprintErrorMixin):
+    pass
     
 
 class WeaveBaseWarning(Warning):

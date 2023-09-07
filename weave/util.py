@@ -5,6 +5,7 @@ import string
 import gc, inspect
 import ipynbname
 import typing
+from .errors import WeaveFingerprintErrorMixin
 
 sentry_inited = False
 
@@ -20,7 +21,7 @@ def init_sentry():
     except ImportError:
         return
     # Disable logs going to Sentry. Its slow
-    sentry_sdk.init(integrations=[LoggingIntegration(level=None, event_level=None)])
+    sentry_sdk.init(integrations=[LoggingIntegration(level=None)])
 
 
 def raise_exception_with_sentry_if_available(
@@ -28,7 +29,7 @@ def raise_exception_with_sentry_if_available(
     fingerprint: typing.Any
 ) -> typing.NoReturn:
     init_sentry()
-    if hasattr(err, 'fingerprint'):
+    if isinstance(err, WeaveFingerprintErrorMixin):
         err.fingerprint = fingerprint
     raise err
 
@@ -45,7 +46,7 @@ def capture_exception_with_sentry_if_available(
         with sentry_sdk.push_scope() as scope:
             if fingerprint:
                 scope.fingerprint = fingerprint
-            elif hasattr(err, "fingerprint"):
+            elif isinstance(err, WeaveFingerprintErrorMixin):
                 scope.fingerprint = err.fingerprint
             return sentry_sdk.capture_exception(err)
     return None
