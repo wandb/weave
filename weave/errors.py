@@ -1,24 +1,17 @@
 from typing import Optional, Iterable
 
+
 class WeaveUnmergableArtifactsError(Exception):
     pass
 
 
-class WeaveFingerprintErrorMixin():
-    @property
-    def fingerprint(self) -> Optional[Iterable]:
-        if not hasattr(self, "_fingerprint"):
-            self._fingerprint = None
-        return self._fingerprint
-
-    @fingerprint.setter
-    def fingerprint(self, value: Optional[Iterable]) -> None:
-        self._fingerprint = value
+class WeaveFingerprintErrorMixin:
+    fingerprint: Optional[Iterable] = None
 
 
 class WeaveBaseError(Exception, WeaveFingerprintErrorMixin):
     pass
-    
+
 
 class WeaveBaseWarning(Warning):
     pass
