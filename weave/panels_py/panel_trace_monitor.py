@@ -164,7 +164,7 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=12, h=6),
     )
 
     overview_tab.add(
@@ -173,20 +173,25 @@ def board(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_expr=lambda row: row["status_code"] == "SUCCESS",
+            y_expr=lambda row: (
+                row.filter(
+                    lambda inner_row: inner_row["status_code"] == "SUCCESS"
+                ).count()
+                / row.count()
+            ),
             y_title="success rate",
             color_expr=lambda row: grouping_fn(row),
             color_title="Root Span Name",
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave.panels.GroupPanelLayout(x=12, y=0, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=12, y=0, w=12, h=6),
     )
 
     overview_tab.add(
         "latency_distribution",
         filtered_window_data["summary.latency_s"],
-        layout=weave.panels.GroupPanelLayout(x=0, y=8, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=6, w=12, h=6),
     )
 
     overview_tab.add(
@@ -201,13 +206,13 @@ def board(
                 ).count(),
             }
         ),
-        layout=weave.panels.GroupPanelLayout(x=12, y=8, w=12, h=8),
+        layout=weave.panels.GroupPanelLayout(x=12, y=6, w=12, h=6),
     )
 
     traces_table_var = overview_tab.add(
         "traces_table",
         make_span_table(filtered_window_data),
-        layout=weave.panels.GroupPanelLayout(x=0, y=16, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=14, w=24, h=8),
     )
 
     trace_spans = all_spans.filter(
@@ -219,7 +224,7 @@ def board(
     trace_viewer_var = overview_tab.add(
         "trace_viewer",
         trace_viewer,
-        layout=weave.panels.GroupPanelLayout(x=0, y=24, w=16, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=22, w=16, h=8),
     )
 
     active_span = trace_viewer_var.active_span()
@@ -227,7 +232,7 @@ def board(
     selected_trace_obj = overview_tab.add(
         "selected_trace_obj",
         active_span,
-        layout=weave.panels.GroupPanelLayout(x=16, y=24, w=8, h=16),
+        layout=weave.panels.GroupPanelLayout(x=16, y=22, w=8, h=16),
     )
 
     similar_spans = all_spans.filter(lambda row: row["name"] == active_span["name"])
@@ -236,7 +241,7 @@ def board(
     similar_spans_table_var = overview_tab.add(
         "similar_spans_table",
         similar_spans_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=24, w=16, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=22, w=16, h=8),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)
