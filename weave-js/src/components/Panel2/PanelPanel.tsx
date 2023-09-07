@@ -39,6 +39,7 @@ import {
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {
+  updateExpressionVarNamesFromConfig,
   getConfigForPath,
   refineAllExpressions,
   refineForUpdate,
@@ -162,22 +163,30 @@ const panelRootReducer = (
     // while one is in flight, the second completion will restore the first change.
     // Accept this more now until we switch to delta updates.
     case 'updateConfig':
-      if (state.panelRoots[action.id].inFlight) {
+      const renamedConfig = updateExpressionVarNamesFromConfig(
+        panelRoot.root,
+        action.newConfig
+      );
+      const newAction = {
+        ...action,
+        newConfig: renamedConfig,
+      };
+      if (state.panelRoots[newAction.id].inFlight) {
         return produce(state, draft => {
-          draft.panelRoots[action.id].nextActions.push(action);
+          draft.panelRoots[newAction.id].nextActions.push(newAction);
         });
       }
       doUpdate(
         state.dispatch,
         panelRoot.client,
-        action.id,
+        newAction.id,
         panelRoot.root,
-        action.newConfig
+        newAction.newConfig
       );
       return produce(state, draft => {
-        const panelRootForId = draft.panelRoots[action.id];
+        const panelRootForId = draft.panelRoots[newAction.id];
         panelRootForId.inFlight = true;
-        panelRootForId.root = action.newConfig;
+        panelRootForId.root = newAction.newConfig;
       });
     case 'updateConfig2':
       if (panelRoot.inFlight) {

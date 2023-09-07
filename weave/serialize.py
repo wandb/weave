@@ -113,6 +113,7 @@ def node_id(node: graph.Node):
             hashable["val"] = {"lambda": True, "body": node_id(node.val)}
         else:
             hashable["val"] = storage.to_python(node.val)
+        hashable["type"] = storage.to_python(node.type)
     else:
         raise errors.WeaveInternalError("invalid node encountered: %s" % node)
     hash = hashlib.md5()

@@ -176,6 +176,15 @@ def _collection_and_alias_id_mapping_to_uri(
                 versionIndex
                 commitHash
             }
+            artifactMemberships(first: 1) {
+                edges {
+                    node {
+                        id
+                        versionIndex
+                        commitHash
+                    }
+                }
+            }
             defaultArtifactType {
                 id
                 name
@@ -206,12 +215,31 @@ def _collection_and_alias_id_mapping_to_uri(
     artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
     artifact_membership = res["artifactCollection"]["artifactMembership"]
     if artifact_membership is None:
-        is_deleted = True
-        # If the membership is deleted, then we will not be able to get the commit hash.
-        # Here, we can simply use the alias name as the commit hash. If the collection
-        # is ever un-deleted or the alias is re-assigned, then the next call will result
-        # in a "true" commit hash, ensuring we don't hit a stale cache.
-        commit_hash = alias_name
+        # Here we account for a special case: when the alias is `latest`. It is
+        # exceedingly common and expected to reference the latest alias of a
+        # collection. This is particularly common when logging tables (but used
+        # in many other places as well). Occasionally the user deletes the
+        # `latest` alias which is a super easy thing to do in the UI. However,
+        # this results in the data not being found. We solved this similarly in
+        # the typescript implementation by getting the most recent version in
+        # such cases. At one point we had an extended discussion about making
+        # `latest` a "calculated" alias, which would solve this issue on
+        # gorilla's side, but were unable to reach an actionable conclusion.
+        # This is a simple workaround that solves for these cases.
+        if (
+            alias_name == "latest"
+            and len(res["artifactCollection"]["artifactMemberships"]["edges"]) > 0
+        ):
+            commit_hash = res["artifactCollection"]["artifactMemberships"]["edges"][0][
+                "node"
+            ]["commitHash"]
+        else:
+            is_deleted = True
+            # If the membership is deleted, then we will not be able to get the commit hash.
+            # Here, we can simply use the alias name as the commit hash. If the collection
+            # is ever un-deleted or the alias is re-assigned, then the next call will result
+            # in a "true" commit hash, ensuring we don't hit a stale cache.
+            commit_hash = alias_name
     else:
         commit_hash = artifact_membership["commitHash"]
     entity_name = collection["project"]["entity"]["name"]
