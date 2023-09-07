@@ -275,7 +275,10 @@ class WeaveWriter:
 
         # sampling just returns the root span
         was_sampled = len(maybe_sampled_spans) == 1
-        weave_spans = [{**dd_span_to_weave_span(s), 'sampled': was_sampled} for s in maybe_sampled_spans]
+        weave_spans = [
+            {**dd_span_to_weave_span(s), "sampled": was_sampled}
+            for s in maybe_sampled_spans
+        ]
         self._queue.put(weave_spans)
         self._orig_writer.write(spans)
 
