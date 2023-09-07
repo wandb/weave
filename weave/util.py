@@ -21,7 +21,7 @@ def init_sentry():
     except ImportError:
         return
     # Disable logs going to Sentry. Its slow
-    sentry_sdk.init(integrations=[LoggingIntegration(level=None)])
+    sentry_sdk.init(integrations=[LoggingIntegration(level=None, event_level=None)])
 
 
 def raise_exception_with_sentry_if_available(
