@@ -210,8 +210,6 @@ def dd_span_to_weave_span(dd_span):
 
 
 def send_proc(queue):
-    from .wandb_client_api import _thread_local_api_settings
-
     os.environ["WANDB_API_KEY"] = os.getenv("WEAVE_ADMIN_STREAM_TABLE_API_KEY")
 
     while True:
