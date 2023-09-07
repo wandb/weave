@@ -19,7 +19,6 @@ if typing.TYPE_CHECKING:
 WANDB_ERROR_REPORTING = "WANDB_ERROR_REPORTING"
 WEAVE_USAGE_ANALYTICS = "WEAVE_USAGE_ANALYTICS"
 WEAVE_GQL_SCHEMA_PATH = "WEAVE_GQL_SCHEMA_PATH"
-WEAVE_TRACE_SAMPLING_RATE = "WEAVE_TRACE_SAMPLING_RATE"
 
 
 def _env_as_bool(var: str, default: typing.Optional[str] = None) -> bool:
@@ -224,8 +223,3 @@ def usage_analytics_enabled() -> bool:
 
 def gql_schema_path() -> typing.Optional[str]:
     return os.environ.get(WEAVE_GQL_SCHEMA_PATH) or None
-
-
-def trace_sampling_rate() -> float:
-    # default is no sampling
-    return float(os.environ.get(WEAVE_TRACE_SAMPLING_RATE, 1.0))
