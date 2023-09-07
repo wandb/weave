@@ -7,7 +7,7 @@ class WeaveUnmergableArtifactsError(Exception):
 
 
 class WeaveFingerprintErrorMixin:
-    fingerprint: typing.Any = None
+    fingerprint: Optional[Iterable] = None
 
 
 class WeaveBaseError(Exception, WeaveFingerprintErrorMixin):
