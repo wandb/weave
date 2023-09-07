@@ -14,7 +14,7 @@ class WeaveBaseError(Exception):
         return self._fingerprint
 
     @fingerprint.setter
-    def fingerprint(self, value: Iterable) -> None:
+    def fingerprint(self, value: Optional[Iterable]) -> None:
         self._fingerprint = value
     
 
