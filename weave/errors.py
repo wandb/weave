@@ -5,7 +5,7 @@ class WeaveUnmergableArtifactsError(Exception):
 
 
 class WeaveBaseError(Exception):
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: Optional[str] = None) -> None:
         super().__init__(message)
         self._fingerprint = None
     

@@ -4,7 +4,6 @@ import socket
 import string
 import gc, inspect
 import ipynbname
-import re
 import typing
 
 sentry_inited = False

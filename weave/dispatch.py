@@ -282,7 +282,7 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
     if not ops:
         logging.info('No ops found for "%s" with first arg "%s"', name, input_types[0])
         err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}',
+            f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}'
         )
         util.raise_exception_with_sentry_if_available(err, [name])
 
