@@ -204,11 +204,11 @@ def dd_span_to_weave_span(dd_span):
 
 
 def send_proc(queue):
-    logging.info('Starting weave trace stream writer')
+    logging.info("Starting weave trace stream writer")
     while True:
-        logging.info('Waiting on spans')
+        logging.info("Waiting on spans")
         spans = queue.get()
-        logging.info('Got spans')
+        logging.info("Got spans")
         if spans is None:
             break
         trace_stream = weave_trace_stream()
