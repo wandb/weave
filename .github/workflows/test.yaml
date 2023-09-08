@@ -49,7 +49,7 @@ jobs:
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
-      - run: source /root/venv/bin/activate && pre-commit run --all-files
+      - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
       - name: Show changes if pre-commit fails
         if: failure()
         run: |
