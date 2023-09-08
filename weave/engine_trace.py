@@ -90,6 +90,7 @@ def weave_trace_stream():
     if _weave_trace_stream is None:
         from weave.wandb_interface.wandb_stream_table import StreamTable
 
+        logging.info("Creating weave_trace_stream")
         _weave_trace_stream = StreamTable(os.getenv("WEAVE_TRACE_STREAM"))
     return _weave_trace_stream
 
@@ -250,7 +251,6 @@ class WeaveWriter:
 
 
 def tracer():
-
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
