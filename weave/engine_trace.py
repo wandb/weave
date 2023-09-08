@@ -237,7 +237,7 @@ class WeaveWriter:
         self._orig_writer.stop(timeout)
 
     def _ensure_started(self):
-        logging.info(f"ENSURING PROC STARTED. ENV: {os.environ}")
+        # logging.info(f"ENSURING PROC STARTED. ENV: {os.environ}")
         if not self._proc.is_alive():
             self._proc.start()
 
