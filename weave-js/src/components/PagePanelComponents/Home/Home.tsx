@@ -31,6 +31,7 @@ import {
   urlRecentTables,
 } from '../../../urls';
 import getConfig from '../../../config';
+import {ErrorBoundary} from '../../ErrorBoundary';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -143,7 +144,6 @@ const HomeComp: FC<HomeProps> = props => {
                   props.browserType === 'wandb' && params.entity === entity,
                 to: urlEntity(entity),
                 onClick: () => {
-                  console.log('setpreview node undefined');
                   setPreviewNode(undefined);
                   history.push(urlEntity(entity));
                 },
@@ -265,24 +265,26 @@ const HomeComp: FC<HomeProps> = props => {
         {/* Center Content */}
         {!loading && (
           <CenterSpace>
-            {props.browserType === 'recent' ? (
-              // This should never come up
-              <Placeholder />
-            ) : props.browserType === 'wandb' ? (
-              <CenterEntityBrowser
-                navigateToExpression={navigateToExpression}
-                setPreviewNode={setPreviewNode}
-                entityName={params.entity ?? ''}
-              />
-            ) : props.browserType === 'local' ? (
-              <CenterLocalBrowser
-                navigateToExpression={navigateToExpression}
-                setPreviewNode={setPreviewNode}
-              />
-            ) : (
-              // This should never come up
-              <Placeholder />
-            )}
+            <ErrorBoundary key={pathname}>
+              {props.browserType === 'recent' ? (
+                // This should never come up
+                <Placeholder />
+              ) : props.browserType === 'wandb' ? (
+                <CenterEntityBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                  entityName={params.entity ?? ''}
+                />
+              ) : props.browserType === 'local' ? (
+                <CenterLocalBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                />
+              ) : (
+                // This should never come up
+                <Placeholder />
+              )}
+            </ErrorBoundary>
           </CenterSpace>
         )}
         {/* Right Bar */}
