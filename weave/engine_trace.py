@@ -205,6 +205,7 @@ def dd_span_to_weave_span(dd_span):
 
 
 def send_proc(queue):
+    logging.info("IN OLD SEND PROC")
     logging.info("Starting weave trace stream writer")
     while True:
         logging.info("Waiting on spans")
@@ -236,6 +237,7 @@ class WeaveWriter:
         self._orig_writer.stop(timeout)
 
     def _ensure_started(self):
+        logging.info(f"ENSURING PROC STARTED. ENV: {os.environ}")
         if not self._proc.is_alive():
             self._proc.start()
 
