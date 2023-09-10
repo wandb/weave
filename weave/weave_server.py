@@ -60,8 +60,9 @@ def custom_dd_patch():
         ) as span:
             span.set_tag("document", wandb_graphql.print_ast(document))
             span.set_tag("variable_values", kwargs.get("variable_values", {}))
+            span.set_tag("ppid", os.getppid())
             span.set_tag("pid", os.getpid())
-            span.set_tag("traceback", '\n'.join(traceback.format_stack()))
+            span.set_tag("traceback", "\n".join(traceback.format_stack()))
             return orig_execute(self, document, *args, **kwargs)
 
     wandb_gql.Client.execute = execute
