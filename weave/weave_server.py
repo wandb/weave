@@ -62,7 +62,7 @@ def custom_dd_patch():
             span.set_tag("variable_values", kwargs.get("variable_values", {}))
             return orig_execute(self, document, *args, **kwargs)
 
-    wandb_gql.Client.execute = execute
+    # wandb_gql.Client.execute = execute
 
 
 if engine_trace.datadog_is_enabled():
