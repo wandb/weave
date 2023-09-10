@@ -210,9 +210,11 @@ def send_proc(queue):
     while True:
         logging.info("Waiting on spans")
         spans = queue.get()
-        logging.info("Got spans")
+        logging.info(f"Got {len(spans)} spans")
         if spans is None:
+            logging.info("Got None, exiting")
             break
+        logging.info(f"Spans received: {spans[:5]}...")
         trace_stream = weave_trace_stream()
         if trace_stream is not None:
             for span in spans:
