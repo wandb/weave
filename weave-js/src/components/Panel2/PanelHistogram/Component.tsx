@@ -1,5 +1,5 @@
 import CustomPanelRenderer from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {useInView} from 'react-intersection-observer';
 import {VisualizationSpec} from 'react-vega';
 import {BinParams} from 'vega-lite/build/src/bin';
@@ -14,6 +14,7 @@ import {
   PanelHistogramProps,
   useExtentFromData,
 } from './common';
+import {key} from 'vega';
 
 /* eslint-disable no-template-curly-in-string */
 
@@ -66,6 +67,11 @@ function getVegaHistoSpec(
         axis: {
           title: null,
         },
+        scale: {
+          domain: config.fixYAxis?.isFixed
+            ? [0, config.fixYAxis?.value]
+            : undefined,
+        },
       },
       ...(isColorable
         ? {
@@ -95,19 +101,47 @@ const PanelHistogram: React.FC<PanelHistogramProps> = props => {
   const {ref, inView} = useInView();
   const hasBeenOnScreen = useGatedValue(inView, o => o);
   const nodeValueQuery = useNodeValue(props.input);
+  const buckets: {[key: number]: number} = {};
+
   const data = useMemo(() => {
     if (nodeValueQuery.loading || (isColorable && colorNodeValue.loading)) {
       return [];
     }
     if (!isColorable) {
-      return nodeValueQuery.result.map(num => ({value: num}));
+      return nodeValueQuery.result.map(num => {
+        if (num != null) {
+          buckets[num] = buckets[num] ? buckets[num] + 1 : 1;
+        }
+        return {value: num};
+      });
     } else {
-      return nodeValueQuery.result.map((num, ndx) => ({
-        value: num,
-        color: colorNodeValue.result[ndx] ?? '#94aecb',
-      }));
+      return nodeValueQuery.result.map((num, ndx) => {
+        if (num != null) {
+          buckets[num] = buckets[num] ? buckets[num] + 1 : 1;
+        }
+        return {
+          value: num,
+          color: colorNodeValue.result[ndx] ?? '#94aecb',
+        };
+      });
     }
   }, [nodeValueQuery, isColorable, colorNodeValue]);
+
+  useEffect(() => {
+    if (Object.keys(buckets).length > 0) {
+      const newMax = Math.max(...Object.values(buckets));
+      const value = config.fixYAxis?.value || null;
+      const shouldUpdateValue = !value || newMax > value;
+      if (shouldUpdateValue) {
+        props.updateConfig({
+          fixYAxis: {
+            isFixed: config.fixYAxis?.isFixed,
+            value: shouldUpdateValue ? newMax : value,
+          },
+        });
+      }
+    }
+  }, [buckets, config.fixYAxis?.value, config.fixYAxis?.isFixed]);
 
   const dataExtent = useExtentFromData(props.input);
 
