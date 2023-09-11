@@ -49,7 +49,7 @@ export const ConfigSectionContainer = styled.div`
 ConfigSectionContainer.displayName = 'S.ConfigSectionContainer';
 
 export const ConfigSectionHeader = styled.div`
-  margin-bottom: 12px;
+  // margin-bottom: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
