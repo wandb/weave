@@ -43,6 +43,17 @@ export const opUserName = makeUserOp({
   resolver: ({user}) => user.name,
 });
 
+export const opUserEmail = makeUserOp({
+  hidden: true,
+  name: 'user-email',
+  argTypes: userArgType,
+  description: `Returns the email of the ${docType('user')}`,
+  argDescriptions: {user: userArgDescription},
+  returnValueDescription: `The user of the ${docType('user')}`,
+  returnType: inputTypes => 'string',
+  resolver: ({user}) => user.email,
+});
+
 export const opUserLink = makeUserOp({
   hidden: true,
   name: 'user-link',
