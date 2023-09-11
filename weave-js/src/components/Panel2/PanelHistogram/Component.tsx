@@ -14,7 +14,6 @@ import {
   PanelHistogramProps,
   useExtentFromData,
 } from './common';
-import {key} from 'vega';
 
 /* eslint-disable no-template-curly-in-string */
 
@@ -93,6 +92,7 @@ function getVegaHistoSpec(
 }
 
 const PanelHistogram: React.FC<PanelHistogramProps> = props => {
+  const {updateConfig} = props;
   const config = props.config ?? defaultConfig();
   const colorNode = useColorNode(props.input);
   const colorNodeValue = useNodeValue(colorNode);
@@ -101,7 +101,7 @@ const PanelHistogram: React.FC<PanelHistogramProps> = props => {
   const {ref, inView} = useInView();
   const hasBeenOnScreen = useGatedValue(inView, o => o);
   const nodeValueQuery = useNodeValue(props.input);
-  const buckets: {[key: number]: number} = {};
+  const buckets: {[key: number]: number} = useMemo(() => ({}), []);
 
   const data = useMemo(() => {
     if (nodeValueQuery.loading || (isColorable && colorNodeValue.loading)) {
@@ -125,7 +125,7 @@ const PanelHistogram: React.FC<PanelHistogramProps> = props => {
         };
       });
     }
-  }, [nodeValueQuery, isColorable, colorNodeValue]);
+  }, [buckets, nodeValueQuery, isColorable, colorNodeValue]);
 
   useEffect(() => {
     if (Object.keys(buckets).length > 0) {
@@ -133,7 +133,7 @@ const PanelHistogram: React.FC<PanelHistogramProps> = props => {
       const value = config.fixYAxis?.value || null;
       const shouldUpdateValue = !value || newMax > value;
       if (shouldUpdateValue) {
-        props.updateConfig({
+        updateConfig({
           fixYAxis: {
             isFixed: config.fixYAxis?.isFixed,
             value: shouldUpdateValue ? newMax : value,
@@ -141,7 +141,7 @@ const PanelHistogram: React.FC<PanelHistogramProps> = props => {
         });
       }
     }
-  }, [buckets, config.fixYAxis?.value, config.fixYAxis?.isFixed]);
+  }, [buckets, config.fixYAxis?.value, config.fixYAxis?.isFixed, updateConfig]);
 
   const dataExtent = useExtentFromData(props.input);
 
