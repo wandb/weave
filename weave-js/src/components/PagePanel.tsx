@@ -120,21 +120,23 @@ function useEnablePageAnalytics() {
   const pathRef = useRef('');
   const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
 
-  const trackOnPathDiff = useCallback((location: any, options: any) => {
-    const currentPath = `${location.pathname}${location.search}`;
-    const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
-    if (pathRef.current !== currentPath) {
-      let pageName = "";
-      if (location.search.includes("exp=get")) {
-        pageName = "WeaveBoardOrTable"
+  const trackOnPathDiff = useCallback(
+    (location: any, options: any) => {
+      const currentPath = `${location.pathname}${location.search}`;
+      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+      if (pathRef.current !== currentPath) {
+        let pageName = '';
+        if (location.search.includes('exp=get')) {
+          pageName = 'WeaveBoardOrTable';
+        } else if (location.pathname.includes('/browse')) {
+          pageName = 'WeaveBrowser';
+        }
+        trackPage({url: fullURL, pageName}, options);
+        pathRef.current = currentPath;
       }
-      else if (location.pathname.includes("/browse")) {
-        pageName = "WeaveBrowser"
-      } 
-      trackPage({url: fullURL, pageName}, options);
-      pathRef.current = currentPath;
-    }
-  }, [pathRef])
+    },
+    [pathRef]
+  );
 
   // fetch user
   useEffect(() => {
@@ -176,11 +178,11 @@ function useEnablePageAnalytics() {
     };
 
     const unlisten = history.listen(location => {
-      trackOnPathDiff(location, options)
+      trackOnPathDiff(location, options);
     });
 
     // Track initial page view
-    trackOnPathDiff(history.location, options)
+    trackOnPathDiff(history.location, options);
 
     return () => {
       unlisten();
