@@ -365,7 +365,9 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         }
                     finally:
                         if span is not None:
-                            # Check if we have read bytes into arrow
+                            span.set_tag(
+                                "bytes_read_to_arrow", report["bytes_read_to_arrow"]
+                            )
 
                             span.finish()
 
