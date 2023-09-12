@@ -773,6 +773,8 @@ export const toGqlField = (
     return gqlBasicField('username');
   } else if (forwardOp.op.name === 'user-name') {
     return gqlBasicField('name');
+  } else if (forwardOp.op.name === 'user-email') {
+    return gqlBasicField('email');
   } else if (forwardOp.op.name === 'user-link') {
     return gqlBasicField('name').concat(gqlBasicField('username'));
   } else if (forwardOp.op.name === 'artifact-type') {

@@ -1,4 +1,5 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
 import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
 import styled from 'styled-components';
@@ -12,7 +13,13 @@ import {
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
-import {IconCopy, IconDelete, IconRetry, IconSplit} from '../Panel2/Icons';
+import {
+  IconAddNew,
+  IconCopy,
+  IconDelete,
+  IconRetry,
+  IconSplit,
+} from '../Panel2/Icons';
 import {PopupMenu} from './PopupMenu';
 
 const Divider = styled.div`
@@ -44,6 +51,8 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   onOpen,
   isOpen,
 }) => {
+  const isViewerWandbEmployee = useIsViewerWandbEmployee();
+
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
       ev.stopPropagation();
@@ -162,6 +171,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       icon: <IconCopy />,
       onClick: () => handleDuplicate(path),
     });
+
     if (path.find(p => p === 'main') != null && path.length > 1) {
       items.push({
         key: 'split',
@@ -169,9 +179,27 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         icon: <IconSplit />,
         onClick: () => handleSplit(path),
       });
+
+      if (isViewerWandbEmployee) {
+        items.push({
+          key: 'divider-0',
+          content: <Divider />,
+          disabled: true,
+        });
+        items.push({
+          key: 'export-report',
+          content: 'Add to report...',
+          icon: <IconAddNew />,
+          onClick: () =>
+            alert(
+              'Coming soon! This feature is under development behind an internal-only feature flag.'
+            ),
+        });
+      }
     }
+
     items.push({
-      key: 'divider',
+      key: 'divider-1',
       content: <Divider />,
       disabled: true,
     });
@@ -183,12 +211,13 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     });
     return items;
   }, [
-    handleDelete,
-    handleSplit,
-    handleUnnest,
-    handleDuplicate,
     localConfig?.id,
     path,
+    handleDelete,
+    handleUnnest,
+    handleDuplicate,
+    isViewerWandbEmployee,
+    handleSplit,
   ]);
 
   return (
