@@ -127,7 +127,7 @@ function useEnablePageAnalytics() {
       if (pathRef.current !== currentPath) {
         let pageName = '';
         if (location.search.includes('exp=get')) {
-          pageName = 'WeaveBoardOrTable';
+          pageName = 'WeaveGetExpression';
         } else if (location.pathname.includes('/browse')) {
           pageName = 'WeaveBrowser';
         }
