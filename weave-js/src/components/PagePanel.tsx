@@ -120,6 +120,24 @@ function useEnablePageAnalytics() {
   const pathRef = useRef('');
   const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
 
+  const trackOnPathDiff = useCallback(
+    (location: any, options: any) => {
+      const currentPath = `${location.pathname}${location.search}`;
+      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+      if (pathRef.current !== currentPath) {
+        let pageName = '';
+        if (location.search.includes('exp=get')) {
+          pageName = 'WeaveGetExpression';
+        } else if (location.pathname.includes('/browse')) {
+          pageName = 'WeaveBrowser';
+        }
+        trackPage({url: fullURL, pageName}, options);
+        pathRef.current = currentPath;
+      }
+    },
+    [pathRef]
+  );
+
   // fetch user
   useEffect(() => {
     const anonApiKey = getCookie('anon_api_key');
@@ -159,28 +177,17 @@ function useEnablePageAnalytics() {
       },
     };
 
-    // TODO: Make this DRY-er
     const unlisten = history.listen(location => {
-      const currentPath = `${location.pathname}${location.search}`;
-      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
-      if (pathRef.current !== currentPath) {
-        trackPage({url: fullURL}, options);
-        pathRef.current = currentPath;
-      }
+      trackOnPathDiff(location, options);
     });
 
     // Track initial page view
-    const initialPath = `${history.location.pathname}${history.location.search}`;
-    const entireURL = `${window.location.protocol}//${window.location.host}${history.location.pathname}${history.location.search}${history.location.hash}`;
-    if (pathRef.current !== initialPath) {
-      trackPage({url: entireURL}, options);
-      pathRef.current = initialPath;
-    }
+    trackOnPathDiff(history.location, options);
 
     return () => {
       unlisten();
     };
-  }, [history]);
+  }, [history, trackOnPathDiff]);
 }
 
 // Simple function that forces rerender when URL changes.
