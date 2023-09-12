@@ -32,6 +32,7 @@ import {
 } from '../../../urls';
 import getConfig from '../../../config';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {Alert} from '../../Alert';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -73,7 +74,7 @@ const HomeComp: FC<HomeProps> = props => {
     [props]
   );
   const isLocallyServed = isServedLocally();
-  const isAuthenticated = useIsAuthenticated();
+  const {isAuthenticated, authenticationError} = useIsAuthenticated();
   const userEntities = query.useUserEntities(isAuthenticated);
   const userName = query.useUserName(isAuthenticated);
   const recentSection = useMemo(() => {
@@ -242,7 +243,7 @@ const HomeComp: FC<HomeProps> = props => {
     if (isLocallyServed && REDIRECT_LOCAL.includes(pathname)) {
       return <Redirect to={urlLocalBoards()} />;
     }
-    // This should never happen
+    // This can happen if there is an authentication problem.
     console.warn('Unable to determine root');
   }
 
@@ -266,7 +267,9 @@ const HomeComp: FC<HomeProps> = props => {
         {!loading && (
           <CenterSpace>
             <ErrorBoundary key={pathname}>
-              {props.browserType === 'recent' ? (
+              {authenticationError ? (
+                <Alert severity="error">{authenticationError}</Alert>
+              ) : props.browserType === 'recent' ? (
                 // This should never come up
                 <Placeholder />
               ) : props.browserType === 'wandb' ? (

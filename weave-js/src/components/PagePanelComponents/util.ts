@@ -30,6 +30,9 @@ declare function btoa(s: string): string;
 
 export const useIsAuthenticated = (skip: boolean = false) => {
   const [isAuth, setIsAuth] = useState<boolean | undefined>(undefined);
+  const [authenticationError, setAuthenticationError] = useState<string | null>(
+    null
+  );
   const anonApiKey = getCookie('anon_api_key');
 
   const isMounted = useRef(true);
@@ -57,6 +60,7 @@ export const useIsAuthenticated = (skip: boolean = false) => {
         }
         if (res.status !== 200) {
           setIsAuth(false);
+          setAuthenticationError(`Authentication error: ${res.statusText}`);
           return;
         } else {
           return res.json();
@@ -80,7 +84,7 @@ export const useIsAuthenticated = (skip: boolean = false) => {
       isMounted.current = false;
     };
   }, [anonApiKey, skip]);
-  return isAuth;
+  return {isAuthenticated: isAuth, authenticationError};
 };
 
 export const isServedLocally = () => {

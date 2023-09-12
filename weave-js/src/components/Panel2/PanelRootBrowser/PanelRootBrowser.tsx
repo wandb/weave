@@ -33,7 +33,7 @@ export const PanelRootBrowser: React.FC<
 > = props => {
   const servedLocally = isServedLocally();
   const localObjectsExist = useLocalObjectsExist();
-  const isAuthenticated = useIsAuthenticated();
+  const {isAuthenticated} = useIsAuthenticated();
   const panelContext = usePanelContext();
   const variablesExist = useMemo(() => {
     return _.keys(panelContext.frame).length > 0;
