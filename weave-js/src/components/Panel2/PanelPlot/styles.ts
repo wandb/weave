@@ -32,7 +32,7 @@ export const UnconstrainedIconContainer = styled.div`
   height: 24px;
   display: flex;
   padding: 3px;
-  color: ${globals.MOON_500}
+  color: ${globals.MOON_500};
   justify-content: center;
   align-items: center;
   border-radius: 4px;
