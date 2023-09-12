@@ -609,6 +609,11 @@ def execute_forward_node(
             run = TRACE_LOCAL.new_run(run_key, inputs=input_refs)  # type: ignore
             execute_async_op(op_def, input_refs, run_key)
             forward_node.set_result(run)
+            return {
+                "cache_used": False,
+                "already_executed": False,
+                "bytes_read_to_arrow": 0,
+            }
     else:
         result: typing.Any
         with tracer.trace("execute-sync"):
@@ -658,8 +663,8 @@ def execute_forward_node(
             ):
                 logging.debug("Saving run")
                 TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
-    return {
-        "cache_used": False,
-        "already_executed": False,
-        "bytes_read_to_arrow": get_bytes_read_to_arrow(node, result),
-    }
+        return {
+            "cache_used": False,
+            "already_executed": False,
+            "bytes_read_to_arrow": get_bytes_read_to_arrow(node, result),
+        }
