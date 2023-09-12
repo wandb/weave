@@ -282,7 +282,7 @@ const rowToExpression = (
   return opGet({uri: constString(uri)});
 };
 
-const CenterProjectBoardsBrowser: React.FC<
+export const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();

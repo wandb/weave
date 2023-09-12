@@ -50,7 +50,7 @@ export const ComputeGraphContextProviderFromClient: React.FC<{client: Client}> =
     }, [context]);
 
     return (
-      <div
+      <span
         data-test="compute-graph-provider"
         data-test-num-shadow-server-requests-counter={
           GlobalCGEventTracker.shadowServerRequests
@@ -59,7 +59,7 @@ export const ComputeGraphContextProviderFromClient: React.FC<{client: Client}> =
         <ClientContext.Provider value={context}>
           {children}
         </ClientContext.Provider>
-      </div>
+      </span>
     );
   });
 ComputeGraphContextProviderFromClient.displayName =
