@@ -13,7 +13,6 @@ export const PostfixContainer = styled.div`
 
 export const ConfigOptionLabel = styled.div`
   width: 92px;
-  line-height: 32px;
   margin-right: 8px;
   flex-shrink: 0;
   color: ${globals.GRAY_500};

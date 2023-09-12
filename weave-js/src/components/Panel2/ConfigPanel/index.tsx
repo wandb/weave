@@ -112,7 +112,7 @@ export const ConfigSection: FC<ConfigSectionProps> = ({
               />
             )}
             <ConfigSectionHeaderButton expanded={expanded}>
-              <IconCaret />
+              <IconDown />
             </ConfigSectionHeaderButton>
           </div>
         </ConfigSectionHeader>
@@ -265,6 +265,7 @@ export const TextInputConfigField: React.FC<
 };
 
 export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
+  border-radius: 4px;
   flex: 1 1 auto;
   display: flex;
   width: 100%;
