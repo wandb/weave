@@ -42,6 +42,7 @@ CACHE_OP_NAMES = [
 
 ARROW_FS_OPS = [
     "run-history3",
+    "run-history3_with_columns"
 ]
 
 

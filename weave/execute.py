@@ -385,6 +385,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         time.time() - start_time,
                         report["cache_used"],
                         report.get("already_executed") or False,
+                        report.get("bytes_read_to_arrow") or 0,
                     )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:

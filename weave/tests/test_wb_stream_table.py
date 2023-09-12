@@ -66,7 +66,8 @@ def test_bytes_read_from_arrow_reporting(user_by_api_key_in_env):
             with gql_json_cache.gql_json_cache_context():
                 execute.execute_nodes([hist_node["hello"]])
 
-    assert stats.summary
+    # all data is the live set at this point, so it is all counted
+    assert stats.summary["bytes_read_to_arrow"] == 190
 
 
 def test_stream_logging_image(user_by_api_key_in_env):
