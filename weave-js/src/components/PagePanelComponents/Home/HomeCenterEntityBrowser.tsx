@@ -186,6 +186,7 @@ type CenterProjectBrowserInnerPropsType = {
   projectName: string;
   setPreviewNode: SetPreviewNodeType;
   navigateToExpression: NavigateToExpressionType;
+  hideTitle?: boolean;
 };
 
 const CenterProjectBrowserInner: React.FC<
@@ -284,7 +285,13 @@ const rowToExpression = (
 
 export const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
-> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
+> = ({
+  entityName,
+  projectName,
+  hideTitle,
+  setPreviewNode,
+  navigateToExpression,
+}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
   const browserTitle = 'Boards';
@@ -417,34 +424,41 @@ export const CenterProjectBoardsBrowser: React.FC<
     browserData,
   ]);
 
+  const breadcrumbs = useMemo(() => {
+    if (hideTitle) {
+      return undefined;
+    }
+    return [
+      {
+        key: 'entity',
+        text: entityName,
+        onClick: () => {
+          setPreviewNode(undefined);
+          history.push(urlEntity(entityName));
+        },
+      },
+      {
+        key: 'project',
+        text: projectName,
+        onClick: () => {
+          setPreviewNode(undefined);
+          history.push(urlProject(entityName, projectName));
+        },
+      },
+    ];
+  }, [entityName, hideTitle, history, projectName, setPreviewNode]);
+
   return (
     <CenterBrowser
       allowSearch
-      title={browserTitle}
+      title={hideTitle ? undefined : browserTitle}
       selectedRowId={params.preview}
       setPreviewNode={setPreviewNode}
       deletingId={deletingId}
       setDeletingId={setDeletingId}
       deleteTypeString="board"
       noDataCTA={`No Weave boards found for project: ${entityName}/${projectName}`}
-      breadcrumbs={[
-        {
-          key: 'entity',
-          text: entityName,
-          onClick: () => {
-            setPreviewNode(undefined);
-            history.push(urlEntity(entityName));
-          },
-        },
-        {
-          key: 'project',
-          text: projectName,
-          onClick: () => {
-            setPreviewNode(undefined);
-            history.push(urlProject(entityName, projectName));
-          },
-        },
-      ]}
+      breadcrumbs={breadcrumbs}
       loading={boards.loading}
       columns={['name', 'updated at', 'created at', 'created by']}
       data={browserData}
