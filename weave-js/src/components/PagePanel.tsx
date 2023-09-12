@@ -3,12 +3,16 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
-import getConfig from '../config';
 
+import getConfig from '../config';
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
+import {getCookie} from '../common/util/cookie';
+import {consoleLog} from '../util';
+import {trackPage} from '../util/events';
 import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
@@ -26,6 +30,7 @@ import {
   ChildPanelConfigComp,
   ChildPanelFullConfig,
 } from './Panel2/ChildPanel';
+import {ChildPanelExportReport} from './Panel2/ChildPanelExportReport/ChildPanelExportReport';
 import {themes} from './Panel2/Editor.styles';
 import {
   IconAddNew,
@@ -49,11 +54,6 @@ import {useUpdateServerPanel} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
 import {useWeaveAutomation} from './automation';
-import {consoleLog} from '../util';
-import {trackPage} from '../util/events';
-import {getCookie} from '../common/util/cookie';
-import {useHistory} from 'react-router-dom';
-import {ChildPanelExportReport} from './Panel2/ChildPanelExportReport';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;

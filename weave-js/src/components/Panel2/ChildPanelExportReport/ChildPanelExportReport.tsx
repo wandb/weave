@@ -1,10 +1,10 @@
 import React from 'react';
 import _ from 'lodash';
 
-import {Alert} from '../Alert.styles';
-import {Button} from '../Button';
-import {Tailwind} from '../Tailwind';
-import {useCloseDrawer, useSelectedPath} from './PanelInteractContext';
+import {Alert} from '../../Alert.styles';
+import {Button} from '../../Button';
+import {Tailwind} from '../../Tailwind';
+import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 
 export const ChildPanelExportReport = () => {
   const selectedPath = useSelectedPath();
