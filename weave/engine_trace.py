@@ -186,7 +186,7 @@ class WeaveTrace:
         return cur_span
 
 
-def dd_span_to_weave_span(dd_span):
+def dd_span_to_weave_span(dd_span) -> dict[str, typing.Any]:
     # Use '' for None, currently history2 doesn't read None columns from
     # the liveset correctly.
     parent_id = ""

@@ -40,6 +40,10 @@ CACHE_OP_NAMES = [
     "gqlroot-wbgqlquery",
 ] + CACHE_AND_PARALLEL_OP_NAMES
 
+ARROW_FS_OPS = [
+    "run-history3",
+]
+
 
 # history ops are parallelized by derive_op only, in a custom way
 # PARALLEL_OP_NAMES = ["run-history", "run-history2"] + CACHE_AND_PARALLEL_OP_NAMES

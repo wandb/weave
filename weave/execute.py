@@ -360,7 +360,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         report = {"cache_used": False, "already_executed": False}
                     finally:
                         if span is not None:
+                            # Check if we have read bytes into arrow
+
                             span.finish()
+
                     stats.add_node(
                         forward_node.node,
                         time.time() - start_time,
@@ -419,9 +422,26 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
+def get_bytes_read_to_arrow(node: graph.Node, result: typing.Any) -> int:
+    from .ops_arrow import ArrowWeaveList
+
+    # deref if we have a ref
+    result = ref_base.deref(result)
+
+    if (
+        isinstance(node, graph.OutputNode)
+        and node.from_op.name in op_policy.ARROW_FS_OPS
+        and isinstance(result, ArrowWeaveList)
+    ):
+        return result._arrow_data.nbytes
+
+    return 0
+
+
 class NodeExecutionReport(typing.TypedDict):
     cache_used: bool
     already_executed: typing.Optional[bool]
+    bytes_read_to_arrow: int
 
 
 # This function is not called in prod - but helpful when debugging
@@ -462,7 +482,7 @@ def execute_forward_node(
 ) -> NodeExecutionReport:
     node = forward_node.node
     if fg.has_result(node):
-        return {"cache_used": False, "already_executed": True}
+        return {"cache_used": False, "already_executed": True, "bytes_read_to_arrow": 0}
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
 
@@ -476,7 +496,11 @@ def execute_forward_node(
 
     use_cache = not no_cache
     if isinstance(node, graph.ConstNode):
-        return {"cache_used": False}
+        return {
+            "cache_used": False,
+            "already_executed": False,
+            "bytes_read_to_arrow": 0,
+        }
 
     # This is expensive!
     logging.debug(
@@ -494,7 +518,11 @@ def execute_forward_node(
             input_refs[input_name] = fg.get_result(input_node)
             if isinstance(input_refs[input_name], forward_graph.ErrorResult):
                 forward_node.set_result(input_refs[input_name])
-                return {"cache_used": False, "already_executed": False}
+                return {
+                    "cache_used": False,
+                    "already_executed": False,
+                    "bytes_read_to_arrow": 0,
+                }
 
         run_key = None
         if use_cache or op_def.is_async:
@@ -509,7 +537,11 @@ def execute_forward_node(
                 # Watch out, we handle loading async runs in different ways.
                 if op_def.is_async:
                     forward_node.set_result(TRACE_LOCAL.get_run(run_key))
-                    return {"cache_used": True, "already_executed": False}
+                    return {
+                        "cache_used": True,
+                        "already_executed": False,
+                        "bytes_read_to_arrow": 0,
+                    }
                 else:
                     if run.output is not None:
                         output_ref = run.output
@@ -534,7 +566,13 @@ def execute_forward_node(
 
                         forward_node.set_result(output_ref)
 
-                        return {"cache_used": True, "already_executed": False}
+                        return {
+                            "cache_used": True,
+                            "already_executed": False,
+                            "bytes_read_to_arrow": get_bytes_read_to_arrow(
+                                node, output
+                            ),
+                        }
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
         inputs = {
@@ -602,4 +640,8 @@ def execute_forward_node(
             ):
                 logging.debug("Saving run")
                 TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
-    return {"cache_used": False, "already_executed": False}
+    return {
+        "cache_used": False,
+        "already_executed": False,
+        "bytes_read_to_arrow": get_bytes_read_to_arrow(node, result),
+    }
