@@ -61,6 +61,7 @@ class OpExecuteStats(typing.TypedDict):
     already_executed: int
     count: int
     total_time: float
+    bytes_read_to_arrow: int
 
 
 class OpExecuteSummaryStats(OpExecuteStats):
@@ -79,6 +80,7 @@ class ExecuteStats:
         execution_time: float,
         cache_used: bool,
         already_executed: bool,
+        bytes_read_to_arrow: int,
     ):
         op_stats = self.op_stats.setdefault(
             node.from_op.name,
@@ -87,12 +89,14 @@ class ExecuteStats:
                 "total_time": 0,
                 "cache_used": 0,
                 "already_executed": 0,
+                "bytes_read_to_arrow": 0,
             },
         )
         op_stats["cache_used"] += int(cache_used)
         op_stats["already_executed"] += int(already_executed)
         op_stats["count"] += 1
         op_stats["total_time"] += execution_time
+        op_stats["bytes_read_to_arrow"] += bytes_read_to_arrow
 
     def merge(self, other: "ExecuteStats"):
         for op_name, op_stats in other.op_stats.items():
@@ -104,6 +108,9 @@ class ExecuteStats:
                 self.op_stats[op_name]["cache_used"] += op_stats["cache_used"]
                 self.op_stats[op_name]["already_executed"] += op_stats[
                     "already_executed"
+                ]
+                self.op_stats[op_name]["bytes_read_to_arrow"] += op_stats[
+                    "bytes_read_to_arrow"
                 ]
 
     def op_summary(self) -> dict[str, OpExecuteSummaryStats]:
@@ -125,12 +132,14 @@ class ExecuteStats:
             "total_time": 0,
             "cache_used": 0,
             "already_executed": 0,
+            "bytes_read_to_arrow": 0,
         }
         for op_stats in self.op_stats.values():
             summary["count"] += op_stats["count"]
             summary["total_time"] += op_stats["total_time"]
             summary["cache_used"] += op_stats["cache_used"]
             summary["already_executed"] += op_stats["already_executed"]
+            summary["bytes_read_to_arrow"] += op_stats["bytes_read_to_arrow"]
         return summary
 
 
