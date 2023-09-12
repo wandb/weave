@@ -53,6 +53,7 @@ import {consoleLog} from '../util';
 import {trackPage} from '../util/events';
 import {getCookie} from '../common/util/cookie';
 import {useHistory} from 'react-router-dom';
+import {ChildPanelExportReport} from './Panel2/ChildPanelExportReport';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -546,6 +547,7 @@ export const PageContent: FC<PageContentProps> = props => {
             updateConfig2={updateConfig2}
           />
         )}
+        {panelInteractMode === 'export-report' && <ChildPanelExportReport />}
       </PanelInteractDrawer>
       {inJupyter && (
         <JupyterPageControls
