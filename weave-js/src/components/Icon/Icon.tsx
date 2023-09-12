@@ -186,6 +186,7 @@ import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-p
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
+import {ReactComponent as ImportWeaveLogo} from '../../assets/icons/icon-weave-logo.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
 import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
@@ -763,6 +764,9 @@ export const IconWarning = (props: SVGIconProps) => (
 export const IconWarningAlt = (props: SVGIconProps) => (
   <ImportWarningAlt {...updateIconProps(props)} />
 );
+export const IconWeaveLogo = (props: SVGIconProps) => (
+  <ImportWeaveLogo {...updateIconProps(props)} />
+);
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
 );
@@ -966,6 +970,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
+  'weave-logo': IconWeaveLogo,
   webhook: IconWebhook,
   'x-axi-alt': IconXAxiAlt,
   'x-axis': IconXAxis,
