@@ -287,6 +287,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         result_report = {
                             "cache_used": False,
                             "already_executed": False,
+                            "bytes_read_to_arrow": 0,
                         }
                     return (
                         x,
@@ -357,7 +358,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         if value_or_error.DEBUG:
                             raise
                         forward_node.set_result(forward_graph.ErrorResult(e))
-                        report = {"cache_used": False, "already_executed": False}
+                        report = {
+                            "cache_used": False,
+                            "already_executed": False,
+                            "bytes_read_to_arrow": 0,
+                        }
                     finally:
                         if span is not None:
                             # Check if we have read bytes into arrow
