@@ -319,6 +319,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         duration,
                         report["cache_used"],
                         report.get("already_executed") or False,
+                        report["bytes_read_to_arrow"],
                     )
 
             else:
