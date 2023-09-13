@@ -31,7 +31,7 @@ const inputType = {
 };
 
 interface PanelStringConfigState {
-  mode: 'plaintext' | 'markdown' | 'diff';
+  mode: 'plaintext' | 'markdown' | 'diff' | 'jason';
 
   // Diff only: expression to compare against
   diffComparand?: Node;
@@ -105,6 +105,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
             {text: 'Plain Text', value: 'plaintext'},
             {text: 'Markdown', value: 'markdown'},
             {text: 'Diff', value: 'diff'},
+            {text: 'Jason', value: 'jason'},
           ]}
           value={config.mode}
           onChange={(e, {value}) => {
@@ -156,7 +157,6 @@ export const PanelString: React.FC<PanelStringProps> = props => {
   const comparandStr = String(nodeValueQuery?.result?.[1] ?? ''); // Default comparand is empty string
 
   const [contentHeight, setContentHeight] = React.useState(0);
-
   const displayElement = React.useMemo(() => {
     if (config.mode === 'markdown') {
       const contentMarkdown = (
@@ -216,9 +216,26 @@ export const PanelString: React.FC<PanelStringProps> = props => {
           </S.StringItem>
         </S.StringContainer>
       );
-    }
+    } else if (config.mode == 'jason') {
 
-    const contentPlaintext = (
+    let contentPlaintext = (
+      <S.PreformattedProportionalString>
+        {"jason" + fullStr}
+      </S.PreformattedProportionalString>
+    );
+    // plaintext
+    return (
+      <S.StringContainer data-test-weave-id="string">
+        <S.StringItem>
+          <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
+            {contentPlaintext}
+          </TooltipTrigger>
+        </S.StringItem>
+      </S.StringContainer>
+    );
+    } 
+
+    let contentPlaintext = (
       <S.PreformattedProportionalString>
         {fullStr}
       </S.PreformattedProportionalString>

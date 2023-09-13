@@ -182,7 +182,7 @@ const HomeComp: FC<HomeProps> = props => {
           // },
           {
             icon: IconLaptopLocalComputer,
-            label: `On this machine`,
+            label: `On Jason's Machine`,
             active: props.browserType === 'local',
             to: urlLocalBoards(),
             onClick: () => {

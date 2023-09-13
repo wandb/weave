@@ -3,7 +3,7 @@ import typing
 import weave
 from .. import panel
 
-ModeOption = typing.Literal["plaintext", "markdown", "diff"]
+ModeOption = typing.Literal["plaintext", "markdown", "diff", "jason"]
 
 
 @weave.type()
