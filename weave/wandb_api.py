@@ -16,6 +16,7 @@ from requests.auth import HTTPBasicAuth
 from . import engine_trace
 from . import environment as weave_env
 from . import wandb_client_api
+from . import errors
 
 # Importing at the top-level namespace so other files can import from here.
 from .context_state import WandbApiContext, _wandb_api_context
@@ -70,6 +71,10 @@ def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
 def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
     api_key = weave_env.weave_wandb_api_key()
     if api_key:
+        if weave_env.is_public():
+            raise errors.WeaveConfigurationError(
+                "local api_key should not be set in public mode."
+            )
         return set_wandb_api_context("admin", api_key, None, None)
     return None
 
