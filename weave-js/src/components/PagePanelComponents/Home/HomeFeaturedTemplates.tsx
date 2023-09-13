@@ -3,15 +3,18 @@ import * as LayoutElements from './LayoutElements';
 import {Button} from '../../Button';
 import {Type, callOpVeryUnsafe} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
+import * as Tabs from '@wandb/weave/components/Tabs';
 
 import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
 import {SetPreviewNodeType} from './common';
+import styled from 'styled-components';
 
 type TemplateType = {
   config_type: Type | null;
   description: string;
   display_name: string;
   op_name: string;
+  instructions_md: string;
 };
 
 export const HomeFeaturedTemplates: React.FC<{
@@ -63,7 +66,7 @@ const HomeFeaturedTemplateItem: React.FC<{
       title={template.display_name}
       setPreviewNode={setPreviewNode}
       actions={[]}>
-      <HomeFeaturedTemplateDrawer />
+      <HomeFeaturedTemplateDrawer template={template} />
     </HomePreviewSidebarTemplate>
   );
 
@@ -101,17 +104,38 @@ const HomeFeaturedTemplateItem: React.FC<{
   );
 };
 
-const HomeFeaturedTemplateDrawer: React.FC<{}> = props => {
+const TabContentWrapper = styled.div`
+  overflow-y: scroll;
+  padding: 16px;
+  height: 100%;
+`;
+TabContentWrapper.displayName = 'S.TabContentWrapper';
+
+const HomeFeaturedTemplateDrawer: React.FC<{
+  template: TemplateType;
+}> = ({template}) => {
+  const [tabValue, setTabValue] = React.useState('Instructions');
   return (
-    <LayoutElements.VStack>
-      <LayoutElements.Block
-        style={{
-          padding: '12px 12px',
-          fontSize: '18px',
-          fontWeight: 800,
-        }}>
-        Template instructions
-      </LayoutElements.Block>
-    </LayoutElements.VStack>
+    <Tabs.Root
+      value={tabValue}
+      onValueChange={(val: string) => setTabValue(val)}
+      className="h-full">
+      <Tabs.List className="px-16">
+        <Tabs.Trigger value="Instructions">Instructions</Tabs.Trigger>
+        <Tabs.Trigger value="Select Data">Select Data</Tabs.Trigger>
+      </Tabs.List>
+      {/* 38 px is the height of the tab header, to make sure the height of content doesnt exceed window, its explicitly set here */}
+      <Tabs.Content
+        value="Instructions"
+        style={{height: 'calc( 100% - 38px )'}}>
+        <TabContentWrapper>{template.instructions_md}</TabContentWrapper>
+      </Tabs.Content>
+      <Tabs.Content value="Select Data" style={{height: 'calc( 100% - 38px )'}}>
+        <TabContentWrapper>
+          Once you've logged your data, use the browser on your left to find
+          your table. From there, choose a template to get started!
+        </TabContentWrapper>
+      </Tabs.Content>
+    </Tabs.Root>
   );
 };

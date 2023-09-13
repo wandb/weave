@@ -260,7 +260,7 @@ const HomeComp: FC<HomeProps> = props => {
     // This should never happen
     console.warn('Unable to determine root');
   }
-  console.log({previewNode});
+
   return (
     <LayoutElements.VStack>
       <LayoutElements.Block>
