@@ -13,6 +13,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import 'github-markdown-css';
+import {TargetBlank} from '@wandb/weave/common/util/links';
+import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
+// import {dark} from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const TWDrawerHack = styled.div`
   height: 100%;
@@ -121,6 +124,11 @@ const TabContentWrapper = styled.div`
   overflow-y: scroll;
   padding: 16px;
   height: 100%;
+  .markdown-body {
+    ul {
+      list-style: unset !important;
+    }
+  }
 `;
 TabContentWrapper.displayName = 'S.TabContentWrapper';
 
@@ -146,6 +154,28 @@ const HomeFeaturedTemplateDrawer: React.FC<{
           <Tabs.Content value="Instructions" style={{height: '100%'}}>
             <TabContentWrapper>
               <ReactMarkdown
+                components={{
+                  // Ensures that links open in a new tab
+                  a: ({node, ...props}) => {
+                    return <TargetBlank {...props} />;
+                  },
+                  code({node, inline, className, children, ...props}) {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return !inline && match ? (
+                      <SyntaxHighlighter
+                        {...props}
+                        children={String(children).replace(/\n$/, '')}
+                        // style={dark}
+                        language={match[1]}
+                        PreTag="div"
+                      />
+                    ) : (
+                      <code {...props} className={className}>
+                        {children}
+                      </code>
+                    );
+                  },
+                }}
                 remarkPlugins={[[remarkGfm]]}
                 className="markdown-body">
                 {template.instructions_md}
