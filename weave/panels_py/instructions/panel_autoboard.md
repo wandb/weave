@@ -2,19 +2,8 @@
 
 
 ```python
-1+1
-```
-
-
-
-
-    2
-
-
-
-
-```python
-
+st= StreamTable("...")
+st.log({})
 ```
 
 # Markdown Sample
