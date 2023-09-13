@@ -99,6 +99,36 @@ export const opReportCreatedAt = makeOp({
   resolver: makeReportResolver(report => new Date(report.createdAt + 'Z')),
 });
 
+export const opReportUpdatedAt = makeOp({
+  hidden: true,
+  name: 'report-updatedAt',
+  argTypes: reportArgTypes,
+  description: `Returns the updated time of the ${docType('report')}`,
+  argDescriptions: {
+    report: reportArgDescription,
+  },
+  returnValueDescription: `The updated time of the ${docType('report')}`,
+  returnType: makeReportReturnType('date'),
+  resolver: makeReportResolver(report => new Date(report.createdAt + 'Z')),
+});
+
+export const opReportUpdatedBy = makeOp({
+  hidden: true,
+  name: 'report-updatedBy',
+  argTypes: reportArgTypes,
+  description: `Returns the${docType('user')} who last updated the ${docType(
+    'report'
+  )}`,
+  argDescriptions: {
+    report: reportArgDescription,
+  },
+  returnValueDescription: `The ${docType(
+    'user'
+  )} who last updated the ${docType('report')}`,
+  returnType: makeReportReturnType('user'),
+  resolver: makeReportResolver(report => report.updatedBy),
+});
+
 export const opReportProject = makeOp({
   hidden: true,
   name: 'report-project',

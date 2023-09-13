@@ -77,6 +77,12 @@ gql_prop_op(
     types.Timestamp(),
 )
 gql_prop_op(
+    "report-updatedAt",
+    wdt.ReportType,
+    "updatedAt",
+    types.Timestamp(),
+)
+gql_prop_op(
     "report-viewcount",
     wdt.ReportType,
     "viewCount",
@@ -97,6 +103,14 @@ gql_direct_edge_op(
     "user",
     wdt.UserType,
 )
+
+gql_direct_edge_op(
+    "report-updatedBy",
+    wdt.ReportType,
+    "updatedBy",
+    wdt.UserType,
+)
+
 
 # Section 5/6: Connection Ops
 #

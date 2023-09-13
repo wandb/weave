@@ -701,10 +701,14 @@ export const toGqlField = (
     return gqlBasicField('description');
   } else if (forwardOp.op.name === 'report-createdAt') {
     return gqlBasicField('createdAt');
+  } else if (forwardOp.op.name === 'report-updatedAt') {
+    return gqlBasicField('updatedAt');
   } else if (forwardOp.op.name === 'report-project') {
     return [gqlObjectField(forwardGraph, forwardOp, 'project')];
   } else if (forwardOp.op.name === 'report-creator') {
     return [gqlObjectField(forwardGraph, forwardOp, 'user')];
+  } else if (forwardOp.op.name === 'report-updatedBy') {
+    return [gqlObjectField(forwardGraph, forwardOp, 'updatedBy')];
   } else if (forwardOp.op.name === 'report-viewcount') {
     return gqlBasicField('viewCount');
   } else if (forwardOp.op.name === 'report-stargazers') {

@@ -1,9 +1,10 @@
 import * as w from '@wandb/weave/core';
-import React from 'react';
 
-import {Select} from '../../Form/Select';
 import {useNodeValue} from '../../../react';
+import {Select} from '../../Form/Select';
+import {Icon} from '../../Icon';
 import {ChildPanelFullConfig} from '../ChildPanel';
+import {customSelectComponents} from './customSelectComponents';
 import {EntityOption, ReportOption} from './utils';
 
 type ReportSelectionProps = {
@@ -43,6 +44,17 @@ export const ReportSelection = ({
       return w.opDict({
         id: w.opReportInternalId({report: row}),
         name: w.opReportName({report: row}),
+        createdAt: w.opReportCreatedAt({report: row}),
+        creatorUsername: w.opUserUsername({
+          user: w.opReportCreator({report: row}),
+        }),
+        updatedAt: w.opReportUpdatedAt({report: row}),
+        updatedByUsername: w.opUserUsername({
+          user: w.opReportUpdatedBy({report: row}),
+        }),
+        updatedByUserName: w.opUserName({
+          user: w.opReportUpdatedBy({report: row}),
+        }),
         projectName: w.opProjectName({
           project: w.opReportProject({report: row}),
         }),
@@ -50,6 +62,8 @@ export const ReportSelection = ({
     }),
   });
   const reports = useNodeValue(reportsMetaNode);
+
+  console.log(reports);
 
   return (
     <div className="mt-8 flex-1">
@@ -78,27 +92,55 @@ export const ReportSelection = ({
         className="mb-4 block font-semibold text-moon-800">
         Destination report
       </label>
-      <Select<ReportOption, false>
-        className="mb-16"
-        aria-label="report selector"
-        isLoading={reports.loading}
-        isDisabled={reports.loading || reports.result.length === 0}
-        options={reports.result ?? []}
-        placeholder={
-          !reports.loading && reports.result.length === 0
-            ? 'No reports found'
-            : 'Select a report'
-        }
-        getOptionLabel={option => option.name}
-        getOptionValue={option => option.id ?? ''}
-        value={selectedReport}
-        onChange={selected => {
-          if (selected != null) {
-            setSelectedReport(selected);
+      {selectedReport == null && (
+        <Select<ReportOption, false>
+          // menuIsOpen
+          className="mb-16"
+          aria-label="report selector"
+          isLoading={reports.loading}
+          isDisabled={reports.loading || reports.result.length === 0}
+          options={reports.result ?? []}
+          placeholder={
+            !reports.loading && reports.result.length === 0
+              ? 'No reports found'
+              : 'Select a report'
           }
-        }}
-        isSearchable
-      />
+          getOptionLabel={option => option.name}
+          getOptionValue={option => option.id ?? ''}
+          value={selectedReport}
+          onChange={selected => {
+            if (selected != null) {
+              setSelectedReport(selected);
+            }
+          }}
+          components={customSelectComponents()}
+          isSearchable
+        />
+      )}
+      {selectedReport != null && (
+        <button
+          className="flex w-full cursor-pointer bg-moon-50 p-8 text-moon-800 hover:bg-moon-100"
+          type="button"
+          onClick={() => setSelectedReport(null)}>
+          <Icon name="report" className="shrink-0 grow-0" />
+          <div className="flex items-center justify-between">
+            <p className="mx-8 flex min-w-[14rem] grow flex-col items-baseline gap-4">
+              <span className="text-left">{selectedReport?.name ?? ''}</span>
+              <span className="text-sm text-moon-500">
+                {selectedReport.updatedByUsername ??
+                  selectedReport?.updatedByUserName}{' '}
+                updated in {selectedReport?.projectName}{' '}
+              </span>
+            </p>
+            <Icon
+              name="close"
+              width={18}
+              height={18}
+              className="flex shrink-0 text-moon-500"
+            />
+          </div>
+        </button>
+      )}
     </div>
   );
 };

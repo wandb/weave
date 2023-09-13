@@ -68,7 +68,7 @@ export const ChildPanelExportReport = ({
           <Button
             icon="add-new"
             className="w-full"
-            disabled={!selectedEntityName && !selectedReport}
+            disabled={selectedReport == null}
             onClick={onAddPanel}>
             Add panel
           </Button>
