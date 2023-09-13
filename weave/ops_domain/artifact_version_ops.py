@@ -184,6 +184,14 @@ gql_prop_op(
 )
 
 
+gql_prop_op(
+    "artifactVersion-historyStep",
+    wdt.ArtifactVersionType,
+    "historyStep",
+    types.optional(types.Int()),
+)
+
+
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
