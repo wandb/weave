@@ -21,6 +21,7 @@ import {
   IconSplit,
 } from '../Panel2/Icons';
 import {PopupMenu} from './PopupMenu';
+import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
 
 const Divider = styled.div`
   margin: 0 -15px;
@@ -52,6 +53,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   isOpen,
 }) => {
   const isViewerWandbEmployee = useIsViewerWandbEmployee();
+  const setInteractingPanel = useSetInteractingPanel();
 
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
@@ -190,10 +192,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
           key: 'export-report',
           content: 'Add to report...',
           icon: <IconAddNew />,
-          onClick: () =>
-            alert(
-              'Coming soon! This feature is under development behind an internal-only feature flag.'
-            ),
+          onClick: () => setInteractingPanel('export-report', path),
         });
       }
     }
@@ -218,6 +217,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     handleDuplicate,
     isViewerWandbEmployee,
     handleSplit,
+    setInteractingPanel,
   ]);
 
   return (
