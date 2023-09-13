@@ -81,6 +81,7 @@ const HomeFeaturedTemplateItem: React.FC<{
     <HomePreviewSidebarTemplate
       title={template.display_name}
       setPreviewNode={setPreviewNode}
+      isTemplate={true}
       actions={[]}>
       <HomeFeaturedTemplateDrawer template={template} />
     </HomePreviewSidebarTemplate>
