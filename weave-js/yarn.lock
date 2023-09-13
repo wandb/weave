@@ -3257,6 +3257,13 @@
     "@types/history" "^4.7.11"
     "@types/react" "*"
 
+"@types/react-syntax-highlighter@^15.5.7":
+  version "15.5.7"
+  resolved "https://registry.yarnpkg.com/@types/react-syntax-highlighter/-/react-syntax-highlighter-15.5.7.tgz#bd29020ccb118543d88779848f99059b64b02d0f"
+  integrity sha512-bo5fEO5toQeyCp0zVHBeggclqf5SQ/Z5blfFmjwO5dkMVGPgmiwZsJh9nu/Bo5L7IHTuGWrja6LxJVE2uB5ZrQ==
+  dependencies:
+    "@types/react" "*"
+
 "@types/react-table@^6.8.5":
   version "6.8.10"
   resolved "https://registry.yarnpkg.com/@types/react-table/-/react-table-6.8.10.tgz#77548689d217c35c39d81fe36492b649d31b7174"
