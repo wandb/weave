@@ -1,4 +1,5 @@
 import * as w from '@wandb/weave/core';
+import React from 'react';
 
 import {useNodeValue} from '../../../react';
 import {Select} from '../../Form/Select';
@@ -119,10 +120,10 @@ export const ReportSelection = ({
       )}
       {selectedReport != null && (
         <button
-          className="flex w-full cursor-pointer bg-moon-50 p-8 text-moon-800 hover:bg-moon-100"
+          className="flex w-full cursor-pointer rounded bg-moon-50 p-8 text-moon-800 hover:bg-moon-100"
           type="button"
           onClick={() => setSelectedReport(null)}>
-          <Icon name="report" className="shrink-0 grow-0" />
+          <Icon name="report" className="shrink-0 grow-0 pt-4" />
           <div className="flex items-center justify-between">
             <p className="mx-8 flex min-w-[14rem] grow flex-col items-baseline gap-4">
               <span className="text-left">{selectedReport?.name ?? ''}</span>
