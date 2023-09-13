@@ -28,7 +28,7 @@ const LeftNavItemBlock = styled(LayoutElements.HBlock)`
 `;
 
 const NewBoardButtonWrapper = styled.div`
-  margin: 24px 24px 16px 24px;
+  margin: 0px 24px 16px 24px;
 `;
 NewBoardButtonWrapper.displayName = 'S.NewBoardButton';
 
@@ -78,6 +78,7 @@ export const LeftNav: React.FC<{
           New blank board
         </Button>
       </NewBoardButtonWrapper>
+
       {props.sections.map((section, i) => (
         <LeftNavSection key={i} {...section} />
       ))}

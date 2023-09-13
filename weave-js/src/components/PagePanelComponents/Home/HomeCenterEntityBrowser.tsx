@@ -69,7 +69,7 @@ type CenterEntityBrowserInnerPropsType = CenterEntityBrowserPropsType;
 export const CenterEntityBrowserInner: React.FC<
   CenterEntityBrowserInnerPropsType
 > = props => {
-  const {entityName} = props;
+  const {entityName, setPreviewNode} = props;
   const history = useHistory();
   const browserTitle = props.entityName;
   const projectsMeta = query.useProjectsForEntityWithWeaveObject(entityName);
@@ -646,6 +646,9 @@ const CenterProjectTablesBrowser: React.FC<
   );
 
   useEffect(() => {
+    if (isLoading) {
+      return;
+    }
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
       if (!row) {
@@ -683,6 +686,7 @@ const CenterProjectTablesBrowser: React.FC<
     params.preview,
     setPreviewNode,
     navigateToExpression,
+    isLoading,
   ]);
 
   return (
