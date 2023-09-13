@@ -69,7 +69,7 @@ type CenterEntityBrowserInnerPropsType = CenterEntityBrowserPropsType;
 export const CenterEntityBrowserInner: React.FC<
   CenterEntityBrowserInnerPropsType
 > = props => {
-  const {entityName, setPreviewNode} = props;
+  const {entityName} = props;
   const history = useHistory();
   const browserTitle = props.entityName;
   const projectsMeta = query.useProjectsForEntityWithWeaveObject(entityName);
