@@ -243,7 +243,10 @@ const ALLOWED_CJS_MODULES = [
   'diff',
 
   // markdown rendering
-  "react-markdown", // this is the true dep, the rest are transitive
+  // markdown: true deps
+  "react-markdown",
+  "remark-gfm",
+  // markdown: peer deps
   "escape-string-regexp",
   "lowlight",
   "lowlight/lib/core",
