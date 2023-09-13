@@ -19,10 +19,12 @@ ops = weave.ops
 BOARD_ID = "llm_completions_monitor"
 
 # BOARD_DISPLAY_NAME is the name that will be displayed in the UI
-BOARD_DISPLAY_NAME = "LLM Monitor Board"
+BOARD_DISPLAY_NAME = "Monitor OpenAI API usage"
 
 # BOARD_DESCRIPTION is the description that will be displayed in the UI
-BOARD_DESCRIPTION = "Monitor LLM Completions"
+BOARD_DESCRIPTION = (
+    "Track and visualize OpenAI completions overtime across your organization."
+)
 
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 BOARD_INPUT_WEAVE_TYPE = types.List(
@@ -428,8 +430,14 @@ def board(
     return panels.Board(vars=varbar, panels=overview_tab)
 
 
+instructions_md = """
+# Monitor OpenAI API usage
+"""
+
 template_registry.register(
     board_name,
     BOARD_DISPLAY_NAME,
     BOARD_DESCRIPTION,
+    is_featured=True,
+    instructions_md=instructions_md,
 )

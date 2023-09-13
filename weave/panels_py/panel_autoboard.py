@@ -429,9 +429,15 @@ def seed_autoboard(
     return auto_panels(input_node, config)  # type: ignore
 
 
+instructions_md = """
+This board is automatically generated based on the input data. It is intended to give you a quick overview of the data, and to help you identify interesting patterns and outliers.
+"""
+
 template_registry.register(
     "py_board-seed_autoboard",
     "Timeseries Auto-Board",
     "Column-level analysis of timeseries data",
     input_node_predicate=node_qualifies_for_autoboard,
+    is_featured=True,
+    instructions_md=instructions_md,
 )

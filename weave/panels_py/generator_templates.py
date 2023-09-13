@@ -34,6 +34,8 @@ class TemplateRegistrySpec:
         typing.Callable[[graph.Node[typing.Any]], bool]
     ] = None
     config_type: typing.Optional[weave_types.Type] = None
+    is_featured: typing.Optional[bool] = None
+    instructions_md: typing.Optional[str] = None
 
 
 @dataclasses.dataclass
@@ -47,10 +49,13 @@ class _TemplateRegistry:
         op_name: str,
         display_name: str,
         description: str,
+        *,
         input_node_predicate: typing.Optional[
             typing.Callable[[graph.Node[typing.Any]], bool]
         ] = None,
         config_type: typing.Optional[weave_types.Type] = None,
+        is_featured: typing.Optional[bool] = None,
+        instructions_md: typing.Optional[str] = None,
     ) -> None:
         return self.register_spec(
             TemplateRegistrySpec(
@@ -59,6 +64,8 @@ class _TemplateRegistry:
                 op_name=op_name,
                 input_node_predicate=input_node_predicate,
                 config_type=config_type,
+                is_featured=is_featured,
+                instructions_md=instructions_md,
             )
         )
 
@@ -79,6 +86,7 @@ class PyBoardGeneratorSpec(typing.TypedDict):
     description: str
     op_name: str
     config_type: typing.Optional[weave_types.Type]
+    instructions_md: typing.Optional[str]
 
 
 # Processes have a singleton TemplateRegistry
@@ -103,4 +111,21 @@ def get_board_templates_for_node(
                         config_type=spec.config_type,
                     )
                 )
+    return final_specs
+
+
+@decorator_op.op(name="py_board-get_featured_board_templates", hidden=True)  # type: ignore
+def get_featured_board_templates() -> list[PyBoardGeneratorSpec]:
+    final_specs = []
+    for op_name, spec in template_registry.get_specs().items():
+        if spec.is_featured and spec.instructions_md:
+            final_specs.append(
+                PyBoardGeneratorSpec(
+                    display_name=spec.display_name,
+                    description=spec.description,
+                    op_name=spec.op_name,
+                    config_type=spec.config_type,
+                    instructions_md=spec.instructions_md,
+                )
+            )
     return final_specs
