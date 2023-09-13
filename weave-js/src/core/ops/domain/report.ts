@@ -26,6 +26,19 @@ const makeReportResolver =
   (inputs: OpResolverInputTypes<typeof reportArgTypes>) =>
     mappableNullableTaggableVal(inputs.report, v => applyFn(v));
 
+export const opReportInternalId = makeOp({
+  hidden: true,
+  name: 'report-internalId',
+  argTypes: reportArgTypes,
+  description: `Returns the internalId of the ${docType('report')}`,
+  argDescriptions: {
+    entity: reportArgDescription,
+  },
+  returnValueDescription: `The internalId of the ${docType('report')}`,
+  returnType: makeReportReturnType('string'),
+  resolver: makeReportResolver(report => report.id),
+});
+
 export const opReportName = makeOp({
   hidden: true,
   name: 'report-name',

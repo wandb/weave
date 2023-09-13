@@ -59,6 +59,18 @@ def root_all_reports():
 
 # Section 3/6: Attribute Getters
 gql_prop_op(
+    "report-internalId",
+    wdt.ReportType,
+    "id",
+    types.String(),
+)
+gql_prop_op(
+    "report-name",
+    wdt.ReportType,
+    "displayName",
+    types.String(),
+)
+gql_prop_op(
     "report-createdAt",
     wdt.ReportType,
     "createdAt",
