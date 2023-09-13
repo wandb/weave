@@ -22,6 +22,7 @@
 #   just use different UI structures to render.
 
 
+import os
 import typing
 
 import weave
@@ -429,9 +430,11 @@ def seed_autoboard(
     return auto_panels(input_node, config)  # type: ignore
 
 
-instructions_md = """
-This board is automatically generated based on the input data. It is intended to give you a quick overview of the data, and to help you identify interesting patterns and outliers.
-"""
+with open(
+    os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md"), "r"
+) as f:
+    instructions_md = f.read()
+
 
 template_registry.register(
     "py_board-seed_autoboard",
