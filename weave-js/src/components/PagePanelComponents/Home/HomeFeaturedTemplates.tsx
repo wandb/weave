@@ -9,6 +9,19 @@ import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
 import {SetPreviewNodeType} from './common';
 import styled from 'styled-components';
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+import 'github-markdown-css';
+
+const TWDrawerHack = styled.div`
+  height: 100%;
+  overflow: hidden;
+  .tw-style {
+    height: 100%;
+  }
+`;
+
 type TemplateType = {
   config_type: Type | null;
   description: string;
@@ -116,26 +129,37 @@ const HomeFeaturedTemplateDrawer: React.FC<{
 }> = ({template}) => {
   const [tabValue, setTabValue] = React.useState('Instructions');
   return (
-    <Tabs.Root
-      value={tabValue}
-      onValueChange={(val: string) => setTabValue(val)}
-      className="h-full">
-      <Tabs.List className="px-16">
-        <Tabs.Trigger value="Instructions">Instructions</Tabs.Trigger>
-        <Tabs.Trigger value="Select Data">Select Data</Tabs.Trigger>
-      </Tabs.List>
-      {/* 38 px is the height of the tab header, to make sure the height of content doesnt exceed window, its explicitly set here */}
-      <Tabs.Content
-        value="Instructions"
-        style={{height: 'calc( 100% - 38px )'}}>
-        <TabContentWrapper>{template.instructions_md}</TabContentWrapper>
-      </Tabs.Content>
-      <Tabs.Content value="Select Data" style={{height: 'calc( 100% - 38px )'}}>
-        <TabContentWrapper>
-          Once you've logged your data, use the browser on your left to find
-          your table. From there, choose a template to get started!
-        </TabContentWrapper>
-      </Tabs.Content>
-    </Tabs.Root>
+    <TWDrawerHack>
+      <LayoutElements.VBlock
+        style={{
+          height: '100%',
+          overflow: 'hidden',
+        }}>
+        <Tabs.Root
+          className="h-full"
+          value={tabValue}
+          onValueChange={(val: string) => setTabValue(val)}>
+          <Tabs.List className="px-16">
+            <Tabs.Trigger value="Instructions">1. Instructions</Tabs.Trigger>
+            <Tabs.Trigger value="Select Data">2. Select Data</Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="Instructions" style={{height: '100%'}}>
+            <TabContentWrapper>
+              <ReactMarkdown
+                remarkPlugins={[[remarkGfm]]}
+                className="markdown-body">
+                {template.instructions_md}
+              </ReactMarkdown>
+            </TabContentWrapper>
+          </Tabs.Content>
+          <Tabs.Content value="Select Data">
+            <TabContentWrapper>
+              Once you've logged your data, use the browser on your left to find
+              your table. From there, choose a template to get started!
+            </TabContentWrapper>
+          </Tabs.Content>
+        </Tabs.Root>
+      </LayoutElements.VBlock>
+    </TWDrawerHack>
   );
 };
