@@ -63,7 +63,6 @@ export const ReportSelection = ({
       return w.opDict({
         id: w.opReportInternalId({report: row}),
         name: w.opReportName({report: row}),
-        updatedAt: w.opReportUpdatedAt({report: row}),
         projectName: w.opProjectName({
           project: w.opReportProject({report: row}),
         }),
