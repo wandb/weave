@@ -44,7 +44,6 @@
     "cytoscape-dagre": "^2.2.2",
     "diff": "^5.1.0",
     "downloadjs": "^1.4.7",
-    "github-markdown-css": "^5.2.0",
     "hast-util-sanitize": "^4.0.0",
     "immer": "^9.0.21",
     "isomorphic-unfetch": "^3.1.0",
