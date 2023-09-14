@@ -4,6 +4,7 @@ from . import logs as _logging
 _loading_builtins_token = _context.set_loading_built_ins()
 
 from . import weave_types as types
+from . import storage
 
 # this patches the `Type` class to enable the make method - needed due to circular references
 from . import make_type as _make_type

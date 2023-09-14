@@ -141,6 +141,10 @@ class TypeRegistry:
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
+            # TODO: this needs to happen earlier in case it's in incompatible object type
+            # with the one we already have and we need an ObjectType cache
+            if is_serialized_object_type(d):
+                return deserialize_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
@@ -962,6 +966,15 @@ class ObjectType(Type):
     def property_types(self) -> dict[str, Type]:
         return self.type_vars
 
+    def attr_types(self) -> dict[str, Type]:
+        from . import op_def_type
+
+        return {
+            k: t
+            for k, t in self.property_types().items()
+            if not isinstance(t, op_def_type.OpDefType)
+        }
+
     @classmethod
     def type_of_instance(cls, obj):
         variable_prop_types = {}
@@ -994,6 +1007,53 @@ class ObjectType(Type):
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
+
+
+def is_serialized_object_type(t: dict) -> bool:
+    if "_base_type" not in t:
+        return False
+    if t["_base_type"]["type"] == "Object":
+        return True
+    return is_serialized_object_type(t["_base_type"])
+
+
+def deserialize_object_type(t: dict) -> ObjectType:
+    object_class_name = t["type"]
+    type_class_name = object_class_name + "Type"
+
+    type_attr_types = {
+        k: TypeRegistry.type_from_dict(v)
+        for k, v in t.items()
+        if not k.startswith("_") and k != "type"
+    }
+    import textwrap
+
+    object_constructor_arg_names = [
+        k for k, t in type_attr_types.items() if t.name != "OpDef"
+    ]
+
+    object_init_code = textwrap.dedent(
+        f"""
+        def loaded_object_init(self, {', '.join(object_constructor_arg_names)}):
+            for k, v in locals().items():
+                if k != 'self':
+                    setattr(self, k, v)
+        """
+    )
+    exec(object_init_code)
+
+    new_object_class = type(
+        object_class_name, (), {"__init__": locals()["loaded_object_init"]}
+    )
+
+    all_attr_types = {**type_attr_types, "instance_classes": new_object_class}
+    new_type_class = type(type_class_name, (ObjectType,), all_attr_types)
+    setattr(new_type_class, "__annotations__", {})
+    for k, v in type_attr_types.items():
+        setattr(new_type_class, k, v)
+        new_type_class.__dict__["__annotations__"][k] = Type
+    new_type_dataclass = dataclasses.dataclass(frozen=True)(new_type_class)
+    return new_type_dataclass()
 
 
 @dataclasses.dataclass(frozen=True)

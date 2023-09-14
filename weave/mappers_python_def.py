@@ -53,6 +53,8 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
+        from .op_def_type import OpDefType
+
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
         # that we want to include in the serialized representation.
@@ -63,7 +65,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         instance_class = result_type._instance_classes()[0]
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
-            if k in constructor_sig.parameters:
+            if serializer.type != OpDefType() and k in constructor_sig.parameters:
                 # None haxxx
                 # TODO: remove
                 obj_val = obj.get(k)
@@ -75,10 +77,26 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
+        # deserialize op methods separately
+        op_methods = {}
+        for k, serializer in self._property_serializers.items():
+
+            if isinstance(serializer, DefaultFromPy) and serializer.type == OpDefType():
+                op_methods[k] = serializer.apply(obj.get(k))
+
         if "artifact" in constructor_sig.parameters and "artifact" not in result:
             result["artifact"] = self._artifact
         try:
-            return instance_class(**result)
+            # Construct a new class, inheriting from the original instance_class
+            # with overridden op methods. The op_methods are unbound on the class,
+            # and will bind self upon construction as usual.
+            new_class = type(
+                instance_class.__name__ + "WithLoadedMethods",
+                (instance_class,),
+                op_methods,
+            )
+
+            return new_class(**result)
         except:
             raise errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)

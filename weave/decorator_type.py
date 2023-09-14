@@ -76,6 +76,16 @@ def type(
                 else:
                     static_property_types[field.name] = weave_type
 
+        # Iterate through methods, finding ops that have versions (not builtins)
+        # and sticking them on the type. This way we'll serialize
+        # and deserialize them along with the data attached to the object
+        for name, member in inspect.getmembers(target):
+            from . import op_def
+            from . import op_def_type
+
+            if isinstance(member, op_def.BoundOpDef):
+                static_property_types[name] = op_def_type.OpDefType()
+
         if type_vars:
             setattr(TargetType, "__annotations__", {})
         for name, default_type in type_vars.items():
