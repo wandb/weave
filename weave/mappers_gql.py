@@ -30,13 +30,10 @@ class GQLTypedDictToTypedDict(TypedDictToPyDict):
 
 
 class GQLUnionToUnion(UnionMapper):
-    def is_nullable(self) -> bool:
-        return types.non_none(self.type) != self.type
-
     def apply(self, obj):
-        if self.is_nullable() and obj is None:
-            return None
-        elif self.is_single_object_nullable and obj is not None:
+        if self.is_single_object_nullable:
+            if obj is None:
+                return None
             non_null_mapper = next(
                 filter(
                     lambda m: not types.NoneType().assign_type(m.type),
@@ -55,7 +52,7 @@ class GQLUnionToUnion(UnionMapper):
                         if mapper_typename == typename:
                             return mapper.apply(obj)
         raise errors.WeaveValueError(
-            f"Cant find a member of union {self.type} for object {obj}"
+            f"Cant find a member of union {self.type} with typename {typename}"
         )
 
 
