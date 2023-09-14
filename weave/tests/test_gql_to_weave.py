@@ -14,11 +14,13 @@ def test_simple_query():
     return_type = gql_to_weave.get_query_weave_type(query)
     assert return_type == types.TypedDict(
         {
-            "project": types.TypedDict(
-                {
-                    "id": types.String(),
-                    "name": types.String(),
-                }
+            "project": types.optional(
+                types.TypedDict(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                    }
+                )
             )
         }
     )
@@ -60,47 +62,55 @@ def test_artifact_query():
         }
         """
     return_type = gql_to_weave.get_query_weave_type(query)
-    assert return_type == types.TypedDict(
+    expected = types.TypedDict(
         {
-            "project_8d1592567720841659de23c02c97d594": types.TypedDict(
-                {
-                    "id": types.String(),
-                    "name": types.String(),
-                    "runs_261949318143369aa6c158af92afee03": types.TypedDict(
-                        {
-                            "edges": types.List(
-                                types.TypedDict(
-                                    {
-                                        "node": types.TypedDict(
+            "project_8d1592567720841659de23c02c97d594": types.optional(
+                types.TypedDict(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                        "runs_261949318143369aa6c158af92afee03": types.optional(
+                            types.TypedDict(
+                                {
+                                    "edges": types.List(
+                                        types.TypedDict(
                                             {
-                                                "id": types.String(),
-                                                "name": types.String(),
-                                                "summaryMetricsSubset": types.optional(
-                                                    types.String()
-                                                ),
-                                                "project": types.TypedDict(
+                                                "node": types.TypedDict(
                                                     {
                                                         "id": types.String(),
                                                         "name": types.String(),
-                                                        "entity": types.TypedDict(
-                                                            {
-                                                                "id": types.String(),
-                                                                "name": types.String(),
-                                                            }
+                                                        "summaryMetricsSubset": types.optional(
+                                                            types.String()
+                                                        ),
+                                                        "project": types.optional(
+                                                            types.TypedDict(
+                                                                {
+                                                                    "id": types.String(),
+                                                                    "name": types.String(),
+                                                                    "entity": types.TypedDict(
+                                                                        {
+                                                                            "id": types.String(),
+                                                                            "name": types.String(),
+                                                                        }
+                                                                    ),
+                                                                }
+                                                            )
                                                         ),
                                                     }
-                                                ),
+                                                )
                                             }
                                         )
-                                    }
-                                )
+                                    )
+                                }
                             )
-                        }
-                    ),
-                }
+                        ),
+                    }
+                )
             )
         }
     )
+
+    assert return_type == expected
 
 
 def test_multi_root_query():
@@ -137,61 +147,75 @@ def test_multi_root_query():
         }
         """
 
-    return_type = gql_to_weave.get_query_weave_type(query)
-    assert return_type == types.TypedDict(
+    actual = gql_to_weave.get_query_weave_type(query)
+    expected = types.TypedDict(
         {
-            "project_8d1592567720841659de23c02c97d594": types.TypedDict(
-                {
-                    "id": types.String(),
-                    "name": types.String(),
-                    "createdAt": types.Timestamp(),
-                }
+            "project_8d1592567720841659de23c02c97d594": types.optional(
+                types.TypedDict(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                        "createdAt": types.Timestamp(),
+                    }
+                )
             ),
-            "project_3c237e5b25fed9a705b21513dd7921c6": types.TypedDict(
-                {
-                    "id": types.String(),
-                    "name": types.String(),
-                    "runs_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
-                        {
-                            "edges": types.List(
-                                types.TypedDict(
-                                    {
-                                        "node": types.TypedDict(
+            "project_3c237e5b25fed9a705b21513dd7921c6": types.optional(
+                types.TypedDict(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                        "runs_c1233b7003317090ab5e2a75db4ad965": types.optional(
+                            types.TypedDict(
+                                {
+                                    "edges": types.List(
+                                        types.TypedDict(
                                             {
-                                                "id": types.String(),
-                                                "name": types.String(),
+                                                "node": types.TypedDict(
+                                                    {
+                                                        "id": types.String(),
+                                                        "name": types.String(),
+                                                    }
+                                                )
                                             }
                                         )
-                                    }
-                                )
+                                    )
+                                }
                             )
-                        }
-                    ),
-                }
+                        ),
+                    }
+                )
             ),
-            "instance": types.TypedDict(
-                {
-                    "projects_500": types.TypedDict(
-                        {
-                            "edges": types.List(
-                                types.TypedDict(
-                                    {
-                                        "node": types.TypedDict(
+            "instance": types.optional(
+                types.TypedDict(
+                    {
+                        "projects_500": types.optional(
+                            types.TypedDict(
+                                {
+                                    "edges": types.List(
+                                        types.TypedDict(
                                             {
-                                                "id": types.String(),
-                                                "name": types.String(),
-                                                "createdAt": types.Timestamp(),
+                                                "node": types.optional(
+                                                    types.TypedDict(
+                                                        {
+                                                            "id": types.String(),
+                                                            "name": types.String(),
+                                                            "createdAt": types.Timestamp(),
+                                                        }
+                                                    )
+                                                )
                                             }
                                         )
-                                    }
-                                )
+                                    )
+                                }
                             )
-                        }
-                    )
-                }
+                        )
+                    }
+                )
             ),
         }
     )
+
+    assert actual == expected
 
 
 def test_inline_fragments():
