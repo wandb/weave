@@ -307,6 +307,21 @@ export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
     && > .text {
       cursor: pointer;
     }
+    && > .menu {
+      width: 100%;
+    }
+    && > .menu .item {
+      font-size: 15px;
+      line-height: 36px;
+      font-weight: 400;
+    }
+    && > .menu .item:hover,
+    && > .menu .item.selected:hover {
+      background: ${globals.MOON_100};
+    }
+    && > .menu .item.selected {
+      background: transparent;
+    }
 
     &.active svg {
       transform: rotate(180deg);
