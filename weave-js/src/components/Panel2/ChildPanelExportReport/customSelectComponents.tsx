@@ -6,7 +6,7 @@ import {
 } from 'react-select';
 import {Icon} from '../../Icon';
 import React from 'react';
-import {EntityOption, ReportOption, formatUpdatedBy} from './utils';
+import {EntityOption, ReportOption, formatUpdatedAt} from './utils';
 import TimeAgo from 'react-timeago';
 
 export const customEntitySelectComps = {
@@ -68,7 +68,7 @@ export const customReportSelectComps = {
               date={optionData.updatedAt}
               live={false}
               formatter={(value, unit, suffix) =>
-                formatUpdatedBy({
+                formatUpdatedAt({
                   date: optionData.updatedAt ?? 0,
                   value,
                   unit,

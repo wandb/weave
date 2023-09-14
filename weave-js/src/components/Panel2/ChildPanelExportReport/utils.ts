@@ -37,19 +37,19 @@ export function useEntityAndProject(root_config: ChildPanelFullConfig) {
  *
  * This is a custom formatter for TimeAgo.
  */
-type formatUpdatedByArgs = {
+type formatUpdatedAtArgs = {
   date: number;
   value: number;
   unit: string;
   suffix: string;
 };
 
-export function formatUpdatedBy({
+export function formatUpdatedAt({
   date,
   value,
   unit,
   suffix,
-}: formatUpdatedByArgs) {
+}: formatUpdatedAtArgs) {
   if (unit === 'second') {
     return `${value} sec ${suffix}`;
   }
