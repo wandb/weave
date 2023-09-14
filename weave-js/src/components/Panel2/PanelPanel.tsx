@@ -409,13 +409,15 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             </SidebarConfig.HeaderTopRight>
           </SidebarConfig.HeaderTop>
         </SidebarConfig.Header>
-        <Outline
-          config={panelConfig}
-          updateConfig={panelUpdateConfig}
-          updateConfig2={panelUpdateConfig2}
-          setSelected={path => setInteractingPanel('config', path)}
-          selected={selectedPanel}
-        />
+        <SidebarConfig.Body>
+          <Outline
+            config={panelConfig}
+            updateConfig={panelUpdateConfig}
+            updateConfig2={panelUpdateConfig2}
+            setSelected={path => setInteractingPanel('config', path)}
+            selected={selectedPanel}
+          />
+        </SidebarConfig.Body>
       </SidebarConfig.Container>
     );
   }
