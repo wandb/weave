@@ -21,8 +21,8 @@ export type ReportOption = {
   updatedAt?: number;
 };
 
-export function useEntityAndProject(config: ChildPanelFullConfig) {
-  const inputNode = config.input_node;
+export function useEntityAndProject(root_config: ChildPanelFullConfig) {
+  const inputNode = root_config.input_node;
   const maybeURI = uriFromNode(inputNode);
   const branchPoint = useBranchPointFromURIString(maybeURI);
   const entityProjectName = determineURISource(maybeURI, branchPoint);

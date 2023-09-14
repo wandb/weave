@@ -10,11 +10,11 @@ import {ChildPanelFullConfig} from '../ChildPanel';
 import {EntityOption, ReportOption} from './utils';
 
 type ChildPanelExportReportProps = {
-  config: ChildPanelFullConfig;
+  rootConfig: ChildPanelFullConfig;
 };
 
 export const ChildPanelExportReport = ({
-  config,
+  rootConfig,
 }: ChildPanelExportReportProps) => {
   const selectedPath = useSelectedPath();
   const closeDrawer = useCloseDrawer();
@@ -50,7 +50,7 @@ export const ChildPanelExportReport = ({
             </p>
           </Alert>
           <ReportSelection
-            config={config}
+            rootConfig={rootConfig}
             selectedEntity={selectedEntity}
             selectedReport={selectedReport}
             setSelectedEntity={setSelectedEntity}

@@ -555,7 +555,7 @@ export const PageContent: FC<PageContentProps> = props => {
           />
         )}
         {panelInteractMode === 'export-report' && (
-          <ChildPanelExportReport config={config} />
+          <ChildPanelExportReport rootConfig={config} />
         )}
       </PanelInteractDrawer>
       {inJupyter && (

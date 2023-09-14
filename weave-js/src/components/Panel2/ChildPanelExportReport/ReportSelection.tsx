@@ -1,5 +1,5 @@
 import * as w from '@wandb/weave/core';
-import React from 'react';
+import React, {useEffect} from 'react';
 
 import {useNodeValue} from '../../../react';
 import {Select} from '../../Form/Select';
@@ -13,7 +13,7 @@ import {EntityOption, ReportOption, useEntityAndProject} from './utils';
 import {Button} from '../../Button';
 
 type ReportSelectionProps = {
-  config: ChildPanelFullConfig;
+  rootConfig: ChildPanelFullConfig;
   selectedEntity: EntityOption | null;
   selectedReport: ReportOption | null;
   setSelectedEntity: (entity: EntityOption) => void;
@@ -21,13 +21,13 @@ type ReportSelectionProps = {
 };
 
 export const ReportSelection = ({
-  config,
+  rootConfig,
   selectedEntity,
   selectedReport,
   setSelectedEntity,
   setSelectedReport,
 }: ReportSelectionProps) => {
-  const {entityName} = useEntityAndProject(config);
+  const {entityName} = useEntityAndProject(rootConfig);
 
   // Get all of user's entities
   const entitiesMetaNode = w.opMap({
@@ -41,9 +41,19 @@ export const ReportSelection = ({
   });
   const entities = useNodeValue(entitiesMetaNode);
 
+  useEffect(() => {
+    // Default initial entity value based on url
+    if (!entities.loading && entities.result.length > 0) {
+      const foundEntity = entities.result.find(
+        (item: EntityOption) => item.name === entityName
+      );
+      setSelectedEntity(foundEntity);
+    }
+  }, [entityName, entities, setSelectedEntity]);
+
   // Get list of reports across all entities and projects
   const reportsNode = w.opEntityReports({
-    enity: w.opRootEntity({
+    entity: w.opRootEntity({
       entityName: w.constString(selectedEntity?.name ?? entityName),
     }),
   });
@@ -71,7 +81,7 @@ export const ReportSelection = ({
       </label>
       <Select<EntityOption, false>
         className="mb-16"
-        aria-label="entity selector"
+        id="entity selector"
         isLoading={entities.loading}
         options={entities.result ?? []}
         placeholder={
@@ -81,14 +91,12 @@ export const ReportSelection = ({
         }
         getOptionLabel={option => option.name}
         getOptionValue={option => option.name}
+        value={selectedEntity}
         onChange={selected => {
           if (selected) {
             setSelectedEntity(selected);
             setSelectedReport(null);
           }
-        }}
-        menuListStyle={{
-          maxHeight: 'calc(100vh - 34rem)',
         }}
         components={customEntitySelectComps}
         isSearchable
@@ -101,7 +109,7 @@ export const ReportSelection = ({
       {selectedReport == null && (
         <Select<ReportOption, false>
           className="mb-16"
-          aria-label="report selector"
+          id="report selector"
           isLoading={reports.loading}
           isDisabled={
             entities.loading || reports.loading || reports.result.length === 0
@@ -121,9 +129,6 @@ export const ReportSelection = ({
             }
           }}
           components={customReportSelectComps}
-          menuListStyle={{
-            maxHeight: 'calc(100vh - 34rem)',
-          }}
           isSearchable
         />
       )}

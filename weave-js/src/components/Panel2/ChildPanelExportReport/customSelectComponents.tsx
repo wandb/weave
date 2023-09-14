@@ -2,6 +2,7 @@ import {
   components as selectComponents,
   OptionProps,
   SingleValueProps,
+  MenuListProps,
 } from 'react-select';
 import {Icon} from '../../Icon';
 import React from 'react';
@@ -23,6 +24,12 @@ export const customEntitySelectComps = {
       <p className="overflow-hidden text-ellipsis">{children}</p>
     </selectComponents.SingleValue>
   ),
+  MenuList: (props: MenuListProps<EntityOption, false>) => (
+    <selectComponents.MenuList
+      {...props}
+      className="max-h-[calc(100vh-34rem)]"
+    />
+  ),
   Option: ({children, ...props}: OptionProps<EntityOption, false>) => {
     return (
       <selectComponents.Option {...props} className="flex items-center  gap-8">
@@ -36,6 +43,12 @@ export const customEntitySelectComps = {
 };
 
 export const customReportSelectComps = {
+  MenuList: (props: MenuListProps<ReportOption, false>) => (
+    <selectComponents.MenuList
+      {...props}
+      className="max-h-[calc(100vh-34rem)]"
+    />
+  ),
   Option: ({children, ...props}: OptionProps<ReportOption, false>) => {
     const optionData: ReportOption = props.data;
     return (
@@ -52,7 +65,6 @@ export const customReportSelectComps = {
         {optionData?.updatedAt != null && (
           <p className="shrink-0 text-sm text-moon-500">
             <TimeAgo
-              aria-label="datetime of last report edit"
               date={optionData.updatedAt}
               live={false}
               formatter={(value, unit, suffix) =>
