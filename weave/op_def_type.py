@@ -145,7 +145,6 @@ class OpDefType(types.Type):
                 "Unexpected Weave module saved in: %s" % module_path
             )
         _, od = op_defs[0]
-        breakpoint()
         return od
 
 
