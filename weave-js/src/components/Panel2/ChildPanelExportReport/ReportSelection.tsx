@@ -1,5 +1,5 @@
 import * as w from '@wandb/weave/core';
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 
 import {useNodeValue} from '../../../react';
 import {Select} from '../../Form/Select';
@@ -9,23 +9,34 @@ import {
   customEntitySelectComps,
   customReportSelectComps,
 } from './customSelectComponents';
-import {EntityOption, ReportOption, useEntityAndProject} from './utils';
-import {Button} from '../../Button';
+import {
+  NEW_REPORT_OPTION,
+  DEFAULT_REPORT_OPTION,
+  EntityOption,
+  ReportOption,
+  useEntityAndProject,
+  GroupedReportOption,
+} from './utils';
+import {SelectedExistingReport} from './SelectedExistingReport';
 
 type ReportSelectionProps = {
   rootConfig: ChildPanelFullConfig;
   selectedEntity: EntityOption | null;
   selectedReport: ReportOption | null;
+  selectedProjectName: string;
   setSelectedEntity: (entity: EntityOption) => void;
   setSelectedReport: (report: ReportOption | null) => void;
+  setSelectedProjectName: (projectName: string) => void;
 };
 
 export const ReportSelection = ({
   rootConfig,
   selectedEntity,
   selectedReport,
+  selectedProjectName,
   setSelectedEntity,
   setSelectedReport,
+  setSelectedProjectName,
 }: ReportSelectionProps) => {
   const {entityName} = useEntityAndProject(rootConfig);
 
@@ -40,6 +51,9 @@ export const ReportSelection = ({
     }),
   });
   const entities = useNodeValue(entitiesMetaNode);
+  const selectedEntityNode = w.opRootEntity({
+    entityName: w.constString(selectedEntity?.name ?? entityName),
+  });
 
   useEffect(() => {
     // Default initial entity value based on url
@@ -52,13 +66,10 @@ export const ReportSelection = ({
   }, [entityName, entities, setSelectedEntity]);
 
   // Get list of reports across all entities and projects
-  const reportsNode = w.opEntityReports({
-    entity: w.opRootEntity({
-      entityName: w.constString(selectedEntity?.name ?? entityName),
-    }),
-  });
   const reportsMetaNode = w.opMap({
-    arr: reportsNode,
+    arr: w.opEntityReports({
+      entity: selectedEntityNode,
+    }),
     mapFn: w.constFunction({row: 'report'}, ({row}) => {
       return w.opDict({
         id: w.opReportInternalId({report: row}),
@@ -71,6 +82,34 @@ export const ReportSelection = ({
     }),
   });
   const reports = useNodeValue(reportsMetaNode);
+  const groupedReportOptions = useMemo(() => {
+    return [
+      {
+        label: 'new report',
+        options: [DEFAULT_REPORT_OPTION],
+      },
+      {
+        label: 'existing reports',
+        options: reports.result ?? [],
+      },
+    ];
+  }, [reports.result]);
+
+  // Get list of project names for the selected entity
+  const projectMetaNode = w.opMap({
+    arr: w.opEntityProjects({
+      entity: selectedEntityNode,
+    }),
+    mapFn: w.constFunction({row: 'project'}, ({row}) => {
+      return w.opDict({
+        name: w.opProjectName({project: row}),
+      } as any);
+    }),
+  });
+  const projectNames = useNodeValue(projectMetaNode, {
+    skip: selectedEntity == null || selectedReport == null,
+  });
+  console.log(projectNames);
 
   return (
     <div className="mt-8 flex-1">
@@ -106,50 +145,81 @@ export const ReportSelection = ({
         className="mb-4 block font-semibold text-moon-800">
         Destination report
       </label>
-      {selectedReport == null && (
-        <Select<ReportOption, false>
-          className="mb-16"
-          id="report selector"
-          isLoading={reports.loading}
-          isDisabled={
-            entities.loading || reports.loading || reports.result.length === 0
-          }
-          options={reports.result ?? []}
-          placeholder={
-            !reports.loading && reports.result.length === 0
-              ? 'No reports found.'
-              : 'Select a report...'
-          }
-          getOptionLabel={option => option.name}
-          getOptionValue={option => option.id ?? ''}
-          value={selectedReport}
-          onChange={selected => {
-            if (selected != null) {
-              setSelectedReport(selected);
-            }
-          }}
-          components={customReportSelectComps}
-          isSearchable
+      {selectedReport != null && selectedReport.name !== NEW_REPORT_OPTION && (
+        <SelectedExistingReport
+          selectedReport={selectedReport}
+          setSelectedReport={setSelectedReport}
         />
       )}
-      {selectedReport != null && (
-        <div className="flex rounded bg-moon-50 p-8 text-moon-800 ">
-          <Icon name="report" className="shrink-0 grow-0 pt-4" />
-          <div className="flex grow items-center justify-between">
-            <p className="mx-8 flex  grow flex-col items-baseline gap-4">
-              <span className="text-left">{selectedReport.name}</span>
-              <span className="text-sm text-moon-500">
-                {selectedReport.projectName}
-              </span>
-            </p>
-            <Button
-              icon="close"
-              variant="ghost"
-              className="flex shrink-0 text-moon-500"
-              onClick={() => setSelectedReport(null)}
-            />
-          </div>
-        </div>
+      {(selectedReport == null ||
+        selectedReport.name === NEW_REPORT_OPTION) && (
+        <>
+          <Select<ReportOption, false, GroupedReportOption>
+            className="mb-16"
+            aria-label="report selector"
+            isLoading={reports.loading}
+            isDisabled={
+              entities.loading || reports.loading || reports.result.length === 0
+            }
+            options={groupedReportOptions}
+            placeholder={
+              !reports.loading && reports.result.length === 0
+                ? 'No reports found.'
+                : 'Select a report...'
+            }
+            getOptionLabel={option => option.name}
+            getOptionValue={option => option.id ?? ''}
+            value={selectedReport}
+            onChange={selected => {
+              if (selected != null) {
+                setSelectedReport(selected);
+              }
+            }}
+            components={customReportSelectComps}
+            menuListStyle={{
+              maxHeight: 'calc(100vh - 34rem)',
+            }}
+            groupStyle={{
+              padding: '0',
+            }}
+            groupDivider
+            isSearchable
+          />
+        </>
+      )}
+      {selectedReport != null && selectedReport.name === NEW_REPORT_OPTION && (
+        <>
+          <label
+            htmlFor="entity"
+            className="mb-4 block font-semibold text-moon-800">
+            Project
+          </label>
+          <Select<string, false>
+            className="mb-16"
+            aria-label="project selector"
+            isLoading={projectNames.loading}
+            isDisabled={
+              projectNames.loading || projectNames.result.length === 0
+            }
+            options={projectNames.result}
+            placeholder={
+              !projectNames.loading && projectNames.result.length === 0
+                ? 'No projects found.'
+                : 'Select a project...'
+            }
+            getOptionLabel={option => option.name}
+            value={selectedProjectName ?? null}
+            onChange={selected => {
+              if (selected != null) {
+                setSelectedProjectName(selected);
+              }
+            }}
+            menuListStyle={{
+              maxHeight: 'calc(100vh - 34rem)',
+            }}
+            isSearchable
+          />
+        </>
       )}
     </div>
   );

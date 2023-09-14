@@ -25,6 +25,7 @@ export const ChildPanelExportReport = ({
   const [selectedReport, setSelectedReport] = useState<ReportOption | null>(
     null
   );
+  const [selectedProjectName, setSelectedProjectName] = useState<string>('');
 
   const onAddPanel = () => {
     // TODO - this will be replaced with correct add panel implementation later on
@@ -53,8 +54,10 @@ export const ChildPanelExportReport = ({
             rootConfig={rootConfig}
             selectedEntity={selectedEntity}
             selectedReport={selectedReport}
+            selectedProjectName={selectedProjectName}
             setSelectedEntity={setSelectedEntity}
             setSelectedReport={setSelectedReport}
+            setSelectedProjectName={setSelectedProjectName}
           />
           <p className="mt-16 text-moon-500">
             Future changes to the board will not affect exported panels inside

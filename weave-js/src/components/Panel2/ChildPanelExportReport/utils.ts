@@ -4,11 +4,10 @@ import {uriFromNode, determineURISource} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {format, getYear} from 'date-fns';
 
-export const CREATE_NEW_REPORT_OPTION = 'Create new report';
+export const NEW_REPORT_OPTION = 'New report';
 export const DEFAULT_REPORT_OPTION = {
-  id: null,
-  name: CREATE_NEW_REPORT_OPTION,
-  projectName: null,
+  id: 'new-report', // TODO
+  name: NEW_REPORT_OPTION,
 };
 
 export type EntityOption = {
@@ -20,6 +19,10 @@ export type ReportOption = {
   name: string;
   projectName?: string;
   updatedAt?: number;
+};
+export type GroupedReportOption = {
+  label: string;
+  options: ReportOption[];
 };
 
 export function useEntityAndProject(rootConfig: ChildPanelFullConfig) {
