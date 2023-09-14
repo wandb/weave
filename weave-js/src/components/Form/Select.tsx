@@ -40,7 +40,7 @@ export type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 const HEIGHTS: Record<SelectSize, number> = {
   small: 24,
   medium: 32,
-  large: 40, // fixed in here???
+  large: 40,
 } as const;
 
 const LINE_HEIGHTS: Record<SelectSize, string> = {

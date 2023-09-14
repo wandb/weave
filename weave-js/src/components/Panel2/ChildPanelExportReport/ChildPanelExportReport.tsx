@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import _ from 'lodash';
 
 import {Alert} from '../../Alert.styles';
@@ -7,7 +7,7 @@ import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {EntityOption, ReportOption, useEntityAndProject} from './utils';
+import {EntityOption, ReportOption} from './utils';
 
 type ChildPanelExportReportProps = {
   config: ChildPanelFullConfig;
