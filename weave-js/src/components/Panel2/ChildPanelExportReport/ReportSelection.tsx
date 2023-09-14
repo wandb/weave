@@ -5,38 +5,46 @@ import {useNodeValue} from '../../../react';
 import {Select} from '../../Form/Select';
 import {Icon} from '../../Icon';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {customSelectComponents} from './customSelectComponents';
-import {EntityOption, ReportOption} from './utils';
+import {
+  customEntitySelectComps,
+  customReportSelectComps,
+} from './customSelectComponents';
+import {EntityOption, ReportOption, useEntityAndProject} from './utils';
+import {Button} from '../../Button';
 
 type ReportSelectionProps = {
   config: ChildPanelFullConfig;
-  selectedEntityName: string;
+  selectedEntity: EntityOption | null;
   selectedReport: ReportOption | null;
-  setSelectedEntityName: (name: string) => void;
+  setSelectedEntity: (entity: EntityOption) => void;
   setSelectedReport: (report: ReportOption | null) => void;
 };
 
 export const ReportSelection = ({
-  selectedEntityName,
+  config,
+  selectedEntity,
   selectedReport,
-  setSelectedEntityName,
+  setSelectedEntity,
   setSelectedReport,
 }: ReportSelectionProps) => {
+  const {entityName} = useEntityAndProject(config);
+
   // Get all of user's entities
   const entitiesMetaNode = w.opMap({
     arr: w.opUserEntities({user: w.opRootViewer({})}),
     mapFn: w.constFunction({row: 'entity'}, ({row}) => {
       return w.opDict({
-        value: w.opEntityName({entity: row}),
+        name: w.opEntityName({entity: row}),
+        isTeam: w.opEntityIsTeam({entity: row}),
       } as any);
     }),
   });
-  const entityNames = useNodeValue(entitiesMetaNode);
+  const entities = useNodeValue(entitiesMetaNode);
 
   // Get list of reports across all entities and projects
   const reportsNode = w.opEntityReports({
     enity: w.opRootEntity({
-      entityName: w.constString(selectedEntityName),
+      entityName: w.constString(selectedEntity?.name ?? entityName),
     }),
   });
   const reportsMetaNode = w.opMap({
@@ -45,17 +53,7 @@ export const ReportSelection = ({
       return w.opDict({
         id: w.opReportInternalId({report: row}),
         name: w.opReportName({report: row}),
-        createdAt: w.opReportCreatedAt({report: row}),
-        creatorUsername: w.opUserUsername({
-          user: w.opReportCreator({report: row}),
-        }),
         updatedAt: w.opReportUpdatedAt({report: row}),
-        updatedByUsername: w.opUserUsername({
-          user: w.opReportUpdatedBy({report: row}),
-        }),
-        updatedByUserName: w.opUserName({
-          user: w.opReportUpdatedBy({report: row}),
-        }),
         projectName: w.opProjectName({
           project: w.opReportProject({report: row}),
         }),
@@ -63,8 +61,6 @@ export const ReportSelection = ({
     }),
   });
   const reports = useNodeValue(reportsMetaNode);
-
-  console.log(reports);
 
   return (
     <div className="mt-8 flex-1">
@@ -76,16 +72,25 @@ export const ReportSelection = ({
       <Select<EntityOption, false>
         className="mb-16"
         aria-label="entity selector"
-        isLoading={entityNames.loading}
-        options={entityNames.result ?? []}
-        formatOptionLabel={option => option.value}
-        value={{value: selectedEntityName}}
+        isLoading={entities.loading}
+        options={entities.result ?? []}
+        placeholder={
+          !entities.loading && entities.result.length === 0
+            ? 'No entities found.'
+            : 'Select an entity...'
+        }
+        getOptionLabel={option => option.name}
+        getOptionValue={option => option.name}
         onChange={selected => {
-          if (selected?.value) {
-            setSelectedEntityName(selected.value);
+          if (selected) {
+            setSelectedEntity(selected);
             setSelectedReport(null);
           }
         }}
+        menuListStyle={{
+          maxHeight: 'calc(100vh - 34rem)',
+        }}
+        components={customEntitySelectComps}
         isSearchable
       />
       <label
@@ -95,16 +100,17 @@ export const ReportSelection = ({
       </label>
       {selectedReport == null && (
         <Select<ReportOption, false>
-          // menuIsOpen
           className="mb-16"
           aria-label="report selector"
           isLoading={reports.loading}
-          isDisabled={reports.loading || reports.result.length === 0}
+          isDisabled={
+            entities.loading || reports.loading || reports.result.length === 0
+          }
           options={reports.result ?? []}
           placeholder={
             !reports.loading && reports.result.length === 0
-              ? 'No reports found'
-              : 'Select a report'
+              ? 'No reports found.'
+              : 'Select a report...'
           }
           getOptionLabel={option => option.name}
           getOptionValue={option => option.id ?? ''}
@@ -114,33 +120,32 @@ export const ReportSelection = ({
               setSelectedReport(selected);
             }
           }}
-          components={customSelectComponents()}
+          components={customReportSelectComps}
+          menuListStyle={{
+            maxHeight: 'calc(100vh - 34rem)',
+          }}
           isSearchable
         />
       )}
       {selectedReport != null && (
-        <button
-          className="flex w-full cursor-pointer rounded bg-moon-50 p-8 text-moon-800 hover:bg-moon-100"
-          type="button"
+        <div
+          className="flex w-full cursor-pointer rounded bg-moon-50 p-8 text-moon-800 "
           onClick={() => setSelectedReport(null)}>
           <Icon name="report" className="shrink-0 grow-0 pt-4" />
           <div className="flex items-center justify-between">
-            <p className="mx-8 flex min-w-[14rem] grow flex-col items-baseline gap-4">
+            <p className="mx-8 flex min-w-[12rem] grow flex-col items-baseline gap-4">
               <span className="text-left">{selectedReport?.name ?? ''}</span>
               <span className="text-sm text-moon-500">
-                {selectedReport.updatedByUsername ??
-                  selectedReport?.updatedByUserName}{' '}
-                updated in {selectedReport?.projectName}{' '}
+                {selectedReport?.projectName}
               </span>
             </p>
-            <Icon
-              name="close"
-              width={18}
-              height={18}
-              className="flex shrink-0 text-moon-500"
+            <Button
+              icon="close"
+              variant="ghost"
+              className="flex text-moon-500"
             />
           </div>
-        </button>
+        </div>
       )}
     </div>
   );

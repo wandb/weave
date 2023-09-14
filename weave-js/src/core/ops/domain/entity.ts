@@ -49,6 +49,7 @@ export const opEntityIsTeam = makeEntityOp({
     return entity.isTeam;
   },
 });
+
 export const opEntityLink = makeEntityOp({
   name: 'entity-link',
   argTypes: entityArgTypes,

@@ -40,7 +40,7 @@ export type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 const HEIGHTS: Record<SelectSize, number> = {
   small: 24,
   medium: 32,
-  large: 40,
+  large: 40, // fixed in here???
 } as const;
 
 const LINE_HEIGHTS: Record<SelectSize, string> = {
@@ -71,6 +71,7 @@ interface AdditionalProps {
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;
+  menuListStyle?: Record<string, string>;
 }
 
 // See: https://react-select.com/typescript
@@ -177,6 +178,7 @@ export const Select = <
       return {
         ...baseStyles,
         padding: '6px 0',
+        ...props.menuListStyle,
       };
     },
     groupHeading: (baseStyles, state) => {

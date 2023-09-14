@@ -7,7 +7,7 @@ import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {ReportOption, useEntityAndProject} from './utils';
+import {EntityOption, ReportOption, useEntityAndProject} from './utils';
 
 type ChildPanelExportReportProps = {
   config: ChildPanelFullConfig;
@@ -19,20 +19,17 @@ export const ChildPanelExportReport = ({
   const selectedPath = useSelectedPath();
   const closeDrawer = useCloseDrawer();
 
-  const {entityName} = useEntityAndProject(config);
-  useEffect(() => {
-    setSelectedEntityName(entityName);
-  }, [entityName]);
-
-  const [selectedEntityName, setSelectedEntityName] =
-    useState<string>(entityName);
+  const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(
+    null
+  );
   const [selectedReport, setSelectedReport] = useState<ReportOption | null>(
     null
   );
 
   const onAddPanel = () => {
+    // TODO - this will be replaced with correct add panel implementation later on
     alert(
-      `Report id: ${selectedReport?.id} \nReport name: ${selectedReport?.name} \nEntity name: ${selectedEntityName}`
+      `Report id: ${selectedReport?.id} \nReport name: ${selectedReport?.name} \nEntity name: ${selectedEntity?.name}`
     );
   };
 
@@ -54,9 +51,9 @@ export const ChildPanelExportReport = ({
           </Alert>
           <ReportSelection
             config={config}
-            selectedEntityName={selectedEntityName}
+            selectedEntity={selectedEntity}
             selectedReport={selectedReport}
-            setSelectedEntityName={setSelectedEntityName}
+            setSelectedEntity={setSelectedEntity}
             setSelectedReport={setSelectedReport}
           />
           <p className="mt-16 text-moon-500">

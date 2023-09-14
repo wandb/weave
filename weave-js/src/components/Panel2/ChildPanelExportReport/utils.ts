@@ -1,6 +1,7 @@
 import {useBranchPointFromURIString} from '../../PagePanelComponents/hooks';
 import {uriFromNode, determineURISource} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
+import {format, getYear} from 'date-fns';
 
 export const CREATE_NEW_REPORT_OPTION = 'Create new report';
 export const DEFAULT_REPORT_OPTION = {
@@ -9,14 +10,18 @@ export const DEFAULT_REPORT_OPTION = {
   projectName: null,
 };
 
-export type EntityOption = Record<'value', string>;
+export type EntityOption = {
+  name: string;
+  isTeam: boolean;
+};
 export type ReportOption = {
   id?: string;
   name: string;
   projectName?: string;
+  updatedAt?: number;
 };
 
-export const useEntityAndProject = (config: ChildPanelFullConfig) => {
+export function useEntityAndProject(config: ChildPanelFullConfig) {
   const inputNode = config.input_node;
   const maybeURI = uriFromNode(inputNode);
   const branchPoint = useBranchPointFromURIString(maybeURI);
@@ -26,4 +31,40 @@ export const useEntityAndProject = (config: ChildPanelFullConfig) => {
     entityName: entityProjectName?.entity ?? '',
     projectName: entityProjectName?.project ?? '',
   };
+}
+
+/**
+ *
+ * This is a custom formatter for TimeAgo.
+ */
+type formatUpdatedByArgs = {
+  date: number;
+  value: number;
+  unit: string;
+  suffix: string;
 };
+
+export function formatUpdatedBy({
+  date,
+  value,
+  unit,
+  suffix,
+}: formatUpdatedByArgs) {
+  if (unit === 'second') {
+    return `${value} sec ${suffix}`;
+  }
+  if (unit === 'minute') {
+    return `${value} min ${suffix}`;
+  }
+  if (unit === 'hour') {
+    return `${value} hr ${suffix}`;
+  }
+  if (unit === 'day' && value === 1) {
+    return 'Yesterday';
+  }
+  if (getYear(date) !== getYear(new Date())) {
+    return format(date, 'MMM dd, yy');
+  }
+  // Handles when unit is "week", "month"
+  return format(date, 'MMM dd');
+}
