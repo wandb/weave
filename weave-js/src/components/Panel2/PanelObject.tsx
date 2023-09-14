@@ -252,7 +252,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
           {props.input.type.type}
         </div>
       )}
-      {expanded && <tbody>{keyChildren}</tbody>}
+      {expanded && <KeyValTable.Rows>{keyChildren}</KeyValTable.Rows>}
     </KeyValTable.Table>
   );
 };

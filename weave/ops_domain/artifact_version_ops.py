@@ -303,6 +303,19 @@ gql_connection_op(
     wdt.RunType,
 )
 
+gql_connection_op(
+    "artifactVersion-dependsOn",
+    wdt.ArtifactVersionType,
+    "dependsOn",
+    wdt.ArtifactVersionType,
+)
+
+gql_connection_op(
+    "artifactVersion-dependencyOf",
+    wdt.ArtifactVersionType,
+    "dependencyOf",
+    wdt.ArtifactVersionType,
+)
 
 # Section 6/6: Non Standard Business Logic Ops
 @op(
@@ -457,7 +470,7 @@ def _get_history_metrics(
                     name
                     project {
                         id
-                        name 
+                        name
                         entity {
                             id
                             name
@@ -486,7 +499,7 @@ def refine_history_metrics(
                     name
                     project {
                         id
-                        name 
+                        name
                         entity {
                             id
                             name

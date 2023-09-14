@@ -23,11 +23,11 @@ def node_to_ref(node: graph.Node) -> typing.Optional[ref_base.Ref]:
       - any __getitem__ (or pick) call can be converted to a Ref if its input is a Node
         that can be converted to a Ref
 
-    Its desirable to store these as Refs rather than nodes because:
+    It's desirable to store these as Refs rather than nodes because:
       - The representation is much more compact
       - A ref is a guarantee of existence
       - Artifacts is aware of cross-artifact references and keeps them
-        consistent (it does not allow deletion an artifact that has exisiting
+        consistent (it does not allow deleting an artifact that has existing
           depending artifacts)
 
     This is used when saving objects, to achieve cross-artifact references.
@@ -48,7 +48,7 @@ def node_to_ref(node: graph.Node) -> typing.Optional[ref_base.Ref]:
         return None
 
     # First node in chain must be get op
-    # TODO: check its a get of a specific artifact version, not an alias!
+    # TODO: check it's a get of a specific artifact version, not an alias!
     #     maybe we should have two different ops for that, so we can distinguish
     #     via type instead of via string checking.
     if nodes[0].from_op.name != "get":
@@ -67,7 +67,7 @@ def node_to_ref(node: graph.Node) -> typing.Optional[ref_base.Ref]:
             node.from_op.name.endswith("__getitem__")
             # Allow pick too, but this is kinda busted. What if both exist?
             # I think we should maybe just use __getitem__ to implement both
-            # of these. If passed a string, its a column lookup, int is row
+            # of these. If passed a string, it's a column lookup, int is row
             # lookup. Some other tools do this. However, if that's the solution,
             # then our "ref extra is list of string" solution doesn't work.
             # TODO: fix
