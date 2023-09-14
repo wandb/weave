@@ -17,7 +17,7 @@ import {WeaveExpression} from '../../../panel/WeaveExpression';
 import {themes} from '../Editor.styles';
 import * as S from './styles';
 import * as SN from './stylesNew';
-import {IconCaret, IconOverflowHorizontal} from '../Icons';
+import {IconOverflowHorizontal} from '../Icons';
 
 import {IconDown as IconDownUnstyled} from '../Icons';
 import {MenuItemProps} from 'semantic-ui-react';
@@ -49,7 +49,6 @@ export const ConfigSectionContainer = styled.div`
 ConfigSectionContainer.displayName = 'S.ConfigSectionContainer';
 
 export const ConfigSectionHeader = styled.div`
-  // margin-bottom: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
