@@ -472,24 +472,17 @@ const tableRowToNode = (
       list(typedDict({}))
     ) as any;
   } else {
-    // This is a  hacky here. Would be nice to have better mapping
+    // This is a hack. Would be nice to have better mapping
+    // Note that this will not work for tables with spaces in their name
+    // as we strip the space out to make the artifact name.
     const artNameParts = artName.split('-', 3);
     const tableName = artNameParts[artNameParts.length - 1] + '.table.json';
+
+    const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest`;
     newExpr = opTableRows({
       table: opFileTable({
         file: opArtifactVersionFile({
-          artifactVersion: opArtifactMembershipArtifactVersion({
-            artifactMembership: opArtifactMembershipForAlias({
-              artifact: opProjectArtifact({
-                project: opRootProject({
-                  entityName: constString(entityName),
-                  projectName: constString(projectName),
-                }),
-                artifactName: constString(artName),
-              }),
-              aliasName: constString('latest'),
-            }),
-          }),
+          artifactVersion: opGet({uri: constString(uri)}),
           path: constString(tableName),
         }),
       }),
