@@ -179,10 +179,10 @@ def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
     """Returns a single op that matches the given name and raw inputs (inputs can be python objects or nodes)"""
     shared_name_ops: list[op_def.OpDef]
 
-    if fq_op_name.startswith("local-artifact://"):
+    if "://" in fq_op_name:
         # If the incoming op is a locally-defined op, then we are just going to look at the derived op space.
         # We don't need to search the whole registry since by definition it is user-defined
-        op = registry_mem.memory_registry.get_op(fq_op_name + "/obj")
+        op = registry_mem.memory_registry.get_op(fq_op_name)
         derived_ops = list(op.derived_ops.values())
         shared_name_ops = [op] + derived_ops
     # Else, we lookup all the ops with the same common name
@@ -284,6 +284,7 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
         err = errors.WeaveDispatchError(
             f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}'
         )
+        breakpoint()
         util.raise_exception_with_sentry_if_available(err, [name])
 
     final_ops = _dispatch_remaining_args(

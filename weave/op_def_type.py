@@ -114,31 +114,38 @@ class OpDefType(types.Type):
         except FileNotFoundError:
             pass
 
-        path_with_ext = os.path.relpath(
-            artifact.path(f"{name}.py"), start=artifact_local.local_artifact_dir()
-        )
-        # remove the .py extension
-        path = os.path.splitext(path_with_ext)[0]
-        # convert filename into module path
-        parts = path.split("/")
-        module_path = ".".join(parts)
+        module_path = artifact.path(f"{name}.py")
+        module_dir = os.path.dirname(module_path)
+        model_filename = os.path.basename(module_path)
 
-        sys.path.insert(0, artifact_local.local_artifact_dir())
+        import_name = os.path.splitext(model_filename)[0]
+
+        # path_with_ext = os.path.relpath(
+        #     artifact.path(f"{name}.py"), start=artifact_local.local_artifact_dir()
+        # )
+        # # remove the .py extension
+        # path = os.path.splitext(path_with_ext)[0]
+        # # convert filename into module path
+        # parts = path.split("/")
+        # module_path = ".".join(parts)
+
+        sys.path.insert(0, os.path.abspath(module_dir))
         with context_state.loading_op_location(artifact.uri_obj):
             # This has a side effect of registering the op
-            mod = __import__(module_path)
+            mod = __import__(import_name)
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
         # mod down to _obj.
-        for part in parts[1:]:
-            mod = getattr(mod, part)
+        # for part in parts[1:]:
+        #     mod = getattr(mod, part)
 
         op_defs = inspect.getmembers(mod, op_def.is_op_def)
         if len(op_defs) != 1:
             raise errors.WeaveInternalError(
-                "Unexpected Weave module saved in: %s" % path
+                "Unexpected Weave module saved in: %s" % module_path
             )
         _, od = op_defs[0]
+        breakpoint()
         return od
 
 

@@ -105,7 +105,6 @@ class DefaultToPy(mappers.Mapper):
         published_ref = storage._direct_publish(
             obj,
             existing_ref.name,
-            branch_name=existing_ref.version,
             assume_weave_type=self.type,
         )
 

@@ -554,7 +554,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
-            raise FileNotFoundError("Path not in artifact")
+            raise FileNotFoundError("Path not in artifact %s %s" % (self, name))
         return self.io_service.fs.path(fs_path)
 
     def size(self, path: str) -> int:
