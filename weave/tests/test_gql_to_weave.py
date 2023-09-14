@@ -393,44 +393,50 @@ def test_json_array():
     return_type = gql_to_weave.get_query_weave_type(query)
     expected = types.TypedDict(
         {
-            "project_23045de0d7920e9b08772d538b4b9da9": types.TypedDict(
-                property_types={
-                    "id": types.String(),
-                    "name": types.String(),
-                    "run_1dbf019d4314adc6f3bc206824769929": types.TypedDict(
-                        property_types={
-                            "id": types.String(),
-                            "name": types.String(),
-                            "historyKeys": types.optional(types.String()),
-                            "sampledParquetHistory": types.TypedDict(
-                                property_types={
-                                    # important that liveData is a string
-                                    "liveData": types.String(),
-                                    "parquetUrls": types.List(
-                                        object_type=types.String()
-                                    ),
-                                },
-                                not_required_keys=set(),
-                            ),
-                            "project": types.TypedDict(
+            "project_23045de0d7920e9b08772d538b4b9da9": types.optional(
+                types.TypedDict(
+                    property_types={
+                        "id": types.String(),
+                        "name": types.String(),
+                        "run_1dbf019d4314adc6f3bc206824769929": types.optional(
+                            types.TypedDict(
                                 property_types={
                                     "id": types.String(),
                                     "name": types.String(),
-                                    "entity": types.TypedDict(
+                                    "historyKeys": types.optional(types.String()),
+                                    "sampledParquetHistory": types.TypedDict(
                                         property_types={
-                                            "id": types.String(),
-                                            "name": types.String(),
+                                            # important that liveData is a string
+                                            "liveData": types.String(),
+                                            "parquetUrls": types.List(
+                                                object_type=types.String()
+                                            ),
                                         },
                                         not_required_keys=set(),
                                     ),
+                                    "project": types.optional(
+                                        types.TypedDict(
+                                            property_types={
+                                                "id": types.String(),
+                                                "name": types.String(),
+                                                "entity": types.TypedDict(
+                                                    property_types={
+                                                        "id": types.String(),
+                                                        "name": types.String(),
+                                                    },
+                                                    not_required_keys=set(),
+                                                ),
+                                            },
+                                            not_required_keys=set(),
+                                        )
+                                    ),
                                 },
                                 not_required_keys=set(),
-                            ),
-                        },
-                        not_required_keys=set(),
-                    ),
-                },
-                not_required_keys=set(),
+                            )
+                        ),
+                    },
+                    not_required_keys=set(),
+                )
             )
         },
         not_required_keys=set(),
