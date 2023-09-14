@@ -177,6 +177,7 @@ export const Select = <
       return {
         ...baseStyles,
         padding: '6px 0',
+        ...props.menuListStyle,
       };
     },
     groupHeading: (baseStyles, state) => {

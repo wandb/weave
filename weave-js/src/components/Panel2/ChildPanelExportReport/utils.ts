@@ -11,7 +11,10 @@ export const DEFAULT_REPORT_OPTION = {
   projectName: null,
 };
 
-export type EntityOption = Record<'value', string>;
+export type EntityOption = {
+  name: string;
+  isTeam: boolean;
+};
 export type ReportOption = {
   id?: string;
   name: string;

@@ -63,17 +63,7 @@ export const ReportSelection = ({
       return w.opDict({
         id: w.opReportInternalId({report: row}),
         name: w.opReportName({report: row}),
-        createdAt: w.opReportCreatedAt({report: row}),
-        creatorUsername: w.opUserUsername({
-          user: w.opReportCreator({report: row}),
-        }),
         updatedAt: w.opReportUpdatedAt({report: row}),
-        updatedByUsername: w.opUserUsername({
-          user: w.opReportUpdatedBy({report: row}),
-        }),
-        updatedByUserName: w.opUserName({
-          user: w.opReportUpdatedBy({report: row}),
-        }),
         projectName: w.opProjectName({
           project: w.opReportProject({report: row}),
         }),
@@ -81,8 +71,6 @@ export const ReportSelection = ({
     }),
   });
   const reports = useNodeValue(reportsMetaNode);
-
-  console.log(reports);
 
   return (
     <div className="mt-8 flex-1">
