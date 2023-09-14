@@ -146,5 +146,7 @@ def get_query_weave_type(query: str) -> types.Type:
         if isinstance(definition, OperationDefinitionNode):
             schema = gql_schema.gql_schema()
             root_operation_type = get_operation_root_type(schema, definition)
-            return gql_type_to_weave_type(root_operation_type, definition.selection_set)
+            return types.non_none(
+                gql_type_to_weave_type(root_operation_type, definition.selection_set)
+            )
     raise ValueError("No operation found in query")
