@@ -17,9 +17,10 @@ export const customEntitySelectComps = {
       {...props}
       className="flex items-center gap-8">
       <Icon
+        className="shrink-0 grow-0 "
         name={props.data?.isTeam ? 'users-team' : 'user-profile-personal'}
       />
-      {children}
+      <p className="overflow-hidden text-ellipsis">{children}</p>
     </selectComponents.SingleValue>
   ),
   Option: ({children, ...props}: OptionProps<EntityOption, false>) => {
