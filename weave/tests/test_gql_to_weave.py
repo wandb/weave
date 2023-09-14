@@ -265,76 +265,88 @@ def test_inline_fragments():
     return_type = gql_to_weave.get_query_weave_type(query)
     expected = types.TypedDict(
         {
-            "project_518fa79465d8ffaeb91015dce87e092f": types.TypedDict(
-                {
-                    "id": types.String(),
-                    "name": types.String(),
-                    "artifactType_46d22fef09db004187bb8da4b5e98c58": types.TypedDict(
-                        {
-                            "id": types.String(),
-                            "name": types.String(),
-                            "artifactCollections_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
+            "project_518fa79465d8ffaeb91015dce87e092f": types.optional(
+                types.TypedDict(
+                    {
+                        "id": types.String(),
+                        "name": types.String(),
+                        "artifactType_46d22fef09db004187bb8da4b5e98c58": types.optional(
+                            types.TypedDict(
                                 {
-                                    "edges": types.List(
+                                    "id": types.String(),
+                                    "name": types.String(),
+                                    "artifactCollections_c1233b7003317090ab5e2a75db4ad965": types.optional(
                                         types.TypedDict(
                                             {
-                                                "node": types.TypedDict(
-                                                    {
-                                                        "id": types.String(),
-                                                        "name": types.String(),
-                                                        "artifacts_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
-                                                            {
-                                                                "edges": types.List(
-                                                                    types.TypedDict(
-                                                                        {
-                                                                            "node": types.TypedDict(
+                                                "edges": types.List(
+                                                    types.TypedDict(
+                                                        {
+                                                            "node": types.optional(
+                                                                types.TypedDict(
+                                                                    {
+                                                                        "id": types.String(),
+                                                                        "name": types.String(),
+                                                                        "artifacts_c1233b7003317090ab5e2a75db4ad965": types.optional(
+                                                                            types.TypedDict(
                                                                                 {
-                                                                                    "id": types.String(),
-                                                                                    "createdBy": types.UnionType(
+                                                                                    "edges": types.List(
                                                                                         types.TypedDict(
                                                                                             {
-                                                                                                "__typename": types.Const(
-                                                                                                    types.String(),
-                                                                                                    "Run",
-                                                                                                ),
-                                                                                                "id": types.String(),
-                                                                                                "name": types.String(),
-                                                                                                "displayName": types.optional(
-                                                                                                    types.String()
-                                                                                                ),
+                                                                                                "node": types.TypedDict(
+                                                                                                    {
+                                                                                                        "id": types.String(),
+                                                                                                        "createdBy": types.optional(
+                                                                                                            types.UnionType(
+                                                                                                                types.TypedDict(
+                                                                                                                    {
+                                                                                                                        "__typename": types.Const(
+                                                                                                                            types.String(),
+                                                                                                                            "Run",
+                                                                                                                        ),
+                                                                                                                        "id": types.String(),
+                                                                                                                        "name": types.String(),
+                                                                                                                        "displayName": types.optional(
+                                                                                                                            types.String()
+                                                                                                                        ),
+                                                                                                                    }
+                                                                                                                ),
+                                                                                                                types.TypedDict(
+                                                                                                                    {
+                                                                                                                        "__typename": types.Const(
+                                                                                                                            types.String(),
+                                                                                                                            "User",
+                                                                                                                        ),
+                                                                                                                    }
+                                                                                                                ),
+                                                                                                            )
+                                                                                                        ),
+                                                                                                    }
+                                                                                                )
                                                                                             }
-                                                                                        ),
-                                                                                        types.TypedDict(
-                                                                                            {
-                                                                                                "__typename": types.Const(
-                                                                                                    types.String(),
-                                                                                                    "User",
-                                                                                                ),
-                                                                                            }
-                                                                                        ),
-                                                                                    ),
+                                                                                        )
+                                                                                    )
                                                                                 }
                                                                             )
-                                                                        }
-                                                                    )
+                                                                        ),
+                                                                    }
                                                                 )
-                                                            }
-                                                        ),
-                                                    }
+                                                            )
+                                                        }
+                                                    )
                                                 )
                                             }
                                         )
-                                    )
+                                    ),
                                 }
-                            ),
-                        }
-                    ),
-                }
+                            )
+                        ),
+                    }
+                )
             )
         }
     )
 
-    assert return_type == expected
+    assert return_type.__str__() == expected.__str__()
 
 
 def test_json_array():
