@@ -118,7 +118,6 @@ gql_direct_edge_op(
     wdt.UserType,
 )
 
-
 # Section 5/6: Connection Ops
 #
 
