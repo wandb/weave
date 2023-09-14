@@ -707,8 +707,6 @@ export const toGqlField = (
     return [gqlObjectField(forwardGraph, forwardOp, 'project')];
   } else if (forwardOp.op.name === 'report-creator') {
     return [gqlObjectField(forwardGraph, forwardOp, 'user')];
-  } else if (forwardOp.op.name === 'report-updatedBy') {
-    return [gqlObjectField(forwardGraph, forwardOp, 'updatedBy')];
   } else if (forwardOp.op.name === 'report-viewcount') {
     return gqlBasicField('viewCount');
   } else if (forwardOp.op.name === 'report-stargazers') {

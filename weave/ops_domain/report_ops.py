@@ -111,13 +111,6 @@ gql_direct_edge_op(
     wdt.UserType,
 )
 
-gql_direct_edge_op(
-    "report-updatedBy",
-    wdt.ReportType,
-    "updatedBy",
-    wdt.UserType,
-)
-
 # Section 5/6: Connection Ops
 #
 
