@@ -165,8 +165,12 @@ jobs:
         run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - name: Make Log Dir
         run: mkdir -p /tmp/weave/log
-      - name: Copy over built assets
-        run: cp -r /root/weave-js-build/* ./weave/frontend
+      - name: Build assets
+        run:
+          cp -r /root/weave-js-build/* ./weave/frontend && cd ./weave/frontend \
+          yarn build && \
+          echo $SHA1 > ./build/sha1.txt && \
+          rm -rf node_modules
       - name: Start weave server
         # github actions does something funky with the std file descriptors, they end up
         # being closed. tqdm (for example) raises an exception when the descriptor it
