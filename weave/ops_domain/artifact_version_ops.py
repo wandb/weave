@@ -317,6 +317,7 @@ gql_connection_op(
     wdt.ArtifactVersionType,
 )
 
+
 # Section 6/6: Non Standard Business Logic Ops
 @op(
     name="artifactVersion-name",
@@ -445,7 +446,7 @@ def _get_history_metrics(
                     "run_name": ConstNode(types.String(), run_name),
                 },
             ),
-            "asOfStep": ConstNode(types.Int(), history_step),
+            "asOfStep": ConstNode(types.Int(), max(0, history_step - 1)),
         },
     )
 
