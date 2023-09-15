@@ -272,6 +272,15 @@ const opArtifactsBasicMetadata = ({artifacts}: {artifacts: w.Node}) => {
             artifactVersion: latestVersionNode,
           }),
         }),
+        numRows: w.callOpVeryUnsafe(
+          'run-historyLineCount',
+          {
+            run: w.opArtifactVersionCreatedBy({
+              artifactVersion: latestVersionNode,
+            }),
+          },
+          'number'
+        ) as any,
       } as any);
     }),
   });
@@ -314,6 +323,7 @@ export const useProjectRunStreams = (
     createdAt: number;
     updatedAt: number;
     createdByUpdatedAt: number;
+    numRows: number;
   }>;
   loading: boolean;
 } => {
@@ -341,6 +351,7 @@ export const useProjectRunLoggedTables = (
     createdAt: number;
     updatedAt: number;
     createdByUpdatedAt: number;
+    numRows: number;
   }>;
   loading: boolean;
 } => {
