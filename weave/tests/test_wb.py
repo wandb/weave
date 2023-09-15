@@ -1486,7 +1486,7 @@ def run_history_as_of_mocker(q, ndx):
 
 def test_run_history_as_of(fake_wandb):
     fake_wandb.fake_api.add_mock(run_history_as_of_mocker)
-    node = ops.project("stacey", "mendeleev").runs()[0].historyAsOf(2)
+    node = ops.project("stacey", "mendeleev").runs()[0].historyAsOf(2, None)
     assert isinstance(node.type, TaggedValueType)
     assert types.TypedDict(
         {
