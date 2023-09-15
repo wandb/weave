@@ -69,7 +69,7 @@ def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
 
 
 def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
-    cookie = weave_env.weave_test_wandb_cookie()
+    cookie = weave_env.weave_wandb_cookie()
     if cookie:
         # This is a special case for testing. It should never be used in production.
         cookies = {"wandb": cookie}
@@ -77,10 +77,6 @@ def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]
         return set_wandb_api_context("test_admin", None, headers, cookies)
     api_key = weave_env.weave_wandb_api_key()
     if api_key:
-        if weave_env.is_public():
-            raise errors.WeaveConfigurationError(
-                "local api_key should not be set in public mode."
-            )
         return set_wandb_api_context("admin", api_key, None, None)
     return None
 

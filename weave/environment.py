@@ -151,12 +151,12 @@ def sigterm_sighandler_enabled() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_SIGTERM_SIGHANDLER")
 
 
-def weave_test_wandb_cookie() -> typing.Optional[str]:
-    cookie = os.environ.get("WEAVE_TEST_WANDB_COOKIE")
+def weave_wandb_cookie() -> typing.Optional[str]:
+    cookie = os.environ.get("WEAVE_WANDB_COOKIE")
     if cookie:
         if is_public():
             raise errors.WeaveConfigurationError(
-                "WEAVE_TEST_WANDB_COOKIE should not be set in public mode."
+                "WEAVE_WANDB_COOKIE should not be set in public mode."
             )
         if os.path.exists(os.path.expanduser("~/.netrc")):
             raise errors.WeaveConfigurationError(
