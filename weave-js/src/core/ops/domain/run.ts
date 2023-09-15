@@ -587,7 +587,7 @@ export const opRunHistoryAsOfStep = makeRunOp({
   argTypes: {
     run: 'run' as const,
     asOfStep: 'number' as const,
-    maxKeyLimit: 'number' as const,
+    maxKeyLimit: TypeHelpers.maybe('number' as const),
   },
   returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
   resolver: ({run, asOfStep}) => {

@@ -638,7 +638,7 @@ export const opArtifactVersionRunHistoryRow = makeBasicOp({
   name: 'artifactVersion-historyMetrics',
   argTypes: {
     artifactVersion: TypeHelpers.nullableOneOrMany('artifactVersion' as const),
-    maxKeyLimit: 'number' as const,
+    maxKeyLimit: TypeHelpers.maybe('number' as const),
   },
   returnType: inputTypes =>
     mappableNullableTaggableVal(inputTypes, v => typedDict({})),
