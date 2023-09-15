@@ -528,6 +528,7 @@ const CenterProjectTablesBrowser: React.FC<
       'updated at': moment.utc(b.createdByUpdatedAt).local().calendar(),
       'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
+      'number of rows': b.numRows,
     }));
     const logged = loggedTables.result.map(b => ({
       _id: b.name,
@@ -537,6 +538,11 @@ const CenterProjectTablesBrowser: React.FC<
       'updated at': moment.utc(b.updatedAt).local().calendar(),
       'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
+      // we use the # of steps in the run history to compute rows quickly. This works for stream tables
+      // because the table leverages run history. For logged tables, we must open the table in order
+      // to know the number of rows which is a much more expensive operation. Instead, we will just
+      // display a dummy placeholder
+      'number of rows': '-',
     }));
     const combined = [...streams, ...logged];
     combined.sort((a, b) => b._updatedAt - a._updatedAt);
@@ -709,7 +715,14 @@ const CenterProjectTablesBrowser: React.FC<
         ]}
         loading={isLoading}
         filters={{kind: {placeholder: 'All table kinds'}}}
-        columns={['name', 'kind', 'updated at', 'created at', 'created by']}
+        columns={[
+          'name',
+          'kind',
+          'updated at',
+          'created at',
+          'created by',
+          'number of rows',
+        ]}
         data={browserData}
         actions={browserActions}
       />
