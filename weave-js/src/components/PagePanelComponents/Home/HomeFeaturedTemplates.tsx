@@ -1,7 +1,7 @@
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
 import {Button} from '../../Button';
-import {Type, callOpVeryUnsafe} from '@wandb/weave/core';
+import {Node, Type, callOpVeryUnsafe} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import * as Tabs from '@wandb/weave/components/Tabs';
 
@@ -15,8 +15,11 @@ import remarkGfm from 'remark-gfm';
 import './github-markdown-light.css';
 import {TargetBlank} from '@wandb/weave/common/util/links';
 import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
-// import {dark} from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+// This is considered a `hack` because I need to drop down to
+// access .tw-style, to give it a height 100%. When using tailwind
+// components, the hight is not set and it collapses in this case because
+// all children have relative hights.
 const TWDrawerHack = styled.div`
   height: 100%;
   overflow: hidden;
@@ -24,6 +27,7 @@ const TWDrawerHack = styled.div`
     height: 100%;
   }
 `;
+TWDrawerHack.displayName = 'S.TWDrawerHack';
 
 type TemplateType = {
   config_type: Type | null;
@@ -39,8 +43,8 @@ export const HomeFeaturedTemplates: React.FC<{
   const featuredTemplatesNode = callOpVeryUnsafe(
     'py_board-get_featured_board_templates',
     {}
-  );
-  const featuredTemplates = useNodeValue(featuredTemplatesNode as any);
+  ) as Node;
+  const featuredTemplates = useNodeValue(featuredTemplatesNode);
   if (featuredTemplates.loading || featuredTemplates.result.length === 0) {
     return null;
   }
@@ -61,9 +65,9 @@ export const HomeFeaturedTemplates: React.FC<{
         style={{
           gap: '16px',
         }}>
-        {featuredTemplates.result.map((template: any, i: number) => (
+        {featuredTemplates.result.map((template: TemplateType, i: number) => (
           <HomeFeaturedTemplateItem
-            key={i}
+            key={template.op_name}
             template={template}
             setPreviewNode={setPreviewNode}
           />
@@ -160,7 +164,7 @@ const HomeFeaturedTemplateDrawer: React.FC<{
                   a: ({node, ...props}) => {
                     return <TargetBlank {...props} />;
                   },
-                  code({node, inline, className, children, ...props}) {
+                  code: ({node, inline, className, children, ...props}) => {
                     const match = /language-(\w+)/.exec(className || '');
                     return !inline && match ? (
                       <SyntaxHighlighter

@@ -24,7 +24,7 @@ BOARD_DISPLAY_NAME = "Monitor OpenAI API usage"
 
 # BOARD_DESCRIPTION is the description that will be displayed in the UI
 BOARD_DESCRIPTION = (
-    "Track and visualize OpenAI completions overtime across your organization."
+    "Track and visualize OpenAI completions over time across your organization."
 )
 
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
