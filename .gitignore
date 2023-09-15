@@ -21,4 +21,4 @@ gha-creds-*.json
 .hypothesis
 .env
 yarn-error.log*
-.private.env
+.admin.env
