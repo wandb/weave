@@ -35,6 +35,7 @@ from weave import storage
 from weave import wandb_api
 from weave.language_features.tagging import tag_store
 
+logger = logging.getLogger(__name__)
 
 WEAVE_CLIENT_CACHE_KEY_HEADER = "x-weave-client-cache-key"
 
@@ -108,9 +109,33 @@ def import_ecosystem():
             pass
 
 
+def log_system_info():
+    WEAVE_SERVER_URL = os.environ.get("WEAVE_SERVER_URL")
+    WANDB_BASE_URL = os.environ.get("WANDB_BASE_URL", "http://api.wandb.ai")
+    WEAVE_LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR")
+    netrc_exists = os.path.exists("~/.netrc")
+    WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
+    WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
+
+    logger.info("Network Config:")
+    logger.info(f"  WEAVE_SERVER_URL    = {WEAVE_SERVER_URL}")
+    logger.info(f"  WANDB_BASE_URL      = {WANDB_BASE_URL}")
+
+    logger.info("Cache Config:")
+    logger.info(f"  WEAVE_LOCAL_ARTIFACT_DIR  = {WEAVE_LOCAL_ARTIFACT_DIR}")
+
+    logger.info("Auth Config:")
+    logger.info(f"  netrc_exists        = {netrc_exists}")
+    logger.info(f"  WANDB_API_KEY       = {WANDB_API_KEY}")
+    logger.info(f"  WEAVE_WANDB_COOKIE  = {WEAVE_WANDB_COOKIE}")
+
+
 def make_app():
     logs.configure_logger()
     import_ecosystem()
+
+    logger.info("Starting weave server")
+    log_system_info()
 
     app = Flask(__name__)
     app.register_blueprint(blueprint)

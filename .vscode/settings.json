@@ -8,5 +8,6 @@
     "search.exclude": {
         "weave/frontend": true
     },
+    "files.insertFinalNewline": true,
     "black-formatter.importStrategy": "fromEnvironment"
 }

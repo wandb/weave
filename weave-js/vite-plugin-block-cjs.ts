@@ -241,6 +241,17 @@ const ALLOWED_CJS_MODULES = [
 
   'd3-scale',
   'diff',
+
+  // markdown rendering
+  // markdown: true deps
+  "react-markdown",
+  "remark-gfm",
+  // markdown: peer deps
+  "escape-string-regexp",
+  "lowlight",
+  "lowlight/lib/core",
+  "refractor",
+  "refractor/core",
 ];
 
 const repositoryRoot = path.dirname(path.dirname(__dirname));

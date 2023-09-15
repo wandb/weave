@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 import blockCjsPlugin from './vite-plugin-block-cjs';
 import fileUrls from './vite-plugin-file-urls';
 import {visualizer} from 'rollup-plugin-visualizer';
+import fs from 'fs';
 
 // https://vitejs.dev/config/
 export default defineConfig(({mode, command}) => {
@@ -26,6 +27,14 @@ export default defineConfig(({mode, command}) => {
     : undefined;
 
   const showVisualizer = process.env.VISUALIZER;
+
+  let https: boolean | {key: Buffer; cert: Buffer} = false;
+  if (process.env.VITE_HTTPS_KEY_PATH && process.env.VITE_HTTPS_CERT_PATH) {
+    https = {
+      key: fs.readFileSync(process.env.VITE_HTTPS_KEY_PATH),
+      cert: fs.readFileSync(process.env.VITE_HTTPS_CERT_PATH),
+    };
+  }
 
   const hmrPort = process.env.HMR_PORT
     ? Number.parseInt(process.env.HMR_PORT, 10)
@@ -125,7 +134,7 @@ export default defineConfig(({mode, command}) => {
     server: {
       host,
       port,
-      https: false,
+      https,
       // for invoker_local we need the frontend to proxy back to the local
       // container NOTE: if you update values here, you need to update
       // onprem/local/files/etc/nginx/sites-available/*
