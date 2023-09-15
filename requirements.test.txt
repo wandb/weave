@@ -8,7 +8,7 @@ pytest-rerunfailures>=11.1.2
 pytest-timestamper>=0.0.9
 plotly>=5.13.0
 nbmake>=0.5
-bokeh>=3.0.3
+bokeh==3.0.3 # pinning to help speed up CI
 soundfile>=0.11.0
 pytest-asyncio>=0.20.3
 hypothesis>=6.68.3
