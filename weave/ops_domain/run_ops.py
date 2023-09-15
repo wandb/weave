@@ -294,11 +294,15 @@ def _history_as_of_plugin(inputs, inner):
     )
     max_step = min_step + 1
     alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
-    max_key_limit = (inputs.raw["maxKeyLimit"] if "maxKeyLimit" in inputs.raw else None)
+    max_key_limit = inputs.raw["maxKeyLimit"] if "maxKeyLimit" in inputs.raw else None
     return f"{alias}: history(minStep: {min_step}, maxStep: {max_step}, maxKeyLimit: {max_key_limit})"
 
 
-def _get_history_as_of_step(run: wdt.Run, asOfStep: int, maxKeyLimit: typing.Optional[int],):
+def _get_history_as_of_step(
+    run: wdt.Run,
+    asOfStep: int,
+    maxKeyLimit: typing.Optional[int],
+):
     alias = _make_alias(str(asOfStep), prefix="history")
 
     data = run[alias]
@@ -317,8 +321,14 @@ def _get_history_as_of_step(run: wdt.Run, asOfStep: int, maxKeyLimit: typing.Opt
     plugins=wb_gql_op_plugin(_history_as_of_plugin),
     hidden=True,
 )
-def _refine_history_as_of_type(run: wdt.Run, asOfStep: int, maxKeyLimit: typing.Optional[int],) -> types.Type:
-    return wb_util.process_run_dict_type(_get_history_as_of_step(run, asOfStep, maxKeyLimit))
+def _refine_history_as_of_type(
+    run: wdt.Run,
+    asOfStep: int,
+    maxKeyLimit: typing.Optional[int],
+) -> types.Type:
+    return wb_util.process_run_dict_type(
+        _get_history_as_of_step(run, asOfStep, maxKeyLimit)
+    )
 
 
 @op(
@@ -326,7 +336,11 @@ def _refine_history_as_of_type(run: wdt.Run, asOfStep: int, maxKeyLimit: typing.
     refine_output_type=_refine_history_as_of_type,
     plugins=wb_gql_op_plugin(_history_as_of_plugin),
 )
-def history_as_of(run: wdt.Run, asOfStep: int, maxKeyLimit: typing.Optional[int],) -> dict[str, typing.Any]:
+def history_as_of(
+    run: wdt.Run,
+    asOfStep: int,
+    maxKeyLimit: typing.Optional[int],
+) -> dict[str, typing.Any]:
     return _get_history_as_of_step(run, asOfStep, maxKeyLimit)
 
 

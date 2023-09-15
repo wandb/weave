@@ -488,7 +488,9 @@ def refine_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
     maxKeyLimit: typing.Optional[int],
 ) -> types.Type:
-    return wb_util.process_run_dict_type(_get_history_metrics(artifactVersion, maxKeyLimit))
+    return wb_util.process_run_dict_type(
+        _get_history_metrics(artifactVersion, maxKeyLimit)
+    )
 
 
 @op(
