@@ -114,7 +114,10 @@ type HomePreviewSidebarTemplateProps<RT extends CenterBrowserDataType> = {
 };
 
 export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
-  props: HomePreviewSidebarTemplateProps<RT>
+  props: HomePreviewSidebarTemplateProps<RT> & {
+    // Temp hack until we decouple history from all these components
+    isTemplate?: boolean;
+  }
 ) => {
   const history = useHistory();
   return (
@@ -146,7 +149,11 @@ export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
               cursor: 'pointer',
             }}
             onClick={e => {
-              history.push('.');
+              if (!props.isTemplate) {
+                history.push('.');
+              } else {
+                props.setPreviewNode(undefined);
+              }
             }}
           />
         </CenterTableActionCellIcon>

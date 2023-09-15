@@ -636,6 +636,9 @@ const CenterProjectTablesBrowser: React.FC<
   );
 
   useEffect(() => {
+    if (isLoading) {
+      return;
+    }
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
       if (!row) {
@@ -673,6 +676,7 @@ const CenterProjectTablesBrowser: React.FC<
     params.preview,
     setPreviewNode,
     navigateToExpression,
+    isLoading,
   ]);
 
   return (
