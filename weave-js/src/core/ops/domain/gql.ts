@@ -1332,12 +1332,14 @@ export const toGqlField = (
     const asOfStep = opInputs.asOfStep ?? 0;
     const minStep = asOfStep;
     const maxStep = minStep + 1;
+    const maxKeyLimit = opInputs.maxKeyLimit;
     return [
       {
         name: 'history',
         args: gqlArgs({
           minStep,
           maxStep,
+          maxKeyLimit,
         }),
         fields: [],
         alias: `historyAsOf_${opInputs.asOfStep}`,
