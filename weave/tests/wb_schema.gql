@@ -502,7 +502,7 @@ type Artifact {
   artifactSequence: ArtifactSequence!
   createdAt: DateTime!
   updatedAt: DateTime
-  createdBy: Initiator!
+  createdBy: Initiator
   usedCount: Int!
   usedBy(
     filters: JSONString

@@ -253,7 +253,8 @@ gql_direct_edge_op(
 def artifact_version_created_by(
     artifactVersion: wdt.ArtifactVersion,
 ) -> typing.Optional[wdt.Run]:
-    if artifactVersion["createdBy"]["__typename"] == "Run":
+    cb = artifactVersion["createdBy"]
+    if cb is not None and cb["__typename"] == "Run":
         return wdt.Run.from_keys(artifactVersion["createdBy"])
     return None
 
