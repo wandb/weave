@@ -539,7 +539,7 @@ const CenterProjectTablesBrowser: React.FC<
       'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
       // we use the # of steps in the run history to compute rows quickly. This works for stream tables
-      // because the table leverages run history. For logged tables, we must open to table in order to
+      // because the table leverages run history. For logged tables, we must open the table in order
       // to know the number of rows which is a much more expensive operation. Instead, we will just
       // display a dummy placeholder
       'number of rows': '-',
