@@ -295,7 +295,7 @@ def _history_as_of_plugin(inputs, inner):
     max_step = min_step + 1
     alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
     max_key_limit = (inputs.raw["maxKeyLimit"] if "maxKeyLimit" in inputs.raw else None)
-    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step}, maxKeyLimit: {5})"
+    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step}, maxKeyLimit: {max_key_limit})"
 
 
 def _get_history_as_of_step(run: wdt.Run, asOfStep: int, maxKeyLimit: typing.Optional[int],):

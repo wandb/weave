@@ -446,7 +446,7 @@ def _get_history_metrics(
                     "run_name": ConstNode(types.String(), run_name),
                 },
             ),
-            "asOfStep": ConstNode(types.Int(), history_step),
+            "asOfStep": ConstNode(types.Int(), max(0, history_step-1)),
             "maxKeyLimit": ConstNode(types.Int(), maxKeyLimit),
         },
     )
