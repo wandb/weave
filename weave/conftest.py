@@ -273,16 +273,3 @@ def io_server_factory():
 def consistent_table_col_ids():
     with table_state.use_consistent_col_ids():
         yield
-
-
-@pytest.fixture()
-def simulate_cookie_for_testing_only():
-    wandb_cookie = os.getenv("WEAVE_TEST_WANDB_COOKIE")
-    cookies = None
-    headers = None
-
-    if wandb_cookie:
-        cookies = {"wandb": wandb_cookie}
-        headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
-    with wandb_api_context(WandbApiContext("test_admin", None, headers, cookies)):
-        yield
