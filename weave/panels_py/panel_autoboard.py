@@ -441,6 +441,7 @@ template_registry.register(
     "Timeseries Auto-Board",
     "Column-level analysis of timeseries data",
     input_node_predicate=node_qualifies_for_autoboard,
-    is_featured=True,
+    # Not featuring because it is pretty buggy
+    # is_featured=True,
     instructions_md=instructions_md,
 )
