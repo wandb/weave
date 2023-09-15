@@ -147,6 +147,10 @@ def memdump_sighandler_enabled() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_MEMDUMP_SIGHANDLER")
 
 
+def sigterm_sighandler_enabled() -> bool:
+    return util.parse_boolean_env_var("WEAVE_ENABLE_SIGTERM_SIGHANDLER")
+
+
 def weave_test_wandb_cookie() -> typing.Optional[str]:
     cookie = os.environ.get("WEAVE_TEST_WANDB_COOKIE")
     if cookie:
@@ -159,10 +163,6 @@ def weave_test_wandb_cookie() -> typing.Optional[str]:
                 "Please delete ~/.netrc while using WEAVE_WANDB_COOKIE to avoid using your credentials"
             )
     return cookie
-
-
-def sigterm_sighandler_enabled() -> bool:
-    return util.parse_boolean_env_var("WEAVE_ENABLE_SIGTERM_SIGHANDLER")
 
 
 def stack_dump_sighandler_enabled() -> bool:
