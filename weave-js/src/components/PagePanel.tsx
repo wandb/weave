@@ -232,7 +232,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
     panelConfig = JSON.parse(panelConfig);
   }
   const inJupyter = inJupyterCell();
-  const authed = useIsAuthenticated();
+  const {isAuthenticated: authed} = useIsAuthenticated();
   const isLocal = isServedLocally();
   const transparentlyMountExpString = useRef('');
 

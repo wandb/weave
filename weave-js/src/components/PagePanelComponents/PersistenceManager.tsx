@@ -240,7 +240,7 @@ export const PersistenceManager: React.FC<{
     hasRemote
   );
 
-  const isAuthenticated = useIsAuthenticated();
+  const {isAuthenticated} = useIsAuthenticated();
   const availableActions = useMemo(
     () => getAvailableActions(nodeState, isAuthenticated ?? false),
     [nodeState, isAuthenticated]
