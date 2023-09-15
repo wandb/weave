@@ -317,6 +317,7 @@ gql_connection_op(
     wdt.ArtifactVersionType,
 )
 
+
 # Section 6/6: Non Standard Business Logic Ops
 @op(
     name="artifactVersion-name",
