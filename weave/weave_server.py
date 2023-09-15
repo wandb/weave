@@ -112,7 +112,7 @@ def import_ecosystem():
 def log_system_info():
     WEAVE_SERVER_URL = os.environ.get("WEAVE_SERVER_URL")
     WANDB_BASE_URL = os.environ.get("WANDB_BASE_URL", "http://api.wandb.ai")
-    WANDB_ARTIFACT_DIR = os.environ.get("WANDB_ARTIFACT_DIR")
+    WEAVE_LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR")
     netrc_exists = os.path.exists("~/.netrc")
     WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
     WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
@@ -122,7 +122,7 @@ def log_system_info():
     logger.info(f"  WANDB_BASE_URL      = {WANDB_BASE_URL}")
 
     logger.info("Cache Config:")
-    logger.info(f"  WANDB_ARTIFACT_DIR  = {WANDB_ARTIFACT_DIR}")
+    logger.info(f"  WEAVE_LOCAL_ARTIFACT_DIR  = {WEAVE_LOCAL_ARTIFACT_DIR}")
 
     logger.info("Auth Config:")
     logger.info(f"  netrc_exists        = {netrc_exists}")
