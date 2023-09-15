@@ -8,6 +8,7 @@ const ALLOWED_CJS_MODULES = [
   'src', // allow absolute imports from weave root
   'react',
   'react-dom',
+  'react-select',
   'lodash',
   '@segment',
   '@babel/runtime',
@@ -36,6 +37,7 @@ const ALLOWED_CJS_MODULES = [
 
   '@emotion/stylis',
   '@emotion/unitless',
+  '@emtion/weak-memoize',
   '@hypnosphi/create-react-context',
   '@material-ui/core/Avatar',
   '@material-ui/core/ButtonBase',
