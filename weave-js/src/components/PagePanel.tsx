@@ -3,12 +3,16 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
-import getConfig from '../config';
 
+import getConfig from '../config';
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
+import {getCookie} from '../common/util/cookie';
+import {consoleLog} from '../util';
+import {trackPage} from '../util/events';
 import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
@@ -26,6 +30,7 @@ import {
   ChildPanelConfigComp,
   ChildPanelFullConfig,
 } from './Panel2/ChildPanel';
+import {ChildPanelExportReport} from './Panel2/ChildPanelExportReport/ChildPanelExportReport';
 import {themes} from './Panel2/Editor.styles';
 import {
   IconAddNew,
@@ -41,18 +46,14 @@ import {
 } from './Panel2/PanelGroup';
 import {
   PanelInteractContextProvider,
-  useCloseEditor,
-  useEditorIsOpen,
-  useSetInspectingPanel,
+  useCloseDrawer,
+  usePanelInteractMode,
+  useSetInteractingPanel,
 } from './Panel2/PanelInteractContext';
 import {useUpdateServerPanel} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
-import Inspector from './Sidebar/Inspector';
+import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
 import {useWeaveAutomation} from './automation';
-import {consoleLog} from '../util';
-import {trackPage} from '../util/events';
-import {getCookie} from '../common/util/cookie';
-import {useHistory} from 'react-router-dom';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -120,6 +121,24 @@ function useEnablePageAnalytics() {
   const pathRef = useRef('');
   const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
 
+  const trackOnPathDiff = useCallback(
+    (location: any, options: any) => {
+      const currentPath = `${location.pathname}${location.search}`;
+      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+      if (pathRef.current !== currentPath) {
+        let pageName = '';
+        if (location.search.includes('exp=get')) {
+          pageName = 'WeaveGetExpression';
+        } else if (location.pathname.includes('/browse')) {
+          pageName = 'WeaveBrowser';
+        }
+        trackPage({url: fullURL, pageName}, options);
+        pathRef.current = currentPath;
+      }
+    },
+    [pathRef]
+  );
+
   // fetch user
   useEffect(() => {
     const anonApiKey = getCookie('anon_api_key');
@@ -159,28 +178,17 @@ function useEnablePageAnalytics() {
       },
     };
 
-    // TODO: Make this DRY-er
     const unlisten = history.listen(location => {
-      const currentPath = `${location.pathname}${location.search}`;
-      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
-      if (pathRef.current !== currentPath) {
-        trackPage({url: fullURL}, options);
-        pathRef.current = currentPath;
-      }
+      trackOnPathDiff(location, options);
     });
 
     // Track initial page view
-    const initialPath = `${history.location.pathname}${history.location.search}`;
-    const entireURL = `${window.location.protocol}//${window.location.host}${history.location.pathname}${history.location.search}${history.location.hash}`;
-    if (pathRef.current !== initialPath) {
-      trackPage({url: entireURL}, options);
-      pathRef.current = initialPath;
-    }
+    trackOnPathDiff(history.location, options);
 
     return () => {
       unlisten();
     };
-  }, [history]);
+  }, [history, trackOnPathDiff]);
 }
 
 // Simple function that forces rerender when URL changes.
@@ -456,7 +464,7 @@ type PageContentProps = {
 export const PageContent: FC<PageContentProps> = props => {
   const {config, updateConfig, updateConfig2, goHome} = props;
   const weave = useWeaveContext();
-  const editorIsOpen = useEditorIsOpen();
+  const panelInteractMode = usePanelInteractMode();
   const inJupyter = inJupyterCell();
   const {urlPrefixed} = getConfig();
 
@@ -538,18 +546,20 @@ export const PageContent: FC<PageContentProps> = props => {
           updateConfig2={updateConfig2}
         />
       </div>
-      <Inspector active={editorIsOpen}>
-        <ChildPanelConfigComp
-          // pathEl={CHILD_NAME}
-          config={config}
-          updateConfig={updateConfig}
-          updateConfig2={updateConfig2}
-        />
-      </Inspector>
+      <PanelInteractDrawer active={panelInteractMode !== null}>
+        {panelInteractMode === 'config' && (
+          <ChildPanelConfigComp
+            config={config}
+            updateConfig={updateConfig}
+            updateConfig2={updateConfig2}
+          />
+        )}
+        {panelInteractMode === 'export-report' && <ChildPanelExportReport />}
+      </PanelInteractDrawer>
       {inJupyter && (
         <JupyterPageControls
           {...props}
-          reveal={showJupyterControls && !editorIsOpen}
+          reveal={showJupyterControls && panelInteractMode === null}
           goHome={goHome}
           openNewTab={openNewTab}
           maybeUri={maybeUri}
@@ -576,9 +586,9 @@ const JupyterPageControls: React.FC<
   const [hoverText, setHoverText] = useState('');
   // TODO(fix): Hiding code export temporarily as it is partially broken
   // const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
-  const setInspectingPanel = useSetInspectingPanel();
-  const closeEditor = useCloseEditor();
-  const editorIsOpen = useEditorIsOpen();
+  const setInteractingPanel = useSetInteractingPanel();
+  const closeDrawer = useCloseDrawer();
+  const panelInteractMode = usePanelInteractMode();
   const updateInput = useCallback(
     (newInput: NodeOrVoidNode) => {
       props.updateConfig2(oldConfig => {
@@ -662,10 +672,10 @@ const JupyterPageControls: React.FC<
         </JupyterControlsIcon>
       )}
 
-      {editorIsOpen ? (
+      {panelInteractMode !== null ? (
         <JupyterControlsIcon
           onClick={() => {
-            closeEditor();
+            closeDrawer();
             setHoverText('Edit configuration');
           }}
           onMouseEnter={e => {
@@ -679,7 +689,7 @@ const JupyterPageControls: React.FC<
       ) : (
         <JupyterControlsIcon
           onClick={() => {
-            setInspectingPanel(['']);
+            setInteractingPanel('config', ['']);
             setHoverText('Close configuration editor');
           }}
           onMouseEnter={e => {

@@ -125,20 +125,6 @@ def user_by_api_key_in_env(
 
 
 @pytest.fixture(scope=determine_scope)
-def user_by_http_headers_in_env(
-    bootstrap_user: LocalBackendFixturePayload, serial
-) -> Generator[LocalBackendFixturePayload, None, None]:
-    with unittest.mock.patch.dict(
-        os.environ,
-        {
-            "WEAVE_WANDB_COOKIE": bootstrap_user.cookie,
-        },
-    ):
-        with from_environment():
-            yield bootstrap_user
-
-
-@pytest.fixture(scope=determine_scope)
 def user_by_api_key_netrc(
     bootstrap_user: LocalBackendFixturePayload,
 ) -> Generator[LocalBackendFixturePayload, None, None]:

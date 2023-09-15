@@ -1,8 +1,15 @@
+from typing import Optional, Iterable
+
+
 class WeaveUnmergableArtifactsError(Exception):
     pass
 
 
-class WeaveBaseError(Exception):
+class WeaveFingerprintErrorMixin:
+    fingerprint: Optional[Iterable] = None
+
+
+class WeaveBaseError(Exception, WeaveFingerprintErrorMixin):
     pass
 
 

@@ -31,9 +31,9 @@ class GQLTypedDictToTypedDict(TypedDictToPyDict):
 
 class GQLUnionToUnion(UnionMapper):
     def apply(self, obj):
+        if obj is None:
+            return None
         if self.is_single_object_nullable:
-            if obj is None:
-                return None
             non_null_mapper = next(
                 filter(
                     lambda m: not types.NoneType().assign_type(m.type),

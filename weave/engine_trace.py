@@ -16,12 +16,9 @@ import multiprocessing
 import logging
 import time
 import json
-import random
 import dataclasses
-from ddtrace.internal import service
 
 from . import logs
-from . import environment
 
 
 # Thanks co-pilot!
@@ -93,9 +90,6 @@ def weave_trace_stream():
     if _weave_trace_stream is None:
         from weave.wandb_interface.wandb_stream_table import StreamTable
 
-        logging.info(
-            "Setting up weave trace stream at %s", os.getenv("WEAVE_TRACE_STREAM")
-        )
         _weave_trace_stream = StreamTable(os.getenv("WEAVE_TRACE_STREAM"))
     return _weave_trace_stream
 
@@ -192,7 +186,7 @@ class WeaveTrace:
         return cur_span
 
 
-def dd_span_to_weave_span(dd_span):
+def dd_span_to_weave_span(dd_span) -> dict[str, typing.Any]:
     # Use '' for None, currently history2 doesn't read None columns from
     # the liveset correctly.
     parent_id = ""
@@ -210,8 +204,6 @@ def dd_span_to_weave_span(dd_span):
 
 
 def send_proc(queue):
-    os.environ["WANDB_API_KEY"] = os.getenv("WEAVE_ADMIN_STREAM_TABLE_API_KEY")
-
     while True:
         spans = queue.get()
         if spans is None:
@@ -227,51 +219,27 @@ def send_proc(queue):
 # My guess is this is because logging to StreamTable uses gql, which is wrapped
 # by datadog, so we have some kind of re-entrancy/deadlock. Putting in a separate
 # process fixes.
-
-
 class WeaveWriter:
     def __init__(self, orig_writer):
         self._orig_writer = orig_writer
         self._queue = multiprocessing.Queue()
-        self._proc = multiprocessing.Process(
-            target=send_proc, args=(self._queue,), name="WeaveTraceWriter"
-        )
+        self._proc = multiprocessing.Process(target=send_proc, args=(self._queue,))
 
     def recreate(self):
         return WeaveWriter(self._orig_writer.recreate())
 
     def stop(self, timeout=None):
-        try:
-            self._orig_writer.stop(timeout)
-        except service.ServiceStatusError:
-            # its already stopped
-            pass
+        self._orig_writer.stop(timeout)
 
     def _ensure_started(self):
         if not self._proc.is_alive():
             self._proc.start()
 
-    @staticmethod
-    def apply_sampling(spans):
-        # Here we apply sampling to the spans, so we don't send too much data to W&B.
-        # We do this by generating a random number between 0 and 1, and only sending
-        # the full trace if the number is less than the sampling rate.
-        # Otherwise, we send a single span, which is the root span of the trace.
-
-        random_number = random.random()
-        trace_sampling_rate = environment.trace_sampling_rate()
-
-        if random_number >= trace_sampling_rate:
-            spans = list(filter(lambda s: s.parent_id is None, spans))
-
-        return spans
-
     def write(self, spans):
         if len(spans) == 1:
             return
         self._ensure_started()
-        weave_spans = [dd_span_to_weave_span(s) for s in self.apply_sampling(spans)]
-        self._queue.put(weave_spans)
+        self._queue.put([dd_span_to_weave_span(s) for s in spans])
         self._orig_writer.write(spans)
 
     def flush_queue(self):
@@ -279,6 +247,7 @@ class WeaveWriter:
 
 
 def tracer():
+
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
@@ -286,7 +255,6 @@ def tracer():
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
             # mirror DataDog trace info to W&B.
             # In this mode we log a table of spans, as opposed to traces.
-
             if not isinstance(ddtrace_tracer._writer, WeaveWriter):
                 ddtrace_tracer._writer = WeaveWriter(ddtrace_tracer._writer)
                 from ddtrace.internal.processor.trace import SpanAggregator

@@ -31,6 +31,9 @@ import {
   urlRecentTables,
 } from '../../../urls';
 import getConfig from '../../../config';
+import {ErrorBoundary} from '../../ErrorBoundary';
+import {HomeFeaturedTemplates} from './HomeFeaturedTemplates';
+import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -58,7 +61,21 @@ export type HomeParams = {
 const HomeComp: FC<HomeProps> = props => {
   const history = useHistory();
   const params = useParams<HomeParams>();
-  const [previewNode, setPreviewNode] = useState<React.ReactNode>();
+  const [previewNode, setPreviewNodeRaw] = useState<{
+    node: React.ReactNode;
+    requestedWidth?: string;
+  }>();
+  const viewerIsEmployee = useIsViewerWandbEmployee();
+  const setPreviewNode = useCallback(
+    (node: React.ReactNode, requestedWidth?: string) => {
+      if (node == null) {
+        setPreviewNodeRaw(undefined);
+      } else {
+        setPreviewNodeRaw({node, requestedWidth});
+      }
+    },
+    []
+  );
   const navigateToExpression: NavigateToExpressionType = useCallback(
     newDashExpr => {
       setPreviewNode(undefined);
@@ -69,7 +86,7 @@ const HomeComp: FC<HomeProps> = props => {
         config: undefined,
       });
     },
-    [props]
+    [props, setPreviewNode]
   );
   const isLocallyServed = isServedLocally();
   const isAuthenticated = useIsAuthenticated();
@@ -109,7 +126,7 @@ const HomeComp: FC<HomeProps> = props => {
     } else {
       return [];
     }
-  }, [history, props.browserType, params.assetType]);
+  }, [props.browserType, params.assetType, setPreviewNode, history]);
 
   const wandbSection = useMemo(() => {
     return userEntities.result.length === 0
@@ -143,7 +160,6 @@ const HomeComp: FC<HomeProps> = props => {
                   props.browserType === 'wandb' && params.entity === entity,
                 to: urlEntity(entity),
                 onClick: () => {
-                  console.log('setpreview node undefined');
                   setPreviewNode(undefined);
                   history.push(urlEntity(entity));
                 },
@@ -151,11 +167,12 @@ const HomeComp: FC<HomeProps> = props => {
           },
         ];
   }, [
-    params,
-    history,
-    props.browserType,
     userEntities.result,
     userName.result,
+    props.browserType,
+    params.entity,
+    setPreviewNode,
+    history,
   ]);
 
   const localSection = useMemo(() => {
@@ -193,7 +210,7 @@ const HomeComp: FC<HomeProps> = props => {
         ],
       },
     ];
-  }, [history, props.browserType, isLocallyServed]);
+  }, [isLocallyServed, props.browserType, setPreviewNode, history]);
 
   const navSections = useMemo(() => {
     return [...recentSection, ...wandbSection, ...localSection];
@@ -251,6 +268,11 @@ const HomeComp: FC<HomeProps> = props => {
       <LayoutElements.Block>
         <HomeTopBar />
       </LayoutElements.Block>
+      {viewerIsEmployee && (
+        <LayoutElements.Block>
+          <HomeFeaturedTemplates setPreviewNode={setPreviewNode} />
+        </LayoutElements.Block>
+      )}
       {/* Main Region */}
       <LayoutElements.HSpace
         style={{
@@ -265,32 +287,37 @@ const HomeComp: FC<HomeProps> = props => {
         {/* Center Content */}
         {!loading && (
           <CenterSpace>
-            {props.browserType === 'recent' ? (
-              // This should never come up
-              <Placeholder />
-            ) : props.browserType === 'wandb' ? (
-              <CenterEntityBrowser
-                navigateToExpression={navigateToExpression}
-                setPreviewNode={setPreviewNode}
-                entityName={params.entity ?? ''}
-              />
-            ) : props.browserType === 'local' ? (
-              <CenterLocalBrowser
-                navigateToExpression={navigateToExpression}
-                setPreviewNode={setPreviewNode}
-              />
-            ) : (
-              // This should never come up
-              <Placeholder />
-            )}
+            <ErrorBoundary key={pathname}>
+              {props.browserType === 'recent' ? (
+                // This should never come up
+                <Placeholder />
+              ) : props.browserType === 'wandb' ? (
+                <CenterEntityBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                  entityName={params.entity ?? ''}
+                />
+              ) : props.browserType === 'local' ? (
+                <CenterLocalBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                />
+              ) : (
+                // This should never come up
+                <Placeholder />
+              )}
+            </ErrorBoundary>
           </CenterSpace>
         )}
         {/* Right Bar */}
         <LayoutElements.Block
           style={{
-            width: previewNode != null ? '400px' : '0px',
+            width:
+              previewNode != null
+                ? previewNode.requestedWidth ?? '400px'
+                : '0px',
           }}>
-          {previewNode}
+          {previewNode?.node}
         </LayoutElements.Block>
       </LayoutElements.HSpace>
     </LayoutElements.VStack>

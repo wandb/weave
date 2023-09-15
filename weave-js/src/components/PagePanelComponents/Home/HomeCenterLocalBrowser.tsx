@@ -57,6 +57,9 @@ export const CenterLocalBrowser: React.FC<
 
   const {setPreviewNode, navigateToExpression} = props;
   useEffect(() => {
+    if (localDashboards.loading) {
+      return;
+    }
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
       if (row) {
@@ -77,7 +80,13 @@ export const CenterLocalBrowser: React.FC<
     } else {
       setPreviewNode(undefined);
     }
-  }, [params.preview, setPreviewNode, navigateToExpression, browserData]);
+  }, [
+    params.preview,
+    setPreviewNode,
+    navigateToExpression,
+    browserData,
+    localDashboards.loading,
+  ]);
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
