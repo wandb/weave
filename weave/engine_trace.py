@@ -202,6 +202,11 @@ def dd_span_to_weave_span(dd_span) -> stream_data_interfaces.TraceSpanDict:
         "trace_id": str(dd_span.trace_id),
         "span_id": str(dd_span.span_id),
         "parent_id": parent_id,
+        "status_code": None,
+        "inputs": None,
+        "output": None,
+        "summary": None,
+        "exception": None,
     }
 
 
