@@ -15,7 +15,7 @@ import logging
 from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
 from .. import graph
-from . import stream_data_interfaces
+from .. import stream_data_interfaces
 
 logger = logging.getLogger(__name__)
 
