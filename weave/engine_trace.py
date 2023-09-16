@@ -19,6 +19,7 @@ import json
 import dataclasses
 
 from . import logs
+from . import stream_data_interfaces
 
 
 # Thanks co-pilot!
@@ -186,20 +187,26 @@ class WeaveTrace:
         return cur_span
 
 
-def dd_span_to_weave_span(dd_span) -> dict[str, typing.Any]:
+def dd_span_to_weave_span(dd_span) -> stream_data_interfaces.TraceSpanDict:
     # Use '' for None, currently history2 doesn't read None columns from
     # the liveset correctly.
     parent_id = ""
     if dd_span.parent_id is not None:
         parent_id = str(dd_span.parent_id)
+
     return {
         "name": dd_span.name,
-        "start_time_ms": dd_span.start_ns / 1e6,
-        "end_time_ms": (dd_span.start_ns + dd_span.duration_ns) / 1e6,
+        "start_time_s": dd_span.start_ns / 1e9,
+        "end_time_s": (dd_span.start_ns + dd_span.duration_ns) / 1e9,
         "attributes": dd_span.get_tags(),
         "trace_id": str(dd_span.trace_id),
         "span_id": str(dd_span.span_id),
         "parent_id": parent_id,
+        "status_code": "UNSET",
+        "inputs": None,
+        "output": None,
+        "summary": None,
+        "exception": None,
     }
 
 
@@ -247,7 +254,6 @@ class WeaveWriter:
 
 
 def tracer():
-
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
