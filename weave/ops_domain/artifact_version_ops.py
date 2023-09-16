@@ -409,7 +409,6 @@ def artifact_version_weave_type(
 
 def _get_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
-    maxKeyLimit: typing.Optional[int],
 ) -> dict[str, typing.Any]:
     from ..compile import enable_compile
     from weave.graph import OutputNode, ConstNode
@@ -448,7 +447,6 @@ def _get_history_metrics(
                 },
             ),
             "asOfStep": ConstNode(types.Int(), max(0, history_step - 1)),
-            "maxKeyLimit": ConstNode(types.Int(), maxKeyLimit),
         },
     )
 
@@ -486,11 +484,8 @@ def _get_history_metrics(
 )
 def refine_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
-    maxKeyLimit: typing.Optional[int],
 ) -> types.Type:
-    return wb_util.process_run_dict_type(
-        _get_history_metrics(artifactVersion, maxKeyLimit)
-    )
+    return wb_util.process_run_dict_type(_get_history_metrics(artifactVersion))
 
 
 @op(
@@ -519,9 +514,8 @@ def refine_history_metrics(
 )
 def history_metrics(
     artifactVersion: wdt.ArtifactVersion,
-    maxKeyLimit: typing.Optional[int],
 ) -> dict[str, typing.Any]:
-    return _get_history_metrics(artifactVersion, maxKeyLimit)
+    return _get_history_metrics(artifactVersion)
 
 
 # Special bridge functions to lower level local artifacts
