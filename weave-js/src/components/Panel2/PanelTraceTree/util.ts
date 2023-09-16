@@ -59,7 +59,7 @@ export const SpanWeaveType = {
       members: ['string' as const, 'none' as const],
     },
   },
-  notRequiredKeys: ['exception'],
+  notRequiredKeys: ["status_code", "inputs", "output", "exception", "attributes", "summary"],
 }
 
 export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {

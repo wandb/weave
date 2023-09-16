@@ -113,7 +113,9 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
           },
           render: () => (
             <S.TabWrapper>
-              <GeneralObjectRenderer data={modelObj} />
+              <S.ModelWrapper>
+                <GeneralObjectRenderer data={modelObj} />
+              </S.ModelWrapper>
             </S.TabWrapper>
           ),
         },
