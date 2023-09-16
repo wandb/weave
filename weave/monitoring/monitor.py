@@ -15,6 +15,7 @@ import logging
 from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
 from .. import graph
+from .. import stream_data_interfaces
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,8 @@ def get_function_name(fn: typing.Callable) -> str:
 class TraceSpanStruct:
     # These are OpenTelemetry standard
 
+    parent_id: typing.Optional[str]
+    trace_id: str
     id: str  # span_id
     name: str
     status_code: str = StatusCode.UNSET
@@ -197,7 +200,7 @@ class Span(TraceSpanStruct):
         if self._autoclose:
             self.close()
 
-    def asdict(self) -> dict[str, typing.Any]:
+    def asdict(self) -> stream_data_interfaces.TraceSpanDict:
         if self.end_time is None:
             raise ValueError(
                 "Cannot log a span that has not been ended.  Call span.end() before logging."
