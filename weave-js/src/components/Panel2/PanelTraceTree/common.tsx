@@ -127,7 +127,6 @@ export const opSpanAsDictToLegacySpanShape = ({spanDict}: {spanDict: Node}) => {
     }),
     span_kind: opPick({
       obj: spanDict,
-      // DO NOT MERGE THIS UGLY span_kind ... fix this TIM!
       key: constString('attributes.span_kind'),
     }),
     results: opArray({
