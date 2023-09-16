@@ -223,7 +223,9 @@ class WeaveWriter:
     def __init__(self, orig_writer):
         self._orig_writer = orig_writer
         self._queue = multiprocessing.Queue()
-        self._proc = multiprocessing.Process(target=send_proc, args=(self._queue,))
+        self._proc = multiprocessing.Process(
+            target=send_proc, args=(self._queue,), daemon=True
+        )
 
     def recreate(self):
         return WeaveWriter(self._orig_writer.recreate())
@@ -247,7 +249,6 @@ class WeaveWriter:
 
 
 def tracer():
-
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
