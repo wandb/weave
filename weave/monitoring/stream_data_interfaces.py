@@ -25,7 +25,10 @@ class TraceSpanDict(typing.TypedDict):
     trace_id: str
 
     # The status code conforming to the OpenTelemetry spec
-    status_code: typing.Literal["SUCCESS", "ERROR", "UNSET"]
+    # I would like to use a literal `typing.Literal["SUCCESS", "ERROR", "UNSET"]`
+    # here, but then you have to type it this way everywhere and probably causes
+    # more problems than it solves.
+    status_code: str
 
     # Start and end times in seconds since the epoch
     start_time_s: float
@@ -91,11 +94,7 @@ class _LLMCompletionSummary(typing.TypedDict):
     total_tokens: typing.Optional[int]
 
 
-# Should we subclass TraceSpanDict here?
-class LLMCompletion(typing.TypedDict):
+class LLMCompletion(TraceSpanDict):
     inputs: typing.Optional[_LLMCompletionInputs]
     output: typing.Optional[_LLMCompletionOutput]
     summary: typing.Optional[_LLMCompletionSummary]
-    # I think this might want to be a float if we want
-    # to be JSON compliant. Why not reuse the start_time_s?
-    timestamp: typing.Optional[datetime.datetime]

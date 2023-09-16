@@ -68,7 +68,7 @@ class Span:
     # These are OpenTelemetry standard
 
     parent_id: typing.Optional[str]
-    trace_id: typing.Optional[str]
+    trace_id: str
     id: str  # span_id
     name: str
     status_code: str = StatusCode.UNSET
