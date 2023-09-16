@@ -14,17 +14,20 @@ span_typed_dict_type = weave.types.TypedDict(
         "status_code": weave.types.optional(weave.types.String()),
         "inputs": weave.types.optional(weave.types.TypedDict({})),
         "output": weave.types.optional(weave.types.Any()),
-        # "exception": weave.types.optional(weave.types.String()), # maybe use not_required_keys?
+        "exception": weave.types.optional(weave.types.String()),
         "attributes": weave.types.optional(weave.types.TypedDict({})),
         "summary": weave.types.optional(
             weave.types.TypedDict(
                 {
-                    "latency_s": weave.types.optional(weave.types.Number()),
+                    # "latency_s": weave.types.optional(weave.types.Number()),
                 }
             )
         ),
         "timestamp": weave.types.optional(weave.types.Timestamp()),
-    }
+    },
+    not_required_keys=set(
+        ["status_code" "inputs" "output" "exception" "attributes" "summary"]
+    ),
 )
 
 
