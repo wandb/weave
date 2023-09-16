@@ -15,6 +15,7 @@ import logging
 from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
 from .. import graph
+from . import stream_data_interfaces
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ class Span:
         if self._autoclose:
             self.close()
 
-    def asdict(self) -> dict[str, typing.Any]:
+    def asdict(self) -> stream_data_interfaces.TraceSpanDict:
         if self.end_time is None:
             raise ValueError(
                 "Cannot log a span that has not been ended.  Call span.end() before logging."
