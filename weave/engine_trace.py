@@ -194,14 +194,10 @@ def dd_span_to_weave_span(dd_span) -> stream_data_interfaces.TraceSpanDict:
     if dd_span.parent_id is not None:
         parent_id = str(dd_span.parent_id)
 
-    # Notes: in order to correctly conform to `stream_data_interfaces.TraceSpanDict`,
-    # we should use seconds instead of milliseconds for start_time_s and end_time_s.
-    # Furthermore, in principle, we probably want to use `summary` instead of `attributes`
-    # for calculated values.
     return {
         "name": dd_span.name,
-        "start_time_ms": dd_span.start_ns / 1e6,
-        "end_time_ms": (dd_span.start_ns + dd_span.duration_ns) / 1e6,
+        "start_time_s": dd_span.start_ns / 1e9,
+        "end_time_s": (dd_span.start_ns + dd_span.duration_ns) / 1e9,
         "attributes": dd_span.get_tags(),
         "trace_id": str(dd_span.trace_id),
         "span_id": str(dd_span.span_id),
