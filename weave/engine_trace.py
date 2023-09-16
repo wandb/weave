@@ -19,7 +19,7 @@ import json
 import dataclasses
 
 from . import logs
-from .. import stream_data_interfaces
+from . import stream_data_interfaces
 
 
 # Thanks co-pilot!

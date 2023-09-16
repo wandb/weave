@@ -94,7 +94,54 @@ class _LLMCompletionSummary(typing.TypedDict):
     total_tokens: typing.Optional[int]
 
 
-class LLMCompletion(TraceSpanDict):
+# Ideally we would inherit from TraceSpanDict here, but
+# mypy doesn't support that level of sophistication yet.
+# The only difference between this and TraceSpanDict is
+# the further specification of the inputs, output, and summary.
+class LLMCompletionDict(typing.TypedDict):
+    # **OpenTelemetry spec**
+
+    # The ID of the span - typically a UUID
+    span_id: str
+
+    # The name of the span - typically the name of the operation
+    name: str
+
+    # The ID of the trace this span belongs to - typically a UUID
+    trace_id: str
+
+    # The status code conforming to the OpenTelemetry spec
+    # I would like to use a literal `typing.Literal["SUCCESS", "ERROR", "UNSET"]`
+    # here, but then you have to type it this way everywhere and probably causes
+    # more problems than it solves.
+    status_code: str
+
+    # Start and end times in seconds since the epoch
+    start_time_s: float
+    end_time_s: float
+
+    # The parent span ID - typically a UUID (optional)
+    # if not set, this is a root span
+    parent_id: typing.Optional[str]
+
+    # **Weave specific keys**
+
+    # Attributes are any key value pairs associated with the span,
+    # typically known before the execution operation
+    attributes: typing.Optional[typing.Dict[str, typing.Any]]
+
+    # Inputs are the parameters to the operation
     inputs: typing.Optional[_LLMCompletionInputs]
+
+    # Output is the result of the operation
     output: typing.Optional[_LLMCompletionOutput]
+
+    # Summary is a dictionary of key value pairs that summarize
+    # the execution of the operation. This data is typically only
+    # available after the operation has completed, as a function
+    # of the output.
     summary: typing.Optional[_LLMCompletionSummary]
+
+    # Exception is any free form string describing an exception
+    # that occurred during the execution of the operation
+    exception: typing.Optional[str]

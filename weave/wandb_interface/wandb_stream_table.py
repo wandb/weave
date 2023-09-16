@@ -46,7 +46,7 @@ TRUST_GORILLA_FOR_NESTED_STRUCTURES = True
 ENCODE_ENTIRE_TYPE = True
 TYPE_ENCODE_PREFIX = "_wt_::"
 
-ROW_TYPE = typing.Union[dict, list[dict]]
+ROW_TYPE = typing.Union[typing.Mapping, list[typing.Mapping]]
 
 
 class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
@@ -207,7 +207,7 @@ class _StreamTableSync:
 
         return show(self.rows())
 
-    def _log_row(self, row: dict) -> None:
+    def _log_row(self, row: typing.Mapping) -> None:
         row_copy = {**row}
         row_copy["_client_id"] = self._client_id
         if "timestamp" not in row_copy:
