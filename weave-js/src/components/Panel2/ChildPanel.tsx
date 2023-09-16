@@ -292,7 +292,10 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         return;
       }
 
-      if (isAssignableTo(newExpression.type, handler?.inputType ?? 'invalid')) {
+      if (
+        handler?.inputType !== 'any' &&
+        isAssignableTo(newExpression.type, handler?.inputType ?? 'invalid')
+      ) {
         // If type didn't change, keep current settings
         updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
       } else if (curPanelId === 'Each') {
