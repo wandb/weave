@@ -638,7 +638,6 @@ export const opArtifactVersionRunHistoryRow = makeBasicOp({
   name: 'artifactVersion-historyMetrics',
   argTypes: {
     artifactVersion: TypeHelpers.nullableOneOrMany('artifactVersion' as const),
-    maxKeyLimit: TypeHelpers.maybe('number' as const),
   },
   returnType: inputTypes =>
     mappableNullableTaggableVal(inputTypes, v => typedDict({})),
@@ -687,7 +686,6 @@ export const opArtifactVersionRunHistoryRow = makeBasicOp({
               runName: constString(runName),
             }),
             asOfStep: constNumber(Math.max(0, historyStep - 1)),
-            maxKeyLimit: forwardOp.op.inputs.maxKeyLimit,
           });
         }
       );
@@ -707,7 +705,6 @@ export const opArtifactVersionRunHistoryRow = makeBasicOp({
               runName: constString(rootDataResult.runName),
             }),
             asOfStep: constNumber(Math.max(0, rootDataResult.historyStep - 1)),
-            maxKeyLimit: forwardOp.op.inputs.maxKeyLimit,
           }),
         ])
       )[0];
