@@ -228,7 +228,7 @@ def board(
     trace_viewer_var = overview_tab.add(
         "trace_viewer",
         trace_viewer,
-        layout=weave.panels.GroupPanelLayout(x=0, y=14, w=16, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=14, w=24, h=8),
     )
 
     active_span = trace_viewer_var.active_span()
@@ -255,4 +255,10 @@ template_registry.register(
     board_name,
     BOARD_DISPLAY_NAME,
     BOARD_DESCRIPTION,
+    is_featured=True,
+    instructions_md="""
+# Trace Monitor Board
+
+* Placeholder: employee-only view
+    """,
 )
