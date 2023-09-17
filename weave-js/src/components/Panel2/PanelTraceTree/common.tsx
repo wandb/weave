@@ -13,6 +13,7 @@ import {
   Node,
   opMerge,
   opArray,
+  opNoneCoalesce,
 } from '@wandb/weave/core';
 
 export const chainColor = '#F59B1414';
@@ -122,8 +123,14 @@ export const opSpanAsDictToLegacySpanShape = ({spanDict}: {spanDict: Node}) => {
     status_code: opPick({obj: spanDict, key: constString('status_code')}),
     status_message: opPick({obj: spanDict, key: constString('exception')}),
     attributes: opMerge({
-      lhs: opPick({obj: spanDict, key: constString('attributes')}) as any,
-      rhs: opPick({obj: spanDict, key: constString('summary')}) as any,
+      lhs: opNoneCoalesce({
+        lhs: opPick({obj: spanDict, key: constString('attributes')}),
+        rhs: opDict({} as any),
+      }) as any,
+      rhs: opNoneCoalesce({
+        lhs: opPick({obj: spanDict, key: constString('summary')}),
+        rhs: opDict({} as any),
+      }) as any,
     }),
     span_kind: opPick({
       obj: spanDict,
