@@ -60,12 +60,13 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
     elif tc_type == "bool":
         return types.Boolean()
     elif tc_type == "map":
+        keys = tc["keys"] if "keys" in tc else {}
         return types.TypedDict(
             {
                 key: types.union(
                     *[history_key_type_count_to_weave_type(vv) for vv in val]
                 )
-                for key, val in tc["keys"].items()
+                for key, val in keys.items()
             }
         )
     elif tc_type == "list":
@@ -99,6 +100,22 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
         if possible_type is not None:
             return possible_type
+
+    # Hack: there are circumstances where the user has logged data with a
+    # `_type` key. This is nasty... because so much of our logic depends on
+    # `_type` being a reserved key. In such circumstances the gorilla history
+    # parser will still return the correct keys. This is essentially the same as
+    # the `map` case above. This MUST go last however, since we want to properly
+    # catch any named types first.
+    if "keys" in tc:
+        return types.TypedDict(
+            {
+                key: types.union(
+                    *[history_key_type_count_to_weave_type(vv) for vv in val]
+                )
+                for key, val in tc["keys"].items()
+            }
+        )
     return types.UnknownType()
 
 
