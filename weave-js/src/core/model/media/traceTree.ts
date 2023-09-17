@@ -22,6 +22,7 @@ export type SpanType = {
   results?: ResultType[];
   child_spans?: SpanType[];
   span_kind?: SpanKindType;
+  _span_index?: number; // special field to unmap the span
 };
 
 // Flat representation of a span, this is a TypedDict

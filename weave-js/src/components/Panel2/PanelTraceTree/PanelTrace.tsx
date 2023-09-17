@@ -1,61 +1,31 @@
 import * as Panel2 from '../panel';
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {TraceTreeSpanViewer} from './PanelTraceTreeTrace';
 import {useNodeValue} from '@wandb/weave/react';
 import {
   constFunction,
   constNumber,
-  constString,
   listObjectType,
-  opDict,
   opLimit,
   opMap,
-  opPick,
 } from '@wandb/weave/core';
 import {Loader} from 'semantic-ui-react';
-import {flatToTrees, unifyRoots} from './util';
+import {SpanWeaveType, flatToTrees, unifyRoots} from './util';
+import {opSpanAsDictToLegacySpanShape} from './common';
+import * as S from './lct.style';
+import {GeneralObjectRenderer} from './PanelTraceTreeModel';
 
 const inputType = {
   type: 'list' as const,
-  objectType: {
-    type: 'typedDict' as const,
-    propertyTypes: {
-      trace_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      span_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      parent_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      name: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      start_time_s: {
-        type: 'union' as const,
-        members: ['number' as const, 'none' as const],
-      },
-      end_time_s: {
-        type: 'union' as const,
-        members: ['number' as const, 'none' as const],
-      },
-      attributes: {
-        type: 'union' as const,
-        members: [
-          {type: 'typedDict' as const, propertyTypes: {}},
-          'none' as const,
-        ],
-      },
-    },
-  },
+  objectType: SpanWeaveType,
 };
 
-type PanelTraceTreeTraceProps = Panel2.PanelProps<typeof inputType>;
+type PanelTraceTreeTraceProps = Panel2.PanelProps<
+  typeof inputType,
+  {
+    selectedSpanIndex?: number;
+  }
+>;
 
 const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
   const query = useMemo(() => {
@@ -64,18 +34,7 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
       arr: limited as any,
       mapFn: constFunction(
         {row: listObjectType(props.input.type), index: 'number'},
-        ({row, index}) =>
-          opDict({
-            name: opPick({obj: row, key: constString('name')}),
-            start_time_s: opPick({
-              obj: row,
-              key: constString('start_time_s'),
-            }),
-            end_time_s: opPick({obj: row, key: constString('end_time_s')}),
-            trace_id: opPick({obj: row, key: constString('trace_id')}),
-            span_id: opPick({obj: row, key: constString('span_id')}),
-            parent_id: opPick({obj: row, key: constString('parent_id')}),
-          } as any)
+        ({row, index}) => opSpanAsDictToLegacySpanShape({spanDict: row})
       ),
     } as any);
   }, [props.input]);
@@ -85,14 +44,86 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
       nodeValue.loading ? null : unifyRoots(flatToTrees(nodeValue.result)),
     [nodeValue.loading, nodeValue.result]
   );
+  const setSelectedSpanIndex = useCallback(
+    (selectedSpanIndex: number) => {
+      props.updateConfig({selectedSpanIndex});
+    },
+    [props]
+  );
+  const [selectedTab, setSelectedTab] = React.useState(0);
+
   if (tree == null) {
     return <Loader />;
   }
-  return <TraceTreeSpanViewer span={tree} />;
+
+  const modelId = tree.attributes?.model?.id;
+  let modelObj = tree.attributes?.model?.obj;
+  if (typeof modelObj === 'string') {
+    try {
+      modelObj = JSON.parse(modelObj);
+    } catch (e) {
+      console.log(e);
+      modelObj = null;
+    }
+  }
+  let modelTitle = 'Model Architecture';
+  if (modelId != null) {
+    modelTitle += ` (ID: ${modelId})`;
+  }
+
+  if (modelObj == null) {
+    return (
+      <TraceTreeSpanViewer
+        span={tree}
+        selectedSpanIndex={props.config?.selectedSpanIndex}
+        onSelectSpanIndex={setSelectedSpanIndex}
+      />
+    );
+  }
+
+  return (
+    <S.SimpleTabs
+      activeIndex={selectedTab}
+      onTabChange={(e: any, p: any) => {
+        setSelectedTab(p?.activeIndex ?? 0);
+      }}
+      panes={[
+        {
+          menuItem: {
+            key: 'trace',
+            content: `Trace Timeline`,
+          },
+          render: () => (
+            <S.TabWrapper>
+              <TraceTreeSpanViewer
+                span={tree}
+                selectedSpanIndex={props.config?.selectedSpanIndex}
+                onSelectSpanIndex={setSelectedSpanIndex}
+              />
+              );
+            </S.TabWrapper>
+          ),
+        },
+        {
+          menuItem: {
+            key: 'model',
+            content: modelTitle,
+          },
+          render: () => (
+            <S.TabWrapper>
+              <S.ModelWrapper>
+                <GeneralObjectRenderer data={modelObj} />
+              </S.ModelWrapper>
+            </S.TabWrapper>
+          ),
+        },
+      ]}
+    />
+  );
 };
 
 export const Spec: Panel2.PanelSpec = {
-  id: 'Trace',
+  id: 'tracePanel',
   canFullscreen: true,
   Component: PanelTraceRender,
   inputType,
