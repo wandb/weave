@@ -186,6 +186,10 @@ export const SpanTreeDetail: React.FC<{
 
 export const Spec: Panel2.PanelSpec = {
   id: 'traceSpanPanel',
+  // Keep this hidden for now. I think we might want tio unhide this in the future,
+  // but limiting product scope for now. This is a special panel that knows how to display
+  // a single span. It is useful if we want to decouple the detail view from the tree view.
+  hidden: true,
   canFullscreen: true,
   Component: PanelTraceSpan,
   inputType,

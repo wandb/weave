@@ -233,11 +233,11 @@ def board(
 
     active_span = trace_viewer_var.active_span()
 
-    selected_trace_obj = overview_tab.add(
-        "selected_trace_obj",
-        active_span,
-        layout=weave.panels.GroupPanelLayout(x=16, y=14, w=8, h=16),
-    )
+    # selected_trace_obj = overview_tab.add(
+    #     "selected_trace_obj",
+    #     active_span,
+    #     layout=weave.panels.GroupPanelLayout(x=16, y=14, w=8, h=16),
+    # )
 
     similar_spans = all_spans.filter(lambda row: row["name"] == active_span["name"])
 
@@ -245,7 +245,7 @@ def board(
     similar_spans_table_var = overview_tab.add(
         "similar_spans_table",
         similar_spans_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=22, w=16, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=22, w=24, h=8),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)

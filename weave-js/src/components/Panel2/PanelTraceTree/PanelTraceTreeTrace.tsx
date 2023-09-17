@@ -62,7 +62,6 @@ const PanelTraceTreeTrace: React.FC<PanelTraceTreeTraceProps> = props => {
 
 export const TraceTreeSpanViewer: React.FC<{
   span: SpanType;
-  hideDetail?: boolean;
   onSelectSpanIndex?: (spanIndex: number) => void;
   selectedSpanIndex?: number | null;
 }> = props => {
@@ -140,7 +139,7 @@ export const TraceTreeSpanViewer: React.FC<{
         </S.TraceTimeline>
         {tipOverlay}
       </S.TraceTimelineWrapper>
-      {selectedSpan && !props.hideDetail && (
+      {selectedSpan && (
         <S.TraceDetail>
           <SpanTreeDetail span={selectedSpan} />
         </S.TraceDetail>

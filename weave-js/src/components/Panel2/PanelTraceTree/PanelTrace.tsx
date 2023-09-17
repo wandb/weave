@@ -77,7 +77,6 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
         span={tree}
         selectedSpanIndex={props.config?.selectedSpanIndex}
         onSelectSpanIndex={setSelectedSpanIndex}
-        hideDetail={true}
       />
     );
   }
@@ -100,7 +99,6 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
                 span={tree}
                 selectedSpanIndex={props.config?.selectedSpanIndex}
                 onSelectSpanIndex={setSelectedSpanIndex}
-                hideDetail={true}
               />
               );
             </S.TabWrapper>
