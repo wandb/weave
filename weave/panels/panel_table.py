@@ -139,7 +139,7 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         name: typing.Optional[str] = None,
         groupby: bool = False,
         sort_dir: typing.Optional[str] = None,
-        panel_def: table_state.PanelDef | None | str = None,
+        panel_def: typing.Union[table_state.PanelDef, None, str] = None,
     ) -> str:
         config = typing.cast(TableConfig, self.config)
         if isinstance(panel_def, str):

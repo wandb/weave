@@ -16,18 +16,11 @@ span_typed_dict_type = weave.types.TypedDict(
         "output": weave.types.optional(weave.types.Any()),
         "exception": weave.types.optional(weave.types.String()),
         "attributes": weave.types.optional(weave.types.TypedDict({})),
-        "summary": weave.types.optional(
-            weave.types.TypedDict(
-                {
-                    # "latency_s": weave.types.optional(weave.types.Number()),
-                }
-            )
-        ),
+        "summary": weave.types.optional(weave.types.TypedDict({})),
         "timestamp": weave.types.optional(weave.types.Timestamp()),
     },
     not_required_keys=set(
-        ["status_code", "inputs", "output", "exception"]
-        # ["status_code", "inputs", "output", "exception", "attributes", "summary"]
+        ["status_code", "inputs", "output", "exception", "attributes", "summary"]
     ),
 )
 

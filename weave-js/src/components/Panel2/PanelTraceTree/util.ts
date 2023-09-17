@@ -59,8 +59,15 @@ export const SpanWeaveType = {
       members: ['string' as const, 'none' as const],
     },
   },
-  notRequiredKeys: ["status_code", "inputs", "output", "exception", "attributes", "summary"],
-}
+  notRequiredKeys: [
+    'status_code',
+    'inputs',
+    'output',
+    'exception',
+    'attributes',
+    'summary',
+  ],
+};
 
 export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
   const roots: SpanType[] = [];
@@ -74,7 +81,7 @@ export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
       end_time_ms: span.end_time_ms,
       attributes: span.attributes,
       child_spans: [],
-      '_span_index': index,
+      _span_index: index,
     };
   });
   flat.forEach(span => {
@@ -119,4 +126,3 @@ export const unifyRoots = (roots: SpanType[]): SpanType => {
     child_spans: roots,
   };
 };
-
