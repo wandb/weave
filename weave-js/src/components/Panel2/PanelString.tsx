@@ -146,14 +146,12 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
 
 export const PanelString: React.FC<PanelStringProps> = props => {
   const config = props.config ?? defaultConfig();
-  const arrNode = opArray({
-    0: props.input,
-    1: config.diffComparand ?? props.input,
-  } as any);
+  const inputValue = CGReact.useNodeValue(props.input);
+  const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
+  const loading = inputValue.loading || compValue.loading;
 
-  const nodeValueQuery = CGReact.useNodeValue(arrNode);
-  const fullStr = String(nodeValueQuery?.result?.[0] ?? '-');
-  const comparandStr = String(nodeValueQuery?.result?.[1] ?? ''); // Default comparand is empty string
+  const fullStr = String(inputValue?.result ?? '-');
+  const comparandStr = String(compValue?.result ?? ''); // Default comparand is empty string
 
   const [contentHeight, setContentHeight] = React.useState(0);
 
@@ -238,7 +236,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);
 
-  if (nodeValueQuery.loading) {
+  if (loading) {
     return <Panel2Loader />;
   }
 
