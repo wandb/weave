@@ -488,7 +488,8 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
           (type.type as string) === 'tablePanel' &&
           (toType.type as string) === 'tablePanel') ||
         ((type.type as string) === 'Query' &&
-          (toType.type as string) === 'Query') || ((type.type as string) === 'tracePanel' &&
+          (toType.type as string) === 'Query') ||
+        ((type.type as string) === 'tracePanel' &&
           (toType.type as string) === 'tracePanel')
       ) {
         return true;

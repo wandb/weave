@@ -85,13 +85,13 @@ export const TraceTreeSpanViewer: React.FC<{
     useUpdatingState<LayedOutSpanType | null>(layedOutSpan);
 
   const setSelectedSpan = useCallback(
-    (span: LayedOutSpanType | null) => {
+    (newSelectedSpan: LayedOutSpanType | null) => {
       if (props.onSelectSpanIndex != null) {
-        if (span != null && span._span_index != null) {
-          props.onSelectSpanIndex(span._span_index);
+        if (newSelectedSpan != null && newSelectedSpan._span_index != null) {
+          props.onSelectSpanIndex(newSelectedSpan._span_index);
         }
       } else {
-        setSelectedSpanUncontrolled(span);
+        setSelectedSpanUncontrolled(newSelectedSpan);
       }
     },
     [props, setSelectedSpanUncontrolled]
@@ -101,7 +101,7 @@ export const TraceTreeSpanViewer: React.FC<{
     if (props.onSelectSpanIndex != null) {
       if (props.selectedSpanIndex != null) {
         return flatSpans.find(
-          span => span._span_index === props.selectedSpanIndex
+          innerSpan => innerSpan._span_index === props.selectedSpanIndex
         );
       }
       return flatSpans[0];
