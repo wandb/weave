@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import json
+import typing
 
 import wandb
 from wandb.sdk.data_types import trace_tree
@@ -12,15 +13,20 @@ from weave.monitoring import StreamTable
 from langchain.callbacks.tracers.base import BaseTracer
 from langchain.callbacks.tracers.schemas import Run
 from langchain.callbacks.tracers import wandb as LCW
+from wandb.sdk.data_types.trace_tree import Span as WBSpan
 
 from uuid import uuid4
 
 
 # We rely on all the hard work already in our W&B integration and just
 # simply map the properties of the WB Span to the Weave Span
-def wb_span_to_weave_spans(wb_span, trace_id=None, parent_id=None):
-    attributes = {**wb_span.attributes}
-    if hasattr(wb_span, "span_kind"):
+def wb_span_to_weave_spans(
+    wb_span: WBSpan,
+    trace_id: typing.Optional[str] = None,
+    parent_id: typing.Optional[str] = None,
+) -> typing.List[weave.stream_data_interfaces.TraceSpanDict]:
+    attributes = {**wb_span.attributes} if wb_span.attributes is not None else {}
+    if hasattr(wb_span, "span_kind") and wb_span.span_kind is not None:
         attributes["span_kind"] = str(wb_span.span_kind)
     inputs = (
         wb_span.results[0].inputs
@@ -36,6 +42,14 @@ def wb_span_to_weave_spans(wb_span, trace_id=None, parent_id=None):
     # Super Hack - fix merge!
     dummy_dict = {"_": ""} if parent_id == None else {}
 
+    if (
+        wb_span.start_time_ms is None
+        or wb_span.end_time_ms is None
+        or wb_span.span_id is None
+        or wb_span.name is None
+    ):
+        return []
+
     span = weave.stream_data_interfaces.TraceSpanDict(
         start_time_s=wb_span.start_time_ms / 1000.0,
         end_time_s=wb_span.end_time_ms / 1000.0,
@@ -50,7 +64,7 @@ def wb_span_to_weave_spans(wb_span, trace_id=None, parent_id=None):
         summary=dummy_dict,
         inputs=inputs,
         output=outputs,
-        exception=Exception(wb_span.status_message)
+        exception=wb_span.status_message
         if wb_span.status_message is not None
         else None,
     )
@@ -66,13 +80,15 @@ def _hash_id(s: str) -> str:
 
 
 class WeaveTracer(BaseTracer):
-    def __init__(self, stream_uri: str, **kwargs) -> None:
+    def __init__(self, stream_uri: str, **kwargs: typing.Any) -> None:
         super().__init__(**kwargs)
         self.run_processor = LCW.RunProcessor(wandb, trace_tree)
         self._st = StreamTable(stream_uri)
 
     def _persist_run(self, run: Run) -> None:
         root_span = self.run_processor.process_span(run)
+        if root_span is None:
+            return
         model_dict = self.run_processor.process_model(run)
         model_str = json.dumps(model_dict)
         root_span.attributes["model"] = {
