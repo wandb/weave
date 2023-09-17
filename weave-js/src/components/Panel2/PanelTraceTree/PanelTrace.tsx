@@ -52,23 +52,26 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
   );
   const [selectedTab, setSelectedTab] = React.useState(0);
 
-  if (tree == null) {
-    return <Loader />;
-  }
-
-  const modelId = tree.attributes?.model?.id;
-  let modelObj = tree.attributes?.model?.obj;
-  if (typeof modelObj === 'string') {
-    try {
-      modelObj = JSON.parse(modelObj);
-    } catch (e) {
-      console.log(e);
-      modelObj = null;
+  const modelId = tree?.attributes?.model?.id;
+  const modelObj = React.useMemo(() => {
+    let modelObjInner = tree?.attributes?.model?.obj;
+    if (typeof modelObjInner === 'string') {
+      try {
+        modelObjInner = JSON.parse(modelObjInner);
+      } catch (e) {
+        console.log(e);
+        modelObjInner = null;
+      }
     }
-  }
+    return modelObjInner;
+  }, [tree?.attributes?.model?.obj]);
   let modelTitle = 'Model Architecture';
   if (modelId != null) {
     modelTitle += ` (ID: ${modelId})`;
+  }
+
+  if (tree == null) {
+    return <Loader />;
   }
 
   if (modelObj == null) {
@@ -100,7 +103,6 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
                 selectedSpanIndex={props.config?.selectedSpanIndex}
                 onSelectSpanIndex={setSelectedSpanIndex}
               />
-              );
             </S.TabWrapper>
           ),
         },

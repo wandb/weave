@@ -175,7 +175,12 @@ export const SpanTreeDetail: React.FC<{
             )}
             {span.attributes != null &&
               Object.entries(span.attributes).map(([key, value], i) => {
-                return <DetailKeyValueRow key={i} label={key} value={value} />;
+                if (['span_kind', 'model'].includes(key)) {
+                  return null;
+                }
+                return (
+                  <DetailKeyValueRow key={key} label={key} value={value} />
+                );
               })}
           </tbody>
         </S.SpanDetailTable>
