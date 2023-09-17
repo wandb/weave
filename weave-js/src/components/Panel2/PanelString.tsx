@@ -1,13 +1,7 @@
 import Markdown from '@wandb/weave/common/components/Markdown';
 import * as globalStyles from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';
-import {
-  constString,
-  maybe,
-  Node,
-  NodeOrVoidNode,
-  opArray,
-} from '@wandb/weave/core';
+import {constString, maybe, Node, NodeOrVoidNode} from '@wandb/weave/core';
 import * as Diff from 'diff';
 import React from 'react';
 
