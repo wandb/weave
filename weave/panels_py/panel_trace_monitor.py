@@ -5,6 +5,7 @@ from .. import dispatch
 from .. import weave_internal as internal
 from .. import weave_types as types
 from .. import weave_internal
+from .. import graph
 from ..panels import panel_group
 from ..panels import panel_board
 from ..panels import panel_trace
@@ -34,7 +35,7 @@ BOARD_INPUT_WEAVE_TYPE = types.List(panel_trace.span_typed_dict_type)
 board_name = "py_board-" + BOARD_ID
 
 
-def make_span_table(input_node):
+def make_span_table(input_node: graph.Node) -> panels.Table:
     traces_table = panels.Table(input_node)  # type: ignore
     traces_table.add_column(lambda row: row["status_code"].equal("SUCCESS"), "Success")
     traces_table.add_column(lambda row: row["name"], "Span Name")
@@ -60,7 +61,7 @@ def make_span_table(input_node):
     },
 )
 def board(
-    input_node,
+    input_node,  # type: ignore
 ) -> panels.Group:
     timestamp_col_name = "timestamp"
 
