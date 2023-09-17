@@ -105,9 +105,8 @@ export const TraceTreeSpanViewer: React.FC<{
         );
       }
       return flatSpans[0];
-    } else {
-      return selectedSpanUncontrolled;
     }
+    return selectedSpanUncontrolled;
   }, [
     flatSpans,
     props.onSelectSpanIndex,
@@ -133,7 +132,7 @@ export const TraceTreeSpanViewer: React.FC<{
             <SpanElements
               spans={flatSpans}
               setSelectedSpan={setSelectedSpan}
-              selectedSpan={selectedSpan}
+              selectedSpan={selectedSpan ?? null}
             />
           </S.TraceTimelineScale>
         </S.TraceTimeline>
