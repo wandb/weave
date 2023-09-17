@@ -20,8 +20,8 @@ from uuid import uuid4
 # simply map the properties of the WB Span to the Weave Span
 def wb_span_to_weave_spans(wb_span, trace_id=None, parent_id=None):
     attributes = {**wb_span.attributes}
-    if hasattr(wb_span, "llm_span_kind"):
-        attributes["llm_span_kind"] = str(wb_span.span_kind)
+    if hasattr(wb_span, "span_kind"):
+        attributes["span_kind"] = str(wb_span.span_kind)
     inputs = (
         wb_span.results[0].inputs
         if wb_span.results is not None and len(wb_span.results) > 0
@@ -33,6 +33,9 @@ def wb_span_to_weave_spans(wb_span, trace_id=None, parent_id=None):
         else None
     )
 
+    # Super Hack - fix merge!
+    dummy_dict = {"_": ""} if parent_id == None else {}
+
     span = weave.stream_data_interfaces.TraceSpanDict(
         start_time_s=wb_span.start_time_ms / 1000.0,
         end_time_s=wb_span.end_time_ms / 1000.0,
@@ -41,10 +44,12 @@ def wb_span_to_weave_spans(wb_span, trace_id=None, parent_id=None):
         status_code=str(wb_span.status_code),
         trace_id=trace_id or str(uuid4()),
         parent_id=parent_id,
-        attributes=attributes or {},
+        # Followup: allow None in attributes & summary (there is an issue with vectorized opMerge)
+        # This should be fixed before integrating inside LC
+        attributes=attributes or dummy_dict,
+        summary=dummy_dict,
         inputs=inputs,
         output=outputs,
-        summary=None,
         exception=Exception(wb_span.status_message)
         if wb_span.status_message is not None
         else None,
