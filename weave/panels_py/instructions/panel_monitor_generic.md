@@ -1,7 +1,7 @@
 To monitor and visualize OpenAI calls, log them to W&B via one of the following:
 
 | Method | Use case | Full tutorial | 
-|-----------------------------------|
+|--------|----------|---------------|
 | Python Client | For devs, visualize, understand, and customize analysis of your LLMs |[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/openai_client_quickstart.ipynb) |
 | OpenAI Proxy | For teams, track LLM usage and key metrics like cost/latency across projects | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/openai_proxy_quickstart.ipynb) |
 | Monitoring API | Monitor and visualize any generic functions/app over time | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/weave_monitor_api.ipynb) |
