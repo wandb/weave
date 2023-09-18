@@ -90,6 +90,7 @@ class PyBoardGeneratorSpec(typing.TypedDict):
     op_name: str
     config_type: typing.Optional[weave_types.Type]
     instructions_md: typing.Optional[str]
+    thumbnail_url: typing.Optional[str]
 
 
 # Processes have a singleton TemplateRegistry

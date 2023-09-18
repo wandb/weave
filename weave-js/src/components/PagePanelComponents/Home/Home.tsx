@@ -33,7 +33,6 @@ import {
 import getConfig from '../../../config';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {HomeFeaturedTemplates} from './HomeFeaturedTemplates';
-import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -65,7 +64,7 @@ const HomeComp: FC<HomeProps> = props => {
     node: React.ReactNode;
     requestedWidth?: string;
   }>();
-  const viewerIsEmployee = useIsViewerWandbEmployee();
+
   const setPreviewNode = useCallback(
     (node: React.ReactNode, requestedWidth?: string) => {
       if (node == null) {
