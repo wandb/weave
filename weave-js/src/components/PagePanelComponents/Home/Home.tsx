@@ -268,11 +268,9 @@ const HomeComp: FC<HomeProps> = props => {
       <LayoutElements.Block>
         <HomeTopBar />
       </LayoutElements.Block>
-      {viewerIsEmployee && (
-        <LayoutElements.Block>
-          <HomeFeaturedTemplates setPreviewNode={setPreviewNode} />
-        </LayoutElements.Block>
-      )}
+      <LayoutElements.Block>
+        <HomeFeaturedTemplates setPreviewNode={setPreviewNode} />
+      </LayoutElements.Block>
       {/* Main Region */}
       <LayoutElements.HSpace
         style={{
