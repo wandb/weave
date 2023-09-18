@@ -117,6 +117,7 @@ export const useProjectAssetCount = (
     boardCount: number;
     runStreamCount: number;
     loggedTableCount: number;
+    legacyTracesCount: number;
   };
   loading: boolean;
 } => {
@@ -128,6 +129,7 @@ export const useProjectAssetCount = (
     boardCount: opProjectBoardCount({project: projectNode}),
     runStreamCount: opProjectRunStreamCount({project: projectNode}),
     loggedTableCount: opProjectLoggedTableCount({project: projectNode}),
+    legacyTracesCount: opProjectLegacyTracesCount({project: projectNode}),
   } as any);
   const compositeValue = useNodeValue(compositeNode);
 
@@ -137,6 +139,7 @@ export const useProjectAssetCount = (
         boardCount: 0,
         runStreamCount: 0,
         loggedTableCount: 0,
+        legacyTracesCount: 0,
       },
       loading: compositeValue.loading,
     }),
@@ -146,6 +149,7 @@ export const useProjectAssetCount = (
       boardCount: number;
       runStreamCount: number;
       loggedTableCount: number;
+      legacyTracesCount: number;
     };
     loading: boolean;
   };
@@ -161,6 +165,11 @@ const opProjectRunStreamCount = ({project}: {project: w.Node}) => {
 
 const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
   return w.opCount({arr: opProjectRunLoggedTableArtifacts({project})});
+};
+
+const opProjectLegacyTracesCount = ({project}: {project: w.Node}) => {
+  // TODO: Fill this out
+  return w.constNumber(1);
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {
@@ -310,6 +319,30 @@ export const useProjectBoards = (
       loading: artifactDetailsValue.loading,
     }),
     [artifactDetailsValue.loading, artifactDetailsValue.result]
+  );
+};
+
+export const useProjectLegacyTraces = (
+  entityName: string,
+  projectName: string
+): {
+  result: Array<{
+    name: string;
+    createdAt: number;
+  }>;
+  loading: boolean;
+} => {
+  // TODO: Fill this out
+  const legacyTraceDetailsNode = useNodeValue(
+    w.constNode(w.list('string'), [])
+  );
+  return useMemo(
+    () => ({
+      result: legacyTraceDetailsNode.result ?? [],
+      loading: legacyTraceDetailsNode.loading,
+    }),
+
+    [legacyTraceDetailsNode.loading, legacyTraceDetailsNode.result]
   );
 };
 
