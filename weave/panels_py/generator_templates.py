@@ -114,6 +114,7 @@ def get_board_templates_for_node(
                         op_name=spec.op_name,
                         config_type=spec.config_type,
                         instructions_md=spec.instructions_md,
+                        thumbnail_url=spec.thumbnail_url,
                     )
                 )
     return final_specs
