@@ -1,6 +1,7 @@
 import typing
 
 import weave
+from weave.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
 from .. import dispatch
 from .. import weave_internal as internal
 from .. import weave_types as types
@@ -217,7 +218,7 @@ def board(
     traces_table_var = overview_tab.add(
         "traces_table",
         make_span_table(filtered_window_data),
-        layout=weave.panels.GroupPanelLayout(x=0, y=6, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
     )
 
     trace_spans = all_spans.filter(
@@ -229,16 +230,22 @@ def board(
     trace_viewer_var = overview_tab.add(
         "trace_viewer",
         trace_viewer,
-        layout=weave.panels.GroupPanelLayout(x=0, y=14, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=16, h=6),
+    )
+
+    selected_trace_model = overview_tab.add(
+        "selected_trace_model",
+        TraceSpanModelPanel(traces_table_var.active_data()),
+        layout=weave.panels.GroupPanelLayout(x=0, y=18, w=16, h=6),
     )
 
     active_span = trace_viewer_var.active_span()
 
-    # selected_trace_obj = overview_tab.add(
-    #     "selected_trace_obj",
-    #     active_span,
-    #     layout=weave.panels.GroupPanelLayout(x=16, y=14, w=8, h=16),
-    # )
+    selected_span_details = overview_tab.add(
+        "selected_span_details",
+        TraceSpanPanel(active_span),
+        layout=weave.panels.GroupPanelLayout(x=16, y=12, w=8, h=12),
+    )
 
     similar_spans = all_spans.filter(lambda row: row["name"] == active_span["name"])
 
@@ -246,7 +253,7 @@ def board(
     similar_spans_table_var = overview_tab.add(
         "similar_spans_table",
         similar_spans_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=22, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=22, w=24, h=6),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)
@@ -256,10 +263,4 @@ template_registry.register(
     board_name,
     BOARD_DISPLAY_NAME,
     BOARD_DESCRIPTION,
-    is_featured=True,
-    instructions_md="""
-# Trace Monitor Board
-
-* Placeholder: employee-only view
-    """,
 )
