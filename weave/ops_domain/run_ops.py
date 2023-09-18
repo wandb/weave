@@ -69,7 +69,7 @@ tracer = engine_trace.tracer()
 ROW_LIMIT_FOR_TYPE_INTERROGATION = 10
 
 # number of history key metrics to fetch from run history
-LIMIT_RUN_HISTORY_KEYS = 100
+LIMIT_RUN_HISTORY_KEYS = 5
 
 # Section 1/6: Tag Getters
 run_tag_getter_op = make_tag_getter_op("run", wdt.RunType, op_name="tag-run")
