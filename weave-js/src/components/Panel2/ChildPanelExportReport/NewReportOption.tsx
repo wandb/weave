@@ -1,18 +1,7 @@
 import React from 'react';
-import {
-  DEFAULT_REPORT_OPTION,
-  EntityOption,
-  GroupedReportOption,
-  NEW_REPORT_OPTION,
-  ReportOption,
-  formatUpdatedAt,
-} from './utils';
-import {Icon} from '../../Icon';
-import TimeAgo from 'react-timeago';
-import {size} from 'lodash';
-import {MOON_250} from '../../../common/css/color.styles';
-import {Group} from '../../../common/util/data';
 import {twMerge} from 'tailwind-merge';
+import {Icon} from '../../Icon';
+import {NEW_REPORT_OPTION, ReportOption} from './utils';
 
 type NewReportOptionProps = {
   optionData: ReportOption;

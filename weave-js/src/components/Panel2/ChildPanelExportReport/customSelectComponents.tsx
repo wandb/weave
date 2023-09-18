@@ -4,24 +4,17 @@ import {
   SingleValueProps,
   MenuListProps,
   GroupHeadingProps,
-  components,
   GroupProps,
 } from 'react-select';
 import {Icon} from '../../Icon';
 import React from 'react';
 import {
-  DEFAULT_REPORT_OPTION,
   EntityOption,
   GroupedReportOption,
-  NEW_REPORT_OPTION,
   ReportOption,
   formatUpdatedAt,
 } from './utils';
 import TimeAgo from 'react-timeago';
-import {size} from 'lodash';
-import {MOON_250} from '../../../common/css/color.styles';
-import {Group} from '../../../common/util/data';
-import {twMerge} from 'tailwind-merge';
 import {NewReportOption} from './NewReportOption';
 
 export const customEntitySelectComps = {
@@ -61,7 +54,7 @@ export const customReportSelectComps = {
   SingleValue: ({
     children,
     ...props
-  }: SingleValueProps<ReportOption, false>) => (
+  }: SingleValueProps<ReportOption, false, GroupedReportOption>) => (
     <selectComponents.SingleValue
       {...props}
       className="flex items-center gap-8">
@@ -69,7 +62,9 @@ export const customReportSelectComps = {
       {children}
     </selectComponents.SingleValue>
   ),
-  MenuList: (props: MenuListProps<ReportOption, false>) => (
+  MenuList: (
+    props: MenuListProps<ReportOption, false, GroupedReportOption>
+  ) => (
     <selectComponents.MenuList
       {...props}
       className="max-h-[calc(100vh-34rem)]"

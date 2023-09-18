@@ -3,7 +3,6 @@ import React, {useEffect, useMemo} from 'react';
 
 import {useNodeValue} from '../../../react';
 import {Select} from '../../Form/Select';
-import {Icon} from '../../Icon';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {
   customEntitySelectComps,
@@ -16,6 +15,7 @@ import {
   ReportOption,
   useEntityAndProject,
   GroupedReportOption,
+  ProjectOption,
 } from './utils';
 import {SelectedExistingReport} from './SelectedExistingReport';
 
@@ -23,20 +23,20 @@ type ReportSelectionProps = {
   rootConfig: ChildPanelFullConfig;
   selectedEntity: EntityOption | null;
   selectedReport: ReportOption | null;
-  selectedProjectName: string;
+  selectedProject: ProjectOption | null;
   setSelectedEntity: (entity: EntityOption) => void;
   setSelectedReport: (report: ReportOption | null) => void;
-  setSelectedProjectName: (projectName: string) => void;
+  setSelectedProject: (project: ProjectOption | null) => void;
 };
 
 export const ReportSelection = ({
   rootConfig,
   selectedEntity,
   selectedReport,
-  selectedProjectName,
+  selectedProject,
   setSelectedEntity,
   setSelectedReport,
-  setSelectedProjectName,
+  setSelectedProject,
 }: ReportSelectionProps) => {
   const {entityName} = useEntityAndProject(rootConfig);
 
@@ -107,9 +107,8 @@ export const ReportSelection = ({
     }),
   });
   const projectNames = useNodeValue(projectMetaNode, {
-    skip: selectedEntity == null || selectedReport == null,
+    skip: selectedEntity == null || selectedReport?.name !== NEW_REPORT_OPTION,
   });
-  console.log(projectNames);
 
   return (
     <div className="mt-8 flex-1">
@@ -173,6 +172,7 @@ export const ReportSelection = ({
             onChange={selected => {
               if (selected != null) {
                 setSelectedReport(selected);
+                setSelectedProject(null);
               }
             }}
             components={customReportSelectComps}
@@ -188,7 +188,7 @@ export const ReportSelection = ({
             className="mb-4 block font-semibold text-moon-800">
             Project
           </label>
-          <Select<string, false>
+          <Select<ProjectOption, false>
             className="mb-16"
             aria-label="project selector"
             isLoading={projectNames.loading}
@@ -202,10 +202,11 @@ export const ReportSelection = ({
                 : 'Select a project...'
             }
             getOptionLabel={option => option.name}
-            value={selectedProjectName ?? null}
+            getOptionValue={option => option.name}
+            value={selectedProject ?? null}
             onChange={selected => {
               if (selected != null) {
-                setSelectedProjectName(selected);
+                setSelectedProject(selected);
               }
             }}
             isSearchable

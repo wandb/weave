@@ -179,12 +179,6 @@ export const Select = <
         padding: '6px 0',
       };
     },
-    group: (baseStyles, state) => {
-      return {
-        ...baseStyles,
-        ...props.groupStyle,
-      };
-    },
     groupHeading: (baseStyles, state) => {
       return {
         ...baseStyles,

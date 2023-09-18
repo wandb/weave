@@ -1,23 +1,7 @@
-import * as w from '@wandb/weave/core';
-import React, {useEffect, useMemo} from 'react';
-
-import {useNodeValue} from '../../../react';
-import {Select} from '../../Form/Select';
-import {Icon} from '../../Icon';
-import {ChildPanelFullConfig} from '../ChildPanel';
-import {
-  customEntitySelectComps,
-  customReportSelectComps,
-} from './customSelectComponents';
-import {
-  NEW_REPORT_OPTION,
-  DEFAULT_REPORT_OPTION,
-  EntityOption,
-  ReportOption,
-  useEntityAndProject,
-  GroupedReportOption,
-} from './utils';
+import React from 'react';
 import {Button} from '../../Button';
+import {Icon} from '../../Icon';
+import {ReportOption} from './utils';
 
 type SelectedExistingReportProps = {
   selectedReport: ReportOption;

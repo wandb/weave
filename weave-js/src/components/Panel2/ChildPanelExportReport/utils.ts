@@ -6,7 +6,7 @@ import {format, getYear} from 'date-fns';
 
 export const NEW_REPORT_OPTION = 'New report';
 export const DEFAULT_REPORT_OPTION = {
-  id: 'new-report', // TODO
+  id: NEW_REPORT_OPTION,
   name: NEW_REPORT_OPTION,
 };
 
@@ -14,6 +14,7 @@ export type EntityOption = {
   name: string;
   isTeam: boolean;
 };
+
 export type ReportOption = {
   id?: string;
   name: string;
@@ -23,6 +24,10 @@ export type ReportOption = {
 export type GroupedReportOption = {
   label: string;
   options: ReportOption[];
+};
+
+export type ProjectOption = {
+  name: string;
 };
 
 export function useEntityAndProject(rootConfig: ChildPanelFullConfig) {
