@@ -176,12 +176,6 @@ export const ReportSelection = ({
               }
             }}
             components={customReportSelectComps}
-            menuListStyle={{
-              maxHeight: 'calc(100vh - 34rem)',
-            }}
-            groupStyle={{
-              padding: '0',
-            }}
             groupDivider
             isSearchable
           />
@@ -213,9 +207,6 @@ export const ReportSelection = ({
               if (selected != null) {
                 setSelectedProjectName(selected);
               }
-            }}
-            menuListStyle={{
-              maxHeight: 'calc(100vh - 34rem)',
             }}
             isSearchable
           />

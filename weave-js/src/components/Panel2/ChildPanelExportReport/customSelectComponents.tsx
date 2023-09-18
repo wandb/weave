@@ -5,6 +5,7 @@ import {
   MenuListProps,
   GroupHeadingProps,
   components,
+  GroupProps,
 } from 'react-select';
 import {Icon} from '../../Icon';
 import React from 'react';
@@ -14,13 +15,14 @@ import {
   GroupedReportOption,
   NEW_REPORT_OPTION,
   ReportOption,
-  formatUpdatedBy,
+  formatUpdatedAt,
 } from './utils';
 import TimeAgo from 'react-timeago';
 import {size} from 'lodash';
 import {MOON_250} from '../../../common/css/color.styles';
 import {Group} from '../../../common/util/data';
 import {twMerge} from 'tailwind-merge';
+import {NewReportOption} from './NewReportOption';
 
 export const customEntitySelectComps = {
   SingleValue: ({
@@ -56,6 +58,17 @@ export const customEntitySelectComps = {
 };
 
 export const customReportSelectComps = {
+  SingleValue: ({
+    children,
+    ...props
+  }: SingleValueProps<ReportOption, false>) => (
+    <selectComponents.SingleValue
+      {...props}
+      className="flex items-center gap-8">
+      <Icon name="add-new" width={18} height={18} />
+      {children}
+    </selectComponents.SingleValue>
+  ),
   MenuList: (props: MenuListProps<ReportOption, false>) => (
     <selectComponents.MenuList
       {...props}
@@ -79,16 +92,8 @@ export const customReportSelectComps = {
       </selectComponents.GroupHeading>
     );
   },
-  SingleValue: ({
-    children,
-    ...props
-  }: SingleValueProps<EntityOption, false>) => (
-    <selectComponents.SingleValue
-      {...props}
-      className="flex items-center gap-8">
-      <Icon name="add-new" width={18} height={18} />
-      {children}
-    </selectComponents.SingleValue>
+  Group: (groupProps: GroupProps<ReportOption, false, GroupedReportOption>) => (
+    <selectComponents.Group {...groupProps} className="p-0" />
   ),
   Option: ({
     children,
@@ -97,23 +102,7 @@ export const customReportSelectComps = {
     const optionData: ReportOption = props.data;
     return (
       <selectComponents.Option {...props} className="flex items-center">
-        <div
-          className={twMerge(
-            'flex grow',
-            optionData.name === NEW_REPORT_OPTION && 'items-center'
-          )}>
-          {optionData.name === NEW_REPORT_OPTION ? (
-            <Icon name="add-new" width={18} height={18} />
-          ) : (
-            <Icon name="report" className="shrink-0 grow-0 pt-4" />
-          )}
-          <p className="mx-8 flex grow flex-col gap-4 p-0 text-base leading-6">
-            <span>{children}</span>
-            <span className="text-sm text-moon-500">
-              {optionData.projectName}
-            </span>
-          </p>
-        </div>
+        <NewReportOption optionData={optionData} children={children} />
         {optionData?.updatedAt != null && (
           <p className="shrink-0 text-sm text-moon-500">
             <TimeAgo
