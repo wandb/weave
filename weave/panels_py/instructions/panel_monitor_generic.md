@@ -11,7 +11,7 @@ For full details and features, see the [Weave Monitoring README](https://github.
 ## How to authenticate with OpenAI
 
 1. Set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1`.
-2. Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys))
+2. Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
 
 ### Via environment variables
 
