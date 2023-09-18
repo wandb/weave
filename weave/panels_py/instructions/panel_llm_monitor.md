@@ -1,23 +1,33 @@
-Simply set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1` and the OpenAI API Key to the concatenation of your W&B API Key ([wandb.ai/authorize](https://wandb.ai/authorize)) and current OpenAI API Key ([platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys)) in order to track all API calls! Please refer to the [Weave Monitoring README](https://github.com/wandb/weave/tree/master/examples/monitoring) for full details. Features:
+## OpenAI Monitoring Quicksart
 
-- Automatically track LLM usage and aggregate useful metrics like cost, latency and throughput across your projects/teams
-- Dynamically query and derive insights from the logs of all your OpenAI API calls
-- Iterate visually to slice, aggregate, and explore your data
+To start monitoring OpenAI calls:
 
-### Setup with environment variables
+1. Set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1`.
+2. Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
+
+### Via environment variables
 
 ```shell
 OPENAI_API_BASE="https://api.wandb.ai/proxy/openai/v1"
 OPENAI_API_KEY="$WANDB_API_KEY:$OPENAI_API_KEY"
 ```
 
-### Setup with Python library
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/openai_proxy_quickstart.ipynb)
+### Via Python
 
 ```python
 import openai
 openai.api_base = "https://api.wandb.ai/proxy/openai/v1"
 openai.api_key = f"{WANDB_API_KEY}:{OPENAI_API_KEY}"
-openai.ChatCompletion.create(...)
 ```
+
+## Configure and script OpenAI monitoring and visualization
+
+Log your OpenAI data to W&B via one of the following:
+
+| Method | Full tutorial | Scenario | 
+|--------|----------|---------------|
+| Python Client |[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/openai_client_quickstart.ipynb)| For devs, visualize, understand, and customize analysis of your LLMs | 
+| OpenAI Proxy | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/openai_proxy_quickstart.ipynb) | For teams, track LLM usage and key metrics like cost/latency across projects |
+| Monitoring API | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/weave_monitor_api.ipynb) | Monitor any generic functions or app over time |
+
+For full details and features, see the [Weave Monitoring README](https://github.com/wandb/weave/tree/master/examples/monitoring).
