@@ -1,4 +1,4 @@
-## OpenAI Monitoring Quicksart
+## OpenAI Monitoring Quickstart
 
 To record history, monitor performance, & analyze cost/latency of OpenAI calls:
 
