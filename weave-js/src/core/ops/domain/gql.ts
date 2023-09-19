@@ -25,6 +25,7 @@ const LIMIT_PROJECT_RUNS = 100;
 const LIMIT_REPORT_STARGAZERS = 100;
 const LIMIT_USER_RUNS = 100;
 const LIMIT_USER_TEAMS = 100;
+const LIMIT_RUN_HISTORY_KEYS = 100;
 
 const gqlBasicField = (name: string, args?: Vega3.QueryArg[]) => {
   const field: Vega3.QueryField = {
@@ -1338,6 +1339,7 @@ export const toGqlField = (
         args: gqlArgs({
           minStep,
           maxStep,
+          maxKeyLimit: LIMIT_RUN_HISTORY_KEYS,
         }),
         fields: [],
         alias: `historyAsOf_${opInputs.asOfStep}`,

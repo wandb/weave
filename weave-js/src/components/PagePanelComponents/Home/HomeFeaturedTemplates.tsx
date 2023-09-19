@@ -15,6 +15,7 @@ import remarkGfm from 'remark-gfm';
 import './github-markdown-light.css';
 import {TargetBlank} from '@wandb/weave/common/util/links';
 import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
+import {Panel2Loader} from '../../Panel2/PanelComp';
 
 // This is considered a `hack` because I need to drop down to
 // access .tw-style, to give it a height 100%. When using tailwind
@@ -35,6 +36,7 @@ type TemplateType = {
   display_name: string;
   op_name: string;
   instructions_md: string;
+  thumbnail_url?: string;
 };
 
 export const HomeFeaturedTemplates: React.FC<{
@@ -45,7 +47,8 @@ export const HomeFeaturedTemplates: React.FC<{
     {}
   ) as Node;
   const featuredTemplates = useNodeValue(featuredTemplatesNode);
-  if (featuredTemplates.loading || featuredTemplates.result.length === 0) {
+  if (featuredTemplates.result?.length === 0) {
+    // not expecting this to happen, but just in case
     return null;
   }
   return (
@@ -61,18 +64,24 @@ export const HomeFeaturedTemplates: React.FC<{
           FEATURED TEMPLATES
         </LayoutElements.BlockHeader>
       </LayoutElements.HBlock>
-      <LayoutElements.HStack
-        style={{
-          gap: '16px',
-        }}>
-        {featuredTemplates.result.map((template: TemplateType, i: number) => (
-          <HomeFeaturedTemplateItem
-            key={template.op_name}
-            template={template}
-            setPreviewNode={setPreviewNode}
-          />
-        ))}
-      </LayoutElements.HStack>
+      {featuredTemplates.loading ? (
+        <LayoutElements.Block style={{height: '166px'}}>
+          <Panel2Loader />
+        </LayoutElements.Block>
+      ) : (
+        <LayoutElements.HStack
+          style={{
+            gap: '16px',
+          }}>
+          {featuredTemplates.result.map((template: TemplateType, i: number) => (
+            <HomeFeaturedTemplateItem
+              key={template.op_name}
+              template={template}
+              setPreviewNode={setPreviewNode}
+            />
+          ))}
+        </LayoutElements.HStack>
+      )}
     </LayoutElements.VBlock>
   );
 };
@@ -92,43 +101,71 @@ const HomeFeaturedTemplateItem: React.FC<{
   );
 
   return (
-    <LayoutElements.VStack
+    <LayoutElements.HStack
       style={{
         border: '1px solid #E5E5E5',
         borderRadius: '8px',
         padding: '16px',
         gap: '8px',
       }}>
-      <LayoutElements.HBlock
-        style={{
-          fontSize: '18px',
-          fontWeight: 800,
-        }}>
-        {template.display_name}
-      </LayoutElements.HBlock>
-      <LayoutElements.HStack>{template.description}</LayoutElements.HStack>
-      <LayoutElements.HBlock
-        style={{
-          marginTop: '12px',
-          justifyContent: 'flex-end',
-        }}>
-        <Button
-          variant="secondary"
-          size="medium"
-          onClick={() => {
-            setPreviewNode(node, '40%');
+      {template.thumbnail_url && (
+        <LayoutElements.Block
+          style={{
+            height: '132px',
           }}>
-          Use template
-        </Button>
-      </LayoutElements.HBlock>
-    </LayoutElements.VStack>
+          <img
+            src={template.thumbnail_url}
+            alt={template.display_name + ' thumbnail'}
+            style={{
+              height: '100%',
+              // width: '100%',
+              borderRadius: '4px',
+            }}
+          />
+        </LayoutElements.Block>
+      )}
+      <LayoutElements.VStack
+        style={{
+          // gap: '8px',
+          flex: 1,
+          height: '132px',
+        }}>
+        <LayoutElements.HBlock
+          style={{
+            fontSize: '18px',
+            fontWeight: 800,
+          }}>
+          {template.display_name}
+        </LayoutElements.HBlock>
+        <LayoutElements.HStack
+          style={{
+            overflow: 'auto',
+          }}>
+          {template.description}
+        </LayoutElements.HStack>
+        <LayoutElements.HBlock
+          style={{
+            justifyContent: 'flex-end',
+          }}>
+          <Button
+            variant="secondary"
+            size="medium"
+            onClick={() => {
+              setPreviewNode(node, '40%');
+            }}>
+            Use template
+          </Button>
+        </LayoutElements.HBlock>
+      </LayoutElements.VStack>
+    </LayoutElements.HStack>
   );
 };
 
 const TabContentWrapper = styled.div`
   overflow-y: scroll;
   padding: 16px;
-  height: 100%;
+  // Another reason I can't stand tailwind
+  height: calc(100% - 32px);
   .markdown-body {
     ul {
       list-style: unset !important;
