@@ -457,6 +457,30 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def delete(self) -> None:
         self._saved_artifact.delete(delete_aliases=True)
 
+    def add_artifact_reference(self, uri: str) -> None:
+        # The URI for a get node might look like: wandb-artifact:///<entity>/<project>/test8:latest/obj
+        # but the SDK add_reference call requires something like:
+        # wandb-artifact://41727469666163743a353432353830303535/obj.object.json
+        assert uri.startswith("wandb-artifact:///")
+        uri_path = "/".join(uri.split("/")[3:-1])  # Trim off protocol and /obj
+        ref_artifact = get_wandb_read_artifact(uri_path)
+
+        # A reference needs to point to a specific existing file in the other artifact.
+        # For stream tables obj.object.json should exist. For logged tables, the filename
+        # can vary, so we just pick the first file we find.
+        filename = "obj.object.json"
+        try:
+            ref_url = ref_artifact.get_path(filename).ref_url()
+        except KeyError:
+            for ref_file in ref_artifact.files(None, per_page=1):
+                ref_url = ref_artifact.get_path(ref_file.name).ref_url()
+                break
+
+        # We have a name collision problem. E.g. A board and a stream table will both have
+        # a file named obj.object.json. Add a prefix to distinguish them.
+        ref_name = f"{ref_artifact.id}__{filename}"
+        self._writeable_artifact.add_reference(ref_url, ref_name)
+
     @property
     def commit_hash(self) -> str:
         if not self.is_saved:
