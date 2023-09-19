@@ -513,7 +513,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
     return legacyTraces.result.map(b => ({
       _id: b.name,
       name: b.name,
-      'created at': moment.utc(b.createdAt).local().calendar(),
+      // 'created at': moment.utc(b.createdAt).local().calendar(),
     }));
   }, [legacyTraces]);
 
@@ -619,7 +619,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
           },
         ]}
         loading={legacyTraces.loading}
-        columns={['name', 'created at']}
+        columns={['name']}
         data={browserData}
         actions={browserActions}
       />

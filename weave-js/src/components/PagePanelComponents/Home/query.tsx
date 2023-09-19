@@ -191,45 +191,6 @@ const opProjectHistoryType = ({project}: {project: w.Node}) => {
   );
 };
 
-const projectHistoryTypeToLegacyTraceKeys = (
-  projectHistoryType: w.Type
-): string[] => {
-  if (w.isTaggedValue(projectHistoryType)) {
-    projectHistoryType = projectHistoryType.value;
-    if (w.isList(projectHistoryType)) {
-      projectHistoryType = projectHistoryType.objectType;
-      if (w.isTaggedValue(projectHistoryType)) {
-        projectHistoryType = projectHistoryType.value;
-        if (
-          !w.isSimpleTypeShape(projectHistoryType) &&
-          projectHistoryType.type === 'ArrowWeaveList'
-        ) {
-          projectHistoryType = projectHistoryType.objectType;
-          if (w.isTypedDict(projectHistoryType)) {
-            const legacyTraceKeys = Object.entries(
-              projectHistoryType.propertyTypes
-            )
-              .filter(([key, value]) => {
-                return (
-                  value != null &&
-                  w.isAssignableTo(
-                    value,
-                    w.maybe({
-                      type: 'wb_trace_tree',
-                    })
-                  )
-                );
-              })
-              .map(([key, value]) => key);
-            return legacyTraceKeys;
-          }
-        }
-      }
-    }
-  }
-  return [];
-};
-
 const projectBoardsNode = (entityName: string, projectName: string) => {
   const projectNode = w.opRootProject({
     entityName: w.constString(entityName),
@@ -386,22 +347,68 @@ export const useProjectLegacyTraces = (
 ): {
   result: Array<{
     name: string;
-    createdAt: number;
   }>;
   loading: boolean;
 } => {
-  // TODO: Fill this out
-  const legacyTraceDetailsNode = useNodeValue(
-    w.constNode(w.list('string'), [])
-  );
-  return useMemo(
-    () => ({
-      result: legacyTraceDetailsNode.result ?? [],
-      loading: legacyTraceDetailsNode.loading,
-    }),
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+  const historyTypeNode = opProjectHistoryType({project: projectNode});
+  const historyTypeValue = useNodeValue(historyTypeNode as w.Node);
+  return useMemo(() => {
+    const keys =
+      historyTypeValue.result == null
+        ? []
+        : projectHistoryTypeToLegacyTraceKeys(
+            historyTypeValue.result as w.Type
+          );
+    return {
+      result: keys.map(key => ({
+        name: key,
+      })),
+      loading: historyTypeValue.loading,
+    };
+  }, [historyTypeValue.loading, historyTypeValue.result]);
+};
 
-    [legacyTraceDetailsNode.loading, legacyTraceDetailsNode.result]
-  );
+const projectHistoryTypeToLegacyTraceKeys = (
+  projectHistoryType: w.Type
+): string[] => {
+  if (w.isTaggedValue(projectHistoryType)) {
+    projectHistoryType = projectHistoryType.value;
+    if (w.isList(projectHistoryType)) {
+      projectHistoryType = projectHistoryType.objectType;
+      if (w.isTaggedValue(projectHistoryType)) {
+        projectHistoryType = projectHistoryType.value;
+        if (
+          !w.isSimpleTypeShape(projectHistoryType) &&
+          projectHistoryType.type === 'ArrowWeaveList'
+        ) {
+          projectHistoryType = projectHistoryType.objectType;
+          if (w.isTypedDict(projectHistoryType)) {
+            const legacyTraceKeys = Object.entries(
+              projectHistoryType.propertyTypes
+            )
+              .filter(([key, value]) => {
+                return (
+                  value != null &&
+                  w.isAssignableTo(
+                    value,
+                    w.maybe({
+                      type: 'wb_trace_tree',
+                    })
+                  )
+                );
+              })
+              .map(([key, value]) => key);
+            return legacyTraceKeys;
+          }
+        }
+      }
+    }
+  }
+  return [];
 };
 
 export const useProjectRunStreams = (
