@@ -79,6 +79,29 @@ def _hash_id(s: str) -> str:
     return hashlib.md5(s.encode("utf-8")).hexdigest()[:16]
 
 
+patched = False
+
+
+# This should be committed to the langchain repo
+def patch_serialize():
+    global patched
+    if patched:
+        return
+    patched = True
+
+    old_serialize_io = LCW._serialize_io
+
+    def new_serialize_io(run_inputs):
+        if run_inputs is None:
+            return {}
+        return old_serialize_io(run_inputs)
+
+    LCW._serialize_io = new_serialize_io
+
+
+patch_serialize()
+
+
 class WeaveTracer(BaseTracer):
     def __init__(self, stream_uri: str, **kwargs: typing.Any) -> None:
         super().__init__(**kwargs)
@@ -92,6 +115,8 @@ class WeaveTracer(BaseTracer):
         model_dict = self.run_processor.process_model(run)
         model_str = json.dumps(model_dict)
         root_span.attributes["model"] = {
+            # This is hardly an "id", since it is unique for each run.
+            # Need to reconcile this with LC
             "id": _hash_id(model_str),
             "obj": model_str,
         }
