@@ -182,7 +182,11 @@ export const ReportSelection = ({
             onChange={selected => {
               if (selected != null) {
                 setSelectedReport(selected);
-                setSelectedProject(null);
+                setSelectedProject(
+                  isNewReportOption(selected)
+                    ? null
+                    : {name: selected.projectName ?? ''}
+                );
               }
             }}
             components={customReportSelectComps}
