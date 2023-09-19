@@ -37,7 +37,7 @@ const ALLOWED_CJS_MODULES = [
 
   '@emotion/stylis',
   '@emotion/unitless',
-  '@emtion/weak-memoize',
+  '@emotion/weak-memoize',
   '@hypnosphi/create-react-context',
   '@material-ui/core/Avatar',
   '@material-ui/core/ButtonBase',
@@ -246,14 +246,14 @@ const ALLOWED_CJS_MODULES = [
 
   // markdown rendering
   // markdown: true deps
-  "react-markdown",
-  "remark-gfm",
+  'react-markdown',
+  'remark-gfm',
   // markdown: peer deps
-  "escape-string-regexp",
-  "lowlight",
-  "lowlight/lib/core",
-  "refractor",
-  "refractor/core",
+  'escape-string-regexp',
+  'lowlight',
+  'lowlight/lib/core',
+  'refractor',
+  'refractor/core',
 ];
 
 const repositoryRoot = path.dirname(path.dirname(__dirname));
