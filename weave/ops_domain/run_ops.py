@@ -68,6 +68,9 @@ tracer = engine_trace.tracer()
 # number of rows of example data to look at to determine history type
 ROW_LIMIT_FOR_TYPE_INTERROGATION = 10
 
+# number of history key metrics to fetch from run history
+LIMIT_RUN_HISTORY_KEYS = 100
+
 # Section 1/6: Tag Getters
 run_tag_getter_op = make_tag_getter_op("run", wdt.RunType, op_name="tag-run")
 
@@ -294,10 +297,13 @@ def _history_as_of_plugin(inputs, inner):
     )
     max_step = min_step + 1
     alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
-    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step})"
+    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step}, maxKeyLimit: {LIMIT_RUN_HISTORY_KEYS})"
 
 
-def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
+def _get_history_as_of_step(
+    run: wdt.Run,
+    asOfStep: int,
+):
     alias = _make_alias(str(asOfStep), prefix="history")
 
     data = run[alias]
@@ -316,7 +322,10 @@ def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
     plugins=wb_gql_op_plugin(_history_as_of_plugin),
     hidden=True,
 )
-def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
+def _refine_history_as_of_type(
+    run: wdt.Run,
+    asOfStep: int,
+) -> types.Type:
     return wb_util.process_run_dict_type(_get_history_as_of_step(run, asOfStep))
 
 
@@ -325,7 +334,10 @@ def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
     refine_output_type=_refine_history_as_of_type,
     plugins=wb_gql_op_plugin(_history_as_of_plugin),
 )
-def history_as_of(run: wdt.Run, asOfStep: int) -> dict[str, typing.Any]:
+def history_as_of(
+    run: wdt.Run,
+    asOfStep: int,
+) -> dict[str, typing.Any]:
     return _get_history_as_of_step(run, asOfStep)
 
 

@@ -62,7 +62,6 @@ class NullResultErrorBoundary extends React.Component<
     if (this.state.isNullValue) {
       return (
         <div
-          data-test-weave-id="number"
           style={{
             width: '100%',
             height: '100%',

@@ -28,7 +28,7 @@ def init_sentry():
 def raise_exception_with_sentry_if_available(
     err: Exception, fingerprint: typing.Any
 ) -> typing.NoReturn:
-    init_sentry()
+    # init_sentry()
     if isinstance(err, WeaveFingerprintErrorMixin):
         err.fingerprint = fingerprint
     raise err
@@ -37,7 +37,7 @@ def raise_exception_with_sentry_if_available(
 def capture_exception_with_sentry_if_available(
     err: Exception, fingerprint: typing.Any
 ) -> typing.Union[None, str]:
-    init_sentry()
+    # init_sentry()
     try:
         import sentry_sdk
     except ImportError:

@@ -17,13 +17,10 @@ import {
   callOpVeryUnsafe,
   constString,
   list,
-  opArtifactMembershipArtifactVersion,
-  opArtifactMembershipForAlias,
   opArtifactVersionFile,
   opFileTable,
   opGet,
   opIsNone,
-  opProjectArtifact,
   opRootProject,
   opTableRows,
   typedDict,
@@ -472,24 +469,17 @@ const tableRowToNode = (
       list(typedDict({}))
     ) as any;
   } else {
-    // This is a  hacky here. Would be nice to have better mapping
+    // This is a hack. Would be nice to have better mapping
+    // Note that this will not work for tables with spaces in their name
+    // as we strip the space out to make the artifact name.
     const artNameParts = artName.split('-', 3);
     const tableName = artNameParts[artNameParts.length - 1] + '.table.json';
+
+    const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest`;
     newExpr = opTableRows({
       table: opFileTable({
         file: opArtifactVersionFile({
-          artifactVersion: opArtifactMembershipArtifactVersion({
-            artifactMembership: opArtifactMembershipForAlias({
-              artifact: opProjectArtifact({
-                project: opRootProject({
-                  entityName: constString(entityName),
-                  projectName: constString(projectName),
-                }),
-                artifactName: constString(artName),
-              }),
-              aliasName: constString('latest'),
-            }),
-          }),
+          artifactVersion: opGet({uri: constString(uri)}),
           path: constString(tableName),
         }),
       }),
@@ -538,6 +528,7 @@ const CenterProjectTablesBrowser: React.FC<
       'updated at': moment.utc(b.createdByUpdatedAt).local().calendar(),
       'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
+      'number of rows': b.numRows,
     }));
     const logged = loggedTables.result.map(b => ({
       _id: b.name,
@@ -547,6 +538,11 @@ const CenterProjectTablesBrowser: React.FC<
       'updated at': moment.utc(b.updatedAt).local().calendar(),
       'created at': moment.utc(b.createdAt).local().calendar(),
       'created by': b.createdByUserName,
+      // we use the # of steps in the run history to compute rows quickly. This works for stream tables
+      // because the table leverages run history. For logged tables, we must open the table in order
+      // to know the number of rows which is a much more expensive operation. Instead, we will just
+      // display a dummy placeholder
+      'number of rows': '-',
     }));
     const combined = [...streams, ...logged];
     combined.sort((a, b) => b._updatedAt - a._updatedAt);
@@ -646,6 +642,9 @@ const CenterProjectTablesBrowser: React.FC<
   );
 
   useEffect(() => {
+    if (isLoading) {
+      return;
+    }
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
       if (!row) {
@@ -683,6 +682,7 @@ const CenterProjectTablesBrowser: React.FC<
     params.preview,
     setPreviewNode,
     navigateToExpression,
+    isLoading,
   ]);
 
   return (
@@ -715,7 +715,14 @@ const CenterProjectTablesBrowser: React.FC<
         ]}
         loading={isLoading}
         filters={{kind: {placeholder: 'All table kinds'}}}
-        columns={['name', 'kind', 'updated at', 'created at', 'created by']}
+        columns={[
+          'name',
+          'kind',
+          'updated at',
+          'created at',
+          'created by',
+          'number of rows',
+        ]}
         data={browserData}
         actions={browserActions}
       />

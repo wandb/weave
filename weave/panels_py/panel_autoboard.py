@@ -22,6 +22,7 @@
 #   just use different UI structures to render.
 
 
+import os
 import typing
 
 import weave
@@ -429,9 +430,18 @@ def seed_autoboard(
     return auto_panels(input_node, config)  # type: ignore
 
 
+with open(
+    os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md"), "r"
+) as f:
+    instructions_md = f.read()
+
+
 template_registry.register(
     "py_board-seed_autoboard",
     "Timeseries Auto-Board",
     "Column-level analysis of timeseries data",
     input_node_predicate=node_qualifies_for_autoboard,
+    # Not featuring because it is pretty buggy
+    # is_featured=True,
+    instructions_md=instructions_md,
 )

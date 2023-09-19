@@ -139,10 +139,17 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         name: typing.Optional[str] = None,
         groupby: bool = False,
         sort_dir: typing.Optional[str] = None,
+        panel_def: typing.Union[table_state.PanelDef, None, str] = None,
     ) -> str:
         config = typing.cast(TableConfig, self.config)
+        if isinstance(panel_def, str):
+            panel_def = table_state.PanelDef(panel_def)
         return config.tableState.add_column(
-            select_expr, name, groupby=groupby, sort_dir=sort_dir
+            select_expr,
+            name,
+            groupby=groupby,
+            sort_dir=sort_dir,
+            panel_def=panel_def,
         )
 
     def enable_sort(self, col_id: str, dir: typing.Optional[str] = "asc") -> None:

@@ -52,10 +52,10 @@ import {
 } from './PanelContext';
 import * as Styles from './PanelExpression/styles';
 import {
-  useCloseEditor,
+  useCloseDrawer,
   usePanelInputExprIsHighlightedByPath,
   useSelectedPath,
-  useSetInspectingChildPanel,
+  useSetInteractingChildPanel,
   useSetPanelInputExprIsHighlighted,
 } from './PanelInteractContext';
 import PanelNameEditor from './PanelNameEditor';
@@ -292,7 +292,10 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         return;
       }
 
-      if (isAssignableTo(newExpression.type, handler?.inputType ?? 'invalid')) {
+      if (
+        handler?.inputType !== 'any' &&
+        isAssignableTo(newExpression.type, handler?.inputType ?? 'invalid')
+      ) {
         // If type didn't change, keep current settings
         updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
       } else if (curPanelId === 'Each') {
@@ -461,7 +464,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     [panelInputExpr.type]
   );
 
-  const setInspectingPanel = useSetInspectingChildPanel();
+  const setInteractingPanel = useSetInteractingChildPanel();
 
   return useMemo(
     () => ({
@@ -481,7 +484,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
       updatePanelConfig,
       updatePanelConfig2,
       updatePanelInput,
-      setInspectingPanel,
+      setInteractingPanel,
     }),
     [
       curPanelId,
@@ -500,7 +503,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
       updatePanelConfig,
       updatePanelConfig2,
       updatePanelInput,
-      setInspectingPanel,
+      setInteractingPanel,
     ]
   );
 };
@@ -528,11 +531,11 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     updatePanelConfig,
     updatePanelConfig2,
     updatePanelInput,
-    setInspectingPanel,
+    setInteractingPanel,
   } = useChildPanelCommon(props);
 
   const {frame} = usePanelContext();
-  const closeEditor = useCloseEditor();
+  const closeDrawer = useCloseDrawer();
 
   const validateName = useCallback(
     (newName: string) => {
@@ -637,7 +640,9 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       variant="ghost"
                       size="small"
                       icon="pencil-edit"
-                      onClick={() => setInspectingPanel(props.pathEl ?? '')}
+                      onClick={() =>
+                        setInteractingPanel('config', props.pathEl ?? '')
+                      }
                     />
                   }>
                   Open panel editor
@@ -658,7 +663,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   onOpen={() => setIsMenuOpen(true)}
                   onClose={() => setIsMenuOpen(false)}
                   isOpen={isMenuOpen}
-                  goBackToOutline={closeEditor}
+                  goBackToOutline={closeDrawer}
                 />
               </EditorIcons>
             )}

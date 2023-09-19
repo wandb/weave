@@ -114,7 +114,10 @@ type HomePreviewSidebarTemplateProps<RT extends CenterBrowserDataType> = {
 };
 
 export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
-  props: HomePreviewSidebarTemplateProps<RT>
+  props: HomePreviewSidebarTemplateProps<RT> & {
+    // Temp hack until we decouple history from all these components
+    isTemplate?: boolean;
+  }
 ) => {
   const history = useHistory();
   return (
@@ -146,7 +149,11 @@ export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
               cursor: 'pointer',
             }}
             onClick={e => {
-              history.push('.');
+              if (!props.isTemplate) {
+                history.push('.');
+              } else {
+                props.setPreviewNode(undefined);
+              }
             }}
           />
         </CenterTableActionCellIcon>
@@ -216,9 +223,9 @@ type Template = {
 
 export const SEED_BOARD_OP_NAME = 'py_board-seed_board';
 const OPEN_AI_OP_NAME = 'py_board-llm_completions_monitor';
-const RECOMMENDED_TEMPLATES = [OPEN_AI_OP_NAME];
+const TRACE_OP_NAME = 'py_board-trace_monitor';
+const RECOMMENDED_TEMPLATES = [OPEN_AI_OP_NAME, TRACE_OP_NAME];
 const FALL_BACK_TEMPLATE = SEED_BOARD_OP_NAME;
-
 // Returns a recommended template in order of recommendation if they exist
 // else returns any template thats not the fallback as recommended
 // else returns fallback

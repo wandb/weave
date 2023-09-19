@@ -184,6 +184,14 @@ gql_prop_op(
 )
 
 
+gql_prop_op(
+    "artifactVersion-historyStep",
+    wdt.ArtifactVersionType,
+    "historyStep",
+    types.optional(types.Int()),
+)
+
+
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
@@ -245,7 +253,8 @@ gql_direct_edge_op(
 def artifact_version_created_by(
     artifactVersion: wdt.ArtifactVersion,
 ) -> typing.Optional[wdt.Run]:
-    if artifactVersion["createdBy"]["__typename"] == "Run":
+    cb = artifactVersion["createdBy"]
+    if cb is not None and cb["__typename"] == "Run":
         return wdt.Run.from_keys(artifactVersion["createdBy"])
     return None
 
@@ -292,6 +301,20 @@ gql_connection_op(
     wdt.ArtifactVersionType,
     "usedBy",
     wdt.RunType,
+)
+
+gql_connection_op(
+    "artifactVersion-dependsOn",
+    wdt.ArtifactVersionType,
+    "dependsOn",
+    wdt.ArtifactVersionType,
+)
+
+gql_connection_op(
+    "artifactVersion-dependencyOf",
+    wdt.ArtifactVersionType,
+    "dependencyOf",
+    wdt.ArtifactVersionType,
 )
 
 
@@ -423,7 +446,7 @@ def _get_history_metrics(
                     "run_name": ConstNode(types.String(), run_name),
                 },
             ),
-            "asOfStep": ConstNode(types.Int(), history_step),
+            "asOfStep": ConstNode(types.Int(), max(0, history_step - 1)),
         },
     )
 
@@ -448,7 +471,7 @@ def _get_history_metrics(
                     name
                     project {
                         id
-                        name 
+                        name
                         entity {
                             id
                             name
@@ -477,7 +500,7 @@ def refine_history_metrics(
                     name
                     project {
                         id
-                        name 
+                        name
                         entity {
                             id
                             name

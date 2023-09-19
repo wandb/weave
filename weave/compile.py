@@ -835,6 +835,7 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
         "panel_plot-selected_data",
         "panel_table-all_rows",
         "stream_table-rows",
+        "panel_trace-active_span",
     ]:
         return None
     new_node = typing.cast(graph.Node, weave_internal.use(node))

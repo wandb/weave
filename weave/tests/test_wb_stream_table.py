@@ -6,6 +6,8 @@ from weave.wandb_interface.wandb_stream_table import StreamTable
 import numpy as np
 from PIL import Image
 
+from weave import execute, context, gql_json_cache
+
 
 def make_stream_table(*args, **kwargs):
     # Unit test backend does not support async logging
@@ -41,6 +43,31 @@ def test_stream_logging(user_by_api_key_in_env):
     assert weave.use(hist_node["nested"]).to_pylist_tagged() == [
         {"a": [i]} for i in range(10)
     ]
+
+
+def test_bytes_read_from_arrow_reporting(user_by_api_key_in_env):
+    st = make_stream_table(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
+    for i in range(10):
+        st.log({"hello": f"world_{i}", "index": i, "nested": {"a": [i]}})
+    st.finish()
+
+    hist_node = (
+        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+        .run("test_table")
+        .history3()
+    )
+
+    with execute.top_level_stats() as stats:
+        with context.execution_client():
+            with gql_json_cache.gql_json_cache_context():
+                execute.execute_nodes([hist_node["hello"]])
+
+    # all data is the live set at this point, so it is all counted
+    assert stats.summary()["bytes_read_to_arrow"] == 190
 
 
 def test_stream_logging_image(user_by_api_key_in_env):
