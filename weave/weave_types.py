@@ -305,7 +305,9 @@ class Type(metaclass=_TypeSubclassWatcher):
         # its bases.
         next_type_class = next_type.__class__
         while True:
-            if self.__class__ == next_type_class:
+            # __name__ based comparison instead of class equality, since we
+            # dynamically create ObjectType classes when deserializing
+            if self.__class__.__name__ == next_type_class.__name__:
                 break
             elif next_type_class._base_type is None:
                 # nothing left in base chain, no match

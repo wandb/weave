@@ -284,7 +284,6 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
         err = errors.WeaveDispatchError(
             f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}'
         )
-        breakpoint()
         util.raise_exception_with_sentry_if_available(err, [name])
 
     final_ops = _dispatch_remaining_args(

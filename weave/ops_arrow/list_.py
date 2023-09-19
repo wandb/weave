@@ -494,15 +494,28 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     # TODO: Refactor to disable None artifact? (Only used in tests)
     def __init__(
         self,
-        arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array],
+        arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array, dict, list],
         object_type=None,
         artifact: typing.Optional[artifact_base.Artifact] = None,
         invalid_reason=None,
     ) -> None:
+        from . import constructors
+        from . import convert
+
         # Do not dictionary decode this array! That will break performance.
         # Note we combine chunks here, to make the internal interface easy
         # to use. In the future we could refactor to retain chunked form.
-        if isinstance(arrow_data, pa.Array):
+        if isinstance(arrow_data, dict):
+            res = constructors.vectorized_container_constructor_preprocessor(arrow_data)
+            self._arrow_data = pa.StructArray.from_arrays(
+                res.arrays, list(arrow_data.keys())
+            )
+            object_type = types.TypedDict(res.prop_types)
+        elif isinstance(arrow_data, list):
+            loaded = convert.to_arrow(arrow_data)
+            self._arrow_data = loaded._arrow_data
+            object_type = loaded.object_type
+        elif isinstance(arrow_data, pa.Array):
             self._arrow_data = arrow_data
         elif isinstance(arrow_data, pa.Table):
             self._arrow_data = pa.StructArray.from_arrays(
@@ -1407,6 +1420,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return ArrowWeaveList(
             self._arrow_data, self.object_type, self._artifact, invalid_reason=None
         )
+
+    def to_pandas(self):
+        arrow_data = self._arrow_data
+        if isinstance(self.object_type, types.TypedDict):
+            arrow_data = pa.Table.from_arrays(
+                [arrow_data.field(i) for i in range(len(arrow_data.type))],
+                names=[f.name for f in arrow_data.type],
+            )
+        return arrow_data.to_pandas()
 
 
 ArrowWeaveListGenericType = typing.TypeVar(

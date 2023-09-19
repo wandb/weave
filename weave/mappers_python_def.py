@@ -81,7 +81,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         op_methods = {}
         for k, serializer in self._property_serializers.items():
 
-            if isinstance(serializer, DefaultFromPy) and serializer.type == OpDefType():
+            if (
+                obj.get(k) is not None
+                and isinstance(serializer, DefaultFromPy)
+                and serializer.type == OpDefType()
+            ):
                 op_methods[k] = serializer.apply(obj.get(k))
 
         if "artifact" in constructor_sig.parameters and "artifact" not in result:

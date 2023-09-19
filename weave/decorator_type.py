@@ -115,22 +115,26 @@ def type(
 
         # constructor op for this type. due to a circular dependency with ArrowWeave* types, we
         # define the vectorized constructor ops in vectorize.py instead of here
-        @decorator_op.op(
-            name=f"objectConstructor-_new_{target_name.replace('-', '_')}",
-            input_type={
-                field.name: static_property_types.get(field.name, None)
-                or type_vars[field.name]
-                for field in fields
-            },
-            output_type=TargetType(),
-            render_info={"type": "function"},
-        )
-        def constructor(**attributes):
-            return dc(
-                **{field.name: attributes[field.name] for field in fields if field.init}
-            )
 
-        dc.constructor = constructor
+        # TODO: this is commented out because the new op serialization stuff
+        # causes us to serialize this in every object for some reason
+
+        # @decorator_op.op(
+        #     name=f"objectConstructor-_new_{target_name.replace('-', '_')}",
+        #     input_type={
+        #         field.name: static_property_types.get(field.name, None)
+        #         or type_vars[field.name]
+        #         for field in fields
+        #     },
+        #     output_type=TargetType(),
+        #     render_info={"type": "function"},
+        # )
+        # def constructor(**attributes):
+        #     return dc(
+        #         **{field.name: attributes[field.name] for field in fields if field.init}
+        #     )
+
+        # dc.constructor = constructor
 
         return dc
 

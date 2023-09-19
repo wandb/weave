@@ -29,6 +29,10 @@ from .core_types import *
 from .panels_py import *
 from . import version
 
+from . import ops_arrow as _ops_arrow
+
+WeaveList = _ops_arrow.ArrowWeaveList
+
 _wandb_api.init()
 
 _context.clear_loading_built_ins(_loading_builtins_token)
