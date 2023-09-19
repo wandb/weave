@@ -35,3 +35,31 @@ mon = init_monitor(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")
 def adder(a, b):
     return a + b
 ```
+
+### Via Direct Span Construction
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/tim%2Fmake_tracer_a_featured_template/examples/prompts/trace_debugging/dev/synthetic_trace_data.ipynb)
+
+Finally, if you want to manually log span data, you can do so as well by logging directly to a StreamTable:
+
+```python
+from weave.monitoring import StreamTable
+from weave.stream_data_interfaces import TraceSpanDict
+
+st = StreamTable(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")
+st.log(TraceSpanDict(
+    name=...,
+    span_id=...,
+    trace_id=...,
+    status_code=...,
+    start_time_s=...,
+    end_time_s=...,
+    parent_id=...,
+    attributes=...,
+    inputs=...,
+    output=...,
+    summary=...,
+    exception=...,
+))
+
+```
