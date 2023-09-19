@@ -132,7 +132,7 @@ export const useProjectAssetCount = (
     projectHistoryType: opProjectHistoryType({project: projectNode}),
   } as any);
   const compositeValue = useNodeValue(compositeNode);
-  console.log(compositeValue);
+
   return useMemo(() => {
     let result = {
       boardCount: 0,
