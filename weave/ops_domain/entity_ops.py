@@ -31,13 +31,7 @@ def entity_name(entity: wdt.Entity) -> str:
     return entity["name"]
 
 
-gql_prop_op(
-    "entity-internalId",
-    wdt.EntityType,
-    "id",
-    types.String(),
-    True
-)
+gql_prop_op("entity-internalId", wdt.EntityType, "id", types.String(), True)
 
 gql_prop_op(
     "entity-isTeam",
