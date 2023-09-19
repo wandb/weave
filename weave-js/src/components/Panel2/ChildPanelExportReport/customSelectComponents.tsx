@@ -82,7 +82,7 @@ export const customReportSelectComps = {
         option => option === groupHeadingProps.data
       ) === 0;
     return (
-      <selectComponents.GroupHeading {...groupHeadingProps} className="m-0 p-0">
+      <selectComponents.GroupHeading {...groupHeadingProps} className="">
         {!isFirstGroup && <div className="my-8 h-1 bg-moon-250"></div>}
       </selectComponents.GroupHeading>
     );

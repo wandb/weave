@@ -81,7 +81,9 @@ export const ReportSelection = ({
       } as any);
     }),
   });
-  const reports = useNodeValue(reportsMetaNode);
+  const reports = useNodeValue(reportsMetaNode ?? w.voidNode(), {
+    skip: entities.loading,
+  });
   const groupedReportOptions = useMemo(() => {
     return [
       {
@@ -106,8 +108,8 @@ export const ReportSelection = ({
       } as any);
     }),
   });
-  const projectNames = useNodeValue(projectMetaNode, {
-    skip: selectedEntity == null || selectedReport?.name !== NEW_REPORT_OPTION,
+  const projects = useNodeValue(projectMetaNode, {
+    skip: selectedEntity == null || entities.loading,
   });
 
   return (
@@ -191,13 +193,11 @@ export const ReportSelection = ({
           <Select<ProjectOption, false>
             className="mb-16"
             aria-label="project selector"
-            isLoading={projectNames.loading}
-            isDisabled={
-              projectNames.loading || projectNames.result.length === 0
-            }
-            options={projectNames.result}
+            isLoading={projects.loading}
+            isDisabled={projects.loading || projects.result.length === 0}
+            options={projects.result}
             placeholder={
-              !projectNames.loading && projectNames.result.length === 0
+              !projects.loading && projects.result.length === 0
                 ? 'No projects found.'
                 : 'Select a project...'
             }

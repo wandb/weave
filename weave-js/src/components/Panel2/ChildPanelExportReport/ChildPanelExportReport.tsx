@@ -7,7 +7,12 @@ import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {EntityOption, ProjectOption, ReportOption} from './utils';
+import {
+  EntityOption,
+  NEW_REPORT_OPTION,
+  ProjectOption,
+  ReportOption,
+} from './utils';
 
 type ChildPanelExportReportProps = {
   rootConfig: ChildPanelFullConfig;
@@ -70,7 +75,11 @@ export const ChildPanelExportReport = ({
           <Button
             icon="add-new"
             className="w-full"
-            disabled={selectedReport == null}
+            disabled={
+              selectedReport == null ||
+              (selectedReport.name === NEW_REPORT_OPTION &&
+                selectedProject == null)
+            }
             onClick={onAddPanel}>
             Add panel
           </Button>
