@@ -31,6 +31,8 @@ def entity_name(entity: wdt.Entity) -> str:
     return entity["name"]
 
 
+gql_prop_op("entity-internalId", wdt.EntityType, "id", types.String(), True)
+
 gql_prop_op(
     "entity-isTeam",
     wdt.EntityType,
@@ -65,6 +67,14 @@ gql_connection_op(
     # lambda inputs: f"first: 100",
 )
 
+gql_connection_op(
+    "entity-reports",
+    wdt.EntityType,
+    "views",
+    wdt.ReportType,
+    {},
+    # lambda inputs: f"first: 100",
+)
 
 # Section 6/6: Non Standard Business Logic Ops
 @op(name="entity-link")

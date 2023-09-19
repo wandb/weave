@@ -479,6 +479,22 @@ export const toGqlField = (
         ],
       },
     ];
+  } else if (forwardOp.op.name === 'entity-reports') {
+    return [
+      {
+        name: 'views',
+        // TODO: hardcoding for perf during dev
+        args: gqlArgs({
+          first: childLimitWithDefault(LIMIT_ORG_REPORTS),
+        }),
+        fields: [
+          {
+            name: 'edges',
+            fields: [gqlObjectField(forwardGraph, forwardOp, 'node')],
+          },
+        ],
+      },
+    ];
   } else if (forwardOp.op.name === 'entity-org') {
     return [gqlObjectField(forwardGraph, forwardOp, 'organization')];
   } else if (forwardOp.op.name === 'project-id') {
@@ -681,6 +697,8 @@ export const toGqlField = (
     return gqlBasicField('description');
   } else if (forwardOp.op.name === 'report-createdAt') {
     return gqlBasicField('createdAt');
+  } else if (forwardOp.op.name === 'report-updatedAt') {
+    return gqlBasicField('updatedAt');
   } else if (forwardOp.op.name === 'report-project') {
     return [gqlObjectField(forwardGraph, forwardOp, 'project')];
   } else if (forwardOp.op.name === 'report-creator') {
