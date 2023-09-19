@@ -604,6 +604,7 @@ const JupyterPageControls: React.FC<
     props.config.input_node,
     updateInput
   );
+
   const addPanelToPanel = useCallback(() => {
     if (props.isPanel) {
       props.updateConfig2(oldConfig => {

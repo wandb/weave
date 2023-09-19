@@ -491,23 +491,36 @@ const legacyTraceRowToSimpleNode = (
   //   }),
   //   key: constString(legacyTraceKey),
   // });
-  return opConcat({
-    arr: opMap({
-      arr: opProjectRuns({
-        project: opRootProject({
-          entityName: constString(entityName),
-          projectName: constString(projectName),
+  // return opConcat({
+  //   arr: opMap({
+  //     arr: opProjectRuns({
+  //       project: opRootProject({
+  //         entityName: constString(entityName),
+  //         projectName: constString(projectName),
+  //       }),
+  //     }),
+  //     mapFn: constFunction({row: 'run'}, ({row}) => {
+  //       return opPick({
+  //         obj: opRunHistory3({
+  //           run: row,
+  //         }),
+  //         key: constString(legacyTraceKey),
+  //       });
+  //     }),
+  //   }),
+  // });
+  return opPick({
+    obj: opConcat({
+      arr: opRunHistory3({
+        run: opProjectRuns({
+          project: opRootProject({
+            entityName: constString(entityName),
+            projectName: constString(projectName),
+          }),
         }),
       }),
-      mapFn: constFunction({row: 'run'}, ({row}) => {
-        return opPick({
-          obj: opRunHistory3({
-            run: row,
-          }),
-          key: constString(legacyTraceKey),
-        });
-      }),
     }),
+    key: constString(legacyTraceKey),
   });
 };
 

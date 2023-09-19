@@ -3,11 +3,13 @@ import json
 import logging
 import typing
 import dataclasses
+import datetime
 
 import typeguard
 
 from .. import stream_data_interfaces
 from wandb.sdk.data_types.trace_tree import Span as WBSpan
+from wandb.sdk.data_types.trace_tree import Result as WBSpanResult
 
 
 from .. import api as weave
@@ -233,7 +235,7 @@ class WBTraceTree:
 def span_dict_to_wb_span(span_dict: dict) -> WBSpan:
     child_spans = [
         span_dict_to_wb_span(child_dict)
-        for child_dict in span_dict.get("child_spans", [])
+        for child_dict in (span_dict.get("child_spans") or [])
     ]
     return WBSpan(
         span_id=span_dict.get("span_id"),
@@ -243,7 +245,13 @@ def span_dict_to_wb_span(span_dict: dict) -> WBSpan:
         status_code=span_dict.get("status_code"),
         status_message=span_dict.get("status_message"),
         attributes=span_dict.get("attributes"),
-        results=span_dict.get("results"),
+        results=[
+            WBSpanResult(
+                inputs=r.get("inputs"),
+                outputs=r.get("outputs"),
+            )
+            for r in span_dict.get("results", [])
+        ],
         span_kind=span_dict.get("span_kind"),
         child_spans=child_spans,
     )
@@ -263,3 +271,7 @@ def convert_to_spans(
         "id": tree.model_hash,
         "obj": tree.model_dict_dumps,
     }
+
+    for span in spans:
+        span["timestamp"] = datetime.datetime.fromtimestamp(span["start_time_s"])
+    return spans
