@@ -473,23 +473,41 @@ const legacyTraceRowToSimpleNode = (
   projectName: string,
   legacyTraceKey: string
 ) => {
-  return opPick({
-    obj: opConcat({
-      arr: opMap({
-        arr: opProjectRuns({
-          project: opRootProject({
-            entityName: constString(entityName),
-            projectName: constString(projectName),
-          }),
-        }),
-        mapFn: constFunction({row: 'run'}, ({row}) => {
-          return opRunHistory3({
-            run: row,
-          });
+  // return opPick({
+  //   obj: opConcat({
+  //     arr: opMap({
+  //       arr: opProjectRuns({
+  //         project: opRootProject({
+  //           entityName: constString(entityName),
+  //           projectName: constString(projectName),
+  //         }),
+  //       }),
+  //       mapFn: constFunction({row: 'run'}, ({row}) => {
+  //         return opRunHistory3({
+  //           run: row,
+  //         });
+  //       }),
+  //     }),
+  //   }),
+  //   key: constString(legacyTraceKey),
+  // });
+  return opConcat({
+    arr: opMap({
+      arr: opProjectRuns({
+        project: opRootProject({
+          entityName: constString(entityName),
+          projectName: constString(projectName),
         }),
       }),
+      mapFn: constFunction({row: 'run'}, ({row}) => {
+        return opPick({
+          obj: opRunHistory3({
+            run: row,
+          }),
+          key: constString(legacyTraceKey),
+        });
+      }),
     }),
-    key: constString(legacyTraceKey),
   });
 };
 
