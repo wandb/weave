@@ -27,7 +27,7 @@ import {
   opPick,
   opProjectRuns,
   opRootProject,
-  opRunHistory,
+  opRunHistory3,
   opTableRows,
   typedDict,
 } from '@wandb/weave/core';
@@ -482,8 +482,8 @@ const legacyTraceRowToNode = (
             projectName: constString(projectName),
           }),
         }),
-        mapFn: constFunction({row: typedDict({})}, ({row}) => {
-          return opRunHistory({
+        mapFn: constFunction({row: 'run'}, ({row}) => {
+          return opRunHistory3({
             run: row,
           });
         }),
