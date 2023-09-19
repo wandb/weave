@@ -64,6 +64,7 @@ export const TraceTreeSpanViewer: React.FC<{
   span: SpanType;
   onSelectSpanIndex?: (spanIndex: number) => void;
   selectedSpanIndex?: number | null;
+  hideDetails?: boolean;
 }> = props => {
   const {isFullscreen} = React.useContext(PanelFullscreenContext);
   const split = isFullscreen ? `horizontal` : `vertical`;
@@ -138,7 +139,7 @@ export const TraceTreeSpanViewer: React.FC<{
         </S.TraceTimeline>
         {tipOverlay}
       </S.TraceTimelineWrapper>
-      {selectedSpan && (
+      {!props.hideDetails && selectedSpan && (
         <S.TraceDetail>
           <SpanTreeDetail span={selectedSpan} />
         </S.TraceDetail>
