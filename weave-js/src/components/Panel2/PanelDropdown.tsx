@@ -1,9 +1,11 @@
 import {
   NodeOrVoidNode,
+  Type,
   constNodeUnsafe,
   constNone,
   constString,
   isList,
+  isSimpleTypeShape,
   opUnique,
   voidNode,
 } from '@wandb/weave/core';
@@ -76,6 +78,14 @@ export const PanelDropdownConfigComponent: React.FC<
   );
 };
 
+// Stupid that we need this, TODO: figure out why this is necessary
+const unwrapConst = (t: Type): Type => {
+  if (!isSimpleTypeShape(t) && t.type === 'const') {
+    return t.valType;
+  }
+  return t;
+};
+
 export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   const config = props.config!;
 
@@ -93,7 +103,7 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   );
 
   const valueNode = props.input;
-  const isMultiple = isList(valueNode.type);
+  const isMultiple = isList(unwrapConst(valueNode.type));
 
   const valueQuery = useNodeValue(valueNode as any);
   const chosen = useMemo(() => valueQuery.result ?? [], [valueQuery]);

@@ -420,6 +420,14 @@ def vectorize(
                     node_inputs, vectorized_keys
                 )
             )
+        if node_name == "run-name":
+            # Why did I need this? Seems like another .name access issue :(
+            op = registry_mem.memory_registry.get_op("ArrowWeaveListrun-name")
+            return op.lazy_call(
+                **_vectorized_inputs_as_awl_non_vectorized_as_lists(
+                    node_inputs, vectorized_keys
+                )
+            )
         if node_name == "list":
             return _vectorize_list_special_case(node_name, node_inputs, vectorized_keys)
 
