@@ -118,8 +118,8 @@ const HomeFeaturedTemplateItem: React.FC<{
             alt={template.display_name + ' thumbnail'}
             style={{
               height: '100%',
-              // width: '100%',
               borderRadius: '4px',
+              border: '2px solid #E5E5E5',
             }}
           />
         </LayoutElements.Block>
