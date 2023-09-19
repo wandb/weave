@@ -129,22 +129,38 @@ export const useProjectAssetCount = (
     boardCount: opProjectBoardCount({project: projectNode}),
     runStreamCount: opProjectRunStreamCount({project: projectNode}),
     loggedTableCount: opProjectLoggedTableCount({project: projectNode}),
-    legacyTracesCount: opProjectLegacyTracesCount({project: projectNode}),
+    projectHistoryType: opProjectHistoryType({project: projectNode}),
   } as any);
   const compositeValue = useNodeValue(compositeNode);
+  console.log(compositeValue);
+  return useMemo(() => {
+    let result = {
+      boardCount: 0,
+      runStreamCount: 0,
+      loggedTableCount: 0,
+      legacyTracesCount: 0,
+    };
+    if (compositeValue.result != null) {
+      const keys = projectHistoryTypeToLegacyTraceKeys(
+        compositeValue.result.projectHistoryType as w.Type
+      );
 
-  return useMemo(
-    () => ({
-      result: compositeValue.result ?? {
-        boardCount: 0,
-        runStreamCount: 0,
-        loggedTableCount: 0,
-        legacyTracesCount: 0,
-      },
+      result = {
+        ...compositeValue.result,
+        legacyTracesCount: keys.length,
+      } as {
+        boardCount: number;
+        runStreamCount: number;
+        loggedTableCount: number;
+        legacyTracesCount: number;
+      };
+    }
+
+    return {
+      result,
       loading: compositeValue.loading,
-    }),
-    [compositeValue.loading, compositeValue.result]
-  ) as {
+    };
+  }, [compositeValue.loading, compositeValue.result]) as {
     result: {
       boardCount: number;
       runStreamCount: number;
@@ -167,9 +183,51 @@ const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
   return w.opCount({arr: opProjectRunLoggedTableArtifacts({project})});
 };
 
-const opProjectLegacyTracesCount = ({project}: {project: w.Node}) => {
-  // TODO: Fill this out
-  return w.constNumber(1);
+const opProjectHistoryType = ({project}: {project: w.Node}) => {
+  return w.callOpVeryUnsafe(
+    'refine_history3_type',
+    {run: w.opProjectRuns({project: project})},
+    'type'
+  );
+};
+
+const projectHistoryTypeToLegacyTraceKeys = (
+  projectHistoryType: w.Type
+): string[] => {
+  if (w.isTaggedValue(projectHistoryType)) {
+    projectHistoryType = projectHistoryType.value;
+    if (w.isList(projectHistoryType)) {
+      projectHistoryType = projectHistoryType.objectType;
+      if (w.isTaggedValue(projectHistoryType)) {
+        projectHistoryType = projectHistoryType.value;
+        if (
+          !w.isSimpleTypeShape(projectHistoryType) &&
+          projectHistoryType.type === 'ArrowWeaveList'
+        ) {
+          projectHistoryType = projectHistoryType.objectType;
+          if (w.isTypedDict(projectHistoryType)) {
+            const legacyTraceKeys = Object.entries(
+              projectHistoryType.propertyTypes
+            )
+              .filter(([key, value]) => {
+                return (
+                  value != null &&
+                  w.isAssignableTo(
+                    value,
+                    w.maybe({
+                      type: 'wb_trace_tree',
+                    })
+                  )
+                );
+              })
+              .map(([key, value]) => key);
+            return legacyTraceKeys;
+          }
+        }
+      }
+    }
+  }
+  return [];
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {
