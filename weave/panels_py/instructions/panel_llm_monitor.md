@@ -1,6 +1,6 @@
 ## OpenAI Monitoring Quicksart
 
-To record, monitor performance, & analyze cost & latency of OpenAI calls:
+To record history, monitor performance, & analyze cost/latency of OpenAI calls:
 
 1. Set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1`.
 2. Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
