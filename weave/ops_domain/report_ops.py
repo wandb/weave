@@ -63,6 +63,7 @@ gql_prop_op(
     wdt.ReportType,
     "id",
     types.String(),
+    True
 )
 gql_prop_op(
     "report-name",

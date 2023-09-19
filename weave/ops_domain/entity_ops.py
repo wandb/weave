@@ -36,6 +36,7 @@ gql_prop_op(
     wdt.EntityType,
     "id",
     types.String(),
+    True
 )
 
 gql_prop_op(
