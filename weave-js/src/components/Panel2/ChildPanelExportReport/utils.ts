@@ -1,3 +1,4 @@
+import {useMemo} from 'react';
 import {useBranchPointFromURIString} from '../../PagePanelComponents/hooks';
 import {uriFromNode, determineURISource} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
@@ -27,10 +28,13 @@ export function useEntityAndProject(rootConfig: ChildPanelFullConfig) {
   const branchPoint = useBranchPointFromURIString(maybeURI);
   const entityProjectName = determineURISource(maybeURI, branchPoint);
 
-  return {
-    entityName: entityProjectName?.entity ?? '',
-    projectName: entityProjectName?.project ?? '',
-  };
+  return useMemo(
+    () => ({
+      entityName: entityProjectName?.entity ?? '',
+      projectName: entityProjectName?.project ?? '',
+    }),
+    [entityProjectName]
+  );
 }
 
 /**
