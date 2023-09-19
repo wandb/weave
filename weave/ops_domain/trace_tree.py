@@ -6,6 +6,10 @@ import dataclasses
 
 import typeguard
 
+from .. import stream_data_interfaces
+from wandb.sdk.data_types.trace_tree import Span as WBSpan
+
+
 from .. import api as weave
 
 
@@ -224,3 +228,38 @@ class WBTraceTree:
             "error": get_first_error(root_span),
             "modelHash": self.model_hash,
         }
+
+
+def span_dict_to_wb_span(span_dict: dict) -> WBSpan:
+    child_spans = [
+        span_dict_to_wb_span(child_dict)
+        for child_dict in span_dict.get("child_spans", [])
+    ]
+    return WBSpan(
+        span_id=span_dict.get("span_id"),
+        name=span_dict.get("name"),
+        start_time_ms=span_dict.get("start_time_ms"),
+        end_time_ms=span_dict.get("end_time_ms"),
+        status_code=span_dict.get("status_code"),
+        status_message=span_dict.get("status_message"),
+        attributes=span_dict.get("attributes"),
+        results=span_dict.get("results"),
+        span_kind=span_dict.get("span_kind"),
+        child_spans=child_spans,
+    )
+
+
+@weave.op(
+    name="wb_trace_tree-convertToSpans",
+)
+def convert_to_spans(
+    tree: WBTraceTree,
+) -> typing.List[stream_data_interfaces.TraceSpanDict]:
+    loaded_dump = json.loads(tree.root_span_dumps)
+    wb_span = span_dict_to_wb_span(loaded_dump)
+    spans = stream_data_interfaces.wb_span_to_weave_spans(wb_span, None, None)
+    spans[0]["attributes"] = spans[0]["attributes"] or {}
+    spans[0]["attributes"]["model"] = {
+        "id": tree.model_hash,
+        "obj": tree.model_dict_dumps,
+    }

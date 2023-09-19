@@ -2,7 +2,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
 import * as Tabs from '@wandb/weave/components/Tabs';
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import * as LayoutElements from './LayoutElements';
 import styled from 'styled-components';
 import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
@@ -246,8 +246,10 @@ const getRecommendedTemplateInfo = (generators: Template[]) => {
 
 export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
+  previewExpr?: Node;
   navigateToExpression: NavigateToExpressionType;
-}> = ({expr, navigateToExpression}) => {
+  generatorAllowList?: string[];
+}> = ({expr, previewExpr, navigateToExpression, generatorAllowList}) => {
   const refinedExpression = useNodeWithServerType(expr);
   const generators = useBoardGeneratorsForNode(expr);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -255,8 +257,20 @@ export const HomeExpressionPreviewParts: React.FC<{
 
   const isLoadingTemplates =
     generators.loading || refinedExpression.loading || isGenerating;
-  const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
-  const recommendedTemplateInfo = getRecommendedTemplateInfo(generators.result);
+  const finalGenerators = useMemo(() => {
+    if (generators.loading || !generators.result) {
+      return [];
+    }
+
+    if (!generatorAllowList) {
+      return generators.result;
+    }
+    return generators.result.filter(generator =>
+      generatorAllowList.includes(generator.op_name)
+    );
+  }, [generatorAllowList, generators.loading, generators.result]);
+  const hasTemplates = !isLoadingTemplates && finalGenerators.length > 1;
+  const recommendedTemplateInfo = getRecommendedTemplateInfo(finalGenerators);
 
   useEffect(() => {
     setTabValue('Overview');
@@ -280,12 +294,13 @@ export const HomeExpressionPreviewParts: React.FC<{
           <TabContentWrapper>
             <OverviewTab
               expr={expr}
+              previewExpr={previewExpr}
               navigateToExpression={navigateToExpression}
               refinedExpression={refinedExpression}
               recommendedTemplateInfo={recommendedTemplateInfo}
               isLoadingTemplates={isLoadingTemplates}
               setIsGenerating={setIsGenerating}
-              generators={generators.result}
+              generators={finalGenerators}
               setTabValue={setTabValue}
               hasTemplates={hasTemplates}
             />
@@ -302,7 +317,7 @@ export const HomeExpressionPreviewParts: React.FC<{
                 recommendedTemplateInfo={recommendedTemplateInfo}
                 isLoadingTemplates={isLoadingTemplates}
                 setIsGenerating={setIsGenerating}
-                generators={generators.result}
+                generators={finalGenerators}
               />
             </TabContentWrapper>
           </Tabs.Content>
@@ -315,6 +330,7 @@ export const HomeExpressionPreviewParts: React.FC<{
 
 const OverviewTab = ({
   expr,
+  previewExpr,
   navigateToExpression,
   refinedExpression,
   recommendedTemplateInfo,
@@ -325,6 +341,7 @@ const OverviewTab = ({
   hasTemplates,
 }: {
   expr: Node;
+  previewExpr?: Node;
   navigateToExpression: NavigateToExpressionType;
   refinedExpression: {
     loading: boolean;
@@ -338,7 +355,8 @@ const OverviewTab = ({
   hasTemplates: boolean;
 }) => {
   const weave = useWeaveContext();
-  const inputExpr = weave.expToString(expr);
+  const pExpr = previewExpr ?? expr;
+  const previewExprString = weave.expToString(pExpr);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
   const [copyButtonText, setCopyButtonText] = useState<'Copy' | 'Copied'>(
     'Copy'
@@ -351,7 +369,7 @@ const OverviewTab = ({
           PREVIEW
           <Button
             onClick={() => {
-              navigateToExpression(expr);
+              navigateToExpression(pExpr);
             }}
             size="small"
             variant="ghost"
@@ -360,7 +378,7 @@ const OverviewTab = ({
           </Button>
         </LayoutElements.BlockHeader>
         <LayoutElements.Block>
-          <PreviewNode inputExpr={inputExpr} />
+          <PreviewNode inputExpr={previewExprString} />
         </LayoutElements.Block>
       </LayoutElements.VBlock>
       <LayoutElements.VBlock style={{gap: '8px'}}>

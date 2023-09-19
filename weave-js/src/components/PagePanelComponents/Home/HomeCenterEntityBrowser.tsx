@@ -49,6 +49,7 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
+import {SpanWeaveType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -467,12 +468,11 @@ const CenterProjectBoardsBrowser: React.FC<
   );
 };
 
-const legacyTraceRowToNode = (
+const legacyTraceRowToSimpleNode = (
   entityName: string,
   projectName: string,
   legacyTraceKey: string
 ) => {
-  // TODO: Convert to new format
   return opPick({
     obj: opConcat({
       arr: opMap({
@@ -490,6 +490,19 @@ const legacyTraceRowToNode = (
       }),
     }),
     key: constString(legacyTraceKey),
+  });
+};
+
+const convertSimpleLegacyNodeToNewFormat = (node: Node) => {
+  // WARNING: This is a slow operation due to json parsing.
+  return opConcat({
+    arr: callOpVeryUnsafe(
+      'wb_trace_tree-convertToSpans',
+      {
+        tree: node,
+      },
+      list(list(SpanWeaveType))
+    ) as Node,
   });
 };
 
@@ -540,7 +553,11 @@ const CenterProjectLegacyTracesBrowser: React.FC<
           icon: IconCopy,
           label: 'Copy Weave expression',
           onClick: row => {
-            const node = legacyTraceRowToNode(entityName, projectName, row._id);
+            const node = legacyTraceRowToSimpleNode(
+              entityName,
+              projectName,
+              row._id
+            );
             const copyText = weave.expToString(node);
             navigator.clipboard.writeText(copyText).then(() => {
               // give user feedback
@@ -562,7 +579,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
         setPreviewNode(undefined);
         return;
       }
-      const expr = legacyTraceRowToNode(
+      const expr = legacyTraceRowToSimpleNode(
         params.entity!,
         params.project!,
         row._id
@@ -573,7 +590,9 @@ const CenterProjectLegacyTracesBrowser: React.FC<
           row={row}
           setPreviewNode={setPreviewNode}>
           <HomeExpressionPreviewParts
-            expr={expr}
+            expr={convertSimpleLegacyNodeToNewFormat(expr)}
+            previewExpr={expr}
+            generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
           />
         </HomePreviewSidebarTemplate>
