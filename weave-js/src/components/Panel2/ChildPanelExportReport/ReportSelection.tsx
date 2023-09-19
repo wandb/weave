@@ -9,13 +9,13 @@ import {
   customReportSelectComps,
 } from './customSelectComponents';
 import {
-  NEW_REPORT_OPTION,
   DEFAULT_REPORT_OPTION,
   EntityOption,
   ReportOption,
   useEntityAndProject,
   GroupedReportOption,
   ProjectOption,
+  isNewReportOption,
 } from './utils';
 import {SelectedExistingReport} from './SelectedExistingReport';
 
@@ -55,16 +55,6 @@ export const ReportSelection = ({
     entityName: w.constString(selectedEntity?.name ?? entityName),
   });
 
-  useEffect(() => {
-    // Default initial entity value based on url
-    if (!entities.loading && entities.result.length > 0) {
-      const foundEntity = entities.result.find(
-        (item: EntityOption) => item.name === entityName
-      );
-      setSelectedEntity(foundEntity);
-    }
-  }, [entityName, entities, setSelectedEntity]);
-
   // Get list of reports across all entities and projects
   const reportsMetaNode = w.opMap({
     arr: w.opEntityReports({
@@ -87,11 +77,9 @@ export const ReportSelection = ({
   const groupedReportOptions = useMemo(() => {
     return [
       {
-        label: 'new report',
         options: [DEFAULT_REPORT_OPTION],
       },
       {
-        label: 'existing reports',
         options: reports.result ?? [],
       },
     ];
@@ -109,19 +97,43 @@ export const ReportSelection = ({
     }),
   });
   const projects = useNodeValue(projectMetaNode, {
-    skip: selectedEntity == null || entities.loading,
+    skip:
+      selectedEntity == null ||
+      entities.loading ||
+      isNewReportOption(selectedReport),
   });
+
+  useEffect(() => {
+    // Default initial entity value based on url
+    if (!entities.loading && entities.result.length > 0) {
+      const foundEntity = entities.result.find(
+        (item: EntityOption) => item.name === entityName
+      );
+      setSelectedEntity(foundEntity);
+    }
+  }, [entityName, entities, setSelectedEntity]);
+
+  useEffect(() => {
+    // Default report value to `New report` option if no reports are found
+    if (
+      !reports.loading &&
+      reports.result.length === 0 &&
+      selectedReport == null
+    ) {
+      setSelectedReport(DEFAULT_REPORT_OPTION);
+    }
+  }, [reports, setSelectedReport, selectedReport]);
 
   return (
     <div className="mt-8 flex-1">
       <label
-        htmlFor="entity"
+        htmlFor="entity-selector"
         className="mb-4 block font-semibold text-moon-800">
         Entity
       </label>
       <Select<EntityOption, false>
         className="mb-16"
-        id="entity selector"
+        id="entity-selector"
         isLoading={entities.loading}
         options={entities.result ?? []}
         placeholder={
@@ -136,6 +148,7 @@ export const ReportSelection = ({
           if (selected) {
             setSelectedEntity(selected);
             setSelectedReport(null);
+            setSelectedProject(null);
           }
         }}
         components={customEntitySelectComps}
@@ -146,28 +159,23 @@ export const ReportSelection = ({
         className="mb-4 block font-semibold text-moon-800">
         Destination report
       </label>
-      {selectedReport != null && selectedReport.name !== NEW_REPORT_OPTION && (
+      {selectedReport != null && !isNewReportOption(selectedReport) && (
         <SelectedExistingReport
           selectedReport={selectedReport}
-          setSelectedReport={setSelectedReport}
+          clearSelectedReport={() => setSelectedReport(null)}
         />
       )}
-      {(selectedReport == null ||
-        selectedReport.name === NEW_REPORT_OPTION) && (
+      {(selectedReport == null || isNewReportOption(selectedReport)) && (
         <>
           <Select<ReportOption, false, GroupedReportOption>
             className="mb-16"
-            aria-label="report selector"
+            id="report-selector"
             isLoading={reports.loading}
             isDisabled={
-              entities.loading || reports.loading || reports.result.length === 0
+              entities.loading || reports.loading || reports.result.length === 1
             }
             options={groupedReportOptions}
-            placeholder={
-              !reports.loading && reports.result.length === 0
-                ? 'No reports found.'
-                : 'Select a report...'
-            }
+            placeholder={!reports.loading && 'Select a report...'}
             getOptionLabel={option => option.name}
             getOptionValue={option => option.id ?? ''}
             value={selectedReport}
@@ -183,16 +191,16 @@ export const ReportSelection = ({
           />
         </>
       )}
-      {selectedReport != null && selectedReport.name === NEW_REPORT_OPTION && (
+      {isNewReportOption(selectedReport) && (
         <>
           <label
-            htmlFor="entity"
+            htmlFor="project-selector"
             className="mb-4 block font-semibold text-moon-800">
             Project
           </label>
           <Select<ProjectOption, false>
             className="mb-16"
-            aria-label="project selector"
+            id="project-selector"
             isLoading={projects.loading}
             isDisabled={projects.loading || projects.result.length === 0}
             options={projects.result}

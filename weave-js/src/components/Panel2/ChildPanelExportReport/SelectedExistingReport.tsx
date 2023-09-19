@@ -5,12 +5,12 @@ import {ReportOption} from './utils';
 
 type SelectedExistingReportProps = {
   selectedReport: ReportOption;
-  setSelectedReport: (report: ReportOption | null) => void;
+  clearSelectedReport: () => void;
 };
 
 export const SelectedExistingReport = ({
   selectedReport,
-  setSelectedReport,
+  clearSelectedReport,
 }: SelectedExistingReportProps) => {
   return (
     <div className="mb-16 flex rounded bg-moon-50 p-8 text-moon-800">
@@ -23,10 +23,11 @@ export const SelectedExistingReport = ({
           </span>
         </p>
         <Button
+          aria-label="deselect report option"
           icon="close"
           variant="ghost"
           className="flex shrink-0 text-moon-500"
-          onClick={() => setSelectedReport(null)}
+          onClick={clearSelectedReport}
         />
       </div>
     </div>

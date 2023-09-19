@@ -1,23 +1,20 @@
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
 import {Icon} from '../../Icon';
-import {NEW_REPORT_OPTION, ReportOption} from './utils';
+import {ReportOption, isNewReportOption} from './utils';
 
-type NewReportOptionProps = {
+type ReportOptionProps = {
   optionData: ReportOption;
   children: React.ReactNode;
 };
-export const NewReportOption = ({
-  optionData,
-  children,
-}: NewReportOptionProps) => {
+export const ReportOptionComp = ({optionData, children}: ReportOptionProps) => {
   return (
     <div
       className={twMerge(
         'flex grow',
-        optionData.name === NEW_REPORT_OPTION && 'items-center'
+        isNewReportOption(optionData) && 'items-center'
       )}>
-      {optionData.name === NEW_REPORT_OPTION ? (
+      {isNewReportOption(optionData) ? (
         <Icon name="add-new" width={18} height={18} />
       ) : (
         <Icon name="report" className="shrink-0 grow-0 pt-4" />

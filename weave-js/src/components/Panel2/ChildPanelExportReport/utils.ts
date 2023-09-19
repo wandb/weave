@@ -4,11 +4,14 @@ import {uriFromNode, determineURISource} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {format, getYear} from 'date-fns';
 
-export const NEW_REPORT_OPTION = 'New report';
+export const NEW_REPORT_LABEL = 'New report';
 export const DEFAULT_REPORT_OPTION = {
-  id: NEW_REPORT_OPTION,
-  name: NEW_REPORT_OPTION,
+  id: NEW_REPORT_LABEL,
+  name: NEW_REPORT_LABEL,
 };
+export function isNewReportOption(option: ReportOption | null) {
+  return option?.name === NEW_REPORT_LABEL;
+}
 
 export type EntityOption = {
   name: string;
@@ -22,7 +25,6 @@ export type ReportOption = {
   updatedAt?: number;
 };
 export type GroupedReportOption = {
-  label: string;
   options: ReportOption[];
 };
 

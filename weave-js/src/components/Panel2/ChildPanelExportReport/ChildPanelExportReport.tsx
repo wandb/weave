@@ -9,9 +9,9 @@ import {ReportSelection} from './ReportSelection';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {
   EntityOption,
-  NEW_REPORT_OPTION,
   ProjectOption,
   ReportOption,
+  isNewReportOption,
 } from './utils';
 
 type ChildPanelExportReportProps = {
@@ -77,8 +77,7 @@ export const ChildPanelExportReport = ({
             className="w-full"
             disabled={
               selectedReport == null ||
-              (selectedReport.name === NEW_REPORT_OPTION &&
-                selectedProject == null)
+              (isNewReportOption(selectedReport) && selectedProject == null)
             }
             onClick={onAddPanel}>
             Add panel

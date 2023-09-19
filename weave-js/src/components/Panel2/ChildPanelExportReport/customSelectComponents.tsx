@@ -15,7 +15,7 @@ import {
   formatUpdatedAt,
 } from './utils';
 import TimeAgo from 'react-timeago';
-import {NewReportOption} from './NewReportOption';
+import {ReportOptionComp} from './ReportOption';
 
 export const customEntitySelectComps = {
   SingleValue: ({
@@ -83,7 +83,7 @@ export const customReportSelectComps = {
       ) === 0;
     return (
       <selectComponents.GroupHeading {...groupHeadingProps} className="">
-        {!isFirstGroup && <div className="my-8 h-1 bg-moon-250"></div>}
+        {!isFirstGroup && <hr className="my-8 h-1 border-moon-250" />}
       </selectComponents.GroupHeading>
     );
   },
@@ -97,7 +97,7 @@ export const customReportSelectComps = {
     const optionData: ReportOption = props.data;
     return (
       <selectComponents.Option {...props} className="flex items-center">
-        <NewReportOption optionData={optionData} children={children} />
+        <ReportOptionComp optionData={optionData} children={children} />
         {optionData?.updatedAt != null && (
           <p className="shrink-0 text-sm text-moon-500">
             <TimeAgo
