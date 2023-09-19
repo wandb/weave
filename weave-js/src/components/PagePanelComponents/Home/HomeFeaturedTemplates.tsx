@@ -225,7 +225,7 @@ const HomeFeaturedTemplateDrawer: React.FC<{
           </Tabs.Content>
           <Tabs.Content value="Select Data">
             <TabContentWrapper>
-              Once you've logged your data, use the browser on your left to find
+              Once you've logged your data, use the project browser on the left to find
               your table. From there, choose a template to get started!
             </TabContentWrapper>
           </Tabs.Content>
