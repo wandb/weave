@@ -1,18 +1,18 @@
 ## OpenAI Monitoring Quickstart
 
-Start monitoring your OpenAI calls with the steps below.
+To start monitoring your OpenAI calls:
 
-- Set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1`.
-- Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
+- Set the OpenAI API key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
+- Set the OpenAI API base URL to `https://api.wandb.ai/proxy/openai/v1`.
 
-### 1. Set Environment Variables via Terminal:
+### Step 1: Set environment variables
 
 ```shell
-export WANDB_API_KEY="" # API Key from https://wandb.ai/authorize
+export WANDB_API_KEY="" # W&B API Key from https://wandb.ai/authorize
 export WANDB_OPENAI_API_KEY="$WANDB_API_KEY:$OPENAI_API_KEY"
 ```
 
-### 2. Set the API Base and API Key:
+### Step 2: Set local variables in your code
 
 ```python
 import os
@@ -21,13 +21,13 @@ openai.api_base = "https://api.wandb.ai/proxy/openai/v1"
 openai.api_key = os.getenv("WANDB_OPENAI_API_KEY")
 ```
 
-### 3. Create a Monitoring Board
+### Step 3: Create a monitoring board
 
 Use OpenAI as normal and navigate to `monitoring/openai` via the project browser on the left to create a board to visualize your usage.
 
 ## In-depth Tutorials
 
-For more details and ways to monitor LLMs, you can follow along with one of the following tutorials.
+For more ways to configure monitoring and understand LLM usage, follow along with one of our tutorials:
 
 | Method | Tutorial | Use Case | 
 |--------|----------|---------------|
