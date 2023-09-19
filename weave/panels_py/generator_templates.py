@@ -36,6 +36,7 @@ class TemplateRegistrySpec:
     config_type: typing.Optional[weave_types.Type] = None
     is_featured: typing.Optional[bool] = None
     instructions_md: typing.Optional[str] = None
+    thumbnail_url: typing.Optional[str] = None
 
 
 @dataclasses.dataclass
@@ -56,6 +57,7 @@ class _TemplateRegistry:
         config_type: typing.Optional[weave_types.Type] = None,
         is_featured: typing.Optional[bool] = None,
         instructions_md: typing.Optional[str] = None,
+        thumbnail_url: typing.Optional[str] = None,
     ) -> None:
         return self.register_spec(
             TemplateRegistrySpec(
@@ -66,6 +68,7 @@ class _TemplateRegistry:
                 config_type=config_type,
                 is_featured=is_featured,
                 instructions_md=instructions_md,
+                thumbnail_url=thumbnail_url,
             )
         )
 
@@ -87,6 +90,7 @@ class PyBoardGeneratorSpec(typing.TypedDict):
     op_name: str
     config_type: typing.Optional[weave_types.Type]
     instructions_md: typing.Optional[str]
+    thumbnail_url: typing.Optional[str]
 
 
 # Processes have a singleton TemplateRegistry
@@ -110,6 +114,7 @@ def get_board_templates_for_node(
                         op_name=spec.op_name,
                         config_type=spec.config_type,
                         instructions_md=spec.instructions_md,
+                        thumbnail_url=spec.thumbnail_url,
                     )
                 )
     return final_specs
@@ -127,6 +132,7 @@ def get_featured_board_templates() -> list[PyBoardGeneratorSpec]:
                     op_name=spec.op_name,
                     config_type=spec.config_type,
                     instructions_md=spec.instructions_md,
+                    thumbnail_url=spec.thumbnail_url,
                 )
             )
     return final_specs

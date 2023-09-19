@@ -12,8 +12,6 @@ import {
 import {Loader} from 'semantic-ui-react';
 import {SpanWeaveType, flatToTrees, unifyRoots} from './util';
 import {opSpanAsDictToLegacySpanShape} from './common';
-import * as S from './lct.style';
-import {GeneralObjectRenderer} from './PanelTraceTreeModel';
 
 const inputType = {
   type: 'list' as const,
@@ -50,76 +48,16 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
     },
     [props]
   );
-  const [selectedTab, setSelectedTab] = React.useState(0);
-
-  const modelId = tree?.attributes?.model?.id;
-  const modelObj = React.useMemo(() => {
-    let modelObjInner = tree?.attributes?.model?.obj;
-    if (typeof modelObjInner === 'string') {
-      try {
-        modelObjInner = JSON.parse(modelObjInner);
-      } catch (e) {
-        console.log(e);
-        modelObjInner = null;
-      }
-    }
-    return modelObjInner;
-  }, [tree?.attributes?.model?.obj]);
-  let modelTitle = 'Model Architecture';
-  if (modelId != null) {
-    modelTitle += ` (ID: ${modelId})`;
-  }
-
   if (tree == null) {
     return <Loader />;
   }
 
-  if (modelObj == null) {
-    return (
-      <TraceTreeSpanViewer
-        span={tree}
-        selectedSpanIndex={props.config?.selectedSpanIndex}
-        onSelectSpanIndex={setSelectedSpanIndex}
-      />
-    );
-  }
-
   return (
-    <S.SimpleTabs
-      activeIndex={selectedTab}
-      onTabChange={(e: any, p: any) => {
-        setSelectedTab(p?.activeIndex ?? 0);
-      }}
-      panes={[
-        {
-          menuItem: {
-            key: 'trace',
-            content: `Trace Timeline`,
-          },
-          render: () => (
-            <S.TabWrapper>
-              <TraceTreeSpanViewer
-                span={tree}
-                selectedSpanIndex={props.config?.selectedSpanIndex}
-                onSelectSpanIndex={setSelectedSpanIndex}
-              />
-            </S.TabWrapper>
-          ),
-        },
-        {
-          menuItem: {
-            key: 'model',
-            content: modelTitle,
-          },
-          render: () => (
-            <S.TabWrapper>
-              <S.ModelWrapper>
-                <GeneralObjectRenderer data={modelObj} />
-              </S.ModelWrapper>
-            </S.TabWrapper>
-          ),
-        },
-      ]}
+    <TraceTreeSpanViewer
+      span={tree}
+      selectedSpanIndex={props.config?.selectedSpanIndex}
+      onSelectSpanIndex={setSelectedSpanIndex}
+      hideDetails={true}
     />
   );
 };
