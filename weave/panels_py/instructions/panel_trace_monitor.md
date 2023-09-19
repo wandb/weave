@@ -6,6 +6,8 @@ To analyze Trace data, log `TraceSpanDict`s to a StreamTable. This can be achiev
 - (Medium) Via decorating existing code with `@trace`
 - (Advanced) Via low-level construction of Spans using `TraceSpanDict`.
 
+> Already using [W&B Tracer](https://docs.wandb.ai/guides/prompts)? Stay tuned: you soon will be able to load these traces in this dashboard!
+
 ### Via Langchain Tracer
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/tim%2Fmake_tracer_a_featured_template/examples/prompts/trace_debugging/trace_quickstart_langchain.ipynb)
