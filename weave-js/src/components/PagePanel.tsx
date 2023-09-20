@@ -33,7 +33,6 @@ import {
 import {ChildPanelExportReport} from './Panel2/ChildPanelExportReport/ChildPanelExportReport';
 import {themes} from './Panel2/Editor.styles';
 import {
-  IconAddNew,
   IconClose,
   IconHome,
   IconOpenNewTab,
@@ -41,16 +40,11 @@ import {
 } from './Panel2/Icons';
 import * as Styles from './Panel2/PanelExpression/styles';
 import {
-  PANEL_GROUP_DEFAULT_CONFIG,
-  addPanelToGroupConfig,
-} from './Panel2/PanelGroup';
-import {
   PanelInteractContextProvider,
   useCloseDrawer,
   usePanelInteractMode,
   useSetInteractingPanel,
 } from './Panel2/PanelInteractContext';
-import {useUpdateServerPanel} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
 import {useWeaveAutomation} from './automation';
@@ -591,65 +585,6 @@ const JupyterPageControls: React.FC<
   const setInteractingPanel = useSetInteractingPanel();
   const closeDrawer = useCloseDrawer();
   const panelInteractMode = usePanelInteractMode();
-  const updateInput = useCallback(
-    (newInput: NodeOrVoidNode) => {
-      props.updateConfig2(oldConfig => {
-        return {
-          ...oldConfig,
-          input_node: newInput,
-        };
-      });
-    },
-    [props]
-  );
-  const updateConfigForPanelNode = useUpdateServerPanel(
-    props.config.input_node,
-    updateInput
-  );
-  const addPanelToPanel = useCallback(() => {
-    if (props.isPanel) {
-      props.updateConfig2(oldConfig => {
-        // props.updateConfig2(oldConfig => {
-        let newInnerPanelConfig: ChildPanelFullConfig;
-        if (props.isGroup) {
-          newInnerPanelConfig = {
-            ...oldConfig.config,
-            config: addPanelToGroupConfig(
-              oldConfig.config.config,
-              [''],
-              'panel'
-            ),
-          };
-        } else {
-          newInnerPanelConfig = {
-            config: addPanelToGroupConfig(
-              addPanelToGroupConfig(
-                PANEL_GROUP_DEFAULT_CONFIG(),
-                undefined,
-                'panel',
-                oldConfig.config
-              ),
-              [''],
-              'panel'
-            ),
-            id: 'Group',
-            input_node: {
-              nodeType: 'void',
-              type: 'invalid',
-            },
-            vars: {},
-          };
-        }
-
-        updateConfigForPanelNode(newInnerPanelConfig);
-
-        return {
-          ...oldConfig,
-          config: newInnerPanelConfig,
-        };
-      });
-    }
-  }, [props, updateConfigForPanelNode]);
 
   return (
     <JupyterControlsMain
@@ -660,19 +595,6 @@ const JupyterPageControls: React.FC<
       <JupyterControlsHelpText active={hoverText !== ''}>
         {hoverText}
       </JupyterControlsHelpText>
-
-      {props.isPanel && (
-        <JupyterControlsIcon
-          onClick={addPanelToPanel}
-          onMouseEnter={e => {
-            setHoverText('Add new panel');
-          }}
-          onMouseLeave={e => {
-            setHoverText('');
-          }}>
-          <IconAddNew />
-        </JupyterControlsIcon>
-      )}
 
       {panelInteractMode !== null ? (
         <JupyterControlsIcon
