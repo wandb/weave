@@ -8,14 +8,21 @@ import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {EntityOption, ProjectOption, ReportOption} from './utils';
+import {useNodeValue} from '@wandb/weave/react';
+import {computeReportSlateNode} from './computeReportSlateNode';
 
 type ChildPanelExportReportProps = {
+  /**
+   * "root" config of the board, which points to the artifact that contains
+   * the "full" config with actual details about all the sub-panels within
+   */
   rootConfig: ChildPanelFullConfig;
 };
 
 export const ChildPanelExportReport = ({
   rootConfig,
 }: ChildPanelExportReportProps) => {
+  const {result: fullConfig} = useNodeValue(rootConfig.input_node);
   const selectedPath = useSelectedPath();
   const closeDrawer = useCloseDrawer();
 
@@ -30,10 +37,16 @@ export const ChildPanelExportReport = ({
   );
 
   const onAddPanel = () => {
+    const slateNode = computeReportSlateNode(fullConfig, selectedPath);
     // TODO - this will be replaced with correct add panel implementation later on
-    alert(
-      `Report id: ${selectedReport?.id} \nReport name: ${selectedReport?.name} \nEntity name: ${selectedEntity?.name} \nProject name: ${selectedProject?.name}`
-    );
+    alert(`
+      Report id: ${selectedReport?.id}
+      Report name: ${selectedReport?.name}
+      Entity name: ${selectedEntity?.name}
+      Project name: ${selectedProject?.name}
+      Slate node: logged in dev console
+    `);
+    console.log('Slate node to be added:', slateNode);
   };
 
   return (
