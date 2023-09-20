@@ -257,7 +257,7 @@ class AxisScale:
     # need to use scaleType instead of `type` here because
     # `type` serializes to the same key as the
     # `type` used by ObjectType
-    scaleType: typing.Optional[ScaleType]
+    scaleType: typing.Optional[ScaleType] = "linear"
     range: typing.Optional[
         dict[typing.Literal["field"], typing.Callable[[str], str]]
     ] = None
@@ -266,9 +266,9 @@ class AxisScale:
 
 @weave.type()
 class AxisSetting:
-    noLabels: bool
-    noTitle: bool
-    noTicks: bool
+    noLabels: bool = False
+    noTitle: bool = False
+    noTicks: bool = False
     title: typing.Optional[str] = None
     scale: typing.Optional[AxisScale] = None
 
@@ -288,12 +288,12 @@ class LegendSetting:
 
 @weave.type()
 class LegendSettings:
-    x: LegendSetting
-    y: LegendSetting
-    color: LegendSetting
-    pointShape: LegendSetting
-    pointSize: LegendSetting
-    lineStyle: LegendSetting
+    x: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    y: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    color: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    pointShape: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    pointSize: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    lineStyle: LegendSetting = dataclasses.field(default_factory=LegendSetting)
 
 
 @weave.type()
