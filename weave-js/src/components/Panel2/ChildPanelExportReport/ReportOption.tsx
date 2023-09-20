@@ -21,7 +21,9 @@ export const ReportOptionComp = ({optionData, children}: ReportOptionProps) => {
       )}
       <div className="mx-8 flex grow flex-col p-0 text-base leading-6">
         <p>{children}</p>
-        <p className="mt-4 text-sm text-moon-500">{optionData.projectName}</p>
+        {!!optionData.projectName && (
+          <p className="mt-4 text-sm text-moon-500">{optionData.projectName}</p>
+        )}
       </div>
     </div>
   );
