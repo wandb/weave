@@ -5,6 +5,9 @@ from ... import decorator_op
 from . import tagged_value_type
 from . import tag_store
 from ...ops_arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from ...ops_arrow import arrow_tags
+
+from ... import box
 
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
@@ -40,12 +43,15 @@ def make_tag_getter_op(
                 types.TypedDict({tag_key: types.optional(tag_type)}), base_type
             ),
         },
-        output_type=lambda input_types: input_types["obj"].tag.property_types.get(
-            tag_key, types.NoneType()
+        output_type=lambda input_types: tagged_value_type.TaggedValueType(
+            input_types["obj"].tag,
+            input_types["obj"].tag.property_types.get(tag_key, types.NoneType()),
         ),
     )
     def tag_getter_op(obj):  # type: ignore
-        return tag_store.find_tag(obj, tag_key, tag_type)
+        untagged_result = tag_store.find_tag(obj, tag_key, tag_type)
+        tags = tag_store.get_tags(obj)
+        return tag_store.add_tags(box.box(untagged_result), tags)
 
     # This is the vectorized version of the tag getter specifically for
     # ArrowWeaveList. We have discussed the possibility of having a single tag
@@ -61,15 +67,20 @@ def make_tag_getter_op(
             )
         },
         output_type=lambda input_types: ArrowWeaveListType(
-            input_types["obj"].object_type.tag.property_types[tag_key]
+            tagged_value_type.TaggedValueType(
+                input_types["obj"].object_type.tag,
+                input_types["obj"].object_type.tag.property_types[tag_key],
+            )
         ),
     )
     def awl_tag_getter_op(obj):  # type: ignore
-        return ArrowWeaveList(
-            obj._arrow_data.field("_tag").field(tag_key),
-            obj.object_type.tag.property_types[tag_key],
-            obj._artifact,
+        key_type = obj.object_type.tag.property_types[tag_key]
+
+        raw = ArrowWeaveList(
+            obj._arrow_data.field("_tag").field(tag_key), key_type, obj._artifact
         )
+        tags = obj._arrow_data.field("_tag")
+        return arrow_tags.awl_add_arrow_tags(raw, tags, obj.object_type.tag)
 
     tag_getter_op._gets_tag_by_name = tag_key
     awl_tag_getter_op._gets_tag_by_name = tag_key
