@@ -42,9 +42,13 @@ def should_flow_tags(op_def: "OpDef.OpDef") -> bool:
 # Helper function to determine if the op_def consumes a tag
 def op_def_consumes_tags(op_def: "OpDef.OpDef") -> bool:
     named_args = op_def.input_type.named_args()
-    return len(named_args) > 0 and tagged_value_type.TaggedValueType(
-        types.TypedDict({}), types.Any()
-    ).assign_type(named_args[0].type)
+    return (
+        len(named_args) > 0
+        and tagged_value_type.TaggedValueType(
+            types.TypedDict({}), types.Any()
+        ).assign_type(named_args[0].type)
+        and not op_def.name.startswith('tag')
+    )
 
 
 # Helper function to get the first argument of the op_def
