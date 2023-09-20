@@ -20,7 +20,6 @@ import {
   inJupyterCell,
   isServedLocally,
   uriFromNode,
-  useIsAuthenticated,
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
@@ -54,6 +53,10 @@ import {useUpdateServerPanel} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
 import {useWeaveAutomation} from './automation';
+import {
+  useIsAuthenticated,
+  useWeaveViewer,
+} from '../context/WeaveViewerContext';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -115,11 +118,11 @@ const JupyterControlsIcon = styled.div`
 
 const HOST_SESSION_ID_COOKIE = `host_session_id`;
 
-// TODO: This should be merged with useIsAuthenticated and refactored to useWBViewer()
 function useEnablePageAnalytics() {
   const history = useHistory();
   const pathRef = useRef('');
   const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
+  const weaveViewer = useWeaveViewer();
 
   const trackOnPathDiff = useCallback(
     (location: any, options: any) => {
@@ -141,35 +144,10 @@ function useEnablePageAnalytics() {
 
   // fetch user
   useEffect(() => {
-    const anonApiKey = getCookie('anon_api_key');
-    const additionalHeaders: Record<string, string> = {};
-    if (anonApiKey != null && anonApiKey !== '') {
-      additionalHeaders['x-wandb-anonymous-auth-id'] = btoa(anonApiKey);
+    if (!weaveViewer.loading) {
+      (window.analytics as any)?.identify(weaveViewer.data.user_id ?? '');
     }
-    fetch(urlPrefixed(backendWeaveViewerUrl()), {
-      credentials: 'include',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...additionalHeaders,
-      },
-    })
-      .then(res => {
-        if (res.status === 200) {
-          return res.json();
-        }
-        return;
-      })
-      .then(json => {
-        const serverUserId = json?.user_id ?? '';
-        if (serverUserId !== '') {
-          (window.analytics as any)?.identify(serverUserId);
-        }
-      })
-      .catch(err => {
-        console.error(err);
-      });
-  }, [urlPrefixed, backendWeaveViewerUrl]);
+  }, [urlPrefixed, backendWeaveViewerUrl, weaveViewer]);
 
   useEffect(() => {
     const options = {

@@ -1,4 +1,4 @@
-import {useIsAuthenticated} from '@wandb/weave/components/PagePanelComponents/util';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {opRootViewer, opUserEmail} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 
