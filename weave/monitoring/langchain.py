@@ -83,7 +83,7 @@ patched = False
 
 
 # This should be committed to the langchain repo
-def patch_serialize():
+def patch_serialize() -> None:
     global patched
     if patched:
         return
@@ -91,7 +91,7 @@ def patch_serialize():
 
     old_serialize_io = LCW._serialize_io
 
-    def new_serialize_io(run_inputs):
+    def new_serialize_io(run_inputs):  # type: ignore
         if run_inputs is None:
             return {}
         return old_serialize_io(run_inputs)
