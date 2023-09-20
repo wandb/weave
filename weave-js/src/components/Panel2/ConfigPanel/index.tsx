@@ -285,6 +285,9 @@ export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
       color: ${globals.GRAY_800};
     }
   }
+  &:focus-within {
+    border: 2px solid ${globals.TEAL_400};
+  }
 `;
 
 export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
@@ -307,12 +310,16 @@ export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
       cursor: pointer;
     }
     && > .menu {
-      width: 100%;
+      width: calc(100% + 16px);
+      margin-top: 5px;
+      margin-left: -12px;
     }
     && > .menu .item {
       font-size: 15px;
-      line-height: 36px;
+      line-height: 20px;
       font-weight: 400;
+      padding-top: 8px !important;
+      padding-bottom: 8px !important;
     }
     && > .menu .item:hover,
     && > .menu .item.selected:hover {
