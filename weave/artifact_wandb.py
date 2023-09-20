@@ -193,12 +193,13 @@ def _collection_and_alias_id_mapping_to_uri(
     }
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
+    res = wandb_client_api._query_with_retry(
         query,
         variable_values={
             "id": client_collection_id,
             "aliasName": alias_name,
         },
+        num_timeout_retries=1,
     )
     collection = res["artifactCollection"]
 
