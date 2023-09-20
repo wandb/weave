@@ -274,6 +274,5 @@ template_registry.register(
     BOARD_DESCRIPTION,
     is_featured=True,
     instructions_md=instructions_md,
-    # TODO: Change to master once this lands
-    thumbnail_url="https://raw.githubusercontent.com/wandb/weave/tim/make_tracer_a_featured_template/docs/assets/traces_debug_board.png",
+    thumbnail_url="https://raw.githubusercontent.com/wandb/weave/master/docs/assets/traces_debug_board.png",
 )

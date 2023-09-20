@@ -10,7 +10,7 @@ To analyze Trace data, log `TraceSpanDict`s to a StreamTable. This can be achiev
 
 ### Via Langchain Tracer
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/tim%2Fmake_tracer_a_featured_template/examples/prompts/trace_debugging/trace_quickstart_langchain.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/prompts/trace_debugging/trace_quickstart_langchain.ipynb)
 
 If you are already using `Langchain`, simply create a tracer and add it as a callback to your next call:
 
@@ -23,7 +23,7 @@ llm.run(question, callbacks=[tracer])
 
 ### Via Trace Decorator
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/tim%2Fmake_tracer_a_featured_template/examples/prompts/trace_debugging/trace_quickstart_decorator.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/prompts/trace_debugging/trace_quickstart_decorator.ipynb)
 
 If you have existing code, the Trace decorator (and related utilities) allows you to instrument and log in a variety of formats. For example:
 
@@ -40,7 +40,7 @@ def adder(a, b):
 
 ### Via Direct Span Construction
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/tim%2Fmake_tracer_a_featured_template/examples/prompts/trace_debugging/dev/synthetic_trace_data.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/prompts/trace_debugging/dev/synthetic_trace_data.ipynb)
 
 Finally, if you want to manually log span data, you can do so as well by logging directly to a StreamTable:
 
