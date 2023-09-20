@@ -120,7 +120,7 @@ def _direct_publish(
 
     wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
     name = name or _get_name(weave_type, obj)
-    wb_artifact_type_name = wb_artifact_type_name or weave_type.name
+    wb_artifact_type_name = wb_artifact_type_name or weave_type.root_type_class().name
 
     _assert_valid_artifact_name(name)
     _assert_valid_project_name(wb_project_name)

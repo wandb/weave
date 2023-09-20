@@ -250,6 +250,15 @@ class Type(metaclass=_TypeSubclassWatcher):
         return dict(self.type_vars_tuple)
 
     @classmethod
+    def root_type_class(cls) -> type["Type"]:
+        if cls._base_type is None:
+            return cls
+        base_type_class = cls._base_type.root_type_class()
+        if base_type_class.__name__ == "ObjectType":
+            return cls
+        return base_type_class
+
+    @classmethod
     def is_instance(cls, obj):
         for ic in cls._instance_classes():
             if isinstance(obj, ic):
@@ -1193,7 +1202,10 @@ class LocalArtifactRefType(FilesystemArtifactRefType):
 
 @dataclasses.dataclass(frozen=True)
 class WandbArtifactRefType(FilesystemArtifactRefType):
-    pass
+    def load_instance(self, artifact, name, extra=None):
+        from . import artifact_wandb
+
+        return artifact_wandb.WandbArtifactRef(artifact, name)
 
 
 class WBTable(Type):
