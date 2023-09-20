@@ -109,7 +109,7 @@ export const ReportSelection = ({
       const foundEntity = entities.result.find(
         (item: EntityOption) => item.name === entityName
       );
-      setSelectedEntity(foundEntity);
+      setSelectedEntity(foundEntity ?? entities.result[0]);
     }
   }, [entityName, entities, setSelectedEntity]);
 
@@ -155,7 +155,7 @@ export const ReportSelection = ({
         isSearchable
       />
       <label
-        htmlFor="destination-report"
+        htmlFor="report-selector"
         className="mb-4 block font-semibold text-moon-800">
         Destination report
       </label>
@@ -171,9 +171,7 @@ export const ReportSelection = ({
             className="mb-16"
             id="report-selector"
             isLoading={reports.loading}
-            isDisabled={
-              entities.loading || reports.loading || reports.result.length === 1
-            }
+            isDisabled={entities.loading || reports.loading}
             options={groupedReportOptions}
             placeholder={!reports.loading && 'Select a report...'}
             getOptionLabel={option => option.name}

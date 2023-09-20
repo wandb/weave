@@ -1,0 +1,65 @@
+import {voidNode} from '@wandb/weave/core';
+import {ChildPanelFullConfig} from '../ChildPanel';
+import {getConfigForPath} from '../panelTree';
+
+type WeavePanelSlateNode = {
+  type: 'weave-panel';
+  /**
+   * A weave-panel slate node in a report is a "void element", which
+   * requires an empty child text node. See:
+   * https://docs.slatejs.org/api/nodes/element#rendering-void-elements
+   */
+  children: [{text: ''}];
+  /** Slate node config, passed to RootQueryPanel in core */
+  config: {
+    isWeave1Panel: true;
+    /** Weave child panel config */
+    panelConfig: ChildPanelFullConfig;
+  };
+};
+
+/**
+ * Given a full child panel config and the path to a target panel,
+ * get the target config and map it into a slate node that can be
+ * displayed in a report
+ *
+ * @param fullConfig - config containing the target panel
+ * @param targetPath - path to the target panel
+ */
+export const computeReportSlateNode = (
+  fullConfig: ChildPanelFullConfig,
+  targetPath: string[]
+): WeavePanelSlateNode => {
+  const targetConfig = getConfigForPath(fullConfig, targetPath);
+
+  return {
+    type: 'weave-panel',
+    children: [{text: ''}],
+    config: {
+      isWeave1Panel: true,
+      panelConfig: {
+        id: 'Panel',
+        config: undefined,
+        input_node: {
+          nodeType: 'const',
+          type: {type: 'Panel'},
+          val: {
+            id: 'Group',
+            input_node: voidNode(),
+            config: {
+              items: {
+                panel: targetConfig,
+              },
+              disableDeletePanel: true,
+              enableAddPanel: true, // actually means "is editable"
+              layoutMode: 'vertical',
+              showExpressions: true,
+            },
+            vars: {},
+          },
+        },
+        vars: {},
+      },
+    },
+  };
+};
