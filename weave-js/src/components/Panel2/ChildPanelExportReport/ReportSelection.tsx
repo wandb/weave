@@ -171,9 +171,7 @@ export const ReportSelection = ({
             className="mb-16"
             id="report-selector"
             isLoading={reports.loading}
-            isDisabled={
-              entities.loading || reports.loading || reports.result.length === 1
-            }
+            isDisabled={entities.loading || reports.loading}
             options={groupedReportOptions}
             placeholder={!reports.loading && 'Select a report...'}
             getOptionLabel={option => option.name}
