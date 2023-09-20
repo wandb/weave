@@ -8,6 +8,7 @@ import {
   listObjectType,
   Node,
   opArray,
+  opArtifactAliasAlias,
   opArtifactProject,
   opArtifactVersionAliases,
   opArtifactVersionArtifactSequence,
@@ -46,12 +47,10 @@ const getArtifactDependencyOfForNode = (node: Node) => {
           arr: opArtifactVersionAliases({
             artifactVersion: row,
           }),
-          mapFn: constFunction(
-            {row: 'artifactAlias'},
-            ({row: rowAlias}) =>
-              callOpVeryUnsafe('artifactAlias-alias', {
-                input_node: rowAlias,
-              }) as any
+          mapFn: constFunction({row: 'artifactAlias'}, ({row: rowAlias}) =>
+            opArtifactAliasAlias({
+              artifactAlias: rowAlias,
+            })
           ),
         }),
         createdAt: opArtifactVersionCreatedAt({
