@@ -3,11 +3,19 @@ import {
   OptionProps,
   SingleValueProps,
   MenuListProps,
+  GroupHeadingProps,
+  GroupProps,
 } from 'react-select';
 import {Icon} from '../../Icon';
 import React from 'react';
-import {EntityOption, ReportOption, formatUpdatedAt} from './utils';
+import {
+  EntityOption,
+  GroupedReportOption,
+  ReportOption,
+  formatUpdatedAt,
+} from './utils';
 import TimeAgo from 'react-timeago';
+import {ReportOptionComp} from './ReportOption';
 
 export const customEntitySelectComps = {
   SingleValue: ({
@@ -43,25 +51,53 @@ export const customEntitySelectComps = {
 };
 
 export const customReportSelectComps = {
-  MenuList: (props: MenuListProps<ReportOption, false>) => (
+  SingleValue: ({
+    children,
+    ...props
+  }: SingleValueProps<ReportOption, false, GroupedReportOption>) => (
+    <selectComponents.SingleValue
+      {...props}
+      className="flex items-center gap-8">
+      <Icon name="add-new" width={18} height={18} />
+      {children}
+    </selectComponents.SingleValue>
+  ),
+  MenuList: (
+    props: MenuListProps<ReportOption, false, GroupedReportOption>
+  ) => (
     <selectComponents.MenuList
       {...props}
       className="max-h-[calc(100vh-34rem)]"
     />
   ),
-  Option: ({children, ...props}: OptionProps<ReportOption, false>) => {
+  GroupHeading: (
+    groupHeadingProps: GroupHeadingProps<
+      ReportOption,
+      false,
+      GroupedReportOption
+    >
+  ) => {
+    const isFirstGroup =
+      groupHeadingProps.selectProps.options.findIndex(
+        option => option === groupHeadingProps.data
+      ) === 0;
+    return (
+      <selectComponents.GroupHeading {...groupHeadingProps} className="">
+        {!isFirstGroup && <hr className="my-8 h-1 border-moon-250" />}
+      </selectComponents.GroupHeading>
+    );
+  },
+  Group: (groupProps: GroupProps<ReportOption, false, GroupedReportOption>) => (
+    <selectComponents.Group {...groupProps} className="p-0" />
+  ),
+  Option: ({
+    children,
+    ...props
+  }: OptionProps<ReportOption, false, GroupedReportOption>) => {
     const optionData: ReportOption = props.data;
     return (
       <selectComponents.Option {...props} className="flex items-center">
-        <div className="flex grow">
-          <Icon name="report" className="shrink-0 grow-0 pt-4" />
-          <p className="mx-8 flex grow flex-col gap-4">
-            <span>{children}</span>
-            <span className="text-sm text-moon-500">
-              {optionData.projectName}
-            </span>
-          </p>
-        </div>
+        <ReportOptionComp optionData={optionData} children={children} />
         {optionData?.updatedAt != null && (
           <p className="shrink-0 text-sm text-moon-500">
             <TimeAgo

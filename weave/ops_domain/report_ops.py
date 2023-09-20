@@ -66,6 +66,18 @@ gql_prop_op(
     types.String(),
 )
 gql_prop_op(
+    "report-internalId",
+    wdt.ReportType,
+    "id",
+    types.String(),
+)
+gql_prop_op(
+    "report-name",
+    wdt.ReportType,
+    "displayName",
+    types.String(),
+)
+gql_prop_op(
     "report-createdAt",
     wdt.ReportType,
     "createdAt",

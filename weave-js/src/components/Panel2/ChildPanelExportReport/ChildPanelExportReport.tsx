@@ -7,7 +7,7 @@ import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {EntityOption, ReportOption} from './utils';
+import {EntityOption, ProjectOption, ReportOption} from './utils';
 
 type ChildPanelExportReportProps = {
   rootConfig: ChildPanelFullConfig;
@@ -25,11 +25,14 @@ export const ChildPanelExportReport = ({
   const [selectedReport, setSelectedReport] = useState<ReportOption | null>(
     null
   );
+  const [selectedProject, setSelectedProject] = useState<ProjectOption | null>(
+    null
+  );
 
   const onAddPanel = () => {
     // TODO - this will be replaced with correct add panel implementation later on
     alert(
-      `Report id: ${selectedReport?.id} \nReport name: ${selectedReport?.name} \nEntity name: ${selectedEntity?.name}`
+      `Report id: ${selectedReport?.id} \nReport name: ${selectedReport?.name} \nEntity name: ${selectedEntity?.name} \nProject name: ${selectedProject?.name}`
     );
   };
 
@@ -53,8 +56,10 @@ export const ChildPanelExportReport = ({
             rootConfig={rootConfig}
             selectedEntity={selectedEntity}
             selectedReport={selectedReport}
+            selectedProject={selectedProject}
             setSelectedEntity={setSelectedEntity}
             setSelectedReport={setSelectedReport}
+            setSelectedProject={setSelectedProject}
           />
           <p className="mt-16 text-moon-500">
             Future changes to the board will not affect exported panels inside
@@ -65,7 +70,7 @@ export const ChildPanelExportReport = ({
           <Button
             icon="add-new"
             className="w-full"
-            disabled={selectedReport == null}
+            disabled={selectedReport == null || selectedProject == null}
             onClick={onAddPanel}>
             Add panel
           </Button>
