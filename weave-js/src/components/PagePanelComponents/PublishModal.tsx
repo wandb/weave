@@ -60,7 +60,7 @@ export const PublishModal = ({
   const showError = boardName.length > 0 && !isValidName;
 
   // Make sure we only make requests once this is open
-  const isAuthenticated = useIsAuthenticated(!open);
+  const isAuthenticated = useIsAuthenticated();
   const userEntities = query.useUserEntities(isAuthenticated && open);
   const userName = query.useUserName(isAuthenticated && open);
 
