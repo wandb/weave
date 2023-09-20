@@ -195,7 +195,7 @@ def _collection_and_alias_id_mapping_to_uri(
     )
     res = wandb_client_api._query_with_retry(
         query,
-        variable_values={
+        variables={
             "id": client_collection_id,
             "aliasName": alias_name,
         },
