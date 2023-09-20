@@ -39,7 +39,7 @@ export const UnconstrainedIconContainer = styled.div`
   margin-left: 8px;
   cursor: pointer;
   &:hover {
-      background-color: ${globals.MOON_100}
+    background-color: ${globals.MOON_100};
   }
 `;
 
