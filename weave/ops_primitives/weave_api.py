@@ -27,6 +27,10 @@ class RefNodeMethods:
     def get(self):
         return storage.deref(self)
 
+    @op()
+    def __eq__(self, other: str) -> bool:
+        return str(self) == uris.WeaveURI.parse(other).to_ref().uri
+
 
 @op(
     input_type={
@@ -34,7 +38,6 @@ class RefNodeMethods:
     },
 )
 def created_by(self) -> typing.Optional[runs.Run]:
-    print("IN CREATED BY")
     # TODO: engine derefences blindly before passing in, but we expect ref! Hack
     # here by just getting ._ref
     return trace.get_obj_creator(self._ref)

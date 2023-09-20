@@ -285,6 +285,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             or self.type.name == "ArrowTable"
             or self.type.name == "FilesystemArtifact"
             or self.type.name == "file"
+            or self.type.name == "WandbArtifactRef"
         ):
             # Ref type
             return pa.string()

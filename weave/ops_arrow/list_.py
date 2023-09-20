@@ -1132,6 +1132,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     # But you can still reference them, because you have to get that
                     # file through an op, and therefore we know the type?
                     ref._type = type_
+                    if isinstance(type_, types.RefType):
+                        # if we actually have a ref, then don't deref, return the ref
+                        return ref
                     return ref.get()
 
                 return self._artifact.get(v, type_)
