@@ -205,7 +205,7 @@ const opProjectBoardArtifacts = ({project}: {project: w.Node}) => {
   if (ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE) {
     const artifactTypesNode = w.opProjectArtifactType({
       project,
-      artifactType: w.constString('Group'),
+      artifactType: w.constString('Panel'),
     });
     artifactsNode = w.opArtifactTypeArtifacts({
       artifactType: artifactTypesNode,

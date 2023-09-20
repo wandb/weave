@@ -21,6 +21,7 @@ const inputType = {
     'number' as const,
     'boolean' as const,
     'id' as const,
+    {type: 'WandbArtifactRef' as const},
   ],
 };
 
