@@ -276,7 +276,8 @@ def artifact_version_created_by(
 def artifact_version_created_by_user(
     artifactVersion: wdt.ArtifactVersion,
 ) -> typing.Optional[wdt.User]:
-    if artifactVersion["createdBy"]["__typename"] == "User":
+    cb = artifactVersion["createdBy"]
+    if cb is not None and cb["__typename"] == "User":
         return wdt.User.from_keys(artifactVersion["createdBy"])
     return None
 
