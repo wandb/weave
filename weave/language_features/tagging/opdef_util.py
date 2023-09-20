@@ -47,7 +47,7 @@ def op_def_consumes_tags(op_def: "OpDef.OpDef") -> bool:
         and tagged_value_type.TaggedValueType(
             types.TypedDict({}), types.Any()
         ).assign_type(named_args[0].type)
-        and not op_def.name.startswith('tag')
+        and not op_def.name.startswith("tag")
     )
 
 
