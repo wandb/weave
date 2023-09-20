@@ -1,4 +1,5 @@
 import {voidNode} from '@wandb/weave/core';
+import {v4 as uuid} from 'uuid';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {getConfigForPath} from '../panelTree';
 
@@ -13,8 +14,14 @@ type WeavePanelSlateNode = {
   /** Slate node config, passed to RootQueryPanel in core */
   config: {
     isWeave1Panel: true;
-    /** Weave child panel config */
-    panelConfig: ChildPanelFullConfig;
+    /** Packaged PanelPanel config */
+    panelConfig: ChildPanelFullConfig<{
+      /**
+       * Unique documentId is required because multiple
+       * panels could be exported to the same report.
+       */
+      documentId: string;
+    }>;
   };
 };
 
@@ -39,7 +46,9 @@ export const computeReportSlateNode = (
       isWeave1Panel: true,
       panelConfig: {
         id: 'Panel',
-        config: undefined,
+        config: {
+          documentId: uuid(),
+        },
         input_node: {
           nodeType: 'const',
           type: {type: 'Panel'},
