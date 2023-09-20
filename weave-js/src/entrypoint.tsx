@@ -11,7 +11,7 @@ import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {URL_BROWSE, URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
 import getConfig from './config';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
-import {WeaveViewerContextProvider} from './components/PagePanelComponents/WeaveViewerContext';
+import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {

@@ -1,5 +1,5 @@
 import {NodeOrVoidNode, Type, isAssignableTo} from '@wandb/weave/core';
-import { useWeaveViewer } from './WeaveViewerContext';
+import { useWeaveViewer } from '../../context/WeaveViewerContext';
 
 export const REMOTE_URI_PREFIX = 'wandb-artifact:///';
 export const LOCAL_URI_PREFIX = 'local-artifact:///';

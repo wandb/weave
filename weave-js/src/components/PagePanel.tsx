@@ -54,7 +54,7 @@ import {useUpdateServerPanel} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
 import {useWeaveAutomation} from './automation';
-import {useWeaveViewer} from './PagePanelComponents/WeaveViewerContext';
+import {useWeaveViewer} from '../context/WeaveViewerContext';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
