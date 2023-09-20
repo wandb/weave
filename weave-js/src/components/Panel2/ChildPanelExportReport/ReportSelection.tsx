@@ -109,7 +109,7 @@ export const ReportSelection = ({
       const foundEntity = entities.result.find(
         (item: EntityOption) => item.name === entityName
       );
-      setSelectedEntity(foundEntity);
+      setSelectedEntity(foundEntity ?? entities.result[0]);
     }
   }, [entityName, entities, setSelectedEntity]);
 
@@ -155,7 +155,7 @@ export const ReportSelection = ({
         isSearchable
       />
       <label
-        htmlFor="destination-report"
+        htmlFor="report-selector"
         className="mb-4 block font-semibold text-moon-800">
         Destination report
       </label>
