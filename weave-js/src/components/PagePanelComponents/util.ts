@@ -21,8 +21,6 @@ export const inJupyterCell = () => {
   return window.location.toString().includes('weave_jupyter');
 };
 
-
-
 export const isServedLocally = () => {
   return (
     window.location.hostname === 'localhost' ||
