@@ -267,6 +267,28 @@ export const toGqlField = (
         {alias}
       ),
     ];
+    // } else if (forwardOp.op.name === 'report-upsert') {
+    //   const spec = `upsertView_${hash(opInputs.spec)}`;
+
+    //   return [
+    //     {
+    //       name: 'upsertView',
+    //       args: gqlArgs({
+    //         id: opInputs.id,
+    //         spec: opInputs.spec,
+    //       }),
+    //       fields: [
+    //         {name: 'id', fields: []},
+    //         gqlObjectField(
+    //           forwardGraph,
+    //           forwardOp,
+    //           'spec',
+    //           gqlArgs({spec: opInputs.spec}),
+    //           {alias: spec}
+    //         ),
+    //       ],
+    //     },
+    //   ];
   } else if (forwardOp.op.name === 'root-artifactVersion') {
     const projectAlias = `project_${hash(
       opInputs.entityName + '/' + opInputs.projectName

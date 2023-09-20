@@ -83,6 +83,35 @@ export const opRootProject = makeTaggingStandardOp({
   },
 });
 
+export const opRootReport = makeTaggingStandardOp({
+  hidden: true,
+  name: 'root-report',
+  argTypes: {id: 'string'},
+  description: `Directly fetch a ${docType('report')} by id`,
+  argDescriptions: {
+    id: `The id of the ${docType('report')}`,
+  },
+  renderInfo: {type: 'function'},
+  returnValueDescription: `A ${docType('report')}`,
+  returnType: () => 'report',
+  resolver: async (
+    inputs,
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context
+  ) => {
+    const query = {
+      queryFields: toGqlQuery(forwardGraph, forwardOp),
+    };
+    const result = await context.backend.execute(query);
+    const alias = `report_${hash(inputs.id)}`;
+    const out = result[alias];
+    return out;
+  },
+});
+
 export const opRootArtifactVersion = makeOp({
   hidden: true,
   name: 'root-artifactVersion',

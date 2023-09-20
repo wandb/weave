@@ -194,6 +194,7 @@ ArtifactAliasType = typing.cast(PartialObjectTypeGeneratorType, ArtifactAliasTyp
 class Report(GQLBase):
     REQUIRED_FRAGMENT = """
         id
+        spec
     """
 
 

@@ -1,6 +1,7 @@
 import * as Urls from '../../_external/util/urls';
 import type {OpInputNodes, OpResolverInputTypes, Type} from '../../model';
 import {
+  hash,
   list,
   mappableNullableTaggable,
   mappableNullableTaggableVal,
@@ -9,6 +10,8 @@ import {
 } from '../../model';
 import {makeOp} from '../../opStore';
 import {docType} from '../../util/docs';
+import {makeTaggingStandardOp} from '../opKinds';
+import {gqlArgs, gqlObjectField, toGqlQuery} from './gql';
 import {connectionToNodes} from './util';
 
 const reportArgTypes = {
@@ -176,4 +179,33 @@ export const opReportStargazers = makeOp({
   )}`,
   returnType: makeReportReturnType(list('user')),
   resolver: makeReportResolver(report => connectionToNodes(report.stargazers)),
+});
+
+export const opReportUpsert = makeTaggingStandardOp({
+  hidden: true,
+  name: 'report-upsert',
+  argTypes: {id: 'string', spec: 'string'},
+  description: `Upsert ${docType('report')}`,
+  argDescriptions: {
+    id: `The id of the ${docType('report')}`,
+    spec: `The content of the ${docType('report')}`,
+  },
+  renderInfo: {type: 'function'},
+  returnValueDescription: `A ${docType('report')}`,
+  returnType: () => 'report',
+  resolver: async (
+    inputs,
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context
+  ) => {
+    const query = {
+      queryFields: toGqlQuery(forwardGraph, forwardOp),
+    };
+    const result = await context.backend.execute(query);
+    const alias = `view_${hash(inputs.id)}`;
+    return result[alias];
+  },
 });

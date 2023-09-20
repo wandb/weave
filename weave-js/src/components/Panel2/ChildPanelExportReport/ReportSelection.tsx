@@ -74,6 +74,45 @@ export const ReportSelection = ({
   const reports = useNodeValue(reportsMetaNode ?? w.voidNode(), {
     skip: entities.loading,
   });
+
+  // Get current report/view object
+  const selectedReportNode = w.opRootReport({
+    id: w.constString(selectedReport?.id ?? ''),
+  });
+  const selectedReportNodeInfo = useNodeValue(
+    selectedReportNode ?? w.voidNode(),
+    {
+      skip:
+        entities.loading ||
+        selectedReport == null ||
+        isNewReportOption(selectedReport),
+    }
+  );
+
+  // Test some janky block insert
+  const spec = JSON.parse(selectedReportNodeInfo.result?.spec ?? '{}');
+  if (spec?.blocks) {
+    spec['blocks'].push({
+      type: 'weave-panel',
+      children: [{text: ''}],
+      config: {
+        panelConfig: {
+          autoFocus: false,
+        },
+      },
+    });
+  }
+
+  // Testing how to upsertView???? sos i am so lost
+  // const upsertNode = w.opReportUpsert({
+  //   id: w.constString(selectedReport?.id ?? ''),
+  //   spec: w.constString('{}'),
+  // });
+  // const res = useNodeValue(upsertNode ?? w.voidNode(), {
+  //   skip: entities.loading || selectedReport == null,
+  // });
+  // console.log('**result', upsertNode, res);
+
   const groupedReportOptions = useMemo(() => {
     return [
       {

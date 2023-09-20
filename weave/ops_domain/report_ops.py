@@ -6,6 +6,7 @@ from . import wb_domain_types as wdt
 from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
+    gql_root_op,
 )
 from .. import weave_types as types
 import urllib
@@ -16,6 +17,30 @@ from .. import errors
 
 
 # Section 2/6: Root Ops
+report = gql_root_op(
+    "root-report",
+    "view",
+    wdt.ReportType,
+    {
+        "id": types.String(),
+
+    },
+    lambda inputs: f'id: {inputs["id"]}',
+)
+
+report = gql_root_op(
+    "report-upsert",
+    "upsertView",
+    wdt.ReportType,
+    {
+        "id": types.String(),
+        "spec": types.Const(types.String(), "json"),
+    },
+    lambda inputs: f'id: {inputs["id"]}, spec: {inputs["spec"]}',
+    # lambda inputs: f'id: {inputs["id"]}, name: {inputs["name"]}, displayName: {inputs["displayName"]}, type: {inputs["type"]}, entityName: {inputs["entityName"]}, projectName: {inputs["projectName"]}, description: {inputs["description"]}, spec: {inputs["spec"]}',
+)
+
+
 @op(
     name="root-allReportsGQLResolver",
     input_type={"gql_result": types.TypedDict({})},
