@@ -43,15 +43,12 @@ def make_tag_getter_op(
                 types.TypedDict({tag_key: types.optional(tag_type)}), base_type
             ),
         },
-        output_type=lambda input_types: tagged_value_type.TaggedValueType(
-            input_types["obj"].tag,
-            input_types["obj"].tag.property_types.get(tag_key, types.NoneType()),
+        output_type=lambda input_types: input_types["obj"].tag.property_types.get(
+            tag_key, types.NoneType()
         ),
     )
     def tag_getter_op(obj):  # type: ignore
-        untagged_result = tag_store.find_tag(obj, tag_key, tag_type)
-        tags = tag_store.get_tags(obj)
-        return tag_store.add_tags(box.box(untagged_result), tags)
+        return tag_store.find_tag(obj, tag_key, tag_type)
 
     # This is the vectorized version of the tag getter specifically for
     # ArrowWeaveList. We have discussed the possibility of having a single tag
