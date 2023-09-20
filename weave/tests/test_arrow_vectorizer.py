@@ -10,18 +10,21 @@ from .. import weave_internal
 from ..ops_primitives import dict_, list_
 from .. import errors
 
-import datetime
-
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
 from .. import ops_arrow as arrow
 from ..ops_arrow import arraylist_ops
 from ..ops_arrow import convert_ops
+from ..ops_arrow import util
 
 from ..ops_domain import wb_domain_types as wdt
 
 from ..ops_domain import run_ops
 
+
+import pyarrow as pa
+
+from pyarrow import compute as pc
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),
@@ -1401,3 +1404,10 @@ def test_vectorize_run_runtime():
     # it finds an AWL op
     assert "ArrowWeaveList" in vec_fn.from_op.name
     assert "mapped" not in vec_fn.from_op.name
+
+
+def test_boxed_null_in_array_equal():
+    lhs = pa.array([1, None, 3])
+    rhs = box.box(None)
+    assert util.equal(lhs, rhs).to_pylist() == [False, True, False]
+    assert util.not_equal(lhs, rhs).to_pylist() == [True, False, True]
