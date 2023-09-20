@@ -159,6 +159,19 @@ export const useSetPanelIsHoveredInOutline = () => {
   );
 };
 
+export const useSetSelectedPanel = () => {
+  const {setState} = usePanelInteractContext();
+  return useCallback(
+    (path: string[]) => {
+      setState(prevState => ({
+        ...prevState,
+        selectedPath: path,
+      }));
+    },
+    [setState]
+  );
+};
+
 export const useSetInteractingPanel = () => {
   const {setState} = usePanelInteractContext();
   return useCallback(
