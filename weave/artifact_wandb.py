@@ -193,7 +193,7 @@ def _collection_and_alias_id_mapping_to_uri(
     }
     """
     )
-    res = wandb_client_api._query_with_retry(
+    res = wandb_client_api.query_with_retry(
         query,
         variables={
             "id": client_collection_id,
