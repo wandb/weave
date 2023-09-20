@@ -310,9 +310,9 @@ export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
       cursor: pointer;
     }
     && > .menu {
-      width: calc(100% + 16px);
+      width: calc(100% + 19px);
       margin-top: 5px;
-      margin-left: -12px;
+      margin-left: -14px;
     }
     && > .menu .item {
       font-size: 15px;
