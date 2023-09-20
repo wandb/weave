@@ -17,7 +17,7 @@ import {WeaveExpression} from '../../../panel/WeaveExpression';
 import {themes} from '../Editor.styles';
 import * as S from './styles';
 import * as SN from './stylesNew';
-import {IconCaret, IconOverflowHorizontal} from '../Icons';
+import {IconOverflowHorizontal} from '../Icons';
 
 import {IconDown as IconDownUnstyled} from '../Icons';
 import {MenuItemProps} from 'semantic-ui-react';
@@ -49,7 +49,6 @@ export const ConfigSectionContainer = styled.div`
 ConfigSectionContainer.displayName = 'S.ConfigSectionContainer';
 
 export const ConfigSectionHeader = styled.div`
-  margin-bottom: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -61,7 +60,7 @@ ConfigSectionHeader.displayName = 'S.ConfigSectionHeader';
 export const ConfigSectionHeaderButton = styled.div<{expanded: boolean}>`
   display: flex;
   transform: rotate(${p => (p.expanded ? 0 : 180)}deg);
-  margin-left: 12px;
+  margin-left: 8px;
 `;
 ConfigSectionHeaderButton.displayName = 'S.ConfigSectionHeaderButton';
 
@@ -112,7 +111,7 @@ export const ConfigSection: FC<ConfigSectionProps> = ({
               />
             )}
             <ConfigSectionHeaderButton expanded={expanded}>
-              <IconCaret />
+              <IconDown />
             </ConfigSectionHeaderButton>
           </div>
         </ConfigSectionHeader>
@@ -265,6 +264,7 @@ export const TextInputConfigField: React.FC<
 };
 
 export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
+  border-radius: 4px;
   flex: 1 1 auto;
   display: flex;
   width: 100%;
@@ -284,6 +284,9 @@ export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
     svg {
       color: ${globals.GRAY_800};
     }
+  }
+  &:focus-within {
+    border: 2px solid ${globals.TEAL_400};
   }
 `;
 
@@ -305,6 +308,25 @@ export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
     }
     && > .text {
       cursor: pointer;
+    }
+    && > .menu {
+      width: calc(100% + 19px);
+      margin-top: 5px;
+      margin-left: -14px;
+    }
+    && > .menu .item {
+      font-size: 15px;
+      line-height: 20px;
+      font-weight: 400;
+      padding-top: 8px !important;
+      padding-bottom: 8px !important;
+    }
+    && > .menu .item:hover,
+    && > .menu .item.selected:hover {
+      background: ${globals.MOON_100};
+    }
+    && > .menu .item.selected {
+      background: transparent;
     }
 
     &.active svg {
