@@ -27,6 +27,11 @@ export const useWeaveViewer = () => {
   return res;
 };
 
+export const useIsAuthenticated = () => {
+  const weaveViewer = useWeaveViewer();
+  return weaveViewer.loading ? undefined : weaveViewer.data.authenticated;
+};
+
 export const WeaveViewerContextProvider: React.FC = ({children}) => {
   const viewerData = useWeaveViewerData();
   return (

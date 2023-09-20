@@ -1,5 +1,4 @@
 import {NodeOrVoidNode, Type, isAssignableTo} from '@wandb/weave/core';
-import { useWeaveViewer } from '../../context/WeaveViewerContext';
 
 export const REMOTE_URI_PREFIX = 'wandb-artifact:///';
 export const LOCAL_URI_PREFIX = 'local-artifact:///';
@@ -22,11 +21,6 @@ export const inJupyterCell = () => {
   return window.location.toString().includes('weave_jupyter');
 };
 
-
-export const useIsAuthenticated = () => {
-  const weaveViewer = useWeaveViewer();
-  return weaveViewer.loading ? undefined : weaveViewer.data.authenticated;
-};
 
 
 export const isServedLocally = () => {

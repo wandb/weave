@@ -59,7 +59,6 @@ import {
   determineURISource,
   isLocalURI,
   uriFromNode,
-  useIsAuthenticated,
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './util';
@@ -76,6 +75,7 @@ import {mapPanels} from '../Panel2/panelTree';
 import {DeleteActionModal} from './DeleteActionModal';
 import {PublishModal} from './PublishModal';
 import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
