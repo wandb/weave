@@ -54,7 +54,13 @@ import produce from 'immer';
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
   typeof inputType,
-  ChildPanelFullConfig
+  {
+    /**
+     * Unique identifier for a PanelPanel. Required if multiple
+     * PanelPanels are rendered in a single PanelRootContext.
+     */
+    documentId?: string;
+  }
 >;
 
 // There is a single reducer, stored in a single global context.
@@ -305,12 +311,13 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   const setInteractingPanel = useSetInteractingPanel();
   // const panelConfig = props.config;
 
-  // TODO: this is not the right ID to use!!! The expression string changes when the panel
+  // TODO: props.input is not the right default ID to use!!! The expression string changes when the panel
   // is renamed or published. Need to figure out how to get an ID shared across the Render
   // and Config components here... this probably something simple to do.
   // The path through the React tree... could work. Then panel path? Idk
+  const documentId = props.config?.documentId ?? weave.expToString(props.input);
 
-  const {state, dispatch} = usePanelRootContext(weave.expToString(props.input));
+  const {state, dispatch} = usePanelRootContext(documentId);
   const initialLoading = state == null;
   const panelConfig = state?.root;
 
