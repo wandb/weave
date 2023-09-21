@@ -66,8 +66,8 @@ const defaultOpts: RemoteWeaveOptions = {
   tokenFunc: () => Promise.resolve(''),
   useAdminPrivileges: false,
   isShadow: false,
-  contiguousBatchesOnly: false,
-  maxConcurrentRequests: 1,
+  contiguousBatchesOnly: true,
+  maxConcurrentRequests: 3,
   maxBatchSize: Infinity,
   maxRetries: 5,
   backoffBase: 500,
@@ -158,28 +158,30 @@ export class RemoteHttpServer implements Server {
       )
     );
   }
+  public refreshBackendCacheKey() {
+    this.clientCacheKey = createClientCacheKey();
+  }
 
-  public async queryEach(
+  public queryEach(
     nodes: Node[]
     // withBackendCacheReset?: boolean
-  ): Promise<Array<PromiseSettledResult<any>>> {
+  ): Array<Promise<any>> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
     // TODO: pass withBackendCacheReset across the network
 
     this.trace(`Enqueue ${nodes.length} nodes`);
-    return await Promise.allSettled(
-      nodes.map(
-        node =>
-          new Promise((resolve, reject) => {
-            this.pendingNodes.set(node, {
-              node,
-              resolve,
-              reject,
-              state: 'waiting',
-              retries: 0,
-            });
-          })
-      )
+
+    return nodes.map(
+      node =>
+        new Promise((resolve, reject) => {
+          this.pendingNodes.set(node, {
+            node,
+            resolve,
+            reject,
+            state: 'waiting',
+            retries: 0,
+          });
+        })
     );
   }
 

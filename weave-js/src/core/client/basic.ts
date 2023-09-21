@@ -18,11 +18,14 @@ interface ObservableNode<T extends Model.Type = Model.Type> {
   observers: Set<ZenObservable.SubscriptionObserver<T>>;
   hasResult: boolean;
   lastResult: any;
+  inFlight: boolean;
+  lastUpdatedAt?: number;
 }
 
 type ResetRequestType = {
   promise: Promise<void>;
   resolve: () => void;
+  requestTime: number;
 };
 
 const POLL_INTERVAL = 15000;
@@ -44,13 +47,15 @@ export class BasicClient implements Client {
 
     return () => this.loadingListeners.delete(id);
   });
-  private shouldPoll: boolean = false;
+  private shouldPoll: boolean = true;
   private pollingListeners: Array<(poll: boolean) => void> = [];
   private readonly hasher: Hasher;
+  private isRemoteServer: boolean = false;
 
   public constructor(private readonly server: Server) {
     this.hasher = new MemoizedHasher();
-    if (server instanceof RemoteHttpServer) {
+    this.isRemoteServer = server instanceof RemoteHttpServer;
+    if (this.isRemoteServer) {
       // only works for weave execution engines that do not depend on apollo
       // initial issue: https://weightsandbiases.slack.com/archives/C01T8BLDHKP/p1649955797252749
       // resolution: https://weightsandbiases.slack.com/archives/C04UJFUUSSW/p1679341328969859
@@ -123,7 +128,9 @@ export class BasicClient implements Client {
       observers: new Set(),
       node,
       hasResult: false,
+      inFlight: false,
       lastResult: undefined,
+      lastUpdatedAt: undefined,
     });
     this.scheduleRequest();
     return observable;
@@ -173,7 +180,11 @@ export class BasicClient implements Client {
       this.resolveRefreshRequest = {
         promise: prom,
         resolve: res,
+        requestTime: Date.now(),
       };
+      if (this.isRemoteServer) {
+        (this.server as RemoteHttpServer).refreshBackendCacheKey();
+      }
       this.scheduleRequest();
     }
     return this.resolveRefreshRequest.promise;
@@ -206,6 +217,14 @@ export class BasicClient implements Client {
   }
 
   private async requestBatch() {
+    if (this.isRemoteServer) {
+      return this.requestBatchParallel();
+    } else {
+      return this.requestBatchSequential();
+    }
+  }
+
+  private async requestBatchSequential() {
     this.nextRequestTimer = undefined;
     if (this.requestInFlight) {
       this.makeRequestWhenDone = true;
@@ -220,10 +239,39 @@ export class BasicClient implements Client {
     }
   }
 
+  private async requestBatchParallel() {
+    await this.doRequestBatch();
+  }
+
   private async doRequestBatch() {
     const notDoneObservables = Array.from(this.observables.values()).filter(
-      l => !l.hasResult || this.resolveRefreshRequest != null
+      l => {
+        // This could be a single conditional, but writing it out is easier to understand.
+
+        // First, if it is in flight, we don't want to re-request it.
+        if (l.inFlight) {
+          return false;
+        }
+
+        // Next, if there is no result, we want to request it.
+        if (!l.hasResult) {
+          return true;
+        }
+
+        // Lastly, if a refresh is requested, we want to re-request it only if
+        // it was last updated before the refresh request.
+        if (this.resolveRefreshRequest != null) {
+          if (l.lastUpdatedAt == null) {
+            return true;
+          }
+          return l.lastUpdatedAt < this.resolveRefreshRequest.requestTime;
+        }
+
+        // Otherwise, we don't want to re-request it.
+        return false;
+      }
     );
+    notDoneObservables.map(o => (o.inFlight = true));
     if (notDoneObservables.length > 0) {
       // console.log(
       //   'CLIENT BATCH START',
@@ -233,6 +281,8 @@ export class BasicClient implements Client {
 
       const rejectObservable = (observable: ObservableNode<any>, e: any) => {
         observable.hasResult = true;
+        observable.lastUpdatedAt = Date.now();
+        observable.inFlight = false;
         for (const observer of observable.observers) {
           observer.error(e);
         }
@@ -244,6 +294,8 @@ export class BasicClient implements Client {
       ) => {
         observable.hasResult = true;
         observable.lastResult = result;
+        observable.lastUpdatedAt = Date.now();
+        observable.inFlight = false;
         for (const observer of observable.observers) {
           observer.next(result);
         }
@@ -257,11 +309,11 @@ export class BasicClient implements Client {
       };
 
       // console.time('graph execute');
-      if (this.server instanceof RemoteHttpServer) {
+      if (this.isRemoteServer) {
         // Modern - Weave1 Server
-        let eachResults: Array<PromiseSettledResult<any>> = [];
+        let eachResults: Array<Promise<any>> = [];
         try {
-          eachResults = await this.server.queryEach(
+          eachResults = (this.server as RemoteHttpServer).queryEach(
             notDoneObservables.map(o => o.node)
           );
         } catch (e) {
@@ -275,12 +327,11 @@ export class BasicClient implements Client {
             // ERROR HERE?
             continue;
           }
-          if (result.status === 'rejected') {
-            rejectObservable(observable, result.reason);
-          } else {
-            resolveObservable(observable, result.value);
-          }
+          result
+            .then(value => resolveObservable(observable, value))
+            .catch(e => rejectObservable(observable, e));
         }
+        await Promise.allSettled(eachResults);
       } else {
         let results: any[] = [];
         try {
@@ -300,12 +351,21 @@ export class BasicClient implements Client {
 
     if (Array.from(this.observables.values()).every(obs => obs.hasResult)) {
       this.setIsLoading(false);
-    }
 
-    if (this.resolveRefreshRequest != null) {
-      const res = this.resolveRefreshRequest.resolve;
-      this.resolveRefreshRequest = undefined;
-      res();
+      if (this.resolveRefreshRequest != null) {
+        const reqTime = this.resolveRefreshRequest.requestTime;
+        if (
+          _.every(
+            Array.from(this.observables.values()).map(
+              obs => obs.lastUpdatedAt != null && obs.lastUpdatedAt >= reqTime
+            )
+          )
+        ) {
+          const res = this.resolveRefreshRequest.resolve;
+          this.resolveRefreshRequest = undefined;
+          res();
+        }
+      }
     }
   }
 
