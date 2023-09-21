@@ -9,7 +9,7 @@ import {Client} from './types';
 
 type CachedNode = {
   obs: Observable<any>;
-  sub: ZenObservable.Subscription
+  sub: ZenObservable.Subscription;
 };
 export class CachedClient implements Client {
   readonly opStore: OpStore;
@@ -26,8 +26,8 @@ export class CachedClient implements Client {
     this.opStore = client.opStore;
   }
   subscribe<T extends Type>(node: Node<T>): Observable<any> {
-    // Moving the cache from `query` to subscribe. 
-    // This allows us to maintain a cache of subscriptions 
+    // Moving the cache from `query` to subscribe.
+    // This allows us to maintain a cache of subscriptions
     // (which are used for both `query` and `subscribe`)
     // This works by maintaining a single open subscription per node
     // during the lifetime of the node being cached. This allows
@@ -40,11 +40,11 @@ export class CachedClient implements Client {
       return this.cache.get(node).obs;
     }
     const obs = this.client.subscribe(node);
-    const sub = obs.subscribe((res) => {})
+    const sub = obs.subscribe(res => {});
 
     this.cache.set(node, {obs, sub}, 5);
 
-    return obs
+    return obs;
   }
 
   private onDispose(value: CachedNode, key: string): void {
