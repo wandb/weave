@@ -2,6 +2,8 @@ import React, {useContext} from 'react';
 import {ChildPanelConfig, ChildPanelFullConfig} from './ChildPanel';
 
 export interface PanelPanelContextValue {
+  /** Unique ID of the root PanelPanel, if available */
+  documentId?: string;
   config: ChildPanelFullConfig;
   updateConfig: (config: ChildPanelFullConfig) => void;
   updateConfig2: (
@@ -25,24 +27,20 @@ export const PanelPanelContext = React.createContext<PanelPanelContextValue>({
   updateConfig2: () => {},
 });
 
-export const PanelPanelContextProvider: React.FC<{
-  config: ChildPanelFullConfig;
-  updateConfig: (config: ChildPanelFullConfig) => void;
-  updateConfig2: (
-    change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig
-  ) => void;
-}> = React.memo(({config, updateConfig, updateConfig2, children}) => {
-  return (
-    <PanelPanelContext.Provider
-      value={{
-        config,
-        updateConfig,
-        updateConfig2,
-      }}>
-      {children}
-    </PanelPanelContext.Provider>
-  );
-});
+export const PanelPanelContextProvider: React.FC<PanelPanelContextValue> =
+  React.memo(({documentId, config, updateConfig, updateConfig2, children}) => {
+    return (
+      <PanelPanelContext.Provider
+        value={{
+          documentId,
+          config,
+          updateConfig,
+          updateConfig2,
+        }}>
+        {children}
+      </PanelPanelContext.Provider>
+    );
+  });
 
 export const usePanelPanelContext = () => {
   const context = useContext(PanelPanelContext);

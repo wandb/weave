@@ -15,6 +15,11 @@ type PanelInteractMode = 'config' | 'export-report' | null;
 export interface PanelInteractContextState {
   // State is stored by panel path. panel path is managed by PanelContext.
   panelInteractMode: PanelInteractMode;
+  /**
+   * Unique ID of the selected root panel. Required if
+   * multiple root panels share one interact drawer.
+   */
+  selectedDocumentId?: string;
   selectedPath: string[];
   panelState: {[pathString: string]: PanelInteractState};
 }
@@ -162,11 +167,12 @@ export const useSetPanelIsHoveredInOutline = () => {
 export const useSetInteractingPanel = () => {
   const {setState} = usePanelInteractContext();
   return useCallback(
-    (mode: PanelInteractMode, path: string[]) => {
+    (mode: PanelInteractMode, path: string[], documentId?: string) => {
       setState(prevState => ({
         ...prevState,
         panelInteractMode: mode,
         selectedPath: path,
+        selectedDocumentId: documentId,
       }));
     },
     [setState]
@@ -177,8 +183,8 @@ export const useSetInteractingChildPanel = () => {
   const setInteractingPanel = useSetInteractingPanel();
   const {path} = usePanelContext();
   return useCallback(
-    (mode: PanelInteractMode, childPath: string) => {
-      setInteractingPanel(mode, path.concat([childPath]));
+    (mode: PanelInteractMode, childPath: string, documentId?: string) => {
+      setInteractingPanel(mode, path.concat([childPath]), documentId);
     },
     [path, setInteractingPanel]
   );
@@ -197,6 +203,11 @@ export const useCloseDrawer = () => {
 export const usePanelInteractMode = () => {
   const {state} = usePanelInteractContext();
   return state.panelInteractMode;
+};
+
+export const useSelectedDocumentId = () => {
+  const {state} = usePanelInteractContext();
+  return state.selectedDocumentId;
 };
 
 export const useSelectedPath = () => {

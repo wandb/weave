@@ -556,6 +556,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   }, []);
 
   const {
+    documentId,
     config: fullConfig,
     updateConfig,
     updateConfig2,
@@ -641,7 +642,11 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       size="small"
                       icon="pencil-edit"
                       onClick={() =>
-                        setInteractingPanel('config', props.pathEl ?? '')
+                        setInteractingPanel(
+                          'config',
+                          props.pathEl ?? '',
+                          documentId
+                        )
                       }
                     />
                   }>
