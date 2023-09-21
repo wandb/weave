@@ -153,8 +153,7 @@ def _collection_and_alias_id_mapping_to_uri(
     client_collection_id: str, alias_name: str
 ) -> ReadClientArtifactURIResult:
     is_deleted = False
-    query = wb_public.gql(
-        """
+    query = """
     query ArtifactVersionFromIdAlias(
         $id: ID!,
         $aliasName: String!
@@ -192,13 +191,14 @@ def _collection_and_alias_id_mapping_to_uri(
         }
     }
     """
-    )
-    res = wandb_client_api.wandb_public_api().client.execute(
+
+    res = wandb_client_api.query_with_retry(
         query,
-        variable_values={
+        variables={
             "id": client_collection_id,
             "aliasName": alias_name,
         },
+        num_timeout_retries=1,
     )
     collection = res["artifactCollection"]
 
