@@ -29,7 +29,7 @@ def assert_wandb_authenticated() -> None:
         )
 
 
-def _query_with_retry(
+def query_with_retry(
     query_str: str,
     variables: dict[str, typing.Any] = {},
     num_timeout_retries: int = 0,
@@ -52,7 +52,7 @@ def _query_with_retry(
 
 def introspect_server_schema(num_timeout_retries: int = 0) -> GraphQLSchema:
     introspection_query = graphql.get_introspection_query()
-    payload = _query_with_retry(introspection_query, {}, num_timeout_retries)
+    payload = query_with_retry(introspection_query, {}, num_timeout_retries)
     return graphql.build_client_schema(payload)
 
 
@@ -61,7 +61,7 @@ def wandb_gql_query(
     variables: dict[str, typing.Any] = {},
     num_timeout_retries: int = 0,
 ) -> typing.Any:
-    return _query_with_retry(query_str, variables, num_timeout_retries)
+    return query_with_retry(query_str, variables, num_timeout_retries)
 
 
 def set_wandb_thread_local_api_settings(
