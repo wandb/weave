@@ -6,6 +6,7 @@ import functools
 import tempfile
 import typing
 import requests
+import logging
 
 from wandb import Artifact
 from wandb.apis import public as wb_public
@@ -205,9 +206,13 @@ def _collection_and_alias_id_mapping_to_uri(
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 400:
             # This is a special case: the client id corresponds to an artifact that was
-            # never uploaded, so the client id doesn't exist in gorilla.
+            # never uploaded, so the client id doesn't exist in the W&B server.
 
             collection = None
+            logging.warn(
+                f"Artifact collection with client id {client_collection_id} not present in W&B server."
+            )
+
         else:
             raise e
     else:
