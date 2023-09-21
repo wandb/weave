@@ -191,7 +191,10 @@ def local_artifacts() -> list[artifact_local.LocalArtifact]:
 
 def op_get_return_type(uri):
     ref = ref_base.Ref.from_str(uri)
-    return ref.type
+    try:
+        return ref.type
+    except errors.WeaveArtifactVersionNotFound:
+        return types.UnknownType()
 
 
 def get_const_val(list_type_or_node):

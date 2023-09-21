@@ -94,7 +94,12 @@ class WandbArtifactManifest:
 # is still used in a couple places.
 @memo.memo  # Per-request memo reduces duplicate calls to the API
 def get_wandb_read_artifact(path: str):
-    return wandb_client_api.wandb_public_api().artifact(path)
+    try:
+        return wandb_client_api.wandb_public_api().artifact(path)
+    except wandb_client_api.WandbCommError:
+        raise errors.WeaveArtifactVersionNotFound(
+            f"Could not find artifact with path {path} in W&B"
+        )
 
 
 def is_valid_version_index(version_index: str) -> bool:
