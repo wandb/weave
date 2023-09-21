@@ -40,12 +40,6 @@ export class InMemoryCache<
     if (this.opts.onDispose) {
       this.opts.onDispose(key, value);
     }
-    // This is incorrect (it should be `key` no `value`), but
-    // fixing this breaks some unit tests and it is weave0 so
-    // I'm going to leave it for now
-    if (this.dependencyMap.has(value)) {
-      this.dependencyMap.delete(value);
-    }
   }
 
   outerKeyToInnerKey(key: K): IK {
