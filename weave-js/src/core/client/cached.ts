@@ -47,10 +47,6 @@ export class CachedClient implements Client {
     return obs;
   }
 
-  private onDispose(value: CachedNode, key: string): void {
-    value.sub.unsubscribe();
-  }
-
   public setPolling(polling: boolean) {
     this.client.setPolling(polling);
   }
@@ -103,5 +99,9 @@ export class CachedClient implements Client {
       opStore: this.opStore.debugMeta(),
       client: this.client.debugMeta(),
     };
+  }
+
+  private onDispose(value: CachedNode, key: string): void {
+    value.sub.unsubscribe();
   }
 }
