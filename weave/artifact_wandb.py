@@ -5,6 +5,8 @@ import os
 import functools
 import tempfile
 import typing
+import requests
+import logging
 
 from wandb import Artifact
 from wandb.apis import public as wb_public
@@ -192,19 +194,33 @@ def _collection_and_alias_id_mapping_to_uri(
     }
     """
 
-    res = wandb_client_api.query_with_retry(
-        query,
-        variables={
-            "id": client_collection_id,
-            "aliasName": alias_name,
-        },
-        num_timeout_retries=1,
-    )
-    collection = res["artifactCollection"]
+    try:
+        res = wandb_client_api.query_with_retry(
+            query,
+            variables={
+                "id": client_collection_id,
+                "aliasName": alias_name,
+            },
+            num_timeout_retries=1,
+        )
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 400:
+            # This is a special case: the client id corresponds to an artifact that was
+            # never uploaded, so the client id doesn't exist in the W&B server.
+
+            collection = None
+            logging.warn(
+                f"Artifact collection with client id {client_collection_id} not present in W&B server."
+            )
+
+        else:
+            raise e
+    else:
+        collection = res["artifactCollection"]
 
     if collection is None:
         # Note: deleted collections are still returned by the API (with state=DELETED)
-        # So a missing collection is a real error.
+        # So a missing collection is a real error (unless it was never uploaded)
         raise errors.WeaveArtifactCollectionNotFound(
             f"Could not find artifact collection with client id {client_collection_id}"
         )
