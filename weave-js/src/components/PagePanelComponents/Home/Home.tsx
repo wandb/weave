@@ -16,7 +16,7 @@ import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
 import {LeftNav} from './HomeLeftNav';
 import {HomeTopBar} from './HomeTopBar';
 import {NavigateToExpressionType} from './common';
-import {isServedLocally, useIsAuthenticated} from '../util';
+import {isServedLocally} from '../util';
 import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Redirect, useHistory, useParams} from 'react-router-dom';
@@ -33,6 +33,7 @@ import {
 import getConfig from '../../../config';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {HomeFeaturedTemplates} from './HomeFeaturedTemplates';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};

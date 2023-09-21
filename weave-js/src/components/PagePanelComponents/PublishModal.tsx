@@ -11,13 +11,13 @@ import styled from 'styled-components';
 import {RED_550} from '@wandb/weave/common/css/color.styles';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as query from './Home/query';
-import {useIsAuthenticated} from './util';
 import {useEffect, useState} from 'react';
 import * as w from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {Icon} from '../Icon';
 import {TakeActionType} from './persistenceStateMachine';
 import * as M from './Modal.styles';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 
 const Error = styled.div`
   font-size: 14px;
@@ -60,7 +60,7 @@ export const PublishModal = ({
   const showError = boardName.length > 0 && !isValidName;
 
   // Make sure we only make requests once this is open
-  const isAuthenticated = useIsAuthenticated(!open);
+  const isAuthenticated = useIsAuthenticated();
   const userEntities = query.useUserEntities(isAuthenticated && open);
   const userName = query.useUserName(isAuthenticated && open);
 
