@@ -89,11 +89,11 @@ const allowPanel = (stackId: string) => {
   );
 };
 
-export interface ChildPanelFullConfig {
+export interface ChildPanelFullConfig<C = any> {
   vars: Frame;
   input_node: NodeOrVoidNode;
   id: string;
-  config: any;
+  config: C;
 }
 
 export type ChildPanelConfig =
