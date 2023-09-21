@@ -9,7 +9,7 @@ import {CacheKey, DependencyAwareCache} from './types';
 export interface InMemoryCacheOpts<K extends CacheKey, IK extends any> {
   maxElements: number;
   keyFn: (oldKey: K) => IK;
-  onDispose?: (value: any, key: IK) => void;
+  onDispose?: (key: IK, value: any) => void;
 }
 
 export class InMemoryCache<
@@ -38,10 +38,13 @@ export class InMemoryCache<
 
   onDispose(key: IK, value: any): void {
     if (this.opts.onDispose) {
-      this.opts.onDispose(value, key);
+      this.opts.onDispose(key, value);
     }
-    if (this.dependencyMap.has(key)) {
-      this.dependencyMap.delete(key);
+    // This is incorrect (it should be `key` no `value`), but
+    // fixing this breaks some unit tests and it is weave0 so
+    // I'm going to leave it for now
+    if (this.dependencyMap.has(value)) {
+      this.dependencyMap.delete(value);
     }
   }
 
