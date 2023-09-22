@@ -11,7 +11,6 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {Icon} from 'semantic-ui-react';
 
 import {isServedLocally} from '../../PagePanelComponents/util';
-import {useIsAuthenticated} from '../../PagePanelComponents/util';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {usePanelContext} from '../PanelContext';
@@ -21,6 +20,7 @@ import {LocalDashboardsTable} from './LocalDashboardsTable';
 import {LocalObjectsTable, useLocalObjectsExist} from './LocalObjectsTable';
 import {ViewerProjectsTable} from './ViewerProjectsTable';
 import styled from 'styled-components';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 
 const HIDE_VARIABLES_TAB = true;
 

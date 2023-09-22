@@ -1,23 +1,47 @@
-Simply set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1` and the OpenAI API Key to the concatenation of your W&B API Key ([wandb.ai/authorize](https://wandb.ai/authorize)) and current OpenAI API Key ([platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys)) in order to track all API calls! Please refer to the [Weave Monitoring README](https://github.com/wandb/weave/tree/master/examples/monitoring) for full details. Features:
+## OpenAI Monitoring Quickstart
 
-- Automatically track LLM usage and aggregate useful metrics like cost, latency and throughput across your projects/teams
-- Dynamically query and derive insights from the logs of all your OpenAI API calls
-- Iterate visually to slice, aggregate, and explore your data
+To record history, monitor performance, & analyze cost/latency of OpenAI calls:
 
-### Setup with environment variables
+1. Set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1`.
+2. Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
+
+Setup can be achieved 3 different ways: via environment variables, the python library, or direct http requests. After setup, simply use OpenAI as normal and navigate to `monitoring/openai` via the browser on the left to create a board and visualize your usage.
+
+### Via environment variables
 
 ```shell
 OPENAI_API_BASE="https://api.wandb.ai/proxy/openai/v1"
 OPENAI_API_KEY="$WANDB_API_KEY:$OPENAI_API_KEY"
+python prompt.py # Run your existing scripts
 ```
 
-### Setup with Python library
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/wandb/weave/blob/master/examples/monitoring/openai_proxy_quickstart.ipynb)
+### Via Python Library
 
 ```python
 import openai
 openai.api_base = "https://api.wandb.ai/proxy/openai/v1"
 openai.api_key = f"{WANDB_API_KEY}:{OPENAI_API_KEY}"
-openai.ChatCompletion.create(...)
 ```
+
+### Via HTTP Request
+
+```shell
+curl "https://api.wandb.ai/proxy/openai/v1/chat/completions" \
+-H "Authorization: Bearer $WANDB_API_KEY:$OPENAI_API_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+     "model": "gpt-3.5-turbo",
+     "messages": [{"role": "user", "content": "Tell me a joke about loss functions!"}]
+   }'
+```
+
+## In-depth Tutorials
+
+For more ways to configure monitoring and understand LLM usage, follow along with one of our tutorials:
+
+| Method        | Full tutorial                                                                                                                                                                                                 | Scenario                                                                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenAI Proxy  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/prompts/llm_monitoring/openai_proxy_quickstart.ipynb)  | For those looking to use existing OpenAI library calls, W&B can serve as a proxy, automatically logging all necessary data. This is great for developers, teams, and organizations. |
+| Python Client | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/prompts/llm_monitoring/openai_client_quickstart.ipynb) | For those looking to customize metrics and programmatically add more data to requests, developers should use the Weave python client directly.                                      |
+
+For full details and features, see the [Weave Monitoring README](https://github.com/wandb/weave/tree/master/examples/prompts/llm_monitoring).

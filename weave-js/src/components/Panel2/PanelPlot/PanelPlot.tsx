@@ -2151,7 +2151,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     (dimName: 'x' | 'y') => {
       return (newVal: Node) => {
         const currDomain = configRef.current.signals.domain[dimName];
-        if (weave.expToString(newVal) !== weave.expToString(currDomain)) {
+        if (!weave.isExpLogicallyEqual(newVal, currDomain)) {
           updateConfig2((oldConfig: PlotConfig) => {
             return {
               ...oldConfig,

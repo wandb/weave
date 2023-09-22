@@ -21,7 +21,7 @@ export const ConstrainedIconContainer = styled.div`
   background-color: ${globals.TEAL_TRANSPARENT};
   color: ${globals.TEAL};
   border-radius: 4px;
-  margin-left: 10px;
+  margin-left: 8px;
   cursor: pointer;
   &:hover {
     background-color: ${globals.TEAL_LIGHT_TRANSPARENT};
@@ -32,14 +32,14 @@ export const UnconstrainedIconContainer = styled.div`
   height: 24px;
   display: flex;
   padding: 3px;
-  color: ${globals.MOON_500}
+  color: ${globals.MOON_500};
   justify-content: center;
   align-items: center;
   border-radius: 4px;
-  margin-left: 10px;
+  margin-left: 8px;
   cursor: pointer;
   &:hover {
-      background-color: ${globals.MOON_100}
+    background-color: ${globals.MOON_100};
   }
 `;
 

@@ -57,6 +57,7 @@ import {
   useSelectedPath,
   useSetInteractingChildPanel,
   useSetPanelInputExprIsHighlighted,
+  useSetSelectedPanel,
 } from './PanelInteractContext';
 import PanelNameEditor from './PanelNameEditor';
 import {TableState} from './PanelTable/tableState';
@@ -89,11 +90,11 @@ const allowPanel = (stackId: string) => {
   );
 };
 
-export interface ChildPanelFullConfig {
+export interface ChildPanelFullConfig<C = any> {
   vars: Frame;
   input_node: NodeOrVoidNode;
   id: string;
-  config: any;
+  config: C;
 }
 
 export type ChildPanelConfig =
@@ -281,10 +282,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 
   const updateExpression = useCallback(
     (newExpression: NodeOrVoidNode) => {
-      if (
-        weave.expToString(newExpression) === weave.expToString(panelInputExpr)
-      ) {
-        // If expression strings match, no update. This prevents glitching
+      if (weave.isExpLogicallyEqual(newExpression, panelInputExpr)) {
+        // If expressions match, no update. This prevents glitching
         // when types change (which I think happens in panel composition
         // due to inconsistency between client and server detected types).
         // I don't think we have a case for updating just the type of
@@ -564,11 +563,28 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const fullPath = [...path, props.pathEl ?? ''].filter(
     el => el != null && el !== ''
   );
+
+  const pathStr = useMemo(() => ['<root>', ...fullPath].join('.'), [fullPath]);
+  const selectedPath = useSelectedPath();
+  const selectedPathStr = useMemo(() => {
+    if (selectedPath.length === 1 && selectedPath[0] === '') {
+      return '<root>';
+    }
+    return ['<root>', ...selectedPath!].join('.');
+  }, [selectedPath]);
+
+  const isPanelSelected =
+    selectedPathStr !== '<root>' &&
+    selectedPathStr !== '<root>.main' &&
+    pathStr.startsWith(selectedPathStr);
+
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
   const isVarNameEditable = props.editable || controlBar === 'editable';
+  const setSelectedPanel = useSetSelectedPanel();
+  const showEditControls = isPanelSelected || isHoverPanel;
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -577,17 +593,22 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   ) : (
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
+      onClick={event => {
+        event.stopPropagation();
+        setSelectedPanel(fullPath);
+      }}
       onMouseEnter={() => setIsHoverPanel(true)}
       onMouseLeave={() => setIsHoverPanel(false)}>
       {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {(!isVarNameEditable || !isHoverPanel) && props.pathEl != null && (
-              <EditorBarTitleOnly>
-                {varNameToTitle(props.pathEl)}
-              </EditorBarTitleOnly>
-            )}
-            <EditorBarHover show={isHoverPanel && isVarNameEditable}>
+            {(!isVarNameEditable || !showEditControls) &&
+              props.pathEl != null && (
+                <EditorBarTitleOnly>
+                  {varNameToTitle(props.pathEl)}
+                </EditorBarTitleOnly>
+              )}
+            <EditorBarHover show={isVarNameEditable && showEditControls}>
               {/* Variable name */}
               {props.pathEl != null && (
                 <EditorPath>
@@ -631,7 +652,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             </EditorBarHover>
             {/* Control buttons */}
             {props.editable && (
-              <EditorIcons visible={isHoverPanel || isMenuOpen}>
+              <EditorIcons visible={showEditControls || isMenuOpen}>
                 {props.prefixButtons}
                 <Tooltip
                   position="top center"

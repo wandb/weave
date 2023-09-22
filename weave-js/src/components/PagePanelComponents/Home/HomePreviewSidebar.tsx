@@ -6,7 +6,11 @@ import React, {useEffect, useMemo, useState} from 'react';
 import * as LayoutElements from './LayoutElements';
 import styled from 'styled-components';
 import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
-import {NavigateToExpressionType, SetPreviewNodeType} from './common';
+import {
+  NavigateToExpressionType,
+  SetPreviewNodeType,
+  getArtifactVersionNodeFromUri,
+} from './common';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import {Node, NodeOrVoidNode} from '@wandb/weave/core';
 import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
@@ -30,6 +34,10 @@ import {
   CenterBrowserActionType,
   CenterBrowserDataType,
 } from './HomeCenterBrowser';
+import {BoardsTab} from './BoardsTab';
+import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
+import * as S from './styles';
+import {maybePluralize} from '../../../core/util/string';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -272,6 +280,27 @@ export const HomeExpressionPreviewParts: React.FC<{
   const hasTemplates = !isLoadingTemplates && finalGenerators.length > 1;
   const recommendedTemplateInfo = getRecommendedTemplateInfo(finalGenerators);
 
+  // Create an Artifact version node to look up the artifacts that depend on this one.
+  // TODO: Implement a less brittle way of pulling the URI from the get op.
+  //       This should also let us get rid of the "any".
+  let nodeArtifactVersion = null;
+  const outputNode = expr as any;
+  const sourceType = outputNode.fromOp.name;
+  if (sourceType === 'table-rows') {
+    const uri =
+      outputNode.fromOp.inputs.table.fromOp.inputs.file.fromOp.inputs
+        .artifactVersion.fromOp.inputs.uri.val;
+    nodeArtifactVersion = getArtifactVersionNodeFromUri(uri, 'run_table');
+  } else if (sourceType === 'stream_table-rows') {
+    const uri = outputNode.fromOp.inputs.self.fromOp.inputs.uri.val;
+    nodeArtifactVersion = getArtifactVersionNodeFromUri(uri, 'stream_table');
+  } else {
+    // Previewing a board.
+  }
+
+  const hasBoardsTab = nodeArtifactVersion != null;
+  const dependencyQuery = useArtifactDependencyOfForNode(nodeArtifactVersion);
+
   useEffect(() => {
     setTabValue('Overview');
   }, [expr]);
@@ -287,7 +316,7 @@ export const HomeExpressionPreviewParts: React.FC<{
           {hasTemplates && (
             <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>
           )}
-          {/* <Tabs.Trigger value="Boards">Boards</Tabs.Trigger> */}
+          {hasBoardsTab && <Tabs.Trigger value="Boards">Boards</Tabs.Trigger>}
         </Tabs.List>
         {/* 38 px is the height of the tab header, to make sure the height of content doesnt exceed window, its explicitly set here */}
         <Tabs.Content value="Overview" style={{height: 'calc( 100% - 38px )'}}>
@@ -322,7 +351,19 @@ export const HomeExpressionPreviewParts: React.FC<{
             </TabContentWrapper>
           </Tabs.Content>
         )}
-        {/* <Tabs.Content value="Boards" style={{height: 'calc( 100% - 38px )'}}>Boards</Tabs.Content> */}
+        <Tabs.Content value="Boards" style={{height: 'calc( 100% - 38px )'}}>
+          {hasBoardsTab && (
+            <BoardsTab
+              dependencyQuery={dependencyQuery}
+              navigateToExpression={navigateToExpression}
+              isLoadingTemplates={isLoadingTemplates}
+              setIsGenerating={setIsGenerating}
+              setTabValue={setTabValue}
+              hasTemplates={hasTemplates}
+              refinedExpression={refinedExpression}
+            />
+          )}
+        </Tabs.Content>
       </Tabs.Root>
     </HomeExpressionPreviewPartsWrapper>
   );
@@ -517,6 +558,9 @@ const TemplateTab = ({
         gap: '8px',
         paddingBottom: '32px',
       }}>
+      <S.ObjectCount>
+        {maybePluralize(generators.length, 'template', 's')}
+      </S.ObjectCount>
       <Label
         style={{
           marginBottom: '8px',

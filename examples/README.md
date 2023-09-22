@@ -3,6 +3,7 @@
 ## Examples structure
 
 The `examples/` folder contains:
+
 - `get_started.ipynb`: a quick interactive notebook overview of Weave
 - `getting_started`: Learn how to build interactive data applications
 - `reference`: Syntax and usage for Weave types, ops, and panels
@@ -10,7 +11,6 @@ The `examples/` folder contains:
 - `experimental`: Everything else, ranging from focused proofs-of-concept to very experimental works-in-progress—we hope these inspire your exploration and welcome PRs for improvement!
 - `apps`: Example applications
 - `guides (future)`: Guides to use specific features for advanced users
-
 
 ## Running examples
 
@@ -37,7 +37,7 @@ Colabs to get started:
 
 ### LLM Monitoring
 
-- [OpenAI API Usage Board](../examples/monitoring/openai_client_quickstart.ipynb)
+- [OpenAI API Usage Board](../examples/prompts/llm_monitoring/openai_client_quickstart.ipynb)
 
 ### Weave fundamentals
 

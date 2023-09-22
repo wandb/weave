@@ -1,4 +1,4 @@
-import typing
+import os
 
 import weave
 from ..panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
@@ -22,10 +22,10 @@ ops = weave.ops
 BOARD_ID = "trace_monitor"
 
 # BOARD_DISPLAY_NAME is the name that will be displayed in the UI
-BOARD_DISPLAY_NAME = "Trace Monitor Board"
+BOARD_DISPLAY_NAME = "Trace Debug Board"
 
 # BOARD_DESCRIPTION is the description that will be displayed in the UI
-BOARD_DESCRIPTION = "Monitor Traces"
+BOARD_DESCRIPTION = "Systematically analyze traces from LLM chains, application, or any ML pipeline. Great for understanding complex LLM agent behavior, monitoring complex systems, and debugging ML pipelines."
 
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 
@@ -290,8 +290,17 @@ def board(
     return panels.Board(vars=varbar, panels=overview_tab)
 
 
+with open(
+    os.path.join(os.path.dirname(__file__), "instructions", "panel_trace_monitor.md"),
+    "r",
+) as f:
+    instructions_md = f.read()
+
 template_registry.register(
     board_name,
     BOARD_DISPLAY_NAME,
     BOARD_DESCRIPTION,
+    is_featured=True,
+    instructions_md=instructions_md,
+    thumbnail_url="https://raw.githubusercontent.com/wandb/weave/master/docs/assets/traces_debug_board.png",
 )

@@ -29,7 +29,7 @@ import {
 } from '@wandb/weave/core';
 import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {Button as OldButton} from 'semantic-ui-react';
 import {Button} from '../Button';
 import styled, {css} from 'styled-components';
@@ -70,6 +70,7 @@ import {
 import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {inJupyterCell} from '../PagePanelComponents/util';
+import {usePagePanelControlRequestAction} from '../PagePanelContext';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -762,7 +763,16 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const {updateConfig} = props;
   const updateConfig2 = useUpdateConfig2(props);
   const {handleAddPanel, addPanelBarRef} = usePanelGroupCommon(props);
-
+  const requestAction = usePagePanelControlRequestAction();
+  useEffect(() => {
+    if (groupPath.length === 0) {
+      requestAction('add_new_panel', {
+        onClick: handleAddPanel,
+        label: 'Add new panel',
+        Icon: <IconAddNew />,
+      });
+    }
+  }, [groupPath.length, handleAddPanel, requestAction]);
   const mutateItem = useCallback(
     (name: string, applyFn: (item: Draft<ChildPanelFullConfig>) => void) => {
       // console.log('HIGHLIGHT ITEM NAME', name);
