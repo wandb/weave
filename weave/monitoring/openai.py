@@ -82,8 +82,10 @@ def openai_create_postprocess(span: monitor.SpanWithInputsAndOutput) -> typing.A
                 if "finish_reason" in choice_update:
                     choices[index]["finish_reason"] = choice_update["finish_reason"]
             yield item
-
+        
         if record is not None:
+            import pdb
+            pdb.set_trace()
             encoding = tiktoken.encoding_for_model(record["model"])
 
             prompt_tokens = (
@@ -116,9 +118,9 @@ def openai_create_postprocess(span: monitor.SpanWithInputsAndOutput) -> typing.A
 
 mon = monitor.default_monitor()
 
-monitored_create = mon.trace(
+monitored_create = lambda func: mon.trace(
     preprocess=openai_create_preprocess, postprocess=openai_create_postprocess
-)(openai.ChatCompletion.create)
+)(func)
 
 
 def message_from_stream(stream: typing.Generator) -> typing.Any:
@@ -140,4 +142,9 @@ def message_from_stream(stream: typing.Generator) -> typing.Any:
 class ChatCompletion:
     @staticmethod
     def create(**kwargs: typing.Any) -> typing.Any:
-        return monitored_create(**kwargs)
+        return monitored_create(openai.ChatCompletion.create)(**kwargs)
+
+class Completion:
+    @staticmethod
+    def create(**kwargs: typing.Any) -> typing.Any:
+        return monitored_create(openai.Completion.create)(**kwargs)
