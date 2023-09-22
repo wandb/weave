@@ -180,7 +180,7 @@ const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
     return <CenterProjectBoardsBrowser {...props} />;
   } else if (params.assetType === 'table') {
     return <CenterProjectTablesBrowser {...props} />;
-  } else if (params.assetType === 'legacy_trace') {
+  } else if (params.assetType === 'run_logged_trace') {
     return <CenterProjectLegacyTracesBrowser {...props} />;
   } else {
     return <>Not implemented</>;
@@ -228,7 +228,7 @@ const CenterProjectBrowserInner: React.FC<
         ? []
         : [
             {
-              _id: 'runs_trace',
+              _id: 'run_logged_trace',
               'asset type': 'Run Logged Traces',
               count: assetCounts.result.legacyTracesCount ?? 0,
             },
@@ -525,7 +525,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
               urlProjectAssetPreview(
                 entityName,
                 projectName,
-                'legacy_trace',
+                'run_logged_trace',
                 row._id
               )
             );
