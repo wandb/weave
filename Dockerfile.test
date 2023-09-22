@@ -8,11 +8,8 @@ COPY requirements.* /root/
 WORKDIR /root
 RUN python3 -m venv venv
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
-    pip install -r requirements.test.txt -r requirements.dev.txt"
-
-# Special case for our spacy notebook test
-RUN pip install "spacy>=3.0.0,<4.0.0" && python3 -m spacy download en_core_web_sm
-
+    pip install -r requirements.test.txt -r requirements.dev.txt && \
+    pip install "spacy>=3.0.0,<4.0.0" && python3 -m spacy download en_core_web_sm"
 
 ENTRYPOINT "/bin/bash"
 
