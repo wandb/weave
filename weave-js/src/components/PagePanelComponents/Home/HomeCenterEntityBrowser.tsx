@@ -228,8 +228,8 @@ const CenterProjectBrowserInner: React.FC<
         ? []
         : [
             {
-              _id: 'legacy_trace',
-              'asset type': 'Legacy Traces',
+              _id: 'runs_trace',
+              'asset type': 'Run Logged Traces',
               count: assetCounts.result.legacyTracesCount ?? 0,
             },
           ]),
@@ -493,7 +493,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
 > = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
-  const browserTitle = 'Legacy Traces';
+  const browserTitle = 'Run logged Traces';
   const weave = useWeaveContext();
   useEffect(() => {
     setDocumentTitle(
@@ -599,7 +599,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
         allowSearch
         title={browserTitle}
         selectedRowId={params.preview}
-        noDataCTA={`No legacy traces found for project: ${entityName}/${projectName}`}
+        noDataCTA={`No run logged traces found for project: ${entityName}/${projectName}`}
         breadcrumbs={[
           {
             key: 'entity',
