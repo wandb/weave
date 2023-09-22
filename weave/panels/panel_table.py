@@ -325,9 +325,10 @@ def rows_single_refine(self: Table) -> weave.types.Type:
     return weave.types.optional(_get_row_type(self))
 
 
+# TODO: preserve arrow
 @weave.op(name="panel_table-data_refine", hidden=True)
 def data_refine(self: Table) -> weave.types.Type:
-    return self.input_node.type
+    return weave.types.List(self.input_node.type.object_type)
 
 
 @weave.op(name="panel_table-data_single_refine", hidden=True)
