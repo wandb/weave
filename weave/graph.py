@@ -294,7 +294,7 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
-    # This is an iterative implemenation, to avoid blowing the stack and
+    # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
     to_consider = [node]
     while to_consider:

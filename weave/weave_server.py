@@ -113,7 +113,7 @@ def log_system_info():
     WEAVE_SERVER_URL = os.environ.get("WEAVE_SERVER_URL")
     WANDB_BASE_URL = os.environ.get("WANDB_BASE_URL", "http://api.wandb.ai")
     WEAVE_LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR")
-    netrc_exists = os.path.exists("~/.netrc")
+    netrc_exists = os.path.exists(os.path.expanduser("~/.netrc"))
     WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
     WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
 
@@ -340,6 +340,10 @@ def execute():
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
     response_payload = _value_or_errors_to_response(fixed_response)
+
+    if root_span is not None:
+        root_span.set_metric("node_count", len(response_payload["data"]))
+        root_span.set_metric("error_count", len(response_payload["node_to_error"]))
 
     _log_errors(response_payload, response.nodes)
 
