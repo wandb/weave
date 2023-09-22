@@ -15,13 +15,19 @@ import moment from 'moment';
 import {
   Node,
   callOpVeryUnsafe,
+  constFunction,
   constString,
   list,
   opArtifactVersionFile,
+  opConcat,
   opFileTable,
   opGet,
   opIsNone,
+  opMap,
+  opPick,
+  opProjectRuns,
   opRootProject,
+  opRunHistory3,
   opTableRows,
   typedDict,
 } from '@wandb/weave/core';
@@ -43,6 +49,7 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
+import {SpanWeaveType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -173,6 +180,8 @@ const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
     return <CenterProjectBoardsBrowser {...props} />;
   } else if (params.assetType === 'table') {
     return <CenterProjectTablesBrowser {...props} />;
+  } else if (params.assetType === 'legacy_trace') {
+    return <CenterProjectLegacyTracesBrowser {...props} />;
   } else {
     return <>Not implemented</>;
   }
@@ -204,17 +213,26 @@ const CenterProjectBrowserInner: React.FC<
   const browserData = useMemo(() => {
     return [
       {
-        _id: 'boards',
+        _id: 'board',
         'asset type': 'Boards',
         count: assetCounts.result.boardCount ?? 0,
       },
       {
-        _id: 'tables',
+        _id: 'table',
         'asset type': 'Tables',
         count:
           (assetCounts.result.loggedTableCount ?? 0) +
           (assetCounts.result.runStreamCount ?? 0),
       },
+      ...(assetCounts.result.legacyTracesCount === 0
+        ? []
+        : [
+            {
+              _id: 'legacy_trace',
+              'asset type': 'Legacy Traces',
+              count: assetCounts.result.legacyTracesCount ?? 0,
+            },
+          ]),
       // TODO: Let's skip objects for the MVP
       // {
       //   _id: 'objects',
@@ -226,6 +244,7 @@ const CenterProjectBrowserInner: React.FC<
     ];
   }, [
     assetCounts.result.boardCount,
+    assetCounts.result.legacyTracesCount,
     assetCounts.result.loggedTableCount,
     assetCounts.result.runStreamCount,
   ]);
@@ -239,9 +258,8 @@ const CenterProjectBrowserInner: React.FC<
           icon: IconChevronDown,
           label: 'Browse asset type',
           onClick: row => {
-            const assetType = row._id === 'boards' ? 'board' : 'table';
             history.push(
-              urlProjectAssets(params.entity!, params.project!, assetType)
+              urlProjectAssets(params.entity!, params.project!, row._id)
             );
           },
         },
@@ -447,6 +465,165 @@ const CenterProjectBoardsBrowser: React.FC<
       data={browserData}
       actions={browserActions}
     />
+  );
+};
+
+const legacyTraceRowToSimpleNode = (
+  entityName: string,
+  projectName: string,
+  legacyTraceKey: string
+) => {
+  return opPick({
+    obj: opConcat({
+      arr: opRunHistory3({
+        run: opProjectRuns({
+          project: opRootProject({
+            entityName: constString(entityName),
+            projectName: constString(projectName),
+          }),
+        }),
+      }),
+    }),
+    key: constString(legacyTraceKey),
+  });
+};
+
+const CenterProjectLegacyTracesBrowser: React.FC<
+  CenterProjectBrowserInnerPropsType
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
+  const history = useHistory();
+  const params = useParams<HomeParams>();
+  const browserTitle = 'Legacy Traces';
+  const weave = useWeaveContext();
+  useEffect(() => {
+    setDocumentTitle(
+      params.preview
+        ? `${params.preview} Preview`
+        : `${params.entity}/${params.project} ${browserTitle}`
+    );
+  }, [params.entity, params.project, params.preview, browserTitle]);
+
+  const legacyTraces = query.useProjectLegacyTraces(entityName, projectName);
+  const browserData = useMemo(() => {
+    return legacyTraces.result.map(b => ({
+      _id: b.name,
+      name: b.name,
+      // 'created at': moment.utc(b.createdAt).local().calendar(),
+    }));
+  }, [legacyTraces]);
+
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(
+    () => [
+      [
+        {
+          icon: IconInfo,
+          label: 'Table overview',
+          onClick: row => {
+            history.push(
+              urlProjectAssetPreview(
+                entityName,
+                projectName,
+                'legacy_trace',
+                row._id
+              )
+            );
+          },
+        },
+        {
+          icon: IconCopy,
+          label: 'Copy Weave expression',
+          onClick: row => {
+            const node = legacyTraceRowToSimpleNode(
+              entityName,
+              projectName,
+              row._id
+            );
+            const copyText = weave.expToString(node);
+            navigator.clipboard.writeText(copyText).then(() => {
+              // give user feedback
+            });
+          },
+        },
+      ],
+    ],
+    [history, entityName, projectName, weave]
+  );
+
+  useEffect(() => {
+    if (legacyTraces.loading) {
+      return;
+    }
+    if (params.preview) {
+      const row = browserData.find(b => b._id === params.preview);
+      if (!row) {
+        setPreviewNode(undefined);
+        return;
+      }
+      const expr = legacyTraceRowToSimpleNode(
+        params.entity!,
+        params.project!,
+        row._id
+      );
+      const node = (
+        <HomePreviewSidebarTemplate
+          title={row.name}
+          row={row}
+          setPreviewNode={setPreviewNode}>
+          <HomeExpressionPreviewParts
+            expr={expr}
+            generatorAllowList={['py_board-trace_monitor']}
+            navigateToExpression={navigateToExpression}
+          />
+        </HomePreviewSidebarTemplate>
+      );
+      setPreviewNode(node);
+    } else {
+      setPreviewNode(undefined);
+    }
+  }, [
+    browserData,
+    history,
+    params.entity,
+    params.project,
+    params.preview,
+    setPreviewNode,
+    navigateToExpression,
+    legacyTraces.loading,
+  ]);
+
+  return (
+    <>
+      <CenterBrowser
+        allowSearch
+        title={browserTitle}
+        selectedRowId={params.preview}
+        noDataCTA={`No legacy traces found for project: ${entityName}/${projectName}`}
+        breadcrumbs={[
+          {
+            key: 'entity',
+            text: entityName,
+            onClick: () => {
+              setPreviewNode(undefined);
+              history.push(urlEntity(entityName));
+            },
+          },
+          {
+            key: 'project',
+            text: projectName,
+            onClick: () => {
+              setPreviewNode(undefined);
+              history.push(urlProject(entityName, projectName));
+            },
+          },
+        ]}
+        loading={legacyTraces.loading}
+        columns={['name']}
+        data={browserData}
+        actions={browserActions}
+      />
+    </>
   );
 };
 
