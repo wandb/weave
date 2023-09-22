@@ -19,7 +19,6 @@ import {
   isUnion,
   list,
   listObjectType,
-  maybe,
   nonNullable,
   taggedValue,
   Type,
