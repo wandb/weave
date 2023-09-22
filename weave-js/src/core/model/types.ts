@@ -423,6 +423,7 @@ export type ComplexType =
   | PanelType
   | PanelSubType
   | NewImage
+  | ObjectType
   // End Weave Python additions
   | HistogramType
   | TypedDictType

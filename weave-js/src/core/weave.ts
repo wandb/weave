@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import callFunction, {callOpVeryUnsafe, dereferenceAllVars} from './callers';
 import {Client} from './client';
 import {
@@ -15,6 +16,7 @@ import {
   EditingOpInputs,
   Frame,
   isAssignableTo,
+  isConstNodeWithObjectType,
   Node,
   NodeOrVoidNode,
   OutputNode,
@@ -98,6 +100,18 @@ export class Weave implements WeaveInterface {
 
   expToString(node: EditingNode, indent: number | null = 0): string {
     return this.languageBinding.printGraph(node, indent);
+  }
+
+  isExpLogicallyEqual(node1: NodeOrVoidNode, node2: NodeOrVoidNode): boolean {
+    const isExpStringEqual =
+      this.expToString(node1) === this.expToString(node2);
+    if (!isExpStringEqual) {
+      return false;
+    }
+    if (isConstNodeWithObjectType(node1) && isConstNodeWithObjectType(node2)) {
+      return _.isEqual(node1.val, node2.val);
+    }
+    return true;
   }
 
   nodeIsExecutable(node: EditingNode): node is NodeOrVoidNode {

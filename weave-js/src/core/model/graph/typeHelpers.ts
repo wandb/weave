@@ -1,6 +1,6 @@
 import {has} from '../../util/has';
 import {isAssignableTo} from '../helpers';
-import type {Type} from '../types';
+import type {ObjectType, Type} from '../types';
 import type {
   BaseNode,
   ConstNode,
@@ -63,6 +63,16 @@ export function isConstNodeWithType<T extends Type>(
   type: T
 ): constNode is ConstNode<T> {
   return isAssignableTo(constNode.type, type);
+}
+
+export function isConstNodeWithObjectType(
+  maybeNode: any
+): maybeNode is ConstNode<ObjectType> {
+  return (
+    isConstNode(maybeNode) &&
+    has('_is_object', maybeNode.type) &&
+    maybeNode.type._is_object === true
+  );
 }
 
 export const outputTypeIsType = (

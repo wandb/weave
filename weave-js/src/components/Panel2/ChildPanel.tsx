@@ -281,10 +281,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 
   const updateExpression = useCallback(
     (newExpression: NodeOrVoidNode) => {
-      if (
-        weave.expToString(newExpression) === weave.expToString(panelInputExpr)
-      ) {
-        // If expression strings match, no update. This prevents glitching
+      if (weave.isExpLogicallyEqual(newExpression, panelInputExpr)) {
+        // If expressions match, no update. This prevents glitching
         // when types change (which I think happens in panel composition
         // due to inconsistency between client and server detected types).
         // I don't think we have a case for updating just the type of
