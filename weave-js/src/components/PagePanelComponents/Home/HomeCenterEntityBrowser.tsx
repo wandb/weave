@@ -493,7 +493,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
 > = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
-  const browserTitle = 'Run logged Traces';
+  const browserTitle = 'Run Logged Traces';
   const weave = useWeaveContext();
   useEffect(() => {
     setDocumentTitle(
@@ -573,7 +573,6 @@ const CenterProjectLegacyTracesBrowser: React.FC<
           setPreviewNode={setPreviewNode}>
           <HomeExpressionPreviewParts
             expr={expr}
-            generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
           />
         </HomePreviewSidebarTemplate>
