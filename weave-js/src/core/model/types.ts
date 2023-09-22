@@ -66,7 +66,7 @@ interface ObjectTypeAttrs {
 }
 interface ObjectTypeBase {
   type: string;
-  is_object: true;
+  _is_object: true;
   _base_type: Type;
 }
 export type ObjectType = ObjectTypeBase & ObjectTypeAttrs;
