@@ -15,7 +15,6 @@ import moment from 'moment';
 import {
   Node,
   callOpVeryUnsafe,
-  constFunction,
   constString,
   list,
   opArtifactVersionFile,
@@ -23,7 +22,6 @@ import {
   opFileTable,
   opGet,
   opIsNone,
-  opMap,
   opPick,
   opProjectRuns,
   opRootProject,
@@ -49,7 +47,6 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
-import {SpanWeaveType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
