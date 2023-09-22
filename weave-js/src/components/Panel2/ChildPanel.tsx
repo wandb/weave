@@ -57,6 +57,7 @@ import {
   useSelectedPath,
   useSetInteractingChildPanel,
   useSetPanelInputExprIsHighlighted,
+  useSetSelectedPanel,
 } from './PanelInteractContext';
 import PanelNameEditor from './PanelNameEditor';
 import {TableState} from './PanelTable/tableState';
@@ -564,11 +565,28 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const fullPath = [...path, props.pathEl ?? ''].filter(
     el => el != null && el !== ''
   );
+
+  const pathStr = useMemo(() => ['<root>', ...fullPath].join('.'), [fullPath]);
+  const selectedPath = useSelectedPath();
+  const selectedPathStr = useMemo(() => {
+    if (selectedPath.length === 1 && selectedPath[0] === '') {
+      return '<root>';
+    }
+    return ['<root>', ...selectedPath!].join('.');
+  }, [selectedPath]);
+
+  const isPanelSelected =
+    selectedPathStr !== '<root>' &&
+    selectedPathStr !== '<root>.main' &&
+    pathStr.startsWith(selectedPathStr);
+
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
   const isVarNameEditable = props.editable || controlBar === 'editable';
+  const setSelectedPanel = useSetSelectedPanel();
+  const showEditControls = isPanelSelected || isHoverPanel;
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -577,17 +595,22 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   ) : (
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
+      onClick={event => {
+        event.stopPropagation();
+        setSelectedPanel(fullPath);
+      }}
       onMouseEnter={() => setIsHoverPanel(true)}
       onMouseLeave={() => setIsHoverPanel(false)}>
       {controlBar !== 'off' && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
-            {(!isVarNameEditable || !isHoverPanel) && props.pathEl != null && (
-              <EditorBarTitleOnly>
-                {varNameToTitle(props.pathEl)}
-              </EditorBarTitleOnly>
-            )}
-            <EditorBarHover show={isHoverPanel && isVarNameEditable}>
+            {(!isVarNameEditable || !showEditControls) &&
+              props.pathEl != null && (
+                <EditorBarTitleOnly>
+                  {varNameToTitle(props.pathEl)}
+                </EditorBarTitleOnly>
+              )}
+            <EditorBarHover show={isVarNameEditable && showEditControls}>
               {/* Variable name */}
               {props.pathEl != null && (
                 <EditorPath>
@@ -631,7 +654,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             </EditorBarHover>
             {/* Control buttons */}
             {props.editable && (
-              <EditorIcons visible={isHoverPanel || isMenuOpen}>
+              <EditorIcons visible={showEditControls || isMenuOpen}>
                 {props.prefixButtons}
                 <Tooltip
                   position="top center"
