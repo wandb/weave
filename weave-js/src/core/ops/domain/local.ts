@@ -703,33 +703,33 @@ export const opCrossProduct = makeOp({
   },
 });
 
-export const opCond = makeOp({
-  name: 'op-cond',
-  renderInfo: {
-    type: 'function',
-  },
-  description: 'hello',
-  argDescriptions: {},
-  returnValueDescription: 'hello',
-  argTypes: {
-    cases: {
-      type: 'dict',
-      objectType: 'boolean',
-    },
-    results: {
-      type: 'dict',
-      objectType: 'any',
-    },
-  },
-  returnType: inputNodes => {
-    if (!isTypedDictLike(inputNodes.results.type)) {
-      throw new Error('unexpected type in opCond');
-    }
-    return maybe(
-      union(Object.values(typedDictPropertyTypes(inputNodes.results.type)))
-    );
-  },
-});
+// export const opCond = makeOp({
+//   name: 'op-cond',
+//   renderInfo: {
+//     type: 'function',
+//   },
+//   description: 'hello',
+//   argDescriptions: {},
+//   returnValueDescription: 'hello',
+//   argTypes: {
+//     cases: {
+//       type: 'dict',
+//       objectType: 'boolean',
+//     },
+//     results: {
+//       type: 'dict',
+//       objectType: 'any',
+//     },
+//   },
+//   returnType: inputNodes => {
+//     if (!isTypedDictLike(inputNodes.results.type)) {
+//       throw new Error('unexpected type in opCond');
+//     }
+//     return maybe(
+//       union(Object.values(typedDictPropertyTypes(inputNodes.results.type)))
+//     );
+//   },
+// });
 
 const withColumnType = (
   curType: Type | undefined,
