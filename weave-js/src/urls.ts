@@ -2,6 +2,7 @@ export const URL_BROWSE = 'browse';
 export const URL_RECENT = 'recent';
 export const URL_WANDB = 'wandb';
 export const URL_LOCAL = 'local';
+export const URL_TEMPLATES = 'templates';
 
 export function urlRecent(): string {
   return `/${URL_BROWSE}/${URL_RECENT}/`;
@@ -11,6 +12,10 @@ export function urlRecentBoards(): string {
 }
 export function urlRecentTables(): string {
   return `${urlRecent()}table`;
+}
+
+export function urlTemplates(): string {
+  return `/${URL_BROWSE}/${URL_WANDB}/templates`;
 }
 
 export function urlEntity(entityName: string): string {

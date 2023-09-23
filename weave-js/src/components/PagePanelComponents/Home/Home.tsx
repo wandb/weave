@@ -10,6 +10,7 @@ import {
   IconUsersTeam,
   IconWeaveLogo,
 } from '../../Panel2/Icons';
+import {IconCategoryMultimodal} from '@wandb/weave/components/Icon';
 import * as query from './query';
 import * as LayoutElements from './LayoutElements';
 import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
@@ -29,11 +30,13 @@ import {
   urlLocalBoards,
   urlRecentBoards,
   urlRecentTables,
+  urlTemplates,
 } from '../../../urls';
 import getConfig from '../../../config';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {HomeFeaturedTemplates} from './HomeFeaturedTemplates';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import {HomeCenterTemplates} from './HomeCenterTemplates';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -128,6 +131,22 @@ const HomeComp: FC<HomeProps> = props => {
     }
   }, [props.browserType, params.assetType, setPreviewNode, history]);
 
+  const gettingStartedSection = useMemo(() => {
+    return [
+      {
+        title: `Getting Started`,
+        items: [
+          {
+            icon: IconCategoryMultimodal,
+            label: `Board templates`,
+            active: props.browserType == 'templates',
+            to: urlTemplates(),
+          },
+        ],
+      },
+    ];
+  }, [props.browserType, setPreviewNode]);
+
   const wandbSection = useMemo(() => {
     return userEntities.result.length === 0
       ? ([] as any)
@@ -213,7 +232,12 @@ const HomeComp: FC<HomeProps> = props => {
   }, [isLocallyServed, props.browserType, setPreviewNode, history]);
 
   const navSections = useMemo(() => {
-    return [...recentSection, ...wandbSection, ...localSection];
+    return [
+      ...recentSection,
+      ...gettingStartedSection,
+      ...wandbSection,
+      ...localSection,
+    ];
   }, [localSection, recentSection, wandbSection]);
 
   const loading = userName.loading || isAuthenticated === undefined;
@@ -268,9 +292,6 @@ const HomeComp: FC<HomeProps> = props => {
       <LayoutElements.Block>
         <HomeTopBar />
       </LayoutElements.Block>
-      <LayoutElements.Block>
-        <HomeFeaturedTemplates setPreviewNode={setPreviewNode} />
-      </LayoutElements.Block>
       {/* Main Region */}
       <LayoutElements.HSpace
         style={{
@@ -289,6 +310,8 @@ const HomeComp: FC<HomeProps> = props => {
               {props.browserType === 'recent' ? (
                 // This should never come up
                 <Placeholder />
+              ) : props.browserType === 'templates' ? (
+                <HomeCenterTemplates setPreviewNode={setPreviewNode} />
               ) : props.browserType === 'wandb' ? (
                 <CenterEntityBrowser
                   navigateToExpression={navigateToExpression}
