@@ -373,7 +373,10 @@ def send_local_file(path):
     abspath = "/" / pathlib.Path(
         path
     )  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
-    local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
+    try:
+        local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
+    except errors.WeaveAccessDeniedError:
+        abort(403)
     if local_artifacts_path not in list(abspath.parents):
         abort(403)
     return send_from_directory("/", path)
