@@ -34,7 +34,6 @@ import {
 } from '../../../urls';
 import getConfig from '../../../config';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {HomeFeaturedTemplates} from './HomeFeaturedTemplates';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {HomeCenterTemplates} from './HomeCenterTemplates';
 
@@ -139,13 +138,13 @@ const HomeComp: FC<HomeProps> = props => {
           {
             icon: IconCategoryMultimodal,
             label: `Board templates`,
-            active: props.browserType == 'templates',
+            active: props.browserType === 'templates',
             to: urlTemplates(),
           },
         ],
       },
     ];
-  }, [props.browserType, setPreviewNode]);
+  }, [props.browserType]);
 
   const wandbSection = useMemo(() => {
     return userEntities.result.length === 0
@@ -238,7 +237,7 @@ const HomeComp: FC<HomeProps> = props => {
       ...wandbSection,
       ...localSection,
     ];
-  }, [localSection, recentSection, wandbSection]);
+  }, [localSection, recentSection, gettingStartedSection, wandbSection]);
 
   const loading = userName.loading || isAuthenticated === undefined;
   const REDIRECT_RECENTS = [
