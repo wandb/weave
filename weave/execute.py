@@ -38,12 +38,14 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
+from . import storage
 from . import op_policy
 from . import trace_local
 from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
+from .monitoring import monitor
 
 # Language Features
 from . import language_nullability
@@ -428,7 +430,28 @@ def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
 ):
-    return op_def.resolve_fn(**inputs)
+    mon = monitor.default_monitor()
+    st = mon._streamtable
+    mon_span_inputs = {**inputs}
+    if st and "self" in inputs:
+        project_name = st._project_name
+        ref = storage.get_ref(inputs["self"])
+        if not ref:
+            ref = storage.publish(
+                inputs["self"], f"{project_name}/{inputs['self'].__class__.__name__}"
+            )
+        mon_span_inputs["self"] = ref
+    # TODO: not simple name
+    # TODO: capture publish time here?
+    # TODO: yeah we need to capture all engine overhead so prob want this
+    #    at a higher level... in the engine (execute_forward_node or higher)
+    # TODO: this needs to work with local object saving as well
+    # TODO: generalize "self" publishing above
+    with mon.span(op_def.simple_name) as span:
+        span.inputs = mon_span_inputs
+        res = op_def.resolve_fn(**inputs)
+        span.output = res
+    return res
 
 
 def is_run_op(op_call: graph.Op):
