@@ -174,7 +174,7 @@ const TabContentWrapper = styled.div`
 `;
 TabContentWrapper.displayName = 'S.TabContentWrapper';
 
-const HomeFeaturedTemplateDrawer: React.FC<{
+export const HomeFeaturedTemplateDrawer: React.FC<{
   template: TemplateType;
 }> = ({template}) => {
   const [tabValue, setTabValue] = React.useState('Instructions');
