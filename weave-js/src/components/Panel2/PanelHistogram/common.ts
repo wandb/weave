@@ -55,10 +55,15 @@ export interface HistogramConfigByBinSize {
 }
 
 export type Extent = [min: number | undefined, max: number | undefined];
+export type FixYAxis = {
+  isFixed: boolean | undefined;
+  value: number | null;
+};
 
 export type HistogramConfig = {
   // undefined in extent means min/max, respectively.
   extent?: Extent;
+  fixYAxis?: FixYAxis;
 } & (HistogramConfigAuto | HistogramConfigByNumBins | HistogramConfigByBinSize);
 
 export type PanelHistogramProps = PanelProps<typeof inputType, HistogramConfig>;

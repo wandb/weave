@@ -7,6 +7,7 @@ import {
 } from '../ConfigPanel';
 import {defaultConfig, PanelHistogramProps} from './common';
 import {usePanelContext} from '../PanelContext';
+import {Checkbox} from 'semantic-ui-react';
 
 /* eslint-disable no-template-curly-in-string */
 
@@ -142,6 +143,22 @@ const PanelHistogramConfig: React.FC<PanelHistogramProps> = props => {
             updateConfig({extent: [config.extent?.[0], newValue]});
           }}
         />
+      </ConfigOption>
+      <ConfigOption label={'Fix Y Axis'}>
+        <div style={{display: 'flex', justifyContent: 'flex-end'}}>
+          <Checkbox
+            toggle
+            checked={config.fixYAxis?.isFixed ?? false}
+            onChange={(_, {checked}) => {
+              updateConfig({
+                fixYAxis: {
+                  isFixed: checked ?? false,
+                  value: config.fixYAxis?.value ?? 0,
+                },
+              });
+            }}
+          />
+        </div>
       </ConfigOption>
     </ConfigSection>
   );
