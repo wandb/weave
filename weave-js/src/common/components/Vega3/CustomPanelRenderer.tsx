@@ -106,7 +106,8 @@ interface CustomPanelRendererProps {
   handleTooltip?(handler: any, event: any, item: any, value: any): void;
   onNewView?(view: VegaView): void;
 
-  // if
+  // critical width (in pixels) below which legends are hidden. if not specified,
+  // legends are not hidden.
   legendCutoffWidth?: number;
 }
 
