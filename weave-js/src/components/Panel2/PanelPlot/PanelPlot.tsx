@@ -3165,6 +3165,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       }
     }
 
+    // set the maximum length of x axis labels to be 75 pixels
+    newSpec.encoding.x.axis.labelLimit = 75;
+
     if (newSpec.encoding.color != null) {
       if (axisSettings?.color?.scale != null) {
         newSpec.encoding.color.scale = scaleToVegaScale(
