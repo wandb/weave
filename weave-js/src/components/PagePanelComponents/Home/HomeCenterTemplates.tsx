@@ -1,7 +1,6 @@
 import {SetPreviewNodeType} from './common';
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
-import {Button} from 'semantic-ui-react';
 import {Node, Type, callOpVeryUnsafe} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {Panel2Loader} from '../../Panel2/PanelComp';
@@ -9,11 +8,39 @@ import {Panel2Loader} from '../../Panel2/PanelComp';
 import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
 import {HomeFeaturedTemplateDrawer} from './HomeFeaturedTemplates';
 import {
-  WHITE,
-  TEAL_500,
   MOON_250,
   MOON_350,
+  MOON_500,
 } from '@wandb/weave/common/css/color.styles';
+import {Button} from '../../Button';
+import styled from 'styled-components';
+
+const Template = styled(LayoutElements.VStack)`
+  width: 332px;
+  height: 368px;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px solid ${MOON_250};
+  gap: 16px;
+  overflow-y: auto;
+  &:hover {
+    border: 1px solid ${MOON_350};
+    box-shadow: 0px 4px 8px 0px rgba(14, 16, 20, 0.04);
+  }
+`;
+Template.displayName = 'S.Template';
+
+const TemplateDescription = styled(LayoutElements.Block)`
+  overflow: hidden;
+  color: ${MOON_500};
+  text-overflow: ellipsis;
+  font-family: Source Sans Pro;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 140%;
+`;
+TemplateDescription.displayName = 'S.TemplateDescription';
 
 type TemplateType = {
   config_type: Type | null;
@@ -37,7 +64,8 @@ export const HomeCenterTemplates: React.FC<{
     return null;
   }
   return (
-    <LayoutElements.VBlock style={{padding: '32px', gap: '32px'}}>
+    <LayoutElements.VBlock
+      style={{padding: '32px', gap: '32px', height: '100%'}}>
       <LayoutElements.HBlock>
         <div style={{fontWeight: '600', fontSize: '24px'}}>Board templates</div>
       </LayoutElements.HBlock>
@@ -46,7 +74,8 @@ export const HomeCenterTemplates: React.FC<{
           <Panel2Loader />
         </LayoutElements.Block>
       ) : (
-        <LayoutElements.HStack style={{gap: '32px'}}>
+        <LayoutElements.HStack
+          style={{gap: '32px', flexWrap: 'wrap', overflow: 'auto'}}>
           {featuredTemplates.result.map((template: TemplateType, i: number) => (
             <TemplateCard
               key={template.op_name}
@@ -75,15 +104,7 @@ const TemplateCard: React.FC<{
   );
   const [isHover, setIsHover] = React.useState(false);
   return (
-    <LayoutElements.VStack
-      style={{
-        width: '300px',
-        height: '440px',
-        padding: '16px',
-        borderRadius: '4px',
-        border: `1px solid ${MOON_350}`,
-        gap: '16px',
-      }}
+    <Template
       onMouseEnter={() => {
         setIsHover(true);
       }}
@@ -91,7 +112,7 @@ const TemplateCard: React.FC<{
         setIsHover(false);
       }}>
       {template.thumbnail_url && (
-        <LayoutElements.Block style={{height: '150px'}}>
+        <LayoutElements.Block style={{height: '168px'}}>
           <img
             src={template.thumbnail_url}
             alt={template.display_name + ' thumbnail'}
@@ -107,25 +128,18 @@ const TemplateCard: React.FC<{
       <LayoutElements.Block style={{fontWeight: '600', fontSize: '18px'}}>
         {template.display_name}
       </LayoutElements.Block>
-      <LayoutElements.Block>{template.description}</LayoutElements.Block>
+      <TemplateDescription>{template.description}</TemplateDescription>
       <LayoutElements.Block style={{width: '100%', marginTop: 'auto'}}>
         {isHover && (
           <Button
-            style={{
-              width: '100%',
-              backgroundColor: `${TEAL_500}`,
-              color: `${WHITE}`,
-              borderRadius: '4px',
-              fontWeight: '600',
-              fontSize: '16px',
-            }}
+            className="w-full"
             onClick={() => {
-              setPreviewNode(node, '40%');
+              setPreviewNode(node, '35%');
             }}>
-            Use template
+            Try it out
           </Button>
         )}
       </LayoutElements.Block>
-    </LayoutElements.VStack>
+    </Template>
   );
 };

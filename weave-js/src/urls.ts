@@ -15,7 +15,7 @@ export function urlRecentTables(): string {
 }
 
 export function urlTemplates(): string {
-  return `/${URL_BROWSE}/${URL_WANDB}/templates`;
+  return `/${URL_BROWSE}/${URL_TEMPLATES}`;
 }
 
 export function urlEntity(entityName: string): string {

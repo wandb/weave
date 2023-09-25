@@ -81,7 +81,7 @@ ReactDOM.render(
       <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
         <Main browserType={URL_RECENT} />
       </Route>
-      <Route path={[`/${URL_BROWSE}/${URL_WANDB}/templates/:templateName?`]}>
+      <Route path={[`/${URL_BROWSE}/${URL_TEMPLATES}/:templateName?`]}>
         <Main browserType={URL_TEMPLATES} />
       </Route>
       <Route
