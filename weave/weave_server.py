@@ -113,7 +113,8 @@ def log_system_info():
     WEAVE_SERVER_URL = os.environ.get("WEAVE_SERVER_URL")
     WANDB_BASE_URL = os.environ.get("WANDB_BASE_URL", "http://api.wandb.ai")
     WEAVE_LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR")
-    netrc_exists = os.path.exists(os.path.expanduser("~/.netrc"))
+    dot_netrc_exists = os.path.exists(os.path.expanduser("~/.netrc"))
+    underscore_netrc_exists = os.path.exists(os.path.expanduser("~/_netrc"))
     WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
     WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
 
@@ -125,7 +126,8 @@ def log_system_info():
     logger.info(f"  WEAVE_LOCAL_ARTIFACT_DIR  = {WEAVE_LOCAL_ARTIFACT_DIR}")
 
     logger.info("Auth Config:")
-    logger.info(f"  netrc_exists        = {netrc_exists}")
+    logger.info(f"  ~/.netrc exists     = {dot_netrc_exists}")
+    logger.info(f"  ~/_netrc exists     = {underscore_netrc_exists}")
     logger.info(f"  WANDB_API_KEY       = {WANDB_API_KEY}")
     logger.info(f"  WEAVE_WANDB_COOKIE  = {WEAVE_WANDB_COOKIE}")
 
