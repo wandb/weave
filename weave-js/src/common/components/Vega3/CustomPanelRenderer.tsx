@@ -100,15 +100,15 @@ interface CustomPanelRendererProps {
   signalListeners?: SignalListeners;
   vegaRef?: React.MutableRefObject<Vega | null>;
 
+  // critical width (in pixels) below which legends are hidden. if not specified,
+  // legends are not hidden.
+  legendCutoffWidth?: number;
+
   setViewedRun?(runName: string): void;
   setUserQuery?(query: Query): void;
   setView?(view: VegaView | null): void;
   handleTooltip?(handler: any, event: any, item: any, value: any): void;
   onNewView?(view: VegaView): void;
-
-  // critical width (in pixels) below which legends are hidden. if not specified,
-  // legends are not hidden.
-  legendCutoffWidth?: number;
 }
 
 function hideLegends(obj: any): any {
