@@ -1,6 +1,6 @@
 import {produce} from 'immer';
 import * as _ from 'lodash';
-import React, {useMemo, useRef, useCallback} from 'react';
+import React, {useMemo, useRef} from 'react';
 import ReactDOM from 'react-dom';
 import Measure, {BoundingRect} from 'react-measure';
 import {SignalListeners, Vega, VisualizationSpec} from 'react-vega';
