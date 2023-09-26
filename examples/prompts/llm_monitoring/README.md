@@ -6,11 +6,10 @@ Maintain data privacy and control by leveraging W&B's [hosting options](https://
 
 ## Notebooks
 
-- [OpenAI Monitoring Demo](../monitoring/openai_client_quickstart.ipynb): create, explore, and share OpenAI Monitoring Boards in Weave
+- [OpenAI Monitoring Demo](./openai_client_quickstart.ipynb): create, explore, and share OpenAI Monitoring Boards in Weave
 - OpenAI Proxy Quickstart: set up a proxy to monitor OpenAI API calls
-  - [Enterprise Mode OpenAI Proxy Quickstart](../monitoring/openai_proxy_quickstart_enterprise_mode.ipynb) - Quickstart designed for enterprise users
-  - [General OpenAI Proxy Quickstart](../monitoring/openai_proxy_quickstart.ipynb) - Quickstart designed for non-enterprise / free users
-- [Weave Monitoring API](../monitoring/weave_monitor_api.ipynb): understand the Weave monitoring API
+  - [Enterprise Mode OpenAI Proxy Quickstart](./openai_proxy_quickstart_enterprise_mode.ipynb) - Quickstart designed for enterprise users
+  - [General OpenAI Proxy Quickstart](./openai_proxy_quickstart.ipynb) - Quickstart designed for non-enterprise / free users
 
 <img src="../../../docs/assets/mini_prodmon_overview.gif" width="65%">
 
@@ -24,7 +23,7 @@ There are two main ways to authenticate OpenAI API calls so you can view them in
 2. Import openai as follows: `from weave.monitoring import openai`.
 3. Make calls via the OpenAI SDK as usual.
 
-See details and create an interactive board in the [OpenAI monitoring notebook](../monitoring/openai_client_quickstart.ipynb).
+See details and create an interactive board in the [OpenAI monitoring notebook](./openai_client_quickstart.ipynb).
 
 ### OpenAI Proxy
 
@@ -37,7 +36,7 @@ To log all calls made via an OpenAI proxy:
 5. Optionally set headers on each call to customize the wandb entity, project, and other aspects of logging (see the table below for details).
 6. Call OpenAI via the OpenAI SDK or CURL from the base url.
 
-Try some calls from the [proxy quickstart notebook](../monitoring/openai_proxy_quickstart.ipynb).
+Try some calls from the [proxy quickstart notebook](./openai_proxy_quickstart.ipynb).
 
 ### OpenAI Proxy Headers
 
