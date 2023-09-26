@@ -281,3 +281,4 @@ export const focusEditor = (editor: Editor): void => {
 const Container = styled.div`
   width: 100%;
 `;
+Container.displayName = 'S.Container';
