@@ -141,6 +141,7 @@ def node_expr_str_full(node: graph.Node) -> str:
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
             return f"{node.from_op.friendly_name}({query_hash})"
         elif node.from_op.name == "gqlroot-querytoobj":
+            param_names = list(node.from_op.inputs.keys())            
             const = node.from_op.inputs[param_names[2]]
             try:
                 assert isinstance(const, graph.ConstNode)
