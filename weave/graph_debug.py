@@ -123,6 +123,9 @@ def node_expr_str_full(node: graph.Node) -> str:
 
     This function is a copy/modification of of node_expr_str.
     """
+
+    from . import partial_object
+
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "dict":
             return "dict(%s)" % ", ".join(
@@ -137,6 +140,24 @@ def node_expr_str_full(node: graph.Node) -> str:
         if node.from_op.name == "gqlroot-wbgqlquery":
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
             return f"{node.from_op.friendly_name}({query_hash})"
+        elif node.from_op.name == "gqlroot-querytoobj":
+            const = node.from_op.inputs[param_names[2]]
+            try:
+                assert isinstance(const, graph.ConstNode)
+                narrow_type = const.val
+                assert isinstance(narrow_type, partial_object.PartialObjectType)
+            except AssertionError:
+                return (
+                    f"{node_expr_str_full(node.from_op.inputs[param_names[0]])}."
+                    f"querytoobj({node_expr_str_full(node.from_op.inputs[param_names[1]])}, ?)"
+                )
+            else:
+                return (
+                    f"{node_expr_str_full(node.from_op.inputs[param_names[0]])}."
+                    f"querytoobj({node_expr_str_full(node.from_op.inputs[param_names[1]])},"
+                    f" {narrow_type.keyless_weave_type_class()})"
+                )
+
         param_names = list(node.from_op.inputs.keys())
         if all(
             [not isinstance(n, graph.OutputNode) for n in node.from_op.inputs.values()]
