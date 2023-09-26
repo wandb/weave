@@ -3504,10 +3504,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const panelPlotDivRef = useRef<HTMLDivElement>(document.createElement('div'));
 
   useEffect(() => {
-    const onMouseMove = e => {
+    const onMouseMove = (e: MouseEvent) => {
       if (
         panelPlotDivRef.current &&
-        panelPlotDivRef.current.contains(e.target)
+        panelPlotDivRef.current.contains(e.target as Node)
       ) {
         setIsMouseOver(true);
       } else {
