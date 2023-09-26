@@ -3623,6 +3623,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               }}
               handleTooltip={handleTooltip}
               onNewView={onNewVegaView}
+              legendCutoffWidth={isDash ? 350 : undefined}
             />
           </div>
         </>
