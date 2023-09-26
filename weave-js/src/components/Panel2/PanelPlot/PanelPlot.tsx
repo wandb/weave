@@ -3500,6 +3500,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [tooltipNode]
   );
 
+  const [isMouseOver, setIsMouseOver] = useState<boolean>(false);
+
   const updateTooltipConfig = useMemo(() => {
     const noop = (newPanelConfig: any) => {};
 
@@ -3549,12 +3551,14 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         position: 'relative',
         alignItems: 'flex-start',
       }}
+      onMouseOver={() => setIsMouseOver(true)}
+      onMouseOut={() => setIsMouseOver(false)}
       className={loading ? 'loading' : ''}>
       {loading ? (
         <div style={{width: '100%', height: '100%'}}>{loaderComp}</div>
       ) : (
         <>
-          {isDash && (
+          {isDash && isMouseOver && (
             <div
               style={{
                 position: 'absolute',
