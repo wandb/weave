@@ -16,6 +16,7 @@ Join the W&B Prompts Feedback Sprint for a chance to win some W&B swag by [signi
 ### 1. Try W&B Prompts
 
 **Template Quickstarts**
+
 The easiest way to try our W&B Prompts tools, LLM Monitoring and Traces is to go to **https://weave.wandb.ai** and click on either the LLM Monitoring or Traces template. From there you should see Quickstart instructions as well as links to colabs to run.
 
 <div align="center">
@@ -23,6 +24,7 @@ The easiest way to try our W&B Prompts tools, LLM Monitoring and Traces is to go
 </div>
 
 **Colabs**
+
 Alternatively you could try one of the [LLM Monitoring colabs here](https://github.com/wandb/weave/tree/sep23_feedback_programme/examples/prompts/llm_monitoring) or the [Traces colabs here](https://github.com/wandb/weave/tree/sep23_feedback_programme/examples/prompts/trace_debugging)
 
 ### 2. Give feedback, win swag
