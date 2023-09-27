@@ -23,6 +23,7 @@
     "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait"
   },
   "dependencies": {
+    "@apollo/client": "^3.8.4",
     "@babylonjs/core": "^4.2.0",
     "@babylonjs/gui": "^4.2.0",
     "@babylonjs/loaders": "^4.2.0",
@@ -45,6 +46,7 @@
     "cytoscape-dagre": "^2.2.2",
     "diff": "^5.1.0",
     "downloadjs": "^1.4.7",
+    "graphql": "=16.6.0",
     "hast-util-sanitize": "^4.0.0",
     "immer": "^9.0.21",
     "isomorphic-unfetch": "^3.1.0",
