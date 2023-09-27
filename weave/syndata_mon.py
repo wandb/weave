@@ -93,7 +93,7 @@ def random_predictions(n_users: int = 10) -> ops_arrow.ArrowWeaveList:
     # Read the file and generate prompts
     with open(
         os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "testdata/t8.shakespeare.txt")
+            os.path.join(os.path.dirname(__file__), "weave/testdata/t8.shakespeare.txt")
         ),
         "r",
     ) as f:
