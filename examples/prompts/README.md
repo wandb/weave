@@ -7,4 +7,4 @@
 
 **Try W&B Prompts, share your thoughts, win swag!**
 
-The W&B engineering team want your feedback on how our new LLM tools, LLM Monitoring and Traces-v2, can be tailored to your specific use cases. The programme closes Sunday, October 22nd 2023, [click here to participate](FEEDBACK_SPRINT.md) and be in for a chance to win some W&B swag.
+The W&B engineering team want your feedback on how our new LLM tools, LLM Monitoring and Traces, can be tailored to your specific use cases. The programme closes Sunday, October 22nd 2023, [click here to participate](FEEDBACK_SPRINT.md) and be in for a chance to win some W&B swag.
