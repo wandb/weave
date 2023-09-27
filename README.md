@@ -13,7 +13,7 @@ Whether you are a seasoned data scientist, an aspiring ML practitioner, or just 
 
 ## 🔆 [Join the W&B Prompts Feedback Sprint - Oct 2nd - Oct 22nd](examples/prompts/FEEDBACK_SPRINT.md) 🔆
 
-**Try LLM Monitoring and Traces-v2, share your thoughts, win swag!**
+**Try W&B Prompts, share your thoughts, win swag!**
 
 The W&B engineering team want your feedback on how our new LLM tools, LLM Monitoring and Traces-v2, can be tailored to your specific use cases. The programme closes Sunday, October 22nd 2023, [click here to participate](examples/prompts/FEEDBACK_SPRINT.md) and be in for a chance to win some W&B swag.
 
