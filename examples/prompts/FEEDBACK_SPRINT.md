@@ -1,8 +1,8 @@
 # 🔆 W&B Prompts Feedback Sprint - Oct 2nd - Oct 22nd 🔆 
 
-Built on our new fully OSS library, weave, the W&B Engineering team want your feedback on how our new LLM tools, LLM Monitoring and Traces, can be tailored to your specific use cases!
+Built on Weights & Biases new library, weave, the W&B Engineering team want your feedback on how our new LLM tools, LLM Monitoring and Traces, can be tailored to your specific use cases!
 
-LLM Monitoring is our observability and governance platform for all LLM-related work, while Traces lets you visualize and inspect the execution flow of your LLM chains and agents. [See here](##w&b-prompts) for more.
+LLM Monitoring is our observability and governance platform for all LLM-related work, while Traces lets you visualize, inspect and debug the execution flow of your LLM chains and agents. [See here](##w&b-prompts) for more.
 
 The Feedback Sprint closes Sunday, October 22nd 2023, [click here](https://wandb.ai/site/monitoring?utm_source=weave-github&utm_medium=github&utm_campaign=prompts-feedback-sprint&utm_term=prompts-feedback-sprint-sep23) to participate and be in for a chance to win some W&B swag.
 
@@ -47,5 +47,5 @@ W&B Prompts is our latest LLM offering and comprises so far of LLM Monitoring an
     - Track end-to-end LLM inputs & outputs across distributed systems
     - Centrally secure and govern all LLM workloads with LLM API Gateway
 
-- **[Traces](https://github.com/wandb/weave/tree/master/examples/prompts/trace_debugging) →** Visualize and inspect the execution flow of your LLM chains and agents, analyze the inputs, intermediate results and output. Upgraded to run run on weave for more functionality including being able to view the all inputs + outputs of a selected span type.
+- **[Traces](https://github.com/wandb/weave/tree/master/examples/prompts/trace_debugging) →** Visualize, inspect and debug the execution flow of your LLM chains and agents, analyze the inputs, intermediate results and output. Upgraded to run run on weave for more functionality including being able to view the all inputs + outputs of a selected span type.
 
