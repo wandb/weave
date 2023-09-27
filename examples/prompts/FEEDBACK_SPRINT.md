@@ -35,7 +35,7 @@ We'll select 10 people who provide the team feedback on W&B Prompts. To chat wit
 - Head to the `#prompts-feedback` channel to share your thoughts with our Engineering team!
 
 **Github**
-- If you prefer github, you can open an issue [in the weave repository here](https://github.com/wandb/weave/issues) and add the tag `prompts-feedback` to your issue.
+- If you prefer github, you can open an issue [in the weave repository here](https://github.com/wandb/weave/issues) and add the label `prompts-feedback` to your issue.
 
 We're looking forward to hearing from you and we're excited to shape the future of LLM developer tools with you!
 
