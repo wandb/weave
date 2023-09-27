@@ -356,7 +356,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   const needsLogin = authed === false && isLocal === false;
   useEffect(() => {
     if (needsLogin) {
-      const newOrigin = window.location.origin.replace('//weave.', '//api.');
+      const newOrigin = window.WEAVE_CONFIG.WANDB_BASE_URL;
       const newUrl = `${newOrigin}/oidc/login?${new URLSearchParams({
         redirect_to: window.location.href,
       }).toString()}`;
