@@ -31,6 +31,7 @@ const IconWrapper = styled.div<IconWrapperProps>`
     background-color: ${props =>
       props.isDarkMode ? globals.GRAY_840 : globals.GRAY_50};
   }
+  cursor: pointer;
 `;
 
 interface IconProps {
