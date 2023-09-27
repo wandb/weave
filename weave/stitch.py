@@ -266,6 +266,8 @@ def stitch_node_inner(
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
             path = _dict_utils.split_escaped_string(node.from_op.inputs["key"].val)
+            if len(path) == 0:
+                return ObjectRecorder(node, inputs[0].tags)
             key = _dict_utils.unescape_dots(path[0])
             if (
                 isinstance(inputs[0], LiteralDictObjectRecorder)

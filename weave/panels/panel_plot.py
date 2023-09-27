@@ -165,10 +165,11 @@ class Series:
                     raise ValueError(
                         f"select_functions must contain a function for groupby dim {dimname}"
                     )
-                table.update_col(getattr(dims, dimname), select_functions[dimname])
                 table.enable_groupby(getattr(dims, dimname))
                 if dimname == "label":
                     table.enable_groupby(dims.color)
+
+                table.update_col(getattr(dims, dimname), select_functions[dimname])
 
             for dimname in select_functions:
                 if dimname not in groupby_dims:
