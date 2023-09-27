@@ -17,7 +17,7 @@ if (!window.WEAVE_CONFIG) {
     ANALYTICS_DISABLED: false,
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
-    WANDB_BASE_URL: '',
+    WANDB_BASE_URL: 'https://api.wandb.ai',
   };
 }
 
