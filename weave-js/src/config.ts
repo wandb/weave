@@ -5,6 +5,7 @@ declare global {
       ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
       ONPREM: boolean;
+      WANDB_BASE_URL: string;
     };
   }
 }
@@ -16,6 +17,7 @@ if (!window.WEAVE_CONFIG) {
     ANALYTICS_DISABLED: false,
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
+    WANDB_BASE_URL: '',
   };
 }
 
