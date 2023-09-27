@@ -7,6 +7,10 @@ import {Type} from '../model/types';
 import {OpStore} from '../opStore/types';
 import {Client} from './types';
 
+type CachedNode = {
+  obs: Observable<any>;
+  sub: ZenObservable.Subscription;
+};
 export class CachedClient implements Client {
   readonly opStore: OpStore;
   private readonly cache: Cache;
@@ -17,11 +21,30 @@ export class CachedClient implements Client {
     this.cache = new InMemoryCache({
       maxElements: 1000,
       keyFn: this.hasher.typedNodeId,
+      onDispose: this.onDispose.bind(this),
     });
     this.opStore = client.opStore;
   }
   subscribe<T extends Type>(node: Node<T>): Observable<any> {
-    return this.client.subscribe(node);
+    // Moving the cache from `query` to subscribe.
+    // This allows us to maintain a cache of subscriptions
+    // (which are used for both `query` and `subscribe`)
+    // This works by maintaining a single open subscription per node
+    // during the lifetime of the node being cached. This allows
+    // subsequent calls to `query` or `subscribed` to receive the
+    // data from the subscription. This means reloading similar content
+    // on screen will not cause a re-query, but will instead use the
+    // existing subscription for up to 30 seconds!
+
+    if (this.cache.has(node)) {
+      return this.cache.get(node).obs;
+    }
+    const obs = this.client.subscribe(node);
+    const sub = obs.subscribe(res => {});
+
+    this.cache.set(node, {obs, sub}, 5);
+
+    return obs;
   }
 
   public setPolling(polling: boolean) {
@@ -44,9 +67,6 @@ export class CachedClient implements Client {
   }
 
   async query<T extends Type>(node: Node<T>): Promise<any> {
-    if (this.cache.has(node)) {
-      return this.cache.get(node);
-    }
     const result = new Promise((resolve, reject) => {
       const obs = this.subscribe(node);
       const sub = obs.subscribe(
@@ -60,7 +80,6 @@ export class CachedClient implements Client {
         }
       );
     });
-    this.cache.set(node, result, 30);
     return result;
   }
 
@@ -80,5 +99,9 @@ export class CachedClient implements Client {
       opStore: this.opStore.debugMeta(),
       client: this.client.debugMeta(),
     };
+  }
+
+  private onDispose(key: string, value: CachedNode): void {
+    value.sub.unsubscribe();
   }
 }

@@ -391,6 +391,7 @@ def frontend_env():
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
+        "WANDB_BASE_URL": environment.wandb_base_url(),
     }
 
 
