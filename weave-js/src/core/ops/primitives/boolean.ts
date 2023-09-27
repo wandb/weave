@@ -5,6 +5,7 @@ import {
   union,
   Node,
   Type,
+  getValueFromTaggedValue,
 } from '../../model';
 import {makeEqualOp, makeNotEqualOp, makeStandardOp} from '../opKinds';
 import {opDict} from './literals';
@@ -107,7 +108,7 @@ export const opCond = makeStandardOp({
     maybe(union(Object.values(typedDictPropertyTypes(inputTypes.results)))),
   resolver: ({cases, results}) => {
     for (const k of Object.keys(cases)) {
-      if (cases[k]) {
+      if (getValueFromTaggedValue(cases[k])) {
         return results[k];
       }
     }
