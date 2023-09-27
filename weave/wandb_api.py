@@ -73,6 +73,9 @@ def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]
     if cookie:
         # This is a special case for testing. It should never be used in production.
         cookies = {"wandb": cookie}
+        impersonated_username = weave_env.weave_impersonated_username_cookie()
+        if impersonated_username:
+            cookies["impersonated_username"] = impersonated_username
         headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
         return set_wandb_api_context("admin", None, headers, cookies)
     api_key = weave_env.weave_wandb_api_key()

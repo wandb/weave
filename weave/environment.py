@@ -158,11 +158,16 @@ def weave_wandb_cookie() -> typing.Optional[str]:
             raise errors.WeaveConfigurationError(
                 "WEAVE_WANDB_COOKIE should not be set in public mode."
             )
-        if os.path.exists(os.path.expanduser("~/.netrc")):
-            raise errors.WeaveConfigurationError(
-                "Please delete ~/.netrc while using WEAVE_WANDB_COOKIE to avoid using your credentials"
-            )
+        for netrc_file in ("~/.netrc", "~/_netrc"):
+            if os.path.exists(os.path.expanduser(netrc_file)):
+                raise errors.WeaveConfigurationError(
+                    f"Please delete {netrc_file} while using WEAVE_WANDB_COOKIE to avoid using your credentials"
+                )
     return cookie
+
+
+def weave_impersonated_username_cookie() -> typing.Optional[str]:
+    return os.environ.get("WEAVE_IMPERSONATED_USERNAME_COOKIE")
 
 
 def stack_dump_sighandler_enabled() -> bool:

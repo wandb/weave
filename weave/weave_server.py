@@ -117,6 +117,9 @@ def log_system_info():
     underscore_netrc_exists = os.path.exists(os.path.expanduser("~/_netrc"))
     WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
     WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
+    WEAVE_IMPERSONATED_USERNAME_COOKIE = os.environ.get(
+        "WEAVE_IMPERSONATED_USERNAME_COOKIE"
+    )
 
     logger.info("Network Config:")
     logger.info(f"  WEAVE_SERVER_URL    = {WEAVE_SERVER_URL}")
@@ -130,6 +133,9 @@ def log_system_info():
     logger.info(f"  ~/_netrc exists     = {underscore_netrc_exists}")
     logger.info(f"  WANDB_API_KEY       = {WANDB_API_KEY}")
     logger.info(f"  WEAVE_WANDB_COOKIE  = {WEAVE_WANDB_COOKIE}")
+    logger.info(
+        f"  WEAVE_IMPERSONATED_USERNAME_COOKIE = {WEAVE_IMPERSONATED_USERNAME_COOKIE}"
+    )
 
 
 def make_app():
