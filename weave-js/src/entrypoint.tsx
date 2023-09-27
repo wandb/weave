@@ -8,7 +8,13 @@ import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
-import {URL_BROWSE, URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
+import {
+  URL_BROWSE,
+  URL_LOCAL,
+  URL_TEMPLATES,
+  URL_RECENT,
+  URL_WANDB,
+} from './urls';
 import getConfig from './config';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
@@ -74,6 +80,9 @@ ReactDOM.render(
     <Switch>
       <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
         <Main browserType={URL_RECENT} />
+      </Route>
+      <Route path={[`/${URL_BROWSE}/${URL_TEMPLATES}/:templateName?`]}>
+        <Main browserType={URL_TEMPLATES} />
       </Route>
       <Route
         path={[

@@ -22,10 +22,10 @@ ops = weave.ops
 BOARD_ID = "trace_monitor"
 
 # BOARD_DISPLAY_NAME is the name that will be displayed in the UI
-BOARD_DISPLAY_NAME = "Trace Debug Board"
+BOARD_DISPLAY_NAME = "Trace an LLM pipeline"
 
 # BOARD_DESCRIPTION is the description that will be displayed in the UI
-BOARD_DESCRIPTION = "Systematically analyze traces from LLM chains, application, or any ML pipeline. Great for understanding complex LLM agent behavior, monitoring complex systems, and debugging ML pipelines."
+BOARD_DESCRIPTION = "Analyze traces from LLM chains, applications or any ML pipeline. Understand LLM agent behavior, monitor systems and debug ML pipelines."
 
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 
@@ -274,5 +274,5 @@ template_registry.register(
     BOARD_DESCRIPTION,
     is_featured=True,
     instructions_md=instructions_md,
-    thumbnail_url="https://raw.githubusercontent.com/wandb/weave/master/docs/assets/traces_debug_board.png",
+    thumbnail_url="https://raw.githubusercontent.com/wandb/weave/master/docs/assets/trace-an-llm-pipeline.png",
 )

@@ -1,4 +1,11 @@
-import React, {FC, memo, useCallback, useMemo, useState} from 'react';
+import React, {
+  FC,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import styled from 'styled-components';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
@@ -10,6 +17,10 @@ import {
   IconUsersTeam,
   IconWeaveLogo,
 } from '../../Panel2/Icons';
+import {
+  IconCategoryMultimodal,
+  IconDocumentation,
+} from '@wandb/weave/components/Icon';
 import * as query from './query';
 import * as LayoutElements from './LayoutElements';
 import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
@@ -29,11 +40,13 @@ import {
   urlLocalBoards,
   urlRecentBoards,
   urlRecentTables,
+  urlTemplates,
 } from '../../../urls';
 import getConfig from '../../../config';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {HomeFeaturedTemplates} from './HomeFeaturedTemplates';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import {HomeCenterTemplates} from './HomeCenterTemplates';
+import {useLocalStorage} from '../../../util/useLocalStorage';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -128,6 +141,27 @@ const HomeComp: FC<HomeProps> = props => {
     }
   }, [props.browserType, params.assetType, setPreviewNode, history]);
 
+  const getStartedSection = useMemo(() => {
+    return [
+      {
+        title: 'Get Started',
+        items: [
+          {
+            icon: IconCategoryMultimodal,
+            label: 'Board templates',
+            active: props.browserType === 'templates',
+            to: urlTemplates(),
+          },
+          {
+            icon: IconDocumentation,
+            label: 'Documentation',
+            to: 'https://docs.wandb.ai/guides/weave',
+          },
+        ],
+      },
+    ];
+  }, [props.browserType]);
+
   const wandbSection = useMemo(() => {
     return userEntities.result.length === 0
       ? ([] as any)
@@ -213,8 +247,13 @@ const HomeComp: FC<HomeProps> = props => {
   }, [isLocallyServed, props.browserType, setPreviewNode, history]);
 
   const navSections = useMemo(() => {
-    return [...recentSection, ...wandbSection, ...localSection];
-  }, [localSection, recentSection, wandbSection]);
+    return [
+      ...recentSection,
+      ...getStartedSection,
+      ...wandbSection,
+      ...localSection,
+    ];
+  }, [localSection, recentSection, getStartedSection, wandbSection]);
 
   const loading = userName.loading || isAuthenticated === undefined;
   const REDIRECT_RECENTS = [
@@ -242,6 +281,19 @@ const HomeComp: FC<HomeProps> = props => {
   let {pathname} = window.location;
   const basename = getConfig().PREFIX;
   pathname = pathname.substring(basename.length);
+
+  const [lastVisited, setLastVisited] = useLocalStorage<string>(
+    'lastVisited',
+    '/browse/templates'
+  );
+  useEffect(() => {
+    if (pathname === '/') {
+      history.push(lastVisited);
+    } else {
+      setLastVisited(pathname);
+    }
+  }, [history, lastVisited, setLastVisited, pathname]);
+
   if (!loading && REDIRECT_ANY.includes(pathname)) {
     // If we have Recent enabled, go for that!
     if (REDIRECT_RECENTS.includes(pathname)) {
@@ -268,9 +320,6 @@ const HomeComp: FC<HomeProps> = props => {
       <LayoutElements.Block>
         <HomeTopBar />
       </LayoutElements.Block>
-      <LayoutElements.Block>
-        <HomeFeaturedTemplates setPreviewNode={setPreviewNode} />
-      </LayoutElements.Block>
       {/* Main Region */}
       <LayoutElements.HSpace
         style={{
@@ -289,6 +338,8 @@ const HomeComp: FC<HomeProps> = props => {
               {props.browserType === 'recent' ? (
                 // This should never come up
                 <Placeholder />
+              ) : props.browserType === 'templates' ? (
+                <HomeCenterTemplates setPreviewNode={setPreviewNode} />
               ) : props.browserType === 'wandb' ? (
                 <CenterEntityBrowser
                   navigateToExpression={navigateToExpression}
