@@ -139,7 +139,7 @@ export const weaveCase = (cases: Case[]) => {
 
 // An if-like statement in Weave. Another friendly wrapper around opCond.
 export const weaveIf = (
-  condition: Node<'boolean'>,
+  condition: Node<Type>,
   whenTrue: Node<Type>,
   whenFalse: Node<Type>
 ) => {
