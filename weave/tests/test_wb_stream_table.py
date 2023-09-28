@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from weave import execute, context, gql_json_cache
+from weave import wandb_api
 
 
 def make_stream_table(*args, **kwargs):
@@ -107,7 +108,7 @@ def test_stream_table_entity_inference(user_by_api_key_in_env):
         st.log({"image": [1, 2, 3]})
     st.finish()
 
-    assert st._entity_name == "asd"
+    assert st._entity_name == wandb_api.get_wandb_api_sync().default_entity_name()
 
 
 def test_multi_writers_sequential(user_by_api_key_in_env):
