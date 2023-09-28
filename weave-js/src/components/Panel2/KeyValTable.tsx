@@ -11,11 +11,13 @@ Table.displayName = 'S.Table';
 export const Rows = styled.div`
   display: grid;
   grid-template-columns: max-content 1fr;
+  gap: 2px;
 `;
 Rows.displayName = 'S.Rows';
 
 export const Row = styled.div`
   display: contents;
+  gap: 2px;
 `;
 Row.displayName = 'S.Row';
 
