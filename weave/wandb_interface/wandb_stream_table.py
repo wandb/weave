@@ -141,7 +141,8 @@ class _StreamTableSync:
                 raise ValueError(
                     "Entity not specified and no default entity found. Please specify entity_name or set default entity with `wandb login --entity <entity_name>`"
                 )
-        elif project_name is None or project_name == "":
+                
+        if project_name is None or project_name == "":
             raise ValueError("Must specify project_name")
         elif table_name is None or table_name == "":
             raise ValueError("Must specify table_name")
