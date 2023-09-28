@@ -330,22 +330,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         cursor: 'move',
       };
 
-      const tagLabel = (
-        <LabelTagContainer>
-          <RemovableTag
-            label={item.value?.toLocaleString() ?? ''}
-            color="teal"
-            removeAction={
-              <RemoveAction
-                onClick={(e: React.MouseEvent<HTMLElement, MouseEvent>) => {
-                  onRemove(e, defaultLabelProps);
-                }}
-              />
-            }
-          />
-        </LabelTagContainer>
-      );
-
       const label = (
         <Label
           {...defaultLabelProps}
@@ -414,11 +398,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         </DragSource>
       );
 
-      return canReorder
-        ? wrapLabelWithDragDrop(label)
-        : multiple
-        ? tagLabel
-        : label;
+      return canReorder ? wrapLabelWithDragDrop(label) : label;
     };
 
     const wrapWithDragDrop = (children: React.ReactNode) =>
