@@ -1,7 +1,5 @@
 ## OpenAI Monitoring Quickstart
 
-**Attention:** If you have a `~/.netrc` file saved locally, `openai` will prevent us from using custom authentication headers. Solution: run `mv ~/.netrc ~/.netrc.bak` to backup your `~/.netrc` file before continuing.
-
 To record history, monitor performance, & analyze cost/latency of OpenAI calls:
 
 1. Set the OpenAI API Base to `https://proxy.wandb.ai/proxy/openai/v1`.
