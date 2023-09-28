@@ -32,7 +32,7 @@ To log all calls made via an OpenAI proxy:
 1. Find your wandb API key: for the public cloud instance, this will be at [wandb.ai/authorize](https://wandb.ai/authorize). On other instances, append "/authorize" to the base url of your instance.
 2. Find [your OpenAI API key](https://platform.openai.com/account/api-keys).
 3. Set your OPENAI_API_KEY to these two keys joined by ":", i.e. wandb_api_key:openai_api_key.
-4. Change the OpenAI base url to `https://wandb.ai/proxy/openai/v1` for the public cloud instance (or replace `wandb.ai` with the base url for your instance).
+4. Change the OpenAI base url to `https://proxy.wandb.ai/proxy/openai/v1` for the public cloud instance (or replace `wandb.ai` with the base url for your instance).
 5. Optionally set headers on each call to customize the wandb entity, project, and other aspects of logging (see the table below for details).
 6. Call OpenAI via the OpenAI SDK or CURL from the base url.
 
