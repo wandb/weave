@@ -452,9 +452,4 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
   })
 );
 
-const LabelTagContainer = styled.div`
-  margin-right: 8px;
-  font-size: 15px;
-`;
-
 export default ModifiedDropdown;
