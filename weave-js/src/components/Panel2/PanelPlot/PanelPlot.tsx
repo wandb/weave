@@ -3135,6 +3135,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       axisSettings.x.noTicks
     ) {
       newSpec.encoding.x.axis = false;
+    } else {
+      // set the maximum length of x axis labels to be 75 pixels
+      newSpec.encoding.x.axis.labelLimit = 75;
     }
     if (newSpec.encoding.y != null) {
       newSpec.encoding.y.axis = {...defaultFontStyleDict};
@@ -3164,9 +3167,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.y.axis = false;
       }
     }
-
-    // set the maximum length of x axis labels to be 75 pixels
-    newSpec.encoding.x.axis.labelLimit = 75;
 
     if (newSpec.encoding.color != null) {
       if (axisSettings?.color?.scale != null) {
