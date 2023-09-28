@@ -31,8 +31,6 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
-import {RemovableTag, RemoveAction} from '@wandb/weave/components/Tag';
-import styled from 'styled-components';
 
 type LabelCoord = {
   top: number;
