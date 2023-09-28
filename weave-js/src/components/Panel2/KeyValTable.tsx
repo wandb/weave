@@ -23,9 +23,9 @@ Row.displayName = 'S.Row';
 
 export const Key = styled.div`
   white-space: nowrap;
-  padding: 0 !important;
   text-overflow: ellipsis;
   vertical-align: top;
+  padding: 0 !important;
   color: ${globals.gray500};
   grid-column: 1;
 `;
