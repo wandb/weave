@@ -157,9 +157,8 @@ def openai_create_postprocess(process_choice_fn: typing.Any, count_token_fn: typ
 
 mon = monitor.default_monitor()
 
-monitored_create = lambda openai_func, process_choice_fn, count_token_fn: mon.trace(
-    preprocess=openai_create_preprocess, postprocess=openai_create_postprocess(process_choice_fn, count_token_fn)
-)(openai_func)
+def monitored_create(openai_func, process_choice_fn, count_token_fn):
+    return mon.trace(preprocess=openai_create_preprocess, postprocess=openai_create_postprocess(process_choice_fn, count_token_fn))(openai_func)
 
 
 def message_from_stream(stream: typing.Generator) -> typing.Any:
