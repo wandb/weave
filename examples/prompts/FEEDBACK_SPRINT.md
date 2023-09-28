@@ -11,7 +11,7 @@ The Feedback Sprint closes Sunday, October 22nd 2023, **[sign up for a free Weig
 </div>
 
 ## How to participate
-Join the W&B Prompts Feedback Sprint for a chance to win some W&B swag by **[signing up for a free Weights & Biases account](https://wandb.ai/site/monitoring?utm_source=weave-github&utm_medium=github&utm_campaign=prompts-feedback-sprint&utm_term=prompts-feedback-sprint-sep23)**
+Join the W&B Prompts Feedback Sprint for a chance to win some W&B swag by **[signing up for a free Weights & Biases account](https://wandb.ai/site/monitoring?utm_source=weave-github&utm_medium=github&utm_campaign=prompts-feedback-sprint&utm_term=prompts-feedback-sprint-sep23)** and following the instructions below.
 
 ### 1. Try W&B Prompts
 
