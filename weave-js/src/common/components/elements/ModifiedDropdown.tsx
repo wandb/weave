@@ -330,11 +330,10 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         cursor: 'move',
       };
 
-      const labelText = item.text ?? '';
       const tagLabel = (
         <LabelTagContainer>
           <RemovableTag
-            label={labelText as string}
+            label={item.value?.toLocaleString() ?? ''}
             color="teal"
             removeAction={
               <RemoveAction
