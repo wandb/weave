@@ -1,3 +1,4 @@
+import {useQuery} from '@apollo/client';
 import React, {useState} from 'react';
 import _ from 'lodash';
 
@@ -7,9 +8,15 @@ import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {EntityOption, ProjectOption, ReportOption} from './utils';
+import {
+  EntityOption,
+  ProjectOption,
+  ReportOption,
+  isNewReportOption,
+} from './utils';
 import {useNodeValue} from '@wandb/weave/react';
 import {computeReportSlateNode} from './computeReportSlateNode';
+import {GET_REPORT} from './graphql';
 
 type ChildPanelExportReportProps = {
   /**
@@ -36,7 +43,13 @@ export const ChildPanelExportReport = ({
     null
   );
 
+  const selectedReportQuery = useQuery(GET_REPORT, {
+    variables: {id: selectedReport?.id ?? ''},
+    skip: !selectedReport || isNewReportOption(selectedReport),
+  });
+
   const onAddPanel = () => {
+    const selectedReportDetails = selectedReportQuery.data?.view;
     const slateNode = computeReportSlateNode(fullConfig, selectedPath);
     // TODO - this will be replaced with correct add panel implementation later on
     alert(`
@@ -46,6 +59,7 @@ export const ChildPanelExportReport = ({
       Project name: ${selectedProject?.name}
       Slate node: logged in dev console
     `);
+    console.log('Selected report details:', selectedReportDetails);
     console.log('Slate node to be added:', slateNode);
   };
 
