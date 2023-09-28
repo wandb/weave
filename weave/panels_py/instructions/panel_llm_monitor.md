@@ -2,7 +2,7 @@
 
 To record history, monitor performance, & analyze cost/latency of OpenAI calls:
 
-1. Set the OpenAI API Base to `https://proxy.wandb.ai/proxy/openai/v1`.
+1. Set the OpenAI API Base to `https://api.wandb.ai/proxy/openai/v1`.
 2. Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
 
 Setup can be achieved 3 different ways: via environment variables, the python library, or direct http requests. After setup, simply use OpenAI as normal and navigate to `monitoring/openai` via the browser on the left to create a board and visualize your usage.
@@ -10,7 +10,7 @@ Setup can be achieved 3 different ways: via environment variables, the python li
 ### Via environment variables
 
 ```shell
-OPENAI_API_BASE="https://proxy.wandb.ai/proxy/openai/v1"
+OPENAI_API_BASE="https://api.wandb.ai/proxy/openai/v1"
 OPENAI_API_KEY="$WANDB_API_KEY:$OPENAI_API_KEY"
 python prompt.py # Run your existing scripts
 ```
@@ -19,14 +19,14 @@ python prompt.py # Run your existing scripts
 
 ```python
 import openai
-openai.api_base = "https://proxy.wandb.ai/proxy/openai/v1"
+openai.api_base = "https://api.wandb.ai/proxy/openai/v1"
 openai.api_key = f"{WANDB_API_KEY}:{OPENAI_API_KEY}"
 ```
 
 ### Via HTTP Request
 
 ```shell
-curl "https://proxy.wandb.ai/proxy/openai/v1/chat/completions" \
+curl "https://api.wandb.ai/proxy/openai/v1/chat/completions" \
 -H "Authorization: Bearer $WANDB_API_KEY:$OPENAI_API_KEY" \
 -H "Content-Type: application/json" \
 -d '{
