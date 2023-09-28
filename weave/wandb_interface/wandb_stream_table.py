@@ -14,6 +14,7 @@ import uuid
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
 from wandb.sdk.lib.ipython import _get_python_type
+from wandb.sdk.internal import internal_api
 
 
 from .wandb_lite_run import InMemoryLazyLiteRun
@@ -132,11 +133,12 @@ class _StreamTableSync:
             project_name = splits[1]
             table_name = splits[2]
 
-        # For now, we force the user to specify the entity and project
-        # technically, we could infer the entity from the API key, but
-        # that tends to confuse users.
         if entity_name is None or entity_name == "":
-            raise ValueError("Must specify entity_name")
+            # Use user's default entity
+            api = internal_api.Api()
+            entity_name = api.default_entity
+            if not entity_name:
+                raise ValueError("Entity not specified and no default entity found.")
         elif project_name is None or project_name == "":
             raise ValueError("Must specify project_name")
         elif table_name is None or table_name == "":
