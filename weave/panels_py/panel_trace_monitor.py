@@ -184,24 +184,24 @@ def board(
 
     # traces_table =   # type: ignore
 
-    # overview_tab.add(
-    #     "latency_over_time",
-    #     panel_autoboard.timeseries(
-    #         filtered_data,
-    #         bin_domain_node=bin_range,
-    #         x_axis_key=lambda row: row["start_time_s"].toTimestamp(),
-    #         y_expr=lambda row: row.map(
-    #             lambda ir: ir["end_time_s"] - ir["start_time_s"]
-    #         ).avg(),
-    #         # y_expr=lambda row: row["latency"].avg(),
-    #         y_title="avg latency (s)",
-    #         color_expr=lambda row: grouping_fn(row),
-    #         color_title="Root Span Name",
-    #         x_domain=user_zoom_range,
-    #         n_bins=50,
-    #     ),
-    #     layout=weave.panels.GroupPanelLayout(x=0, y=0, w=6, h=6),
-    # )
+    overview_tab.add(
+        "latency_over_time",
+        panel_autoboard.timeseries(
+            filtered_data,
+            bin_domain_node=bin_range,
+            x_axis_key=lambda row: row["start_time_s"].toTimestamp(),
+            y_expr=lambda row: row.map(
+                lambda ir: ir["end_time_s"] - ir["start_time_s"]
+            ).avg(),
+            # y_expr=lambda row: row["latency"].avg(),
+            y_title="avg latency (s)",
+            color_expr=lambda row: grouping_fn(row),
+            color_title="Root Span Name",
+            x_domain=user_zoom_range,
+            n_bins=50,
+        ),
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=6, h=6),
+    )
 
     overview_tab.add(
         "latency_distribution",
@@ -210,26 +210,26 @@ def board(
         layout=weave.panels.GroupPanelLayout(x=6, y=0, w=6, h=6),
     )
 
-    # overview_tab.add(
-    #     "success_over_time",
-    #     panel_autoboard.timeseries(
-    #         filtered_data,
-    #         bin_domain_node=bin_range,
-    #         x_axis_key=lambda row: row["start_time_s"].toTimestamp(),
-    #         y_expr=lambda row: (
-    #             row.filter(
-    #                 lambda inner_row: inner_row["status_code"] == "SUCCESS"
-    #             ).count()
-    #             / row.count()
-    #         ),
-    #         y_title="success rate",
-    #         color_expr=lambda row: grouping_fn(row),
-    #         color_title="Root Span Name",
-    #         x_domain=user_zoom_range,
-    #         n_bins=50,
-    #     ),
-    #     layout=weave.panels.GroupPanelLayout(x=12, y=0, w=6, h=6),
-    # )
+    overview_tab.add(
+        "success_over_time",
+        panel_autoboard.timeseries(
+            filtered_data,
+            bin_domain_node=bin_range,
+            x_axis_key=lambda row: row["start_time_s"].toTimestamp(),
+            y_expr=lambda row: (
+                row.filter(
+                    lambda inner_row: inner_row["status_code"] == "SUCCESS"
+                ).count()
+                / row.count()
+            ),
+            y_title="success rate",
+            color_expr=lambda row: grouping_fn(row),
+            color_title="Root Span Name",
+            x_domain=user_zoom_range,
+            n_bins=50,
+        ),
+        layout=weave.panels.GroupPanelLayout(x=12, y=0, w=6, h=6),
+    )
 
     overview_tab.add(
         "success_distribution",
