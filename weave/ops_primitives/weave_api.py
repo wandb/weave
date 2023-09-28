@@ -19,7 +19,6 @@ from .. import runs
 from .. import artifact_fs
 from .. import artifact_wandb
 from .. import object_context
-from .. import engine_trace
 
 
 @weave_class(weave_type=types.RefType)
@@ -441,79 +440,69 @@ def mutate_op_body(
     make_new_type: typing.Callable[[types.Type], types.Type],
     mutation_record: object_context.MutationRecord,
 ):
-    tracer = engine_trace.tracer()
-    name = ""
-    if isinstance(self, graph.OutputNode):
-        name = self.from_op.name
-    with tracer.trace("mutate_op_body - node:" + name):
-        # This implements mutations. Note that its argument must be a
-        # Node. You can call it like this:
-        # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
+    # This implements mutations. Note that its argument must be a
+    # Node. You can call it like this:
+    # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
 
-        with tracer.trace("mutate_op_body:compile"):
-            self = compile.compile_fix_calls([self])[0]
-        with tracer.trace("mutate_op_body:linearize"):
-            nodes = graph.linearize(self)
-        if nodes is None:
-            raise errors.WeaveInternalError("Set error")
+    self = compile.compile_fix_calls([self])[0]
+    nodes = graph.linearize(self)
+    if nodes is None:
+        raise errors.WeaveInternalError("Set error")
 
-        # Run through resolvers forward
-        results = []
-        op_inputs = []
-        arg0 = list(nodes[0].from_op.inputs.values())[0].val
-        for node in nodes:
-            inputs = {}
-            arg0_name = list(node.from_op.inputs.keys())[0]
-            inputs[arg0_name] = arg0
-            for name, input_node in list(node.from_op.inputs.items())[1:]:
-                if not isinstance(input_node, graph.ConstNode):
-                    with tracer.trace("mutate_op_body:deref"):
-                        inputs[name] = storage.deref(weave_internal.use(input_node))
-                    # TODO: I was raising here, but the way I'm handling
-                    # default config in multi_distribution makes it necessary
-                    # to handle this case. This solution is more general,
-                    # but also more expensive. We should make use of the execution
-                    # cache (mutations should probably be planned by the compiler)
-                    # raise errors.WeaveInternalError("Set error")
-                else:
-                    inputs[name] = input_node.val
-            op_inputs.append(inputs)
-            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-            arg0 = op_def.resolve_fn(**inputs)
-            results.append(arg0)
+    # Run through resolvers forward
+    results = []
+    op_inputs = []
+    arg0 = list(nodes[0].from_op.inputs.values())[0].val
+    for node in nodes:
+        inputs = {}
+        arg0_name = list(node.from_op.inputs.keys())[0]
+        inputs[arg0_name] = arg0
+        for name, input_node in list(node.from_op.inputs.items())[1:]:
+            if not isinstance(input_node, graph.ConstNode):
+                inputs[name] = storage.deref(weave_internal.use(input_node))
+                # TODO: I was raising here, but the way I'm handling
+                # default config in multi_distribution makes it necessary
+                # to handle this case. This solution is more general,
+                # but also more expensive. We should make use of the execution
+                # cache (mutations should probably be planned by the compiler)
+                # raise errors.WeaveInternalError("Set error")
+            else:
+                inputs[name] = input_node.val
+        op_inputs.append(inputs)
+        op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+        arg0 = op_def.resolve_fn(**inputs)
+        results.append(arg0)
 
-        # Make the updates backwards
-        with tracer.trace("mutate_op_body:make_new_value"):
-            res = make_new_value(arg0)
+    # Make the updates backwards
+    res = make_new_value(arg0)
 
-        for i, (node, inputs, result) in reversed(
-            list(enumerate(zip(nodes, op_inputs, results)))
-        ):
-            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-            if not op_def.setter:
-                return res
-                # TODO: we can't raise the error here. Some of the tests
-                # rely on partial setter chains.
-                # raise errors.WeaveInternalError(
-                #     "Set error. No setter declared for op: %s" % node.from_op.name
-                # )
-            args = list(inputs.values())
-            args.append(res)
-            if i == 0 and node.from_op.name == "get":
-                # TODO hardcoded get to take root_args. Should just check if available on setter.
-                args.append(root_args)
-                args.append(make_new_type)
-                args.append(mutation_record)
-            setter = op_def.setter
-            try:
-                setter = setter.func  # type: ignore
-            except AttributeError:
-                pass
+    for i, (node, inputs, result) in reversed(
+        list(enumerate(zip(nodes, op_inputs, results)))
+    ):
+        op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+        if not op_def.setter:
+            return res
+            # TODO: we can't raise the error here. Some of the tests
+            # rely on partial setter chains.
+            # raise errors.WeaveInternalError(
+            #     "Set error. No setter declared for op: %s" % node.from_op.name
+            # )
+        args = list(inputs.values())
+        args.append(res)
+        if i == 0 and node.from_op.name == "get":
+            # TODO hardcoded get to take root_args. Should just check if available on setter.
+            args.append(root_args)
+            args.append(make_new_type)
+            args.append(mutation_record)
+        setter = op_def.setter
+        try:
+            setter = setter.func  # type: ignore
+        except AttributeError:
+            pass
 
-            with tracer.trace("mutate_op_body:setter"):
-                res = setter(*args)
+        res = setter(*args)
 
-        return res
+    return res
 
 
 @mutation
