@@ -1,4 +1,11 @@
-import React, {FC, memo, useCallback, useMemo, useState} from 'react';
+import React, {
+  FC,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import styled from 'styled-components';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
@@ -10,17 +17,22 @@ import {
   IconUsersTeam,
   IconWeaveLogo,
 } from '../../Panel2/Icons';
+import {
+  IconCategoryMultimodal,
+  IconDocumentation,
+} from '@wandb/weave/components/Icon';
 import * as query from './query';
 import * as LayoutElements from './LayoutElements';
 import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
 import {LeftNav} from './HomeLeftNav';
 import {HomeTopBar} from './HomeTopBar';
 import {NavigateToExpressionType} from './common';
-import {isServedLocally, useIsAuthenticated} from '../util';
+import {isServedLocally} from '../util';
 import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Redirect, useHistory, useParams} from 'react-router-dom';
 import {
+  URL_BROWSE,
   URL_LOCAL,
   URL_RECENT,
   URL_WANDB,
@@ -28,7 +40,13 @@ import {
   urlLocalBoards,
   urlRecentBoards,
   urlRecentTables,
+  urlTemplates,
 } from '../../../urls';
+import getConfig from '../../../config';
+import {ErrorBoundary} from '../../ErrorBoundary';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import {HomeCenterTemplates} from './HomeCenterTemplates';
+import {useLocalStorage} from '../../../util/useLocalStorage';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -56,7 +74,21 @@ export type HomeParams = {
 const HomeComp: FC<HomeProps> = props => {
   const history = useHistory();
   const params = useParams<HomeParams>();
-  const [previewNode, setPreviewNode] = useState<React.ReactNode>();
+  const [previewNode, setPreviewNodeRaw] = useState<{
+    node: React.ReactNode;
+    requestedWidth?: string;
+  }>();
+
+  const setPreviewNode = useCallback(
+    (node: React.ReactNode, requestedWidth?: string) => {
+      if (node == null) {
+        setPreviewNodeRaw(undefined);
+      } else {
+        setPreviewNodeRaw({node, requestedWidth});
+      }
+    },
+    []
+  );
   const navigateToExpression: NavigateToExpressionType = useCallback(
     newDashExpr => {
       setPreviewNode(undefined);
@@ -67,7 +99,7 @@ const HomeComp: FC<HomeProps> = props => {
         config: undefined,
       });
     },
-    [props]
+    [props, setPreviewNode]
   );
   const isLocallyServed = isServedLocally();
   const isAuthenticated = useIsAuthenticated();
@@ -107,7 +139,28 @@ const HomeComp: FC<HomeProps> = props => {
     } else {
       return [];
     }
-  }, [history, props.browserType, params.assetType]);
+  }, [props.browserType, params.assetType, setPreviewNode, history]);
+
+  const getStartedSection = useMemo(() => {
+    return [
+      {
+        title: 'Get Started',
+        items: [
+          {
+            icon: IconCategoryMultimodal,
+            label: 'Board templates',
+            active: props.browserType === 'templates',
+            to: urlTemplates(),
+          },
+          {
+            icon: IconDocumentation,
+            label: 'Documentation',
+            to: 'https://docs.wandb.ai/guides/weave',
+          },
+        ],
+      },
+    ];
+  }, [props.browserType]);
 
   const wandbSection = useMemo(() => {
     return userEntities.result.length === 0
@@ -141,7 +194,6 @@ const HomeComp: FC<HomeProps> = props => {
                   props.browserType === 'wandb' && params.entity === entity,
                 to: urlEntity(entity),
                 onClick: () => {
-                  console.log('setpreview node undefined');
                   setPreviewNode(undefined);
                   history.push(urlEntity(entity));
                 },
@@ -149,11 +201,12 @@ const HomeComp: FC<HomeProps> = props => {
           },
         ];
   }, [
-    params,
-    history,
-    props.browserType,
     userEntities.result,
     userName.result,
+    props.browserType,
+    params.entity,
+    setPreviewNode,
+    history,
   ]);
 
   const localSection = useMemo(() => {
@@ -191,27 +244,56 @@ const HomeComp: FC<HomeProps> = props => {
         ],
       },
     ];
-  }, [history, props.browserType, isLocallyServed]);
+  }, [isLocallyServed, props.browserType, setPreviewNode, history]);
 
   const navSections = useMemo(() => {
-    return [...recentSection, ...wandbSection, ...localSection];
-  }, [localSection, recentSection, wandbSection]);
+    return [
+      ...recentSection,
+      ...getStartedSection,
+      ...wandbSection,
+      ...localSection,
+    ];
+  }, [localSection, recentSection, getStartedSection, wandbSection]);
 
   const loading = userName.loading || isAuthenticated === undefined;
-  const REDIRECT_RECENTS = [`/${URL_RECENT}`, `/${URL_RECENT}/`];
-  const REDIRECT_WANDB = [`/${URL_WANDB}`, `/${URL_WANDB}/`];
-  const REDIRECT_LOCAL = [`/${URL_LOCAL}`, `/${URL_LOCAL}/`];
+  const REDIRECT_RECENTS = [
+    `/${URL_BROWSE}/${URL_RECENT}`,
+    `/${URL_BROWSE}/${URL_RECENT}/`,
+  ];
+  const REDIRECT_WANDB = [
+    `/${URL_BROWSE}/${URL_WANDB}`,
+    `/${URL_BROWSE}/${URL_WANDB}/`,
+  ];
+  const REDIRECT_LOCAL = [
+    `/${URL_BROWSE}/${URL_LOCAL}`,
+    `/${URL_BROWSE}/${URL_LOCAL}/`,
+  ];
   if (RECENTS_SUPPORTED) {
-    REDIRECT_RECENTS.push('/');
+    REDIRECT_RECENTS.push('/', `/${URL_BROWSE}`, `/${URL_BROWSE}/`);
   } else {
-    REDIRECT_WANDB.push('/');
+    REDIRECT_WANDB.push('/', `/${URL_BROWSE}`, `/${URL_BROWSE}/`);
   }
   const REDIRECT_ANY = [
     ...REDIRECT_RECENTS,
     ...REDIRECT_WANDB,
     ...REDIRECT_LOCAL,
   ];
-  const {pathname} = window.location;
+  let {pathname} = window.location;
+  const basename = getConfig().PREFIX;
+  pathname = pathname.substring(basename.length);
+
+  const [lastVisited, setLastVisited] = useLocalStorage<string>(
+    'lastVisited',
+    '/browse/templates'
+  );
+  useEffect(() => {
+    if (pathname === '/') {
+      history.push(lastVisited);
+    } else {
+      setLastVisited(pathname);
+    }
+  }, [history, lastVisited, setLastVisited, pathname]);
+
   if (!loading && REDIRECT_ANY.includes(pathname)) {
     // If we have Recent enabled, go for that!
     if (REDIRECT_RECENTS.includes(pathname)) {
@@ -252,32 +334,39 @@ const HomeComp: FC<HomeProps> = props => {
         {/* Center Content */}
         {!loading && (
           <CenterSpace>
-            {props.browserType === 'recent' ? (
-              // This should never come up
-              <Placeholder />
-            ) : props.browserType === 'wandb' ? (
-              <CenterEntityBrowser
-                navigateToExpression={navigateToExpression}
-                setPreviewNode={setPreviewNode}
-                entityName={params.entity ?? ''}
-              />
-            ) : props.browserType === 'local' ? (
-              <CenterLocalBrowser
-                navigateToExpression={navigateToExpression}
-                setPreviewNode={setPreviewNode}
-              />
-            ) : (
-              // This should never come up
-              <Placeholder />
-            )}
+            <ErrorBoundary key={pathname}>
+              {props.browserType === 'recent' ? (
+                // This should never come up
+                <Placeholder />
+              ) : props.browserType === 'templates' ? (
+                <HomeCenterTemplates setPreviewNode={setPreviewNode} />
+              ) : props.browserType === 'wandb' ? (
+                <CenterEntityBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                  entityName={params.entity ?? ''}
+                />
+              ) : props.browserType === 'local' ? (
+                <CenterLocalBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                />
+              ) : (
+                // This should never come up
+                <Placeholder />
+              )}
+            </ErrorBoundary>
           </CenterSpace>
         )}
         {/* Right Bar */}
         <LayoutElements.Block
           style={{
-            width: previewNode != null ? '450px' : '0px',
+            width:
+              previewNode != null
+                ? previewNode.requestedWidth ?? '400px'
+                : '0px',
           }}>
-          {previewNode}
+          {previewNode?.node}
         </LayoutElements.Block>
       </LayoutElements.HSpace>
     </LayoutElements.VStack>

@@ -49,6 +49,7 @@ export const opEntityIsTeam = makeEntityOp({
     return entity.isTeam;
   },
 });
+
 export const opEntityLink = makeEntityOp({
   name: 'entity-link',
   argTypes: entityArgTypes,
@@ -81,6 +82,23 @@ export const opEntityProjects = makeEntityOp({
   } of the ${docType('entity')}`,
   returnType: inputTypes => list('project'),
   resolver: ({entity}) => connectionToNodes(entity.projects),
+});
+
+export const opEntityReports = makeEntityOp({
+  hidden: true,
+  name: 'entity-reports',
+  argTypes: entityArgTypes,
+  description: `Returns the ${
+    (docType('report'), {plural: true})
+  } of the ${docType('entity')}`,
+  argDescriptions: {
+    entity: entityArgDescription,
+  },
+  returnValueDescription: `The ${
+    (docType('report'), {plural: true})
+  } of the ${docType('entity')}`,
+  returnType: inputTypes => list('report'),
+  resolver: ({entity}) => connectionToNodes(entity.views),
 });
 
 export const opEntityArtifactPortfolios = makeEntityOp({

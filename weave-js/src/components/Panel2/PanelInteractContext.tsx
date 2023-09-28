@@ -10,9 +10,16 @@ interface PanelInteractState {
   highlightInputExpr?: boolean;
 }
 
+type PanelInteractMode = 'config' | 'export-report' | null;
+
 export interface PanelInteractContextState {
   // State is stored by panel path. panel path is managed by PanelContext.
-  editorSidebarOpen: boolean;
+  panelInteractMode: PanelInteractMode;
+  /**
+   * Unique ID of the selected root panel. Required if
+   * multiple root panels share one interact drawer.
+   */
+  selectedDocumentId?: string;
   selectedPath: string[];
   panelState: {[pathString: string]: PanelInteractState};
 }
@@ -34,7 +41,7 @@ export const PanelInteractContextProvider: React.FC<{}> = React.memo(
   ({children}) => {
     const [state, setState] = useState<PanelInteractContextState>({
       selectedPath: [],
-      editorSidebarOpen: false,
+      panelInteractMode: null,
       panelState: {},
     });
 
@@ -157,13 +164,12 @@ export const useSetPanelIsHoveredInOutline = () => {
   );
 };
 
-export const useSetInspectingPanel = () => {
+export const useSetSelectedPanel = () => {
   const {setState} = usePanelInteractContext();
   return useCallback(
     (path: string[]) => {
       setState(prevState => ({
         ...prevState,
-        editorSidebarOpen: true,
         selectedPath: path,
       }));
     },
@@ -171,30 +177,50 @@ export const useSetInspectingPanel = () => {
   );
 };
 
-export const useSetInspectingChildPanel = () => {
-  const setInspectingPanel = useSetInspectingPanel();
-  const {path} = usePanelContext();
+export const useSetInteractingPanel = () => {
+  const {setState} = usePanelInteractContext();
   return useCallback(
-    (childPath: string) => {
-      setInspectingPanel(path.concat([childPath]));
+    (mode: PanelInteractMode, path: string[], documentId?: string) => {
+      setState(prevState => ({
+        ...prevState,
+        panelInteractMode: mode,
+        selectedPath: path,
+        selectedDocumentId: documentId,
+      }));
     },
-    [path, setInspectingPanel]
+    [setState]
   );
 };
 
-export const useCloseEditor = () => {
+export const useSetInteractingChildPanel = () => {
+  const setInteractingPanel = useSetInteractingPanel();
+  const {path} = usePanelContext();
+  return useCallback(
+    (mode: PanelInteractMode, childPath: string, documentId?: string) => {
+      setInteractingPanel(mode, path.concat([childPath]), documentId);
+    },
+    [path, setInteractingPanel]
+  );
+};
+
+export const useCloseDrawer = () => {
   const {setState} = usePanelInteractContext();
   return useCallback(() => {
     setState(prevState => ({
       ...prevState,
-      editorSidebarOpen: false,
+      panelInteractMode: null,
     }));
   }, [setState]);
 };
 
-export const useEditorIsOpen = () => {
+export const usePanelInteractMode = () => {
   const {state} = usePanelInteractContext();
-  return state.editorSidebarOpen;
+  return state.panelInteractMode;
+};
+
+export const useSelectedDocumentId = () => {
+  const {state} = usePanelInteractContext();
+  return state.selectedDocumentId;
 };
 
 export const useSelectedPath = () => {

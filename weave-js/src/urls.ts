@@ -1,9 +1,11 @@
+export const URL_BROWSE = 'browse';
 export const URL_RECENT = 'recent';
 export const URL_WANDB = 'wandb';
 export const URL_LOCAL = 'local';
+export const URL_TEMPLATES = 'templates';
 
 export function urlRecent(): string {
-  return `/${URL_RECENT}/`;
+  return `/${URL_BROWSE}/${URL_RECENT}/`;
 }
 export function urlRecentBoards(): string {
   return `${urlRecent()}board`;
@@ -12,8 +14,12 @@ export function urlRecentTables(): string {
   return `${urlRecent()}table`;
 }
 
+export function urlTemplates(): string {
+  return `/${URL_BROWSE}/${URL_TEMPLATES}`;
+}
+
 export function urlEntity(entityName: string): string {
-  return `/${URL_WANDB}/${entityName}`;
+  return `/${URL_BROWSE}/${URL_WANDB}/${entityName}`;
 }
 
 export function urlProject(entityName: string, projectName: string): string {
@@ -44,7 +50,7 @@ export function urlProjectAssetPreview(
 }
 
 export function urlLocalBoards(): string {
-  return `/${URL_LOCAL}/board/`;
+  return `/${URL_BROWSE}/${URL_LOCAL}/board/`;
 }
 
 export function urlLocalAssetPreview(preview: string): string {

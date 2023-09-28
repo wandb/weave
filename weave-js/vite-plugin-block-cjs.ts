@@ -8,6 +8,7 @@ const ALLOWED_CJS_MODULES = [
   'src', // allow absolute imports from weave root
   'react',
   'react-dom',
+  'react-select',
   'lodash',
   '@segment',
   '@babel/runtime',
@@ -36,6 +37,7 @@ const ALLOWED_CJS_MODULES = [
 
   '@emotion/stylis',
   '@emotion/unitless',
+  '@emotion/weak-memoize',
   '@hypnosphi/create-react-context',
   '@material-ui/core/Avatar',
   '@material-ui/core/ButtonBase',
@@ -64,6 +66,7 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/icons/KeyboardArrowDown',
   '@material-ui/icons/KeyboardArrowRight',
   '@monaco-editor/loader',
+  '@radix-ui/react-tabs',
   '@redux-saga/core',
   '@redux-saga/deferred',
   '@redux-saga/delay-p',
@@ -240,6 +243,17 @@ const ALLOWED_CJS_MODULES = [
 
   'd3-scale',
   'diff',
+
+  // markdown rendering
+  // markdown: true deps
+  'react-markdown',
+  'remark-gfm',
+  // markdown: peer deps
+  'escape-string-regexp',
+  'lowlight',
+  'lowlight/lib/core',
+  'refractor',
+  'refractor/core',
 ];
 
 const repositoryRoot = path.dirname(path.dirname(__dirname));

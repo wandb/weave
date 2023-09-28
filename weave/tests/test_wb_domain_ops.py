@@ -111,6 +111,7 @@ def test_root_project_concat(fake_wandb):
                             "node": {
                                 **fwb.run_payload,
                                 "summaryMetricsSubset": '{"loss": 0.1}',
+                                "summaryMetrics": '{"loss": 0.1}',
                             },
                         }
                     ]
@@ -148,7 +149,7 @@ def test_root_project_concat(fake_wandb):
             }
             }""",
     )
-    assert summary.type == tagged_value_type.TaggedValueType(
+    assert tagged_value_type.TaggedValueType(
         weave.types.TypedDict(property_types={"project": wb_domain_types.ProjectType}),
         weave.types.List(
             object_type=tagged_value_type.TaggedValueType(
@@ -165,7 +166,7 @@ def test_root_project_concat(fake_wandb):
                 weave.types.Float(),
             )
         ),
-    )
+    ).assign_type(summary.type)
 
     assert weave.use(summary) == [0.1, 0.1]
     # The second request is the graph we constructed above. Projection
@@ -274,14 +275,12 @@ def test_rpt_op(fake_wandb):
                     {"node": {"row": [0.5, "US", 1674068711.643377, "pytorch"]}},
                     {"node": {"row": [0.75, "CA", 1674068711.643377, "pytorch"]}},
                 ],
-                "schema": json.dumps(
-                    [
-                        {"Name": "user_fraction", "Type": "FLOAT"},
-                        {"Name": "country", "Type": "STRING"},
-                        {"Name": "created_week", "Type": "TIMESTAMP"},
-                        {"Name": "framework", "Type": "STRING"},
-                    ]
-                ),
+                "schema": [
+                    {"Name": "user_fraction", "Type": "FLOAT"},
+                    {"Name": "country", "Type": "STRING"},
+                    {"Name": "created_week", "Type": "TIMESTAMP"},
+                    {"Name": "framework", "Type": "STRING"},
+                ],
                 "isNormalizedUserCount": True,
             }  #
         }
@@ -473,7 +472,6 @@ def test_two_level_summary(fake_wandb):
 
 
 def test_escaped_gql_query(fake_wandb):
-
     response = {
         "project_8d1592567720841659de23c02c97d594": {
             "id": "UHJvamVjdDp2MTpzYWdlbWFrZXItcGVvcGxlLXZlaGljbGUtY2xhc3Mtc3BsaXR0aW5nOmFjdHVhdGVhaQ==",
@@ -539,3 +537,13 @@ def test_escaped_gql_query(fake_wandb):
         }
         """,
     )
+
+
+def test_null_propagation_through_nonnull_gql_ops(fake_wandb):
+    fake_wandb.fake_api.add_mock(
+        lambda q, ix: {"project_8d1592567720841659de23c02c97d594": None}
+    )
+
+    # this should fail?
+    node = ops.project("e_0", "p_0").run("r_0").name()
+    assert weave.use(node) == None

@@ -5,6 +5,8 @@ import os
 import functools
 import tempfile
 import typing
+import requests
+import logging
 
 from wandb import Artifact
 from wandb.apis import public as wb_public
@@ -153,8 +155,7 @@ def _collection_and_alias_id_mapping_to_uri(
     client_collection_id: str, alias_name: str
 ) -> ReadClientArtifactURIResult:
     is_deleted = False
-    query = wb_public.gql(
-        """
+    query = """
     query ArtifactVersionFromIdAlias(
         $id: ID!,
         $aliasName: String!
@@ -176,6 +177,15 @@ def _collection_and_alias_id_mapping_to_uri(
                 versionIndex
                 commitHash
             }
+            artifactMemberships(first: 1) {
+                edges {
+                    node {
+                        id
+                        versionIndex
+                        commitHash
+                    }
+                }
+            }
             defaultArtifactType {
                 id
                 name
@@ -183,19 +193,34 @@ def _collection_and_alias_id_mapping_to_uri(
         }
     }
     """
-    )
-    res = wandb_client_api.wandb_public_api().client.execute(
-        query,
-        variable_values={
-            "id": client_collection_id,
-            "aliasName": alias_name,
-        },
-    )
-    collection = res["artifactCollection"]
+
+    try:
+        res = wandb_client_api.query_with_retry(
+            query,
+            variables={
+                "id": client_collection_id,
+                "aliasName": alias_name,
+            },
+            num_timeout_retries=1,
+        )
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 400:
+            # This is a special case: the client id corresponds to an artifact that was
+            # never uploaded, so the client id doesn't exist in the W&B server.
+
+            collection = None
+            logging.warn(
+                f"Artifact collection with client id {client_collection_id} not present in W&B server."
+            )
+
+        else:
+            raise e
+    else:
+        collection = res["artifactCollection"]
 
     if collection is None:
         # Note: deleted collections are still returned by the API (with state=DELETED)
-        # So a missing collection is a real error.
+        # So a missing collection is a real error (unless it was never uploaded)
         raise errors.WeaveArtifactCollectionNotFound(
             f"Could not find artifact collection with client id {client_collection_id}"
         )
@@ -206,12 +231,31 @@ def _collection_and_alias_id_mapping_to_uri(
     artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
     artifact_membership = res["artifactCollection"]["artifactMembership"]
     if artifact_membership is None:
-        is_deleted = True
-        # If the membership is deleted, then we will not be able to get the commit hash.
-        # Here, we can simply use the alias name as the commit hash. If the collection
-        # is ever un-deleted or the alias is re-assigned, then the next call will result
-        # in a "true" commit hash, ensuring we don't hit a stale cache.
-        commit_hash = alias_name
+        # Here we account for a special case: when the alias is `latest`. It is
+        # exceedingly common and expected to reference the latest alias of a
+        # collection. This is particularly common when logging tables (but used
+        # in many other places as well). Occasionally the user deletes the
+        # `latest` alias which is a super easy thing to do in the UI. However,
+        # this results in the data not being found. We solved this similarly in
+        # the typescript implementation by getting the most recent version in
+        # such cases. At one point we had an extended discussion about making
+        # `latest` a "calculated" alias, which would solve this issue on
+        # gorilla's side, but were unable to reach an actionable conclusion.
+        # This is a simple workaround that solves for these cases.
+        if (
+            alias_name == "latest"
+            and len(res["artifactCollection"]["artifactMemberships"]["edges"]) > 0
+        ):
+            commit_hash = res["artifactCollection"]["artifactMemberships"]["edges"][0][
+                "node"
+            ]["commitHash"]
+        else:
+            is_deleted = True
+            # If the membership is deleted, then we will not be able to get the commit hash.
+            # Here, we can simply use the alias name as the commit hash. If the collection
+            # is ever un-deleted or the alias is re-assigned, then the next call will result
+            # in a "true" commit hash, ensuring we don't hit a stale cache.
+            commit_hash = alias_name
     else:
         commit_hash = artifact_membership["commitHash"]
     entity_name = collection["project"]["entity"]["name"]
@@ -428,6 +472,31 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def delete(self) -> None:
         self._saved_artifact.delete(delete_aliases=True)
+
+    def add_artifact_reference(self, uri: str) -> None:
+        # The URI for a get node might look like: wandb-artifact:///<entity>/<project>/test8:latest/obj
+        # but the SDK add_reference call requires something like:
+        # wandb-artifact://41727469666163743a353432353830303535/obj.object.json
+        assert uri.startswith("wandb-artifact:///")
+        uri_parts = WeaveWBArtifactURI.parse(uri)
+        uri_path = f"{uri_parts.entity_name}/{uri_parts.project_name}/{uri_parts.name}:{uri_parts.version}"
+        ref_artifact = get_wandb_read_artifact(uri_path)
+
+        # A reference needs to point to a specific existing file in the other artifact.
+        # For stream tables obj.object.json should exist. For logged tables, the filename
+        # can vary, so we just pick the first file we find.
+        filename = "obj.object.json"
+        try:
+            ref_url = ref_artifact.get_path(filename).ref_url()
+        except KeyError:
+            for ref_file in ref_artifact.files(None, per_page=1):
+                ref_url = ref_artifact.get_path(ref_file.name).ref_url()
+                break
+
+        # We have a name collision problem. E.g. A board and a stream table will both have
+        # a file named obj.object.json. Add a prefix to distinguish them.
+        ref_name = f"{ref_artifact.id}__{filename}"
+        self._writeable_artifact.add_reference(ref_url, ref_name)
 
     @property
     def commit_hash(self) -> str:

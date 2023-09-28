@@ -836,6 +836,9 @@ class TypedDict(Type):
             for k, v in self.property_types.items()
         )
 
+    def __getitem__(self, key: str) -> Type:
+        return self.property_types[key]
+
     def _assign_type_inner(self, other_type):
         if isinstance(other_type, Dict):
             for ptype in self.property_types.values():
@@ -1343,6 +1346,15 @@ def merge_types(a: Type, b: Type) -> Type:
         #             final_members.append(new_union.members[i])
         return union(*final_members)
     return union(a, b)
+
+
+def types_are_mergeable(a: Type, b: Type) -> bool:
+    """True if merge_types actually merges a and b.
+
+    This is used to maintain the invariant that types should not be mergeable
+    within a union inside an ArrowWeaveList.
+    """
+    return not isinstance(split_none(merge_types(a, b))[1], UnionType)
 
 
 def unknown_coalesce(in_type: Type) -> Type:

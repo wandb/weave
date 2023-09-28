@@ -46,7 +46,7 @@ TRUST_GORILLA_FOR_NESTED_STRUCTURES = True
 ENCODE_ENTIRE_TYPE = True
 TYPE_ENCODE_PREFIX = "_wt_::"
 
-ROW_TYPE = typing.Union[dict, list[dict]]
+ROW_TYPE = typing.Union[typing.Mapping, list[typing.Mapping]]
 
 
 class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
@@ -183,7 +183,7 @@ class _StreamTableSync:
             self._artifact.set_file_pusher(self._lite_run.pusher)
         if print_url:
             base_url = environment.weave_server_url()
-            url = f"{base_url}/wandb/{self._entity_name}/{self._project_name}/table/{self._table_name}"
+            url = f"{base_url}/browse/wandb/{self._entity_name}/{self._project_name}/table/{self._table_name}"
             printer = get_printer(_get_python_type() != "python")
             printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
@@ -207,7 +207,7 @@ class _StreamTableSync:
 
         return show(self.rows())
 
-    def _log_row(self, row: dict) -> None:
+    def _log_row(self, row: typing.Mapping) -> None:
         row_copy = {**row}
         row_copy["_client_id"] = self._client_id
         if "timestamp" not in row_copy:

@@ -13,6 +13,7 @@ from .. import ref_base
 from .. import weave_types as types
 from .. import box
 from .. import weave_internal
+from ..ops_primitives import _dict_utils
 from .. import errors
 from .. import graph
 from ..language_features.tagging import (
@@ -568,6 +569,53 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self._validate_arrow_data()
         self._invalid_reason = None
 
+    def with_column(self, key: str, val: "ArrowWeaveList"):
+        """Add a column to the AWL.
+
+        key can be a dot-separated path. Any non-TypedDict values encountered
+        in traversal will be replaced with empty TypedDicts.
+
+        leaf will be replaced with val if leaf exists. Added value is always
+        added to the end of the TypedDict (remember, they are ordered).
+
+        Result len is always len(self). Will raise if len(val) != len(self)
+        """
+        if not isinstance(self.object_type, types.TypedDict):
+            self = make_vec_dict()
+        self_object_type = typing.cast(types.TypedDict, self.object_type)
+
+        path = _dict_utils.split_escaped_string(key)
+
+        if len(path) > 1:
+            return self.with_column(
+                path[0], self.column(path[0]).with_column(".".join(path[1:]), val)
+            )
+
+        col_names = list(self_object_type.property_types.keys())
+        col_data = [self._arrow_data.field(i) for i in range(len(col_names))]
+        property_types = {**self_object_type.property_types}
+        try:
+            key_index = col_names.index(key)
+        except ValueError:
+            key_index = None
+        if key_index is not None:
+            property_types.pop(key)
+            col_names.pop(key_index)
+            col_data.pop(key_index)
+        col_names.append(key)
+        col_data.append(val._arrow_data)
+        property_types[key] = val.object_type
+        return ArrowWeaveList(
+            pa.StructArray.from_arrays(col_data, names=col_names),
+            types.TypedDict(property_types),
+            self._artifact,
+        )
+
+    def with_columns(self, cols: dict[str, "ArrowWeaveList"]):
+        for k, v in cols.items():
+            self = self.with_column(k, v)
+        return self
+
     def map_column(
         self,
         fn: typing.Callable[
@@ -753,11 +801,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                         if (
                             member_i is not None
                             and member_j is not None
-                            and not isinstance(
-                                types.merge_types(
-                                    member_i.object_type, member_j.object_type
-                                ),
-                                types.UnionType,
+                            and types.types_are_mergeable(
+                                member_i.object_type, member_j.object_type
                             )
                         ):
                             merged = True
@@ -1270,6 +1315,13 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             property_types[name],
             self._artifact,
             invalid_reason=self._invalid_reason,
+        )
+
+    def unique(self) -> "ArrowWeaveList":
+        return ArrowWeaveList(
+            pa.compute.unique(self._arrow_data),
+            types.split_none(self.object_type)[1],
+            self._artifact,
         )
 
     def tagged_value_tag(self) -> "ArrowWeaveListGeneric[types.TypedDict]":

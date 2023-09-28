@@ -14,7 +14,7 @@ on:
 jobs:
   build-container:
     name: Build test container
-    timeout-minutes: 20
+    timeout-minutes: 30
     runs-on: [self-hosted, builder]
     # runs-on: ubuntu-latest
     env:
@@ -49,7 +49,7 @@ jobs:
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
-      - run: source /root/venv/bin/activate && pre-commit run --all-files
+      - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
       - name: Show changes if pre-commit fails
         if: failure()
         run: |
@@ -76,10 +76,6 @@ jobs:
           yarn install --frozen-lockfile
           yarn eslint --max-warnings=0
           yarn tslint
-          yarn prettier-fix
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git diff --quiet && git diff --staged --quiet || (git commit -am "Format code" && git push)
           yarn prettier
           yarn run tsc
 

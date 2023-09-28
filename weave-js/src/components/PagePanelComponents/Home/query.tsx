@@ -117,6 +117,7 @@ export const useProjectAssetCount = (
     boardCount: number;
     runStreamCount: number;
     loggedTableCount: number;
+    legacyTracesCount: number;
   };
   loading: boolean;
 } => {
@@ -128,24 +129,43 @@ export const useProjectAssetCount = (
     boardCount: opProjectBoardCount({project: projectNode}),
     runStreamCount: opProjectRunStreamCount({project: projectNode}),
     loggedTableCount: opProjectLoggedTableCount({project: projectNode}),
+    projectHistoryType: opProjectHistoryType({project: projectNode}),
   } as any);
   const compositeValue = useNodeValue(compositeNode);
 
-  return useMemo(
-    () => ({
-      result: compositeValue.result ?? {
-        boardCount: 0,
-        runStreamCount: 0,
-        loggedTableCount: 0,
-      },
+  return useMemo(() => {
+    let result = {
+      boardCount: 0,
+      runStreamCount: 0,
+      loggedTableCount: 0,
+      legacyTracesCount: 0,
+    };
+    if (compositeValue.result != null) {
+      const keys = projectHistoryTypeToLegacyTraceKeys(
+        compositeValue.result.projectHistoryType as w.Type
+      );
+
+      result = {
+        ...compositeValue.result,
+        legacyTracesCount: keys.length,
+      } as {
+        boardCount: number;
+        runStreamCount: number;
+        loggedTableCount: number;
+        legacyTracesCount: number;
+      };
+    }
+
+    return {
+      result,
       loading: compositeValue.loading,
-    }),
-    [compositeValue.loading, compositeValue.result]
-  ) as {
+    };
+  }, [compositeValue.loading, compositeValue.result]) as {
     result: {
       boardCount: number;
       runStreamCount: number;
       loggedTableCount: number;
+      legacyTracesCount: number;
     };
     loading: boolean;
   };
@@ -161,6 +181,14 @@ const opProjectRunStreamCount = ({project}: {project: w.Node}) => {
 
 const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
   return w.opCount({arr: opProjectRunLoggedTableArtifacts({project})});
+};
+
+const opProjectHistoryType = ({project}: {project: w.Node}) => {
+  return w.callOpVeryUnsafe(
+    'refine_history3_type',
+    {run: w.opProjectRuns({project})},
+    'type'
+  );
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {
@@ -267,6 +295,20 @@ const opArtifactsBasicMetadata = ({artifacts}: {artifacts: w.Node}) => {
         updatedAt: w.opArtifactVersionCreatedAt({
           artifactVersion: latestVersionNode,
         }),
+        createdByUpdatedAt: w.opRunUpdatedAt({
+          run: w.opArtifactVersionCreatedBy({
+            artifactVersion: latestVersionNode,
+          }),
+        }),
+        numRows: w.callOpVeryUnsafe(
+          'run-historyLineCount',
+          {
+            run: w.opArtifactVersionCreatedBy({
+              artifactVersion: latestVersionNode,
+            }),
+          },
+          'number'
+        ) as any,
       } as any);
     }),
   });
@@ -281,6 +323,7 @@ export const useProjectBoards = (
     createdByUserName: string;
     createdAt: number;
     updatedAt: number;
+    createdByUpdatedAt: number;
   }>;
   loading: boolean;
 } => {
@@ -298,6 +341,76 @@ export const useProjectBoards = (
   );
 };
 
+export const useProjectLegacyTraces = (
+  entityName: string,
+  projectName: string
+): {
+  result: Array<{
+    name: string;
+  }>;
+  loading: boolean;
+} => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+  const historyTypeNode = opProjectHistoryType({project: projectNode});
+  const historyTypeValue = useNodeValue(historyTypeNode as w.Node);
+  return useMemo(() => {
+    const keys =
+      historyTypeValue.result == null
+        ? []
+        : projectHistoryTypeToLegacyTraceKeys(
+            historyTypeValue.result as w.Type
+          );
+    return {
+      result: keys.map(key => ({
+        name: key,
+      })),
+      loading: historyTypeValue.loading,
+    };
+  }, [historyTypeValue.loading, historyTypeValue.result]);
+};
+
+const projectHistoryTypeToLegacyTraceKeys = (
+  projectHistoryType: w.Type
+): string[] => {
+  if (w.isTaggedValue(projectHistoryType)) {
+    projectHistoryType = projectHistoryType.value;
+    if (w.isList(projectHistoryType)) {
+      projectHistoryType = projectHistoryType.objectType;
+      if (w.isTaggedValue(projectHistoryType)) {
+        projectHistoryType = projectHistoryType.value;
+        if (
+          !w.isSimpleTypeShape(projectHistoryType) &&
+          projectHistoryType.type === 'ArrowWeaveList'
+        ) {
+          projectHistoryType = projectHistoryType.objectType;
+          if (w.isTypedDict(projectHistoryType)) {
+            const legacyTraceKeys = Object.entries(
+              projectHistoryType.propertyTypes
+            )
+              .filter(([key, value]) => {
+                return (
+                  value != null &&
+                  w.isAssignableTo(
+                    value,
+                    w.maybe({
+                      type: 'wb_trace_tree',
+                    })
+                  )
+                );
+              })
+              .map(([key, value]) => key);
+            return legacyTraceKeys;
+          }
+        }
+      }
+    }
+  }
+  return [];
+};
+
 export const useProjectRunStreams = (
   entityName: string,
   projectName: string
@@ -307,6 +420,8 @@ export const useProjectRunStreams = (
     createdByUserName: string;
     createdAt: number;
     updatedAt: number;
+    createdByUpdatedAt: number;
+    numRows: number;
   }>;
   loading: boolean;
 } => {
@@ -333,6 +448,8 @@ export const useProjectRunLoggedTables = (
     createdByUserName: string;
     createdAt: number;
     updatedAt: number;
+    createdByUpdatedAt: number;
+    numRows: number;
   }>;
   loading: boolean;
 } => {

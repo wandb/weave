@@ -1,6 +1,6 @@
 import re
 import typing
-from ..compile_domain import wb_gql_op_plugin
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from . import wb_domain_types as wdt
 from .wandb_domain_gql import (
@@ -14,6 +14,7 @@ from .. import errors
 # Section 1/6: Tag Getters
 #
 
+
 # Section 2/6: Root Ops
 @op(
     name="root-allReportsGQLResolver",
@@ -23,7 +24,7 @@ from .. import errors
 )
 def root_all_reports_gql_resolver(gql_result):
     return [
-        wdt.Report.from_gql(report["node"])
+        wdt.Report.from_keys(report["node"])
         for report in gql_result["instance"]["views_500"]["edges"]
         if report["node"]["type"] == "runs"  # yes, this is how we filter to Reports!?
     ]
@@ -57,10 +58,35 @@ def root_all_reports():
 
 
 # Section 3/6: Attribute Getters
+gql_prop_op("report-internalId", wdt.ReportType, "id", types.String(), True)
+gql_prop_op(
+    "report-name",
+    wdt.ReportType,
+    "displayName",
+    types.String(),
+)
+gql_prop_op(
+    "report-internalId",
+    wdt.ReportType,
+    "id",
+    types.String(),
+)
+gql_prop_op(
+    "report-name",
+    wdt.ReportType,
+    "displayName",
+    types.String(),
+)
 gql_prop_op(
     "report-createdAt",
     wdt.ReportType,
     "createdAt",
+    types.Timestamp(),
+)
+gql_prop_op(
+    "report-updatedAt",
+    wdt.ReportType,
+    "updatedAt",
     types.Timestamp(),
 )
 gql_prop_op(
@@ -89,6 +115,7 @@ gql_direct_edge_op(
 #
 
 # Section 6/6: Non Standard Business Logic Ops
+
 
 # Logic taken exactly from Weave0 / frontend
 def make_name_and_id(id: str, name: typing.Optional[str]) -> str:
@@ -120,13 +147,13 @@ def make_name_and_id(id: str, name: typing.Optional[str]) -> str:
     ),
 )
 def link(report: wdt.Report) -> wdt.Link:
-    project = report.gql["project"]
+    project = report["project"]
     entity = project["entity"]
 
     project_name = project["name"]
     entity_name = entity["name"]
-    report_id = report.gql["id"]
-    report_name = report.gql["displayName"]
+    report_id = report["id"]
+    report_name = report["displayName"]
 
     url = f"/{entity_name}/{project_name}/reports/{make_name_and_id(report_id, report_name)}"
     return wdt.Link(report_name, url)

@@ -1054,7 +1054,12 @@ def test_arrow_concat_degenerate_types():
 @pytest.mark.parametrize("li", lath.ListInterfaces)
 def test_arrow_timestamp_conversion(li):
     dates = [
-        datetime.datetime(2020, 1, 2, 3, 4, 5),
+        # Ensure these two are actually different date times! The timezone is utc in
+        # our ci environment, so serializing these results in the same thing if the
+        # timestamps match. We use the serialized representation for graph deduplication,
+        # meaning we end up with the same node for both of these, which breaks the test
+        # (but not the actual behavior of the code).
+        datetime.datetime(2020, 1, 2, 3, 4, 6),
         datetime.datetime(2020, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
     ]
     utc_dates = [d.astimezone(datetime.timezone.utc) for d in dates]
@@ -1588,7 +1593,7 @@ def test_encode_decode_list_of_dictionary_encoded_strings():
 
 
 def test_pushdown_of_gql_tags_on_awls(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([1, 2, 3])
@@ -1637,7 +1642,7 @@ def test_groupby_concat():
 
 
 def test_conversion_of_domain_types_to_awl_values(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([project] * 3)
@@ -1768,3 +1773,19 @@ def test_flatten_handles_tagged_lists():
         }
         for i in expected
     ]
+
+
+def test_keys_ops():
+    awl = arrow.to_arrow([{"a": 1}, {"a": 1, "b": 2, "c": 2}, {"c": 3}])
+    node = weave.save(awl)
+    keys_node = node.keys()
+    # Unfortunately, we lose specific info about key presence in AWL.
+    assert weave.use(keys_node).to_pylist_raw() == [
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+    ]
+
+    all_keys_node = keys_node.flatten().unique()
+
+    assert weave.use(all_keys_node).to_pylist_raw() == ["a", "b", "c"]

@@ -1,8 +1,4 @@
-import getConfig from '../../config';
-import {getCookie} from '@wandb/weave/common/util/cookie';
 import {NodeOrVoidNode, Type, isAssignableTo} from '@wandb/weave/core';
-import fetch from 'isomorphic-unfetch';
-import {useEffect, useState} from 'react';
 
 export const REMOTE_URI_PREFIX = 'wandb-artifact:///';
 export const LOCAL_URI_PREFIX = 'local-artifact:///';
@@ -23,49 +19,6 @@ export type BranchPointType = {
 
 export const inJupyterCell = () => {
   return window.location.toString().includes('weave_jupyter');
-};
-
-// TODO: currently deprecated, but works in all browsers
-declare function btoa(s: string): string;
-
-export const useIsAuthenticated = (skip: boolean = false) => {
-  const [isAuth, setIsAuth] = useState<boolean | undefined>(undefined);
-  const anonApiKey = getCookie('anon_api_key');
-
-  useEffect(() => {
-    if (skip) {
-      setIsAuth(false);
-    }
-    const additionalHeaders: Record<string, string> = {};
-    if (anonApiKey != null && anonApiKey !== '') {
-      additionalHeaders['x-wandb-anonymous-auth-id'] = btoa(anonApiKey);
-    }
-    // eslint-disable-next-line wandb/no-unprefixed-urls
-    fetch(getConfig().backendWeaveViewerUrl(), {
-      credentials: 'include',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...additionalHeaders,
-      },
-    })
-      .then(res => {
-        if (res.status !== 200) {
-          setIsAuth(false);
-          return;
-        } else {
-          return res.json();
-        }
-      })
-      .then(json => {
-        const auth = !!(json?.authenticated ?? false);
-        setIsAuth(auth);
-      })
-      .catch(err => {
-        setIsAuth(false);
-      });
-  }, [anonApiKey, skip]);
-  return isAuth;
 };
 
 export const isServedLocally = () => {

@@ -24,8 +24,24 @@ class RefToPyRef(mappers.Mapper):
 
 
 class FunctionToPyFunction(mappers.Mapper):
+    def __init__(self, type_, mapper, artifact_, path):
+        super().__init__(type_, mapper, artifact_, path)
+        self.artifact = artifact_
+
     def apply(self, obj):
         res = graph.map_nodes_full([obj], _node_publish_mapper)[0]
+
+        # Find any op gets and add cross-artifact dependencies.
+        # We want to do this after we have recursively published any
+        # local artifacts above.
+        def _node_dep_mapper(node: graph.Node) -> graph.Node:
+            if _node_is_op_get(node):
+                node = typing.cast(graph.OutputNode, node)
+                uri = _uri_of_get_node(node)
+                self.artifact.add_artifact_reference(uri)
+            return node
+
+        graph.map_nodes_full([res], _node_dep_mapper)
         return res
 
 

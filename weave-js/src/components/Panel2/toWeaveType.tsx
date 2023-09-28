@@ -128,6 +128,7 @@ export function toWeaveType(o: any): any {
       type: curPanelId,
       id: 'string',
       _is_object: true,
+      _base_type: {type: 'Panel'},
       vars: {
         type: 'typedDict',
         propertyTypes: _.mapValues(o.vars, toWeaveType),

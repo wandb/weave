@@ -17,6 +17,7 @@ class TableConfig:
     tableState: table_state.TableState
     rowSize: int = dataclasses.field(default_factory=lambda: 1)
     pinnedRows: dict[str, list[int]] = dataclasses.field(default_factory=dict)
+    pinnedColumns: list[str] = dataclasses.field(default_factory=list)
     activeRowForGrouping: dict[str, int] = dataclasses.field(default_factory=dict)
 
 
@@ -133,10 +134,27 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         return f"""weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
     def add_column(
-        self, select_expr: typing.Callable, name: typing.Optional[str] = None
-    ) -> None:
+        self,
+        select_expr: typing.Callable,
+        name: typing.Optional[str] = None,
+        groupby: bool = False,
+        sort_dir: typing.Optional[str] = None,
+        panel_def: typing.Union[table_state.PanelDef, None, str] = None,
+    ) -> str:
         config = typing.cast(TableConfig, self.config)
-        config.tableState.add_column(select_expr, name)
+        if isinstance(panel_def, str):
+            panel_def = table_state.PanelDef(panel_def)
+        return config.tableState.add_column(
+            select_expr,
+            name,
+            groupby=groupby,
+            sort_dir=sort_dir,
+            panel_def=panel_def,
+        )
+
+    def enable_sort(self, col_id: str, dir: typing.Optional[str] = "asc") -> None:
+        config = typing.cast(TableConfig, self.config)
+        config.tableState.enable_sort(col_id, dir=dir)
 
 
 def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:
@@ -190,7 +208,7 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
 
 
 # TODO: preserve arrow for empty list
-def _get_rows_node(self: Table) -> Node:
+def _get_rows_node(self: Table, apply_sort: bool = True) -> Node:
     # Apply Filters
     data_node = self.input_node
     if (
@@ -248,7 +266,7 @@ def _get_rows_node(self: Table) -> Node:
     )
 
     # Apply Sorting
-    if self.config and self.config.tableState.sort:
+    if self.config and self.config.tableState.sort and apply_sort:
         sort_defs = self.config.tableState.sort
 
         def make_sort_fn(sort_def, row_node):
@@ -307,19 +325,30 @@ def rows_single_refine(self: Table) -> weave.types.Type:
     return weave.types.optional(_get_row_type(self))
 
 
+# TODO: preserve arrow
 @weave.op(name="panel_table-data_refine", hidden=True)
 def data_refine(self: Table) -> weave.types.Type:
-    return self.input_node.type
+    object_type = (
+        self.input_node.type.object_type
+        if hasattr(self.input_node.type, "object_type")
+        else weave.types.Any()
+    )
+    return weave.types.List(object_type)
 
 
 @weave.op(name="panel_table-data_single_refine", hidden=True)
 def data_single_refine(self: Table) -> weave.types.Type:
-    if not hasattr(self.input_node.type, "object_type"):
+    self_input_node_type = self.input_node.type
+    # TODO: not sure why I need to defunction the type in the panel
+    # construction case, but not when this is called from JS
+    if isinstance(self_input_node_type, weave.types.Function):
+        self_input_node_type = self_input_node_type.output_type
+    if not hasattr(self_input_node_type, "object_type"):
         return weave.types.Any()
     # input_node.type should be FunctionType (since its a Node)
     # but for some reason its not.
     # TODO: fix
-    return weave.types.optional(self.input_node.type.object_type)  # type: ignore
+    return weave.types.optional(self_input_node_type.object_type)  # type: ignore
 
 
 # TODO: keep type in arrow
@@ -352,7 +381,9 @@ def pinned_data(self: typing.Union[Table, Query]):
     refine_output_type=rows_refine,
 )
 def pinned_rows(self: Table):
-    rows_node = _get_rows_node(self)
+    # _get_active_node uses an "activeRowForGrouping" which is relative to the unsorted table.
+    # for the index to be correct, we need to use the unsorted table.
+    rows_node = _get_rows_node(self, apply_sort=False)
     pinned_data_node = _get_pinned_node(self, rows_node)
     return weave.use(pinned_data_node)
 
@@ -375,6 +406,8 @@ def active_data(self: Table) -> typing.Optional[dict]:
     refine_output_type=rows_single_refine,
 )
 def active_row(self: Table):
-    rows_node = _get_rows_node(self)
+    # _get_active_node uses an "activeRowForGrouping" which is relative to the unsorted table.
+    # for the index to be correct, we need to use the unsorted table.
+    rows_node = _get_rows_node(self, apply_sort=False)
     data_node = _get_active_node(self, rows_node)
     return data_node

@@ -14,12 +14,15 @@ from .. import dispatch
 from .. import weave_internal
 from .. import weavify
 
+from .. import graph_debug
+
 from .arrow import ArrowWeaveListType
 from .list_ import ArrowWeaveList
 from . import arraylist_ops
 from . import convert_ops, convert
 from .arrow_tags import pushdown_list_tags
 from ..ops_primitives.dict import dict_
+from ..ops_arrow.dict import preprocess_merge
 
 
 class VectorizeError(errors.WeaveBaseError):
@@ -316,10 +319,21 @@ def _vectorize_list_special_case(node_name, node_inputs, vectorized_keys):
         )
 
 
+def _vectorize_merge_special_case(node_name, node_inputs, vectorized_keys):
+    self = node_inputs["lhs"]
+    other = node_inputs["rhs"]
+
+    self_ensured = preprocess_merge(self, other)
+    other_ensured = preprocess_merge(other, self)
+
+    return self_ensured.merge(other_ensured)
+
+
 def vectorize(
     weave_fn,
     with_respect_to: typing.Optional[typing.Iterable[graph.VarNode]] = None,
     stack_depth: int = 0,
+    strict=False,
 ):
     """Convert a Weave Function of T to a Weave Function of ArrowWeaveList[T]
 
@@ -410,6 +424,11 @@ def vectorize(
             )
         if node_name == "list":
             return _vectorize_list_special_case(node_name, node_inputs, vectorized_keys)
+
+        if node_name == "merge":
+            return _vectorize_merge_special_case(
+                node_name, node_inputs, vectorized_keys
+            )
 
         # 3. In the case of `Object-__getattr__`, we need to special case it will only work when the first arg is AWL
         # and the second is a string:
@@ -533,29 +552,34 @@ def vectorize(
             pick_op = registry_mem.memory_registry.get_op("typedDict-pick")
             return map_each_op(input_vals[0], lambda x: pick_op(x, *input_vals[1:]))
 
-        # Final Fallback: We have no choice anymore. We must bail out completely to mapping
-        # over all the vectorized inputs and calling the function directly.
-        # If we hit this, then it means our vectorization has
-        # created inputs which have no matching op. For example,
-        # if we are doing a pick operation and the key is a
-        # vectorized VarNode. This happens when picking a run
-        # color using a vectorized list of runs for a table
-        # (since pick(dict, list<string>) is not implemented).
-        # This can happen for other ops like `add` and `mul` as
-        # well (imagine `row => 1 + row`)
-        #
-        # In order to safely handle this case, we need to simply map
-        # the original op over all the vectorized inputs.
-        res = _create_manually_mapped_op(
-            node_name,
-            node_inputs,
-            vectorized_keys,
-        )
-        message = f"Encountered non-dispatchable op ({node_name}) during vectorization."
-        message += "This is likely due to vectorization path of the function not leading to the"
-        message += "first parameter. Bailing out to manual mapping"
-        logging.warning(message)
-        return res
+        if strict:
+            raise errors.WeaveVectorizationError(f"Could not vectorize op {node_name}")
+        else:
+            # Final Fallback: We have no choice anymore. We must bail out completely to mapping
+            # over all the vectorized inputs and calling the function directly.
+            # If we hit this, then it means our vectorization has
+            # created inputs which have no matching op. For example,
+            # if we are doing a pick operation and the key is a
+            # vectorized VarNode. This happens when picking a run
+            # color using a vectorized list of runs for a table
+            # (since pick(dict, list<string>) is not implemented).
+            # This can happen for other ops like `add` and `mul` as
+            # well (imagine `row => 1 + row`)
+            #
+            # In order to safely handle this case, we need to simply map
+            # the original op over all the vectorized inputs.
+            res = _create_manually_mapped_op(
+                node_name,
+                node_inputs,
+                vectorized_keys,
+            )
+            message = (
+                f"Encountered non-dispatchable op ({node_name}) during vectorization."
+            )
+            message += "This is likely due to vectorization path of the function not leading to the"
+            message += "first parameter. Bailing out to manual mapping"
+            logging.warning(message)
+            return res
 
     # Vectorize is "with respect to" (wrt) specific variable nodes in the graph.
     # vectorize_along_wrt_paths keeps track of nodes that have already
@@ -601,7 +625,10 @@ def vectorize(
 def _call_and_ensure_awl(
     awl: ArrowWeaveList, called: graph.OutputNode
 ) -> ArrowWeaveList:
-    res = use(called)
+    from .. import compile
+
+    with compile.disable_compile():
+        res = use(called)
     # Since it is possible that the result of `use` bails out of arrow due to a
     # mismatch in the types / op support. This is most likely due to gap in the
     # implementation of vectorized ops. However, there are cases where it is
@@ -668,15 +695,15 @@ def _ensure_variadic_fn(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    logging.info("Vectorizing: %s", fn)
+    debug_str = graph_debug.node_expr_str_full(fn)
+    logging.info("Vectorizing: %s", debug_str)
     from .. import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)
-    logging.info("Vectorizing. Static branch resolution complete.: %s", fn)
-    from .. import graph_debug
+    logging.info("Vectorizing. Static branch resolution complete.: %s", debug_str)
 
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
-    logging.info("Vectorizing. Vectorized: %s", fn)
+    debug_str = graph_debug.node_expr_str_full(vecced)
+    logging.info("Vectorizing. Vectorized: %s", debug_str)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
-    # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)

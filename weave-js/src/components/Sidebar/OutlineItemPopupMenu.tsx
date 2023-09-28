@@ -1,14 +1,12 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
-import {callOpVeryUnsafe, NodeOrVoidNode, varNode} from '@wandb/weave/core';
+import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
 import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
 import styled from 'styled-components';
 
 import {getFullChildPanel} from '../Panel2/ChildPanel';
-import {emptyTable} from '../Panel2/PanelTable/tableState';
 import {
   addChild,
-  ensureDashboard,
   getPath,
   isGroupNode,
   makePanel,
@@ -16,13 +14,14 @@ import {
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
 import {
-  IconBack,
+  IconAddNew,
   IconCopy,
   IconDelete,
   IconRetry,
   IconSplit,
 } from '../Panel2/Icons';
 import {PopupMenu} from './PopupMenu';
+import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
 
 const Divider = styled.div`
   margin: 0 -15px;
@@ -53,6 +52,9 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   onOpen,
   isOpen,
 }) => {
+  const isViewerWandbEmployee = useIsViewerWandbEmployee();
+  const setInteractingPanel = useSetInteractingPanel();
+
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
       ev.stopPropagation();
@@ -155,41 +157,9 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     },
     [updateConfig2, goBackToOutline]
   );
-  const handleAddToQueryBar = useCallback(
-    (panelPath: string[]) => {
-      updateConfig2(oldConfig => {
-        oldConfig = getFullChildPanel(oldConfig);
-        const targetPanel = getPath(oldConfig, panelPath);
-        const input = targetPanel.input_node;
-        const queryPanel = makePanel(
-          'Query',
-          {tableState: emptyTable()},
-          input
-        );
-
-        const newTargetExpr = callOpVeryUnsafe('Query-selected', {
-          self: varNode('any', 'panel0'),
-        }) as NodeOrVoidNode;
-
-        let root = setPath(oldConfig, panelPath, {
-          ...targetPanel,
-          input_node: newTargetExpr,
-        });
-
-        root = ensureDashboard(root);
-
-        console.log('Query panel', queryPanel);
-
-        root = addChild(root, ['sidebar'], queryPanel);
-
-        return root;
-      });
-    },
-    [updateConfig2]
-  );
   const menuItems = useMemo(() => {
     const items = [];
-    if (localConfig.id === 'Group') {
+    if (localConfig?.id === 'Group') {
       items.push({
         key: 'unnest',
         content: 'Replace with first child',
@@ -203,22 +173,32 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       icon: <IconCopy />,
       onClick: () => handleDuplicate(path),
     });
-    items.push({
-      key: 'split',
-      content: 'Split',
-      icon: <IconSplit />,
-      onClick: () => handleSplit(path),
-    });
+
     if (path.find(p => p === 'main') != null && path.length > 1) {
       items.push({
-        key: 'queryBar',
-        content: 'Send to query bar',
-        icon: <IconBack />,
-        onClick: () => handleAddToQueryBar(path),
+        key: 'split',
+        content: 'Split',
+        icon: <IconSplit />,
+        onClick: () => handleSplit(path),
       });
+
+      if (isViewerWandbEmployee) {
+        items.push({
+          key: 'divider-0',
+          content: <Divider />,
+          disabled: true,
+        });
+        items.push({
+          key: 'export-report',
+          content: 'Add to report...',
+          icon: <IconAddNew />,
+          onClick: () => setInteractingPanel('export-report', path),
+        });
+      }
     }
+
     items.push({
-      key: 'divider',
+      key: 'divider-1',
       content: <Divider />,
       disabled: true,
     });
@@ -230,13 +210,14 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     });
     return items;
   }, [
-    handleAddToQueryBar,
+    localConfig?.id,
+    path,
     handleDelete,
-    handleSplit,
     handleUnnest,
     handleDuplicate,
-    localConfig.id,
-    path,
+    isViewerWandbEmployee,
+    handleSplit,
+    setInteractingPanel,
   ]);
 
   return (

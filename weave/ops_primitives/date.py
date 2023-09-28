@@ -35,13 +35,13 @@ def datetimetd_sub(lhs, rhs):
 
 
 @op(
-    name="datetime-add",
+    name="datetime-addms",
     input_type={
-        "lhs": types.UnionType(types.Timestamp(), types.TimeDelta()),
+        "lhs": types.UnionType(types.Timestamp(), types.Number()),
         "rhs": lambda input_types: types.optional(
             types.Timestamp()
-            if types.TimeDelta().assign_type(input_types["lhs"])
-            else types.TimeDelta()
+            if types.Number().assign_type(input_types["lhs"])
+            else types.Number()
         ),
     },
     output_type=types.optional(types.Timestamp()),
@@ -49,7 +49,49 @@ def datetimetd_sub(lhs, rhs):
 def datetime_add(lhs, rhs):
     if rhs == None:
         return None
-    return lhs + rhs
+    return lhs + datetime.timedelta(milliseconds=rhs)
+
+
+AUTO_FORMAT_UNITS_AND_NUM_MS = (
+    ("years", 365 * 24 * 60 * 60 * 1000),
+    ("months", 30 * 24 * 60 * 60 * 1000),  # Approximating a month as 30 days
+    ("days", 24 * 60 * 60 * 1000),
+    ("hours", 60 * 60 * 1000),
+    ("minutes", 60 * 1000),
+    ("seconds", 1000),
+    ("milliseconds", 1),
+)
+
+
+@op(
+    name="timestamp-relativeStringAutoFormat",
+    input_type={
+        "timestamp1": types.Timestamp(),
+        "timestamp2": types.optional(types.Timestamp()),
+    },
+    output_type=types.optional(types.String()),
+)
+def auto_format_relative_string(timestamp1, timestamp2):
+    if timestamp2 == None:
+        return None
+
+    delta: datetime.timedelta = timestamp1 - timestamp2
+    diff_ms = delta.total_seconds() * 1000
+
+    for unit, unit_ms in AUTO_FORMAT_UNITS_AND_NUM_MS:
+        if abs(diff_ms) >= unit_ms:
+            rounding_unit = 1 if unit == "years" or unit == "months" else 0
+            diff = round(diff_ms / unit_ms, rounding_unit)
+
+            if int(diff) == diff:
+                diff = int(diff)
+
+            if abs(diff) == 1:
+                unit = unit[:-1]
+
+            return f"{diff} {unit}"
+
+    return "less than 1 ms"
 
 
 @op(

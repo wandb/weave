@@ -307,18 +307,48 @@ class OpDef:
         )
         return self.output_type(new_input_type)
 
+    def is_gql_root_resolver(self):
+        from . import gql_op_plugin
+
+        return self in gql_op_plugin._ROOT_RESOLVERS
+
     def lazy_call(_self, *args, **kwargs):
         bound_params = _self.bind_params(args, kwargs)
         # Don't try to refine if there are variable nodes, we are building a
         # function in that case!
         final_output_type: types.Type
 
+        # If there are variables in the graph, prior to refining, try to replace them
+        # with their values. This is currently only used in Panel construction paths, to
+        # allow refinement to happen. We may want to move to a more general
+        # Stack/Context for variables like we have in JS, but this works for now.
+        def _replace_var_with_val(n):
+            if isinstance(n, graph.VarNode) and hasattr(n, "_var_val"):
+                return n._var_val
+            return None
+
+        refine_params = {k: graph.resolve_vars(n) for k, n in bound_params.items()}
+
+        # Turn this on to debug scenarios where we don't correctly refine during
+        # panel construction (will throw an error instead of letting it happen).
+        # if refine_enabled():
+        #     for arg_name, arg_node in refine_params.items():
+        #         graph_vars = graph.expr_vars(arg_node)
+        #         if graph_vars:
+        #             raise ValueError(
+        #                 "arg contained graph vars (%s): %s"
+        #                 % (arg_name, [v.name for v in graph_vars])
+        #             )
+
         if (
             refine_enabled()
             and _self.refine_output_type
-            and not any(graph.expr_vars(arg_node) for arg_node in bound_params.values())
+            and not any(
+                graph.expr_vars(arg_node) for arg_node in refine_params.values()
+            )
         ):
-            called_refine_output_type = _self.refine_output_type(**bound_params)
+
+            called_refine_output_type = _self.refine_output_type(**refine_params)
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
                 # api's use auto-creates client. TODO: Fix inline import

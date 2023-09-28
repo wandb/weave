@@ -33,6 +33,7 @@ from ... import artifact_fs
 from ...wandb_interface import wandb_stream_table
 from ...compile_table import KeyTree
 from ...ops_primitives import _dict_utils
+from ... import gql_json_cache
 
 tracer = engine_trace.tracer()
 
@@ -59,12 +60,13 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
     elif tc_type == "bool":
         return types.Boolean()
     elif tc_type == "map":
+        keys = tc["keys"] if "keys" in tc else {}
         return types.TypedDict(
             {
                 key: types.union(
                     *[history_key_type_count_to_weave_type(vv) for vv in val]
                 )
-                for key, val in tc["keys"].items()
+                for key, val in keys.items()
             }
         )
     elif tc_type == "list":
@@ -98,6 +100,22 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
         if possible_type is not None:
             return possible_type
+
+    # Hack: there are circumstances where the user has logged data with a
+    # `_type` key. This is nasty... because so much of our logic depends on
+    # `_type` being a reserved key. In such circumstances the gorilla history
+    # parser will still return the correct keys. This is essentially the same as
+    # the `map` case above. This MUST go last however, since we want to properly
+    # catch any named types first.
+    if "keys" in tc:
+        return types.TypedDict(
+            {
+                key: types.union(
+                    *[history_key_type_count_to_weave_type(vv) for vv in val]
+                )
+                for key, val in tc["keys"].items()
+            }
+        )
     return types.UnknownType()
 
 
@@ -122,7 +140,9 @@ def get_full_columns(columns: typing.Optional[list[str]]):
 
 def get_full_columns_prefixed(run: wdt.Run, columns: typing.Optional[list[str]]):
     all_columns = get_full_columns(columns)
-    all_paths = list(run.gql.get("historyKeys", {}).get("keys", {}).keys())
+    all_paths = list(
+        gql_json_cache.use_json(run.get("historyKeys", "{}")).get("keys", {}).keys()
+    )
     return _filter_known_paths_to_requested_paths(all_paths, all_columns)
 
 
@@ -280,10 +300,10 @@ def refine_history_type(
     run: wdt.Run,
     columns: typing.Optional[list[str]] = None,
 ) -> types.TypedDict:
-    if "historyKeys" not in run.gql:
+    if "historyKeys" not in run.keys:
         raise ValueError("historyKeys not in run gql")
 
-    historyKeys = run.gql["historyKeys"]["keys"]
+    historyKeys = gql_json_cache.use_json(run["historyKeys"])["keys"]
 
     return _refine_history_type_inner(historyKeys, columns)
 
@@ -323,9 +343,9 @@ def _refine_history_type_inner(
 
 
 def history_keys(run: wdt.Run) -> list[str]:
-    if "historyKeys" not in run.gql:
+    if "historyKeys" not in run.keys:
         raise ValueError("historyKeys not in run gql")
-    if "sampledParquetHistory" not in run.gql:
+    if "sampledParquetHistory" not in run.keys:
         raise ValueError("sampledParquetHistory not in run gql")
     object_type = refine_history_type(run)
 
@@ -368,7 +388,8 @@ def process_history_awl_tables(tables: list[ArrowWeaveList]):
 
 def concat_awls(awls: list[ArrowWeaveList]):
     list = make_list(**{str(i): table for i, table in enumerate(awls)})
-    return use(concat(list))
+    with compile.disable_compile():
+        return use(concat(list))
 
 
 def awl_to_pa_table(awl: ArrowWeaveList):
@@ -392,7 +413,7 @@ def read_history_parquet(run: wdt.Run, columns=None):
     io = io_service.get_sync_client()
     object_type = refine_history_type(run, columns=columns)
     tables = []
-    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+    for url in run["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
@@ -412,10 +433,11 @@ def mock_history_rows(
 
     step_type = types.TypedDict({"_step": types.Int()})
     steps: typing.Union[ArrowWeaveList, list] = []
+    history_keys = gql_json_cache.use_json(run["historyKeys"])
 
-    last_step = run.gql["historyKeys"]["lastStep"]
-    history_keys = run.gql["historyKeys"]["keys"]
-    for key, key_details in history_keys.items():
+    last_step = history_keys["lastStep"]
+    keys = history_keys["keys"]
+    for key, key_details in keys.items():
         if key == "_step":
             type_counts: list[TypeCount] = key_details["typeCounts"]
             count = type_counts[0]["count"]

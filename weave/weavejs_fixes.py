@@ -45,8 +45,12 @@ def _convert_specific_opname_to_generic_opname(
         return "limit", {"arr": inputs["self"], "limit": inputs["limit"]}
     elif name == "ArrowWeaveList-map":
         return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
+    elif name == "ArrowWeaveListString-equal":
+        return "number-equal", {"lhs": inputs["self"], "rhs": inputs["other"]}
     elif name == "ArrowWeaveListNumber-mult":
         return "number-mult", {"lhs": inputs["self"], "rhs": inputs["other"]}
+    elif name == "ArrowWeaveListNumber-add":
+        return "number-add", {"lhs": inputs["self"], "rhs": inputs["other"]}
     elif name == "ArrowWeaveListNumber-min":
         return "numbers-min", {"numbers": inputs["self"]}
     elif name == "ArrowWeaveListNumber-max":
@@ -190,6 +194,31 @@ def remove_nan_and_inf(obj):
     return obj
 
 
+def remove_partialobject_from_types(data):
+    """Convert weave-internal types like
+
+    {"type":"PartialObject","keys":{"name":"string"},"keyless_weave_type_class":"project"}
+
+    to types weave0 can understand. in this case:
+
+    "project"
+
+    """
+
+    # TODO: check this
+
+    if isinstance(data, list):
+        return [remove_partialobject_from_types(d) for d in data]
+    elif isinstance(data, dict):
+        result = {}
+        for key in data:
+            if key == "type" and data[key] == "PartialObject":
+                return data["keyless_weave_type_class"]
+            result[key] = remove_partialobject_from_types(data[key])
+        return result
+    return data
+
+
 def fixup_data(data):
     data = recursively_unwrap_unions(data)
     data = remove_opcall_versions_data(data)
@@ -197,4 +226,5 @@ def fixup_data(data):
     # response right now.
     # TODO: fix. Encode as string and then interpret in js side.
     data = remove_nan_and_inf(data)
+    data = remove_partialobject_from_types(data)
     return convert_specific_ops_to_generic_ops_data(data)

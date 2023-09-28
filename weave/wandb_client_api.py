@@ -8,6 +8,9 @@ import typing
 
 from . import errors
 
+import graphql
+from graphql import GraphQLSchema
+
 from requests import exceptions
 
 
@@ -26,14 +29,13 @@ def assert_wandb_authenticated() -> None:
         )
 
 
-def wandb_gql_query(
+def query_with_retry(
     query_str: str,
     variables: dict[str, typing.Any] = {},
     num_timeout_retries: int = 0,
 ) -> typing.Any:
     if num_timeout_retries < 0:
         raise ValueError("num_timeout_retries must be >= 0")
-
     for attempt_no in range(num_timeout_retries + 1):
         try:
             return wandb_public_api().client.execute(
@@ -46,6 +48,20 @@ def wandb_gql_query(
             logging.warn(
                 f'wandb GQL query timed out: "{e}", retrying (num_attempts={attempt_no + 1})'
             )
+
+
+def introspect_server_schema(num_timeout_retries: int = 0) -> GraphQLSchema:
+    introspection_query = graphql.get_introspection_query()
+    payload = query_with_retry(introspection_query, {}, num_timeout_retries)
+    return graphql.build_client_schema(payload)
+
+
+def wandb_gql_query(
+    query_str: str,
+    variables: dict[str, typing.Any] = {},
+    num_timeout_retries: int = 0,
+) -> typing.Any:
+    return query_with_retry(query_str, variables, num_timeout_retries)
 
 
 def set_wandb_thread_local_api_settings(

@@ -5,13 +5,13 @@ import {voidNode} from '@wandb/weave/core';
 import React, {useCallback, useState} from 'react';
 import styled from 'styled-components';
 import * as LayoutElements from './LayoutElements';
-import {Link} from 'react-router-dom';
 import moment from 'moment';
 
 import getConfig from '../../../config';
 import {useWeaveContext} from '../../../context';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {NavigateToExpressionType} from './common';
+import {Link} from '../../../common/util/links';
 
 const LeftNavItemBlock = styled(LayoutElements.HBlock)`
   margin: 0px 0px 0px 12px;
@@ -26,9 +26,10 @@ const LeftNavItemBlock = styled(LayoutElements.HBlock)`
     background-color: #f5f6f7;
   }
 `;
+LeftNavItemBlock.displayName = 'S.LeftNavItemBlock';
 
 const NewBoardButtonWrapper = styled.div`
-  margin: 24px 24px 16px 24px;
+  margin: 0px 24px 16px 24px;
 `;
 NewBoardButtonWrapper.displayName = 'S.NewBoardButton';
 
@@ -78,6 +79,7 @@ export const LeftNav: React.FC<{
           New blank board
         </Button>
       </NewBoardButtonWrapper>
+
       {props.sections.map((section, i) => (
         <LeftNavSection key={i} {...section} />
       ))}

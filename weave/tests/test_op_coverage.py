@@ -436,6 +436,7 @@ hidden_js_ops = set(
         "runQueue-id",
         "user-id",
         "user-name",
+        "user-email",
         "user-link",
         "user-runs",
         "user-entities",

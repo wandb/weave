@@ -16,6 +16,7 @@ from requests.auth import HTTPBasicAuth
 from . import engine_trace
 from . import environment as weave_env
 from . import wandb_client_api
+from . import errors
 
 # Importing at the top-level namespace so other files can import from here.
 from .context_state import WandbApiContext, _wandb_api_context
@@ -70,6 +71,7 @@ def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
 def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
     cookie = weave_env.weave_wandb_cookie()
     if cookie:
+        # This is a special case for testing. It should never be used in production.
         cookies = {"wandb": cookie}
         headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
         return set_wandb_api_context("admin", None, headers, cookies)

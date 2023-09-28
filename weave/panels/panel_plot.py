@@ -165,10 +165,11 @@ class Series:
                     raise ValueError(
                         f"select_functions must contain a function for groupby dim {dimname}"
                     )
-                table.update_col(getattr(dims, dimname), select_functions[dimname])
                 table.enable_groupby(getattr(dims, dimname))
                 if dimname == "label":
                     table.enable_groupby(dims.color)
+
+                table.update_col(getattr(dims, dimname), select_functions[dimname])
 
             for dimname in select_functions:
                 if dimname not in groupby_dims:
@@ -257,7 +258,7 @@ class AxisScale:
     # need to use scaleType instead of `type` here because
     # `type` serializes to the same key as the
     # `type` used by ObjectType
-    scaleType: typing.Optional[ScaleType]
+    scaleType: typing.Optional[ScaleType] = "linear"
     range: typing.Optional[
         dict[typing.Literal["field"], typing.Callable[[str], str]]
     ] = None
@@ -266,9 +267,9 @@ class AxisScale:
 
 @weave.type()
 class AxisSetting:
-    noLabels: bool
-    noTitle: bool
-    noTicks: bool
+    noLabels: bool = False
+    noTitle: bool = False
+    noTicks: bool = False
     title: typing.Optional[str] = None
     scale: typing.Optional[AxisScale] = None
 
@@ -288,9 +289,12 @@ class LegendSetting:
 
 @weave.type()
 class LegendSettings:
-    x: LegendSetting
-    y: LegendSetting
-    color: LegendSetting
+    x: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    y: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    color: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    pointShape: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    pointSize: LegendSetting = dataclasses.field(default_factory=LegendSetting)
+    lineStyle: LegendSetting = dataclasses.field(default_factory=LegendSetting)
 
 
 @weave.type()
@@ -335,7 +339,7 @@ class PlotConfig:
     legendSettings: typing.Optional[LegendSettings]
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
-    configVersion: int = 14
+    configVersion: int = 15
 
 
 def set_through_array(
@@ -543,7 +547,12 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 config_axisSettings.y.scale = AxisScale(scaleType=y_axis_type)
 
             config_legendSettings = LegendSettings(
-                x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
+                x=LegendSetting(),
+                y=LegendSetting(),
+                color=LegendSetting(),
+                pointShape=LegendSetting(),
+                lineStyle=LegendSetting(),
+                pointSize=LegendSetting(),
             )
 
             self.config = PlotConfig(
@@ -599,7 +608,12 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             raise errors.WeaveInternalError("config is None")
 
         self.config.legendSettings = LegendSettings(
-            x=LegendSetting(True), y=LegendSetting(True), color=LegendSetting(True)
+            x=LegendSetting(True),
+            y=LegendSetting(True),
+            color=LegendSetting(True),
+            pointShape=LegendSetting(),
+            lineStyle=LegendSetting(),
+            pointSize=LegendSetting(),
         )
 
     def to_code(self) -> typing.Optional[str]:
@@ -613,7 +627,12 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         )
 
         default_legendSettings = LegendSettings(
-            x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
+            x=LegendSetting(),
+            y=LegendSetting(),
+            color=LegendSetting(),
+            pointShape=LegendSetting(),
+            lineStyle=LegendSetting(),
+            pointSize=LegendSetting(),
         )
         default_configOptionsExpanded = ConfigOptionsExpanded()
 

@@ -945,6 +945,93 @@ export function allVarsWillResolve(node: EditingNode, stack: Stack): boolean {
   }
 }
 
+// Given an expression, update its VarNode's types to match the types of the
+// variables the types of the nodes they reference.
+export function updateVarTypes(node: EditingNode, stack: Stack): EditingNode {
+  switch (node.nodeType) {
+    case 'var':
+      const resolved = resolveVar(stack, node.varName);
+      if (resolved == null) {
+        return node;
+      }
+      return {...node, type: resolved.closure.value.type};
+    case 'output':
+      return {
+        ...node,
+        fromOp: {
+          ...node.fromOp,
+          inputs: mapValues(node.fromOp.inputs, input =>
+            updateVarTypes(input, stack)
+          ),
+        },
+      };
+    case 'const':
+      if (isFunction(node.type)) {
+        return {
+          ...node,
+          val: updateVarTypes(
+            node.val,
+            pushFrame(
+              stack,
+              // true indicates variable is a function argument, and will be
+              // populated at call-time
+              mapValues(node.type.inputTypes, (inputType, inputName) =>
+                varNode(inputType, inputName)
+              )
+            )
+          ),
+        };
+      }
+  }
+  return node;
+}
+
+// Given an expression, update its variable names to match the new name
+export function updateVarNames(
+  node: EditingNode,
+  stack: Stack,
+  oldName: string,
+  newName: string
+): EditingNode {
+  switch (node.nodeType) {
+    case 'var':
+      if (node.varName === oldName) {
+        return {...node, varName: newName};
+      }
+      return node;
+    case 'output':
+      return {
+        ...node,
+        fromOp: {
+          ...node.fromOp,
+          inputs: mapValues(node.fromOp.inputs, input =>
+            updateVarNames(input, stack, oldName, newName)
+          ),
+        },
+      };
+    case 'const':
+      if (isFunction(node.type)) {
+        return {
+          ...node,
+          val: updateVarNames(
+            node.val,
+            pushFrame(
+              stack,
+              // true indicates variable is a function argument, and will be
+              // populated at call-time
+              mapValues(node.type.inputTypes, (inputType, inputName) =>
+                varNode(inputType, inputName)
+              )
+            ),
+            oldName,
+            newName
+          ),
+        };
+      }
+  }
+  return node;
+}
+
 export function couldBeReplacedByType(
   node: EditingNode,
   graph: EditingNode,
@@ -1010,6 +1097,12 @@ function simpleArgsString(args: EditingOpInputs, opStore: OpStore): string {
 function simpleOpString(op: EditingOp, opStore: OpStore): string {
   const argNames = Object.keys(op.inputs);
   const argValues = Object.values(op.inputs);
+  if (op.name.endsWith('bin')) {
+    // Bin ops like timestamp-bin produce really ugly strings. Simplify by not showing the rhs
+    // argument. This makes default plot legends that are binned by timestamp much nicer.
+    return `${simpleNodeString(argValues[0], opStore)} bin`;
+  }
+
   if (isUnaryOp(op, opStore)) {
     return `${opSymbol(op, opStore)}${simpleNodeString(argValues[0], opStore)}`;
   }

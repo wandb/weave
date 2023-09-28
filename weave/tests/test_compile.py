@@ -164,17 +164,6 @@ def test_optimize_merge_empty_dict():
     )
 
 
-def count_nodes(node: graph.Node) -> int:
-    counter = 0
-
-    def inc(n: graph.Node):
-        nonlocal counter
-        counter += 1
-
-    weave.graph.map_nodes_full([node], inc)
-    return counter
-
-
 def test_compile_lambda_uniqueness():
     list_node_1 = weave.ops.make_list(a=make_const_node(weave.types.Number(), 1))
     list_node_2 = weave.ops.make_list(a=make_const_node(weave.types.Number(), 2))
@@ -190,13 +179,15 @@ def test_compile_lambda_uniqueness():
     # combined node contains 1 node, x1 = 1
     # concat node contains 1 node, x1 = 1
     # total = 12
-    assert count_nodes(concatted) == 12
+    assert graph.count(concatted) == 12
 
     # However, after lambda compilation, we should get
-    # 3 more nodes (new row, add, and fn), creating
-    # a total of 15 nodes
+    # 3 more nodes (new row, add, and fn), the const 1
+    # is not deduped because in one case (inside the lambda function),
+    # it is an int and in the other, it is a number
     compiled = compile.compile([concatted])[0]
-    assert count_nodes(compiled) == 15
+
+    assert graph.count(compiled) == 15
 
 
 # We actually don't want this to work because it would require

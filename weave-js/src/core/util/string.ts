@@ -56,3 +56,6 @@ export function indent(s: string, level: number) {
   }
   return result + s;
 }
+
+export const maybePluralize = (count: number, noun: string, suffix = 's') =>
+  `${count} ${noun}${count !== 1 ? suffix : ''}`;

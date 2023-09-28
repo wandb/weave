@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import {mapNodes} from './callers';
 import * as HL from './hl';
 import type {Node} from './model';

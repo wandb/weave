@@ -100,11 +100,29 @@ interface CustomPanelRendererProps {
   signalListeners?: SignalListeners;
   vegaRef?: React.MutableRefObject<Vega | null>;
 
+  // critical width (in pixels) below which legends are hidden. if not specified,
+  // legends are not hidden.
+  legendCutoffWidth?: number;
+
   setViewedRun?(runName: string): void;
   setUserQuery?(query: Query): void;
   setView?(view: VegaView | null): void;
   handleTooltip?(handler: any, event: any, item: any, value: any): void;
   onNewView?(view: VegaView): void;
+}
+
+function hideLegends(obj: any): any {
+  if (_.isArray(obj)) {
+    return obj.map(hideLegends);
+  } else if (_.isPlainObject(obj)) {
+    return _.mapValues(obj, (v, k) => {
+      if (k === 'legend') {
+        return false;
+      }
+      return hideLegends(v);
+    });
+  }
+  return obj;
 }
 
 const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
@@ -130,6 +148,7 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
     signalListeners,
     vegaRef,
     onNewView,
+    legendCutoffWidth,
   } = props;
 
   // Deep memo this so callers don't have to worry about it.
@@ -247,14 +266,26 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
     return null;
   }, [setViewedRun, viewableRunOptions, viewedRun]);
 
+  let width: number = 0;
+  let height: number = 0;
+  if (dimensions) {
+    width = dimensions.width;
+    height = dimensions.height;
+  }
+
   const specWithPatches = useMemo(() => {
     const fieldRefs = parseSpecFields(spec);
     const specWithFields = injectFields(spec, fieldRefs, userSettings);
     const withPatches = patchWBVegaSpec(specWithFields);
-    return produce(withPatches, draft => {
-      draft.autosize = 'fit';
+    const specWithLegendsMaybeDisabled =
+      legendCutoffWidth && width <= legendCutoffWidth
+        ? (hideLegends(withPatches) as VisualizationSpec)
+        : withPatches;
+
+    return produce(specWithLegendsMaybeDisabled, draft => {
+      draft.autosize = {type: 'fit', contains: 'padding'};
     });
-  }, [spec, userSettings]);
+  }, [spec, userSettings, width, legendCutoffWidth]);
 
   const finalData = useMemo(
     () =>
@@ -331,18 +362,6 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
     (showStepSelector && viewableStepOptions != null && viewedStep != null);
 
   const parseErrorText = 'Expression parse error';
-
-  let width: number = 0;
-  let height: number = 0;
-  if (dimensions) {
-    width = dimensions.width;
-    height = dimensions.height;
-    if (vegaView) {
-      const padding = vegaView.padding() as any;
-      width -= padding.left + padding.right;
-      height -= padding.top + padding.bottom;
-    }
-  }
 
   return (
     <Measure

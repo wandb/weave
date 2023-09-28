@@ -3,12 +3,21 @@ import './globalStyleImports';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import {BrowserRouter as Router, Switch, Route} from 'react-router-dom';
-
+import {StateInspector} from 'reinspect';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
-import {URL_LOCAL, URL_RECENT, URL_WANDB} from './urls';
+import {
+  URL_BROWSE,
+  URL_LOCAL,
+  URL_TEMPLATES,
+  URL_RECENT,
+  URL_WANDB,
+} from './urls';
+import getConfig from './config';
+import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
+import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -53,28 +62,38 @@ const Main = ({browserType}: MainProps) => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
-        <PagePanel browserType={browserType} />
+        <StateInspector name="WeaveApp">
+          <PanelRootContextProvider>
+            <WeaveViewerContextProvider>
+              <PagePanel browserType={browserType} />
+            </WeaveViewerContextProvider>
+          </PanelRootContextProvider>
+        </StateInspector>
       </NotebookComputeGraphContextProvider>
     </ErrorBoundary>
   </React.Suspense>
 );
 
+const basename = getConfig().PREFIX;
 ReactDOM.render(
-  <Router>
+  <Router basename={basename}>
     <Switch>
-      <Route path={`/${URL_RECENT}/:assetType?`}>
+      <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
         <Main browserType={URL_RECENT} />
+      </Route>
+      <Route path={[`/${URL_BROWSE}/${URL_TEMPLATES}/:templateName?`]}>
+        <Main browserType={URL_TEMPLATES} />
       </Route>
       <Route
         path={[
-          `/${URL_WANDB}/:entity?/:project?/:assetType?/:preview?`,
-          `/${URL_WANDB}/:entity?/:project?/:assetType?`,
-          `/${URL_WANDB}/:entity?/:project?`,
-          `/${URL_WANDB}/:entity?`,
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?/:preview?`,
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?`,
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?`,
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?`,
         ]}>
         <Main browserType={URL_WANDB} />
       </Route>
-      <Route path={`/${URL_LOCAL}/:assetType?/:preview?`}>
+      <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
         <Main browserType={URL_LOCAL} />
       </Route>
       <Route path="/">

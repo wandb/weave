@@ -137,6 +137,7 @@ import {
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 import {Option} from '@wandb/weave/common/util/uihelpers';
+import {useIsMounted} from '@wandb/weave/common/util/hooks';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -521,7 +522,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   );
 
   const updateGroupBy = useCallback(
-    (
+    async (
       enabled: boolean,
       seriesIndex: number,
       dimName: keyof SeriesConfig['dims'],
@@ -530,20 +531,29 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       const fn = enabled
         ? TableState.enableGroupByCol
         : TableState.disableGroupByCol;
-      let newTable = fn(
+      let newTable = await fn(
         config.series[seriesIndex].table,
-        value
+        value,
+        inputNode,
+        weave,
+        stack
         // config.series[seriesIndex].dims[dimension.name as keyof SeriesConfig['dims']]
       );
       if (dimName === 'label') {
-        newTable = fn(newTable, config.series[seriesIndex].dims.color);
+        newTable = await fn(
+          newTable,
+          config.series[seriesIndex].dims.color,
+          inputNode,
+          weave,
+          stack
+        );
       }
       const newConfig = produce(config, draft => {
         draft.series[seriesIndex].table = newTable;
       });
       updateConfig(newConfig);
     },
-    [config, updateConfig]
+    [config, inputNode, stack, updateConfig, weave]
   );
 
   const newSeriesConfigDom = useMemo(() => {
@@ -1970,6 +1980,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     updateConfig: propsUpdateConfig,
     updateConfig2: propsUpdateConfig2,
   } = props;
+  const isMounted = useIsMounted();
 
   const [brushMode, setBrushMode] = useState<BrushMode>('zoom');
 
@@ -2140,7 +2151,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     (dimName: 'x' | 'y') => {
       return (newVal: Node) => {
         const currDomain = configRef.current.signals.domain[dimName];
-        if (weave.expToString(newVal) !== weave.expToString(currDomain)) {
+        if (!weave.isExpLogicallyEqual(newVal, currDomain)) {
           updateConfig2((oldConfig: PlotConfig) => {
             return {
               ...oldConfig,
@@ -2719,7 +2730,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.color = {
           datum: PlotState.defaultSeriesName(series, weave),
           title: 'series',
-          legend: {...defaultFontStyleDict},
+          legend: concreteConfig.legendSettings.color.noLegend
+            ? false
+            : {...defaultFontStyleDict},
         };
       }
 
@@ -2749,7 +2762,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           } else {
             newSpec.encoding.size = {
               field: fixKeyForVega(dims.pointSize),
-              legend: {...defaultFontStyleDict},
+              legend: concreteConfig.legendSettings.pointSize.noLegend
+                ? false
+                : {...defaultFontStyleDict},
             };
 
             if (isAssignableTo(dimTypes.pointSize, maybe('number'))) {
@@ -2772,7 +2787,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           );
 
           newSpec.encoding.shape = {
-            legend: {...defaultFontStyleDict},
+            legend: concreteConfig.legendSettings.pointShape.noLegend
+              ? false
+              : {...defaultFontStyleDict},
             field: fixKeyForVega(dims.pointShape),
           };
 
@@ -2786,7 +2803,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             newSpec.mark.shape = series.constants.pointShape;
           } else {
             newSpec.encoding.shape = {
-              legend: {...defaultFontStyleDict},
+              legend: concreteConfig.legendSettings.pointShape.noLegend
+                ? false
+                : {...defaultFontStyleDict},
               datum: PlotState.defaultSeriesName(series, weave),
               title: 'series',
             };
@@ -2802,7 +2821,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           encoding: {
             strokeDash: {
               datum: PlotState.defaultSeriesName(series, weave),
-              legend: {...defaultFontStyleDict},
+              legend:
+                concreteConfig.series.length > 1 &&
+                !concreteConfig.legendSettings.lineStyle.noLegend
+                  ? {...defaultFontStyleDict}
+                  : false,
               title: 'series',
               scale: lineStyleScale,
             },
@@ -2990,6 +3013,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     isOrgDashboard,
     concreteConfig.series,
     concreteConfig?.vegaOverlay,
+    concreteConfig.legendSettings,
     isDashboard,
     hasLine,
     brushableAxes,
@@ -3111,6 +3135,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       axisSettings.x.noTicks
     ) {
       newSpec.encoding.x.axis = false;
+    } else {
+      // set the maximum length of x axis labels to be 75 pixels
+      newSpec.encoding.x.axis.labelLimit = 75;
     }
     if (newSpec.encoding.y != null) {
       newSpec.encoding.y.axis = {...defaultFontStyleDict};
@@ -3380,6 +3407,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const handleTooltip = useCallback(
     (toolTipHandler: any, event: any, item: any, value: any) => {
+      if (!isMounted()) {
+        return;
+      }
       let {x, y}: {x?: number; y?: number} = {};
 
       if (value == null) {
@@ -3403,7 +3433,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         setTooltipPos({x, y, value});
       }
     },
-    [setTooltipPos]
+    [isMounted]
   );
 
   const isLineTooltip = useMemo(
@@ -3426,7 +3456,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }
 
     const row = opIndex({
-      arr: listOfTableNodes[tooltipSeriesIndex],
+      arr: opIndex({
+        arr: flatResultNode,
+        index: constNumber(tooltipSeriesIndex),
+      }),
       index: constNumber(valueResultIndex),
     });
     const toolTipFn =
@@ -3450,7 +3483,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   }, [
     config.series,
     toolTipPos.value,
-    listOfTableNodes,
+    flatResultNode,
     vegaReadyTables,
     weave.client.opStore,
     tooltipLineData,
@@ -3466,6 +3499,29 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       }).handler,
     [tooltipNode]
   );
+
+  const [isMouseOver, setIsMouseOver] = useState<boolean>(false);
+  const panelPlotDivRef = useRef<HTMLDivElement>(document.createElement('div'));
+
+  useEffect(() => {
+    const onMouseMove = (e: any) => {
+      if (
+        panelPlotDivRef.current &&
+        e.target &&
+        panelPlotDivRef.current.contains(e.target)
+      ) {
+        setIsMouseOver(true);
+      } else {
+        setIsMouseOver(false);
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+    };
+  }, []);
 
   const updateTooltipConfig = useMemo(() => {
     const noop = (newPanelConfig: any) => {};
@@ -3496,6 +3552,15 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const loaderComp = <Panel2Loader />;
 
+  // Hardcode plot colors for now.
+  if (vegaSpec.encoding.color == null) {
+    vegaSpec.encoding.color = {};
+  }
+  if (vegaSpec.encoding.color.scale == null) {
+    vegaSpec.encoding.color.scale = {};
+  }
+  vegaSpec.encoding.color.scale.range = globals.WB_RUN_COLORS;
+
   return (
     <div
       data-test="panel-plot-2-wrapper"
@@ -3507,12 +3572,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         position: 'relative',
         alignItems: 'flex-start',
       }}
+      ref={panelPlotDivRef}
       className={loading ? 'loading' : ''}>
       {loading ? (
         <div style={{width: '100%', height: '100%'}}>{loaderComp}</div>
       ) : (
         <>
-          {isDash && (
+          {isDash && isMouseOver && (
             <div
               style={{
                 position: 'absolute',
@@ -3528,7 +3594,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           )}
           <div
             data-test-weave-id="plot"
-            style={{width: '100%', height: '100%'}}>
+            // Use overflow hidden so we don't get scrollbars during resizing,
+            // which cause measurement changes and flashes.
+            style={{width: '100%', height: '100%', overflow: 'hidden'}}>
             {toolTipsEnabled && (
               <Portal>
                 <div
@@ -3582,6 +3650,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               }}
               handleTooltip={handleTooltip}
               onNewView={onNewVegaView}
+              legendCutoffWidth={isDash ? 350 : undefined}
             />
           </div>
         </>
