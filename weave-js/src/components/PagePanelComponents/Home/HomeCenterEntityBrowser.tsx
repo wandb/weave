@@ -15,7 +15,6 @@ import moment from 'moment';
 import {
   Node,
   callOpVeryUnsafe,
-  constFunction,
   constString,
   list,
   opArtifactVersionFile,
@@ -23,7 +22,6 @@ import {
   opFileTable,
   opGet,
   opIsNone,
-  opMap,
   opPick,
   opProjectRuns,
   opRootProject,
