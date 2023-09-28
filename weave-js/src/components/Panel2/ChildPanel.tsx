@@ -555,6 +555,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   }, []);
 
   const {
+    documentId,
     config: fullConfig,
     updateConfig,
     updateConfig2,
@@ -662,7 +663,11 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       size="small"
                       icon="pencil-edit"
                       onClick={() =>
-                        setInteractingPanel('config', props.pathEl ?? '')
+                        setInteractingPanel(
+                          'config',
+                          props.pathEl ?? '',
+                          documentId
+                        )
                       }
                     />
                   }>
@@ -1014,7 +1019,7 @@ const EditorBarContent = styled.div`
   flex-shrink: 0;
   position: relative;
   left: -8px;
-  padding: 0 16px 8px;
+  padding: 2px 16px 8px;
   border-bottom: 1px solid ${GRAY_350};
   line-height: 20px;
   display: flex;

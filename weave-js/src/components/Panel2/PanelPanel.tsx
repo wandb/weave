@@ -346,6 +346,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   return {
     dispatch,
     loading: initialLoading,
+    documentId,
     panelConfig,
     selectedPanel,
     setInteractingPanel,
@@ -491,6 +492,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
 export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {
     loading,
+    documentId,
     panelConfig,
     panelUpdateConfig,
     panelUpdateConfig2,
@@ -589,6 +591,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
         justifyContent: 'space-around',
       }}>
       <PanelPanelContextProvider
+        documentId={documentId}
         config={panelConfig}
         updateConfig={panelUpdateConfig}
         updateConfig2={panelUpdateConfig2}>

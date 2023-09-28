@@ -25,6 +25,7 @@ export const EditableContainer = styled.div<{
       min-width: 200px;
     `}
 `;
+EditableContainer.displayName = 'S.EditableContainer';
 
 export const WeaveEditable = styled(Editable)<{$truncate?: boolean}>`
   width: 100%;
@@ -90,6 +91,7 @@ export const WeaveEditable = styled(Editable)<{$truncate?: boolean}>`
       }
     `}
 `;
+WeaveEditable.displayName = 'S.WeaveEditable';
 
 export const ApplyButton = styled(Button)`
   display: none;
@@ -99,6 +101,7 @@ export const ApplyButton = styled(Button)`
   padding: 0px 4px !important;
   height: 20px;
 `;
+ApplyButton.displayName = 'S.ApplyButton';
 
 export const SuggestionContainer = styled.div`
   position: absolute;
@@ -164,6 +167,7 @@ export const SuggestionPane = styled.div<{isBusy: boolean}>`
     }
   }
 `;
+SuggestionPane.displayName = 'S.SuggestionPane';
 
 export const StyledOpDoc = styled(OpDoc)`
   display: inline-block;
