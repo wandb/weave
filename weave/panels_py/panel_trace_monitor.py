@@ -1,7 +1,7 @@
 import os
 
 import weave
-from ..panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
+from weave.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
 from .. import dispatch
 from .. import weave_internal as internal
 from .. import weave_types as types
@@ -46,10 +46,10 @@ def make_span_table(input_node: graph.Node) -> panels.Table:
     )
     traces_table.add_column(lambda row: row["inputs"], "Inputs", panel_def="object")
     traces_table.add_column(lambda row: row["output"], "Output", panel_def="object")
-    # traces_table.add_column(lambda row: row["attributes"]["model"]["id"], "Model ID", panel_def="string")
-    traces_table.add_column(
-        lambda row: row["start_time_s"].toTimestamp(), "Timestamp", sort_dir="desc"
-    )
+    # traces_table.add_column(
+    #     lambda row: row["attributes.model.id"], "Model ID", panel_def="object"
+    # )
+    traces_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
 
     return traces_table
 
@@ -67,7 +67,7 @@ def make_span_table(input_node: graph.Node) -> panels.Table:
 def board(
     input_node,  # type: ignore
 ) -> panels.Group:
-    # timestamp_col_name = "timestamp"
+    timestamp_col_name = "timestamp"
 
     ### Varbar
 
@@ -75,30 +75,6 @@ def board(
     varbar = panel_board.varbar(editable=False)
 
     all_spans = varbar.add("all_spans", input_node)
-    # all_spans = varbar.add(
-    #     "all_spans",
-    #     all_spans_raw.map(
-    #         lambda row: weave.ops.dict_(
-    #             **{
-    #                 "name": row["name"],
-    #                 "span_id": row["span_id"],
-    #                 "parent_id": row["parent_id"],
-    #                 "trace_id": row["trace_id"],
-    #                 "start_time_s".toTimestamp(): row["start_time_s"].toTimestamp(),
-    #                 "end_time_s": row["end_time_s"],
-    #                 "status_code": row["status_code"],
-    #                 "inputs": row["inputs"],
-    #                 "output": row["output"],
-    #                 "exception": row["exception"],
-    #                 "attributes": row["attributes"],
-    #                 "summary": row["summary"],
-    #                 "timestamp": row["end_time_s"].toTimestamp(),
-    #                 "latency": row["end_time_s"] - row["start_time_s"].toTimestamp(),
-    #             }
-    #         )
-    #     ),
-    #     hidden=True,
-    # )
 
     trace_roots = all_spans.filter(lambda row: row["parent_id"].isNone())
 
@@ -130,8 +106,8 @@ def board(
     filtered_range = varbar.add(
         "filtered_range",
         weave.ops.make_list(
-            a=filtered_data["start_time_s"].toTimestamp().min(),
-            b=filtered_data["start_time_s"].toTimestamp().max(),
+            a=filtered_data[timestamp_col_name].min(),
+            b=filtered_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -142,9 +118,7 @@ def board(
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "time_range",
-        weave.panels.DateRange(
-            user_zoom_range, domain=trace_roots["start_time_s"].toTimestamp()
-        ),
+        weave.panels.DateRange(user_zoom_range, domain=trace_roots[timestamp_col_name]),
     )
 
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
@@ -158,8 +132,8 @@ def board(
         "window_data",
         trace_roots.filter(
             lambda row: weave.ops.Boolean.bool_and(
-                row["start_time_s"].toTimestamp() >= bin_range[0],
-                row["start_time_s"].toTimestamp() <= bin_range[1],
+                row[timestamp_col_name] >= bin_range[0],
+                row[timestamp_col_name] <= bin_range[1],
             )
         ),
         hidden=True,
@@ -189,11 +163,10 @@ def board(
         panel_autoboard.timeseries(
             filtered_data,
             bin_domain_node=bin_range,
-            x_axis_key=lambda row: row["start_time_s"].toTimestamp(),
+            x_axis_key="timestamp",
             y_expr=lambda row: row.map(
                 lambda ir: ir["end_time_s"] - ir["start_time_s"]
             ).avg(),
-            # y_expr=lambda row: row["latency"].avg(),
             y_title="avg latency (s)",
             color_expr=lambda row: grouping_fn(row),
             color_title="Root Span Name",
@@ -205,8 +178,7 @@ def board(
 
     overview_tab.add(
         "latency_distribution",
-        filtered_window_data.map(lambda row: (row["end_time_s"] - row["start_time_s"])),
-        # filtered_window_data["latency"],
+        filtered_window_data.map(lambda row: row["end_time_s"] - row["start_time_s"]),
         layout=weave.panels.GroupPanelLayout(x=6, y=0, w=6, h=6),
     )
 
@@ -215,7 +187,7 @@ def board(
         panel_autoboard.timeseries(
             filtered_data,
             bin_domain_node=bin_range,
-            x_axis_key=lambda row: row["start_time_s"].toTimestamp(),
+            x_axis_key="timestamp",
             y_expr=lambda row: (
                 row.filter(
                     lambda inner_row: inner_row["status_code"] == "SUCCESS"

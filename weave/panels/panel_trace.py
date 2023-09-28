@@ -17,8 +17,7 @@ span_typed_dict_type = weave.types.TypedDict(
         "exception": weave.types.optional(weave.types.String()),
         "attributes": weave.types.optional(weave.types.TypedDict({})),
         "summary": weave.types.optional(weave.types.TypedDict({})),
-        # This should NOT be here!
-        # "timestamp": weave.types.optional(weave.types.Timestamp()),
+        "timestamp": weave.types.optional(weave.types.Timestamp()),
     },
     not_required_keys=set(
         ["status_code", "inputs", "output", "exception", "attributes", "summary"]

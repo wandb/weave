@@ -60,7 +60,7 @@ class AutoBoardConfig:
 def timeseries(
     input_node: weave.Node[list[typing.Any]],
     bin_domain_node: weave.Node,
-    x_axis_key: typing.Union[str, typing.Callable],
+    x_axis_key: str,
     y_expr: typing.Callable,
     y_title: str,
     color_expr: typing.Callable,
@@ -69,24 +69,20 @@ def timeseries(
     n_bins: int,
     mark: panel_plot.MarkOption = "line",
 ) -> weave.Panel:
-    x_axis_title = "Date"
-    if isinstance(x_axis_key, str):
-        x_axis_title = x_axis_key
-        x_axis_key = lambda row: row[x_axis_title]
-    x_axis_type = x_axis_key(input_node).type.object_type  # type: ignore
+    x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
         x_title = ""
         bin_fn = weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
-        x_title = x_axis_title
+        x_title = x_axis_key
         bin_fn = weave.ops.numbers_bins_equal
     else:
-        raise ValueError(f"Unsupported type for x_axis_key: {x_axis_type}")
+        raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     if mark == "bar":
-        x = lambda row: x_axis_key(row).bin(bin_fn(bin_domain_node, n_bins))
+        x = lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins))
     else:
         # TODO: should be midpoint
-        x = lambda row: x_axis_key(row).bin(bin_fn(bin_domain_node, n_bins))["start"]
+        x = lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins))["start"]
 
     return weave.panels.Plot(
         input_node,
