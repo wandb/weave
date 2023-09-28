@@ -3,7 +3,7 @@ import styled from 'styled-components';
 
 export const Table = styled.div`
   font-size: 13px;
-
+  display: table;
   padding: 2px;
 `;
 Table.displayName = 'S.Table';
