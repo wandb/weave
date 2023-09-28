@@ -101,6 +101,15 @@ def test_stream_logging_image(user_by_api_key_in_env):
     assert isinstance(images[0], Image.Image)
 
 
+def test_stream_table_entity_inference(user_by_api_key_in_env):
+    st = make_stream_table("stream-tables/test_table-entity-inference")
+    for i in range(3):
+        st.log({"image": [1, 2, 3]})
+    st.finish()
+
+    assert st._entity_name == "asd"
+
+
 def test_multi_writers_sequential(user_by_api_key_in_env):
     st = make_stream_table(
         "test_table",
