@@ -14,11 +14,10 @@ import uuid
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
 from wandb.sdk.lib.ipython import _get_python_type
-from wandb.sdk.internal import internal_api
-
 
 from .wandb_lite_run import InMemoryLazyLiteRun
 
+from .. import wandb_api
 from .. import runfiles_wandb
 from .. import storage
 from .. import weave_types
@@ -135,10 +134,13 @@ class _StreamTableSync:
 
         if entity_name is None or entity_name == "":
             # Use user's default entity
-            api = internal_api.Api()
-            entity_name = api.default_entity
-            if not entity_name:
-                raise ValueError("Entity not specified and no default entity found.")
+            api = wandb_api.get_wandb_api_sync()
+            entity_name = api.default_entity_name()
+            # get default entity
+            if entity_name is None or entity_name == "":
+                raise ValueError(
+                    "Entity not specified and no default entity found. Please specify entity_name or set default entity with `wandb login --entity <entity_name>`"
+                )
         elif project_name is None or project_name == "":
             raise ValueError("Must specify project_name")
         elif table_name is None or table_name == "":
