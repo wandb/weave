@@ -487,7 +487,6 @@ const legacyTraceRowToSimpleNode = (
 };
 
 const convertSimpleLegacyNodeToNewFormat = (node: Node) => {
-  // WARNING: This is a slow operation due to json parsing.
   return opConcat({
     arr: callOpVeryUnsafe(
       'wb_trace_tree-convertToSpans',

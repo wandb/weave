@@ -18,7 +18,6 @@ if typing.TYPE_CHECKING:
 from . import weave_types as types
 from . import box
 from . import uris
-from . import engine_trace
 
 
 @dataclasses.dataclass
@@ -93,48 +92,41 @@ class ObjectContext:
     def finish_mutation(self, target_uri: str) -> None:
         from . import artifact_fs, artifact_local, artifact_wandb
 
-        tracer = engine_trace.tracer()
-        with tracer.trace("finish_mutation:" + target_uri):
-            with tracer.trace("finish_mutation.get"):
-                target_record = self.objects.get(target_uri)
-            if target_record is None:
-                raise ValueError("No object to finish mutation on")
-            if not target_record.mutations:
-                return
+        target_record = self.objects.get(target_uri)
+        if target_record is None:
+            raise ValueError("No object to finish mutation on")
+        if not target_record.mutations:
+            return
 
-            if target_record.branched_from_uri is None:
-                source_uri = uris.WeaveURI.parse(target_uri)
-                art = artifact_local.LocalArtifact(source_uri.name, source_uri.version)
-            else:
-                source_uri = uris.WeaveURI.parse(target_record.branched_from_uri)
-                # Note: the mutation bookeeping is done at the individual object level,
-                # so the path component is often non-empty. However, since we are managing
-                # state at the artifact level, we need to ensure the path is empty to conform
-                # to the expectations of the branching logic.
-                source_uri.path = ""  # type: ignore
-                with tracer.trace("finish_mutation.fork"):
-                    art = artifact_local.LocalArtifact.fork_from_uri(source_uri)  # type: ignore
+        if target_record.branched_from_uri is None:
+            source_uri = uris.WeaveURI.parse(target_uri)
+            art = artifact_local.LocalArtifact(source_uri.name, source_uri.version)
+        else:
+            source_uri = uris.WeaveURI.parse(target_record.branched_from_uri)
+            # Note: the mutation bookeeping is done at the individual object level,
+            # so the path component is often non-empty. However, since we are managing
+            # state at the artifact level, we need to ensure the path is empty to conform
+            # to the expectations of the branching logic.
+            source_uri.path = ""  # type: ignore
+            art = artifact_local.LocalArtifact.fork_from_uri(source_uri)  # type: ignore
 
-            obj = box.box(target_record.val)
-            target_branch = uris.WeaveURI.parse(target_uri).version
-            if target_branch is None:
-                raise ValueError("No branch to finish mutation on")
+        obj = box.box(target_record.val)
+        target_branch = uris.WeaveURI.parse(target_uri).version
+        if target_branch is None:
+            raise ValueError("No branch to finish mutation on")
 
-            from weave import artifact_wandb
+        from weave import artifact_wandb
 
-            # Hack: if the target branch looks like a commit hash, then we
-            # don't want to use it as a branch - this is the case that we are
-            # mutating an artifact directly without a branch. Seems like we
-            # might want to put this logic elsewhere, but for now this works.
-            if artifact_wandb.likely_commit_hash(target_branch):
-                target_branch = None
-            with tracer.trace("finish_mutation.type_of"):
-                weave_type = types.TypeRegistry.type_of(obj)
-            with tracer.trace("finish_mutation.set"):
-                ref = art.set("obj", weave_type, obj)
-            artifact_fs.update_weave_meta(weave_type, art)
-            with tracer.trace("finish_mutation.save"):
-                art.save(branch=target_branch)  # type: ignore
+        # Hack: if the target branch looks like a commit hash, then we
+        # don't want to use it as a branch - this is the case that we are
+        # mutating an artifact directly without a branch. Seems like we
+        # might want to put this logic elsewhere, but for now this works.
+        if artifact_wandb.likely_commit_hash(target_branch):
+            target_branch = None
+        weave_type = types.TypeRegistry.type_of(obj)
+        ref = art.set("obj", weave_type, obj)
+        artifact_fs.update_weave_meta(weave_type, art)
+        art.save(branch=target_branch)  # type: ignore
 
     def finish_mutations(self) -> None:
         for target_uri in self.objects.keys():
