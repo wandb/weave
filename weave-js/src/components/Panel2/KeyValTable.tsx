@@ -3,37 +3,32 @@ import styled from 'styled-components';
 
 export const Table = styled.div`
   font-size: 13px;
-  display: table;
+
   padding: 2px;
 `;
 Table.displayName = 'S.Table';
 
 export const Rows = styled.div`
-  margin-top: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
 `;
 Rows.displayName = 'S.Rows';
 
 export const Row = styled.div`
-  display: flex;
-  gap: 2px;
+  display: contents;
 `;
 Row.displayName = 'S.Row';
 
 export const Key = styled.div`
   white-space: nowrap;
-  text-overflow: ellipsis;
-  vertical-align: top;
   padding: 0 !important;
   color: ${globals.gray500};
-  width: 100px;
+  grid-column: 1;
 `;
 Key.displayName = 'S.Key';
 
 export const Val = styled.div`
-  padding: 0 !important;
+  grid-column: 2;
 `;
 Val.displayName = 'S.Val';
 
