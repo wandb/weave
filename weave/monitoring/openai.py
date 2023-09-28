@@ -54,7 +54,9 @@ def openai_create_preprocess(span: monitor.SpanWithInputs) -> None:
         span.disable_autoclose()
 
 
-def process_chat_completion_choice(existing_choices: list[typing.Any], update_choices: list[typing.Any]) -> list[typing.Any]:
+def process_chat_completion_choice(
+    existing_choices: list[typing.Any], update_choices: list[typing.Any]
+) -> list[typing.Any]:
     for choice_update in update_choices:
         index = choice_update["index"]
         if index > len(existing_choices) - 1:
@@ -71,36 +73,36 @@ def process_chat_completion_choice(existing_choices: list[typing.Any], update_ch
     return existing_choices
 
 
-def process_completion_choice(existing_choices: list[typing.Any], update_choices: list[typing.Any]) -> list[typing.Any]:
+def process_completion_choice(
+    existing_choices: list[typing.Any], update_choices: list[typing.Any]
+) -> list[typing.Any]:
     for choice_update in update_choices:
         index = choice_update["index"]
         if index > len(existing_choices) - 1:
             for i in range(len(existing_choices), index + 1):
-                existing_choices.append(
-                    {"index": i, "text": "", "finish_reason": None}
-                )
-        existing_choices[index]["text"] = existing_choices[index]["text"] + choice_update["text"]
+                existing_choices.append({"index": i, "text": "", "finish_reason": None})
+        existing_choices[index]["text"] = (
+            existing_choices[index]["text"] + choice_update["text"]
+        )
         if "finish_reason" in choice_update:
             existing_choices[index]["finish_reason"] = choice_update["finish_reason"]
     return existing_choices
 
 
-def count_chat_completion_tokens(span: monitor.SpanWithInputsAndOutput, record: typing.Any):
+def count_chat_completion_tokens(
+    span: monitor.SpanWithInputsAndOutput, record: typing.Any
+):
     summary = {}
     encoding = tiktoken.encoding_for_model(record["model"])
 
-    prompt_tokens = (
-        encoding.encode(m["content"]) for m in span.inputs["messages"]
-    )
+    prompt_tokens = (encoding.encode(m["content"]) for m in span.inputs["messages"])
     summary["prompt_tokens"] = sum(len(c) for c in prompt_tokens)
 
     completion_tokens = (
         encoding.encode(c["message"]["content"]) for c in record["choices"]
     )
     summary["completion_tokens"] = sum(len(c) for c in completion_tokens)
-    summary["total_tokens"] = (
-        summary["prompt_tokens"] + summary["completion_tokens"]
-    )
+    summary["total_tokens"] = summary["prompt_tokens"] + summary["completion_tokens"]
     return summary
 
 
@@ -114,14 +116,15 @@ def count_completion_tokens(span: monitor.SpanWithInputsAndOutput, record: typin
     completion_tokens = 0
     for c in record["choices"]:
         completion_tokens += len(encoding.encode(c["text"]))
-#    completion_tokens = (encoding.encode(c["text"] for c in record["choices"]))
+    #    completion_tokens = (encoding.encode(c["text"] for c in record["choices"]))
     summary["completion_tokens"] = completion_tokens
-    summary["total_tokens"] = (
-        summary["prompt_tokens"] + summary["completion_tokens"]
-    )
+    summary["total_tokens"] = summary["prompt_tokens"] + summary["completion_tokens"]
     return summary
 
-def openai_create_postprocess(process_choice_fn: typing.Any, count_token_fn: typing.Any) -> typing.Any:
+
+def openai_create_postprocess(
+    process_choice_fn: typing.Any, count_token_fn: typing.Any
+) -> typing.Any:
     def post_process(span: monitor.SpanWithInputsAndOutput):
         def wrapped_gen(gen: typing.Generator) -> typing.Generator:
             # TODO: this needs to compute token usage.
@@ -135,7 +138,9 @@ def openai_create_postprocess(process_choice_fn: typing.Any, count_token_fn: typ
                         "model": item["model"],
                         "choices": [],
                     }
-                record["choices"] = process_choice_fn(record["choices"], item["choices"])
+                record["choices"] = process_choice_fn(
+                    record["choices"], item["choices"]
+                )
                 yield item
             if record is not None:
                 span.summary.update(count_token_fn(span, record))
@@ -152,13 +157,18 @@ def openai_create_postprocess(process_choice_fn: typing.Any, count_token_fn: typ
             span.summary[k] = v
 
         return span.output
+
     return post_process
 
 
 mon = monitor.default_monitor()
 
+
 def monitored_create(openai_func, process_choice_fn, count_token_fn):
-    return mon.trace(preprocess=openai_create_preprocess, postprocess=openai_create_postprocess(process_choice_fn, count_token_fn))(openai_func)
+    return mon.trace(
+        preprocess=openai_create_preprocess,
+        postprocess=openai_create_postprocess(process_choice_fn, count_token_fn),
+    )(openai_func)
 
 
 def message_from_stream(stream: typing.Generator) -> typing.Any:
@@ -180,9 +190,16 @@ def message_from_stream(stream: typing.Generator) -> typing.Any:
 class ChatCompletion:
     @staticmethod
     def create(**kwargs: typing.Any) -> typing.Any:
-        return monitored_create(openai.ChatCompletion.create, process_chat_completion_choice, count_chat_completion_tokens)(**kwargs)
+        return monitored_create(
+            openai.ChatCompletion.create,
+            process_chat_completion_choice,
+            count_chat_completion_tokens,
+        )(**kwargs)
+
 
 class Completion:
     @staticmethod
     def create(**kwargs: typing.Any) -> typing.Any:
-        return monitored_create(openai.Completion.create, process_completion_choice, count_completion_tokens)(**kwargs)
+        return monitored_create(
+            openai.Completion.create, process_completion_choice, count_completion_tokens
+        )(**kwargs)
