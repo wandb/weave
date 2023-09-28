@@ -4,14 +4,14 @@ Built on Weights & Biases new library, weave, the W&B Engineering team want your
 
 LLM Monitoring is our observability and governance platform for all LLM-related work, [see here](##w&b-prompts) for more.
 
-The Feedback Sprint closes Sunday, October 22nd 2023, **[sign up here](https://wandb.ai/site/monitoring?utm_source=weave-github&utm_medium=github&utm_campaign=prompts-feedback-sprint&utm_term=prompts-feedback-sprint-sep23)** to participate and be in for a chance to win some W&B swag.
+The Feedback Sprint closes Sunday, October 22nd 2023, **[sign up for a free Weights & Biases account here](https://wandb.ai/site/monitoring?utm_source=weave-github&utm_medium=github&utm_campaign=prompts-feedback-sprint&utm_term=prompts-feedback-sprint-sep23)** to participate and be in for a chance to win some W&B swag.
 
 <div align="center">
   <img src="../../docs/assets/mini_prodmon_overview.gif" width="65%">
 </div>
 
 ## How to participate
-Join the W&B Prompts Feedback Sprint for a chance to win some W&B swag by **[signing up here](https://wandb.ai/site/monitoring?utm_source=weave-github&utm_medium=github&utm_campaign=prompts-feedback-sprint&utm_term=prompts-feedback-sprint-sep23)**
+Join the W&B Prompts Feedback Sprint for a chance to win some W&B swag by **[signing up for a free Weights & Biases account](https://wandb.ai/site/monitoring?utm_source=weave-github&utm_medium=github&utm_campaign=prompts-feedback-sprint&utm_term=prompts-feedback-sprint-sep23)**
 
 ### 1. Try W&B Prompts
 
