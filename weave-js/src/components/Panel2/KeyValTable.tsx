@@ -9,6 +9,7 @@ export const Table = styled.div`
 Table.displayName = 'S.Table';
 
 export const Rows = styled.div`
+  margin-top: 2px;
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 2px;
