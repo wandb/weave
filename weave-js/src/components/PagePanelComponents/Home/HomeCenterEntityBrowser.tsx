@@ -180,7 +180,7 @@ const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
     return <CenterProjectBoardsBrowser {...props} />;
   } else if (params.assetType === 'table') {
     return <CenterProjectTablesBrowser {...props} />;
-  } else if (params.assetType === 'legacy_trace') {
+  } else if (params.assetType === 'run_logged_trace') {
     return <CenterProjectLegacyTracesBrowser {...props} />;
   } else {
     return <>Not implemented</>;
@@ -228,8 +228,8 @@ const CenterProjectBrowserInner: React.FC<
         ? []
         : [
             {
-              _id: 'legacy_trace',
-              'asset type': 'Legacy Traces',
+              _id: 'run_logged_trace',
+              'asset type': 'Run Logged Traces',
               count: assetCounts.result.legacyTracesCount ?? 0,
             },
           ]),
@@ -473,42 +473,6 @@ const legacyTraceRowToSimpleNode = (
   projectName: string,
   legacyTraceKey: string
 ) => {
-  // return opPick({
-  //   obj: opConcat({
-  //     arr: opMap({
-  //       arr: opProjectRuns({
-  //         project: opRootProject({
-  //           entityName: constString(entityName),
-  //           projectName: constString(projectName),
-  //         }),
-  //       }),
-  //       mapFn: constFunction({row: 'run'}, ({row}) => {
-  //         return opRunHistory3({
-  //           run: row,
-  //         });
-  //       }),
-  //     }),
-  //   }),
-  //   key: constString(legacyTraceKey),
-  // });
-  // return opConcat({
-  //   arr: opMap({
-  //     arr: opProjectRuns({
-  //       project: opRootProject({
-  //         entityName: constString(entityName),
-  //         projectName: constString(projectName),
-  //       }),
-  //     }),
-  //     mapFn: constFunction({row: 'run'}, ({row}) => {
-  //       return opPick({
-  //         obj: opRunHistory3({
-  //           run: row,
-  //         }),
-  //         key: constString(legacyTraceKey),
-  //       });
-  //     }),
-  //   }),
-  // });
   return opPick({
     obj: opConcat({
       arr: opRunHistory3({
@@ -542,7 +506,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
 > = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
-  const browserTitle = 'Legacy Traces';
+  const browserTitle = 'Run Logged Traces';
   const weave = useWeaveContext();
   useEffect(() => {
     setDocumentTitle(
@@ -574,7 +538,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
               urlProjectAssetPreview(
                 entityName,
                 projectName,
-                'legacy_trace',
+                'run_logged_trace',
                 row._id
               )
             );
@@ -649,7 +613,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
         allowSearch
         title={browserTitle}
         selectedRowId={params.preview}
-        noDataCTA={`No legacy traces found for project: ${entityName}/${projectName}`}
+        noDataCTA={`No run logged traces found for project: ${entityName}/${projectName}`}
         breadcrumbs={[
           {
             key: 'entity',

@@ -1,12 +1,8 @@
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
-import {Button} from '../../Button';
-import {Node, Type, callOpVeryUnsafe} from '@wandb/weave/core';
-import {useNodeValue} from '@wandb/weave/react';
+import {Type} from '@wandb/weave/core';
 import * as Tabs from '@wandb/weave/components/Tabs';
 
-import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
-import {SetPreviewNodeType} from './common';
 import styled from 'styled-components';
 
 import ReactMarkdown from 'react-markdown';
@@ -15,7 +11,6 @@ import remarkGfm from 'remark-gfm';
 import './github-markdown-light.css';
 import {TargetBlank} from '@wandb/weave/common/util/links';
 import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
-import {Panel2Loader} from '../../Panel2/PanelComp';
 
 // This is considered a `hack` because I need to drop down to
 // access .tw-style, to give it a height 100%. When using tailwind
@@ -39,128 +34,6 @@ type TemplateType = {
   thumbnail_url?: string;
 };
 
-export const HomeFeaturedTemplates: React.FC<{
-  setPreviewNode: SetPreviewNodeType;
-}> = ({setPreviewNode}) => {
-  const featuredTemplatesNode = callOpVeryUnsafe(
-    'py_board-get_featured_board_templates',
-    {}
-  ) as Node;
-  const featuredTemplates = useNodeValue(featuredTemplatesNode);
-  if (featuredTemplates.result?.length === 0) {
-    // not expecting this to happen, but just in case
-    return null;
-  }
-  return (
-    <LayoutElements.VBlock
-      style={{
-        padding: '0px 12px 24px 12px',
-      }}>
-      <LayoutElements.HBlock>
-        <LayoutElements.BlockHeader
-          style={{
-            padding: '12px 12px',
-          }}>
-          FEATURED TEMPLATES
-        </LayoutElements.BlockHeader>
-      </LayoutElements.HBlock>
-      {featuredTemplates.loading ? (
-        <LayoutElements.Block style={{height: '166px'}}>
-          <Panel2Loader />
-        </LayoutElements.Block>
-      ) : (
-        <LayoutElements.HStack
-          style={{
-            gap: '16px',
-          }}>
-          {featuredTemplates.result.map((template: TemplateType, i: number) => (
-            <HomeFeaturedTemplateItem
-              key={template.op_name}
-              template={template}
-              setPreviewNode={setPreviewNode}
-            />
-          ))}
-        </LayoutElements.HStack>
-      )}
-    </LayoutElements.VBlock>
-  );
-};
-
-const HomeFeaturedTemplateItem: React.FC<{
-  template: TemplateType;
-  setPreviewNode: SetPreviewNodeType;
-}> = ({template, setPreviewNode}) => {
-  const node = (
-    <HomePreviewSidebarTemplate
-      title={template.display_name}
-      setPreviewNode={setPreviewNode}
-      isTemplate={true}
-      actions={[]}>
-      <HomeFeaturedTemplateDrawer template={template} />
-    </HomePreviewSidebarTemplate>
-  );
-
-  return (
-    <LayoutElements.HStack
-      style={{
-        border: '1px solid #E5E5E5',
-        borderRadius: '8px',
-        padding: '16px',
-        gap: '8px',
-      }}>
-      {template.thumbnail_url && (
-        <LayoutElements.Block
-          style={{
-            height: '132px',
-          }}>
-          <img
-            src={template.thumbnail_url}
-            alt={template.display_name + ' thumbnail'}
-            style={{
-              height: '100%',
-              borderRadius: '4px',
-              border: '2px solid #E5E5E5',
-            }}
-          />
-        </LayoutElements.Block>
-      )}
-      <LayoutElements.VStack
-        style={{
-          // gap: '8px',
-          flex: 1,
-          height: '132px',
-        }}>
-        <LayoutElements.HBlock
-          style={{
-            fontSize: '18px',
-            fontWeight: 800,
-          }}>
-          {template.display_name}
-        </LayoutElements.HBlock>
-        <LayoutElements.HStack
-          style={{
-            overflow: 'auto',
-          }}>
-          {template.description}
-        </LayoutElements.HStack>
-        <LayoutElements.HBlock
-          style={{
-            justifyContent: 'flex-end',
-          }}>
-          <Button
-            variant="secondary"
-            size="medium"
-            onClick={() => {
-              setPreviewNode(node, '40%');
-            }}>
-            Use template
-          </Button>
-        </LayoutElements.HBlock>
-      </LayoutElements.VStack>
-    </LayoutElements.HStack>
-  );
-};
-
 const TabContentWrapper = styled.div`
   overflow-y: scroll;
   padding: 16px;
@@ -174,7 +47,7 @@ const TabContentWrapper = styled.div`
 `;
 TabContentWrapper.displayName = 'S.TabContentWrapper';
 
-const HomeFeaturedTemplateDrawer: React.FC<{
+export const HomeFeaturedTemplateDrawer: React.FC<{
   template: TemplateType;
 }> = ({template}) => {
   const [tabValue, setTabValue] = React.useState('Instructions');

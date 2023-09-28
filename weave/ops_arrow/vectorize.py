@@ -14,6 +14,8 @@ from .. import dispatch
 from .. import weave_internal
 from .. import weavify
 
+from .. import graph_debug
+
 from .arrow import ArrowWeaveListType
 from .list_ import ArrowWeaveList
 from . import arraylist_ops
@@ -693,14 +695,15 @@ def _ensure_variadic_fn(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    logging.info("Vectorizing: %s", fn)
+    debug_str = graph_debug.node_expr_str_full(fn)
+    logging.info("Vectorizing: %s", debug_str)
     from .. import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)
-    logging.info("Vectorizing. Static branch resolution complete.: %s", fn)
-    from .. import graph_debug
+    logging.info("Vectorizing. Static branch resolution complete.: %s", debug_str)
 
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
-    logging.info("Vectorizing. Vectorized: %s", vecced)
+    debug_str = graph_debug.node_expr_str_full(vecced)
+    logging.info("Vectorizing. Vectorized: %s", debug_str)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     return _call_and_ensure_awl(awl, called)
