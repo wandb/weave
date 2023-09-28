@@ -28,6 +28,7 @@ export const Key = styled.div`
 Key.displayName = 'S.Key';
 
 export const Val = styled.div`
+  padding: 0 !important;
   grid-column: 2;
 `;
 Val.displayName = 'S.Val';
