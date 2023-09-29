@@ -532,7 +532,9 @@ async function autosuggestNodes(
         );
       }
     } else {
-      const availOps = availableOpsForChain(node, client.opStore);
+      const availOps = availableOpsForChain(node, client.opStore).filter(
+        opDef => !opDef.name.startsWith('objectConstructor-_new_')
+      );
       result = result.concat(
         availOps.flatMap(opDef => {
           return callOpVeryUnsafe(opDef.name, {

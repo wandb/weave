@@ -2,11 +2,15 @@ import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
 import * as Tabs from '@wandb/weave/components/Tabs';
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import * as LayoutElements from './LayoutElements';
 import styled from 'styled-components';
 import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
-import {NavigateToExpressionType, SetPreviewNodeType} from './common';
+import {
+  NavigateToExpressionType,
+  SetPreviewNodeType,
+  getArtifactVersionNodeFromUri,
+} from './common';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import {Node, NodeOrVoidNode} from '@wandb/weave/core';
 import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
@@ -30,6 +34,10 @@ import {
   CenterBrowserActionType,
   CenterBrowserDataType,
 } from './HomeCenterBrowser';
+import {BoardsTab} from './BoardsTab';
+import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
+import * as S from './styles';
+import {maybePluralize} from '../../../core/util/string';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -246,8 +254,10 @@ const getRecommendedTemplateInfo = (generators: Template[]) => {
 
 export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
+  previewExpr?: Node;
   navigateToExpression: NavigateToExpressionType;
-}> = ({expr, navigateToExpression}) => {
+  generatorAllowList?: string[];
+}> = ({expr, previewExpr, navigateToExpression, generatorAllowList}) => {
   const refinedExpression = useNodeWithServerType(expr);
   const generators = useBoardGeneratorsForNode(expr);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -255,8 +265,41 @@ export const HomeExpressionPreviewParts: React.FC<{
 
   const isLoadingTemplates =
     generators.loading || refinedExpression.loading || isGenerating;
-  const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
-  const recommendedTemplateInfo = getRecommendedTemplateInfo(generators.result);
+  const finalGenerators = useMemo(() => {
+    if (generators.loading || !generators.result) {
+      return [];
+    }
+
+    if (!generatorAllowList) {
+      return generators.result;
+    }
+    return generators.result.filter(generator =>
+      generatorAllowList.includes(generator.op_name)
+    );
+  }, [generatorAllowList, generators.loading, generators.result]);
+  const hasTemplates = !isLoadingTemplates && finalGenerators.length > 1;
+  const recommendedTemplateInfo = getRecommendedTemplateInfo(finalGenerators);
+
+  // Create an Artifact version node to look up the artifacts that depend on this one.
+  // TODO: Implement a less brittle way of pulling the URI from the get op.
+  //       This should also let us get rid of the "any".
+  let nodeArtifactVersion = null;
+  const outputNode = expr as any;
+  const sourceType = outputNode.fromOp.name;
+  if (sourceType === 'table-rows') {
+    const uri =
+      outputNode.fromOp.inputs.table.fromOp.inputs.file.fromOp.inputs
+        .artifactVersion.fromOp.inputs.uri.val;
+    nodeArtifactVersion = getArtifactVersionNodeFromUri(uri, 'run_table');
+  } else if (sourceType === 'stream_table-rows') {
+    const uri = outputNode.fromOp.inputs.self.fromOp.inputs.uri.val;
+    nodeArtifactVersion = getArtifactVersionNodeFromUri(uri, 'stream_table');
+  } else {
+    // Previewing a board.
+  }
+
+  const hasBoardsTab = nodeArtifactVersion != null;
+  const dependencyQuery = useArtifactDependencyOfForNode(nodeArtifactVersion);
 
   useEffect(() => {
     setTabValue('Overview');
@@ -273,19 +316,20 @@ export const HomeExpressionPreviewParts: React.FC<{
           {hasTemplates && (
             <Tabs.Trigger value="Templates">Templates</Tabs.Trigger>
           )}
-          {/* <Tabs.Trigger value="Boards">Boards</Tabs.Trigger> */}
+          {hasBoardsTab && <Tabs.Trigger value="Boards">Boards</Tabs.Trigger>}
         </Tabs.List>
         {/* 38 px is the height of the tab header, to make sure the height of content doesnt exceed window, its explicitly set here */}
         <Tabs.Content value="Overview" style={{height: 'calc( 100% - 38px )'}}>
           <TabContentWrapper>
             <OverviewTab
               expr={expr}
+              previewExpr={previewExpr}
               navigateToExpression={navigateToExpression}
               refinedExpression={refinedExpression}
               recommendedTemplateInfo={recommendedTemplateInfo}
               isLoadingTemplates={isLoadingTemplates}
               setIsGenerating={setIsGenerating}
-              generators={generators.result}
+              generators={finalGenerators}
               setTabValue={setTabValue}
               hasTemplates={hasTemplates}
             />
@@ -302,12 +346,24 @@ export const HomeExpressionPreviewParts: React.FC<{
                 recommendedTemplateInfo={recommendedTemplateInfo}
                 isLoadingTemplates={isLoadingTemplates}
                 setIsGenerating={setIsGenerating}
-                generators={generators.result}
+                generators={finalGenerators}
               />
             </TabContentWrapper>
           </Tabs.Content>
         )}
-        {/* <Tabs.Content value="Boards" style={{height: 'calc( 100% - 38px )'}}>Boards</Tabs.Content> */}
+        <Tabs.Content value="Boards" style={{height: 'calc( 100% - 38px )'}}>
+          {hasBoardsTab && (
+            <BoardsTab
+              dependencyQuery={dependencyQuery}
+              navigateToExpression={navigateToExpression}
+              isLoadingTemplates={isLoadingTemplates}
+              setIsGenerating={setIsGenerating}
+              setTabValue={setTabValue}
+              hasTemplates={hasTemplates}
+              refinedExpression={refinedExpression}
+            />
+          )}
+        </Tabs.Content>
       </Tabs.Root>
     </HomeExpressionPreviewPartsWrapper>
   );
@@ -315,6 +371,7 @@ export const HomeExpressionPreviewParts: React.FC<{
 
 const OverviewTab = ({
   expr,
+  previewExpr,
   navigateToExpression,
   refinedExpression,
   recommendedTemplateInfo,
@@ -325,6 +382,7 @@ const OverviewTab = ({
   hasTemplates,
 }: {
   expr: Node;
+  previewExpr?: Node;
   navigateToExpression: NavigateToExpressionType;
   refinedExpression: {
     loading: boolean;
@@ -338,11 +396,15 @@ const OverviewTab = ({
   hasTemplates: boolean;
 }) => {
   const weave = useWeaveContext();
-  const inputExpr = weave.expToString(expr);
+  const pExpr = previewExpr ?? expr;
+  const previewExprString = weave.expToString(pExpr);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
   const [copyButtonText, setCopyButtonText] = useState<'Copy' | 'Copied'>(
     'Copy'
   );
+  const showSeedBoard = generators.find(g => g.op_name === SEED_BOARD_OP_NAME)
+    ? true
+    : false;
 
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
@@ -351,7 +413,7 @@ const OverviewTab = ({
           PREVIEW
           <Button
             onClick={() => {
-              navigateToExpression(expr);
+              navigateToExpression(pExpr);
             }}
             size="small"
             variant="ghost"
@@ -360,7 +422,7 @@ const OverviewTab = ({
           </Button>
         </LayoutElements.BlockHeader>
         <LayoutElements.Block>
-          <PreviewNode inputExpr={inputExpr} />
+          <PreviewNode inputExpr={previewExprString} />
         </LayoutElements.Block>
       </LayoutElements.VBlock>
       <LayoutElements.VBlock style={{gap: '8px'}}>
@@ -435,31 +497,36 @@ const OverviewTab = ({
                       isExpanded={true}
                       isRecommended={true}
                     />
-                    <Label style={{display: 'flex', justifyContent: 'center'}}>
-                      or
-                    </Label>
+                    {showSeedBoard && (
+                      <Label
+                        style={{display: 'flex', justifyContent: 'center'}}>
+                        or
+                      </Label>
+                    )}
                   </>
                 )}
-              <DashboardTemplate
-                key={SEED_BOARD_OP_NAME}
-                subtitle="Seed a board with a simple visualization of this table."
-                onButtonClick={() => {
-                  setIsGenerating(true);
-                  makeBoardFromNode(
-                    SEED_BOARD_OP_NAME,
-                    refinedExpression.result as any,
-                    newDashExpr => {
-                      setIsGenerating(false);
-                      navigateToExpression(newDashExpr);
-                    }
-                  );
-                }}
-                isExpanded={true}
-                buttonVariant={
-                  generators.length === 1 ? 'primary' : 'secondary'
-                }
-                buttonText="New board"
-              />
+              {showSeedBoard && (
+                <DashboardTemplate
+                  key={SEED_BOARD_OP_NAME}
+                  subtitle="Seed a board with a simple visualization of this table."
+                  onButtonClick={() => {
+                    setIsGenerating(true);
+                    makeBoardFromNode(
+                      SEED_BOARD_OP_NAME,
+                      refinedExpression.result as any,
+                      newDashExpr => {
+                        setIsGenerating(false);
+                        navigateToExpression(newDashExpr);
+                      }
+                    );
+                  }}
+                  isExpanded={true}
+                  buttonVariant={
+                    generators.length === 1 ? 'primary' : 'secondary'
+                  }
+                  buttonText="New board"
+                />
+              )}
             </LayoutElements.VStack>
           </LayoutElements.VBlock>
         )
@@ -499,6 +566,9 @@ const TemplateTab = ({
         gap: '8px',
         paddingBottom: '32px',
       }}>
+      <S.ObjectCount>
+        {maybePluralize(generators.length, 'template', 's')}
+      </S.ObjectCount>
       <Label
         style={{
           marginBottom: '8px',

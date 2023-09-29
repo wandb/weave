@@ -2151,7 +2151,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     (dimName: 'x' | 'y') => {
       return (newVal: Node) => {
         const currDomain = configRef.current.signals.domain[dimName];
-        if (weave.expToString(newVal) !== weave.expToString(currDomain)) {
+        if (!weave.isExpLogicallyEqual(newVal, currDomain)) {
           updateConfig2((oldConfig: PlotConfig) => {
             return {
               ...oldConfig,
@@ -3135,6 +3135,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       axisSettings.x.noTicks
     ) {
       newSpec.encoding.x.axis = false;
+    } else {
+      // set the maximum length of x axis labels to be 75 pixels
+      newSpec.encoding.x.axis.labelLimit = 75;
     }
     if (newSpec.encoding.y != null) {
       newSpec.encoding.y.axis = {...defaultFontStyleDict};
@@ -3497,6 +3500,29 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [tooltipNode]
   );
 
+  const [isMouseOver, setIsMouseOver] = useState<boolean>(false);
+  const panelPlotDivRef = useRef<HTMLDivElement>(document.createElement('div'));
+
+  useEffect(() => {
+    const onMouseMove = (e: any) => {
+      if (
+        panelPlotDivRef.current &&
+        e.target &&
+        panelPlotDivRef.current.contains(e.target)
+      ) {
+        setIsMouseOver(true);
+      } else {
+        setIsMouseOver(false);
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+    };
+  }, []);
+
   const updateTooltipConfig = useMemo(() => {
     const noop = (newPanelConfig: any) => {};
 
@@ -3546,12 +3572,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         position: 'relative',
         alignItems: 'flex-start',
       }}
+      ref={panelPlotDivRef}
       className={loading ? 'loading' : ''}>
       {loading ? (
         <div style={{width: '100%', height: '100%'}}>{loaderComp}</div>
       ) : (
         <>
-          {isDash && (
+          {isDash && isMouseOver && (
             <div
               style={{
                 position: 'absolute',
@@ -3623,6 +3650,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               }}
               handleTooltip={handleTooltip}
               onNewView={onNewVegaView}
+              legendCutoffWidth={isDash ? 350 : undefined}
             />
           </div>
         </>

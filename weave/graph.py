@@ -230,10 +230,19 @@ def op_full_name(op: Op) -> str:
 
 
 def node_expr_str(node: Node) -> str:
+    from . import partial_object
+
     if isinstance(node, OutputNode):
         param_names = list(node.from_op.inputs.keys())
         if node.from_op.name == "dict":
             return "{%s}" % ", ".join(
+                (
+                    '"%s": %s' % (k, node_expr_str(n))
+                    for k, n in node.from_op.inputs.items()
+                )
+            )
+        elif node.from_op.name == "list":
+            return "[%s]" % ", ".join(
                 (
                     '"%s": %s' % (k, node_expr_str(n))
                     for k, n in node.from_op.inputs.items()
@@ -256,6 +265,24 @@ def node_expr_str(node: Node) -> str:
         elif node.from_op.name == "gqlroot-wbgqlquery":
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
             return f"{node.from_op.friendly_name}({query_hash})"
+        elif node.from_op.name == "gqlroot-querytoobj":
+            const = node.from_op.inputs[param_names[2]]
+            try:
+                assert isinstance(const, ConstNode)
+                narrow_type = const.val
+                assert isinstance(narrow_type, partial_object.PartialObjectType)
+            except AssertionError:
+                return (
+                    f"{node_expr_str(node.from_op.inputs[param_names[0]])}."
+                    f"querytoobj({node_expr_str(node.from_op.inputs[param_names[1]])}, ?)"
+                )
+            else:
+                return (
+                    f"{node_expr_str(node.from_op.inputs[param_names[0]])}."
+                    f"querytoobj({node_expr_str(node.from_op.inputs[param_names[1]])},"
+                    f" {narrow_type.keyless_weave_type_class()})"
+                )
+
         elif all([not isinstance(n, OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
                 node.from_op.friendly_name,
@@ -294,7 +321,7 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
-    # This is an iterative implemenation, to avoid blowing the stack and
+    # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
     to_consider = [node]
     while to_consider:

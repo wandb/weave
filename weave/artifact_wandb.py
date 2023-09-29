@@ -5,6 +5,8 @@ import os
 import functools
 import tempfile
 import typing
+import requests
+import logging
 
 from wandb import Artifact
 from wandb.apis import public as wb_public
@@ -153,8 +155,7 @@ def _collection_and_alias_id_mapping_to_uri(
     client_collection_id: str, alias_name: str
 ) -> ReadClientArtifactURIResult:
     is_deleted = False
-    query = wb_public.gql(
-        """
+    query = """
     query ArtifactVersionFromIdAlias(
         $id: ID!,
         $aliasName: String!
@@ -192,19 +193,34 @@ def _collection_and_alias_id_mapping_to_uri(
         }
     }
     """
-    )
-    res = wandb_client_api.wandb_public_api().client.execute(
-        query,
-        variable_values={
-            "id": client_collection_id,
-            "aliasName": alias_name,
-        },
-    )
-    collection = res["artifactCollection"]
+
+    try:
+        res = wandb_client_api.query_with_retry(
+            query,
+            variables={
+                "id": client_collection_id,
+                "aliasName": alias_name,
+            },
+            num_timeout_retries=1,
+        )
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 400:
+            # This is a special case: the client id corresponds to an artifact that was
+            # never uploaded, so the client id doesn't exist in the W&B server.
+
+            collection = None
+            logging.warn(
+                f"Artifact collection with client id {client_collection_id} not present in W&B server."
+            )
+
+        else:
+            raise e
+    else:
+        collection = res["artifactCollection"]
 
     if collection is None:
         # Note: deleted collections are still returned by the API (with state=DELETED)
-        # So a missing collection is a real error.
+        # So a missing collection is a real error (unless it was never uploaded)
         raise errors.WeaveArtifactCollectionNotFound(
             f"Could not find artifact collection with client id {client_collection_id}"
         )
@@ -462,7 +478,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         # but the SDK add_reference call requires something like:
         # wandb-artifact://41727469666163743a353432353830303535/obj.object.json
         assert uri.startswith("wandb-artifact:///")
-        uri_path = "/".join(uri.split("/")[3:-1])  # Trim off protocol and /obj
+        uri_parts = WeaveWBArtifactURI.parse(uri)
+        uri_path = f"{uri_parts.entity_name}/{uri_parts.project_name}/{uri_parts.name}:{uri_parts.version}"
         ref_artifact = get_wandb_read_artifact(uri_path)
 
         # A reference needs to point to a specific existing file in the other artifact.

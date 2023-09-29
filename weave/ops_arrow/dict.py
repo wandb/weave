@@ -155,7 +155,8 @@ def preprocess_merge(self, other):
 @arrow_op(
     name="ArrowWeaveListTypedDict-merge",
     input_type={
-        "self": ArrowWeaveListType(types.TypedDict({})),
+        # Optional inner type to support nullability
+        "self": ArrowWeaveListType(types.optional(types.TypedDict({}))),
         "other": ArrowWeaveListType(types.TypedDict({})),
     },
     output_type=lambda input_types: ArrowWeaveListType(
@@ -171,6 +172,8 @@ def preprocess_merge(self, other):
 def merge(self, other):
     field_arrays: dict[str, pa.Array] = {}
     for arrow_weave_list in (self, other):
+        if isinstance(arrow_weave_list.object_type, types.NoneType):
+            continue
         for key in arrow_weave_list.object_type.property_types:
             if isinstance(arrow_weave_list._arrow_data, pa.Table):
                 field_arrays[key] = arrow_weave_list._arrow_data[key].combine_chunks()

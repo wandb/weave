@@ -65,6 +65,16 @@ export function isConstNodeWithType<T extends Type>(
   return isAssignableTo(constNode.type, type);
 }
 
+export function isConstNodeWithObjectType(
+  maybeNode: any
+): maybeNode is ConstNode<Type> {
+  return (
+    isConstNode(maybeNode) &&
+    has('_is_object', maybeNode.type) &&
+    maybeNode.type._is_object === true
+  );
+}
+
 export const outputTypeIsType = (
   ot: OutputTypeGeneric<any, any>
 ): ot is Type => {

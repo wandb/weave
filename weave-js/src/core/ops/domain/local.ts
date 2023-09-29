@@ -19,7 +19,6 @@ import {
   isUnion,
   list,
   listObjectType,
-  maybe,
   nonNullable,
   taggedValue,
   Type,
@@ -700,34 +699,6 @@ export const opCrossProduct = makeOp({
       return {type: 'list', objectType: typedDict(newPropTypes)};
     }
     throw new Error('unhandled type in op-cross-product');
-  },
-});
-
-export const opCond = makeOp({
-  name: 'op-cond',
-  renderInfo: {
-    type: 'function',
-  },
-  description: 'hello',
-  argDescriptions: {},
-  returnValueDescription: 'hello',
-  argTypes: {
-    cases: {
-      type: 'dict',
-      objectType: 'boolean',
-    },
-    results: {
-      type: 'dict',
-      objectType: 'any',
-    },
-  },
-  returnType: inputNodes => {
-    if (!isTypedDictLike(inputNodes.results.type)) {
-      throw new Error('unexpected type in opCond');
-    }
-    return maybe(
-      union(Object.values(typedDictPropertyTypes(inputNodes.results.type)))
-    );
   },
 });
 

@@ -9,7 +9,7 @@ import {CacheKey, DependencyAwareCache} from './types';
 export interface InMemoryCacheOpts<K extends CacheKey, IK extends any> {
   maxElements: number;
   keyFn: (oldKey: K) => IK;
-  onDispose?: (value: any, key: IK) => void;
+  onDispose?: (key: IK, value: any) => void;
 }
 
 export class InMemoryCache<
@@ -38,10 +38,7 @@ export class InMemoryCache<
 
   onDispose(key: IK, value: any): void {
     if (this.opts.onDispose) {
-      this.opts.onDispose(value, key);
-    }
-    if (this.dependencyMap.has(key)) {
-      this.dependencyMap.delete(key);
+      this.opts.onDispose(key, value);
     }
   }
 

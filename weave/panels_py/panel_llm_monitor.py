@@ -20,10 +20,10 @@ ops = weave.ops
 BOARD_ID = "llm_completions_monitor"
 
 # BOARD_DISPLAY_NAME is the name that will be displayed in the UI
-BOARD_DISPLAY_NAME = "Monitor OpenAI API"
+BOARD_DISPLAY_NAME = "Monitor OpenAI API usage"
 
 # BOARD_DESCRIPTION is the description that will be displayed in the UI
-BOARD_DESCRIPTION = "Use the OpenAI integration to track, monitor, & analyze API calls. LLM Engineers can better understand performance and quality; Admins can track trends and costs across entire organizations."
+BOARD_DESCRIPTION = "Use the OpenAI integration to track, monitor and analyze API calls. Understand performance and quality. Track trends and organization-wide costs."
 
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 BOARD_INPUT_WEAVE_TYPE = types.List(
@@ -440,5 +440,5 @@ template_registry.register(
     BOARD_DESCRIPTION,
     is_featured=True,
     instructions_md=instructions_md,
-    thumbnail_url="https://raw.githubusercontent.com/wandb/weave/master/docs/assets/full_board_view.png",
+    thumbnail_url="https://raw.githubusercontent.com/wandb/weave/master/docs/assets/monitor-open-ai-api-usage.png",
 )

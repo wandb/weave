@@ -113,7 +113,8 @@ def log_system_info():
     WEAVE_SERVER_URL = os.environ.get("WEAVE_SERVER_URL")
     WANDB_BASE_URL = os.environ.get("WANDB_BASE_URL", "http://api.wandb.ai")
     WEAVE_LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR")
-    netrc_exists = os.path.exists("~/.netrc")
+    dot_netrc_exists = os.path.exists(os.path.expanduser("~/.netrc"))
+    underscore_netrc_exists = os.path.exists(os.path.expanduser("~/_netrc"))
     WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
     WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
 
@@ -125,7 +126,8 @@ def log_system_info():
     logger.info(f"  WEAVE_LOCAL_ARTIFACT_DIR  = {WEAVE_LOCAL_ARTIFACT_DIR}")
 
     logger.info("Auth Config:")
-    logger.info(f"  netrc_exists        = {netrc_exists}")
+    logger.info(f"  ~/.netrc exists     = {dot_netrc_exists}")
+    logger.info(f"  ~/_netrc exists     = {underscore_netrc_exists}")
     logger.info(f"  WANDB_API_KEY       = {WANDB_API_KEY}")
     logger.info(f"  WEAVE_WANDB_COOKIE  = {WEAVE_WANDB_COOKIE}")
 
@@ -341,6 +343,10 @@ def execute():
 
     response_payload = _value_or_errors_to_response(fixed_response)
 
+    if root_span is not None:
+        root_span.set_metric("node_count", len(response_payload["data"]))
+        root_span.set_metric("error_count", len(response_payload["node_to_error"]))
+
     _log_errors(response_payload, response.nodes)
 
     if request.headers.get("x-weave-include-execution-time"):
@@ -369,7 +375,10 @@ def send_local_file(path):
     abspath = "/" / pathlib.Path(
         path
     )  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
-    local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
+    try:
+        local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
+    except errors.WeaveAccessDeniedError:
+        abort(403)
     if local_artifacts_path not in list(abspath.parents):
         abort(403)
     return send_from_directory("/", path)
@@ -382,6 +391,7 @@ def frontend_env():
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
+        "WANDB_BASE_URL": environment.wandb_base_url(),
     }
 
 

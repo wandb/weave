@@ -66,7 +66,8 @@ def run_chain(run_path: str) -> RunChain:
         used_arts = run.usedArtifactVersions()
         used_art_names = used_arts.name()
         used_art_type_names = used_arts.artifactType().name()
-        res = weave.use((used_art_names, used_art_type_names))
+        with compile.enable_compile():
+            res = weave.use((used_art_names, used_art_type_names))
 
         checkpoint_names = []
         for name, type_name in zip(res[0], res[1]):
@@ -102,7 +103,8 @@ def run_chain(run_path: str) -> RunChain:
             )
             nodes.append(checkpoint_json_node)
 
-        checkpoint_jsons = weave.use(nodes)
+        with compile.enable_compile():
+            checkpoint_jsons = weave.use(nodes)
         checkpoint_steps = [json.loads(c)["step"] for c in checkpoint_jsons]
         run_infos = [s[0] for s in seq]
 

@@ -11,6 +11,12 @@ Our mission is to equip Machine Learning practitioners with the best tools to tu
 
 Whether you are a seasoned data scientist, an aspiring ML practitioner, or just a tech enthusiast eager to play with data, Weave is for you.
 
+### 🔆 [Join the W&B Prompts Feedback Sprint - Sep 29th - Oct 22nd](examples/prompts/FEEDBACK_SPRINT.md) 🔆
+
+**Try W&B Prompts, share your thoughts, win swag!**
+
+The W&B engineering team want your feedback on how our new LLM tool, LLM Monitoring, can be tailored to your specific use cases. The programme closes Sunday, October 22nd 2023, **[click here to participate](examples/prompts/FEEDBACK_SPRINT.md)** and be in for a chance to win some W&B swag.
+
 ## Getting Started with Weave
 
 [Run in a Google Colab ->](https://colab.research.google.com/drive/1TwlhvvoWIHKDtRUu6eW0NMRq0GzGZ9oX)

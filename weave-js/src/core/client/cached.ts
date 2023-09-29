@@ -101,7 +101,7 @@ export class CachedClient implements Client {
     };
   }
 
-  private onDispose(value: CachedNode, key: string): void {
+  private onDispose(key: string, value: CachedNode): void {
     value.sub.unsubscribe();
   }
 }
