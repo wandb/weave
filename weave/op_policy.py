@@ -38,6 +38,7 @@ CACHE_OP_NAMES = [
     "op-openai_embed",
     "op-hdbscan_cluster",
     "gqlroot-wbgqlquery",
+    "wb_trace_tree-convertToSpans",
 ] + CACHE_AND_PARALLEL_OP_NAMES
 
 ARROW_FS_OPS = ["run-history3", "run-history3_with_columns", "table-rows"]

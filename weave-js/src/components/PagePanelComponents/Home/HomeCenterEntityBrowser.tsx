@@ -47,6 +47,7 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
+import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -93,6 +94,8 @@ export const CenterEntityBrowserInner: React.FC<
         (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
           ? meta.num_stream_tables + meta.num_logged_tables
           : null,
+      'run logged traces':
+        meta.num_logged_traces > 0 ? meta.num_logged_traces : null,
       'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
   }, [projectsMeta.result, entityName]);
@@ -132,7 +135,13 @@ export const CenterEntityBrowserInner: React.FC<
     <CenterBrowser
       allowSearch
       noDataCTA={`No projects with Weave assets found for entity: ${props.entityName}`}
-      columns={['project', 'boards', 'tables', 'updated at']}
+      columns={[
+        'project',
+        'boards',
+        'tables',
+        // 'run logged traces', // keeping this hidden for now to not draw attention
+        'updated at',
+      ]}
       loading={loading}
       title={browserTitle}
       data={browserData}
@@ -485,6 +494,18 @@ const legacyTraceRowToSimpleNode = (
   });
 };
 
+const convertSimpleLegacyNodeToNewFormat = (node: Node) => {
+  return opConcat({
+    arr: callOpVeryUnsafe(
+      'wb_trace_tree-convertToSpans',
+      {
+        tree: node,
+      },
+      list(list(SpanWeaveWithTimestampType))
+    ) as Node,
+  });
+};
+
 const CenterProjectLegacyTracesBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
@@ -569,7 +590,9 @@ const CenterProjectLegacyTracesBrowser: React.FC<
           row={row}
           setPreviewNode={setPreviewNode}>
           <HomeExpressionPreviewParts
-            expr={expr}
+            expr={convertSimpleLegacyNodeToNewFormat(expr)}
+            previewExpr={expr}
+            generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
           />
         </HomePreviewSidebarTemplate>
