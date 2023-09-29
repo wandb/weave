@@ -90,8 +90,8 @@ def process_completion_choice(
 
 
 def count_chat_completion_tokens(
-    span: monitor.SpanWithInputsAndOutput, record: typing.Any
-):
+    span: monitor.SpanWithInputsAndOutput, record: dict
+) -> dict:
     summary = {}
     encoding = tiktoken.encoding_for_model(record["model"])
 
@@ -106,7 +106,9 @@ def count_chat_completion_tokens(
     return summary
 
 
-def count_completion_tokens(span: monitor.SpanWithInputsAndOutput, record: typing.Any):
+def count_completion_tokens(
+    span: monitor.SpanWithInputsAndOutput, record: dict
+) -> dict:
     summary = {}
     encoding = tiktoken.encoding_for_model(record["model"])
 
@@ -116,16 +118,15 @@ def count_completion_tokens(span: monitor.SpanWithInputsAndOutput, record: typin
     completion_tokens = 0
     for c in record["choices"]:
         completion_tokens += len(encoding.encode(c["text"]))
-    #    completion_tokens = (encoding.encode(c["text"] for c in record["choices"]))
     summary["completion_tokens"] = completion_tokens
     summary["total_tokens"] = summary["prompt_tokens"] + summary["completion_tokens"]
     return summary
 
 
 def openai_create_postprocess(
-    process_choice_fn: typing.Any, count_token_fn: typing.Any
-) -> typing.Any:
-    def post_process(span: monitor.SpanWithInputsAndOutput):
+    process_choice_fn: typing.Callable, count_token_fn: typing.Callable
+) -> typing.Callable:
+    def post_process(span: monitor.SpanWithInputsAndOutput) -> typing.Generator:
         def wrapped_gen(gen: typing.Generator) -> typing.Generator:
             # TODO: this needs to compute token usage.
             record = None
@@ -164,7 +165,11 @@ def openai_create_postprocess(
 mon = monitor.default_monitor()
 
 
-def monitored_create(openai_func, process_choice_fn, count_token_fn):
+def monitored_create(
+    openai_func: typing.Callable,
+    process_choice_fn: typing.Callable,
+    count_token_fn: typing.Callable,
+) -> typing.Callable:
     return mon.trace(
         preprocess=openai_create_preprocess,
         postprocess=openai_create_postprocess(process_choice_fn, count_token_fn),
