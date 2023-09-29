@@ -257,12 +257,16 @@ def span_dict_to_wb_span(span_dict: dict) -> WBSpan:
     )
 
 
+class TraceSpanDictWithTimestamp(stream_data_interfaces.TraceSpanDict):
+    timestamp: datetime.datetime
+
+
 @weave.op(
     name="wb_trace_tree-convertToSpans",
 )
 def convert_to_spans(
     tree: WBTraceTree,
-) -> typing.List[stream_data_interfaces.TraceSpanDict]:
+) -> typing.List[TraceSpanDictWithTimestamp]:
     loaded_dump = json.loads(tree.root_span_dumps)
     wb_span = span_dict_to_wb_span(loaded_dump)
     spans = stream_data_interfaces.wb_span_to_weave_spans(wb_span, None, None)
