@@ -94,7 +94,7 @@ export const CenterEntityBrowserInner: React.FC<
         (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
           ? meta.num_stream_tables + meta.num_logged_tables
           : null,
-      'run logged traces': meta.num_logged_traces ?? 0,
+      'run logged traces': meta.num_logged_traces ?? null,
       'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
   }, [projectsMeta.result, entityName]);
