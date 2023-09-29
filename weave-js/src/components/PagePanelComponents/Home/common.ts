@@ -17,8 +17,8 @@ export const getArtifactVersionNodeFromUri = (
     throw new Error(`Expected ${WANDB_ARTIFACT_SCHEME} got ${url.protocol}`);
   }
   const [entityName, projectName, artifactVersionName] = url.pathname
-    .split('/')
-    .slice(3); // Trim off leading '///'
+    .replace(/^\/+/, '')
+    .split('/');
   const artifactVersionNode = opRootArtifactVersion({
     entityName: constString(entityName),
     projectName: constString(projectName),
