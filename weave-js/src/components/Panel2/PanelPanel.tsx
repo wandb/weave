@@ -74,7 +74,7 @@ interface PanelRootsState {
 
 interface PanelRootState {
   client: Client;
-  persist: (root: ChildPanelFullConfig) => void;
+  persist: (root: ChildPanelFullConfig) => Promise<void>;
   root: ChildPanelFullConfig;
   inFlight: boolean;
   nextActions: ActionWithId[];
@@ -82,7 +82,7 @@ interface PanelRootState {
 interface ActionInit {
   type: 'init';
   client: Client;
-  persist: (root: ChildPanelFullConfig) => void;
+  persist: (root: ChildPanelFullConfig) => Promise<void>;
   root: ChildPanelFullConfig;
 }
 
@@ -522,7 +522,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
           type: 'init',
           client: weave.client,
           root: loadedPanel,
-          persist: (newRoot: ChildPanelFullConfig) =>
+          persist: async (newRoot: ChildPanelFullConfig) =>
             updateServerPanel(newRoot),
         });
 
