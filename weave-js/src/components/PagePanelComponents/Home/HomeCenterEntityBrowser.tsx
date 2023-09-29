@@ -47,7 +47,7 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
-import {SpanWeaveType} from '../../Panel2/PanelTraceTree/util';
+import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -493,7 +493,7 @@ const convertSimpleLegacyNodeToNewFormat = (node: Node) => {
       {
         tree: node,
       },
-      list(list(SpanWeaveType))
+      list(list(SpanWeaveWithTimestampType))
     ) as Node,
   });
 };

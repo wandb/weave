@@ -55,6 +55,7 @@ export const useUserEntities = (
   );
 };
 
+// TODO: include legacy traces here
 export const useProjectsForEntityWithWeaveObject = (
   entityName: string
 ): {

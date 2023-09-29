@@ -10,7 +10,9 @@ import typeguard
 from .. import stream_data_interfaces
 from wandb.sdk.data_types.trace_tree import Span as WBSpan
 from wandb.sdk.data_types.trace_tree import Result as WBSpanResult
-
+from .. import weave_types as types
+from ..decorator_op import op
+from .. import op_def
 
 from .. import api as weave
 
@@ -261,8 +263,21 @@ class TraceSpanDictWithTimestamp(stream_data_interfaces.TraceSpanDict):
     timestamp: datetime.datetime
 
 
+@op(
+    hidden=True,
+)
+def refine_convert_output_type(
+    tree: WBTraceTree,
+) -> types.Type:
+    with op_def.no_refine():
+        node = convert_to_spans(tree)
+    res = weave.use(node)
+    final = types.TypeRegistry.type_of(res)
+    return final
+
+
 @weave.op(
-    name="wb_trace_tree-convertToSpans",
+    name="wb_trace_tree-convertToSpans", refine_output_type=refine_convert_output_type
 )
 def convert_to_spans(
     tree: WBTraceTree,
