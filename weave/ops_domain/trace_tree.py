@@ -289,11 +289,12 @@ def convert_to_spans(
     ] = stream_data_interfaces.wb_span_to_weave_spans(
         wb_span, None, None
     )  # type: ignore
-    spans[0]["attributes"] = spans[0]["attributes"] or {}
-    spans[0]["attributes"]["model"] = {  # type: ignore
-        "id": tree.model_hash,
-        "obj": tree.model_dict_dumps,
-    }
+    if len(spans) > 0:
+        spans[0]["attributes"] = spans[0]["attributes"] or {}
+        spans[0]["attributes"]["model"] = {  # type: ignore
+            "id": tree.model_hash,
+            "obj": tree.model_dict_dumps,
+        }
 
     for span in spans:
         span["timestamp"] = datetime.datetime.fromtimestamp(span["start_time_s"])
