@@ -111,13 +111,9 @@ export const useProjectsForEntityWithWeaveObject = (
     }> = rawResult.map(r => {
       return {
         ...r,
-        num_logged_traces: 0,
-        // Uncomment this to enable legacy trace counting
-        // and allow projects with such data to be displayed.
-        // Waiting on performance
-        // num_logged_traces: projectHistoryTypeToLegacyTraceKeys(
-        //   r.projectHistoryType as w.Type
-        // ).length,
+        num_logged_traces: projectHistoryTypeToLegacyTraceKeys(
+          r.projectHistoryType as w.Type
+        ).length,
       };
     });
 
