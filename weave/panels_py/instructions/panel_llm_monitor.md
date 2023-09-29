@@ -52,4 +52,4 @@ For full details and features, see the [Weave Monitoring README](https://github.
 ## Analyze Data
 Once you've logged your data, use the browser on your left to find your table. From there, choose a template to get started!
 
-![](/docs/assets/full_board_view.png)
+![](https://raw.githubusercontent.com/wandb/weave/master/docs/assets/traces_debug_board.png)
