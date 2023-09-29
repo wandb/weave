@@ -64,7 +64,6 @@ export const HomeFeaturedTemplateDrawer: React.FC<{
           onValueChange={(val: string) => setTabValue(val)}>
           <Tabs.List className="px-16">
             <Tabs.Trigger value="Instructions">1. Instructions</Tabs.Trigger>
-            <Tabs.Trigger value="Select Data">2. Select Data</Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="Instructions" style={{height: '100%'}}>
             <TabContentWrapper>
