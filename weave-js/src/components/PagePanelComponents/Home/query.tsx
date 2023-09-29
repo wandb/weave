@@ -55,7 +55,6 @@ export const useUserEntities = (
   );
 };
 
-// TODO: include legacy traces here
 export const useProjectsForEntityWithWeaveObject = (
   entityName: string
 ): {
@@ -65,6 +64,7 @@ export const useProjectsForEntityWithWeaveObject = (
     num_boards: number;
     num_stream_tables: number;
     num_logged_tables: number;
+    num_logged_traces: number;
   }>;
   loading: boolean;
 } => {
@@ -84,6 +84,7 @@ export const useProjectsForEntityWithWeaveObject = (
         num_boards: opProjectBoardCount({project: row}),
         num_stream_tables: opProjectRunStreamCount({project: row}),
         num_logged_tables: opProjectLoggedTableCount({project: row}),
+        projectHistoryType: opProjectHistoryType({project: row}),
       } as any);
     }),
   });
@@ -98,12 +99,24 @@ export const useProjectsForEntityWithWeaveObject = (
       num_boards: number;
       num_stream_tables: number;
       num_logged_tables: number;
-    }> = entityProjectNamesValue.result ?? [];
+      num_logged_traces: number;
+    }> = (entityProjectNamesValue.result ?? []).map(r => {
+      return {
+        ...r,
+        num_logged_traces: projectHistoryTypeToLegacyTraceKeys(
+          r.projectHistoryType as w.Type
+        ).length,
+      };
+    });
 
     return {
       result: result.filter(
         res =>
-          res.num_boards + res.num_logged_tables + res.num_stream_tables > 0
+          res.num_boards +
+            res.num_logged_tables +
+            res.num_stream_tables +
+            res.num_logged_traces >
+          0
       ),
       loading: entityProjectNamesValue.loading,
     };

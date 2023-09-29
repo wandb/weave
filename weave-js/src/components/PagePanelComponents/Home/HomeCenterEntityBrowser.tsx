@@ -94,6 +94,7 @@ export const CenterEntityBrowserInner: React.FC<
         (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
           ? meta.num_stream_tables + meta.num_logged_tables
           : null,
+      'run logged traces': meta.num_logged_traces ?? 0,
       'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
   }, [projectsMeta.result, entityName]);
@@ -133,7 +134,13 @@ export const CenterEntityBrowserInner: React.FC<
     <CenterBrowser
       allowSearch
       noDataCTA={`No projects with Weave assets found for entity: ${props.entityName}`}
-      columns={['project', 'boards', 'tables', 'updated at']}
+      columns={[
+        'project',
+        'boards',
+        'tables',
+        'run logged traces',
+        'updated at',
+      ]}
       loading={loading}
       title={browserTitle}
       data={browserData}
