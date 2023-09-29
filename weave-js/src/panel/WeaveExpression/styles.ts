@@ -13,6 +13,9 @@ export const EditableContainer = styled.div<{
   display: flex;
   flex: 1 1 auto;
 
+  max-height: 80px;
+  overflow: auto;
+
   ${props =>
     !props.noBox &&
     css`

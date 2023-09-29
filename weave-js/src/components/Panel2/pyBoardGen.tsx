@@ -111,6 +111,24 @@ const getNameFromRootArtifactNode = (node: Node) => {
   return null;
 };
 
+const getNameFromLoggedTrace = (node: Node) => {
+  while (isOutputNode(node)) {
+    if (node.fromOp.name === 'wb_trace_tree-convertToSpans') {
+      const pickNode = node.fromOp.inputs.tree;
+      if (isOutputNode(pickNode) && pickNode.fromOp.name === 'pick') {
+        const nameNode = pickNode.fromOp.inputs.key;
+        if (isConstNode(nameNode)) {
+          return nameNode.val;
+        }
+      }
+      return null;
+    }
+    const inputs = Object.values(node.fromOp.inputs);
+    node = inputs[0];
+  }
+  return null;
+};
+
 const sanitizeName = (name: string) => {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 };
@@ -119,6 +137,9 @@ const getNameFromNodeHeuristic = (node: Node) => {
   let name = getNameFromRootURINode(node);
   if (name == null) {
     name = getNameFromRootArtifactNode(node);
+  }
+  if (name == null) {
+    name = getNameFromLoggedTrace(node);
   }
   if (name) {
     return sanitizeName(name);
