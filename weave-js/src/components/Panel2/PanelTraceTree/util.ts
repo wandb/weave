@@ -1,6 +1,6 @@
 import * as _ from 'lodash';
 import {FlatSpan, SpanType} from '@wandb/weave/core/model/media/traceTree';
-import { Type } from '@wandb/weave/core';
+import {Type} from '@wandb/weave/core';
 
 export const SpanWeaveType = {
   type: 'typedDict' as const,
@@ -73,13 +73,16 @@ export const SpanWeaveWithTimestampType: Type = {
   type: 'typedDict' as const,
   propertyTypes: {
     ...SpanWeaveType.propertyTypes,
-    "timestamp": {
+    timestamp: {
       type: 'union' as const,
-      members: [{
-        type: 'timestamp'
-      }, 'none' as const],
-    }
-  }
+      members: [
+        {
+          type: 'timestamp',
+        },
+        'none' as const,
+      ],
+    },
+  },
 };
 
 export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {

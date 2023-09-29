@@ -114,9 +114,9 @@ const getNameFromRootArtifactNode = (node: Node) => {
 const getNameFromLoggedTrace = (node: Node) => {
   while (isOutputNode(node)) {
     if (node.fromOp.name === 'wb_trace_tree-convertToSpans') {
-      const pickNode = node.fromOp.inputs['tree'];
+      const pickNode = node.fromOp.inputs.tree;
       if (isOutputNode(pickNode) && pickNode.fromOp.name === 'pick') {
-        const nameNode = pickNode.fromOp.inputs['key'];
+        const nameNode = pickNode.fromOp.inputs.key;
         if (isConstNode(nameNode)) {
           return nameNode.val;
         }
