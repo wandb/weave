@@ -173,7 +173,7 @@ def wb_span_to_weave_spans(
     dummy_dict = {"_": ""} if parent_id == None else {}
 
     span_id = wb_span.span_id
-    if span_id is None and parent_id is None:
+    if span_id is None:
         span_id = str(uuid4())
 
     if (
