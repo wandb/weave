@@ -17,7 +17,6 @@ tiktoken>=0.4.0
 hdbscan>=0.8.27
 pillow>=10.0.1  # addresses CVE-2023-4863
 
-
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
 # TODO: maybe move this to setup tools...
