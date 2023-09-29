@@ -10,14 +10,14 @@ Table.displayName = 'S.Table';
 
 export const Rows = styled.div`
   margin-top: 2px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: max-content 1fr;
   gap: 2px;
 `;
 Rows.displayName = 'S.Rows';
 
 export const Row = styled.div`
-  display: flex;
+  display: contents;
   gap: 2px;
 `;
 Row.displayName = 'S.Row';
@@ -28,12 +28,13 @@ export const Key = styled.div`
   vertical-align: top;
   padding: 0 !important;
   color: ${globals.gray500};
-  width: 100px;
+  grid-column: 1;
 `;
 Key.displayName = 'S.Key';
 
 export const Val = styled.div`
   padding: 0 !important;
+  grid-column: 2;
 `;
 Val.displayName = 'S.Val';
 
