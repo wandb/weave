@@ -97,14 +97,18 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   renderPanel={panelRef => {
                     const path =
                       groupPath != null ? [...groupPath, panelRef.id] : null;
-                    const isSelected =
-                      path != null && _.isEqual(path, selectedPath);
+                    const selectedPathStr = selectedPath.join('.');
+                    const isSelfOrDescendentSelected =
+                      path != null &&
+                      selectedPathStr.startsWith(path.join('.'));
                     const isHovered =
                       groupPath != null && getPanelIsHovered(panelRef.id);
                     const isHoveredInOutline =
                       groupPath != null &&
                       getPanelIsHoveredInOutline(panelRef.id);
-                    const isFocused = isSelected || isHoveredInOutline;
+                    // TODO: isHighlighted might be a better name
+                    const isFocused =
+                      isSelfOrDescendentSelected || isHoveredInOutline;
 
                     return (
                       <EditablePanel

@@ -1,4 +1,4 @@
-/* Reguralized structure for UI state.
+/* Regularized structure for UI state.
 
 The UI state is a tree of panels. There are three types of non-leaf panels:
 - Group: A group of panels, children are stored at config.items in a map from name

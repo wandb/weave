@@ -574,10 +574,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     return ['<root>', ...selectedPath!].join('.');
   }, [selectedPath]);
 
-  const isPanelSelected =
+  const isHighlighted =
     selectedPathStr !== '<root>' &&
     selectedPathStr !== '<root>.main' &&
-    pathStr.startsWith(selectedPathStr);
+    selectedPathStr.startsWith(pathStr);
 
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
@@ -585,7 +585,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const controlBar = props.controlBar ?? 'off';
   const isVarNameEditable = props.editable || controlBar === 'editable';
   const setSelectedPanel = useSetSelectedPanel();
-  const showEditControls = isPanelSelected || isHoverPanel;
+  const showEditControls = isHighlighted || isHoverPanel;
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -594,9 +594,11 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   ) : (
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
-      onClick={event => {
-        event.stopPropagation();
-        setSelectedPanel(fullPath);
+      onClick={(event: any) => {
+        if (!event.wandbSelectionProcessed) {
+          setSelectedPanel(fullPath);
+          event.wandbSelectionProcessed = true;
+        }
       }}
       onMouseEnter={() => setIsHoverPanel(true)}
       onMouseLeave={() => setIsHoverPanel(false)}>
