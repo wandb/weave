@@ -93,6 +93,14 @@ export const useProjectsForEntityWithWeaveObject = (
 
   return useMemo(() => {
     // this filter step is done client side - very bad!
+    const rawResult: Array<{
+      name: string;
+      updatedAt: number;
+      num_boards: number;
+      num_stream_tables: number;
+      num_logged_tables: number;
+      projectHistoryType: w.Type;
+    }> = entityProjectNamesValue.result ?? [];
     const result: Array<{
       name: string;
       updatedAt: number;
@@ -100,7 +108,7 @@ export const useProjectsForEntityWithWeaveObject = (
       num_stream_tables: number;
       num_logged_tables: number;
       num_logged_traces: number;
-    }> = (entityProjectNamesValue.result ?? []).map(r => {
+    }> = rawResult.map(r => {
       return {
         ...r,
         num_logged_traces: projectHistoryTypeToLegacyTraceKeys(
