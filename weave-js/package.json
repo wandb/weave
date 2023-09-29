@@ -16,6 +16,7 @@
     "eslint-fix": "eslint --fix --ext .js,.jsx,.ts,.tsx src",
     "tslint": "tslint --project .",
     "tslint-fix": "tslint --fix --project .",
+    "generate": "echo 'coming soon!'",
     "prettier": "prettier --config .prettierrc --check \"src/**/*.ts\" \"src/**/*.tsx\"",
     "prettier-fix": "prettier --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
     "lint": "yarn eslint & yarn tslint & yarn prettier & wait",

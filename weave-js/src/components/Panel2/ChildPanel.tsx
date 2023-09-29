@@ -595,8 +595,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
       onClick={event => {
-        event.stopPropagation();
-        setSelectedPanel(fullPath);
+        if (fullPath.length <= 2 && fullPath[0] === 'main') {
+          setSelectedPanel(fullPath);
+          event.stopPropagation();
+        }
       }}
       onMouseEnter={() => setIsHoverPanel(true)}
       onMouseLeave={() => setIsHoverPanel(false)}>
