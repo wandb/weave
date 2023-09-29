@@ -670,7 +670,6 @@ export const makeCallAction = (
       ...inputs,
       root_args: rootArgsNode,
     });
-
     return client.action(calledNode as any).then(onDone);
   };
 };
