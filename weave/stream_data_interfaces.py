@@ -172,10 +172,14 @@ def wb_span_to_weave_spans(
     # Super Hack - fix merge!
     dummy_dict = {"_": ""} if parent_id == None else {}
 
+    span_id = wb_span.span_id
+    if span_id is None and parent_id is None:
+        span_id = str(uuid4())
+
     if (
         wb_span.start_time_ms is None
         or wb_span.end_time_ms is None
-        or wb_span.span_id is None
+        or span_id is None
         or wb_span.name is None
     ):
         return []
@@ -183,7 +187,7 @@ def wb_span_to_weave_spans(
     span = TraceSpanDict(
         start_time_s=wb_span.start_time_ms / 1000.0,
         end_time_s=wb_span.end_time_ms / 1000.0,
-        span_id=wb_span.span_id,
+        span_id=span_id,
         name=wb_span.name,
         status_code=str(wb_span.status_code),
         trace_id=trace_id or str(uuid4()),

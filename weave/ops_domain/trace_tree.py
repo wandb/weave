@@ -272,6 +272,26 @@ def refine_convert_output_type(
     with op_def.no_refine():
         node = convert_to_spans(tree)
     res = weave.use(node)
+    if len(res) == 0:
+        return types.List(
+            types.TypedDict(
+                {
+                    "span_id": types.String(),
+                    "name": types.String(),
+                    "trace_id": types.String(),
+                    "status_code": types.String(),
+                    "start_time_s": types.Number(),
+                    "end_time_s": types.Number(),
+                    "parent_id": types.optional(types.String()),
+                    "attributes": types.optional(types.TypedDict({})),
+                    "inputs": types.optional(types.TypedDict({})),
+                    "output": types.optional(types.TypedDict({})),
+                    "summary": types.optional(types.TypedDict({})),
+                    "exception": types.optional(types.String()),
+                    "timestamp": types.Timestamp(),
+                }
+            )
+        )
     final = types.TypeRegistry.type_of(res)
     return final
 
