@@ -10,7 +10,7 @@ import {Server} from '../server/types';
 import {ID} from '../util/id';
 import {Client} from './types';
 import _ from 'lodash';
-import { LocalStorageBackedLRU } from '../cache/localStorageBackedLRU';
+import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
@@ -62,7 +62,6 @@ export class BasicClient implements Client {
     }
     this.opStore = server.opStore;
     this.localStorageLRU = new LocalStorageBackedLRU();
-
   }
 
   public setPolling(polling: boolean) {
@@ -122,8 +121,8 @@ export class BasicClient implements Client {
       };
     });
 
-    let lastResult = undefined
-    const hasCacheResult = this.localStorageLRU.has(observableId)
+    let lastResult;
+    const hasCacheResult = this.localStorageLRU.has(observableId);
     if (hasCacheResult) {
       lastResult = this.localStorageLRU.get(observableId);
     }
@@ -133,7 +132,7 @@ export class BasicClient implements Client {
       observers: new Set(),
       node,
       hasResult: false,
-      lastResult
+      lastResult,
     });
     this.scheduleRequest();
     return observable;
