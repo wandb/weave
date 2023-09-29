@@ -284,9 +284,13 @@ def convert_to_spans(
 ) -> typing.List[TraceSpanDictWithTimestamp]:
     loaded_dump = json.loads(tree.root_span_dumps)
     wb_span = span_dict_to_wb_span(loaded_dump)
-    spans = stream_data_interfaces.wb_span_to_weave_spans(wb_span, None, None)
+    spans: typing.List[
+        TraceSpanDictWithTimestamp
+    ] = stream_data_interfaces.wb_span_to_weave_spans(
+        wb_span, None, None
+    )  # type: ignore
     spans[0]["attributes"] = spans[0]["attributes"] or {}
-    spans[0]["attributes"]["model"] = {
+    spans[0]["attributes"]["model"] = {  # type: ignore
         "id": tree.model_hash,
         "obj": tree.model_dict_dumps,
     }
