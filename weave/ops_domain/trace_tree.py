@@ -4,6 +4,8 @@ import logging
 import typing
 import dataclasses
 import datetime
+import hashlib
+import uuid
 
 import typeguard
 
@@ -296,6 +298,12 @@ def refine_convert_output_type(
     return final
 
 
+def create_id_from_seed(seed: str) -> str:
+    m = hashlib.md5()
+    m.update(seed.encode("utf-8"))
+    return str(uuid.UUID(m.hexdigest()))
+
+
 @weave.op(
     name="wb_trace_tree-convertToSpans", refine_output_type=refine_convert_output_type
 )
@@ -304,6 +312,11 @@ def convert_to_spans(
 ) -> typing.List[TraceSpanDictWithTimestamp]:
     loaded_dump = json.loads(tree.root_span_dumps)
     wb_span = span_dict_to_wb_span(loaded_dump)
+
+    # Ensure stable span id (since some old traces don't have them)
+    if wb_span.span_id is None:
+        wb_span.span_id = create_id_from_seed(tree.root_span_dumps)
+
     spans: typing.List[
         TraceSpanDictWithTimestamp
     ] = stream_data_interfaces.wb_span_to_weave_spans(
