@@ -188,6 +188,25 @@ class WandbApiAsync:
             return None
         return file["directUrl"]
 
+    VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
+        """
+        query DefaultEntity {
+            viewer {
+                defaultEntity {
+                    name
+                }
+            }
+        }        
+        """
+    )
+
+    async def default_entity_name(self) -> typing.Optional[str]:
+        try:
+            result = await self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+
 
 class WandbApi:
     def query(self, query: graphql.DocumentNode, **kwargs: typing.Any) -> typing.Any:
@@ -273,6 +292,25 @@ class WandbApi:
         if file is None:
             return None
         return file["directUrl"]
+
+    VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
+        """
+        query DefaultEntity {
+            viewer {
+                defaultEntity {
+                    name
+                }
+            }
+        }        
+        """
+    )
+
+    def default_entity_name(self) -> typing.Optional[str]:
+        try:
+            result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
 
 
 async def get_wandb_api() -> WandbApiAsync:
