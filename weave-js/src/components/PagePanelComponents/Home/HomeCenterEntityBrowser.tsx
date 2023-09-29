@@ -139,7 +139,7 @@ export const CenterEntityBrowserInner: React.FC<
         'project',
         'boards',
         'tables',
-        'run logged traces',
+        // 'run logged traces', // keeping this hidden for now to not draw attention
         'updated at',
       ]}
       loading={loading}
