@@ -31,7 +31,6 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
     private removeLeastRecentlyUsed(): void {
         const key = localStorage.key(0)
         if (key) {
-            console.log("Evicting key", key)
             this.del(key)
         }
     }
@@ -69,8 +68,9 @@ function isQuotaExceededError(e: any): boolean {
         if (e.code) {
             switch (e.code) {
                 case 22:
+                    // Chrome and Safari
                     quotaExceeded = true;
-                    break; // Chrome
+                    break; 
                 case 1014:
                     // Firefox
                     if (e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
