@@ -141,3 +141,6 @@ class ChatCompletion:
     @staticmethod
     def create(**kwargs: typing.Any) -> typing.Any:
         return monitored_create(**kwargs)
+
+
+error = openai.error

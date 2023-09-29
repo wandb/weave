@@ -265,6 +265,9 @@ class Monitor:
                                 raise
                             return output
 
+                sync_wrapper.__name__ = fn.__name__
+                sync_wrapper.__doc__ = fn.__doc__
+
                 return sync_wrapper
 
         return decorator
@@ -320,3 +323,10 @@ def init_monitor(stream_key: str) -> Monitor:
     else:
         _global_monitor._streamtable = stream_table
     return _global_monitor
+
+
+def trace(
+    preprocess: typing.Optional[typing.Callable] = None,
+    postprocess: typing.Optional[typing.Callable] = None,
+) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
+    return default_monitor().trace(preprocess, postprocess)
