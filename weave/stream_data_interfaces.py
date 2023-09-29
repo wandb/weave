@@ -190,7 +190,7 @@ def wb_span_to_weave_spans(
         span_id=span_id,
         name=wb_span.name,
         status_code=str(wb_span.status_code),
-        trace_id=trace_id or str(uuid4()),
+        trace_id=trace_id or span_id,
         parent_id=parent_id,
         # Followup: allow None in attributes & summary (there is an issue with vectorized opMerge)
         # This should be fixed before integrating inside LC
