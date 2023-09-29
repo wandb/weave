@@ -115,6 +115,14 @@ export function deltaStringToSeconds(timeString: string) {
   return timestamp * 1000;
 }
 
+// Convert timestamp to a string format that can be parsed by the Date constructor.
+// This is non-standard but tested to work in Chrome, Firefox, Safari.
+const formatTime = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const isoWithMillis = date.toISOString();
+  return isoWithMillis.replace('T', ' ').split('.')[0] + 'Z';
+};
+
 export const DateEditor: React.FC<{
   timestamp: number | null;
   onCommit: (newValue: number) => void;
@@ -124,8 +132,7 @@ export const DateEditor: React.FC<{
 }> = props => {
   const {timestamp} = props;
   const allowDelta = props.allowDelta && props.deltaFromOffset != null;
-  const dateS =
-    timestamp == null ? 'none' : new Date(timestamp).toLocaleString();
+  const dateS = timestamp == null ? 'none' : formatTime(timestamp);
   return (
     <ValidatingTextInput
       key={dateS}
