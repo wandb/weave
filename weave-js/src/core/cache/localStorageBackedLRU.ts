@@ -1,3 +1,5 @@
+import { safeLocalStorage } from "@wandb/weave/util/localStorage";
+
 export class LocalStorageBackedLRU<T extends {} = {}> {
   public set(key: string, value: T): boolean {
     this.del(key);
@@ -6,12 +8,12 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
     let hasError = false;
     while (!setDone && !hasError) {
       try {
-        localStorage.setItem(key, valStr);
+        safeLocalStorage.setItem(key, valStr);
         setDone = true;
       } catch (e) {
         if (isQuotaExceededError(e)) {
           // Try to free up some space
-          if (localStorage.length > 0) {
+          if (safeLocalStorage.length() > 0) {
             this.removeLeastRecentlyUsed();
           } else {
             console.error(
@@ -30,14 +32,14 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
   }
 
   private removeLeastRecentlyUsed(): void {
-    const key = localStorage.key(0);
+    const key = safeLocalStorage.key(0);
     if (key) {
       this.del(key);
     }
   }
 
   public get(key: string): T | null {
-    const valStr = localStorage.getItem(key);
+    const valStr = safeLocalStorage.getItem(key);
     if (!valStr) {
       return null;
     }
@@ -48,18 +50,18 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
   }
 
   public del(key: string): void {
-    const itemStr = localStorage.getItem(key);
+    const itemStr = safeLocalStorage.getItem(key);
     if (itemStr) {
-      localStorage.removeItem(key);
+        safeLocalStorage.removeItem(key);
     }
   }
 
   public has(key: string): boolean {
-    return localStorage.getItem(key) !== null;
+    return safeLocalStorage.getItem(key) !== null;
   }
 
   public reset(): void {
-    localStorage.clear();
+    safeLocalStorage.clear();
   }
 }
 

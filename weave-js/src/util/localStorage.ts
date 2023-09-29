@@ -62,6 +62,32 @@ export const setItem =
     }
   };
 
+export const key =
+  (storage: MaybeStorage) => (index: number) => {
+    try {
+      // @ts-ignore
+      return storage.key(index);
+    } catch (e) {
+      console.error(
+        `Error attempting to get key: "${index}" from storage. Storage may not be available in this environment.`
+      );
+    }
+    return null;
+  };
+
+export const length =
+  (storage: MaybeStorage) => () => {
+    try {
+      // @ts-ignore
+      return storage.length
+    } catch (e) {
+      console.error(
+        `Error attempting to get length from storage. Storage may not be available in this environment.`
+      );
+    }
+    return 0;
+  };
+
 export function getStorage(storage: Storage | null) {
   return {
     clear: clear(storage),
@@ -69,6 +95,8 @@ export function getStorage(storage: Storage | null) {
     getItem: getItem(storage),
     removeItem: removeItem(storage),
     setItem: setItem(storage),
+    key: key(storage),
+    length: length(storage),
   };
 }
 /**
