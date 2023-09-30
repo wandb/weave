@@ -124,7 +124,7 @@ export class BasicClient implements Client {
     let lastResult;
     const hasCacheResult = this.localStorageLRU.has(observableId);
     if (hasCacheResult) {
-      lastResult = this.localStorageLRU.get(observableId);
+      // lastResult = this.localStorageLRU.get(observableId);
     }
     this.observables.set(observableId, {
       id: observableId,
