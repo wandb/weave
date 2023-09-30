@@ -65,11 +65,38 @@ export const setItem =
       // @ts-ignore
       storage.setItem(key, value);
     } catch (e) {
+      if (isQuotaExceededError(e)) {
+        throw e;
+      }
       console.error(
         `Error attempting to set item: "${key}" from storage. Storage may not be available in this environment.`
       );
     }
   };
+
+export function isQuotaExceededError(e: any): boolean {
+  let quotaExceeded = false;
+  if (e) {
+    if (e.code) {
+      switch (e.code) {
+        case 22:
+          // Chrome and Safari
+          quotaExceeded = true;
+          break;
+        case 1014:
+          // Firefox
+          if (e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            quotaExceeded = true;
+          }
+          break;
+      }
+    } else if (e.number === -2147024882) {
+      // Internet Explorer 8
+      quotaExceeded = true;
+    }
+  }
+  return quotaExceeded;
+}
 
 export const keyAt = (storage: MaybeStorage) => (index: number) => {
   try {

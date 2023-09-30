@@ -1,21 +1,35 @@
-import {safeLocalStorage} from '../util/localStorage';
+import {isQuotaExceededError, safeLocalStorage} from '../util/localStorage';
 
 export class LocalStorageBackedLRU<T extends {} = {}> {
+  private scanIndex: number;
+
+  constructor(
+    private readonly maxBytesPerEntry: number = 1e6,
+    private readonly prefix: string = 'wv_'
+  ) {
+    // LocalStorage is limited to 5MB, so we'll use 1MB as our default for the maxBytesPerEntry
+    this.maxBytesPerEntry = maxBytesPerEntry;
+    this.scanIndex = 0;
+  }
+
   public set(key: string, value: T): boolean {
     this.del(key);
     const valStr = JSON.stringify(value);
+    const size = valStr.length;
+    if (size > this.maxBytesPerEntry) {
+      return false;
+    }
     let setDone = false;
     let hasError = false;
     while (!setDone && !hasError) {
       try {
-        safeLocalStorage.setItem(key, valStr);
+        this.prefixedLocalStorageSetItem(key, valStr);
         setDone = true;
       } catch (e) {
         if (isQuotaExceededError(e)) {
+          const removed = this.removeLeastRecentlyUsed();
           // Try to free up some space
-          if (safeLocalStorage.length() > 0) {
-            this.removeLeastRecentlyUsed();
-          } else {
+          if (!removed) {
             console.error(
               'Unable to save to localStorage. Memory limit exceeded, even after freeing up space.'
             );
@@ -32,7 +46,7 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
   }
 
   public get(key: string): T | null {
-    const valStr = safeLocalStorage.getItem(key);
+    const valStr = this.prefixedLocalStorageGetItem(key);
     if (!valStr) {
       return null;
     }
@@ -43,48 +57,42 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
   }
 
   public del(key: string): void {
-    const itemStr = safeLocalStorage.getItem(key);
+    const itemStr = this.prefixedLocalStorageGetItem(key);
     if (itemStr) {
-      safeLocalStorage.removeItem(key);
+      this.prefixedLocalStorageRemoveItem(key);
     }
   }
 
   public has(key: string): boolean {
-    return safeLocalStorage.getItem(key) !== null;
+    return this.prefixedLocalStorageGetItem(key) !== null;
   }
 
   public reset(): void {
     safeLocalStorage.clear();
   }
 
-  private removeLeastRecentlyUsed(): void {
-    const key = safeLocalStorage.key(0);
-    if (key) {
-      this.del(key);
-    }
-  }
-}
-
-function isQuotaExceededError(e: any): boolean {
-  let quotaExceeded = false;
-  if (e) {
-    if (e.code) {
-      switch (e.code) {
-        case 22:
-          // Chrome and Safari
-          quotaExceeded = true;
-          break;
-        case 1014:
-          // Firefox
-          if (e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-            quotaExceeded = true;
-          }
-          break;
+  private removeLeastRecentlyUsed(): boolean {
+    while (this.scanIndex < safeLocalStorage.length()) {
+      const prefixedKey = safeLocalStorage.key(this.scanIndex);
+      if (prefixedKey.startsWith(this.prefix)) {
+        // Only consider keys that start with our prefix
+        safeLocalStorage.removeItem(prefixedKey);
+        return true;
       }
-    } else if (e.number === -2147024882) {
-      // Internet Explorer 8
-      quotaExceeded = true;
+      this.scanIndex++;
     }
+    return false;
   }
-  return quotaExceeded;
+
+  private prefixedLocalStorageSetItem(key: string, value: string): void {
+    safeLocalStorage.setItem(this.prefix + key, value);
+  }
+
+  private prefixedLocalStorageGetItem(key: string): string | null {
+    return safeLocalStorage.getItem(this.prefix + key);
+  }
+
+  private prefixedLocalStorageRemoveItem(key: string): void {
+    safeLocalStorage.removeItem(this.prefix + key);
+  }
 }
