@@ -259,9 +259,9 @@ export class BasicClient implements Client {
       // console.time('graph execute');
       if (this.server instanceof RemoteHttpServer) {
         // Modern - Weave1 Server
-        let eachResults: Array<PromiseSettledResult<any>> = [];
+        let eachResults: Array<Promise<any>> = [];
         try {
-          eachResults = await this.server.queryEach(
+          eachResults = (this.server as RemoteHttpServer).queryEach(
             notDoneObservables.map(o => o.node)
           );
         } catch (e) {
@@ -275,12 +275,11 @@ export class BasicClient implements Client {
             // ERROR HERE?
             continue;
           }
-          if (result.status === 'rejected') {
-            rejectObservable(observable, result.reason);
-          } else {
-            resolveObservable(observable, result.value);
-          }
+          result
+            .then(value => resolveObservable(observable, value))
+            .catch(e => rejectObservable(observable, e));
         }
+        await Promise.allSettled(eachResults);
       } else {
         let results: any[] = [];
         try {

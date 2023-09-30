@@ -66,8 +66,9 @@ const defaultOpts: RemoteWeaveOptions = {
   tokenFunc: () => Promise.resolve(''),
   useAdminPrivileges: false,
   isShadow: false,
-  contiguousBatchesOnly: false,
-  maxConcurrentRequests: 1,
+  contiguousBatchesOnly: true,
+  // Let's start with 2 concurrent requests, and see how it goes
+  maxConcurrentRequests: 2,
   maxBatchSize: Infinity,
   maxRetries: 5,
   backoffBase: 500,
@@ -132,6 +133,11 @@ export class RemoteHttpServer implements Server {
     clearInterval(this.flushInterval);
   }
 
+  public refreshBackendCacheKey(windowSizeMs: number = 15000) {
+    this.clientCacheKey = createClientCacheKey(windowSizeMs);
+  }
+
+
   public async query(
     nodes: Node[],
     stripTags?: boolean,
@@ -139,7 +145,7 @@ export class RemoteHttpServer implements Server {
   ): Promise<any[]> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
     if (withBackendCacheReset) {
-      this.clientCacheKey = createClientCacheKey();
+      this.refreshBackendCacheKey();
     }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
@@ -159,27 +165,29 @@ export class RemoteHttpServer implements Server {
     );
   }
 
-  public async queryEach(
-    nodes: Node[]
-    // withBackendCacheReset?: boolean
-  ): Promise<Array<PromiseSettledResult<any>>> {
+
+  public queryEach(
+    nodes: Node[],
+    withBackendCacheReset?: boolean
+  ): Array<Promise<any>> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
-    // TODO: pass withBackendCacheReset across the network
+    if (withBackendCacheReset) {
+      this.refreshBackendCacheKey();
+    }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
-    return await Promise.allSettled(
-      nodes.map(
-        node =>
-          new Promise((resolve, reject) => {
-            this.pendingNodes.set(node, {
-              node,
-              resolve,
-              reject,
-              state: 'waiting',
-              retries: 0,
-            });
-          })
-      )
+
+    return nodes.map(
+      node =>
+        new Promise((resolve, reject) => {
+          this.pendingNodes.set(node, {
+            node,
+            resolve,
+            reject,
+            state: 'waiting',
+            retries: 0,
+          });
+        })
     );
   }
 
