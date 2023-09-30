@@ -1,4 +1,4 @@
-import { safeLocalStorage } from "@wandb/weave/util/localStorage";
+import {safeLocalStorage} from '@wandb/weave/util/localStorage';
 
 export class LocalStorageBackedLRU<T extends {} = {}> {
   public set(key: string, value: T): boolean {
@@ -52,7 +52,7 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
   public del(key: string): void {
     const itemStr = safeLocalStorage.getItem(key);
     if (itemStr) {
-        safeLocalStorage.removeItem(key);
+      safeLocalStorage.removeItem(key);
     }
   }
 
