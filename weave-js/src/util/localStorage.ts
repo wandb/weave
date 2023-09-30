@@ -1,3 +1,12 @@
+// These two declarations are required until we deprecate weave typescript
+// service. We don't consider "dom" as part of the compileOptions.lib
+// which is correct, because it is a node service. However, this file
+// safely handles when window / Storage is not available. Therefore, this
+// type declaration is a safe workaround for cross-service compatibility.
+
+declare var window: any;
+declare type Storage = any;
+
 // you can simulate this in Firefox by going to about:config in the nav bar and then
 // setting dom.storage.enabled to false.
 type MaybeStorage = Storage | null;
