@@ -68,7 +68,11 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
   }
 
   public reset(): void {
-    safeLocalStorage.clear();
+    this.scanIndex = 0;
+    while (this.removeLeastRecentlyUsed()) {
+      // Keep removing until we can't anymore
+    }
+    this.scanIndex = 0;
   }
 
   private removeLeastRecentlyUsed(): boolean {
