@@ -31,13 +31,6 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
     return setDone;
   }
 
-  private removeLeastRecentlyUsed(): void {
-    const key = safeLocalStorage.key(0);
-    if (key) {
-      this.del(key);
-    }
-  }
-
   public get(key: string): T | null {
     const valStr = safeLocalStorage.getItem(key);
     if (!valStr) {
@@ -62,6 +55,13 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
 
   public reset(): void {
     safeLocalStorage.clear();
+  }
+
+  private removeLeastRecentlyUsed(): void {
+    const key = safeLocalStorage.key(0);
+    if (key) {
+      this.del(key);
+    }
   }
 }
 
