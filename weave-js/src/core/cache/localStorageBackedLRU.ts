@@ -1,4 +1,4 @@
-import {safeLocalStorage} from '@wandb/weave/util/localStorage';
+import {safeLocalStorage} from '../../util/localStorage';
 
 export class LocalStorageBackedLRU<T extends {} = {}> {
   public set(key: string, value: T): boolean {
