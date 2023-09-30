@@ -322,7 +322,7 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
 }
 
 const expensiveOpNames = new Set(['get', 'set', 'getReturnType']);
-const MERGE_INEXPENSIVE_OPS = false;
+const MERGE_INEXPENSIVE_OPS = true;
 // Heuristic to determine if an op is expensive. We should merge
 // all subgraphs with non-expensive ops into a single graph, since
 // the network latency will dominate the cost.
