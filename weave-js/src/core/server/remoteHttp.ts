@@ -67,8 +67,8 @@ const defaultOpts: RemoteWeaveOptions = {
   useAdminPrivileges: false,
   isShadow: false,
   contiguousBatchesOnly: true,
-  // Let's start with 2 concurrent requests, and see how it goes
-  maxConcurrentRequests: 2,
+  // Let's start with 3 concurrent requests, and see how it goes
+  maxConcurrentRequests: 3,
   maxBatchSize: Infinity,
   maxRetries: 5,
   backoffBase: 500,
