@@ -44,6 +44,9 @@ export interface RemoteWeaveOptions {
   // Enable so a single HTTP request cannot contain more than one disjoint graph
   contiguousBatchesOnly: boolean;
 
+  // If true, will merge inexpensive batches into a single request
+  mergeInexpensiveBatches: boolean;
+
   // Maximum number of concurrent requests to the server
   maxConcurrentRequests: number;
 
@@ -67,6 +70,7 @@ const defaultOpts: RemoteWeaveOptions = {
   useAdminPrivileges: false,
   isShadow: false,
   contiguousBatchesOnly: true,
+  mergeInexpensiveBatches: true,
   // Let's start with 2 concurrent requests, and see how it goes
   maxConcurrentRequests: 2,
   maxBatchSize: Infinity,
@@ -265,7 +269,7 @@ export class RemoteHttpServer implements Server {
 
     const nodes = nodeEntries.map(e => e.node);
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
-      ? serializeMulti(nodes, true)
+      ? serializeMulti(nodes, this.opts.mergeInexpensiveBatches)
       : [[serialize(nodes)], [_.range(nodes.length)]];
 
     for (
