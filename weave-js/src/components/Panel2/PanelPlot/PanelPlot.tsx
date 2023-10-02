@@ -3506,47 +3506,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return tooltipLineData[toolTipPos.value] ?? voidNode();
     }
 
-    const tooltipSeriesIndex = toolTipPos.value?._seriesIndex;
-    const valueResultIndex = toolTipPos.value?._rowIndex;
-    const s = config.series[tooltipSeriesIndex];
-
-    if (tooltipSeriesIndex == null || valueResultIndex == null) {
-      return voidNode();
-    }
-
-    const row = opIndex({
-      arr: opIndex({
-        arr: flatResultNode,
-        index: constNumber(tooltipSeriesIndex),
-      }),
-      index: constNumber(valueResultIndex),
-    });
-    const toolTipFn =
-      vegaReadyTables[tooltipSeriesIndex].columnSelectFunctions[s.dims.tooltip];
-    if (toolTipFn.nodeType === 'void' || toolTipFn.type === 'invalid') {
-      return row;
-    }
-    return opPick({
-      obj: row,
-      key: constString(
-        escapeDots(
-          TableState.getTableColumnName(
-            s.table.columnNames,
-            s.table.columnSelectFunctions,
-            s.dims.tooltip,
-            weave.client.opStore
-          )
-        )
-      ),
-    });
+    const key = `[${toolTipPos.value?._seriesIndex},${toolTipPos.value?._rowIndex}]`;
+    return tooltipData[key] ?? voidNode();
   }, [
-    config.series,
     toolTipPos.value,
-    flatResultNode,
-    vegaReadyTables,
-    weave.client.opStore,
     tooltipLineData,
     isLineTooltip,
+    tooltipData,
   ]);
 
   const handler = useMemo(
