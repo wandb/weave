@@ -2347,22 +2347,31 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const concattedTable = useMemo(() => flatPlotTables.flat(), [flatPlotTables]);
 
-  const concattedLineTable = useMemo(() => {
-    return concattedTable.filter(row => {
+  const getMarkForRow = useCallback(
+    (row: any): MarkOption => {
       const s = concreteConfig.series[row._seriesIndex];
-      const mark = getMark(
+      return getMark(
         s,
         listOfTableNodes[row._seriesIndex],
         vegaReadyTables[row._seriesIndex]
       );
+    },
+    [concreteConfig.series, listOfTableNodes, vegaReadyTables]
+  );
+
+  const concattedLineTable = useMemo(() => {
+    return concattedTable.filter(row => {
+      const mark = getMarkForRow(row);
       return mark === 'line';
     });
-  }, [
-    concattedTable,
-    concreteConfig.series,
-    listOfTableNodes,
-    vegaReadyTables,
-  ]);
+  }, [concattedTable, getMarkForRow]);
+
+  const concattedNonLineTable = useMemo(() => {
+    return concattedTable.filter(row => {
+      const mark = getMarkForRow(row);
+      return mark !== 'line';
+    });
+  }, [concattedTable, getMarkForRow]);
 
   const normalizedTable = useMemo(() => {
     const colNameLookups = vegaCols.map(mapping => _.invert(mapping));
@@ -2374,6 +2383,54 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       )
     );
   }, [concattedLineTable, vegaCols]);
+
+  const tooltipData: {[seriesIndexRowIndexString: string]: ConstNode} =
+    useMemo(() => {
+      type ExprDimNameType = (typeof PlotState.EXPRESSION_DIM_NAMES)[number];
+
+      return concattedNonLineTable.reduce(
+        (acc: {[seriesIndexRowIndexString: string]: ConstNode}, row) => {
+          const key = `[${row._seriesIndex},${row._rowIndex}]`;
+
+          // check if we have a null select function, and thus are using the default tooltip
+          const s = concreteConfig.series[row._seriesIndex];
+          const colId = s.dims.tooltip;
+          const selectFn = s.table.columnSelectFunctions[colId];
+          if (isVoidNode(selectFn)) {
+            // use default tooltip
+            const nonNullDims: ExprDimNameType[] = [];
+
+            const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
+              (acc: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
+                const colId = s.dims[dim];
+
+                if (!isVoidNode(s.table.columnSelectFunctions[colId])) {
+                  nonNullDims.push(dim);
+                  const colType = s.table.columnSelectFunctions[colId].type;
+
+                  acc[vegaCols[row._seriesIndex][dim]] = colType;
+                }
+
+                return acc;
+              },
+              {}
+            );
+            const type = typedDict(propertyTypes);
+
+            acc[key] = constNodeUnsafe(type, row);
+          } else {
+            // use custom tooltip
+            acc[key] = constNodeUnsafe(
+              s.table.columnSelectFunctions[s.dims.tooltip].type,
+              row[vegaCols[row._seriesIndex].tooltip]
+            );
+          }
+
+          return acc;
+        },
+        {}
+      );
+    }, [concattedNonLineTable, concreteConfig.series, vegaCols]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
     // concatenate all plot tables into one and group by x value
