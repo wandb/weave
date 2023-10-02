@@ -148,7 +148,10 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
               _.isPlainObject(val) &&
               val.hasOwnProperty(key)
             ) {
-              return constNodeUnsafe(type.propertyTypes[key]!, val[key]);
+              const keyType = type.propertyTypes[key];
+              if (keyType != null) {
+                return constNodeUnsafe(keyType, val[key]);
+              }
             }
           }
           return actualOpPick({obj: objNode, key: constString(key)});
