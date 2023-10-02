@@ -36,7 +36,6 @@ import {
   opContains,
   opDateToNumber,
   opFilter,
-  opIndex,
   // opMap,
   // opMerge,
   opNumberGreaterEqual,
@@ -60,6 +59,8 @@ import {
   taggedValueValueType,
   isTaggedValue,
   opLimit,
+  VoidNode,
+  NodeOrVoidNode,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -3507,7 +3508,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   );
 
   // TODO: this only needs to be one node ... update after getting line tooltip working
-  const tooltipNode = useMemo(() => {
+  const tooltipNode = useMemo<NodeOrVoidNode>(() => {
     if (isLineTooltip) {
       return tooltipLineData[toolTipPos.value] ?? voidNode();
     }
