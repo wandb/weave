@@ -31,8 +31,6 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
-import {RemovableTag, RemoveAction} from '@wandb/weave/components/Tag';
-import styled from 'styled-components';
 
 type LabelCoord = {
   top: number;
@@ -330,23 +328,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         cursor: 'move',
       };
 
-      const labelText = item.text ?? '';
-      const tagLabel = (
-        <LabelTagContainer>
-          <RemovableTag
-            label={labelText as string}
-            color="teal"
-            removeAction={
-              <RemoveAction
-                onClick={(e: React.MouseEvent<HTMLElement, MouseEvent>) => {
-                  onRemove(e, defaultLabelProps);
-                }}
-              />
-            }
-          />
-        </LabelTagContainer>
-      );
-
       const label = (
         <Label
           {...defaultLabelProps}
@@ -415,11 +396,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         </DragSource>
       );
 
-      return canReorder
-        ? wrapLabelWithDragDrop(label)
-        : multiple
-        ? tagLabel
-        : label;
+      return canReorder ? wrapLabelWithDragDrop(label) : label;
     };
 
     const wrapWithDragDrop = (children: React.ReactNode) =>
@@ -472,10 +449,5 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     deep: ['options'],
   })
 );
-
-const LabelTagContainer = styled.div`
-  margin-right: 8px;
-  font-size: 15px;
-`;
 
 export default ModifiedDropdown;

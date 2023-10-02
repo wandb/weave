@@ -468,8 +468,13 @@ export const opGeoSelected = makeOp({
 });
 
 export const opFacetSelected = makeOp({
-  hidden: true,
+  hidden: false,
   name: 'Facet-selected',
+  description: 'Show selected rows of a Facet panel',
+  argDescriptions: {
+    self: 'The facet panel',
+  },
+  returnValueDescription: 'selected rows',
   argTypes: {
     self: {type: 'Facet'} as any,
   },

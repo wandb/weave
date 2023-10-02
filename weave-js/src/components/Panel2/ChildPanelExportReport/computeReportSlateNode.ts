@@ -4,7 +4,7 @@ import {ChildPanelFullConfig} from '../ChildPanel';
 import {getConfigForPath} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
 
-type WeavePanelSlateNode = {
+export type WeavePanelSlateNode = {
   type: 'weave-panel';
   /**
    * A weave-panel slate node in a report is a "void element", which
