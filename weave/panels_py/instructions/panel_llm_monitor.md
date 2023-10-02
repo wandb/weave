@@ -1,4 +1,4 @@
-## OpenAI Monitoring Quickstart
+# OpenAI Monitoring Quickstart
 
 To record history, monitor performance, & analyze cost/latency of OpenAI calls:
 
@@ -6,6 +6,8 @@ To record history, monitor performance, & analyze cost/latency of OpenAI calls:
 2. Set the OpenAI API Key to the concatenation of your [W&B API key](https://wandb.ai/authorize) and [OpenAI API key](https://platform.openai.com/account/api-keys).
 
 Setup can be achieved 3 different ways: via environment variables, the python library, or direct http requests. After setup, simply use OpenAI as normal and navigate to `monitoring/openai` via the browser on the left to create a board and visualize your usage.
+
+## Monitoring
 
 ### Via environment variables
 
@@ -45,3 +47,9 @@ For more ways to configure monitoring and understand LLM usage, follow along wit
 | Python Client | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/prompts/llm_monitoring/openai_client_quickstart.ipynb) | For those looking to customize metrics and programmatically add more data to requests, developers should use the Weave python client directly.                                      |
 
 For full details and features, see the [Weave Monitoring README](https://github.com/wandb/weave/tree/master/examples/prompts/llm_monitoring).
+
+
+## Analyze Data
+Once you've logged your data, use the browser on your left to find your table. From there, choose a template to get started!
+
+![](https://raw.githubusercontent.com/wandb/weave/master/docs/assets/full_board_view.png)
