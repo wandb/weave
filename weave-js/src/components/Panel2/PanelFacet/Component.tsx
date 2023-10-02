@@ -194,7 +194,6 @@ const PanelFacetFlexMode: React.FC<PanelFacetProps> = props => {
             width={cellSize.w}
             height={cellSize.h}
             onResize={(e, data) => {
-              console.log('RESIZING A', data);
               setResizingSize({w: data.size.width, h: data.size.height});
             }}
             onResizeStop={() => props.updateConfig({cellSize: resizingSize})}>

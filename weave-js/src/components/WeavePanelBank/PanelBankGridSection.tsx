@@ -555,7 +555,6 @@ export const PanelBankGridSection: React.FC<
                   height={panelPixelSize?.h ?? 0}
                   minConstraints={[columnWidth, gridRowHeight]}
                   onResize={(e, data) => {
-                    console.log('RESIZING C', data);
                     setResizingPixelWidth(data.size.width);
                     setResizingPixelHeight(data.size.height);
                     forceResize();
