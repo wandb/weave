@@ -67,8 +67,8 @@ const defaultOpts: RemoteWeaveOptions = {
   useAdminPrivileges: false,
   isShadow: false,
   contiguousBatchesOnly: true,
-  // Let's start with 3 concurrent requests, and see how it goes
-  maxConcurrentRequests: 3,
+  // Let's start with 2 concurrent requests, and see how it goes
+  maxConcurrentRequests: 2,
   maxBatchSize: Infinity,
   maxRetries: 5,
   backoffBase: 500,
@@ -137,7 +137,6 @@ export class RemoteHttpServer implements Server {
     this.clientCacheKey = createClientCacheKey(windowSizeMs);
   }
 
-
   public async query(
     nodes: Node[],
     stripTags?: boolean,
@@ -164,7 +163,6 @@ export class RemoteHttpServer implements Server {
       )
     );
   }
-
 
   public queryEach(
     nodes: Node[],
@@ -267,7 +265,7 @@ export class RemoteHttpServer implements Server {
 
     const nodes = nodeEntries.map(e => e.node);
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
-      ? serializeMulti(nodes)
+      ? serializeMulti(nodes, true)
       : [[serialize(nodes)], [_.range(nodes.length)]];
 
     for (

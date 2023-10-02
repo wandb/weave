@@ -322,7 +322,7 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
 }
 
 const expensiveOpNames = new Set(['get', 'set', 'getReturnType']);
-const MERGE_INEXPENSIVE_OPS = true;
+
 // Heuristic to determine if an op is expensive. We should merge
 // all subgraphs with non-expensive ops into a single graph, since
 // the network latency will dominate the cost.
@@ -330,20 +330,21 @@ const MERGE_INEXPENSIVE_OPS = true;
 const opIsExpensive = (op: EditingOp): boolean => {
   const opName = op.name;
   if (expensiveOpNames.has(opName)) {
-    return true
-  } else if (opName.startsWith("root-")) {
-    return true
-  } else if (opName.includes("refine")) {
-    return true
-  } else if (opName.includes("panel")) {
-    return true
+    return true;
+  } else if (opName.startsWith('root-')) {
+    return true;
+  } else if (opName.includes('refine')) {
+    return true;
+  } else if (opName.includes('panel')) {
+    return true;
   }
-  return false
-}
+  return false;
+};
 
 // Given an array of graph entry points, produce an array of disjoint subgraphs
 function getDisjointGraphs(
-  graphs: EditingNode[]
+  graphs: EditingNode[],
+  mergeInexpensiveOps: boolean = false
 ): [EditingNode[][], number[][]] {
   const nodeSubgraphMap: Map<EditingNode, number> = new Map();
   const expensiveSubgraphs: Set<number> = new Set();
@@ -408,7 +409,7 @@ function getDisjointGraphs(
     originalIndexes[subgraph].push(i);
   }
 
-  if (MERGE_INEXPENSIVE_OPS) {
+  if (mergeInexpensiveOps) {
     let inexpensiveSubgraph = -1;
     for (let i = 0; i < result.length; i++) {
       if (!expensiveSubgraphs.has(i)) {
@@ -417,9 +418,7 @@ function getDisjointGraphs(
         } else {
           // Merge subgraph i into inexpensiveSubgraph
           result[inexpensiveSubgraph].push(...result[i]);
-          originalIndexes[inexpensiveSubgraph].push(
-            ...originalIndexes[i]
-          );
+          originalIndexes[inexpensiveSubgraph].push(...originalIndexes[i]);
           result[i] = [];
           originalIndexes[i] = [];
         }
@@ -431,10 +430,14 @@ function getDisjointGraphs(
 }
 
 export function serializeMulti(
-  graphs: EditingNode[]
+  graphs: EditingNode[],
+  mergeInexpensiveOps: boolean = false
 ): [BatchedGraphs[], number[][]] {
   // Serialize graphs into disjoint BatchedGraphs
-  const [disjointGraphs, originalIndexes] = getDisjointGraphs(graphs);
+  const [disjointGraphs, originalIndexes] = getDisjointGraphs(
+    graphs,
+    mergeInexpensiveOps
+  );
   return [disjointGraphs.map(serialize), originalIndexes];
 }
 
