@@ -18,6 +18,9 @@ import {
   Type,
   nonNullable,
   opIsNone,
+  typedDict,
+  TypedDictType,
+  constNodeUnsafe,
 } from '@wandb/weave/core';
 
 import {Icon} from 'semantic-ui-react';
@@ -130,8 +133,26 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
     if (isTypedDictLike(nonNullableInput)) {
       return {
         objPropTypes: typedDictPropertyTypes(nonNullableInput),
-        pickOrGetattr: (objNode: Node, key: string) =>
-          actualOpPick({obj: objNode, key: constString(key)}),
+        pickOrGetattr: (objNode: Node, key: string) => {
+          if (
+            objNode.nodeType === 'const' &&
+            isAssignableTo(objNode.type, typedDict({[key]: 'any'}))
+          ) {
+            // If the node is a const, we can improve performance (e.g. in panelplot tooltips)
+            // by just doing the pick off the value directly and saving a network request
+
+            const type = objNode.type as TypedDictType;
+            const {val} = objNode;
+            if (
+              val != null &&
+              _.isPlainObject(val) &&
+              val.hasOwnProperty(key)
+            ) {
+              return constNodeUnsafe(type.propertyTypes[key]!, val[key]);
+            }
+          }
+          return actualOpPick({obj: objNode, key: constString(key)});
+        },
       };
     } else if (isObjectTypeLike(nonNullableInput)) {
       return {

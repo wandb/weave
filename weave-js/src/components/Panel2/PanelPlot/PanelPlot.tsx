@@ -3508,7 +3508,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   );
 
   // TODO: this only needs to be one node ... update after getting line tooltip working
-  const tooltipNode = useMemo<NodeOrVoidNode>(() => {
+  const tooltipNode = useMemo(() => {
+    if (toolTipPos.value == null) {
+      return voidNode();
+    }
+
     if (isLineTooltip) {
       return tooltipLineData[toolTipPos.value] ?? voidNode();
     }
