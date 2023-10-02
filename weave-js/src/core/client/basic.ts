@@ -254,7 +254,10 @@ export class BasicClient implements Client {
       ) => {
         observable.hasResult = true;
         observable.lastResult = result;
-        this.localStorageLRU.setAsync(observable.id, result);
+        if (result != null) {
+          // Skip caching nulls for now
+          this.localStorageLRU.setAsync(observable.id, result);
+        }
         for (const observer of observable.observers) {
           observer.next(result);
         }
