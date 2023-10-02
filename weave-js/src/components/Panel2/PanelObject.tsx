@@ -201,32 +201,32 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
     [inputVar, pickOrGetattr, updateInputFromProps, weave]
   );
 
-  const keyChildren = useMemo(() => {
-    console.log('keys', keys);
-    return _.sortBy(keys, k => {
-      const kType = nonNullable(propertyTypes[k]!);
-      console.log('key', k, 'kType', kType);
-      return isAssignableTo(kType, PanelStringSpec.inputType) ||
-        isAssignableTo(kType, PanelNumberSpec.inputType) ||
-        isAssignableTo(kType, PanelDateSpec.inputType) ||
-        typeIsRenderableByPanelObject(kType)
-        ? 0
-        : 1;
-    }).map(k => {
-      const childNode = pickOrGetattr(props.input, k);
-      return (
-        <PanelObjectChild
-          key={k}
-          {...props}
-          k={k}
-          level={level}
-          childNode={childNode}
-          childType={propertyTypes[k]!}
-          updateInput={updateInput}
-        />
-      );
-    });
-  }, [keys, level, pickOrGetattr, propertyTypes, props, updateInput]);
+  const keyChildren = useMemo(
+    () =>
+      _.sortBy(keys, k => {
+        const kType = nonNullable(propertyTypes[k]!);
+        return isAssignableTo(kType, PanelStringSpec.inputType) ||
+          isAssignableTo(kType, PanelNumberSpec.inputType) ||
+          isAssignableTo(kType, PanelDateSpec.inputType) ||
+          typeIsRenderableByPanelObject(kType)
+          ? 0
+          : 1;
+      }).map(k => {
+        const childNode = pickOrGetattr(props.input, k);
+        return (
+          <PanelObjectChild
+            key={k}
+            {...props}
+            k={k}
+            level={level}
+            childNode={childNode}
+            childType={propertyTypes[k]!}
+            updateInput={updateInput}
+          />
+        );
+      }),
+    [keys, level, pickOrGetattr, propertyTypes, props, updateInput]
+  );
   const defaultExpanded = !isObjectType(nonNullableInput) || level === 0;
   const expanded = props.config?.expanded ?? defaultExpanded;
 
