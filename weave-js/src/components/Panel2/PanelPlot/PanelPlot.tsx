@@ -59,8 +59,6 @@ import {
   taggedValueValueType,
   isTaggedValue,
   opLimit,
-  VoidNode,
-  NodeOrVoidNode,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
