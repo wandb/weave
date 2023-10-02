@@ -80,9 +80,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         try:
             return instance_class(**result)
         except:
-            raise errors.WeaveSerializeError(
+            err = errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)
             )
+            err.fingerprint = ["failed-to-construct", instance_class, result]
+            raise err
 
 
 class GQLClassWithKeysToPyDict(mappers_weave.GQLMapper):
