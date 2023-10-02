@@ -16,30 +16,38 @@ CACHE_AND_PARALLEL_OP_NAMES = [
     "op-img2prompt",
 ]
 
-CACHE_OP_NAMES = [
-    "file-readcsv",
-    "op-run_chain",
-    "table-2DProjection",
-    "table-projection2D",
-    "ArrowWeaveList-2DProjection",
-    "ArrowWeaveList-projection2D",
-    "op-faiss_from_documents",
-    "FAISS-document_embeddings",
-    "HuggingFacePackage-model",
-    "HFModelTextClassification-pipeline",
-    "HFModelTextClassification-call",
-    # These are parallelized by derive_op only, in a custom way
-    # Should move them to CACHE_AND_PARALLEL_OP_NAMES once that
-    # is fixed.
-    "file-partitionedTable",
-    "file-table",
-    "file-joinedTable",
-    "op-umap_project",
-    "op-openai_embed",
-    "op-hdbscan_cluster",
+CACHE_NON_PURE_OP_NAMES = [
     "gqlroot-wbgqlquery",
-    "wb_trace_tree-convertToSpans",
-] + CACHE_AND_PARALLEL_OP_NAMES
+    "get",
+]
+
+CACHE_OP_NAMES = (
+    [
+        "file-readcsv",
+        "op-run_chain",
+        "table-2DProjection",
+        "table-projection2D",
+        "ArrowWeaveList-2DProjection",
+        "ArrowWeaveList-projection2D",
+        "op-faiss_from_documents",
+        "FAISS-document_embeddings",
+        "HuggingFacePackage-model",
+        "HFModelTextClassification-pipeline",
+        "HFModelTextClassification-call",
+        # These are parallelized by derive_op only, in a custom way
+        # Should move them to CACHE_AND_PARALLEL_OP_NAMES once that
+        # is fixed.
+        "file-partitionedTable",
+        "file-table",
+        "file-joinedTable",
+        "op-umap_project",
+        "op-openai_embed",
+        "op-hdbscan_cluster",
+        "wb_trace_tree-convertToSpans",
+    ]
+    + CACHE_AND_PARALLEL_OP_NAMES
+    + CACHE_NON_PURE_OP_NAMES
+)
 
 ARROW_FS_OPS = ["run-history3", "run-history3_with_columns", "table-rows"]
 
