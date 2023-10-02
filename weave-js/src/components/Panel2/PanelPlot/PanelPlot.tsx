@@ -2395,7 +2395,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           // check if we have a null select function, and thus are using the default tooltip
           const s = concreteConfig.series[row._seriesIndex];
           const colId = s.dims.tooltip;
-          const selectFn = s.table.columnSelectFunctions[colId];
+          const table = vegaReadyTables[row._seriesIndex];
+          const selectFn = table.columnSelectFunctions[colId];
           if (isVoidNode(selectFn)) {
             // use default tooltip
             const nonNullDims: ExprDimNameType[] = [];
@@ -2404,9 +2405,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               (acc: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
                 const colId = s.dims[dim];
 
-                if (!isVoidNode(s.table.columnSelectFunctions[colId])) {
+                if (!isVoidNode(table.columnSelectFunctions[colId])) {
                   nonNullDims.push(dim);
-                  const colType = s.table.columnSelectFunctions[colId].type;
+                  const colType = table.columnSelectFunctions[colId].type;
 
                   acc[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
                     ? taggedValueValueType(colType)
@@ -2423,7 +2424,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           } else {
             // use custom tooltip
             acc[key] = constNodeUnsafe(
-              s.table.columnSelectFunctions[s.dims.tooltip].type,
+              table.columnSelectFunctions[s.dims.tooltip].type,
               row[vegaCols[row._seriesIndex].tooltip]
             );
           }
@@ -2432,7 +2433,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         },
         {}
       );
-    }, [concattedNonLineTable, concreteConfig.series, vegaCols]);
+    }, [
+      concattedNonLineTable,
+      concreteConfig.series,
+      vegaCols,
+      vegaReadyTables,
+    ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
     // concatenate all plot tables into one and group by x value
@@ -3508,12 +3514,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
     const key = `[${toolTipPos.value?._seriesIndex},${toolTipPos.value?._rowIndex}]`;
     return tooltipData[key] ?? voidNode();
-  }, [
-    toolTipPos.value,
-    tooltipLineData,
-    isLineTooltip,
-    tooltipData,
-  ]);
+  }, [toolTipPos.value, tooltipLineData, isLineTooltip, tooltipData]);
 
   const handler = useMemo(
     () =>
