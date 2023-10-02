@@ -127,13 +127,13 @@ function useEnablePageAnalytics() {
       const currentPath = `${location.pathname}${location.search}`;
       const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
       if (pathRef.current !== currentPath) {
-        let pageName = '';
+        let pageCategory = '';
         if (location.search.includes('exp=get')) {
-          pageName = 'WeaveGetExpression';
+          pageCategory = 'WeaveGetExpression';
         } else if (location.pathname.includes('/browse')) {
-          pageName = 'WeaveBrowser';
+          pageCategory = 'WeaveBrowser';
         }
-        trackPage({url: fullURL, pageName}, options);
+        trackPage({url: fullURL, pageCategory}, options);
         pathRef.current = currentPath;
       }
     },

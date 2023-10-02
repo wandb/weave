@@ -797,10 +797,15 @@ def compile_refine_and_propagate_gql(
                     re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
                 )
                 if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
-                    raise errors.WeaveBadRequest(
+                    err = errors.WeaveBadRequest(
                         "Error while dispatching: %s. This is most likely a client error"
                         % from_op.name
                     )
+                    err.fingerprint = [
+                        "error-while-dispatching-client-error",
+                        from_op.name,
+                    ]
+                    raise err
                 else:
                     raise
             except:
