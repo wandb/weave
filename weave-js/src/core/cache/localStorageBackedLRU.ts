@@ -1,5 +1,7 @@
 import {isQuotaExceededError, safeLocalStorage} from '../util/localStorage';
 
+const UNDEFINED_VALUE = '__undefined__';
+
 export class LocalStorageBackedLRU<T extends {} = {}> {
   private scanIndex: number;
 
@@ -20,7 +22,8 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
 
   public set(key: string, value: T): boolean {
     this.del(key);
-    const valStr = JSON.stringify(value);
+    const valStr =
+      value === undefined ? UNDEFINED_VALUE : JSON.stringify(value);
     const size = valStr.length;
     if (size > this.maxBytesPerEntry) {
       return false;
@@ -48,10 +51,13 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
     }
   }
 
-  public get(key: string): T | null {
+  public get(key: string): T | null | undefined {
     const valStr = this.prefixedLocalStorageGetItem(key);
     if (!valStr) {
       return null;
+    }
+    if (valStr === UNDEFINED_VALUE) {
+      return undefined as any;
     }
     const value = JSON.parse(valStr);
     this.del(key);
@@ -67,7 +73,7 @@ export class LocalStorageBackedLRU<T extends {} = {}> {
   }
 
   public has(key: string): boolean {
-    return this.prefixedLocalStorageGetItem(key) !== null;
+    return this.prefixedLocalStorageGetItem(key) != null;
   }
 
   public reset(): void {
