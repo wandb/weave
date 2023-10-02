@@ -49,6 +49,7 @@ export class BasicClient implements Client {
   private pollingListeners: Array<(poll: boolean) => void> = [];
   private readonly hasher: Hasher;
   private readonly localStorageLRU: LocalStorageBackedLRU;
+  private readonly useCache: boolean;
 
   public constructor(private readonly server: Server) {
     this.hasher = new MemoizedHasher();
@@ -62,6 +63,7 @@ export class BasicClient implements Client {
     }
     this.opStore = server.opStore;
     this.localStorageLRU = new LocalStorageBackedLRU();
+    this.useCache = server instanceof RemoteHttpServer;
   }
 
   public setPolling(polling: boolean) {
@@ -122,9 +124,11 @@ export class BasicClient implements Client {
     });
 
     let lastResult;
-    const hasCacheResult = this.localStorageLRU.has(observableId);
-    if (this.server instanceof RemoteHttpServer && hasCacheResult) {
-      lastResult = this.localStorageLRU.get(observableId);
+    if (this.useCache) {
+      const hasCacheResult = this.localStorageLRU.has(observableId);
+      if (hasCacheResult) {
+        lastResult = this.localStorageLRU.get(observableId);
+      }
     }
     this.observables.set(observableId, {
       id: observableId,
@@ -242,7 +246,9 @@ export class BasicClient implements Client {
 
       const rejectObservable = (observable: ObservableNode<any>, e: any) => {
         observable.hasResult = true;
-        this.localStorageLRU.del(observable.id);
+        if (this.useCache) {
+          this.localStorageLRU.del(observable.id);
+        }
         for (const observer of observable.observers) {
           observer.error(e);
         }
@@ -254,9 +260,11 @@ export class BasicClient implements Client {
       ) => {
         observable.hasResult = true;
         observable.lastResult = result;
-        if (result != null) {
-          // Skip caching nulls for now
-          this.localStorageLRU.setAsync(observable.id, result);
+        if (this.useCache) {
+          if (result !== undefined) {
+            // Skip caching undefined for now
+            this.localStorageLRU.setAsync(observable.id, result);
+          }
         }
         for (const observer of observable.observers) {
           observer.next(result);
