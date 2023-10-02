@@ -2422,8 +2422,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             acc[key] = constNodeUnsafe(type, row);
           } else {
             // use custom tooltip
+
+            const type = table.columnSelectFunctions[s.dims.tooltip].type;
             acc[key] = constNodeUnsafe(
-              table.columnSelectFunctions[s.dims.tooltip].type,
+              isTaggedValue(type) ? taggedValueValueType(type) : type,
               row[vegaCols[row._seriesIndex].tooltip]
             );
           }
