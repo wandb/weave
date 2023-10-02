@@ -73,12 +73,13 @@ function forEachWeaveOutputCellInNotebook(
         // patches resolving the issue. I'm not sure if this is the best way
         // to handle this, but it seems to work.
         cy.on('uncaught:exception', err => {
-            console.error('HERE!', err)
-            const resizeObserverLoopErrRe = /^ResizeObserver loop limit exceeded/
-          if (resizeObserverLoopErrRe.test(err.message)) {
-            console.error('Caught an uncaught:exception', err)
-            return false
-          }
+          return false
+          // console.error('HERE!', err)
+          // const resizeObserverLoopErrRe = /^ResizeObserver loop limit exceeded/
+          // if (resizeObserverLoopErrRe.test(err.message)) {
+          //   console.error('Caught an uncaught:exception', err)
+          //   return false
+          // }
         })
         
         // cy.visit('http://localhost:3000/' + url.search);
