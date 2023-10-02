@@ -91,7 +91,9 @@ export class CachedClient implements Client {
     return this.client.loadingObservable();
   }
   public refreshAll(): Promise<void> {
-    return this.client.refreshAll();
+    return this.cache.reset().finally(() => {
+      return this.client.refreshAll();
+    });
   }
   public debugMeta(): {id: string} & {[prop: string]: any} {
     return {

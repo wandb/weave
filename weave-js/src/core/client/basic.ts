@@ -175,16 +175,17 @@ export class BasicClient implements Client {
 
   public refreshAll(): Promise<void> {
     if (this.resolveRefreshRequest == null) {
+      this.resolveRefreshRequest =  {
+        promise: Promise.resolve(),
+        resolve: () => {},
+      }
       const prom = new Promise<void>((resolve, reject) => {
         if (this.resolveRefreshRequest != null) {
+          this.resolveRefreshRequest.promise = prom;
           this.resolveRefreshRequest.resolve = resolve;
-          this.scheduleRequest();
         }
+        this.scheduleRequest();
       });
-      this.resolveRefreshRequest = {
-        promise: prom,
-        resolve: () => {},
-      };
     }
     return this.resolveRefreshRequest.promise;
   }
@@ -318,6 +319,7 @@ export class BasicClient implements Client {
     }
 
     if (this.resolveRefreshRequest != null) {
+      console.log("here")
       const res = this.resolveRefreshRequest.resolve;
       this.resolveRefreshRequest = undefined;
       res();
