@@ -200,6 +200,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
 
   const onPanelResize = useCallback(
     (e: React.SyntheticEvent<Element, Event>, data: ResizeCallbackData) => {
+      console.log('RESIZING B', data);
       setResizingPanelSize({
         width: data.size.width,
         height: data.size.height,

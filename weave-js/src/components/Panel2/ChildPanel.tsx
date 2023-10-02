@@ -586,7 +586,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const isVarNameEditable = props.editable || controlBar === 'editable';
   const setSelectedPanel = useSetSelectedPanel();
   const showEditControls = isPanelSelected || isHoverPanel;
-
+  console.log({editorBarWidth});
   return curPanelId == null || handler == null ? (
     <div>
       No panel for type {defaultLanguageBinding.printType(panelInput.type)}
@@ -621,7 +621,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                     validateInput={validateName}
                     initialValue={props.pathEl}
                     maxWidth={
-                      editorBarWidth != null ? editorBarWidth / 3 : undefined
+                      // editorBarWidth != null ? editorBarWidth / 3 : undefined
+                      editorBarWidth != null && editorBarWidth >= 30
+                        ? Math.floor(editorBarWidth / 3 / 10) * 10
+                        : undefined
                     }
                     maxLength={24}
                   />{' '}
@@ -1107,6 +1110,7 @@ function useElementWidth<T extends HTMLElement>(): ElementWidth<T> {
         return;
       }
       const w = entry.contentBoxSize[0].inlineSize;
+      console.log('resetting', w);
       setElementWidth(w);
     });
 
