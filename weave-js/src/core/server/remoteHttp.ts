@@ -139,7 +139,7 @@ export class RemoteHttpServer implements Server {
   ): Promise<any[]> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
     if (withBackendCacheReset) {
-      this.clientCacheKey = createClientCacheKey();
+      this.clientCacheKey = createClientCacheKey(1);
     }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
