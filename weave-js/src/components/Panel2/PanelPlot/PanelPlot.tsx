@@ -2401,19 +2401,19 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             const nonNullDims: ExprDimNameType[] = [];
 
             const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
-              (acc: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
-                const colId = s.dims[dim];
+              (acc2: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
+                const colid = s.dims[dim];
 
-                if (!isVoidNode(table.columnSelectFunctions[colId])) {
+                if (!isVoidNode(table.columnSelectFunctions[colid])) {
                   nonNullDims.push(dim);
-                  const colType = table.columnSelectFunctions[colId].type;
+                  const colType = table.columnSelectFunctions[colid].type;
 
-                  acc[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
+                  acc2[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
                     ? taggedValueValueType(colType)
                     : colType;
                 }
 
-                return acc;
+                return acc2;
               },
               {}
             );
