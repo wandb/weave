@@ -163,7 +163,7 @@ export class BasicClient implements Client {
   public action<T extends Model.Type>(node: GraphTypes.Node<T>): Promise<any> {
     return new Promise((resolve, reject) => {
       this.server
-        .query([node])
+        .query([node], undefined, true)
         .then(response => resolve(response[0]))
         .catch(reject);
     });

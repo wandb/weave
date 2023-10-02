@@ -1,4 +1,4 @@
-## Trace Debugging Quickstart
+# Trace Debugging Quickstart
 
 To analyze Trace data, log `TraceSpanDict`s to a StreamTable. This can be achieved 3 different ways:
 
@@ -7,6 +7,15 @@ To analyze Trace data, log `TraceSpanDict`s to a StreamTable. This can be achiev
 - (Advanced) Via low-level construction of Spans using `TraceSpanDict`.
 
 > Already using [W&B Tracer](https://docs.wandb.ai/guides/prompts)? Stay tuned: you soon will be able to load these traces in this dashboard!
+
+## Getting Started
+To use any of the methods outlined above, we first install `weave` into our environment
+
+```python
+pip install weave
+```
+
+## Tracing
 
 ### Via Langchain Tracer
 
@@ -65,3 +74,8 @@ st.log(TraceSpanDict(
 ))
 
 ```
+
+## Analyze Data
+Once you've logged your data, use the browser on your left to find your table. From there, choose a template to get started!
+
+![](https://raw.githubusercontent.com/wandb/weave/master/docs/assets/traces_debug_board.png)
