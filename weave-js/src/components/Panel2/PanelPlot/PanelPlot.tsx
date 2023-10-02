@@ -2408,7 +2408,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   nonNullDims.push(dim);
                   const colType = s.table.columnSelectFunctions[colId].type;
 
-                  acc[vegaCols[row._seriesIndex][dim]] = colType;
+                  acc[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
+                    ? taggedValueValueType(colType)
+                    : colType;
                 }
 
                 return acc;
