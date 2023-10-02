@@ -593,7 +593,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
               {
                 icon: IconFullScreenModeExpand,
                 label: 'Preview Traces',
-                onClick: row => {
+                onClick: _ => {
                   navigateToExpression(expr);
                 },
               },
