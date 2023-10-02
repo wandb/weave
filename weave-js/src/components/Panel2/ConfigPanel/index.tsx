@@ -130,24 +130,7 @@ export const ConfigOption: React.FC<
     postfixComponent?: React.ReactElement;
   } & {[key: string]: any}
 > = props => {
-  const dashEnabled = useWeaveDashUiEnable();
-
-  if (dashEnabled) {
-    return <ConfigOptionNew {...props} />;
-  }
-
-  return (
-    <S.ConfigOption
-      {..._.omit(props, ['label', 'children', 'postfixComponent'])}>
-      {props.label !== '' ? (
-        <S.ConfigOptionLabel>{props.label}</S.ConfigOptionLabel>
-      ) : (
-        <></>
-      )}
-      <S.ConfigOptionField>{props.children}</S.ConfigOptionField>
-      {props.postfixComponent}
-    </S.ConfigOption>
-  );
+  return <ConfigOptionNew {...props} />;
 };
 
 const ConfigOptionNew: React.FC<
@@ -192,23 +175,15 @@ const ConfigOptionNew: React.FC<
 export const ModifiedDropdownConfigField: React.FC<
   React.ComponentProps<typeof ModifiedDropdown>
 > = props => {
-  const dashEnabled = useWeaveDashUiEnable();
-
-  if (dashEnabled) {
-    return (
-      <ConfigFieldWrapper withIcon>
-        <ConfigFieldModifiedDropdown
-          {...props}
-          selection={undefined}
-          compact
-          icon={<IconDown />}
-        />
-      </ConfigFieldWrapper>
-    );
-  }
-
   return (
-    <ModifiedDropdown style={{flex: '1 1 auto', width: '100%'}} {...props} />
+    <ConfigFieldWrapper withIcon>
+      <ConfigFieldModifiedDropdown
+        {...props}
+        selection={undefined}
+        compact
+        icon={<IconDown />}
+      />
+    </ConfigFieldWrapper>
   );
 };
 
@@ -228,39 +203,28 @@ export const ExpressionConfigField: React.FC<
   React.ComponentProps<typeof WeaveExpression>
 > = props => {
   const dashEnabled = useWeaveDashUiEnable();
-
-  const wrap = (content: ReactNode) =>
-    dashEnabled ? (
-      <ConfigFieldWrapper>{content}</ConfigFieldWrapper>
-    ) : (
-      <div style={{flex: '1 1 auto', width: '100%'}}>{content}</div>
-    );
-
-  return wrap(
-    <ThemeProvider theme={themes.light}>
-      <WeaveExpression
-        noBox={true}
-        setExpression={props.setExpression}
-        expr={props.expr}
-        liveUpdate={!dashEnabled}
-      />
-    </ThemeProvider>
+  return (
+    <ConfigFieldWrapper>
+      <ThemeProvider theme={themes.light}>
+        <WeaveExpression
+          noBox={true}
+          setExpression={props.setExpression}
+          expr={props.expr}
+          liveUpdate={!dashEnabled}
+        />
+      </ThemeProvider>
+    </ConfigFieldWrapper>
   );
 };
 
 export const TextInputConfigField: React.FC<
   React.ComponentProps<typeof TextInput>
 > = props => {
-  const dashEnabled = useWeaveDashUiEnable();
-
-  const wrap = (content: ReactNode) =>
-    dashEnabled ? (
-      <ConfigFieldWrapper>{content}</ConfigFieldWrapper>
-    ) : (
-      <div style={{flex: '1 1 auto', width: '100%'}}>{content}</div>
-    );
-
-  return wrap(<TextInput {...props} />);
+  return (
+    <ConfigFieldWrapper>
+      <TextInput {...props} />
+    </ConfigFieldWrapper>
+  );
 };
 
 export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`

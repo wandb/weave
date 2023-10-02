@@ -99,6 +99,8 @@ export const ConfigurationContent = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
+  // Make this the same as the weave1 drawer until fully migrated
+  width: 328px;
 `;
 ConfigurationContent.displayName = 'S.ConfigurationContent';
 
