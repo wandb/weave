@@ -64,25 +64,14 @@ function forEachWeaveOutputCellInNotebook(
         const url = new URL(src);
 
         // TODO: This switches depending on if in devmode
-        cy.visit('/__frontend/weave_frontend' + url.search, {
-          onBeforeLoad(win) {
-            // Inject the monkey-patching script into the app running in the test
-            const OriginalResizeObserver = win.ResizeObserver;
-            win.ResizeObserver = class extends OriginalResizeObserver {
-              constructor(callback) {
-                super((entries, observer) => {
-                  console.log('ResizeObserver Callback Triggered', { entries, observer });
-                  callback(entries, observer);
-                });
-                console.log('A new ResizeObserver was created', this);
-              }
-              observe(target) {
-                console.log('A new target is being observed by a ResizeObserver', target);
-                super.observe(target);
-              }
-            };
+        cy.visit('/__frontend/weave_frontend' + url.search);
+        cy.on('uncaught:exception', err => {
+        const resizeObserverLoopErrRe = /^ResizeObserver loop limit exceeded/
+        if (resizeObserverLoopErrRe.test(err.message)) {
+            console.error('Caught an uncaught:exception', err)
+            return false
           }
-        });
+        })
         
         // cy.visit('http://localhost:3000/' + url.search);
 
