@@ -114,11 +114,26 @@ class OpDefType(types.Type):
         except FileNotFoundError:
             pass
 
-        module_path = artifact.path(f"{name}.py")
-        module_dir = os.path.dirname(module_path)
-        model_filename = os.path.basename(module_path)
+        from . import artifact_wandb
 
-        import_name = os.path.splitext(model_filename)[0]
+        is_wandb_artifact = False
+        if isinstance(artifact, artifact_wandb.WandbArtifact):
+            is_wandb_artifact = True
+
+        module_path = artifact.path(f"{name}.py")
+
+        if is_wandb_artifact:
+            module_dir = os.path.dirname(module_path)
+            import_name = os.path.splitext(os.path.basename(module_path))[0]
+        else:
+            # Python import caching means we can't just import "obj.py" here
+            # because serialized ops would be cached at the "obj" key. We include
+            # the version in the module name to avoid this. Since version names
+            # are content hashes, this is correct.
+            art_dir, version_subdir, fname = module_path.rsplit("/", 2)
+            module_dir = art_dir
+            model_filename = fname
+            import_name = version_subdir + "." + os.path.splitext(model_filename)[0]
 
         # path_with_ext = os.path.relpath(
         #     artifact.path(f"{name}.py"), start=artifact_local.local_artifact_dir()
@@ -135,6 +150,8 @@ class OpDefType(types.Type):
             mod = __import__(import_name)
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
+        if not is_wandb_artifact:
+            mod = getattr(mod, "obj")
         # mod down to _obj.
         # for part in parts[1:]:
         #     mod = getattr(mod, part)

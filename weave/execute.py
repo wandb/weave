@@ -39,6 +39,7 @@ from .language_features.tagging import opdef_util
 
 # Trace / cache
 from . import storage
+from . import artifact_wandb
 from . import op_policy
 from . import trace_local
 from . import ref_base
@@ -426,31 +427,70 @@ def execute_async_op(
     job.start()
 
 
+def _auto_publish(project_name: str, obj: typing.Any, output_refs: list):
+    import numpy as np
+
+    if isinstance(obj, dict):
+        return {k: _auto_publish(project_name, v, output_refs) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_auto_publish(project_name, v, output_refs) for v in obj]
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    weave_type = types.TypeRegistry.type_of(obj)
+    if not (
+        types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
+    ):
+        return obj
+    ref = storage.get_ref(obj)
+    if not ref:
+        ref = storage.publish(
+            obj,
+            f"{project_name}/{obj.__class__.__name__}",
+        )
+    output_refs.append(ref)
+    return ref
+
+
+def auto_publish(project_name: str, obj: typing.Any):
+    refs = []
+    return _auto_publish(project_name, obj, refs), refs
+
+
 def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
 ):
     mon = monitor.default_monitor()
-    st = mon._streamtable
     mon_span_inputs = {**inputs}
-    if st and "self" in inputs:
+    st = mon._streamtable
+    if st:
+        op_def_ref = storage._get_ref(op_def)
         project_name = st._project_name
-        ref = storage.get_ref(inputs["self"])
-        if not ref:
-            ref = storage.publish(
-                inputs["self"], f"{project_name}/{inputs['self'].__class__.__name__}"
+        if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
+            op_def._ref = None
+            op_def_ref = storage.publish(
+                op_def,
+                f"{project_name}/{op_def.name}",
             )
-        mon_span_inputs["self"] = ref
+        mon_span_inputs, refs = auto_publish(project_name, inputs)
+        with mon.span(str(op_def_ref)) as span:
+            span.inputs = mon_span_inputs
+            # span.inputs["_op"] = op_def
+            for i, ref in enumerate(refs[:3]):
+                span.inputs["_ref%s" % i] = ref
+            res = op_def.resolve_fn(**inputs)
+            span.output, refs = auto_publish(project_name, res)
+    else:
+        res = op_def.resolve_fn(**inputs)
+
     # TODO: not simple name
     # TODO: capture publish time here?
     # TODO: yeah we need to capture all engine overhead so prob want this
     #    at a higher level... in the engine (execute_forward_node or higher)
     # TODO: this needs to work with local object saving as well
     # TODO: generalize "self" publishing above
-    with mon.span(op_def.simple_name) as span:
-        span.inputs = mon_span_inputs
-        res = op_def.resolve_fn(**inputs)
-        span.output = res
     return res
 
 

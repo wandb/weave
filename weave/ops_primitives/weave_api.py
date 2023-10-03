@@ -31,6 +31,12 @@ class RefNodeMethods:
     def __eq__(self, other: str) -> bool:
         return str(self) == uris.WeaveURI.parse(other).to_ref().uri
 
+    @op()
+    def __eq__(self, other: ref_base.Ref) -> bool:
+        # Have to get the ref because the engine already dereffed
+        other_ref = storage._get_ref(other)
+        return str(self) == str(other_ref)
+
 
 @op(
     input_type={

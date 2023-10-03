@@ -348,6 +348,10 @@ class Type(metaclass=_TypeSubclassWatcher):
         type_props = {}
         if self._base_type is not None:
             type_props["_base_type"] = {"type": self._base_type.name}
+            if self._base_type._base_type is not None:
+                type_props["_base_type"]["_base_type"] = {
+                    "type": self._base_type._base_type.name
+                }
         for field in fields:
             # TODO: I really don't like this change. Only needed because
             # FileType has optional fields... Remove?
@@ -1172,7 +1176,7 @@ class Function(Type):
 
 @dataclasses.dataclass(frozen=True)
 class RefType(Type):
-    object_type: Type = UnknownType()
+    object_type: Type = Any()
 
     @classmethod
     def type_of_instance(cls, obj):
