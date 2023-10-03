@@ -17,7 +17,7 @@ const DATADOG_UI_SERVICE = 'wandb-weave-ui';
 const doDatadogRumInit = once(() => {
   // ensure we're adhering to thirdPartyAnalyticsOK
   if (
-    (typeof window === 'undefined' || !window.DatadogEnabled)
+    (typeof window === 'undefined')
   ) {
     return;
   }
