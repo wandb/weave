@@ -34,9 +34,38 @@ export const setupAnalytics = () => {
 
 setupAnalytics();
 
-/**
- * TODO: Connect to router.
- */
 export function trackPage(properties: object, options: object) {
   (window.analytics as any)?.page?.(properties, options);
+}
+
+export function trackEvent(
+  eventName: string,
+  eventData: Record<string, unknown>
+) {
+  // Taken from W&B app's Analytics.
+  if (
+    Array.isArray(eventData) || // Segment accepts lists but won't process them
+    typeof eventData !== 'object' || // exclude the primitives
+    eventData === null // typeof null => 'object' :grimace:
+    // note this still leaves holes for Date / Error / any other weird "object" types
+  ) {
+    throw new Error('Analytics data must be a non-array object.');
+  }
+
+  (window.analytics as any)?.track?.(eventName, eventData);
+}
+
+export function trackNewBlankBoardClicked(source: string) {
+  trackEvent('New blank board clicked', {source});
+}
+
+export function trackNewBoardFromTemplateClicked(
+  source: string,
+  template: string
+) {
+  trackEvent('New board from template clicked', {source, template});
+}
+
+export function trackPublishBoardClicked(source: string) {
+  trackEvent('Publish board clicked', {source});
 }

@@ -76,6 +76,7 @@ import {DeleteActionModal} from './DeleteActionModal';
 import {PublishModal} from './PublishModal';
 import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -337,6 +338,9 @@ const HeaderPersistenceControls: React.FC<{
                 setIsPublishModalOpen(true);
               } else {
                 takeAction(storeAction);
+              }
+              if (storeAction === 'commit') {
+                trackPublishBoardClicked('commit-changes');
               }
             }}>
             {persistenceActionToLabel[storeAction]}
