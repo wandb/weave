@@ -18,8 +18,11 @@ import {
 import getConfig from './config';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
+import {LocalStorageBackedLRU} from './core/cache/localStorageBackedLRU';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
+  private localStorageCache: LocalStorageBackedLRU;
+
   static getDerivedStateFromError(error: Error) {
     // Update state so the next render will show the fallback UI.
     return {hasError: true};
@@ -27,6 +30,7 @@ class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   constructor(props: {}) {
     super(props);
     this.state = {hasError: false};
+    this.localStorageCache = new LocalStorageBackedLRU();
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
@@ -42,7 +46,12 @@ class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
 
   render() {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
+      try {
+        // Here we blow away our local cache state since it's likely corrupted
+        this.localStorageCache.reset();
+      } catch (e) {
+        console.log(e);
+      }
       return (
         <WeaveMessage>
           Something went wrong. Check the javascript console.
