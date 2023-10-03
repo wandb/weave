@@ -474,7 +474,11 @@ def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
             pa.array(list(range(len(new_data))), type=pa.int32()),
         )
 
-    arrays.append(pa.nulls(1, type=pa.int8()))
+    # TODO: This code tries to add a null we can use, but it makes the
+    # union invalid against the weave type. Instead we can just use the first
+    # array in the union.
+    # TODO: Need to fix this code, it is not correct now, just hacked in the branch
+    # arrays.append(pa.nulls(1, type=pa.int8()))
     type_array = pa.compute.fill_null(type_array, len(arrays) - 1)
     offset_array = pa.compute.fill_null(offset_array, 0)
 
