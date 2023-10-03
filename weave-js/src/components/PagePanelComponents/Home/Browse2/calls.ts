@@ -45,7 +45,7 @@ const refWeaveType = {
   objectType: 'any',
 } as unknown as Type;
 
-const streamTableWeaveType: Type = {
+const callsTableWeaveType: Type = {
   type: 'list',
   objectType: {
     type: 'typedDict',
@@ -70,18 +70,18 @@ const streamTableWeaveType: Type = {
   },
 };
 
-export const streamTableNode = (streamId: StreamId) => {
+export const callsTableNode = (streamId: StreamId) => {
   const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
   const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
     stream_table: opGet({
       uri: constString(predsRefStr),
     }),
   }) as Node;
-  streamTableRowsNode.type = streamTableWeaveType;
+  streamTableRowsNode.type = callsTableWeaveType;
   return streamTableRowsNode;
 };
 
-export const streamTableSelect = (stNode: Node) => {
+export const callsTableSelect = (stNode: Node) => {
   return opMap({
     arr: stNode,
     mapFn: constFunction({row: listObjectType(stNode.type)}, ({row}) =>
@@ -138,7 +138,7 @@ export const streamTableSelect = (stNode: Node) => {
 };
 
 const makeFilterExpr = (filters: CallFilter) => {
-  const rowVar = varNode(listObjectType(streamTableWeaveType), 'row');
+  const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');
   const filterClauses: Node[] = [];
   if (filters.opUri != null) {
     filterClauses.push(
@@ -195,7 +195,7 @@ const makeFilterExpr = (filters: CallFilter) => {
   return expr;
 };
 
-export const streamTableFilter = (stNode: Node, filters: CallFilter) => {
+export const callsTableFilter = (stNode: Node, filters: CallFilter) => {
   const filterExpr = makeFilterExpr(filters);
   return opFilter({
     arr: stNode,
@@ -203,11 +203,11 @@ export const streamTableFilter = (stNode: Node, filters: CallFilter) => {
   }) as Node;
 };
 
-export const streamTableOpCounts = (stNode: Node) => {
+export const callsTableOpCounts = (stNode: Node) => {
   const groups = opGroupby({
     arr: stNode,
     groupByFn: constFunction(
-      {row: listObjectType(streamTableWeaveType)},
+      {row: listObjectType(callsTableWeaveType)},
       ({row}) =>
         opPick({
           obj: row,

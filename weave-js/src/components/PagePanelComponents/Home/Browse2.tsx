@@ -36,10 +36,10 @@ import {flatToTrees} from '../../Panel2/PanelTraceTree/util';
 import {
   CallFilter,
   StreamId,
-  streamTableFilter,
-  streamTableNode,
-  streamTableOpCounts,
-  streamTableSelect,
+  callsTableFilter,
+  callsTableNode,
+  callsTableOpCounts,
+  callsTableSelect,
 } from './Browse2/calls';
 
 function useQuery() {
@@ -475,9 +475,9 @@ const TraceDetails: FC<{streamId: StreamId; traceSpan: TraceSpan}> = ({
   traceSpan,
 }) => {
   const traceSpansNode = useMemo(() => {
-    const rowsNode = streamTableNode(streamId);
-    const filtered = streamTableFilter(rowsNode, {traceId: traceSpan.traceId});
-    return streamTableSelect(filtered);
+    const rowsNode = callsTableNode(streamId);
+    const filtered = callsTableFilter(rowsNode, {traceId: traceSpan.traceId});
+    return callsTableSelect(filtered);
   }, [streamId, traceSpan.traceId]);
   const traceSpansQuery = useNodeValue(traceSpansNode);
 
@@ -513,9 +513,9 @@ const Browse2Calls: FC<{
   const query = useQuery();
 
   const selected = useMemo(() => {
-    const streamTableRowsNode = streamTableNode(streamId);
-    const filtered = streamTableFilter(streamTableRowsNode, filters);
-    return streamTableSelect(filtered);
+    const streamTableRowsNode = callsTableNode(streamId);
+    const filtered = callsTableFilter(streamTableRowsNode, filters);
+    return callsTableSelect(filtered);
   }, [filters, streamId]);
 
   const selectedQuery = useNodeValue(selected);
@@ -691,15 +691,15 @@ const opPageUrl = (opUri: string) => {
 const Browse2RootObjectVersionUsers: FC<{uri: string}> = ({uri}) => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const calledOpCountsNode = useMemo(() => {
-    const streamTableRowsNode = streamTableNode({
+    const streamTableRowsNode = callsTableNode({
       entityName: params.entity,
       projectName: params.project,
       streamName: 'stream',
     });
-    const filtered = streamTableFilter(streamTableRowsNode, {
+    const filtered = callsTableFilter(streamTableRowsNode, {
       inputUris: [uri],
     });
-    return streamTableOpCounts(filtered);
+    return callsTableOpCounts(filtered);
   }, [params.entity, params.project, uri]);
   const calledOpCountsQuery = useNodeValue(calledOpCountsNode);
   const calledOpCounts = calledOpCountsQuery.result ?? [];
