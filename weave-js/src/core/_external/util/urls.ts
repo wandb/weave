@@ -1,3 +1,5 @@
+/* --- Artifacts --- */
+
 export function artifact(r: {
   entityName: string;
   projectName: string;
@@ -21,9 +23,13 @@ export function artifactCollection(r: {
   )}/${encodeURIComponent(r.artifactCollectionName)}`;
 }
 
+/* --- Projects --- */
+
 export function project(projectValue: Record<'entityName' | 'name', string>) {
   return `/${projectValue.entityName}/${projectValue.name}`;
 }
+
+/* --- Runs --- */
 
 export function run(r: {
   entityName: string;
@@ -33,9 +39,21 @@ export function run(r: {
   return `/${r.entityName}/${r.projectName}/runs/${r.name}`;
 }
 
-export function reportView(
-  r: Record<'reportID' | 'reportName' | 'entityName' | 'projectName', string>
-): string {
+/* --- Reports --- */
+
+export type ReportParams = {
+  entityName: string;
+  projectName: string;
+  reportID: string;
+  reportName?: string;
+};
+
+export function reportEdit(r: ReportParams, queryString?: string) {
+  const extra = queryString || '';
+  return `${reportViewWithoutPublished(r)}/edit${extra}`;
+}
+
+export function reportView(r: ReportParams): string {
   return `/${r.entityName}/${r.projectName}/reports/${makeNameAndID(
     r.reportID,
     r.reportName
@@ -52,4 +70,11 @@ export function makeNameAndID(id: string, name?: string): string {
     name = name.replace(/\W/g, '-').replace(/-+/g, '-');
   }
   return name != null ? `${encodeURIComponent(name)}--${id}` : id;
+}
+
+export function reportViewWithoutPublished(r: ReportParams) {
+  return `/${r.entityName}/${r.projectName}/reports/${makeNameAndID(
+    r.reportID,
+    r.reportName
+  )}`;
 }

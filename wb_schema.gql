@@ -5,7 +5,15 @@
 
 schema {
   query: Query
+  mutation: Mutation
 }
+
+directive @audit on FIELD_DEFINITION
+directive @constraints(
+  min: Int
+  max: Int
+  pattern: String
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
 type Query {
   user(id: ID, userName: String): User
@@ -66,6 +74,10 @@ type Query {
     last: Int
   ): RepoInsightsRowConnection
   repo(id: ID!): Repo
+}
+
+type Mutation {
+  upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
 }
 
 scalar DateTime
@@ -593,6 +605,30 @@ type ViewConnection {
 type ViewEdge {
   node: View
   cursor: String!
+}
+
+input UpsertViewInput {
+  id: ID
+  entityName: String
+  projectName: String
+  name: String @constraints(max: 128)
+  displayName: String @constraints(max: 128)
+  description: String
+  type: String
+  spec: String
+  parentId: ID
+  locked: Boolean
+  previewUrl: String @constraints(max: 256)
+  coverUrl: String @constraints(max: 256)
+  clientMutationId: String
+  showcasedAt: DateTime
+  createdUsing: ViewSource
+}
+
+type UpsertViewPayload {
+  view: View
+  inserted: Boolean
+  clientMutationId: String
 }
 
 interface Error {
