@@ -44,6 +44,7 @@ CACHE_OP_NAMES = (
         "op-openai_embed",
         "op-hdbscan_cluster",
         "wb_trace_tree-convertToSpans",
+        "wb_trace_tree-convertToSpans_refine",
     ]
     + CACHE_AND_PARALLEL_OP_NAMES
     + CACHE_NON_PURE_OP_NAMES

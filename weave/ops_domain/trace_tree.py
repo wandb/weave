@@ -266,6 +266,7 @@ class TraceSpanDictWithTimestamp(stream_data_interfaces.TraceSpanDict):
 
 
 @op(
+    name="wb_trace_tree-convertToSpans_refine",
     hidden=True,
 )
 def refine_convert_output_type(

@@ -26,7 +26,12 @@ USE_PARALLEL_DOWNLOAD = True
 USE_PARALLEL_REFINE = True
 USE_PARALLEL_RESOLVE = True
 
-_PARALLEL_ALLOWLIST = ["op-refine_history_metrics", "artifactVersion-historyMetrics"]
+_PARALLEL_ALLOWLIST = [
+    "op-refine_history_metrics",
+    "artifactVersion-historyMetrics",
+    "wb_trace_tree-convertToSpans_refine",
+    "wb_trace_tree-convertToSpans",
+]
 PARALLEL_REFINE_ALLOWLIST = _PARALLEL_ALLOWLIST
 PARALLEL_RESOLVE_ALLOWLIST = _PARALLEL_ALLOWLIST
 
