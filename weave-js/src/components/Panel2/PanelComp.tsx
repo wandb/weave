@@ -63,7 +63,7 @@ class PanelCompErrorBoundary extends React.Component<
 
     datadogRum.addAction(
       'weave_panel_error_boundary',
-      errorToPayload(error, weave)
+      errorToPayload(error, this.props.weave)
     );
 
     if (error instanceof CGReact.InvalidGraph) {
