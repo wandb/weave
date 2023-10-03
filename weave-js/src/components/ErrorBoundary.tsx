@@ -1,5 +1,7 @@
 import React, {Component, ErrorInfo, ReactNode} from 'react';
 import {ErrorPanel} from './ErrorPanel';
+import {datadogRum} from '@datadog/browser-rum';
+import {UseNodeValueServerExecutionError} from '../errors';
 
 type Props = {
   children?: ReactNode;
@@ -20,6 +22,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // TODO: Log to error reporting service?
+    datadogRum.addAction('weave_panel_error_boundary', {
+      isServerError: error instanceof UseNodeValueServerExecutionError,
+    });
   }
 
   public render() {

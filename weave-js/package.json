@@ -28,6 +28,7 @@
     "@babylonjs/loaders": "^4.2.0",
     "@babylonjs/viewer": "^4.2.0",
     "@datadog/browser-logs": "^1.12.7",
+    "@datadog/browser-rum": "^4.50.0",
     "@floating-ui/react": "^0.24.5",
     "@material-ui/core": "^4.11.4",
     "@monaco-editor/react": "^4.3.1",

@@ -55,6 +55,7 @@ import {
   useIsAuthenticated,
   useWeaveViewer,
 } from '../context/WeaveViewerContext';
+import {datadogSetUserInfo} from '../integrations';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -185,12 +186,28 @@ const usePoorMansLocation = () => {
   return window.location;
 };
 
+const useInitializeDataDog = () => {
+  const weaveViewer = useWeaveViewer();
+
+  useEffect(() => {
+    if (weaveViewer.loading) {
+      return;
+    }
+    const userInfo = {username: 'anonymous'};
+    if (weaveViewer.data.authenticated && weaveViewer.data.user_id) {
+      userInfo.username = weaveViewer.data.user_id;
+    }
+    datadogSetUserInfo(userInfo);
+  }, [weaveViewer]);
+};
+
 type PagePanelProps = {
   browserType: string | undefined;
 };
 
 const PagePanel = ({browserType}: PagePanelProps) => {
   useEnablePageAnalytics();
+  useInitializeDataDog();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
   const history = useHistory();

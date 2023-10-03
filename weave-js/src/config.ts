@@ -6,6 +6,8 @@ declare global {
       WEAVE_BACKEND_HOST: string;
       ONPREM: boolean;
       WANDB_BASE_URL: string;
+      DD_ENV?: string;
+      DD_CLIENT_TOKEN?: string;
     };
   }
 }
