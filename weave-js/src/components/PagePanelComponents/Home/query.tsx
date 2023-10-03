@@ -90,6 +90,7 @@ export const useProjectsForEntityWithWeaveObject = (
   });
 
   const entityProjectNamesValue = useNodeValue(projectMetaNode);
+  console.log(entityProjectNamesValue);
 
   return useMemo(() => {
     // this filter step is done client side - very bad!
@@ -154,7 +155,7 @@ export const useProjectAssetCount = (
     projectHistoryType: opProjectHistoryType({project: projectNode}),
   } as any);
   const compositeValue = useNodeValue(compositeNode);
-
+  console.log('compositeValue', compositeValue);
   return useMemo(() => {
     let result = {
       boardCount: 0,
@@ -163,6 +164,7 @@ export const useProjectAssetCount = (
       legacyTracesCount: 0,
     };
     if (compositeValue.result != null) {
+      console.log(compositeValue.result.projectHistoryType);
       const keys = projectHistoryTypeToLegacyTraceKeys(
         compositeValue.result.projectHistoryType as w.Type
       );
@@ -378,6 +380,7 @@ export const useProjectLegacyTraces = (
   });
   const historyTypeNode = opProjectHistoryType({project: projectNode});
   const historyTypeValue = useNodeValue(historyTypeNode as w.Node);
+  console.log({historyTypeValue});
   return useMemo(() => {
     const keys =
       historyTypeValue.result == null
@@ -397,39 +400,31 @@ export const useProjectLegacyTraces = (
 const projectHistoryTypeToLegacyTraceKeys = (
   projectHistoryType: w.Type
 ): string[] => {
-  if (w.isTaggedValue(projectHistoryType)) {
-    projectHistoryType = projectHistoryType.value;
-    if (w.isList(projectHistoryType)) {
-      projectHistoryType = projectHistoryType.objectType;
-      if (w.isTaggedValue(projectHistoryType)) {
-        projectHistoryType = projectHistoryType.value;
-        if (
-          !w.isSimpleTypeShape(projectHistoryType) &&
-          projectHistoryType.type === 'ArrowWeaveList'
-        ) {
-          projectHistoryType = projectHistoryType.objectType;
-          if (w.isTypedDict(projectHistoryType)) {
-            const legacyTraceKeys = Object.entries(
-              projectHistoryType.propertyTypes
-            )
-              .filter(([key, value]) => {
-                return (
-                  value != null &&
-                  w.isAssignableTo(
-                    value,
-                    w.maybe({
-                      type: 'wb_trace_tree',
-                    })
-                  )
-                );
-              })
-              .map(([key, value]) => key);
-            return legacyTraceKeys;
-          }
-        }
+  if (w.isListLike(projectHistoryType)) {
+    projectHistoryType = w.listObjectType(projectHistoryType);
+    if (w.isListLike(projectHistoryType)) {
+      projectHistoryType = w.listObjectType(projectHistoryType);
+      if (w.isTypedDictLike(projectHistoryType)) {
+        const legacyTraceKeys = Object.entries(
+          w.typedDictPropertyTypes(projectHistoryType)
+        )
+          .filter(([key, value]) => {
+            return (
+              value != null &&
+              w.isAssignableTo(
+                value,
+                w.maybe({
+                  type: 'wb_trace_tree',
+                })
+              )
+            );
+          })
+          .map(([key, value]) => key);
+        return legacyTraceKeys;
       }
     }
   }
+
   return [];
 };
 
