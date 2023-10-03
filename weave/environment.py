@@ -224,3 +224,11 @@ def usage_analytics_enabled() -> bool:
 
 def gql_schema_path() -> typing.Optional[str]:
     return os.environ.get(WEAVE_GQL_SCHEMA_PATH) or None
+
+
+def datadog_env() -> typing.Optional[str]:
+    return os.getenv("DD_ENV")
+
+
+def datadog_client_token() -> typing.Optional[str]:
+    return os.getenv("DD_CLIENT_TOKEN")

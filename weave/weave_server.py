@@ -392,6 +392,8 @@ def frontend_env():
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
         "WANDB_BASE_URL": environment.wandb_base_url(),
+        "DD_ENV": environment.datadog_env(),
+        "DD_CLIENT_TOKEN": environment.datadog_client_token(),
     }
 
 
