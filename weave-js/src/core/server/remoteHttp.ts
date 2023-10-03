@@ -287,10 +287,9 @@ export class RemoteHttpServer implements Server {
         indexes.forEach(i => {
           const entry = nodeEntries[i];
           if (entry.retries >= this.opts.maxRetries) {
-            const message = `Cancelling node after ${entry.retries} retries`
+            const message = `Cancelling node after ${entry.retries} retries`;
             this.trace(message);
-            this.rejectNode(entry.node, 
-              {message, traceback: []});
+            this.rejectNode(entry.node, {message, traceback: []});
           } else {
             entry.state = 'waiting';
             entry.retries++;
