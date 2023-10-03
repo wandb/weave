@@ -20,7 +20,16 @@ span_typed_dict_type = weave.types.TypedDict(
         "timestamp": weave.types.optional(weave.types.Timestamp()),
     },
     not_required_keys=set(
-        ["status_code", "inputs", "output", "exception", "attributes", "summary"]
+        # parent_id is not required because it is None for root spans
+        [
+            "status_code",
+            "inputs",
+            "output",
+            "exception",
+            "attributes",
+            "summary",
+            "parent_id",
+        ]
     ),
 )
 

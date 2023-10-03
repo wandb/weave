@@ -67,6 +67,7 @@ export const SpanWeaveType = {
     'exception',
     'attributes',
     'summary',
+    'parent_id',
   ],
 };
 export const SpanWeaveWithTimestampType: Type = {
