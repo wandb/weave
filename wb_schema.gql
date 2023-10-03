@@ -1,7 +1,7 @@
 # This file is a hand-selected subset of the W&B GQL spec that is used by weave python.
-# Its type definitions are used by gql_to_weave.py to convert GQL queries to weave types.
-# If you add a new GQL op that you want to support in weave, you'll need to add any fields
-# in its query_function to this file.
+# On the backend, it's used by gql_to_weave.py to convert GQL queries to weave types.
+# On the frontend, it's used for autogenerating TypeScript definitions for GQL queries.
+# If you need to support a new GQL op in weave, you must add the relevant type definitions here.
 
 schema {
   query: Query
