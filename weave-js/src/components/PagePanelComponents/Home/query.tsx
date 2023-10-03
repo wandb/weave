@@ -397,39 +397,31 @@ export const useProjectLegacyTraces = (
 const projectHistoryTypeToLegacyTraceKeys = (
   projectHistoryType: w.Type
 ): string[] => {
-  if (w.isTaggedValue(projectHistoryType)) {
-    projectHistoryType = projectHistoryType.value;
-    if (w.isList(projectHistoryType)) {
-      projectHistoryType = projectHistoryType.objectType;
-      if (w.isTaggedValue(projectHistoryType)) {
-        projectHistoryType = projectHistoryType.value;
-        if (
-          !w.isSimpleTypeShape(projectHistoryType) &&
-          projectHistoryType.type === 'ArrowWeaveList'
-        ) {
-          projectHistoryType = projectHistoryType.objectType;
-          if (w.isTypedDict(projectHistoryType)) {
-            const legacyTraceKeys = Object.entries(
-              projectHistoryType.propertyTypes
-            )
-              .filter(([key, value]) => {
-                return (
-                  value != null &&
-                  w.isAssignableTo(
-                    value,
-                    w.maybe({
-                      type: 'wb_trace_tree',
-                    })
-                  )
-                );
-              })
-              .map(([key, value]) => key);
-            return legacyTraceKeys;
-          }
-        }
+  if (w.isListLike(projectHistoryType)) {
+    projectHistoryType = w.listObjectType(projectHistoryType);
+    if (w.isListLike(projectHistoryType)) {
+      projectHistoryType = w.listObjectType(projectHistoryType);
+      if (w.isTypedDictLike(projectHistoryType)) {
+        const legacyTraceKeys = Object.entries(
+          w.typedDictPropertyTypes(projectHistoryType)
+        )
+          .filter(([key, value]) => {
+            return (
+              value != null &&
+              w.isAssignableTo(
+                value,
+                w.maybe({
+                  type: 'wb_trace_tree',
+                })
+              )
+            );
+          })
+          .map(([key, value]) => key);
+        return legacyTraceKeys;
       }
     }
   }
+
   return [];
 };
 

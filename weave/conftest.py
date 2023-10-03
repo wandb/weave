@@ -120,7 +120,7 @@ def pre_post_each_test(test_artifact_dir, caplog):
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
     os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
-        pathlib.Path(__file__).parent / "tests/wb_schema.gql"
+        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
     )
     try:
         shutil.rmtree(test_artifact_dir)
