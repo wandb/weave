@@ -255,10 +255,9 @@ class Monitor:
                                 preprocess(span)
                             try:
                                 span.output = fn(*args, **kwargs)
+                                output = span.output
                                 if postprocess:
                                     output = postprocess(span)
-                                else:
-                                    output = span.output
                             except Exception as e:
                                 span.status_code = StatusCode.ERROR
                                 span.exception = e
@@ -276,10 +275,16 @@ class Monitor:
 
 
 def _init_monitor_streamtable(stream_key: str) -> typing.Optional[StreamTable]:
-    try:
-        entity_name, project_name, stream_name = stream_key.split("/", 3)
-    except ValueError:
-        raise ValueError("stream_key must be of the form 'entity/project/stream_name'")
+    tokens = stream_key.split("/")
+    if len(tokens) == 2:
+        project_name, stream_name = tokens
+        entity_name = None
+    elif len(tokens) == 3:
+        entity_name, project_name, stream_name = tokens
+    else:
+        raise ValueError(
+            "stream_key must be of the form 'entity/project/stream_name' or 'project/stream_name'"
+        )
 
     stream_table = None
     try:

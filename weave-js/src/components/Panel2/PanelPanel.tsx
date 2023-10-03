@@ -358,6 +358,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
 export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   const {
     loading,
+    documentId,
     panelConfig,
     selectedPanel,
     setInteractingPanel,
@@ -388,8 +389,8 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   );
 
   const goBackToOutline = useCallback(() => {
-    setInteractingPanel('config', ['']);
-  }, [setInteractingPanel]);
+    setInteractingPanel('config', [''], documentId);
+  }, [documentId, setInteractingPanel]);
 
   if (loading) {
     return <Panel2Loader />;
@@ -422,7 +423,9 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             config={panelConfig}
             updateConfig={panelUpdateConfig}
             updateConfig2={panelUpdateConfig2}
-            setSelected={path => setInteractingPanel('config', path)}
+            setSelected={path =>
+              setInteractingPanel('config', path, documentId)
+            }
             selected={selectedPanel}
           />
         </SidebarConfig.Body>

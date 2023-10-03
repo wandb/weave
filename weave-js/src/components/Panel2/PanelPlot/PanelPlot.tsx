@@ -36,7 +36,6 @@ import {
   opContains,
   opDateToNumber,
   opFilter,
-  opIndex,
   // opMap,
   // opMerge,
   opNumberGreaterEqual,
@@ -2347,22 +2346,31 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const concattedTable = useMemo(() => flatPlotTables.flat(), [flatPlotTables]);
 
-  const concattedLineTable = useMemo(() => {
-    return concattedTable.filter(row => {
+  const getMarkForRow = useCallback(
+    (row: any): MarkOption => {
       const s = concreteConfig.series[row._seriesIndex];
-      const mark = getMark(
+      return getMark(
         s,
         listOfTableNodes[row._seriesIndex],
         vegaReadyTables[row._seriesIndex]
       );
+    },
+    [concreteConfig.series, listOfTableNodes, vegaReadyTables]
+  );
+
+  const concattedLineTable = useMemo(() => {
+    return concattedTable.filter(row => {
+      const mark = getMarkForRow(row);
       return mark === 'line';
     });
-  }, [
-    concattedTable,
-    concreteConfig.series,
-    listOfTableNodes,
-    vegaReadyTables,
-  ]);
+  }, [concattedTable, getMarkForRow]);
+
+  const concattedNonLineTable = useMemo(() => {
+    return concattedTable.filter(row => {
+      const mark = getMarkForRow(row);
+      return mark !== 'line';
+    });
+  }, [concattedTable, getMarkForRow]);
 
   const normalizedTable = useMemo(() => {
     const colNameLookups = vegaCols.map(mapping => _.invert(mapping));
@@ -2374,6 +2382,64 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       )
     );
   }, [concattedLineTable, vegaCols]);
+
+  const tooltipData: {[seriesIndexRowIndexString: string]: ConstNode} =
+    useMemo(() => {
+      type ExprDimNameType = (typeof PlotState.EXPRESSION_DIM_NAMES)[number];
+
+      return concattedNonLineTable.reduce(
+        (acc: {[seriesIndexRowIndexString: string]: ConstNode}, row) => {
+          const key = `[${row._seriesIndex},${row._rowIndex}]`;
+
+          // check if we have a null select function, and thus are using the default tooltip
+          const s = concreteConfig.series[row._seriesIndex];
+          const colId = s.dims.tooltip;
+          const table = vegaReadyTables[row._seriesIndex];
+          const selectFn = table.columnSelectFunctions[colId];
+          if (isVoidNode(selectFn)) {
+            // use default tooltip
+            const nonNullDims: ExprDimNameType[] = [];
+
+            const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
+              (acc2: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
+                const colid = s.dims[dim];
+
+                if (!isVoidNode(table.columnSelectFunctions[colid])) {
+                  nonNullDims.push(dim);
+                  const colType = table.columnSelectFunctions[colid].type;
+
+                  acc2[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
+                    ? taggedValueValueType(colType)
+                    : colType;
+                }
+
+                return acc2;
+              },
+              {}
+            );
+            const type = typedDict(propertyTypes);
+
+            acc[key] = constNodeUnsafe(type, row);
+          } else {
+            // use custom tooltip
+
+            const type = table.columnSelectFunctions[s.dims.tooltip].type;
+            acc[key] = constNodeUnsafe(
+              isTaggedValue(type) ? taggedValueValueType(type) : type,
+              row[vegaCols[row._seriesIndex].tooltip]
+            );
+          }
+
+          return acc;
+        },
+        {}
+      );
+    }, [
+      concattedNonLineTable,
+      concreteConfig.series,
+      vegaCols,
+      vegaReadyTables,
+    ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
     // concatenate all plot tables into one and group by x value
@@ -3443,52 +3509,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   // TODO: this only needs to be one node ... update after getting line tooltip working
   const tooltipNode = useMemo(() => {
+    if (toolTipPos.value == null) {
+      return voidNode();
+    }
+
     if (isLineTooltip) {
       return tooltipLineData[toolTipPos.value] ?? voidNode();
     }
 
-    const tooltipSeriesIndex = toolTipPos.value?._seriesIndex;
-    const valueResultIndex = toolTipPos.value?._rowIndex;
-    const s = config.series[tooltipSeriesIndex];
-
-    if (tooltipSeriesIndex == null || valueResultIndex == null) {
-      return voidNode();
-    }
-
-    const row = opIndex({
-      arr: opIndex({
-        arr: flatResultNode,
-        index: constNumber(tooltipSeriesIndex),
-      }),
-      index: constNumber(valueResultIndex),
-    });
-    const toolTipFn =
-      vegaReadyTables[tooltipSeriesIndex].columnSelectFunctions[s.dims.tooltip];
-    if (toolTipFn.nodeType === 'void' || toolTipFn.type === 'invalid') {
-      return row;
-    }
-    return opPick({
-      obj: row,
-      key: constString(
-        escapeDots(
-          TableState.getTableColumnName(
-            s.table.columnNames,
-            s.table.columnSelectFunctions,
-            s.dims.tooltip,
-            weave.client.opStore
-          )
-        )
-      ),
-    });
-  }, [
-    config.series,
-    toolTipPos.value,
-    flatResultNode,
-    vegaReadyTables,
-    weave.client.opStore,
-    tooltipLineData,
-    isLineTooltip,
-  ]);
+    const key = `[${toolTipPos.value?._seriesIndex},${toolTipPos.value?._rowIndex}]`;
+    return tooltipData[key] ?? voidNode();
+  }, [toolTipPos.value, tooltipLineData, isLineTooltip, tooltipData]);
 
   const handler = useMemo(
     () =>

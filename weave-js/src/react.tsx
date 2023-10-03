@@ -61,6 +61,7 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
+import {UseNodeValueServerExecutionError} from './errors';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**
@@ -347,7 +348,8 @@ export const useNodeValue = <T extends Type>(
       const message =
         'Node execution failed (useNodeValue): ' + errorToText(error);
       console.error(message);
-      throw new Error(message);
+
+      throw new UseNodeValueServerExecutionError(message);
     }
     if (isConstNode(node)) {
       if (isFunction(node.type)) {

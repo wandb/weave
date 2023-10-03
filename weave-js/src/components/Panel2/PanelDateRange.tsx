@@ -66,8 +66,8 @@ type PanelDateRangeProps = Panel.PanelProps<
 >;
 
 // From GPT-4
-// This is the inverse of our monthRoundedTime function
-export function deltaStringToSeconds(timeString: string) {
+// This is the inverse of our monthRoundedTime function (except that takes seconds)
+export function deltaStringToMilliseconds(timeString: string) {
   const units: {[key: string]: number} = {
     mo: 60 * 60 * 24 * 30, // month in seconds
     d: 60 * 60 * 24, // day in seconds
@@ -79,7 +79,7 @@ export function deltaStringToSeconds(timeString: string) {
   let timestamp = 0;
 
   // matches a number followed by a unit
-  const regex = /(\d+)(mo|d|h|m|s)/g;
+  const regex = /(-?\d+)(mo|d|h|m|s)/g;
   let match;
 
   // To track which units have been found already
@@ -104,23 +104,40 @@ export function deltaStringToSeconds(timeString: string) {
     timestamp += value * (units[unit] || 0);
   }
 
-  // // If the whole string was not matched, it is not valid
-  if (regex.lastIndex == null) {
+  // If no matches, return null
+  if (Object.keys(foundUnits).length === 0) {
     return null;
   }
-  // if (regex.lastIndex < timeString.length - 2) {
-  //   return null;
-  // }
 
   return timestamp * 1000;
 }
 
-// Convert timestamp to a string format that can be parsed by the Date constructor.
-// This is non-standard but tested to work in Chrome, Firefox, Safari.
+// Forcing to U.S. format is not ideal, but in the browsers tested (Chrome, Firefox, Safari)
+// the string can be parsed back into a Date object, which is not true for all locales.
+//
+// Will use system time zone because timeZone is not specified.
+const formatterUnitedStates = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric', // 4-digit year
+  month: 'numeric', // no leading zero
+  day: 'numeric', // no leading zero
+  hour: 'numeric', // no leading zero
+  minute: '2-digit',
+  second: '2-digit',
+  // It would be nice to include a timezone indicator, but it gets truncated in the
+  // varbar at the currently hardcoded width.
+  // timeZoneName: 'short',
+});
+
 const formatTime = (timestamp: number): string => {
   const date = new Date(timestamp);
-  const isoWithMillis = date.toISOString();
-  return isoWithMillis.replace('T', ' ').split('.')[0] + 'Z';
+  return formatterUnitedStates.format(date);
+};
+
+// Will assume the datetime is system timezone if not specified.
+// Attempted to use moment with an explicit string here, but it is overly
+// forgiving, and interprets some of our delta formats as dates.
+const parseDateTime = (datetime: string): number => {
+  return new Date(datetime).getTime();
 };
 
 export const DateEditor: React.FC<{
@@ -139,10 +156,10 @@ export const DateEditor: React.FC<{
       initialValue={dateS}
       dataTest={''}
       onCommit={(newValue: string) => {
-        if (!isNaN(new Date(newValue).getTime())) {
-          props.onCommit(new Date(newValue).getTime());
+        if (!isNaN(parseDateTime(newValue))) {
+          props.onCommit(parseDateTime(newValue));
         } else if (allowDelta && props.deltaFromOffset != null) {
-          const delta = deltaStringToSeconds(newValue);
+          const delta = deltaStringToMilliseconds(newValue);
           if (delta != null) {
             const newTimestamp =
               props.deltaDirection === 'up'
@@ -158,7 +175,7 @@ export const DateEditor: React.FC<{
           return true;
         }
         if (allowDelta) {
-          const delta = deltaStringToSeconds(value);
+          const delta = deltaStringToMilliseconds(value);
           if (delta != null) {
             return true;
           }

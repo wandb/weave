@@ -588,10 +588,20 @@ const CenterProjectLegacyTracesBrowser: React.FC<
         <HomePreviewSidebarTemplate
           title={row.name}
           row={row}
+          actions={[
+            [
+              {
+                icon: IconFullScreenModeExpand,
+                label: 'Preview Traces',
+                onClick: _ => {
+                  navigateToExpression(expr);
+                },
+              },
+            ],
+          ]}
           setPreviewNode={setPreviewNode}>
           <HomeExpressionPreviewParts
             expr={convertSimpleLegacyNodeToNewFormat(expr)}
-            previewExpr={expr}
             generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
           />
