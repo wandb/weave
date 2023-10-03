@@ -16,19 +16,16 @@ const DATADOG_UI_SERVICE = 'wandb-weave-ui';
 
 const doDatadogRumInit = once(() => {
   // ensure we're adhering to thirdPartyAnalyticsOK
-  if (
-    (typeof window === 'undefined')
-  ) {
+  if (typeof window === 'undefined') {
     return;
   }
 
   const clientToken = window.WEAVE_CONFIG?.DD_CLIENT_TOKEN;
   const env = window.WEAVE_CONFIG?.DD_ENV;
-  console.log({clientToken, env})
 
-    if (!clientToken || !env) {
-        return;
-    }
+  if (!clientToken || !env) {
+    return;
+  }
 
   datadogRum.init({
     // TODO(np): get and append username from env
