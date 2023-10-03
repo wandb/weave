@@ -18,6 +18,9 @@ import {
   Type,
   nonNullable,
   opIsNone,
+  typedDict,
+  TypedDictType,
+  constNodeUnsafe,
 } from '@wandb/weave/core';
 
 import {Icon} from 'semantic-ui-react';
@@ -130,8 +133,29 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
     if (isTypedDictLike(nonNullableInput)) {
       return {
         objPropTypes: typedDictPropertyTypes(nonNullableInput),
-        pickOrGetattr: (objNode: Node, key: string) =>
-          actualOpPick({obj: objNode, key: constString(key)}),
+        pickOrGetattr: (objNode: Node, key: string) => {
+          if (
+            objNode.nodeType === 'const' &&
+            isAssignableTo(objNode.type, typedDict({[key]: 'any'}))
+          ) {
+            // If the node is a const, we can improve performance (e.g. in panelplot tooltips)
+            // by just doing the pick off the value directly and saving a network request
+
+            const type = objNode.type as TypedDictType;
+            const {val} = objNode;
+            if (
+              val != null &&
+              _.isPlainObject(val) &&
+              val.hasOwnProperty(key)
+            ) {
+              const keyType = type.propertyTypes[key];
+              if (keyType != null) {
+                return constNodeUnsafe(keyType, val[key]);
+              }
+            }
+          }
+          return actualOpPick({obj: objNode, key: constString(key)});
+        },
       };
     } else if (isObjectTypeLike(nonNullableInput)) {
       return {
@@ -255,10 +279,18 @@ const PanelObjectChild: React.FC<
   config,
 }) => {
   const nonNullableChildType = nonNullable(childType);
-  const isNone = useNodeValue(opIsNone({val: childNode}));
+  let isNone = useNodeValue(opIsNone({val: childNode}), {
+    skip: childNode.nodeType === 'const',
+  });
+
+  if (childNode.nodeType === 'const') {
+    isNone = {loading: false, result: childNode.val == null};
+  }
+
   if (isNone.loading || isNone.result) {
     return null;
   }
+
   return (
     <KeyValTable.Row>
       <KeyValTable.Key>
