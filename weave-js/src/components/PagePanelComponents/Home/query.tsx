@@ -90,7 +90,6 @@ export const useProjectsForEntityWithWeaveObject = (
   });
 
   const entityProjectNamesValue = useNodeValue(projectMetaNode);
-  console.log(entityProjectNamesValue);
 
   return useMemo(() => {
     // this filter step is done client side - very bad!
@@ -155,7 +154,7 @@ export const useProjectAssetCount = (
     projectHistoryType: opProjectHistoryType({project: projectNode}),
   } as any);
   const compositeValue = useNodeValue(compositeNode);
-  console.log('compositeValue', compositeValue);
+
   return useMemo(() => {
     let result = {
       boardCount: 0,
@@ -164,7 +163,6 @@ export const useProjectAssetCount = (
       legacyTracesCount: 0,
     };
     if (compositeValue.result != null) {
-      console.log(compositeValue.result.projectHistoryType);
       const keys = projectHistoryTypeToLegacyTraceKeys(
         compositeValue.result.projectHistoryType as w.Type
       );
@@ -380,7 +378,6 @@ export const useProjectLegacyTraces = (
   });
   const historyTypeNode = opProjectHistoryType({project: projectNode});
   const historyTypeValue = useNodeValue(historyTypeNode as w.Node);
-  console.log({historyTypeValue});
   return useMemo(() => {
     const keys =
       historyTypeValue.result == null
