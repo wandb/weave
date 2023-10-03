@@ -1,3 +1,12 @@
+// These two declarations are required until we deprecate weave typescript
+// service. We don't consider "dom" as part of the compileOptions.lib
+// which is correct, because it is a node service. However, this file
+// safely handles when window / Storage is not available. Therefore, this
+// type declaration is a safe workaround for cross-service compatibility.
+
+declare var window: any;
+declare type Storage = any;
+
 // you can simulate this in Firefox by going to about:config in the nav bar and then
 // setting dom.storage.enabled to false.
 type MaybeStorage = Storage | null;
@@ -56,11 +65,62 @@ export const setItem =
       // @ts-ignore
       storage.setItem(key, value);
     } catch (e) {
+      if (isQuotaExceededError(e)) {
+        throw e;
+      }
       console.error(
         `Error attempting to set item: "${key}" from storage. Storage may not be available in this environment.`
       );
     }
   };
+
+export function isQuotaExceededError(e: any): boolean {
+  let quotaExceeded = false;
+  if (e) {
+    if (e.code) {
+      switch (e.code) {
+        case 22:
+          // Chrome and Safari
+          quotaExceeded = true;
+          break;
+        case 1014:
+          // Firefox
+          if (e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            quotaExceeded = true;
+          }
+          break;
+      }
+    } else if (e.number === -2147024882) {
+      // Internet Explorer 8
+      quotaExceeded = true;
+    }
+  }
+  return quotaExceeded;
+}
+
+export const keyAt = (storage: MaybeStorage) => (index: number) => {
+  try {
+    // @ts-ignore
+    return storage.key(index);
+  } catch (e) {
+    console.error(
+      `Error attempting to get key: "${index}" from storage. Storage may not be available in this environment.`
+    );
+  }
+  return null;
+};
+
+export const length = (storage: MaybeStorage) => () => {
+  try {
+    // @ts-ignore
+    return storage.length;
+  } catch (e) {
+    console.error(
+      `Error attempting to get length from storage. Storage may not be available in this environment.`
+    );
+  }
+  return 0;
+};
 
 export function getStorage(storage: Storage | null) {
   return {
@@ -69,6 +129,8 @@ export function getStorage(storage: Storage | null) {
     getItem: getItem(storage),
     removeItem: removeItem(storage),
     setItem: setItem(storage),
+    key: keyAt(storage), // maintain compatibility with localStorage API
+    length: length(storage),
   };
 }
 /**
