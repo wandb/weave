@@ -4,21 +4,27 @@ export class UseNodeValueServerExecutionError extends Error {}
 
 export const errorToPayload = (
   error: Error,
-  weave: WeaveApp
+  weave?: WeaveApp
 ): {[prop: string]: any} => {
-  return {
-    errorMessage: trimString(error.message),
-    errorName: trimString(error.name),
-    errorStack: trimString(error.stack),
-    hashedErrorMessage: hashStr(error.message),
-    hashedErrorStack: hashStr(error.stack),
-    // segment analytics creates a context_page_url which is supposed to
-    // be the current page, but in practice, this seems to be broken
-    // about 15% of the time. Adding this manually for now.
-    windowLocationURL: trimString(window.location.href),
-    weaveContext: weave.client.debugMeta(),
-    isServerError: error instanceof UseNodeValueServerExecutionError,
-  };
+  try {
+    return {
+      errorMessage: trimString(error.message),
+      errorName: trimString(error.name),
+      errorStack: trimString(error.stack),
+      hashedErrorMessage: hashStr(error.message),
+      hashedErrorStack: hashStr(error.stack),
+      // segment analytics creates a context_page_url which is supposed to
+      // be the current page, but in practice, this seems to be broken
+      // about 15% of the time. Adding this manually for now.
+      windowLocationURL: trimString(window.location.href),
+      weaveContext: weave?.client.debugMeta(),
+      isServerError: error instanceof UseNodeValueServerExecutionError,
+    };
+  } catch (e) {
+    // If we fail to serialize the error, just return an empty object.
+    console.error('Failed to serialize error', e);
+    return {};
+  }
 };
 
 const MAX_CONFIG_STRING_LENGTH = 2500;
