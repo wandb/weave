@@ -29,10 +29,14 @@ import * as PanelLib from './panellib/libpanel';
 import * as TSTypeWithPath from './tsTypeWithPath';
 import {HOVER_DELAY_MS} from './Tooltip';
 import {ErrorPanel} from '../ErrorPanel';
+import {errorToPayload} from '../../errors';
+import {datadogRum} from '@datadog/browser-rum';
+import {WeaveApp} from '../..';
 
 class PanelCompErrorBoundary extends React.Component<
   {
     inPanelMaybe: boolean;
+    weave: WeaveApp;
     onInvalidGraph?: (node: NodeOrVoidNode) => void;
   },
   {hasError: boolean; customMessage?: string}
@@ -56,6 +60,11 @@ class PanelCompErrorBoundary extends React.Component<
     if (error instanceof CGReact.NullResult && this.props.inPanelMaybe) {
       throw error;
     }
+
+    datadogRum.addAction(
+      'weave_panel_error_boundary',
+      errorToPayload(error, weave)
+    );
 
     if (error instanceof CGReact.InvalidGraph) {
       this.props.onInvalidGraph?.(error.node);
@@ -272,16 +281,19 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
   }, [panelSpec, props, configMode, updateConfig2]);
 
   const {panelMaybeNode} = usePanelContext();
+  const weave = useWeaveContext();
 
   unboundedContent = useMemo(() => {
     return dashUiEnabled ? (
-      <PanelCompErrorBoundary inPanelMaybe={panelMaybeNode != null}>
+      <PanelCompErrorBoundary
+        inPanelMaybe={panelMaybeNode != null}
+        weave={weave}>
         {unboundedContent}
       </PanelCompErrorBoundary>
     ) : (
       unboundedContent
     );
-  }, [dashUiEnabled, panelMaybeNode, unboundedContent]);
+  }, [dashUiEnabled, panelMaybeNode, unboundedContent, weave]);
 
   if (props.input.nodeType === 'void') {
     return (
