@@ -40,6 +40,7 @@ import {
   callsTableNode,
   callsTableOpCounts,
   callsTableSelect,
+  callsTableSelectTraces,
 } from './Browse2/calls';
 
 function useQuery() {
@@ -126,8 +127,9 @@ const Browse2Project: FC = props => {
         />
       </div>
       <div style={{marginBottom: 12}}>
-        <div>Runs</div>
-        <Browse2RunsPage />
+        <Link to={`/${URL_BROWSE2}/${params.entity}/${params.project}/trace`}>
+          Traces
+        </Link>
       </div>
     </div>
   );
@@ -606,15 +608,65 @@ const Browse2CallsPage: FC = () => {
   );
 };
 
-const Browse2Runs: FC<{
+const Browse2Trace: FC<{
+  streamId: StreamId;
+  selectedSpan: TraceSpan;
+}> = ({streamId, selectedSpan}) => {
+  return <TraceDetails streamId={streamId} traceSpan={selectedSpan} />;
+};
+
+interface Browse2TracePageParams {
+  entity: string;
+  project: string;
+  traceId: string;
+}
+
+const Browse2TracePage: FC = () => {
+  const params = useParams<Browse2TracePageParams>();
+  return (
+    <Browse2Trace
+      streamId={{
+        entityName: params.entity,
+        projectName: params.project,
+        streamName: 'stream',
+      }}
+      selectedSpan={{traceId: params.traceId}}
+    />
+  );
+};
+
+const Browse2Traces: FC<{
   streamId: StreamId;
   selectedSpan?: TraceSpan;
 }> = ({streamId, selectedSpan}) => {
-  return <div>Runs</div>;
+  const tracesNode = useMemo(() => {
+    const callsRowsNode = callsTableNode(streamId);
+    return callsTableSelectTraces(callsRowsNode);
+  }, [streamId]);
+  const tracesQuery = useNodeValue(tracesNode);
+  const traces = tracesQuery.result ?? [];
+  return (
+    <div>
+      {traces.map(trace => (
+        <div>
+          <Link
+            to={`/${URL_BROWSE2}/${streamId.entityName}/${streamId.projectName}/trace/${trace.trace_id}`}>
+            {trace.trace_id}
+          </Link>
+          : {trace.span_count}
+        </div>
+      ))}
+    </div>
+  );
 };
 
-const Browse2RunsPage: FC = () => {
-  const params = useParams<Browse2RootObjectVersionItemParams>();
+interface Browse2TracesPageParams {
+  entity: string;
+  project: string;
+}
+
+const Browse2TracesPage: FC = () => {
+  const params = useParams<Browse2TracesPageParams>();
   const filters: CallFilter = {};
   const query = useQuery();
   let selectedSpan: TraceSpan | undefined = undefined;
@@ -632,7 +684,7 @@ const Browse2RunsPage: FC = () => {
     }
   });
   return (
-    <Browse2Runs
+    <Browse2Traces
       streamId={{
         entityName: params.entity,
         projectName: params.project,
@@ -949,6 +1001,12 @@ export const Browse2: FC = props => {
       <div style={{padding: 32}}>
         <Browse2Breadcrumbs />
         <Switch>
+          <Route path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId`}>
+            <Browse2TracePage />
+          </Route>
+          <Route path={`/${URL_BROWSE2}/:entity/:project/trace`}>
+            <Browse2TracesPage />
+          </Route>
           <Route
             path={`/${URL_BROWSE2}/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
             <Browse2RootObjectVersionItem />

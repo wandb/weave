@@ -137,7 +137,7 @@ export const callsTableSelect = (stNode: Node) => {
   });
 };
 
-const makeFilterExpr = (filters: CallFilter) => {
+const makeFilterExpr = (filters: CallFilter): Node | undefined => {
   const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');
   const filterClauses: Node[] = [];
   if (filters.opUri != null) {
@@ -197,9 +197,12 @@ const makeFilterExpr = (filters: CallFilter) => {
 
 export const callsTableFilter = (stNode: Node, filters: CallFilter) => {
   const filterExpr = makeFilterExpr(filters);
+  if (filterExpr == null) {
+    return stNode;
+  }
   return opFilter({
     arr: stNode,
-    filterFn: constFunction({row: 'any'}, ({row}) => filterExpr as any),
+    filterFn: constFunction({row: 'any'}, ({row}) => filterExpr),
   }) as Node;
 };
 
@@ -225,6 +228,35 @@ export const callsTableOpCounts = (stNode: Node) => {
             obj: row,
           }),
           count: opCount({
+            arr: row,
+          }),
+        } as any) as any
+    ),
+  });
+};
+
+export const callsTableSelectTraces = (stNode: Node) => {
+  const groups = opGroupby({
+    arr: stNode,
+    groupByFn: constFunction(
+      {row: listObjectType(callsTableWeaveType)},
+      ({row}) =>
+        opPick({
+          obj: row,
+          key: constString('trace_id'),
+        }) as any
+    ),
+  });
+  return opMap({
+    arr: groups,
+    mapFn: constFunction(
+      {row: listObjectType(groups.type)},
+      ({row}) =>
+        opDict({
+          trace_id: opGroupGroupKey({
+            obj: row,
+          }),
+          span_count: opCount({
             arr: row,
           }),
         } as any) as any
