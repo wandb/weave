@@ -255,10 +255,9 @@ class Monitor:
                                 preprocess(span)
                             try:
                                 span.output = fn(*args, **kwargs)
+                                output = span.output
                                 if postprocess:
                                     output = postprocess(span)
-                                else:
-                                    output = span.output
                             except Exception as e:
                                 span.status_code = StatusCode.ERROR
                                 span.exception = e
