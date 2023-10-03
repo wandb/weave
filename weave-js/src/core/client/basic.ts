@@ -10,6 +10,7 @@ import {Server} from '../server/types';
 import {ID} from '../util/id';
 import {Client} from './types';
 import _ from 'lodash';
+import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
@@ -49,6 +50,7 @@ export class BasicClient implements Client {
   private pollingListeners: Array<(poll: boolean) => void> = [];
   private readonly hasher: Hasher;
   private isRemoteServer: boolean = false;
+  private readonly localStorageLRU: LocalStorageBackedLRU;
 
   public constructor(private readonly server: Server) {
     this.hasher = new MemoizedHasher();
@@ -62,6 +64,7 @@ export class BasicClient implements Client {
       setTimeout(this.pollIteration.bind(this), POLL_INTERVAL);
     }
     this.opStore = server.opStore;
+    this.localStorageLRU = new LocalStorageBackedLRU();
   }
 
   public setPolling(polling: boolean) {
@@ -105,7 +108,7 @@ export class BasicClient implements Client {
         return;
       }
       obs.observers.add(observer);
-      if (obs.hasResult) {
+      if (obs.hasResult || obs.lastResult !== undefined) {
         observer.next(obs.lastResult);
       } else {
         this.setIsLoading(true);
@@ -120,6 +123,14 @@ export class BasicClient implements Client {
         }
       };
     });
+
+    let lastResult;
+    if (this.isRemoteServer) {
+      const hasCacheResult = this.localStorageLRU.has(observableId);
+      if (hasCacheResult) {
+        lastResult = this.localStorageLRU.get(observableId);
+      }
+    }
     this.observables.set(observableId, {
       id: observableId,
       observable,
@@ -127,7 +138,7 @@ export class BasicClient implements Client {
       node,
       hasResult: false,
       inFlight: false,
-      lastResult: undefined,
+      lastResult,
     });
     this.scheduleRequest();
     return observable;
@@ -253,6 +264,9 @@ export class BasicClient implements Client {
 
       const rejectObservable = (observable: ObservableNode<any>, e: any) => {
         observable.hasResult = true;
+        if (this.isRemoteServer) {
+          this.localStorageLRU.del(observable.id);
+        }
         for (const observer of observable.observers) {
           observer.error(e);
         }
@@ -265,6 +279,12 @@ export class BasicClient implements Client {
       ) => {
         observable.hasResult = true;
         observable.lastResult = result;
+        if (this.isRemoteServer) {
+          if (result !== undefined) {
+            // Skip caching undefined for now
+            this.localStorageLRU.setAsync(observable.id, result);
+          }
+        }
         for (const observer of observable.observers) {
           observer.next(result);
         }
