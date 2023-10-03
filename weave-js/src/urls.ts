@@ -1,4 +1,5 @@
 export const URL_BROWSE = 'browse';
+export const URL_BROWSE2 = 'browse2';
 export const URL_RECENT = 'recent';
 export const URL_WANDB = 'wandb';
 export const URL_LOCAL = 'local';

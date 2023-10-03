@@ -31,6 +31,7 @@ import {Spec as PanelDateRange} from './PanelDateRange';
 import {Spec as PanelStringHistogramWeave} from './PanelStringHistogramWeave';
 import {Spec as PanelTextEditor} from './PanelTextEditor';
 import {Spec as PanelWeaveLink} from './PanelWeaveLink';
+import {Spec as PanelOpDef} from './PanelOpDef';
 
 export const weavePythonPanelSpecs = () => {
   return [
@@ -66,5 +67,6 @@ export const weavePythonPanelSpecs = () => {
     PanelLayoutFlow,
     PanelFacetTabs,
     PanelSections,
+    PanelOpDef,
   ];
 };

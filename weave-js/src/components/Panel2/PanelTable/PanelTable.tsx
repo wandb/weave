@@ -3,6 +3,7 @@ import 'react-base-table/lib/TableRow';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {
+  callOpVeryUnsafe,
   constFunction,
   constNumber,
   constString,
@@ -256,6 +257,7 @@ const PanelTableInner: React.FC<
   const {
     input,
     updateConfig,
+    updateInput,
     updateContext,
     height,
     width,
@@ -351,46 +353,69 @@ const PanelTableInner: React.FC<
 
   const setRowAsPinned = useCallback(
     (row: number, pinned: boolean) => {
-      const pinnedRows = config.pinnedRows ?? {};
-      if (pinned) {
-        const update = {
-          pinnedRows: {
-            ...pinnedRows,
-            [compositeGroupKey]: pinnedRowsForCurrentGrouping.includes(row)
-              ? pinnedRowsForCurrentGrouping
-              : [...pinnedRowsForCurrentGrouping, row],
-          },
-        };
-        updateConfig(update);
+      if (window.location.toString().includes('browse2')) {
+        if (updateInput) {
+          updateInput(
+            opIndex({
+              arr: varNode('any', 'input'),
+              index: constNumber(row),
+            }) as any
+          );
+        }
       } else {
-        updateConfig({
-          pinnedRows: {
-            ...pinnedRows,
-            [compositeGroupKey]: pinnedRowsForCurrentGrouping.filter(
-              r => r !== row
-            ),
-          },
-        });
+        const pinnedRows = config.pinnedRows ?? {};
+        if (pinned) {
+          const update = {
+            pinnedRows: {
+              ...pinnedRows,
+              [compositeGroupKey]: pinnedRowsForCurrentGrouping.includes(row)
+                ? pinnedRowsForCurrentGrouping
+                : [...pinnedRowsForCurrentGrouping, row],
+            },
+          };
+          updateConfig(update);
+        } else {
+          updateConfig({
+            pinnedRows: {
+              ...pinnedRows,
+              [compositeGroupKey]: pinnedRowsForCurrentGrouping.filter(
+                r => r !== row
+              ),
+            },
+          });
+        }
       }
     },
     [
-      config.pinnedRows,
       compositeGroupKey,
+      config.pinnedRows,
       pinnedRowsForCurrentGrouping,
       updateConfig,
+      updateInput,
     ]
   );
 
   const setRowAsActive = useCallback(
     (row: number) => {
-      updateConfig({
-        activeRowForGrouping: {
-          ...config.activeRowForGrouping,
-          [compositeGroupKey]: row,
-        },
-      });
+      if (window.location.toString().includes('browse2')) {
+        if (updateInput) {
+          updateInput(
+            callOpVeryUnsafe('index', {
+              arr: varNode('any', 'input'),
+              index: constNumber(row),
+            }) as any
+          );
+        }
+      } else {
+        updateConfig({
+          activeRowForGrouping: {
+            ...config.activeRowForGrouping,
+            [compositeGroupKey]: row,
+          },
+        });
+      }
     },
-    [compositeGroupKey, config.activeRowForGrouping, updateConfig]
+    [compositeGroupKey, config.activeRowForGrouping, updateConfig, updateInput]
   );
   const activeRowIndex = config.activeRowForGrouping?.[compositeGroupKey] ?? -1;
 
@@ -1151,6 +1176,8 @@ const IndexCell: React.FC<{
           }}>
           {props.simpleTable ? (
             <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+          ) : window.location.toString().includes('browse2') ? (
+            <div style={{cursor: 'pointer'}}>🔗</div>
           ) : (
             <Popup
               // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725

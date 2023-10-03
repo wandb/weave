@@ -412,6 +412,14 @@ export interface NewRun {
   _state: {_val: string};
   _prints: string[];
 }
+
+export interface OpDefType {
+  type: 'OpDef';
+}
+
+export interface RefType {
+  type: 'Ref';
+}
 // End Weave Python additions
 
 export type ComplexType =
@@ -441,7 +449,9 @@ export type ComplexType =
   | FunctionType
   | Union
   | NDArrayType
-  | TimestampType;
+  | TimestampType
+  | OpDefType
+  | RefType;
 export type Type = ComplexType | SimpleType;
 
 export type TypeID = ComplexType['type'] | SimpleType;

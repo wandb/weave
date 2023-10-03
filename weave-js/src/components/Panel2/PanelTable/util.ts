@@ -73,7 +73,9 @@ export const useAutomatedTableState = (
   weave: WeaveInterface
 ) => {
   let {stack} = usePanelContext();
-  ({node: input as any, stack} = useRefEqualExpr(input, stack));
+  // TODO: This was reversing stack and breaking stuff!
+  // TODO TODO TODO
+  // ({node: input as any, stack} = useRefEqualExpr(input, stack));
   const {table: autoTable} = useMemo(() => {
     const dereffedInput = dereferenceAllVars(input, stack).node as Node;
     return Table.initTableFromTableType(dereffedInput, weave);

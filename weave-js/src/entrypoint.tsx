@@ -10,6 +10,7 @@ import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
+  URL_BROWSE2,
   URL_LOCAL,
   URL_TEMPLATES,
   URL_RECENT,
@@ -18,6 +19,8 @@ import {
 import getConfig from './config';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
+import {Browse2} from './components/PagePanelComponents/Home/Browse2';
+import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -74,6 +77,24 @@ const Main = ({browserType}: MainProps) => (
   </React.Suspense>
 );
 
+const Browse2Wrapper = () => (
+  <React.Suspense fallback="loading">
+    <ErrorBoundary>
+      <NotebookComputeGraphContextProvider>
+        <StateInspector name="WeaveApp">
+          <PanelRootContextProvider>
+            <WeaveViewerContextProvider>
+              <PanelInteractContextProvider>
+                <Browse2 />
+              </PanelInteractContextProvider>
+            </WeaveViewerContextProvider>
+          </PanelRootContextProvider>
+        </StateInspector>
+      </NotebookComputeGraphContextProvider>
+    </ErrorBoundary>
+  </React.Suspense>
+);
+
 const basename = getConfig().PREFIX;
 ReactDOM.render(
   <Router basename={basename}>
@@ -95,6 +116,10 @@ ReactDOM.render(
       </Route>
       <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
         <Main browserType={URL_LOCAL} />
+      </Route>
+      <Route
+        path={`/${URL_BROWSE2}/:entity?/:project?/:rootType?/:objName?/:objVersion?/:refExtra*`}>
+        <Browse2Wrapper />
       </Route>
       <Route path="/">
         <Main />

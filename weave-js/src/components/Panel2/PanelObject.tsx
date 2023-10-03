@@ -30,6 +30,7 @@ import {Spec as PanelDateSpec} from './PanelDate';
 import PanelDate from './PanelDate/Component';
 import * as ConfigPanel from './ConfigPanel';
 import {useNodeValue} from '@wandb/weave/react';
+import {ChildPanel} from './ChildPanel';
 
 const inputType = {
   type: 'union' as const,
@@ -311,7 +312,22 @@ const PanelObjectChild: React.FC<
             updateInput={newInput => updateInput(k, newInput)}
           />
         ) : (
-          <div>{defaultLanguageBinding.printType(childType, true)}</div>
+          <div style={{height: 400, width: '100%'}}>
+            {defaultLanguageBinding.printType(childType, true)}
+            {/* TODO: This is not probably what we always want! */}
+            <ChildPanel
+              config={config?.children?.[k] ?? childNode}
+              updateConfig={newConfig => {
+                updateConfig({
+                  ...config,
+                  children: {
+                    ...config?.children,
+                    [k]: newConfig,
+                  },
+                });
+              }}
+            />
+          </div>
         )}
       </KeyValTable.Val>
     </KeyValTable.Row>

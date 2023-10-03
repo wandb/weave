@@ -449,13 +449,29 @@ export const useValue = <T extends Type>(
   );
 };
 
-interface ArtifactURI {
+interface LocalArtifactRef {
   artifactName: string;
   artifactVersion: string;
   artifactPath: string;
 }
 
-export const parseRef = (ref: string): ArtifactURI => {
+interface WandbArtifactRef {
+  entityName: string;
+  projectName: string;
+  artifactName: string;
+  artifactVersion: string;
+  artifactPath: string;
+}
+
+type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
+
+export const isWandbArtifactRef = (
+  ref: ArtifactRef
+): ref is WandbArtifactRef => {
+  return 'entityName' in ref;
+};
+
+export const parseRef = (ref: string): ArtifactRef => {
   const url = new URL(ref);
   let splitLimit: number;
 
@@ -476,12 +492,22 @@ export const parseRef = (ref: string): ArtifactURI => {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
-  const path = isWandbArtifact ? splitUri.slice(2) : splitUri;
-  const [artifactId, artifactPath] = path;
-  const [artifactName, artifactVersion] = artifactId.split(':', 2);
+  if (isWandbArtifact) {
+    const [entityName, projectName, artifactId, artifactPath] = splitUri;
+    const [artifactName, artifactVersion] = artifactId.split(':', 2);
+    return {
+      entityName,
+      projectName,
+      artifactName,
+      artifactVersion,
+      artifactPath,
+    };
+  }
+
+  const [artifactName, artifactPath] = splitUri;
   return {
     artifactName,
-    artifactVersion,
+    artifactVersion: 'latest',
     artifactPath,
   };
 };

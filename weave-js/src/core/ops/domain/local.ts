@@ -30,7 +30,7 @@ import {
 import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
 import {opIndex} from '../primitives';
-import {makeStandardOp, makeBasicOp} from '../opKinds';
+import {makeStandardOp, makeBasicOp, makeEqualOp} from '../opKinds';
 import {splitEscapedString} from '../primitives/splitEscapedString';
 
 // import * as TypeHelpers from '../model/typeHelpers';
@@ -816,4 +816,10 @@ export const opChainRun = makeStandardOp({
   resolver: inputs => {
     throw new Error('cant resolve op-chain-run in js');
   },
+});
+
+export const opRefEqual = makeEqualOp({
+  hidden: true,
+  name: 'Ref-__eq__',
+  argType: {type: 'Ref'},
 });
