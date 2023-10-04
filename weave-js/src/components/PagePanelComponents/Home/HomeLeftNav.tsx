@@ -12,6 +12,7 @@ import {useWeaveContext} from '../../../context';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {NavigateToExpressionType} from './common';
 import {Link} from '../../../common/util/links';
+import {trackNewBlankBoardClicked} from '@wandb/weave/util/events';
 
 const LeftNavItemBlock = styled(LayoutElements.HBlock)`
   margin: 0px 0px 0px 12px;
@@ -73,7 +74,10 @@ export const LeftNav: React.FC<{
       <NewBoardButtonWrapper>
         <Button
           variant="secondary"
-          onClick={newDashboard}
+          onClick={() => {
+            newDashboard();
+            trackNewBlankBoardClicked('home');
+          }}
           icon="add-new"
           size="large">
           New blank board

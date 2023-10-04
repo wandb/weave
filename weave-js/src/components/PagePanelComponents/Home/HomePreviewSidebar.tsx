@@ -38,6 +38,7 @@ import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
 import * as S from './styles';
 import {maybePluralize} from '../../../core/util/string';
 import {Unclickable} from './PreviewNode';
+import {trackNewBoardFromTemplateClicked} from '@wandb/weave/util/events';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -443,6 +444,13 @@ const OverviewTab = ({
                               navigateToExpression(newDashExpr);
                             }
                           );
+                          const templateName = processTemplateNameForTracking(
+                            recommendedTemplateInfo.display_name
+                          );
+                          trackNewBoardFromTemplateClicked(
+                            'table-overview-tab',
+                            templateName
+                          );
                         }}
                         isExpanded={true}
                         isRecommended={true}
@@ -468,6 +476,10 @@ const OverviewTab = ({
                           setIsGenerating(false);
                           navigateToExpression(newDashExpr);
                         }
+                      );
+                      trackNewBoardFromTemplateClicked(
+                        'table-overview-tab',
+                        'simple-table-visualization'
                       );
                     }}
                     isExpanded={true}
@@ -571,6 +583,13 @@ const TemplateTab = ({
                 navigateToExpression(newDashExpr);
               }
             );
+            const templateName = processTemplateNameForTracking(
+              recommendedTemplateInfo.display_name
+            );
+            trackNewBoardFromTemplateClicked(
+              'table-template-tab',
+              templateName
+            );
           }}
           onClick={() => {
             setExpandedTemplate(recommendedTemplateInfo.op_name);
@@ -604,6 +623,13 @@ const TemplateTab = ({
             }}
             onClick={() => {
               setExpandedTemplate(template.op_name);
+              const templateName = processTemplateNameForTracking(
+                template.display_name
+              );
+              trackNewBoardFromTemplateClicked(
+                'table-template-tab',
+                templateName
+              );
             }}
             isExpanded={expandedTemplate === template.op_name}
           />
@@ -712,3 +738,7 @@ export const HomeBoardPreview: React.FC<{
     </HomePreviewSidebarTemplate>
   );
 };
+
+function processTemplateNameForTracking(templateName: string) {
+  return templateName.toLowerCase().trim().split(' ').join('_');
+}
