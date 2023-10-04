@@ -35,6 +35,27 @@ export interface CallFilter {
   traceId?: string;
 }
 
+export interface Call {
+  name: string;
+  inputs: {[key: string]: any};
+  output: any;
+  attributes: {[key: string]: any};
+  summary: {latency_s: number; [key: string]: any};
+  span_id: string;
+  trace_id: string;
+  parent_id: string;
+  timestamp: string;
+  start_time_ms: number;
+  end_time_ms: number;
+}
+
+export type Span = Call;
+
+export interface TraceSpan {
+  traceId: string;
+  spanId?: string;
+}
+
 // TODO: Put into Types
 const refWeaveType = {
   type: 'FilesystemArtifactRef',

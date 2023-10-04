@@ -31,17 +31,26 @@ import {SEED_BOARD_OP_NAME} from './HomePreviewSidebar';
 import {Button} from 'semantic-ui-react';
 import {isWandbArtifactRef, parseRef, useNodeValue} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
-import Sidebar from '../../Sidebar/Sidebar';
 import {flatToTrees} from '../../Panel2/PanelTraceTree/util';
 import {
+  Call,
   CallFilter,
+  Span,
   StreamId,
+  TraceSpan,
   callsTableFilter,
   callsTableNode,
   callsTableOpCounts,
   callsTableSelect,
   callsTableSelectTraces,
-} from './Browse2/calls';
+} from './Browse2/callTree';
+import {useTraceSpans} from './Browse2/callTreeHooks';
+import {
+  OpenAIChatInputView,
+  OpenAIChatOutputView,
+  isOpenAIChatInput,
+  isOpenAIChatOutput,
+} from './Browse2/openai';
 
 function useQuery() {
   const {search} = useLocation();
@@ -49,12 +58,29 @@ function useQuery() {
   return React.useMemo(() => new URLSearchParams(search), [search]);
 }
 
-const Browse2Root: FC = props => {
+const PageEl = styled.div``;
+
+const PageHeaderEl = styled.div`
+  font-size: 24px;
+  margin-bottom: 12px;
+  display: flex;
+`;
+
+const PageHeaderObjectType = styled.div`
+  font-weight: bold;
+  margin-right: 6px;
+`;
+
+const PageHeaderObjectName = styled.div``;
+
+const Browse2Home: FC = props => {
   const isAuthenticated = useIsAuthenticated();
   const userEntities = query.useUserEntities(isAuthenticated);
   return (
-    <div>
-      Root
+    <PageEl>
+      <PageHeaderEl>
+        <PageHeaderObjectType>Home</PageHeaderObjectType>
+      </PageHeaderEl>
       <div>
         {userEntities.result.map(entityName => (
           <div key={entityName}>
@@ -62,7 +88,7 @@ const Browse2Root: FC = props => {
           </div>
         ))}
       </div>
-    </div>
+    </PageEl>
   );
 };
 
@@ -70,11 +96,15 @@ interface Browse2EntityParams {
   entity: string;
 }
 
-const Browse2Entity: FC = props => {
+const Browse2EntityPage: FC = props => {
   const params = useParams<Browse2EntityParams>();
   const entityProjects = query.useProjectsForEntity(params.entity);
   return (
-    <div>
+    <PageEl>
+      <PageHeaderEl>
+        <PageHeaderObjectType>Entity</PageHeaderObjectType>
+        <PageHeaderObjectName>{params.entity}</PageHeaderObjectName>
+      </PageHeaderEl>
       <div>
         {entityProjects.result.map(projectName => (
           <div key={projectName}>
@@ -84,7 +114,7 @@ const Browse2Entity: FC = props => {
           </div>
         ))}
       </div>
-    </div>
+    </PageEl>
   );
 };
 
@@ -93,14 +123,18 @@ interface Browse2ProjectParams {
   project: string;
 }
 
-const Browse2Project: FC = props => {
+const Browse2ProjectPage: FC = props => {
   const params = useParams<Browse2ProjectParams>();
   const rootTypeCounts = query.useProjectAssetCountGeneral(
     params.entity,
     params.project
   );
   return (
-    <div>
+    <PageEl>
+      <PageHeaderEl>
+        <PageHeaderObjectType>Project</PageHeaderObjectType>
+        <PageHeaderObjectName>{params.project}</PageHeaderObjectName>
+      </PageHeaderEl>
       <div style={{marginBottom: 12}}>
         Objects
         {rootTypeCounts.result
@@ -131,7 +165,7 @@ const Browse2Project: FC = props => {
           Traces
         </Link>
       </div>
-    </div>
+    </PageEl>
   );
 };
 
@@ -148,7 +182,11 @@ const Browse2RootObjectType: FC<Browse2RootObjectTypeParams> = ({
 }) => {
   const objectsInfo = query.useProjectObjectsOfType(entity, project, rootType);
   return (
-    <div>
+    <PageEl>
+      <PageHeaderEl>
+        <PageHeaderObjectType>Object Type</PageHeaderObjectType>
+        <PageHeaderObjectName>{rootType}</PageHeaderObjectName>
+      </PageHeaderEl>
       <div>
         {objectsInfo.result.map(objInfo => (
           <div key={objInfo.name}>
@@ -159,11 +197,11 @@ const Browse2RootObjectType: FC<Browse2RootObjectTypeParams> = ({
           </div>
         ))}
       </div>
-    </div>
+    </PageEl>
   );
 };
 
-const Browse2RootObjectTypePage: FC = props => {
+const Browse2ObjectTypePage: FC = props => {
   const params = useParams<Browse2RootObjectTypeParams>();
   return <Browse2RootObjectType {...params} />;
 };
@@ -176,7 +214,7 @@ interface Browse2RootObjectParams {
   objVersion: string;
 }
 
-const Browse2RootObject: FC = props => {
+const Browse2ObjectPage: FC = props => {
   const params = useParams<Browse2RootObjectParams>();
   const aliases = query.useObjectAliases(
     params.entity,
@@ -189,7 +227,11 @@ const Browse2RootObject: FC = props => {
     params.objName
   );
   return (
-    <div>
+    <PageEl>
+      <PageHeaderEl>
+        <PageHeaderObjectType>Object</PageHeaderObjectType>
+        <PageHeaderObjectName>{params.objName}</PageHeaderObjectName>
+      </PageHeaderEl>
       <div>
         Aliases
         {aliases.result.map(alias => (
@@ -212,7 +254,7 @@ const Browse2RootObject: FC = props => {
           </div>
         ))}
       </div>
-    </div>
+    </PageEl>
   );
 };
 
@@ -266,22 +308,6 @@ const nodeFromExtra = (node: Node, extra: string[]): Node => {
   );
 };
 
-interface Call {
-  name: string;
-  inputs: {[key: string]: any};
-  output: any;
-  attributes: {[key: string]: any};
-  summary: {latency_s: number; [key: string]: any};
-  span_id: string;
-  trace_id: string;
-  parent_id: string;
-  timestamp: string;
-  start_time_ms: number;
-  end_time_ms: number;
-}
-
-type Span = Call;
-
 const callOpName = (call: Call) => {
   if (!call.name.startsWith('wandb-artifact:')) {
     return call.name;
@@ -330,6 +356,9 @@ const CallInputs = styled.div`
 
 const CallEl = styled.div<{selected: boolean}>`
   display: flex;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
   cursor: pointer;
   :hover {
     background: ${globals.lightSky};
@@ -340,7 +369,7 @@ const CallEl = styled.div<{selected: boolean}>`
 const CallViewSmall: FC<{
   call: Call;
   selected: boolean;
-  onClick: () => void;
+  onClick?: () => void;
 }> = ({call, selected, onClick}) => {
   const inputEntries = Object.entries(call.inputs).filter(
     ([k, c]) => c != null && !k.startsWith('_')
@@ -349,7 +378,9 @@ const CallViewSmall: FC<{
     <CallEl
       selected={selected}
       onClick={() => {
-        onClick();
+        if (onClick) {
+          onClick();
+        }
       }}>
       {/* <CallField style={{marginRight: 4}}>{call.timestamp}</CallField> */}
       <CallField>{monthRoundedTime(call.summary.latency_s, true)}</CallField>
@@ -381,11 +412,6 @@ export const SidebarWrapper = styled.div`
 `;
 SidebarWrapper.displayName = 'S.SidebarWrapper';
 
-interface TraceSpan {
-  traceId: string;
-  spanId?: string;
-}
-
 type SpanWithChildren = Span & {child_spans: SpanWithChildren[]};
 
 export const SpanTreeChildrenEl = styled.div`
@@ -402,38 +428,50 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
   );
   const inputs = _.fromPairs(actualInputs);
   return (
-    <div>
+    <div style={{width: '100%'}}>
       <div style={{marginBottom: 12}}>
         <div>
-          <b>Op</b>
+          <b>Function name</b>
         </div>
         {call.name}
       </div>
       <div style={{marginBottom: 12}}>
         <div>
-          <b>inputs</b>
+          <b>Inputs</b>
         </div>
-        <pre style={{fontSize: 12}}>{JSON.stringify(inputs, undefined, 2)}</pre>
+        {isOpenAIChatInput(inputs) ? (
+          <OpenAIChatInputView chatInput={inputs} />
+        ) : (
+          <pre style={{fontSize: 12}}>
+            {JSON.stringify(inputs, undefined, 2)}
+          </pre>
+        )}
       </div>
       <div style={{marginBottom: 12}}>
         <div>
-          <b>output</b>
+          <b>Output</b>
         </div>
-        <pre style={{fontSize: 12}}>
-          {JSON.stringify(call.output, undefined, 2)}
-        </pre>
+        {isOpenAIChatOutput(call.output) ? (
+          <OpenAIChatOutputView chatOutput={call.output} />
+        ) : (
+          <pre style={{fontSize: 12}}>
+            {JSON.stringify(call.output, undefined, 2)}
+          </pre>
+        )}
       </div>
+      {call.attributes != null && (
+        <div style={{marginBottom: 12}}>
+          <div>
+            <b>Attributes</b>
+          </div>
+          <pre style={{fontSize: 12}}>
+            {JSON.stringify(call.attributes, undefined, 2)}
+          </pre>
+        </div>
+      )}
       <div style={{marginBottom: 12}}>
         <div>
-          <b>attributes</b>
-        </div>
-        <pre style={{fontSize: 12}}>
-          {JSON.stringify(call.attributes, undefined, 2)}
-        </pre>
-      </div>
-      <div style={{marginBottom: 12}}>
-        <div>
-          <b>summary</b>
+          <b>Summary</b>
         </div>
         <pre style={{fontSize: 12}}>
           {JSON.stringify(call.summary, undefined, 2)}
@@ -443,77 +481,58 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
   );
 };
 
-const SpanTreeNode: FC<{call: SpanWithChildren; selectedSpan: TraceSpan}> = ({
-  call,
-  selectedSpan,
-}) => {
-  const isSelected =
-    selectedSpan.traceId === call.trace_id &&
-    selectedSpan.spanId === call.span_id;
-  const [expanded, setExpanded] = useState(isSelected);
+const SpanTreeNode: FC<{
+  call: SpanWithChildren;
+  selectedSpanId?: string;
+  setSelectedSpanId: (spanId: string) => void;
+}> = ({call, selectedSpanId, setSelectedSpanId}) => {
+  const isSelected = selectedSpanId === call.span_id;
   return (
     <>
       <CallViewSmall
         call={call}
         selected={isSelected}
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => setSelectedSpanId(call.span_id)}
       />
-      {expanded && (
-        <SpanTreeDetailsEl>
-          <SpanDetails call={call} />{' '}
-        </SpanTreeDetailsEl>
-      )}
       <SpanTreeChildrenEl>
         {call.child_spans.map(child => (
-          <SpanTreeNode call={child} selectedSpan={selectedSpan} />
+          <SpanTreeNode
+            call={child}
+            selectedSpanId={selectedSpanId}
+            setSelectedSpanId={setSelectedSpanId}
+          />
         ))}
       </SpanTreeChildrenEl>
     </>
   );
 };
 
-const TraceDetails: FC<{streamId: StreamId; traceSpan: TraceSpan}> = ({
-  streamId,
-  traceSpan,
-}) => {
-  const traceSpansNode = useMemo(() => {
-    const rowsNode = callsTableNode(streamId);
-    const filtered = callsTableFilter(rowsNode, {traceId: traceSpan.traceId});
-    return callsTableSelect(filtered);
-  }, [streamId, traceSpan.traceId]);
-  const traceSpansQuery = useNodeValue(traceSpansNode);
-
-  const traceSpans: Span[] = useMemo(
-    () => traceSpansQuery.result ?? [],
-    [traceSpansQuery.result]
-  );
-
+const VerticalTraceView: FC<{
+  traceSpans: Span[];
+  selectedSpanId?: string;
+  setSelectedSpanId: (spanId: string) => void;
+  callStyle: 'full' | 'short';
+}> = ({traceSpans, selectedSpanId, setSelectedSpanId}) => {
   const tree = useMemo(
     () => flatToTrees(traceSpans),
     [traceSpans]
   ) as SpanWithChildren[];
 
-  return (
-    <div>
-      <div>Trace id: {traceSpan.traceId}</div>
-      <div>Span id: {traceSpan.spanId}</div>
-      <div style={{marginBottom: 12}}>Span count: {traceSpans.length}</div>
-      {tree[0] != null && (
-        <SpanTreeNode call={tree[0]} selectedSpan={traceSpan} />
-      )}
-    </div>
+  return tree[0] == null ? (
+    <div>No trace spans found</div>
+  ) : (
+    <SpanTreeNode
+      call={tree[0]}
+      selectedSpanId={selectedSpanId}
+      setSelectedSpanId={setSelectedSpanId}
+    />
   );
 };
 
 const Browse2Calls: FC<{
   streamId: StreamId;
   filters: CallFilter;
-  selectedSpan?: TraceSpan;
-}> = ({streamId, filters, selectedSpan}) => {
-  const history = useHistory();
-  const location = useLocation();
-  const query = useQuery();
-
+}> = ({streamId, filters}) => {
   const selected = useMemo(() => {
     const streamTableRowsNode = callsTableNode(streamId);
     const filtered = callsTableFilter(streamTableRowsNode, filters);
@@ -522,9 +541,6 @@ const Browse2Calls: FC<{
 
   const selectedQuery = useNodeValue(selected);
 
-  const [selectedSpanId, setSelectedSpanId] = useState<TraceSpan | undefined>(
-    selectedSpan
-  );
   const selectedData = selectedQuery.result ?? [];
 
   return (
@@ -541,37 +557,12 @@ const Browse2Calls: FC<{
       )}
       <div style={{paddingLeft: 24}}>
         {selectedData.map((call: Call) => (
-          <CallViewSmall
-            call={call}
-            selected={
-              call.trace_id === selectedSpanId?.traceId &&
-              call.span_id === selectedSpanId?.spanId
-            }
-            onClick={() => {
-              query.set('traceSpan', `${call.trace_id},${call.span_id}`);
-              history.push({
-                pathname: location.pathname,
-                search: query.toString(),
-              });
-              setSelectedSpanId({traceId: call.trace_id, spanId: call.span_id});
-            }}
-          />
+          <Link
+            to={`/${URL_BROWSE2}/${streamId.entityName}/${streamId.projectName}/trace/${call.trace_id}/${call.span_id}`}>
+            <CallViewSmall call={call} selected={false} />
+          </Link>
         ))}
       </div>
-      {selectedSpanId != null && (
-        <SidebarWrapper>
-          <Sidebar
-            width={600}
-            collapsed={false}
-            close={() => setSelectedSpanId(undefined)}>
-            <div style={{width: '100%', height: '100%', overflowY: 'auto'}}>
-              <div style={{padding: 12}}>
-                <TraceDetails streamId={streamId} traceSpan={selectedSpanId} />
-              </div>
-            </div>
-          </Sidebar>
-        </SidebarWrapper>
-      )}
     </div>
   );
 };
@@ -602,7 +593,6 @@ const Browse2CallsPage: FC = () => {
         projectName: params.project,
         streamName: 'stream',
       }}
-      selectedSpan={selectedSpan}
       filters={filters}
     />
   );
@@ -610,28 +600,87 @@ const Browse2CallsPage: FC = () => {
 
 const Browse2Trace: FC<{
   streamId: StreamId;
-  selectedSpan: TraceSpan;
-}> = ({streamId, selectedSpan}) => {
-  return <TraceDetails streamId={streamId} traceSpan={selectedSpan} />;
+  traceId: string;
+  spanId?: string;
+  setSelectedSpanId: (spanId: string) => void;
+}> = ({streamId, traceId, spanId, setSelectedSpanId}) => {
+  const traceSpans = useTraceSpans(streamId, traceId);
+  const selectedSpanId = spanId;
+  const selectedSpan = useMemo(() => {
+    if (selectedSpanId == null) {
+      return undefined;
+    }
+    return traceSpans.filter(ts => ts.span_id === selectedSpanId)[0];
+  }, [selectedSpanId, traceSpans]);
+  return (
+    <div style={{height: '100%', width: '100%', display: 'flex'}}>
+      <div
+        style={{
+          height: '100%',
+          width: selectedSpanId == null ? '100%' : 300,
+          padding: 12,
+        }}>
+        <VerticalTraceView
+          traceSpans={traceSpans}
+          selectedSpanId={selectedSpanId}
+          setSelectedSpanId={setSelectedSpanId}
+          callStyle="short"
+        />
+      </div>
+      {selectedSpanId != null && (
+        <div
+          style={{
+            flexGrow: 1,
+            height: '100%',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}>
+          <div
+            style={{
+              padding: 12,
+            }}>
+            {selectedSpan == null ? (
+              <div>Span not found</div>
+            ) : (
+              <SpanDetails call={selectedSpan} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 interface Browse2TracePageParams {
   entity: string;
   project: string;
   traceId: string;
+  spanId?: string;
 }
 
 const Browse2TracePage: FC = () => {
   const params = useParams<Browse2TracePageParams>();
+  const history = useHistory();
+  const setSelectedSpanId = useCallback(
+    (spanId: string) =>
+      history.push(
+        `/${URL_BROWSE2}/${params.entity}/${params.project}/trace/${params.traceId}/${spanId}`
+      ),
+    [history, params.entity, params.project, params.traceId]
+  );
   return (
-    <Browse2Trace
-      streamId={{
-        entityName: params.entity,
-        projectName: params.project,
-        streamName: 'stream',
-      }}
-      selectedSpan={{traceId: params.traceId}}
-    />
+    <PageEl>
+      <Browse2Trace
+        streamId={{
+          entityName: params.entity,
+          projectName: params.project,
+          streamName: 'stream',
+        }}
+        traceId={params.traceId}
+        spanId={params.spanId}
+        setSelectedSpanId={setSelectedSpanId}
+      />
+    </PageEl>
   );
 };
 
@@ -684,14 +733,16 @@ const Browse2TracesPage: FC = () => {
     }
   });
   return (
-    <Browse2Traces
-      streamId={{
-        entityName: params.entity,
-        projectName: params.project,
-        streamName: 'stream',
-      }}
-      selectedSpan={selectedSpan}
-    />
+    <PageEl>
+      <Browse2Traces
+        streamId={{
+          entityName: params.entity,
+          projectName: params.project,
+          streamName: 'stream',
+        }}
+        selectedSpan={selectedSpan}
+      />
+    </PageEl>
   );
 };
 
@@ -699,8 +750,7 @@ const Browse2OpDefPage: FC = () => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const uri = makeObjRefUri(params);
   const query = useQuery();
-  const {filt: filters, selSpan: selectedSpan} = useMemo(() => {
-    let selSpan: TraceSpan | undefined = undefined;
+  const filters = useMemo(() => {
     const filt: CallFilter = {opUri: uri};
     query.forEach((val, key) => {
       if (key === 'op') {
@@ -710,12 +760,9 @@ const Browse2OpDefPage: FC = () => {
           filt.inputUris = [];
         }
         filt.inputUris.push(val);
-      } else if (key === 'traceSpan') {
-        const [traceId, spanId] = val.split(',', 2);
-        selSpan = {traceId, spanId};
       }
     });
-    return {filt, selSpan};
+    return filt;
   }, [query, uri]);
   return (
     <div>
@@ -726,7 +773,6 @@ const Browse2OpDefPage: FC = () => {
           streamName: 'stream',
         }}
         filters={filters}
-        selectedSpan={selectedSpan}
       />
     </div>
   );
@@ -769,7 +815,7 @@ const Browse2RootObjectVersionUsers: FC<{uri: string}> = ({uri}) => {
   );
 };
 
-const Browse2RootObjectVersionItem: FC = props => {
+const Browse2ObjectVersionItemPage: FC = props => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const uri = makeObjRefUri(params);
   const history = useHistory();
@@ -860,10 +906,20 @@ const Browse2RootObjectVersionItem: FC = props => {
     ]
   );
   return (
-    <div>
-      {/* <div>Name: {params.objName}</div>
-      <div>Version: {params.objVersion}</div> */}
-      {/* <div>Root Ref: {uri}</div> */}
+    <PageEl>
+      <PageHeaderEl>
+        <PageHeaderObjectType>
+          {params.rootType === 'OpDef'
+            ? 'Op'
+            : params.rootType === 'stream_table'
+            ? 'Traces'
+            : 'Object'}
+        </PageHeaderObjectType>
+        <PageHeaderObjectName>
+          {params.objName}:{params.objVersion}
+          {params.refExtra && '/' + params.refExtra}
+        </PageHeaderObjectName>
+      </PageHeaderEl>
       <div style={{marginBottom: 12}}>
         <div style={{display: 'flex', alignItems: 'center'}}>
           Expr: {weave.expToString(itemNode)}
@@ -899,9 +955,13 @@ const Browse2RootObjectVersionItem: FC = props => {
           </div>
         </>
       )}
-    </div>
+    </PageEl>
   );
 };
+
+const BreadcrumbsEl = styled.div`
+  margin-bottom: 12px;
+`;
 
 interface Browse2Params {
   entity?: string;
@@ -915,7 +975,7 @@ interface Browse2Params {
 const Browse2Breadcrumbs: FC = props => {
   const params = useParams<Browse2Params>();
   return (
-    <div>
+    <BreadcrumbsEl>
       <Link to={`/${URL_BROWSE2}`}>🏠</Link>
       {params.entity && (
         <>
@@ -961,7 +1021,7 @@ const Browse2Breadcrumbs: FC = props => {
           )}
         </>
       )}
-    </div>
+    </BreadcrumbsEl>
   );
 };
 
@@ -998,10 +1058,11 @@ const RefExtraBreadCrumbs: FC<{refExtra: string}> = ({refExtra}) => {
 export const Browse2: FC = props => {
   return (
     <div style={{height: '100vh', overflow: 'auto'}}>
-      <div style={{padding: 32}}>
+      <div style={{padding: 32, height: '100%'}}>
         <Browse2Breadcrumbs />
         <Switch>
-          <Route path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId`}>
+          <Route
+            path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId/:spanId?`}>
             <Browse2TracePage />
           </Route>
           <Route path={`/${URL_BROWSE2}/:entity/:project/trace`}>
@@ -1009,22 +1070,22 @@ export const Browse2: FC = props => {
           </Route>
           <Route
             path={`/${URL_BROWSE2}/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
-            <Browse2RootObjectVersionItem />
+            <Browse2ObjectVersionItemPage />
           </Route>
           <Route path={`/${URL_BROWSE2}/:entity/:project/:rootType/:objName`}>
-            <Browse2RootObject />
+            <Browse2ObjectPage />
           </Route>
           <Route path={`/${URL_BROWSE2}/:entity/:project/:rootType`}>
-            <Browse2RootObjectTypePage />
+            <Browse2ObjectTypePage />
           </Route>
           <Route path={`/${URL_BROWSE2}/:entity/:project`}>
-            <Browse2Project />
+            <Browse2ProjectPage />
           </Route>
           <Route path={`/${URL_BROWSE2}/:entity`}>
-            <Browse2Entity />
+            <Browse2EntityPage />
           </Route>
           <Route path={`/${URL_BROWSE2}`}>
-            <Browse2Root />
+            <Browse2Home />
           </Route>
         </Switch>
       </div>
