@@ -5,5 +5,5 @@ generate_panel_instructions:
 	pip install -r requirements.test.txt
 	touch .test-deps-installed.idea
 
-run-integration: .test-deps-installed.idea supervisord.conf
+run-integration: .test-deps-installed.idea
 	supervisord -c supervisord.conf
