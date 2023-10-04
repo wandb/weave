@@ -47,7 +47,7 @@
     "cytoscape-dagre": "^2.2.2",
     "diff": "^5.1.0",
     "downloadjs": "^1.4.7",
-    "graphql": "=16.6.0",
+    "graphql": "=16.8.1",
     "hast-util-sanitize": "^4.0.0",
     "immer": "^9.0.21",
     "isomorphic-unfetch": "^3.1.0",
