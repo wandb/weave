@@ -25,7 +25,7 @@ import {
   opPick,
   opProjectRuns,
   opRootProject,
-  opRunHistory3,
+  opRunHistory,
   opTableRows,
   typedDict,
 } from '@wandb/weave/core';
@@ -481,7 +481,7 @@ const legacyTraceRowToSimpleNode = (
 ) => {
   return opPick({
     obj: opConcat({
-      arr: opRunHistory3({
+      arr: opRunHistory({
         run: opProjectRuns({
           project: opRootProject({
             entityName: constString(entityName),

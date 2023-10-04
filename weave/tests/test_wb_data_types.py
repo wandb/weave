@@ -858,15 +858,14 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
 
     run_node = weave.ops.project(run.entity, run.project).run(run.id)
 
-    for history_op_name in ["history3", "history"]:
+    for history_op_name in ["history"]:
         history_node = run_node._get_op(history_op_name)()
         mapped_node = history_node.map(
             lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()})
         )
 
         history = weave.use(mapped_node)
-        if history_op_name == "history3":
-            history = history.to_pylist_notags()
+        history = history.to_pylist_notags()
 
         assert len(history) == 1
 
@@ -876,10 +875,9 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
         #
         # image_node = history_node["image"]
         # image_use = weave.use(image_node)
-        # if history_op_name == "history3":
-        #     image_use = image_use.to_pylist_notags()
-        #     masks = image_use[0]["masks"]
-        #     boxes = image_use[0]["boxes"]
+        # image_use = image_use.to_pylist_notags()
+        # masks = image_use[0]["masks"]
+        # boxes = image_use[0]["boxes"]
         # else:
         #     masks = image_use[0].masks
         #     boxes = image_use[0].boxes
@@ -889,11 +887,8 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
         # Test file path access
         audio_node = history_node["audio"]
         audio_use = weave.use(audio_node)
-        if history_op_name == "history3":
-            audio_use = audio_use.to_pylist_notags()
-            path = audio_use[0]["path"]
-        else:
-            path = audio_use[0].path
+        audio_use = audio_use.to_pylist_notags()
+        path = audio_use[0]["path"]
         file_node = audio_node[0].artifactVersion().file(path)
         file_use = weave.use(file_node)
         assert file_use != None

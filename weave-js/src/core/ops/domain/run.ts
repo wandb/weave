@@ -424,52 +424,6 @@ export const opRunHistoryType = OpKinds.makeBasicOp({
   ) => opRunHistoryTypeResolver(run, engine),
 });
 
-export const opRunHistoryType2 = OpKinds.makeBasicOp({
-  hidden: true,
-  name: 'refine_history2_type',
-  argTypes: {
-    run: TypeHelpers.nullableOneOrMany('run'),
-  },
-  description: `Returns the type of a ${docType('run')} history.`,
-  argDescriptions: {
-    run: `A ${docType('run')}`,
-  },
-  returnValueDescription: `The type of the ${docType('run')} history`,
-  returnType: inputs => 'type',
-  resolver: async (
-    {run},
-    inputTypes,
-    rawInputs,
-    forwardGraph,
-    forwardOp,
-    context,
-    engine
-  ) => opRunHistoryTypeResolver(run, engine),
-});
-
-export const opRunHistoryType3 = OpKinds.makeBasicOp({
-  hidden: true,
-  name: 'refine_history3_type',
-  argTypes: {
-    run: TypeHelpers.nullableOneOrMany('run'),
-  },
-  description: `Returns the type of a ${docType('run')} history.`,
-  argDescriptions: {
-    run: `A ${docType('run')}`,
-  },
-  returnValueDescription: `The type of the ${docType('run')} history`,
-  returnType: inputs => 'type',
-  resolver: async (
-    {run},
-    inputTypes,
-    rawInputs,
-    forwardGraph,
-    forwardOp,
-    context,
-    engine
-  ) => opRunHistoryTypeResolver(run, engine),
-});
-
 const opRunHistoryResolveOutputType = async (
   executableNode: GraphTypes.OutputNode<Types.Type>,
   client: Client,
@@ -531,7 +485,6 @@ const opRunHistoryResolver = (run: any) => {
   );
 };
 
-// TODO: missing test
 export const opRunHistory = makeRunOp({
   name: 'run-history',
   argTypes: runArgTypes,
@@ -540,33 +493,12 @@ export const opRunHistory = makeRunOp({
   returnValueDescription: `The log history of the ${docType('run')}`,
   returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
   resolver: ({run}) => opRunHistoryResolver(run),
-  // TODO: resolveOutputType does not perform all the correct
-  // unwrapping!
-
   resolveOutputType: async (inputTypes, node, executableNode, client) => {
-    return opRunHistoryResolveOutputType(executableNode, client, 1);
+    return opRunHistoryResolveOutputType(executableNode, client, 3);
   },
 });
 
-// TODO: missing test
-export const opRunHistory2 = makeRunOp({
-  name: 'run-history2',
-  argTypes: runArgTypes,
-  description: `Returns the log history of the ${docType('run')}`,
-  argDescriptions: {run: runArgDescriptions},
-  returnValueDescription: `The log history of the ${docType('run')}`,
-  returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
-  hidden: true,
-  resolver: ({run}) => opRunHistoryResolver(run),
-  // TODO: resolveOutputType does not perform all the correct
-  // unwrapping!
-
-  resolveOutputType: async (inputTypes, node, executableNode, client) => {
-    return opRunHistoryResolveOutputType(executableNode, client, 2);
-  },
-});
-
-// This is just here so we can type history3 in the EE outside of weave.wandb.ai for testing
+// Legacy stub for any stale state still using history3 notion
 export const opRunHistory3 = makeRunOp({
   name: 'run-history3',
   argTypes: runArgTypes,

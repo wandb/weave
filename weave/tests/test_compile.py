@@ -202,7 +202,7 @@ def test_compile_lambda_uniqueness():
 #     This test demonstrates successful execution when there is an explicit
 #     const function instead of a direct node (resulting in an intermediate execution op)
 #     """
-#     history_node = weave.ops.project(run.entity, run.project).run(run.id).history2()
+#     history_node = weave.ops.project(run.entity, run.project).run(run.id).history()
 #     pick = const(history_node).pick("val")
 #     res = weave.use(pick)
 #     assert res.to_pylist_notags() == list(range(10))
@@ -221,7 +221,7 @@ def test_compile_through_function_call(user_by_api_key_in_env):
     fn_node = define_fn(
         {"entity_name": types.String()},
         lambda entity_name: (
-            weave.ops.project(entity_name, run.project).run(run.id).history2()
+            weave.ops.project(entity_name, run.project).run(run.id).history()
         ),
     )
     called_node = fn_node(run.entity)

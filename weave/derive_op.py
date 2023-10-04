@@ -248,8 +248,6 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("file-joinedTable")
                 or orig_op.name.endswith("file-partitionedTable")
                 or orig_op.name.endswith("run-history")
-                or orig_op.name.endswith("run-history2")
-                or orig_op.name.endswith("run-history3")
             ):
 
                 def download_one(x):

@@ -12,7 +12,7 @@ def _get_history_node(stream_table: StreamTableType):
         return (
             project(stream_table.entity_name, stream_table.project_name)
             .run(stream_table.table_name)
-            .history3()
+            .history()
             .dropTags()
         )
 

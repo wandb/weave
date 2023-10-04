@@ -399,12 +399,8 @@ def compile_apply_column_pushdown(
 
     op_names = [
         "project-runs2",
-        "run-history2",
-        "mapped_run-history2",
         "run-history",
         "mapped_run-history",
-        "run-history3",
-        "mapped_run-history3",
     ]
 
     if not graph.filter_nodes_full(

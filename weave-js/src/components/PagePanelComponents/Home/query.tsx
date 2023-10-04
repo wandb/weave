@@ -207,7 +207,7 @@ const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
 
 const opProjectHistoryType = ({project}: {project: w.Node}) => {
   return w.callOpVeryUnsafe(
-    'refine_history3_type',
+    'refine_history_type',
     {run: w.opProjectRuns({project})},
     'type'
   );
