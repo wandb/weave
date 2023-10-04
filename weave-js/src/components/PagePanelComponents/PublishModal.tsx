@@ -224,7 +224,7 @@ export const PublishModal = ({
                 disabled={!isValidName || !entityName || !projectName || acting}
                 onClick={() => {
                   onPublish();
-                  trackPublishBoardClicked('publish-new-modal');
+                  trackPublishBoardClicked('new_board', 'publish-new-modal');
                 }}>
                 Publish board
               </WBButton>

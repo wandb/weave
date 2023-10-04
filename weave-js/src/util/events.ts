@@ -55,17 +55,38 @@ export function trackEvent(
   (window.analytics as any)?.track?.(eventName, eventData);
 }
 
+export function trackWeaveAppEvent(
+  eventName: string,
+  payload?: {[key: string]: string}
+) {
+  const data: {[key: string]: any} = {event_name: eventName};
+  if (payload) {
+    Object.assign(data, payload);
+  }
+  trackEvent('Weave App Event', data);
+}
+
 export function trackNewBlankBoardClicked(source: string) {
-  trackEvent('New blank board clicked', {source});
+  trackWeaveAppEvent('create_board', {
+    event_type: 'new_blank_board',
+    event_source: source,
+  });
 }
 
 export function trackNewBoardFromTemplateClicked(
   source: string,
   template: string
 ) {
-  trackEvent('New board from template clicked', {source, template});
+  trackWeaveAppEvent('create_board', {
+    event_type: 'board_template',
+    event_source: source,
+    template_name: template,
+  });
 }
 
-export function trackPublishBoardClicked(source: string) {
-  trackEvent('Publish board clicked', {source});
+export function trackPublishBoardClicked(eventType: string, source: string) {
+  trackWeaveAppEvent('publish_board', {
+    event_type: eventType,
+    event_source: source,
+  });
 }

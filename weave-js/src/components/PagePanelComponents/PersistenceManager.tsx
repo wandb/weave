@@ -340,7 +340,7 @@ const HeaderPersistenceControls: React.FC<{
                 takeAction(storeAction);
               }
               if (storeAction === 'commit') {
-                trackPublishBoardClicked('commit-changes');
+                trackPublishBoardClicked('commit-changes', 'board-toolbar');
               }
             }}>
             {persistenceActionToLabel[storeAction]}
