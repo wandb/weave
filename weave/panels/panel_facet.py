@@ -4,6 +4,7 @@ import weave
 from .. import panel
 from . import table_state
 
+from .. import compile
 from .. import graph
 from .. import weave_internal
 
@@ -125,4 +126,5 @@ class Facet(panel.Panel):
                 ),
             ),
         )
-        return weave_internal.use(filtered)
+
+        return filtered
