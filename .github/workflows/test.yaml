@@ -74,6 +74,7 @@ jobs:
           set -e
           cd weave-js
           yarn install --frozen-lockfile
+          yarn generate
           yarn eslint --max-warnings=0
           yarn tslint
           yarn prettier

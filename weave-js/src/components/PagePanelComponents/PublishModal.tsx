@@ -18,6 +18,7 @@ import {Icon} from '../Icon';
 import {TakeActionType} from './persistenceStateMachine';
 import * as M from './Modal.styles';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
 
 const Error = styled.div`
   font-size: 14px;
@@ -221,7 +222,10 @@ export const PublishModal = ({
                 variant="confirm"
                 loading={acting}
                 disabled={!isValidName || !entityName || !projectName || acting}
-                onClick={onPublish}>
+                onClick={() => {
+                  onPublish();
+                  trackPublishBoardClicked('new_board', 'publish-new-modal');
+                }}>
                 Publish board
               </WBButton>
               <WBButton variant="ghost" onClick={onClose}>

@@ -13,6 +13,7 @@ import {BoardsTabNone} from './BoardsTabNone';
 import {Button} from '../../Button';
 import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
 import {SEED_BOARD_OP_NAME} from './HomePreviewSidebar';
+import {trackNewBoardFromTemplateClicked} from '@wandb/weave/util/events';
 
 const BoardList = styled.div`
   flex: 1 1 auto;
@@ -120,6 +121,10 @@ export const BoardsTab = ({
         setIsGenerating(false);
         navigateToExpression(newDashExpr);
       }
+    );
+    trackNewBoardFromTemplateClicked(
+      'table-board-tab',
+      'simple-table-visualization'
     );
   };
 
