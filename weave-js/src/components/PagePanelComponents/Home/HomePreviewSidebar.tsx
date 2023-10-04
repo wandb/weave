@@ -740,5 +740,5 @@ export const HomeBoardPreview: React.FC<{
 };
 
 function processTemplateNameForTracking(templateName: string) {
-  return templateName.toLowerCase().trim().split(' ').join('-');
+  return templateName.toLowerCase().trim().split(' ').join('_');
 }
