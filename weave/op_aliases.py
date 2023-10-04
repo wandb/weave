@@ -24,6 +24,7 @@ _OP_ALIASES: list[list[str]] = [
     ["lstrip", "lStrip"],
     ["rstrip", "rStrip"],
     ["in_", "in"],
+    ["history3", "history"],
     # This is Run.set_state. TODO: just fix it.
     ["set_state", "setstate"],
     ["set_output", "setoutput"],
