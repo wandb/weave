@@ -204,6 +204,7 @@ export const PublishModal = ({
                 ) : projectOptions.length > 0 ? (
                   <Dropdown
                     placeholder="Select project"
+                    search
                     fluid
                     selection
                     options={projectOptions}
