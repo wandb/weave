@@ -19,7 +19,9 @@ const addSidebarPanel = () => {
 };
 
 const addMainPanel = () => {
-  getPanel(['main']).find('button').contains('+').click({force: true});
+  getPanel(['main'])
+    .find('button[data-test="new-panel-button"]')
+    .click({force: true});
 };
 
 const dashboardConvertToControl = (path: string[]) => {
@@ -37,6 +39,7 @@ const panelTypeInputExpr = (path: string[], text: string) => {
   panel
     .find('[data-test=expression-editor-container] [contenteditable=true]')
     .click()
+    .clear()
     .type(text)
     .wait(300)
     .type('{enter}', {force: true});
@@ -106,15 +109,16 @@ describe('dashboard', () => {
 
     // Add another table panel
     addMainPanel();
-    panelTypeInputExpr(['main', 'panel1'], 'panel0.all_rows');
+    scrollToEEAndType(['main', 'panel1'], 'panel0.all_rows');
     tableCheckContainsValue(['main', 'panel1'], '5.657');
 
     // Add plot panel
     addMainPanel();
-    panelTypeInputExpr(['main', 'panel2'], 'panel0.all_rows');
+    scrollToEEAndType(['main', 'panel2'], 'panel0.all_rows');
     panelChangeId(['main', 'panel2'], 'plot');
 
-    sliderSetValue(['sidebar', 'var2'], 0.5);
+    // sliderSetValue(['sidebar', 'var2'], 0.5);
+    panelTypeInputExpr(['sidebar', 'var1'], '0.5');
     tableCheckContainsValue(['main', 'panel0'], '1.414');
     tableCheckContainsValue(['main', 'panel1'], '1.414');
   });
