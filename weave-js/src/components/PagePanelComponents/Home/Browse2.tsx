@@ -22,7 +22,6 @@ import {
   Node,
   linearize,
   isConstNode,
-  opIndex,
 } from '@wandb/weave/core';
 import {ChildPanel, ChildPanelConfig, initPanel} from '../../Panel2/ChildPanel';
 import {usePanelContext} from '../../Panel2/PanelContext';
@@ -44,7 +43,11 @@ import {
   callsTableSelect,
   callsTableSelectTraces,
 } from './Browse2/callTree';
-import {useTraceSpans} from './Browse2/callTreeHooks';
+import {
+  useFirstCall,
+  useOpSignature,
+  useTraceSpans,
+} from './Browse2/callTreeHooks';
 import {
   OpenAIChatInputView,
   OpenAIChatOutputView,
@@ -63,8 +66,10 @@ import {
   Grid,
   Paper as MaterialPaper,
   Container,
-  TextField,
   Chip,
+  Tabs,
+  Tab,
+  TextField,
 } from '@mui/material';
 import {DataGridPro as DataGrid} from '@mui/x-data-grid-pro';
 import {Home, FilterList} from '@mui/icons-material';
@@ -898,6 +903,30 @@ const Browse2CallsPage: FC = () => {
   );
 };
 
+const SpanFeedback: FC<{streamId: string; traceId: string; spanId: string}> = ({
+  streamId,
+  traceId,
+  spanId,
+}) => {
+  return (
+    <>
+      <TextField
+        label="feedback"
+        multiline
+        fullWidth
+        minRows={10}
+        maxRows={20}
+        sx={{
+          backgroundColor: globals.lightYellow,
+        }}
+      />
+      <Box display="flex" justifyContent="flex-end" pt={2}>
+        <Button sx={{backgroundColor: globals.lightYellow}}>Update</Button>
+      </Box>
+    </>
+  );
+};
+
 const Browse2Trace: FC<{
   streamId: StreamId;
   traceId: string;
@@ -912,6 +941,10 @@ const Browse2Trace: FC<{
     }
     return traceSpans.filter(ts => ts.span_id === selectedSpanId)[0];
   }, [selectedSpanId, traceSpans]);
+  const [tabId, setTabId] = React.useState(0);
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabId(newValue);
+  };
   return (
     <Grid container spacing={1} alignItems="flex-start">
       <Grid xs={3} item>
@@ -927,17 +960,53 @@ const Browse2Trace: FC<{
       <Grid xs={9} item>
         {selectedSpanId != null && (
           <Paper>
-            <div
-              style={{
-                padding: 12,
-                overflowX: 'hidden',
-              }}>
-              {selectedSpan == null ? (
-                <div>Span not found</div>
-              ) : (
-                <SpanDetails call={selectedSpan} />
+            <Tabs value={tabId} onChange={handleTabChange}>
+              <Tab label="Run" />
+              <Tab
+                label="Feedback"
+                sx={{backgroundColor: globals.lightYellow}}
+              />
+              <Tab
+                label="Datasets"
+                sx={{backgroundColor: globals.lightYellow}}
+              />
+            </Tabs>
+            <Box pt={2}>
+              {tabId === 0 &&
+                (selectedSpan == null ? (
+                  <div>Span not found</div>
+                ) : (
+                  <SpanDetails call={selectedSpan} />
+                ))}
+              {tabId === 1 && (
+                <SpanFeedback
+                  streamId={streamId.streamName}
+                  traceId={traceId}
+                  spanId={selectedSpanId}
+                />
               )}
-            </div>
+              {tabId === 2 && (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    Appears in datasets
+                  </Typography>
+                  <Box
+                    mb={4}
+                    sx={{
+                      background: globals.lightYellow,
+                      height: 200,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    Placeholder
+                  </Box>
+                  <Button sx={{backgroundColor: globals.lightYellow}}>
+                    Add to dataset
+                  </Button>
+                </>
+              )}
+            </Box>
           </Paper>
         )}
       </Grid>
@@ -1072,6 +1141,10 @@ const Browse2OpDefPage: FC = () => {
     }),
     [params.entity, params.project]
   );
+
+  const firstCall = useFirstCall(streamId, uri);
+  const opSignature = useOpSignature(streamId, uri);
+
   // const firstCall = useMemo(() => {
   //   const streamTableRowsNode = callsTableNode(streamId);
   //   const filtered = callsTableFilter(streamTableRowsNode, {opUri: uri});
@@ -1080,6 +1153,36 @@ const Browse2OpDefPage: FC = () => {
   // }, [streamId, uri]);
   return (
     <div>
+      <Box marginBottom={2}>
+        <Paper>
+          <Typography variant="h6" gutterBottom>
+            Call
+          </Typography>
+          <Box sx={{width: 400}}>
+            {opSignature.result != null &&
+              Object.keys(opSignature.result.inputTypes).map(k => (
+                <Box mb={2}>
+                  <TextField
+                    label={k}
+                    fullWidth
+                    value={
+                      firstCall.result != null
+                        ? firstCall.result.inputs[k]
+                        : undefined
+                    }
+                  />
+                </Box>
+              ))}
+          </Box>
+          <Box pt={1}>
+            <Button
+              variant="outlined"
+              sx={{backgroundColor: globals.lightYellow}}>
+              Execute
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
       <Browse2Calls streamId={streamId} filters={filters} />
     </div>
   );

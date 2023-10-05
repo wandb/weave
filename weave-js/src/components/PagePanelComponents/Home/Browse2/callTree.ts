@@ -1,3 +1,5 @@
+import * as _ from 'lodash';
+import {toWeaveType} from '@wandb/weave/components/Panel2/toWeaveType';
 import {
   callOpVeryUnsafe,
   constNumber,
@@ -21,6 +23,8 @@ import {
   opStringEqual,
   opAnd,
   opNumberMult,
+  InputTypes,
+  OutputType,
 } from '@wandb/weave/core';
 
 export interface StreamId {
@@ -54,6 +58,14 @@ export type Span = Call;
 export interface TraceSpan {
   traceId: string;
   spanId?: string;
+}
+
+// A subset of OpDefBase from weave core.
+export interface OpSignature {
+  inputTypes: InputTypes;
+
+  // return type (may be a function of arguments)
+  outputType: OutputType;
 }
 
 // TODO: Put into Types
@@ -287,4 +299,22 @@ export const callsTableSelectTraces = (stNode: Node) => {
         } as any) as any
     ),
   });
+};
+
+export const opSignatureFromSpan = (span: Span): OpSignature => {
+  const inputs = span.inputs;
+  const inputOrder =
+    inputs._input_order ?? Object.keys(inputs).filter(k => !k.startsWith('_'));
+  const inputTypes = _.fromPairs(
+    inputOrder
+      .map(k => {
+        return [k, toWeaveType(inputs[k])];
+      })
+      .filter(([k, v]) => v !== 'none')
+  );
+  const outputType = toWeaveType(span.output);
+  return {
+    inputTypes,
+    outputType,
+  };
 };

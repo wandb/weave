@@ -249,5 +249,5 @@ export const isOpenAIChatInput = (obj: any): obj is OpenAIChatInput => {
 };
 
 export const isOpenAIChatOutput = (obj: any): obj is OpenAIChatOutput => {
-  return obj.model !== undefined && obj.choices !== undefined;
+  return obj != null && obj.model !== undefined && obj.choices !== undefined;
 };
