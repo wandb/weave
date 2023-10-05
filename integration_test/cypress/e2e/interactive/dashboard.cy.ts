@@ -15,7 +15,7 @@ const gotoBlankDashboard = async () => {
 };
 
 const addSidebarPanel = () => {
-  getPanel(['sidebar']).find('button').contains('Add var').click();
+  getPanel(['sidebar']).contains('New variable').click();
 };
 
 const addMainPanel = () => {
