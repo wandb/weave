@@ -1,7 +1,7 @@
 # Running in devmode
 
 Start the weave server and frontend dev server with 
-make integration
+cd .. && make integration
 
 Start cypress with 
 yarn dev
