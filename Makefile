@@ -4,6 +4,7 @@ generate_panel_instructions:
 
 .integration-deps: requirements.test.txt requirements.txt
 	pip install -r requirements.test.txt
+	touch .integration-deps
 
 
 integration: .integration-deps
