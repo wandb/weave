@@ -1,5 +1,4 @@
-import {voidNode} from '@wandb/weave/core';
-import {v4 as uuid} from 'uuid';
+import {ID, voidNode} from '@wandb/weave/core';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {getConfigForPath} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
@@ -62,7 +61,7 @@ export const computeReportSlateNode = (
       panelConfig: {
         id: 'Panel',
         config: {
-          documentId: uuid(),
+          documentId: ID(12),
         },
         input_node: {
           nodeType: 'const',
