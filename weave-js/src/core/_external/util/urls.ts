@@ -50,7 +50,7 @@ export type ReportParams = {
 
 export function reportEdit(r: ReportParams, queryString?: string) {
   const extra = queryString || '';
-  return `${reportViewWithoutPublished(r)}/edit${extra}`;
+  return `/${reportViewWithoutPublished(r)}/edit${extra}`;
 }
 
 export function reportView(r: ReportParams): string {
