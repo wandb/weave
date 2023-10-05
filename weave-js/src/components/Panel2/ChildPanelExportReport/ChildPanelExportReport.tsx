@@ -1,22 +1,25 @@
-import {useQuery} from '@apollo/client';
+import {useMutation, useQuery} from '@apollo/client';
+import {coreAppUrl} from '@wandb/weave/config';
+import * as Urls from '@wandb/weave/core/_external/util/urls';
+import {opRootViewer} from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
 import React, {useState} from 'react';
 import _ from 'lodash';
 
 import {Alert} from '../../Alert.styles';
 import {Button} from '../../Button';
+import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
-import {ChildPanelFullConfig} from '../ChildPanel';
+import {computeReportSlateNode} from './computeReportSlateNode';
+import {GET_REPORT, UPSERT_REPORT} from './graphql';
 import {
   EntityOption,
   ProjectOption,
   ReportOption,
   isNewReportOption,
 } from './utils';
-import {useNodeValue} from '@wandb/weave/react';
-import {computeReportSlateNode} from './computeReportSlateNode';
-import {GET_REPORT} from './graphql';
 
 type ChildPanelExportReportProps = {
   /**
@@ -29,6 +32,7 @@ type ChildPanelExportReportProps = {
 export const ChildPanelExportReport = ({
   rootConfig,
 }: ChildPanelExportReportProps) => {
+  const {result: viewer} = useNodeValue(opRootViewer({}));
   const {result: fullConfig} = useNodeValue(rootConfig.input_node);
   const selectedPath = useSelectedPath();
   const closeDrawer = useCloseDrawer();
@@ -43,24 +47,66 @@ export const ChildPanelExportReport = ({
     null
   );
 
-  const selectedReportQuery = useQuery(GET_REPORT, {
+  const isNewReportSelected = isNewReportOption(selectedReport);
+
+  const [upsertReport, upsertReportResult] = useMutation(UPSERT_REPORT);
+  const reportQueryResult = useQuery(GET_REPORT, {
     variables: {id: selectedReport?.id ?? ''},
     skip: !selectedReport || isNewReportOption(selectedReport),
   });
 
-  const onAddPanel = () => {
-    const selectedReportDetails = selectedReportQuery.data?.view;
+  const isAddPanelDisabled =
+    !selectedEntity ||
+    !selectedReport ||
+    !selectedProject ||
+    reportQueryResult.loading ||
+    reportQueryResult.error != null ||
+    upsertReportResult.loading;
+
+  const onAddPanel = async () => {
+    if (isAddPanelDisabled) {
+      return;
+    }
+
     const slateNode = computeReportSlateNode(fullConfig, selectedPath);
-    // TODO - this will be replaced with correct add panel implementation later on
-    alert(`
-      Report id: ${selectedReport?.id}
-      Report name: ${selectedReport?.name}
-      Entity name: ${selectedEntity?.name}
-      Project name: ${selectedProject?.name}
-      Slate node: logged in dev console
-    `);
-    console.log('Selected report details:', selectedReportDetails);
-    console.log('Slate node to be added:', slateNode);
+    const entityName = selectedEntity.name;
+    const projectName = selectedProject.name;
+    let upsertBody;
+
+    if (isNewReportSelected) {
+      // https://wandb.atlassian.net/browse/WB-15495
+      alert('TODO: handle new report option');
+      return;
+    } else {
+      const publishedReport = reportQueryResult.data?.view;
+      const drafts = publishedReport?.children?.edges.map(({node}) => node);
+      const viewerDraft = drafts?.find(draft => draft?.user?.id === viewer.id);
+      if (viewerDraft) {
+        const spec = JSON.parse(viewerDraft.spec);
+        spec.blocks.push(slateNode);
+        upsertBody = {
+          id: viewerDraft.id,
+          spec: JSON.stringify(spec),
+        };
+      } else {
+        // https://wandb.atlassian.net/browse/WB-15494
+        alert('TODO: handle report without existing draft');
+        return;
+      }
+    }
+
+    const result = await upsertReport({variables: upsertBody});
+    const upsertedDraft = result.data?.upsertView?.view!;
+    const reportDraftPath = Urls.reportEdit({
+      entityName,
+      projectName,
+      reportID: upsertedDraft.id,
+      reportName: upsertedDraft.displayName ?? '',
+    });
+
+    // eslint-disable-next-line wandb/no-unprefixed-urls
+    window.open(coreAppUrl(reportDraftPath), '_blank');
+    closeDrawer();
   };
 
   return (
@@ -97,7 +143,7 @@ export const ChildPanelExportReport = ({
           <Button
             icon="add-new"
             className="w-full"
-            disabled={selectedReport == null || selectedProject == null}
+            disabled={isAddPanelDisabled}
             onClick={onAddPanel}>
             Add panel
           </Button>
