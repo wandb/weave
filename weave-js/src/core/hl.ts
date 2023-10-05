@@ -1062,9 +1062,6 @@ export const getPlaceholderArg = (
   argName: string
 ): EditingNode | null => {
   const argType = opDef.inputTypes[argName];
-  if (opDef.name.includes('merge')) {
-    console.log('merge placeholder arg', opDef.name, argName, argType);
-  }
   if (isAssignableTo('string', argType)) {
     return constString('');
   }
