@@ -426,7 +426,7 @@ export const opRunHistoryType = OpKinds.makeBasicOp({
 
 const opRunHistoryResolveOutputType = async (
   executableNode: GraphTypes.OutputNode<Types.Type>,
-  client: Client,
+  client: Client
 ) => {
   // See opRunSummary for comment
 
@@ -459,7 +459,9 @@ const opRunHistoryResolveOutputType = async (
   const run = firstRunNode.fromOp.inputs.run;
   const refinedRunNode = await refineNode(client, run, []);
 
-  let result = nullableTaggableStrip(await client.query(opRunHistoryType({run})));
+  let result = nullableTaggableStrip(
+    await client.query(opRunHistoryType({run}))
+  );
 
   if (TypeHelpers.isListLike(refinedRunNode.type)) {
     result = TypeHelpers.listObjectType(result);

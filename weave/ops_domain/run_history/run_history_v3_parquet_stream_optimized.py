@@ -30,6 +30,7 @@ tracer = engine_trace.tracer()
 
 
 @op(
+    name="run-history_refine",
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
     hidden=True,
@@ -42,6 +43,7 @@ def refine_history_type(run: wdt.Run) -> types.Type:
 
 
 @op(
+    name="run-history_with_columns_refine",
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
     hidden=True,
@@ -78,7 +80,6 @@ def history_with_columns(run: wdt.Run, history_cols: list[str]):
     refine_output_type=refine_history_type,
     plugins=wb_gql_op_plugin(history_op_common.make_run_history_gql_field),
     output_type=ArrowWeaveListType(types.TypedDict({})),
-    hidden=True,
 )
 def history(run: wdt.Run):
     # TODO: This is now equivalent to hist2
