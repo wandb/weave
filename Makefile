@@ -6,5 +6,5 @@ generate_panel_instructions:
 	pip install -r requirements.test.txt
 
 
-run-integration: .integration-deps
+integration: .integration-deps
 	supervisord -c supervisord.conf
