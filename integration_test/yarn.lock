@@ -511,6 +511,11 @@ cypress-promise@^1.1.0:
   resolved "https://registry.yarnpkg.com/cypress-promise/-/cypress-promise-1.1.0.tgz#f2d66965945fe198431aaf692d5157cea9d47b25"
   integrity sha512-DhIf5PJ/a0iY+Yii6n7Rbwq+9TJxU4pupXYzf9mZd8nPG0AzQrj9i+pqINv4xbI2EV1p+PKW3maCkR7oPG4GrA==
 
+cypress-real-events@1.10.3:
+  version "1.10.3"
+  resolved "https://registry.yarnpkg.com/cypress-real-events/-/cypress-real-events-1.10.3.tgz#e2e949ea509cc4306df6c238de1a9982d67360e5"
+  integrity sha512-YN3fn+CJIAM638sE6uMvv2/n3PsWowdd0rOiN6ZoyezNAMyENfuQHvccLKZpN+apGfQZYetCml6QXLYgDid2fg==
+
 cypress@^10.11.0:
   version "10.11.0"
   resolved "https://registry.yarnpkg.com/cypress/-/cypress-10.11.0.tgz#e9fbdd7638bae3d8fb7619fd75a6330d11ebb4e8"

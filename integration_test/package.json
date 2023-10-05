@@ -10,7 +10,8 @@
   "dependencies": {   
   "slate": "0.94.1",
   "slate-history": "0.93.0",
-  "slate-react": "0.97.1"
+  "slate-react": "0.97.1",
+  "cypress-real-events": "1.10.3"
 },
   "author": "",
   "license": "ISC",

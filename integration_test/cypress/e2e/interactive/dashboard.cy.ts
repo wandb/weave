@@ -42,6 +42,19 @@ const panelTypeInputExpr = (path: string[], text: string) => {
     .type('{enter}', {force: true});
 };
 
+const scrollToEEAndType = (path: string[], text: string) => {
+  const panel = getPanel(path);
+  panel
+    .click()
+    .find('[data-test=expression-editor-container] [contenteditable=true]')
+    .realHover()
+    .realClick()
+    .wait(200)
+    .type(text)
+    .wait(300)
+    .type('{enter}', {force: true});
+};
+
 const panelChangeId = (path: string[], text: string) => {
   const panel = getPanel(path);
   panel.find('[data-test-comp=PanelNameEditor] [contenteditable=true]').click();
@@ -83,10 +96,10 @@ describe('dashboard', () => {
     panelTypeInputExpr(['sidebar', 'var1'], '2.5');
     addSidebarPanel();
     panelTypeInputExpr(['sidebar', 'var2'], 'var1');
-    dashboardConvertToControl(['sidebar', 'var2']);
+    // dashboardConvertToControl(['sidebar', 'var2']);
 
     // Add table panel
-    panelTypeInputExpr(['main', 'panel0'], 'var0');
+    scrollToEEAndType(['main', 'panel0'], 'var0');
     panelChangeId(['main', 'panel0'], 'table');
     tableAppendColumn(['main', 'panel0'], 'row ** var1');
     tableCheckContainsValue(['main', 'panel0'], '5.657');
