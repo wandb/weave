@@ -10,12 +10,8 @@ const gotoBlankDashboard = async () => {
   cy.viewport(1600, 900);
   cy.visit(url);
   cy.get('canvas').should('be.visible');
-  cy.get('[data-testid="header-center-controls"]', {timeout: 5000})
-    .should('be.visible')
-    .click();
-  cy.get('[data-testid="new-board-button"]', {timeout: 5000})
-    .should('be.visible')
-    .click();
+  cy.get('[data-testid="header-center-controls"]').should('be.visible').click();
+  cy.get('[data-testid="new-board-button"]').should('be.visible').click();
 };
 
 const addSidebarPanel = () => {
