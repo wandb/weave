@@ -27,6 +27,7 @@ type ReportSelectionProps = {
   setSelectedEntity: (entity: EntityOption) => void;
   setSelectedReport: (report: ReportOption | null) => void;
   setSelectedProject: (project: ProjectOption | null) => void;
+  onChange?: () => void;
 };
 
 export const ReportSelection = ({
@@ -37,6 +38,7 @@ export const ReportSelection = ({
   setSelectedEntity,
   setSelectedReport,
   setSelectedProject,
+  onChange,
 }: ReportSelectionProps) => {
   const {entityName} = useEntityAndProject(rootConfig);
 
@@ -145,6 +147,7 @@ export const ReportSelection = ({
         getOptionValue={option => option.name}
         value={selectedEntity}
         onChange={selected => {
+          onChange?.();
           if (selected) {
             setSelectedEntity(selected);
             setSelectedReport(null);
@@ -162,7 +165,10 @@ export const ReportSelection = ({
       {selectedReport != null && !isNewReportOption(selectedReport) && (
         <SelectedExistingReport
           selectedReport={selectedReport}
-          clearSelectedReport={() => setSelectedReport(null)}
+          clearSelectedReport={() => {
+            onChange?.();
+            setSelectedReport(null);
+          }}
         />
       )}
       {(selectedReport == null || isNewReportOption(selectedReport)) && (
@@ -178,6 +184,7 @@ export const ReportSelection = ({
             getOptionValue={option => option.id ?? ''}
             value={selectedReport}
             onChange={selected => {
+              onChange?.();
               if (selected != null) {
                 setSelectedReport(selected);
                 setSelectedProject(
@@ -215,6 +222,7 @@ export const ReportSelection = ({
             getOptionValue={option => option.name}
             value={selectedProject ?? null}
             onChange={selected => {
+              onChange?.();
               if (selected != null) {
                 setSelectedProject(selected);
               }

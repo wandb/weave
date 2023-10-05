@@ -10,6 +10,7 @@ import {Alert} from '../../Alert.styles';
 import {Button} from '../../Button';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
+import {ErrorAlerts} from './ErrorAlerts';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {ReportSelection} from './ReportSelection';
 import {computeReportSlateNode} from './computeReportSlateNode';
@@ -55,6 +56,7 @@ export const ChildPanelExportReport = ({
     skip: !selectedReport || isNewReportOption(selectedReport),
   });
 
+  const isErrorDisplayed = reportQueryResult.error || upsertReportResult.error;
   const isAddPanelDisabled =
     !selectedEntity ||
     !selectedReport ||
@@ -133,11 +135,20 @@ export const ChildPanelExportReport = ({
             setSelectedEntity={setSelectedEntity}
             setSelectedReport={setSelectedReport}
             setSelectedProject={setSelectedProject}
+            onChange={upsertReportResult.reset}
           />
-          <p className="mt-16 text-moon-500">
-            Future changes to the board will not affect exported panels inside
-            reports.
-          </p>
+          {!isErrorDisplayed && (
+            <p className="mt-16 text-moon-500">
+              Future changes to the board will not affect exported panels inside
+              reports.
+            </p>
+          )}
+          {reportQueryResult.error && (
+            <ErrorAlerts.ReportQuery error={reportQueryResult.error} />
+          )}
+          {upsertReportResult.error && (
+            <ErrorAlerts.UpsertReport error={upsertReportResult.error} />
+          )}
         </div>
         <div className="border-t border-moon-250 px-16 py-20">
           <Button
