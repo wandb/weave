@@ -1,4 +1,5 @@
 import {useMutation, useQuery} from '@apollo/client';
+import {ID} from '@wandb/weave/common/util/id';
 import {coreAppUrl} from '@wandb/weave/config';
 import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {opRootViewer} from '@wandb/weave/core';
@@ -91,9 +92,18 @@ export const ChildPanelExportReport = ({
           spec: JSON.stringify(spec),
         };
       } else {
-        // https://wandb.atlassian.net/browse/WB-15494
-        alert('TODO: handle report without existing draft');
-        return;
+        const spec = JSON.parse(publishedReport?.spec);
+        spec.blocks.push(slateNode);
+        upsertBody = {
+          coverUrl: publishedReport?.coverUrl,
+          description: publishedReport?.description,
+          displayName: publishedReport?.displayName,
+          name: ID(12),
+          parentId: publishedReport?.id,
+          previewUrl: publishedReport?.previewUrl,
+          spec: JSON.stringify(spec),
+          type: 'runs/draft',
+        };
       }
     }
 
