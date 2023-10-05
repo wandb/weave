@@ -1,4 +1,5 @@
 import {useMutation, useQuery} from '@apollo/client';
+import {coreAppUrl} from '@wandb/weave/config';
 import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {opRootViewer} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
@@ -103,9 +104,8 @@ export const ChildPanelExportReport = ({
       reportName: upsertedDraft.displayName ?? '',
     });
 
-    // Should set hostname per env (e.g. dev, local, saas), presumably with urlPrefixed?
     // eslint-disable-next-line wandb/no-unprefixed-urls
-    window.open(`https://wandb.ai/${reportDraftPath}`, '_blank');
+    window.open(coreAppUrl(reportDraftPath), '_blank');
     closeDrawer();
   };
 
