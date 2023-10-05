@@ -7,6 +7,11 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "FE_PORT=3000 cypress open"
   },
+  "dependencies": {   
+  "slate": "0.94.1",
+  "slate-history": "0.93.0",
+  "slate-react": "0.97.1"
+},
   "author": "",
   "license": "ISC",
   "devDependencies": {
