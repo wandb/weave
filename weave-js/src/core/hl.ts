@@ -682,6 +682,9 @@ function isProducibleType(type: Type): boolean {
   if (isFunction(type)) {
     return isProducibleType(type.outputType);
   }
+  if (type === 'any') {
+    return false;
+  }
   const PRODUCIBLE_TYPES: Type[] = [
     'string',
     'number',
@@ -807,6 +810,9 @@ export function availableOpsForChain(node: Node, opStore: OpStore): OpDef[] {
     availableOps(supportedEngineForNode(node, opStore), opStore)
   ).filter(opDef => {
     if (isValidRootOp(opDef)) {
+      return false;
+    }
+    if (opDef.name.startsWith('panel-')) {
       return false;
     }
     const inputTypes = Object.values(opDef.inputTypes);
@@ -1056,6 +1062,9 @@ export const getPlaceholderArg = (
   argName: string
 ): EditingNode | null => {
   const argType = opDef.inputTypes[argName];
+  if (opDef.name.includes('merge')) {
+    console.log('merge placeholder arg', opDef.name, argName, argType);
+  }
   if (isAssignableTo('string', argType)) {
     return constString('');
   }
