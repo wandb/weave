@@ -37,7 +37,7 @@ export interface CallFilter {
 
 export interface Call {
   name: string;
-  inputs: {[key: string]: any};
+  inputs: {_input_order?: string[]; [key: string]: any};
   output: any;
   attributes: {[key: string]: any};
   summary: {latency_s: number; [key: string]: any};
@@ -77,6 +77,7 @@ const callsTableWeaveType: Type = {
         propertyTypes: {
           _ref0: refWeaveType,
           _ref1: refWeaveType,
+          _arg_order: {type: 'list', objectType: 'string'},
         },
       },
       output: 'any',
@@ -223,7 +224,10 @@ export const callsTableFilter = (stNode: Node, filters: CallFilter) => {
   }
   return opFilter({
     arr: stNode,
-    filterFn: constFunction({row: 'any'}, ({row}) => filterExpr),
+    filterFn: constFunction(
+      {row: listObjectType(stNode.type)},
+      ({row}) => filterExpr
+    ),
   }) as Node;
 };
 

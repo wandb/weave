@@ -3,7 +3,7 @@ import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Switch,
   Route,
-  Link,
+  Link as RouterLink,
   useParams,
   useHistory,
   useLocation,
@@ -22,13 +22,13 @@ import {
   Node,
   linearize,
   isConstNode,
+  opIndex,
 } from '@wandb/weave/core';
 import {ChildPanel, ChildPanelConfig, initPanel} from '../../Panel2/ChildPanel';
 import {usePanelContext} from '../../Panel2/PanelContext';
 import {useWeaveContext} from '@wandb/weave/context';
 import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
 import {SEED_BOARD_OP_NAME} from './HomePreviewSidebar';
-import {Button} from 'semantic-ui-react';
 import {isWandbArtifactRef, parseRef, useNodeValue} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import {flatToTrees} from '../../Panel2/PanelTraceTree/util';
@@ -51,6 +51,28 @@ import {
   isOpenAIChatInput,
   isOpenAIChatOutput,
 } from './Browse2/openai';
+import {
+  AppBar,
+  IconButton,
+  Link as MaterialLink,
+  Button,
+  Toolbar,
+  Typography,
+  Breadcrumbs,
+  Box,
+  Grid,
+  Paper as MaterialPaper,
+  Container,
+  TextField,
+  Chip,
+} from '@mui/material';
+import {DataGridPro as DataGrid} from '@mui/x-data-grid-pro';
+import {Home, FilterList} from '@mui/icons-material';
+import {LicenseInfo} from '@mui/x-license-pro';
+
+LicenseInfo.setLicenseKey(
+  '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
+);
 
 function useQuery() {
   const {search} = useLocation();
@@ -60,34 +82,120 @@ function useQuery() {
 
 const PageEl = styled.div``;
 
-const PageHeaderEl = styled.div`
-  font-size: 24px;
-  margin-bottom: 12px;
-  display: flex;
-`;
+const PageHeader: FC<{objectType: string; objectName?: string}> = ({
+  objectType,
+  objectName,
+}) => {
+  return (
+    <Box display="flex" alignItems="baseline" marginBottom={3}>
+      <Typography variant="h4" component="span" style={{fontWeight: 'bold'}}>
+        {objectType}
+      </Typography>
+      {objectName != null && (
+        <Typography variant="h4" component="span" style={{marginLeft: '8px'}}>
+          {objectName}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
-const PageHeaderObjectType = styled.div`
-  font-weight: bold;
-  margin-right: 6px;
-`;
+const opDisplayName = (opName: string) => {
+  if (opName.startsWith('wandb-artifact:')) {
+    const ref = parseRef(opName);
+    if (isWandbArtifactRef(ref)) {
+      let opName = ref.artifactName;
+      if (opName.startsWith('op-')) {
+        opName = opName.slice(3);
+      }
+      return opName + ':' + ref.artifactVersion;
+    }
+  }
+  return opName;
+};
 
-const PageHeaderObjectName = styled.div``;
+const LinkTable = <RowType extends {[key: string]: any}>({
+  rows,
+  handleRowClick,
+}: {
+  rows: RowType[];
+  handleRowClick: (row: RowType) => void;
+}) => {
+  const columns = useMemo(() => {
+    const row0 = rows[0];
+    if (row0 == null) {
+      return [];
+    }
+    const cols = Object.keys(row0).filter(
+      k => k !== 'id' && !k.startsWith('_')
+    );
+    return row0 == null
+      ? []
+      : cols.map((key, i) => ({
+          field: key,
+          headerName: key,
+          flex: i === 0 ? 1 : undefined,
+        }));
+  }, [rows]);
+  return (
+    <Box
+      sx={{
+        height: 460,
+        width: '100%',
+        '& .MuiDataGrid-root': {
+          border: 'none',
+        },
+        '& .MuiDataGrid-row': {
+          cursor: 'pointer',
+        },
+      }}>
+      <DataGrid
+        density="compact"
+        rows={rows}
+        columns={columns}
+        autoPageSize
+        // initialState={{
+        //   pagination: {
+        //     paginationModel: {
+        //       pageSize: 10,
+        //     },
+        //   },
+        // }}
+        disableRowSelectionOnClick
+        onRowClick={params => handleRowClick(params.row as RowType)}
+      />
+    </Box>
+  );
+};
 
 const Browse2Home: FC = props => {
   const isAuthenticated = useIsAuthenticated();
   const userEntities = query.useUserEntities(isAuthenticated);
+  const rows = useMemo(
+    () =>
+      userEntities.result.map((entityName, i) => ({
+        id: i,
+        name: entityName,
+      })),
+    [userEntities.result]
+  );
+  const history = useHistory();
+  const handleRowClick = useCallback(
+    (row: any) => {
+      const entityName = row.name;
+      history.push(`/${URL_BROWSE2}/${entityName}`);
+    },
+    [history]
+  );
   return (
     <PageEl>
-      <PageHeaderEl>
-        <PageHeaderObjectType>Home</PageHeaderObjectType>
-      </PageHeaderEl>
-      <div>
-        {userEntities.result.map(entityName => (
-          <div key={entityName}>
-            <Link to={`/${URL_BROWSE2}/${entityName}`}>{entityName}</Link>
-          </div>
-        ))}
-      </div>
+      <PageHeader objectType="Home" />
+      <Paper>
+        <Typography variant="h6" gutterBottom>
+          Entities
+        </Typography>
+        <LinkTable rows={rows} handleRowClick={handleRowClick} />
+      </Paper>
     </PageEl>
   );
 };
@@ -99,21 +207,31 @@ interface Browse2EntityParams {
 const Browse2EntityPage: FC = props => {
   const params = useParams<Browse2EntityParams>();
   const entityProjects = query.useProjectsForEntity(params.entity);
+  const rows = useMemo(
+    () =>
+      entityProjects.result.map((entityProject, i) => ({
+        id: i,
+        name: entityProject,
+      })),
+    [entityProjects.result]
+  );
+  const history = useHistory();
+  const handleRowClick = useCallback(
+    (row: any) => {
+      const projectName = row.name;
+      history.push(`/${URL_BROWSE2}/${params.entity}/${projectName}`);
+    },
+    [history, params.entity]
+  );
   return (
     <PageEl>
-      <PageHeaderEl>
-        <PageHeaderObjectType>Entity</PageHeaderObjectType>
-        <PageHeaderObjectName>{params.entity}</PageHeaderObjectName>
-      </PageHeaderEl>
-      <div>
-        {entityProjects.result.map(projectName => (
-          <div key={projectName}>
-            <Link to={`/${URL_BROWSE2}/${params.entity}/${projectName}`}>
-              {projectName}
-            </Link>
-          </div>
-        ))}
-      </div>
+      <PageHeader objectType="Entity" objectName={params.entity} />
+      <Paper>
+        <Typography variant="h6" gutterBottom>
+          Projects
+        </Typography>
+        <LinkTable rows={rows} handleRowClick={handleRowClick} />
+      </Paper>
     </PageEl>
   );
 };
@@ -129,42 +247,66 @@ const Browse2ProjectPage: FC = props => {
     params.entity,
     params.project
   );
+  const rows = useMemo(
+    () =>
+      (rootTypeCounts.result ?? [])
+        .filter(
+          typeInfo =>
+            // typeInfo.name !== 'stream_table' &&
+            typeInfo.name !== 'OpDef' && typeInfo.name !== 'wandb-history'
+        )
+        .map((row, i) => ({
+          id: i,
+          ...row,
+        })),
+    [rootTypeCounts.result]
+  );
+  const history = useHistory();
+  const handleRowClick = useCallback(
+    (row: any) => {
+      history.push(
+        `/${URL_BROWSE2}/${params.entity}/${params.project}/${row.name}`
+      );
+    },
+    [history, params.entity, params.project]
+  );
   return (
     <PageEl>
-      <PageHeaderEl>
-        <PageHeaderObjectType>Project</PageHeaderObjectType>
-        <PageHeaderObjectName>{params.project}</PageHeaderObjectName>
-      </PageHeaderEl>
-      <div style={{marginBottom: 12}}>
-        Objects
-        {rootTypeCounts.result
-          .filter(
-            typeInfo =>
-              // typeInfo.name !== 'stream_table' &&
-              typeInfo.name !== 'OpDef' && typeInfo.name !== 'wandb-history'
-          )
-          .map(typeInfo => (
-            <div key={typeInfo.name}>
-              <Link
-                to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${typeInfo.name}`}>
-                {typeInfo.name}
-              </Link>
-            </div>
-          ))}
-      </div>
-      <div style={{marginBottom: 12}}>
-        <div>Ops</div>
-        <Browse2RootObjectType
-          entity={params.entity}
-          project={params.project}
-          rootType="OpDef"
-        />
-      </div>
-      <div style={{marginBottom: 12}}>
-        <Link to={`/${URL_BROWSE2}/${params.entity}/${params.project}/trace`}>
-          Traces
-        </Link>
-      </div>
+      <PageHeader objectType="Project" objectName={params.project} />
+      <Grid container spacing={3}>
+        <Grid item xs={12} sm={6}>
+          <Paper>
+            <Typography variant="h6" gutterBottom>
+              Object Types
+            </Typography>
+            <LinkTable rows={rows} handleRowClick={handleRowClick} />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <Paper>
+            <Typography
+              variant="h6"
+              gutterBottom
+              display="flex"
+              justifyContent="space-between">
+              Functions
+              <Typography variant="h6" component="span">
+                <Link
+                  to={`/${URL_BROWSE2}/${params.entity}/${params.project}/trace`}>
+                  [See all runs]
+                </Link>
+              </Typography>
+            </Typography>
+            <Browse2RootObjectType
+              entity={params.entity}
+              project={params.project}
+              rootType="OpDef"
+            />
+          </Paper>
+        </Grid>
+      </Grid>
+      <div style={{marginBottom: 12}}></div>
+      <div style={{marginBottom: 12}}></div>
     </PageEl>
   );
 };
@@ -181,29 +323,43 @@ const Browse2RootObjectType: FC<Browse2RootObjectTypeParams> = ({
   rootType,
 }) => {
   const objectsInfo = query.useProjectObjectsOfType(entity, project, rootType);
+  const rows = useMemo(
+    () =>
+      (objectsInfo.result ?? []).map((row, i) => ({
+        id: i,
+        ...row,
+      })),
+    [objectsInfo.result]
+  );
+  const history = useHistory();
+  const handleRowClick = useCallback(
+    (row: any) => {
+      history.push(
+        `/${URL_BROWSE2}/${entity}/${project}/${rootType}/${row.name}`
+      );
+    },
+    [history, entity, project, rootType]
+  );
   return (
-    <PageEl>
-      <PageHeaderEl>
-        <PageHeaderObjectType>Object Type</PageHeaderObjectType>
-        <PageHeaderObjectName>{rootType}</PageHeaderObjectName>
-      </PageHeaderEl>
-      <div>
-        {objectsInfo.result.map(objInfo => (
-          <div key={objInfo.name}>
-            <Link
-              to={`/${URL_BROWSE2}/${entity}/${project}/${rootType}/${objInfo.name}`}>
-              {objInfo.name}
-            </Link>
-          </div>
-        ))}
-      </div>
-    </PageEl>
+    <>
+      <LinkTable rows={rows} handleRowClick={handleRowClick} />
+    </>
   );
 };
 
 const Browse2ObjectTypePage: FC = props => {
   const params = useParams<Browse2RootObjectTypeParams>();
-  return <Browse2RootObjectType {...params} />;
+  return (
+    <PageEl>
+      <PageHeader objectType="Object Type" objectName={params.rootType} />
+      <Paper>
+        <Typography variant="h6" gutterBottom>
+          {params.rootType + 's'}
+        </Typography>
+        <Browse2RootObjectType {...params} />
+      </Paper>
+    </PageEl>
+  );
 };
 
 interface Browse2RootObjectParams {
@@ -216,23 +372,37 @@ interface Browse2RootObjectParams {
 
 const Browse2ObjectPage: FC = props => {
   const params = useParams<Browse2RootObjectParams>();
-  const aliases = query.useObjectAliases(
-    params.entity,
-    params.project,
-    params.objName
-  );
+  // const aliases = query.useObjectAliases(
+  //   params.entity,
+  //   params.project,
+  //   params.objName
+  // );
   const versionNames = query.useObjectVersions(
     params.entity,
     params.project,
     params.objName
   );
+  const rows = useMemo(
+    () =>
+      (versionNames.result ?? []).map((row, i) => ({
+        id: i,
+        name: row,
+      })),
+    [versionNames.result]
+  );
+  const history = useHistory();
+  const handleRowClick = useCallback(
+    (row: any) => {
+      history.push(
+        `/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${row.name}`
+      );
+    },
+    [history, params.entity, params.objName, params.project, params.rootType]
+  );
   return (
     <PageEl>
-      <PageHeaderEl>
-        <PageHeaderObjectType>Object</PageHeaderObjectType>
-        <PageHeaderObjectName>{params.objName}</PageHeaderObjectName>
-      </PageHeaderEl>
-      <div>
+      <PageHeader objectType={params.rootType} objectName={params.objName} />
+      {/* <div>
         Aliases
         {aliases.result.map(alias => (
           <div key={alias}>
@@ -242,17 +412,22 @@ const Browse2ObjectPage: FC = props => {
             </Link>
           </div>
         ))}
-      </div>
+      </div> */}
       <div>
-        Versions
-        {versionNames.result.map(version => (
+        <Paper>
+          <Typography variant="h6" gutterBottom>
+            Versions
+          </Typography>
+          <LinkTable rows={rows} handleRowClick={handleRowClick} />
+        </Paper>
+        {/* {versionNames.result.map(version => (
           <div key={version}>
             <Link
               to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${version}`}>
               {version}
             </Link>
           </div>
-        ))}
+        ))} */}
       </div>
     </PageEl>
   );
@@ -319,86 +494,47 @@ const callOpName = (call: Call) => {
   return ref.artifactName;
 };
 
-const RefEl = styled.div`
-  margin-right: 4px;
-  display: flex;
-`;
-
-const RefName = styled.div``;
-
-const RefVer = styled.div``;
-
-const RefViewSmall: FC<{refS: string}> = ({refS}) => {
-  const parsed = parseRef(refS);
-  return (
-    <RefEl>
-      <RefName>{parsed.artifactName}</RefName>:
-      <RefVer>{parsed.artifactVersion.slice(0, 7)}</RefVer>
-    </RefEl>
-  );
-};
-
-const CallField = styled.div`
-  margin-right: 4px;
-`;
-
-const CallOpEl = styled.div`
-  margin-right: 4px;
-`;
-
-const CallInputs = styled.div`
-  display: flex;
-  margin-right: 4px;
-  > *:not(:last-child) {
-    margin-right: 4px;
-  }
-`;
-
-const CallEl = styled.div<{selected: boolean}>`
+const CallEl = styled.div`
   display: flex;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+  align-items: center;
   cursor: pointer;
-  :hover {
-    background: ${globals.lightSky};
-  }
-  background: ${props => (props.selected ? globals.sky : 'inherit')};
 `;
 
 const CallViewSmall: FC<{
   call: Call;
-  selected: boolean;
+  // selected: boolean;
   onClick?: () => void;
-}> = ({call, selected, onClick}) => {
-  const inputEntries = Object.entries(call.inputs).filter(
-    ([k, c]) => c != null && !k.startsWith('_')
-  );
+}> = ({call, onClick}) => {
   return (
-    <CallEl
-      selected={selected}
-      onClick={() => {
-        if (onClick) {
-          onClick();
-        }
-      }}>
-      {/* <CallField style={{marginRight: 4}}>{call.timestamp}</CallField> */}
-      <CallField>{monthRoundedTime(call.summary.latency_s, true)}</CallField>
-      <CallOpEl>{callOpName(call)}</CallOpEl>
-      <CallInputs>
-        (
-        {inputEntries.map(([k, input]) =>
-          typeof input === 'string' && input.startsWith('wandb-artifact:') ? (
-            <RefViewSmall refS={input} />
-          ) : (
-            JSON.stringify(input).slice(0, 10)
-          )
-        )}
-        )
-      </CallInputs>
-      <CallField>➡</CallField>
-      <CallField>{JSON.stringify(call.output).slice(0, 10)}</CallField>
-    </CallEl>
+    <Box mb={1}>
+      <Typography>
+        <CallEl
+          onClick={() => {
+            if (onClick) {
+              onClick();
+            }
+          }}>
+          <Box mr={1}>
+            <Chip
+              variant="outlined"
+              label={callOpName(call)}
+              sx={{
+                maxWidth: '200px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            />
+          </Box>
+          <Typography variant="body2" component="span">
+            {monthRoundedTime(call.summary.latency_s, true)}
+          </Typography>
+        </CallEl>
+      </Typography>
+    </Box>
   );
 };
 
@@ -414,10 +550,6 @@ SidebarWrapper.displayName = 'S.SidebarWrapper';
 
 type SpanWithChildren = Span & {child_spans: SpanWithChildren[]};
 
-export const SpanTreeChildrenEl = styled.div`
-  padding-left: 12px;
-`;
-
 export const SpanTreeDetailsEl = styled.div`
   padding-left: 18px;
 `;
@@ -429,16 +561,16 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
   const inputs = _.fromPairs(actualInputs);
   return (
     <div style={{width: '100%'}}>
-      <div style={{marginBottom: 12}}>
-        <div>
-          <b>Function name</b>
-        </div>
-        {call.name}
+      <div style={{marginBottom: 24}}>
+        <Typography variant="h5" gutterBottom>
+          Function
+        </Typography>
+        <Chip label={call.name} />
       </div>
-      <div style={{marginBottom: 12}}>
-        <div>
-          <b>Inputs</b>
-        </div>
+      <div style={{marginBottom: 24}}>
+        <Typography variant="h5" gutterBottom>
+          Inputs
+        </Typography>
         {isOpenAIChatInput(inputs) ? (
           <OpenAIChatInputView chatInput={inputs} />
         ) : (
@@ -447,10 +579,10 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
           </pre>
         )}
       </div>
-      <div style={{marginBottom: 12}}>
-        <div>
-          <b>Output</b>
-        </div>
+      <div style={{marginBottom: 24}}>
+        <Typography variant="h6" gutterBottom>
+          Output
+        </Typography>
         {isOpenAIChatOutput(call.output) ? (
           <OpenAIChatOutputView chatOutput={call.output} />
         ) : (
@@ -470,9 +602,9 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
         </div>
       )}
       <div style={{marginBottom: 12}}>
-        <div>
-          <b>Summary</b>
-        </div>
+        <Typography variant="h6" gutterBottom>
+          Summary
+        </Typography>
         <pre style={{fontSize: 12}}>
           {JSON.stringify(call.summary, undefined, 2)}
         </pre>
@@ -482,27 +614,40 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
 };
 
 const SpanTreeNode: FC<{
+  level?: number;
   call: SpanWithChildren;
   selectedSpanId?: string;
   setSelectedSpanId: (spanId: string) => void;
-}> = ({call, selectedSpanId, setSelectedSpanId}) => {
+}> = ({call, selectedSpanId, setSelectedSpanId, level}) => {
   const isSelected = selectedSpanId === call.span_id;
+  const curLevel = level ?? 0;
+  const childLevel = curLevel + 1;
   return (
     <>
-      <CallViewSmall
-        call={call}
-        selected={isSelected}
-        onClick={() => setSelectedSpanId(call.span_id)}
-      />
-      <SpanTreeChildrenEl>
-        {call.child_spans.map(child => (
-          <SpanTreeNode
-            call={child}
-            selectedSpanId={selectedSpanId}
-            setSelectedSpanId={setSelectedSpanId}
-          />
-        ))}
-      </SpanTreeChildrenEl>
+      <Box
+        ml={-1}
+        pl={1 + curLevel * 2}
+        mr={-1}
+        pr={1}
+        sx={{
+          '& *:hover': {
+            backgroundColor: globals.lightSky,
+          },
+          backgroundColor: isSelected ? globals.sky : 'inherit',
+        }}>
+        <CallViewSmall
+          call={call}
+          onClick={() => setSelectedSpanId(call.span_id)}
+        />
+      </Box>
+      {call.child_spans.map(child => (
+        <SpanTreeNode
+          level={childLevel}
+          call={child}
+          selectedSpanId={selectedSpanId}
+          setSelectedSpanId={setSelectedSpanId}
+        />
+      ))}
     </>
   );
 };
@@ -529,6 +674,158 @@ const VerticalTraceView: FC<{
   );
 };
 
+type DataGridColumnGroupingModel = Exclude<
+  React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+  undefined
+>;
+
+const RunsTable: FC<{
+  spans: Span[];
+}> = ({spans}) => {
+  const params = useParams<Browse2RootObjectVersionItemParams>();
+  const history = useHistory();
+  const tableData = useMemo(() => {
+    return spans.map((call: Call) => {
+      const argOrder = call.inputs._input_order;
+      let args = _.fromPairs(
+        Object.entries(call.inputs).filter(
+          ([k, c]) => c != null && !k.startsWith('_')
+        )
+      );
+      if (argOrder) {
+        args = _.fromPairs(argOrder.map((k: string) => [k, args[k]]));
+      }
+
+      return {
+        id: call.span_id,
+        trace_id: call.trace_id,
+        timestamp: call.timestamp,
+        latency: monthRoundedTime(call.summary.latency_s, true),
+        ..._.mapKeys(
+          _.omitBy(args, v => v == null),
+          (v, k) => {
+            return 'input_' + k;
+          }
+        ),
+        ..._.mapValues(
+          _.mapKeys(
+            _.omitBy(call.output, v => v == null),
+            (v, k) => {
+              return 'output_' + k;
+            }
+          ),
+          JSON.stringify
+        ),
+      };
+    });
+  }, [spans]);
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        field: 'timestamp',
+        headerName: 'Timestamp',
+      },
+      {
+        field: 'latency',
+        headerName: 'Latency',
+      },
+    ];
+    const colGroupingModel: DataGridColumnGroupingModel = [
+      {
+        headerName: '',
+        groupId: 'timestamp',
+        children: [{field: 'timestamp'}],
+      },
+      {
+        headerName: '',
+        groupId: 'latency',
+        children: [{field: 'latency'}],
+      },
+    ];
+    const row0 = spans[0];
+    if (row0 == null) {
+      return {cols: [], colGroupingModel: []};
+    }
+
+    const inputOrder =
+      row0.inputs._arg_order ??
+      Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
+        k => !k.startsWith('_')
+      );
+    const inputGroup: Exclude<
+      React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+      undefined
+    >[number] = {
+      groupId: 'inputs',
+      children: [],
+    };
+    for (const key of inputOrder) {
+      cols.push({
+        field: 'input_' + key,
+        headerName: key,
+        flex: 1,
+      });
+      inputGroup.children.push({field: 'input_' + key});
+    }
+    colGroupingModel.push(inputGroup);
+
+    const outputOrder = Object.keys(_.omitBy(row0.output, v => v == null));
+    const outputGroup: Exclude<
+      React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+      undefined
+    >[number] = {
+      groupId: 'output',
+      children: [],
+    };
+    for (const key of outputOrder) {
+      cols.push({
+        field: 'output_' + key,
+        headerName: key,
+        flex: 1,
+      });
+      outputGroup.children.push({field: 'output_' + key});
+    }
+    colGroupingModel.push(outputGroup);
+
+    return {cols, colGroupingModel};
+  }, [spans]);
+  console.log('COL GROUPING MODEL', columns);
+  return (
+    <Box
+      sx={{
+        height: 460,
+        width: '100%',
+        '& .MuiDataGrid-root': {
+          border: 'none',
+        },
+        '& .MuiDataGrid-row': {
+          cursor: 'pointer',
+        },
+      }}>
+      <DataGrid
+        density="compact"
+        experimentalFeatures={{columnGrouping: true}}
+        rows={tableData}
+        columns={columns.cols}
+        columnGroupingModel={columns.colGroupingModel}
+        initialState={{
+          pagination: {
+            paginationModel: {
+              pageSize: 10,
+            },
+          },
+        }}
+        disableRowSelectionOnClick
+        onRowClick={rowParams =>
+          history.push(
+            `/${URL_BROWSE2}/${params.entity}/${params.project}/trace/${rowParams.row.trace_id}/${rowParams.row.id}`
+          )
+        }
+      />
+    </Box>
+  );
+};
+
 const Browse2Calls: FC<{
   streamId: StreamId;
   filters: CallFilter;
@@ -545,24 +842,27 @@ const Browse2Calls: FC<{
 
   return (
     <div style={{width: '100%', height: 500}}>
-      Calls
-      {filters.opUri != null && <div>Op: {filters.opUri}</div>}
-      {filters.inputUris != null && (
-        <div>
-          Inputs:
-          {filters.inputUris.map((inputUri, i) => (
-            <div key={i}>{inputUri}</div>
-          ))}
-        </div>
-      )}
-      <div style={{paddingLeft: 24}}>
-        {selectedData.map((call: Call) => (
-          <Link
-            to={`/${URL_BROWSE2}/${streamId.entityName}/${streamId.projectName}/trace/${call.trace_id}/${call.span_id}`}>
-            <CallViewSmall call={call} selected={false} />
-          </Link>
-        ))}
-      </div>
+      <Paper>
+        <Typography variant="h6" gutterBottom>
+          Runs
+        </Typography>
+        {filters.inputUris != null && (
+          <div
+            style={{
+              display: 'flex',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+            }}>
+            <FilterList />
+            <i>Showing runs where input is one of: </i>
+            {filters.inputUris.map((inputUri, i) => (
+              <div key={i}>{inputUri}</div>
+            ))}
+          </div>
+        )}
+        <RunsTable spans={selectedData} />
+      </Paper>
     </div>
   );
 };
@@ -613,41 +913,35 @@ const Browse2Trace: FC<{
     return traceSpans.filter(ts => ts.span_id === selectedSpanId)[0];
   }, [selectedSpanId, traceSpans]);
   return (
-    <div style={{height: '100%', width: '100%', display: 'flex'}}>
-      <div
-        style={{
-          height: '100%',
-          width: selectedSpanId == null ? '100%' : 300,
-          padding: 12,
-        }}>
-        <VerticalTraceView
-          traceSpans={traceSpans}
-          selectedSpanId={selectedSpanId}
-          setSelectedSpanId={setSelectedSpanId}
-          callStyle="short"
-        />
-      </div>
-      {selectedSpanId != null && (
-        <div
-          style={{
-            flexGrow: 1,
-            height: '100%',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-          }}>
-          <div
-            style={{
-              padding: 12,
-            }}>
-            {selectedSpan == null ? (
-              <div>Span not found</div>
-            ) : (
-              <SpanDetails call={selectedSpan} />
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    <Grid container spacing={1} alignItems="flex-start">
+      <Grid xs={3} item>
+        <Paper>
+          <VerticalTraceView
+            traceSpans={traceSpans}
+            selectedSpanId={selectedSpanId}
+            setSelectedSpanId={setSelectedSpanId}
+            callStyle="short"
+          />
+        </Paper>
+      </Grid>
+      <Grid xs={9} item>
+        {selectedSpanId != null && (
+          <Paper>
+            <div
+              style={{
+                padding: 12,
+                overflowX: 'hidden',
+              }}>
+              {selectedSpan == null ? (
+                <div>Span not found</div>
+              ) : (
+                <SpanDetails call={selectedSpan} />
+              )}
+            </div>
+          </Paper>
+        )}
+      </Grid>
+    </Grid>
   );
 };
 
@@ -670,6 +964,12 @@ const Browse2TracePage: FC = () => {
   );
   return (
     <PageEl>
+      <PageHeader
+        objectType="Trace"
+        objectName={
+          params.traceId + params.spanId != null ? '/' + params.spanId : ''
+        }
+      />
       <Browse2Trace
         streamId={{
           entityName: params.entity,
@@ -764,16 +1064,23 @@ const Browse2OpDefPage: FC = () => {
     });
     return filt;
   }, [query, uri]);
+  const streamId = useMemo(
+    () => ({
+      entityName: params.entity,
+      projectName: params.project,
+      streamName: 'stream',
+    }),
+    [params.entity, params.project]
+  );
+  // const firstCall = useMemo(() => {
+  //   const streamTableRowsNode = callsTableNode(streamId);
+  //   const filtered = callsTableFilter(streamTableRowsNode, {opUri: uri});
+  //   const selected = callsTableSelect(filtered);
+  //   return opIndex({arr: selected, index: constNumber(0)});
+  // }, [streamId, uri]);
   return (
     <div>
-      <Browse2Calls
-        streamId={{
-          entityName: params.entity,
-          projectName: params.project,
-          streamName: 'stream',
-        }}
-        filters={filters}
-      />
+      <Browse2Calls streamId={streamId} filters={filters} />
     </div>
   );
 };
@@ -800,19 +1107,27 @@ const Browse2RootObjectVersionUsers: FC<{uri: string}> = ({uri}) => {
     return callsTableOpCounts(filtered);
   }, [params.entity, params.project, uri]);
   const calledOpCountsQuery = useNodeValue(calledOpCountsNode);
-  const calledOpCounts = calledOpCountsQuery.result ?? [];
-  return (
-    <div style={{width: '100%'}}>
-      {calledOpCounts.map(({name, count}: {name: string; count: number}) => (
-        <div>
-          <Link to={`${opPageUrl(name)}?inputUri=${encodeURIComponent(uri)}`}>
-            {name}
-          </Link>
-          : {count}
-        </div>
-      ))}
-    </div>
+
+  const rows = useMemo(() => {
+    const calledOpCounts = calledOpCountsQuery.result ?? [];
+    return calledOpCounts.map((row: any, i: number) => ({
+      id: i,
+      _name: row.name,
+      name: opDisplayName(row.name),
+      count: row.count,
+    }));
+  }, [calledOpCountsQuery]);
+  const history = useHistory();
+  const handleRowClick = useCallback(
+    (row: any) => {
+      history.push(
+        `${opPageUrl(row._name)}?inputUri=${encodeURIComponent(uri)}`
+      );
+    },
+    [history, uri]
   );
+
+  return <LinkTable rows={rows} handleRowClick={handleRowClick} />;
 };
 
 const Browse2ObjectVersionItemPage: FC = props => {
@@ -834,6 +1149,8 @@ const Browse2ObjectVersionItemPage: FC = props => {
   const makeBoardFromNode = useMakeLocalBoardFromNode();
 
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // console.log('ITEM QUERY', useNodeValue(itemNode));
 
   const onNewBoard = useCallback(async () => {
     setIsGenerating(true);
@@ -907,61 +1224,79 @@ const Browse2ObjectVersionItemPage: FC = props => {
   );
   return (
     <PageEl>
-      <PageHeaderEl>
-        <PageHeaderObjectType>
-          {params.rootType === 'OpDef'
+      <PageHeader
+        objectType={
+          params.rootType === 'OpDef'
             ? 'Op'
             : params.rootType === 'stream_table'
             ? 'Traces'
-            : 'Object'}
-        </PageHeaderObjectType>
-        <PageHeaderObjectName>
-          {params.objName}:{params.objVersion}
-          {params.refExtra && '/' + params.refExtra}
-        </PageHeaderObjectName>
-      </PageHeaderEl>
-      <div style={{marginBottom: 12}}>
-        <div style={{display: 'flex', alignItems: 'center'}}>
-          Expr: {weave.expToString(itemNode)}
-          <Button
-            style={{marginLeft: 12}}
-            size="mini"
-            onClick={onNewBoard}
-            loading={isGenerating}>
-            Open in board
-          </Button>
-        </div>
-      </div>
+            : params.rootType
+        }
+        objectName={
+          params.objName +
+          ':' +
+          params.objVersion +
+          (params.refExtra ? '/' + params.refExtra : '')
+        }
+      />
+      <Box marginBottom={2}>
+        <Paper>
+          <Grid container spacing={1} alignItems="center">
+            <Grid xs={10} item>
+              <TextField
+                label="Weave Expression"
+                value={weave.expToString(itemNode)}
+                fullWidth
+              />
+            </Grid>
+            <Grid xs={2} item>
+              <Button style={{marginLeft: 12}} onClick={onNewBoard}>
+                Open in board
+              </Button>
+            </Grid>
+          </Grid>
+          {/* <FormControl>
+          <InputLabel>Expr</InputLabel>
+          <Input value={weave.expToString(itemNode)} />
+        </FormControl> */}
+        </Paper>
+      </Box>
       {params.rootType === 'stream_table' ? (
         <Browse2CallsPage />
       ) : params.rootType === 'OpDef' ? (
         <Browse2OpDefPage />
       ) : (
-        <>
-          <div style={{marginBottom: 12}}>
-            Used in ops
-            <Browse2RootObjectVersionUsers uri={uri} />
-          </div>
-          <div style={{height: 300, width: '100%'}}>
-            Object view
-            {panel != null && (
-              <ChildPanel
-                config={panel}
-                updateConfig={newConfig => setPanel(newConfig)}
-                updateInput={handleUpdateInput}
-                passthroughUpdate
-              />
-            )}
-          </div>
-        </>
+        <Grid container spacing={3}>
+          <Grid item xs={8}>
+            <Paper>
+              <Typography variant="h6" gutterBottom>
+                Value
+              </Typography>
+              <Box p={2}>
+                {panel != null && (
+                  <ChildPanel
+                    config={panel}
+                    updateConfig={newConfig => setPanel(newConfig)}
+                    updateInput={handleUpdateInput}
+                    passthroughUpdate
+                  />
+                )}
+              </Box>
+            </Paper>
+          </Grid>
+          <Grid item xs={4}>
+            <Paper>
+              <Typography variant="h6" gutterBottom>
+                Used in runs
+              </Typography>
+              <Browse2RootObjectVersionUsers uri={uri} />
+            </Paper>
+          </Grid>
+        </Grid>
       )}
     </PageEl>
   );
 };
-
-const BreadcrumbsEl = styled.div`
-  margin-bottom: 12px;
-`;
 
 interface Browse2Params {
   entity?: string;
@@ -972,56 +1307,55 @@ interface Browse2Params {
   refExtra?: string;
 }
 
+const Link = props => <MaterialLink {...props} component={RouterLink} />;
+
+const AppBarLink = props => (
+  <MaterialLink
+    sx={{
+      color: theme => theme.palette.getContrastText(theme.palette.primary.main),
+      '&:hover': {
+        color: theme =>
+          theme.palette.getContrastText(theme.palette.primary.dark),
+      },
+    }}
+    {...props}
+    component={RouterLink}
+  />
+);
+
 const Browse2Breadcrumbs: FC = props => {
   const params = useParams<Browse2Params>();
   return (
-    <BreadcrumbsEl>
-      <Link to={`/${URL_BROWSE2}`}>🏠</Link>
+    <Breadcrumbs>
       {params.entity && (
-        <>
-          {' / '}
-          <Link to={`/${URL_BROWSE2}/${params.entity}`}>{params.entity}</Link>
-          {params.project && (
-            <>
-              {' / '}
-              <Link to={`/${URL_BROWSE2}/${params.entity}/${params.project}`}>
-                {params.project}
-              </Link>
-              {params.rootType && (
-                <>
-                  {' / '}
-                  <Link
-                    to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}`}>
-                    {params.rootType}
-                  </Link>
-                  {params.objName && (
-                    <>
-                      {' / '}
-                      <Link
-                        to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}`}>
-                        {params.objName}
-                      </Link>
-                      {params.objVersion && (
-                        <>
-                          {' / '}
-                          <Link
-                            to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`}>
-                            {params.objVersion}
-                          </Link>
-                          {params.refExtra && (
-                            <RefExtraBreadCrumbs refExtra={params.refExtra} />
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </>
+        <AppBarLink to={`/${URL_BROWSE2}/${params.entity}`}>
+          {params.entity}
+        </AppBarLink>
       )}
-    </BreadcrumbsEl>
+      {params.project && (
+        <AppBarLink to={`/${URL_BROWSE2}/${params.entity}/${params.project}`}>
+          {params.project}
+        </AppBarLink>
+      )}
+      {params.rootType && (
+        <AppBarLink
+          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}`}>
+          {params.rootType}
+        </AppBarLink>
+      )}
+      {params.objName && (
+        <AppBarLink
+          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}`}>
+          {params.objName}
+        </AppBarLink>
+      )}
+      {params.objVersion && (
+        <AppBarLink
+          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`}>
+          {params.objVersion}
+        </AppBarLink>
+      )}
+    </Breadcrumbs>
   );
 };
 
@@ -1055,11 +1389,43 @@ const RefExtraBreadCrumbs: FC<{refExtra: string}> = ({refExtra}) => {
   );
 };
 
+const Paper = (props: React.ComponentProps<typeof MaterialPaper>) => {
+  return (
+    <MaterialPaper
+      sx={{
+        padding: theme => theme.spacing(2),
+      }}
+      {...props}>
+      {props.children}
+    </MaterialPaper>
+  );
+};
+
 export const Browse2: FC = props => {
   return (
-    <div style={{height: '100vh', overflow: 'auto'}}>
-      <div style={{padding: 32, height: '100%'}}>
-        <Browse2Breadcrumbs />
+    <div
+      style={{height: '100vh', overflow: 'auto', backgroundColor: '#fafafa'}}>
+      <AppBar position="static">
+        <Toolbar>
+          <IconButton
+            component={RouterLink}
+            to={`/${URL_BROWSE2}`}
+            sx={{
+              color: theme =>
+                theme.palette.getContrastText(theme.palette.primary.main),
+              '&:hover': {
+                color: theme =>
+                  theme.palette.getContrastText(theme.palette.primary.dark),
+              },
+              marginRight: theme => theme.spacing(2),
+            }}>
+            <Home />
+          </IconButton>
+          <Browse2Breadcrumbs />
+        </Toolbar>
+      </AppBar>
+      <Container maxWidth="xl">
+        <Box sx={{height: 40}} />
         <Switch>
           <Route
             path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId/:spanId?`}>
@@ -1088,7 +1454,7 @@ export const Browse2: FC = props => {
             <Browse2Home />
           </Route>
         </Switch>
-      </div>
+      </Container>
     </div>
   );
 };

@@ -231,9 +231,8 @@ export const useProjectAssetCountGeneral = (
     const resultRows = resultQuery.result ?? [];
     return {
       result: resultRows.map((row: any) => ({
-        _id: row.artifactTypeName,
         name: row.artifactTypeName,
-        count: row.artifactCount,
+        'object count': row.artifactCount,
       })),
       loading: resultQuery.loading,
     };

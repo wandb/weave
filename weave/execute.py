@@ -477,7 +477,7 @@ def execute_sync_op(
         mon_span_inputs, refs = auto_publish(project_name, inputs)
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
-            # span.inputs["_op"] = op_def
+            span.inputs["_arg_order"] = list(inputs.keys())
             for i, ref in enumerate(refs[:3]):
                 span.inputs["_ref%s" % i] = ref
             res = op_def.resolve_fn(**inputs)
