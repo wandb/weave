@@ -112,10 +112,6 @@ const ChatMessageEl = styled.div<{callResponse: 'call' | 'response'}>`
   padding: 16px;
   border-radius: 4px;
   margin-bottom: 12px;
-  margin-left: ${props => (props.callResponse === 'call' ? -64 : 0)}px;
-  padding-left: ${props => (props.callResponse === 'call' ? 80 : 16)}px;
-  margin-right: ${props => (props.callResponse === 'call' ? -64 : 0)}px;
-  padding-right: ${props => (props.callResponse === 'call' ? 80 : 16)}px;
   background-color: ${props =>
     props.callResponse === 'call' ? '#f9f9f9' : 'fff'};
 `;

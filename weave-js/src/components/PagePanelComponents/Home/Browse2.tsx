@@ -43,6 +43,8 @@ import {
   callsTableSelect,
   callsTableSelectTraces,
 } from './Browse2/callTree';
+
+import {Paper} from './Browse2/CommonLib';
 import {
   useFirstCall,
   useOpSignature,
@@ -64,7 +66,6 @@ import {
   Breadcrumbs,
   Box,
   Grid,
-  Paper as MaterialPaper,
   Container,
   Chip,
   Tabs,
@@ -87,20 +88,37 @@ function useQuery() {
 
 const PageEl = styled.div``;
 
-const PageHeader: FC<{objectType: string; objectName?: string}> = ({
-  objectType,
-  objectName,
-}) => {
+const PageHeader: FC<{
+  objectType: string;
+  objectName?: string;
+  actions?: JSX.Element;
+}> = ({objectType, objectName, actions}) => {
   return (
-    <Box display="flex" alignItems="baseline" marginBottom={3}>
-      <Typography variant="h4" component="span" style={{fontWeight: 'bold'}}>
-        {objectType}
-      </Typography>
-      {objectName != null && (
-        <Typography variant="h4" component="span" style={{marginLeft: '8px'}}>
-          {objectName}
+    <Box
+      display="flex"
+      alignItems="flex-start"
+      justifyContent="space-between"
+      mb={4}>
+      <Box
+        display="flex"
+        alignItems="baseline"
+        maxWidth={actions != null ? 800 : undefined}
+        sx={{
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+        marginRight={3}>
+        <Typography variant="h4" component="span" style={{fontWeight: 'bold'}}>
+          {objectType}
         </Typography>
-      )}
+        {objectName != null && (
+          <Typography variant="h4" component="span" style={{marginLeft: '8px'}}>
+            {objectName}
+          </Typography>
+        )}
+      </Box>
+      {actions}
     </Box>
   );
 };
@@ -257,12 +275,17 @@ const Browse2ProjectPage: FC = props => {
       (rootTypeCounts.result ?? [])
         .filter(
           typeInfo =>
-            // typeInfo.name !== 'stream_table' &&
-            typeInfo.name !== 'OpDef' && typeInfo.name !== 'wandb-history'
+            typeInfo.name !== 'stream_table' &&
+            typeInfo.name !== 'Panel' &&
+            typeInfo.name !== 'OpDef' &&
+            typeInfo.name !== 'wandb-history'
         )
         .map((row, i) => ({
           id: i,
-          ...row,
+
+          // TODO: Major hack to rename list to Table
+          name: row.name === 'list' ? 'Table' : row.name,
+          'object count': row['object count'],
         })),
     [rootTypeCounts.result]
   );
@@ -280,11 +303,29 @@ const Browse2ProjectPage: FC = props => {
       <PageHeader objectType="Project" objectName={params.project} />
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6}>
+          <Box mb={4}>
+            <Paper>
+              <Typography variant="h6" gutterBottom>
+                Object Types
+              </Typography>
+              <LinkTable rows={rows} handleRowClick={handleRowClick} />
+            </Paper>
+          </Box>
           <Paper>
             <Typography variant="h6" gutterBottom>
-              Object Types
+              Boards
             </Typography>
-            <LinkTable rows={rows} handleRowClick={handleRowClick} />
+            <Box
+              mb={4}
+              sx={{
+                background: globals.lightYellow,
+                height: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              Placeholder
+            </Box>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -567,9 +608,18 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
   return (
     <div style={{width: '100%'}}>
       <div style={{marginBottom: 24}}>
-        <Typography variant="h5" gutterBottom>
-          Function
-        </Typography>
+        <Box display="flex" justifyContent="space-between">
+          <Typography variant="h5" gutterBottom>
+            Function
+          </Typography>
+          {isOpenAIChatInput(inputs) && (
+            <Button
+              variant="outlined"
+              sx={{backgroundColor: globals.lightYellow}}>
+              Open in LLM Playground
+            </Button>
+          )}
+        </Box>
         <Chip label={call.name} />
       </div>
       <div style={{marginBottom: 24}}>
@@ -946,7 +996,7 @@ const Browse2Trace: FC<{
     setTabId(newValue);
   };
   return (
-    <Grid container spacing={1} alignItems="flex-start">
+    <Grid container spacing={2} alignItems="flex-start">
       <Grid xs={3} item>
         <Paper>
           <VerticalTraceView
@@ -1038,7 +1088,23 @@ const Browse2TracePage: FC = () => {
         objectName={
           params.traceId + params.spanId != null ? '/' + params.spanId : ''
         }
+        actions={
+          <Box display="flex" alignItems="flex-start">
+            <Button
+              variant="outlined"
+              sx={{marginRight: 3, backgroundColor: globals.lightYellow}}
+              onClick={() => console.log('new board trace')}>
+              Open in board
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{backgroundColor: globals.lightYellow, marginRight: 3}}>
+              Compare
+            </Button>
+          </Box>
+        }
       />
+
       <Browse2Trace
         streamId={{
           entityName: params.entity,
@@ -1156,7 +1222,7 @@ const Browse2OpDefPage: FC = () => {
       <Box marginBottom={2}>
         <Paper>
           <Typography variant="h6" gutterBottom>
-            Call
+            Call Op
           </Typography>
           <Box sx={{width: 400}}>
             {opSignature.result != null &&
@@ -1341,61 +1407,109 @@ const Browse2ObjectVersionItemPage: FC = props => {
           params.objVersion +
           (params.refExtra ? '/' + params.refExtra : '')
         }
-      />
-      <Box marginBottom={2}>
-        <Paper>
-          <Grid container spacing={1} alignItems="center">
-            <Grid xs={10} item>
-              <TextField
-                label="Weave Expression"
-                value={weave.expToString(itemNode)}
-                fullWidth
-              />
-            </Grid>
-            <Grid xs={2} item>
-              <Button style={{marginLeft: 12}} onClick={onNewBoard}>
+        actions={
+          params.rootType === 'OpDef' ? undefined : (
+            <Box display="flex" alignItems="flex-start">
+              <Button
+                variant="outlined"
+                sx={{marginRight: 3}}
+                onClick={onNewBoard}>
                 Open in board
               </Button>
-            </Grid>
-          </Grid>
-          {/* <FormControl>
-          <InputLabel>Expr</InputLabel>
-          <Input value={weave.expToString(itemNode)} />
-        </FormControl> */}
-        </Paper>
-      </Box>
+              <Button
+                variant="outlined"
+                sx={{backgroundColor: globals.lightYellow, marginRight: 3}}>
+                Compare
+              </Button>
+              <Box>
+                <Button
+                  variant="outlined"
+                  sx={{backgroundColor: globals.lightYellow}}>
+                  Process with a function
+                </Button>
+                <Typography variant="body2" color="textSecondary">
+                  Training, Finetuning, Data transformation
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                sx={{backgroundColor: globals.lightYellow}}>
+                Add to Hub
+              </Button>
+            </Box>
+          )
+        }
+      />
       {params.rootType === 'stream_table' ? (
         <Browse2CallsPage />
       ) : params.rootType === 'OpDef' ? (
         <Browse2OpDefPage />
       ) : (
-        <Grid container spacing={3}>
-          <Grid item xs={8}>
-            <Paper>
-              <Typography variant="h6" gutterBottom>
-                Value
-              </Typography>
-              <Box p={2}>
-                {panel != null && (
-                  <ChildPanel
-                    config={panel}
-                    updateConfig={newConfig => setPanel(newConfig)}
-                    updateInput={handleUpdateInput}
-                    passthroughUpdate
-                  />
-                )}
+        <>
+          <Grid container spacing={3}>
+            <Grid item xs={8}>
+              <Paper>
+                <Typography variant="h6" gutterBottom>
+                  Value
+                </Typography>
+                <Box p={2} sx={{height: 1000}}>
+                  {panel != null && (
+                    <ChildPanel
+                      config={panel}
+                      updateConfig={newConfig => setPanel(newConfig)}
+                      updateInput={handleUpdateInput}
+                      passthroughUpdate
+                    />
+                  )}
+                </Box>
+              </Paper>
+            </Grid>
+            <Grid item xs={4}>
+              <Paper>
+                <Typography variant="h6" gutterBottom>
+                  Used in runs
+                </Typography>
+                <Browse2RootObjectVersionUsers uri={uri} />
+              </Paper>
+              <Box mt={4}>
+                <Paper>
+                  <Typography variant="h6" gutterBottom>
+                    Appears in boards
+                  </Typography>
+                  <Box
+                    mb={4}
+                    sx={{
+                      background: globals.lightYellow,
+                      height: 200,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    Placeholder
+                  </Box>
+                </Paper>
               </Box>
-            </Paper>
+              <Box mt={4}>
+                <Paper>
+                  <Typography variant="h6" gutterBottom>
+                    Referenced by Objects
+                  </Typography>
+                  <Box
+                    mb={4}
+                    sx={{
+                      background: globals.lightYellow,
+                      height: 200,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    Placeholder
+                  </Box>
+                </Paper>
+              </Box>
+            </Grid>
           </Grid>
-          <Grid item xs={4}>
-            <Paper>
-              <Typography variant="h6" gutterBottom>
-                Used in runs
-              </Typography>
-              <Browse2RootObjectVersionUsers uri={uri} />
-            </Paper>
-          </Grid>
-        </Grid>
+        </>
       )}
     </PageEl>
   );
@@ -1489,18 +1603,6 @@ const RefExtraBreadCrumbs: FC<{refExtra: string}> = ({refExtra}) => {
         );
       })}
     </>
-  );
-};
-
-const Paper = (props: React.ComponentProps<typeof MaterialPaper>) => {
-  return (
-    <MaterialPaper
-      sx={{
-        padding: theme => theme.spacing(2),
-      }}
-      {...props}>
-      {props.children}
-    </MaterialPaper>
   );
 };
 
