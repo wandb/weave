@@ -373,7 +373,7 @@ export const opArtifactVersionFileType = makeOp({
   },
 });
 
-export const opRefGet = makeOp({
+export const opRefGet = makeBasicOp({
   hidden: false,
   name: 'Ref-get',
   description: 'hello',
@@ -392,13 +392,13 @@ export const opRefGet = makeOp({
     },
   },
   returnType: inputTypes => {
-    const selfType = inputTypes.self.type;
+    const selfType = inputTypes.self;
     if (isUnion(selfType)) {
       return union(selfType.members.map(m => m.objectType));
     }
-    return (inputTypes.self.type as any).objectType;
+    return (selfType as any).objectType;
   },
-  resolver: ({path}) => {
+  resolver: ({self}) => {
     throw new Error('not implemented');
   },
 });

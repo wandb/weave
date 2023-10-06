@@ -75,6 +75,7 @@ import {
 import {DataGridPro as DataGrid} from '@mui/x-data-grid-pro';
 import {Home, FilterList} from '@mui/icons-material';
 import {LicenseInfo} from '@mui/x-license-pro';
+import {LoadingButton} from '@mui/lab';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -188,6 +189,47 @@ const LinkTable = <RowType extends {[key: string]: any}>({
         onRowClick={params => handleRowClick(params.row as RowType)}
       />
     </Box>
+  );
+};
+
+const Browse2Boards: FC<{entity: string; project: string}> = ({
+  entity,
+  project,
+}) => {
+  const weave = useWeaveContext();
+  const objectsInfo = query.useProjectObjectsOfType(entity, project, 'Panel');
+  const rows = useMemo(
+    () =>
+      (objectsInfo.result ?? []).map((row, i) => ({
+        id: i,
+        _name: row.name,
+        name: row.name + ' ⮕',
+      })),
+    [objectsInfo.result]
+  );
+  const history = useHistory();
+  const handleRowClick = useCallback(
+    (row: any) => {
+      const boardNode = opGet({
+        uri: constString(
+          makeObjRefUri({
+            entity,
+            project,
+            objName: row._name,
+            objVersion: 'latest',
+          })
+        ),
+      });
+      return history.push(
+        `/?exp=${encodeURIComponent(weave.expToString(boardNode))}`
+      );
+    },
+    [entity, project, history, weave]
+  );
+  return (
+    <>
+      <LinkTable rows={rows} handleRowClick={handleRowClick} />
+    </>
   );
 };
 
@@ -315,17 +357,7 @@ const Browse2ProjectPage: FC = props => {
             <Typography variant="h6" gutterBottom>
               Boards
             </Typography>
-            <Box
-              mb={4}
-              sx={{
-                background: globals.lightYellow,
-                height: 200,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              Placeholder
-            </Box>
+            <Browse2Boards entity={params.entity} project={params.project} />
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -896,29 +928,27 @@ const Browse2Calls: FC<{
   const selectedData = selectedQuery.result ?? [];
 
   return (
-    <div style={{width: '100%', height: 500}}>
-      <Paper>
-        <Typography variant="h6" gutterBottom>
-          Runs
-        </Typography>
-        {filters.inputUris != null && (
-          <div
-            style={{
-              display: 'flex',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              overflow: 'hidden',
-            }}>
-            <FilterList />
-            <i>Showing runs where input is one of: </i>
-            {filters.inputUris.map((inputUri, i) => (
-              <div key={i}>{inputUri}</div>
-            ))}
-          </div>
-        )}
-        <RunsTable spans={selectedData} />
-      </Paper>
-    </div>
+    <Paper>
+      <Typography variant="h6" gutterBottom>
+        Runs
+      </Typography>
+      {filters.inputUris != null && (
+        <div
+          style={{
+            display: 'flex',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+            overflow: 'hidden',
+          }}>
+          <FilterList />
+          <i>Showing runs where input is one of: </i>
+          {filters.inputUris.map((inputUri, i) => (
+            <div key={i}>{inputUri}</div>
+          ))}
+        </div>
+      )}
+      <RunsTable spans={selectedData} />
+    </Paper>
   );
 };
 
@@ -1219,7 +1249,10 @@ const Browse2OpDefPage: FC = () => {
   // }, [streamId, uri]);
   return (
     <div>
-      <Box marginBottom={2}>
+      <Box mb={2}>
+        <Browse2Calls streamId={streamId} filters={filters} />
+      </Box>
+      <Box mb={2}>
         <Paper>
           <Typography variant="h6" gutterBottom>
             Call Op
@@ -1249,7 +1282,6 @@ const Browse2OpDefPage: FC = () => {
           </Box>
         </Paper>
       </Box>
-      <Browse2Calls streamId={streamId} filters={filters} />
     </div>
   );
 };
@@ -1410,12 +1442,12 @@ const Browse2ObjectVersionItemPage: FC = props => {
         actions={
           params.rootType === 'OpDef' ? undefined : (
             <Box display="flex" alignItems="flex-start">
-              <Button
+              <LoadingButton
                 variant="outlined"
                 sx={{marginRight: 3}}
                 onClick={onNewBoard}>
-                Open in board
-              </Button>
+                <span>Open in board</span>
+              </LoadingButton>
               <Button
                 variant="outlined"
                 sx={{backgroundColor: globals.lightYellow, marginRight: 3}}>
@@ -1609,7 +1641,11 @@ const RefExtraBreadCrumbs: FC<{refExtra: string}> = ({refExtra}) => {
 export const Browse2: FC = props => {
   return (
     <div
-      style={{height: '100vh', overflow: 'auto', backgroundColor: '#fafafa'}}>
+      style={{
+        height: '100vh',
+        overflow: 'auto',
+        backgroundColor: '#fafafa',
+      }}>
       <AppBar position="static">
         <Toolbar>
           <IconButton
