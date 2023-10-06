@@ -1,13 +1,21 @@
-# Running in devmod
+# Running in devmode
 
-You want to run the frontend vite server and the weave server so you can develop. Here's how.
+Start the weave server and frontend dev server with 
+cd .. && make integration
 
-change baseUrl to 'http://localhost:3000' in cypress.config.js
+Start cypress with 
+yarn && yarn dev
 
-Add "--host ::1" to weave_server_test.sh. Why is this needed? I have no idea.
+# Running against built assets
 
-run the weave server with `./weave_server_test.sh`
+Build the latest frontend with 
 
-change the url you visit in your test to '/?...' instead of an absolute URL.
+cd .. && ./build_frontend.sh
 
-This is way too much work! Someone should fix this so its automatic!
+Start cypress with 
+
+yarn && yarn run cypress open
+
+Start the weave server with 
+
+bash weave_server_test.sh

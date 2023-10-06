@@ -25,3 +25,5 @@ config/.admin.env
 config/.wb_api.env
 weave/tests/zlib.txt
 weave-js/src/generated
+.integration-deps
+
