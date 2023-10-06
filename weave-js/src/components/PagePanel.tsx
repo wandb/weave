@@ -55,6 +55,7 @@ import {
   useIsAuthenticated,
   useWeaveViewer,
 } from '../context/WeaveViewerContext';
+import {HelpCTA} from './PagePanelComponents/HelpCTA';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -420,6 +421,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
               </div>
             )}
             {/* <ArtifactManager /> */}
+            {!inJupyter && <HelpCTA />}
           </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>
