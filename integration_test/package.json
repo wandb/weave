@@ -16,8 +16,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@deploysentinel/cypress-debugger": "^0.8.0",
-    "cypress": "^10.11.0",
+    "@deploysentinel/cypress-debugger": "^0.8.9",
+    "cypress": "^13.3.0",
     "cypress-promise": "^1.1.0",
     "typescript": "^4.8.4"
   }
