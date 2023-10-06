@@ -1,9 +1,120 @@
-import {displayValueNoBarChart} from '@wandb/weave/common/util/runhelpers';
-import React from 'react';
+import React, {useCallback} from 'react';
 
 import * as CGReact from '../../react';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
+import * as ConfigPanel from './ConfigPanel';
+import {formatNumber} from '../../core/util/number';
+import {Tooltip} from '../Tooltip';
+import {IconHelpAlt} from '../Icon';
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
+
+const CustomFormatHelp = () => {
+  return (
+    <Tooltip
+      trigger={
+        <IconHelpAlt
+          color={MOON_500}
+          width={16}
+          height={16}
+          style={{margin: 4}}
+        />
+      }
+      content="Supports a subset of Python's Format Specification Mini-Language. e.g. Value 1234 with format '+010,.1f' -> '+001,234.0'"
+    />
+  );
+};
+
+const PanelNumberConfig: React.FC<PanelNumberProps> = props => {
+  const {config, updateConfig} = props;
+  const updateFormat = useCallback(
+    (propFormat: string) => {
+      updateConfig({
+        ...config,
+        propFormat,
+      });
+    },
+    [updateConfig, config]
+  );
+
+  const format = config?.propFormat ?? 'Automatic';
+  const formatDropdownValue = format.startsWith('*')
+    ? 'Custom'
+    : format.startsWith('$')
+    ? 'Currency'
+    : format;
+  const customFormatValue = format.startsWith('*') ? format.slice(1) : format;
+  return (
+    <div>
+      <ConfigPanel.ConfigOption label="Format">
+        <ConfigPanel.ModifiedDropdownConfigField
+          selection
+          options={[
+            {
+              text: 'Automatic',
+              value: 'Automatic',
+            },
+            {
+              text: 'Number',
+              value: 'Number',
+              description: '1,000.12',
+            },
+            {
+              text: 'Percent',
+              value: 'Percent',
+              description: '10.12%',
+            },
+            {
+              text: 'Scientific',
+              value: 'Scientific',
+              description: '1.000120e+03',
+            },
+            {
+              text: 'Compact',
+              value: 'Compact',
+              description: '1K',
+            },
+            {
+              text: 'Currency', // TODO: Handle currencies other than USD
+              value: 'Currency',
+              description: '$1,000.12',
+            },
+            {
+              text: 'Custom',
+              value: 'Custom',
+            },
+          ]}
+          value={formatDropdownValue}
+          onChange={(e, {value}) => {
+            const newValue = typeof value === 'string' ? value : 'Automatic';
+            if (newValue === 'Custom') {
+              updateFormat('*');
+            } else if (newValue === 'Currency') {
+              updateFormat('$USD');
+            } else {
+              updateFormat(newValue);
+            }
+          }}
+        />
+      </ConfigPanel.ConfigOption>
+      {formatDropdownValue === 'Custom' && (
+        <ConfigPanel.ConfigOption
+          label="Format expr"
+          postfixComponent={<CustomFormatHelp />}>
+          <ConfigPanel.TextInputConfigField
+            dataTest="label"
+            value={customFormatValue}
+            label=""
+            onChange={(event, {value}) => {
+              // TODO: Validate format and show indication if invalid
+              updateFormat('*' + value.trim());
+            }}
+          />
+        </ConfigPanel.ConfigOption>
+      )}
+    </div>
+  );
+};
 
 const inputType = {
   type: 'union' as const,
@@ -42,7 +153,10 @@ export const PanelNumber: React.FC<
       }}>
       {nodeValueQuery.result == null
         ? '-'
-        : displayValueNoBarChart(nodeValueQuery.result)}
+        : formatNumber(
+            nodeValueQuery.result,
+            props.config?.propFormat ?? 'Automatic'
+          )}
     </div>
   );
 };
@@ -50,5 +164,6 @@ export const PanelNumber: React.FC<
 export const Spec: Panel2.PanelSpec = {
   id: 'number',
   Component: PanelNumber,
+  ConfigComponent: PanelNumberConfig,
   inputType,
 };
