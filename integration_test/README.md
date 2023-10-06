@@ -4,7 +4,7 @@ Start the weave server and frontend dev server with
 cd .. && make integration
 
 Start cypress with 
-yarn dev
+yarn && yarn dev
 
 # Running against built assets
 
@@ -14,7 +14,7 @@ cd .. && ./build_frontend.sh
 
 Start cypress with 
 
-yarn run cypress open
+yarn && yarn run cypress open
 
 Start the weave server with 
 
