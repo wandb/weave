@@ -133,4 +133,4 @@ class Facet(panel.Panel):
                 ),
             ),
         )
-        return weave_internal.use(filtered)
+        return filtered
