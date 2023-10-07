@@ -37,7 +37,15 @@
  *              is given, the scripts are initialized.
  */
 
+window.DEBUG_ANALYTICS = false;
+
 /// UTILS
+function debugLog(...args) {
+  if (window.DEBUG_ANALYTICS) {
+    console.log(...args);
+  }
+}
+
 function insertScript(src, attributes) {
   // Helper function to insert a script into the document.
   return new Promise((resolve, reject) => {
@@ -66,39 +74,44 @@ function enableSegmentAnalytics() {
     // this is segment's analytics.js library (https://github.com/segmentio/analytics.js-core) bundled with all of our integrations and settings.
     // it can be retrieved from https://cdn.segment.com/analytics.js/v1/WmJvIs1MTqNjKAeQmEyw6TvqyRI5Su2z/analytics.min.js
     // we serve it locally since cdn.segment.com is usually blocked by ad-blockers.
+    let prom;
     if (
       window.CONFIG?.ENVIRONMENT_NAME === 'development' ||
       window.CONFIG?.ENVIRONMENT_NAME === 'qa'
     ) {
-      insertScript(
+      prom = insertScript(
         'https://cdn.segment.com/analytics.js/v1/FDppQ6oWt2M4gWarXmIdanSQmj3BjPkl/analytics.min.js'
       ).then(analyticsCallback);
     } else {
-      insertScript((window.CONFIG?.PUBLIC_URL ?? '') + '/sa.min.js').then(
-        analyticsCallback
-      );
+      prom = insertScript(
+        (window.CONFIG?.PUBLIC_URL ?? '') + '/sa.min.js'
+      ).then(analyticsCallback);
     }
 
     // autotrack.js provides the trackers required below
-    return insertScript(
-      (window.CONFIG?.PUBLIC_URL ?? '') + '/autotrack.js'
-    ).then(() => {
-      window.ga =
-        window.ga ||
-        function () {
-          window.ga.q = window.ga.q || [];
-          window.ga.q.push(arguments);
-        };
-      window.ga('require', 'eventTracker');
-      window.ga('require', 'outboundLinkTracker');
-      window.ga('require', 'urlChangeTracker');
-      window.ga('require', 'cleanUrlTracker');
-      window.ga('require', 'impressionTracker');
-      window.ga('require', 'maxScrollTracker');
-      window.ga('require', 'mediaQueryTracker');
-      window.ga('require', 'outboundFormTracker');
-      window.ga('require', 'pageVisibilityTracker');
-    });
+    return prom.then(() =>
+      insertScript((window.CONFIG?.PUBLIC_URL ?? '') + '/autotrack.js').then(
+        () => {
+          window.ga =
+            window.ga ||
+            function () {
+              window.ga.q = window.ga.q || [];
+              window.ga.q.push(arguments);
+            };
+          window.ga('require', 'eventTracker');
+          window.ga('require', 'outboundLinkTracker');
+          window.ga('require', 'urlChangeTracker');
+          window.ga('require', 'cleanUrlTracker');
+          window.ga('require', 'impressionTracker');
+          window.ga('require', 'maxScrollTracker');
+          window.ga('require', 'mediaQueryTracker');
+          window.ga('require', 'outboundFormTracker');
+          window.ga('require', 'pageVisibilityTracker');
+
+          debugLog('Segment analytics initialized');
+        }
+      )
+    );
   }
 }
 
@@ -215,6 +228,7 @@ function enableGoogleTagManager() {
   noscript.innerText =
     '<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TCTWFHR" height="0" width="0" style="display:none;visibility:hidden"></iframe>';
   document.body.appendChild(noscript);
+  debugLog('Google Tag Manager initialized');
 }
 
 /// BEAMER
@@ -224,17 +238,25 @@ function enableBeamerFeatureUpdates() {
     product_id: 'iTpiKrhl12143',
     lazy: true,
   };
-  return insertScript('https://app.getbeamer.com/js/beamer-embed.js');
+  return insertScript('https://app.getbeamer.com/js/beamer-embed.js').then(
+    () => {
+      debugLog('Beamer feature updates initialized');
+    }
+  );
 }
 
 /// WebSights
 function enableWebSights() {
-  return insertScript('https://ws.zoominfo.com/pixel/qhXboAuxB56YVRvedMdX');
+  return insertScript(
+    'https://ws.zoominfo.com/pixel/qhXboAuxB56YVRvedMdX'
+  ).then(() => {
+    debugLog('WebSights initialized');
+  });
 }
 
 /// Pendo
 function enablePendo() {
-  return Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     (function (apiKey) {
       (function (p, e, n, d, o) {
         var v, w, x, y, z;
@@ -262,6 +284,8 @@ function enablePendo() {
         });
       })(window, document, 'script', 'pendo');
     })('6cf55906-1f5f-4b4b-551a-75200e56ad3e');
+  }).then(() => {
+    debugLog('Pendo initialized');
   });
 }
 
@@ -300,6 +324,8 @@ function enableChameleon() {
         d.head.appendChild(i);
     }
   })(document, window);
+
+  debugLog('Chameleon initialized');
 }
 
 /// Datadog
@@ -310,6 +336,8 @@ function enableDatadog() {
   // servers, so we are using the npm package and only initializing it
   // if we've set this flag.
   window.DatadogEnabled = true;
+
+  debugLog('Datadog initialized');
 }
 
 /// Zendesk Chat
@@ -330,18 +358,19 @@ function enableZendeskChat() {
     'https://static.zdassets.com/ekr/snippet.js?key=a0a3439e-c6f9-4864-8d97-4bc7bef38531';
   // the zendesk chat script explicitly needs the 'ze-snippet' ID set on the element
   // before the script loads, otherwise it doesn't work.
-  return insertScript(src, {id: 'ze-snippet'}).then(() => {
-    const scriptEl = document.querySelector(`script[src="${src}"]`);
-    if (scriptEl != null) {
-      // create custom launcher
-      const customLauncher = document.createElement('div');
-      customLauncher.id = 'zendesk-launcher';
-      customLauncher.className = 'wbic-ic-chat-fill';
-      customLauncher.onclick = () => openWidget();
-      // hide default launcher and set custom launcher behavior
-      const customLauncherScript = document.createElement('script');
-      customLauncherScript.type = 'text/javascript';
-      customLauncherScript.innerHTML = `zE('webWidget', 'hide')
+  return insertScript(src, {id: 'ze-snippet'})
+    .then(() => {
+      const scriptEl = document.querySelector(`script[src="${src}"]`);
+      if (scriptEl != null) {
+        // create custom launcher
+        const customLauncher = document.createElement('div');
+        customLauncher.id = 'zendesk-launcher';
+        customLauncher.className = 'wbic-ic-chat-fill';
+        customLauncher.onclick = () => openWidget();
+        // hide default launcher and set custom launcher behavior
+        const customLauncherScript = document.createElement('script');
+        customLauncherScript.type = 'text/javascript';
+        customLauncherScript.innerHTML = `zE('webWidget', 'hide')
       function openWidget() {
         zE('webWidget', 'show');
         zE('webWidget', 'open');
@@ -351,10 +380,13 @@ function enableZendeskChat() {
         zE('webWidget', 'hide');
         document.querySelector('#zendesk-launcher').style.display = 'block'
       })`;
-      // include launcher and behavior after zendesk chat script loads
-      scriptEl.after(customLauncher, customLauncherScript);
-    }
-  });
+        // include launcher and behavior after zendesk chat script loads
+        scriptEl.after(customLauncher, customLauncherScript);
+      }
+    })
+    .then(() => {
+      debugLog('Zendesk Chat initialized');
+    });
 }
 
 function privateAnalyticsMain() {
@@ -390,43 +422,42 @@ function createAnalyticsGlobalInjector() {
     function executeConsentScripts(isAuthenticated = false) {
       // Iterate through scriptMap, executing the callback for each script
       // if the corresponding cookie consent category is enabled.
-      return Promise.allSettled(
-        Object.entries(scriptMap).map(
-          ([cookieControlGroupID, scriptDetails]) => {
-            const {callback, hasRun} = scriptDetails;
-            if (hasRun) {
-              return Promise.resolve();
-            }
-            return Promise((resolve, reject) => {
-              function wrappedCallback() {
-                // Somewhat obfuscated way of logging when a script is enabled
-                // A: Enabled due to auth
-                // OT: Enabled due to OneTrust
-                console.info(
-                  'CGID: ',
-                  cookieControlGroupID,
-                  ' enabled',
-                  isAuthenticated ? ' (A)' : ' (OT)'
-                );
-                let res = callback();
-                scriptDetails.hasRun = true;
-                if (res instanceof Promise) {
-                  return res.then(resolve).catch(reject);
-                }
-                resolve();
-              }
-              if (isAuthenticated) {
-                wrappedCallback();
-              } else {
-                executeCookieControlledCallback(
-                  cookieControlGroupID,
-                  wrappedCallback
-                );
-              }
-            });
+      const allProms = Object.entries(scriptMap).map(
+        ([cookieControlGroupID, scriptDetails]) => {
+          const {callback, hasRun} = scriptDetails;
+          if (hasRun) {
+            return Promise.resolve();
           }
-        )
+          return new Promise((resolve, reject) => {
+            function wrappedCallback() {
+              // Somewhat obfuscated way of logging when a script is enabled
+              // A: Enabled due to auth
+              // OT: Enabled due to OneTrust
+              debugLog(
+                'CGID: ',
+                cookieControlGroupID,
+                ' enabled',
+                isAuthenticated ? ' (Auth)' : ' (OneTrust)'
+              );
+              let res = callback();
+              scriptDetails.hasRun = true;
+              if (res instanceof Promise) {
+                return res.then(resolve).catch(reject);
+              }
+              resolve();
+            }
+            if (isAuthenticated) {
+              wrappedCallback();
+            } else {
+              executeCookieControlledCallback(
+                cookieControlGroupID,
+                wrappedCallback
+              );
+            }
+          });
+        }
       );
+      return Promise.allSettled(allProms);
     }
 
     return {
@@ -437,7 +468,7 @@ function createAnalyticsGlobalInjector() {
         if (isAuthenticated) {
           return executeConsentScripts(isAuthenticated);
         }
-        return Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
           // This is the callback that is executed when the user consents to
           // third-party analytics. It is called by OneTrust.
           window.OptanonWrapper = function OptanonWrapper() {
