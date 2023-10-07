@@ -50,7 +50,6 @@ export interface ObjectConfig {
 
 type PanelObjectProps = Panel2.PanelProps<typeof inputType, ObjectConfig> & {
   level?: number;
-  keyNotLink?: boolean;
 };
 
 const PanelObjectConfig: React.FC<PanelObjectProps> = props => {
@@ -223,6 +222,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
             childNode={childNode}
             childType={propertyTypes[k]!}
             updateInput={updateInput}
+            keyNotLink={updateInputFromProps == null}
           />
         );
       }),
