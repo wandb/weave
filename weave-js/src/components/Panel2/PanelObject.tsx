@@ -50,6 +50,7 @@ export interface ObjectConfig {
 
 type PanelObjectProps = Panel2.PanelProps<typeof inputType, ObjectConfig> & {
   level?: number;
+  keyNotLink?: boolean;
 };
 
 const PanelObjectConfig: React.FC<PanelObjectProps> = props => {
@@ -243,6 +244,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
         width: '100%',
         height: '100%',
         overflowY: 'auto',
+        paddingLeft: '8px',
       }}>
       <KeyValTable.Table>
         {isObjectType(nonNullableInput) && (
@@ -266,6 +268,7 @@ const PanelObjectChild: React.FC<
     childNode: Node;
     childType: Type;
     updateInput: (key: any, newInput: any) => void | undefined;
+    keyNotLink?: boolean;
   } & Omit<PanelObjectProps, 'updateInput'>
 > = ({
   k,
@@ -277,6 +280,7 @@ const PanelObjectChild: React.FC<
   updateContext,
   updateConfig,
   config,
+  keyNotLink,
 }) => {
   const nonNullableChildType = nonNullable(childType);
   let isNone = useNodeValue(opIsNone({val: childNode}), {
@@ -294,21 +298,28 @@ const PanelObjectChild: React.FC<
   return (
     <KeyValTable.Row>
       <KeyValTable.Key>
-        <KeyValTable.InputUpdateLink onClick={() => updateInput(k, null)}>
-          {k}
-        </KeyValTable.InputUpdateLink>
+        {keyNotLink ? (
+          k
+        ) : (
+          <KeyValTable.InputUpdateLink onClick={() => updateInput(k, null)}>
+            {k}
+          </KeyValTable.InputUpdateLink>
+        )}
       </KeyValTable.Key>
       <KeyValTable.Val>
-        {isAssignableTo(nonNullableChildType, PanelStringSpec.inputType) ? (
+        {isAssignableTo(nonNullableChildType, PanelNumberSpec.inputType) ? (
+          <div style={{padding: '0px 1em'}}>
+            <PanelNumber
+              input={childNode as any}
+              context={context}
+              updateContext={updateContext}
+              // Get rid of updateConfig
+              updateConfig={() => {}}
+              textAlign="left"
+            />
+          </div>
+        ) : isAssignableTo(nonNullableChildType, PanelStringSpec.inputType) ? (
           <PanelString
-            input={childNode as any}
-            context={context}
-            updateContext={updateContext}
-            // Get rid of updateConfig
-            updateConfig={() => {}}
-          />
-        ) : isAssignableTo(nonNullableChildType, PanelNumberSpec.inputType) ? (
-          <PanelNumber
             input={childNode as any}
             context={context}
             updateContext={updateContext}
@@ -324,26 +335,30 @@ const PanelObjectChild: React.FC<
             updateConfig={() => {}}
           />
         ) : typeIsRenderableByPanelObject(nonNullableChildType) ? (
-          <PanelObject
-            input={childNode as any}
-            level={level + 1}
-            config={config?.children?.[k]}
-            context={context}
-            updateContext={updateContext}
-            // Get rid of updateConfig
-            updateConfig={newChildConfig =>
-              updateConfig({
-                ...config,
-                children: {
-                  ...config?.children,
-                  [k]: newChildConfig,
-                },
-              })
-            }
-            updateInput={newInput => updateInput(k, newInput)}
-          />
+          <div style={{paddingLeft: '1em', paddingTop: '1em'}}>
+            <PanelObject
+              input={childNode as any}
+              level={level + 1}
+              config={config?.children?.[k]}
+              context={context}
+              updateContext={updateContext}
+              // Get rid of updateConfig
+              updateConfig={newChildConfig =>
+                updateConfig({
+                  ...config,
+                  children: {
+                    ...config?.children,
+                    [k]: newChildConfig,
+                  },
+                })
+              }
+              updateInput={newInput => updateInput(k, newInput)}
+            />
+          </div>
         ) : (
-          <div>{defaultLanguageBinding.printType(childType, true)}</div>
+          <div style={{paddingLeft: '1em'}}>
+            {defaultLanguageBinding.printType(childType, true)}
+          </div>
         )}
       </KeyValTable.Val>
     </KeyValTable.Row>
