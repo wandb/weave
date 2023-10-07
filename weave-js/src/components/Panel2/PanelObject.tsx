@@ -226,7 +226,15 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
           />
         );
       }),
-    [keys, level, pickOrGetattr, propertyTypes, props, updateInput]
+    [
+      keys,
+      level,
+      pickOrGetattr,
+      propertyTypes,
+      props,
+      updateInput,
+      updateInputFromProps,
+    ]
   );
   const defaultExpanded = !isObjectType(nonNullableInput) || level === 0;
   const expanded = props.config?.expanded ?? defaultExpanded;
