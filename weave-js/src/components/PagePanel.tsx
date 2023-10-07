@@ -146,15 +146,19 @@ function useEnablePageAnalytics() {
       const injector = (window as any).WBAnalyticsInjector;
       if (injector) {
         const authenticated = !!weaveViewer.data.authenticated;
-        try {
-          injector.initializeTrackingScripts(authenticated).finally(() => {
-            (window.analytics as any)?.identify(weaveViewer.data.user_id ?? '');
-          });
-        } catch (e) {
-          // console.error('Failed to inject analytics', e);
+        // In Weave, we only want to inject analytics if the user is authenticated.
+        // This means we don't have to muck with the consent banner.
+        if (authenticated) {
+          try {
+            injector.initializeTrackingScripts(authenticated).finally(() => {
+              (window.analytics as any)?.identify(
+                weaveViewer.data.user_id ?? ''
+              );
+            });
+          } catch (e) {
+            // console.error('Failed to inject analytics', e);
+          }
         }
-      } else {
-        (window.analytics as any)?.identify(weaveViewer.data.user_id ?? '');
       }
     }
   }, [urlPrefixed, backendWeaveViewerUrl, weaveViewer]);
