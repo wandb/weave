@@ -3635,7 +3635,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   style={{
                     position: 'fixed',
                     visibility: toolTipPos.x == null ? 'hidden' : 'visible',
-                    borderRadius: 2,
+                    borderRadius: 4,
                     padding: 4,
                     top: toolTipPos.y,
                     left: toolTipPos.x,

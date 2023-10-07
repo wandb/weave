@@ -222,7 +222,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
             childNode={childNode}
             childType={propertyTypes[k]!}
             updateInput={updateInput}
-            keyNotLink={updateInputFromProps == null}
+            readOnly={updateInputFromProps == null}
           />
         );
       }),
@@ -244,9 +244,10 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
         width: '100%',
         height: '100%',
         overflowY: 'auto',
-        paddingLeft: '8px',
+        paddingLeft: level === 0 ? '8px' : '0px',
+        paddingBottom: level === 0 ? '4px' : '0px',
       }}>
-      <KeyValTable.Table>
+      <div style={{display: 'table', fontSize: '13px'}}>
         {isObjectType(nonNullableInput) && (
           <div
             style={{display: 'flex', alignItems: 'center'}}
@@ -256,7 +257,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
           </div>
         )}
         {expanded && <KeyValTable.Rows>{keyChildren}</KeyValTable.Rows>}
-      </KeyValTable.Table>
+      </div>
     </div>
   );
 };
@@ -268,7 +269,7 @@ const PanelObjectChild: React.FC<
     childNode: Node;
     childType: Type;
     updateInput: (key: any, newInput: any) => void | undefined;
-    keyNotLink?: boolean;
+    readOnly?: boolean;
   } & Omit<PanelObjectProps, 'updateInput'>
 > = ({
   k,
@@ -280,7 +281,7 @@ const PanelObjectChild: React.FC<
   updateContext,
   updateConfig,
   config,
-  keyNotLink,
+  readOnly,
 }) => {
   const nonNullableChildType = nonNullable(childType);
   let isNone = useNodeValue(opIsNone({val: childNode}), {
@@ -298,7 +299,7 @@ const PanelObjectChild: React.FC<
   return (
     <KeyValTable.Row>
       <KeyValTable.Key>
-        {keyNotLink ? (
+        {readOnly ? (
           k
         ) : (
           <KeyValTable.InputUpdateLink onClick={() => updateInput(k, null)}>
@@ -352,7 +353,10 @@ const PanelObjectChild: React.FC<
                   },
                 })
               }
-              updateInput={newInput => updateInput(k, newInput)}
+              // if parent keys are read-only, child keys should also be read-only
+              updateInput={
+                readOnly ? undefined : newInput => updateInput(k, newInput)
+              }
             />
           </div>
         ) : (
