@@ -48,6 +48,7 @@ import {
   urlProjectAssets,
 } from '../../../urls';
 import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
+import {urlWandbFrontend} from '../../../util/urls';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -119,8 +120,8 @@ export const CenterEntityBrowserInner: React.FC<
           label: 'View in Weights and Biases',
           onClick: row => {
             // Open a new tab with the W&B project URL
-            // TODO: make this work for local. Probably need to bring over `urlPrefixed`
-            const url = `https://wandb.ai/${props.entityName}/${row.project}/overview`;
+            const prefix = urlWandbFrontend();
+            const url = `${prefix}/${props.entityName}/${row.project}/overview`;
             // eslint-disable-next-line wandb/no-unprefixed-urls
             window.open(url, '_blank');
           },
