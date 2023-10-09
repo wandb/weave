@@ -35,7 +35,7 @@ HelpCTAInner.displayName = 'S.HelpCTAInner';
 
 // TODO: Get link from Scott
 const HELP_LINK =
-  'https://discord.com/channels/979771698612154459/1115778361680199760';
+  'https://wandb.me/prompts-discord';
 
 export const HelpCTA: React.FC<{}> = () => {
   return (
