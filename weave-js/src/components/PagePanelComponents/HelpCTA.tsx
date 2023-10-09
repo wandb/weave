@@ -33,7 +33,6 @@ const HelpCTAInner = styled(LE.HStack)`
 `;
 HelpCTAInner.displayName = 'S.HelpCTAInner';
 
-// TODO: Get link from Scott
 const HELP_LINK =
   'https://wandb.me/prompts-discord';
 
