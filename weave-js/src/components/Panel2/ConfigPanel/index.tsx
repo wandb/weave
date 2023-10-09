@@ -289,6 +289,7 @@ export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
     border: 2px solid ${globals.TEAL_400};
   }
 `;
+ConfigFieldWrapper.displayName = 'S.ConfigFieldWrapper';
 
 export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
   &&& {
@@ -334,13 +335,16 @@ export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
     }
   }
 `;
+ConfigFieldModifiedDropdown.displayName = 'S.ConfigFieldModifiedDropdown';
 
 const IconDown = styled(IconDownUnstyled)`
   width: 18px;
   height: 18px;
 `;
+IconDown.displayName = 'S.IconDown';
 
 const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
   padding: 3px;
 `;
+ConfigDimMenuButton.displayName = 'S.ConfigDimMenuButton';

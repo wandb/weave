@@ -443,7 +443,7 @@ const HeaderFileControls: React.FC<{
 
   return (
     <>
-      <HeaderCenterControls>
+      <HeaderCenterControls data-testid="header-center-controls">
         {entityProjectName && (
           <HeaderCenterControlsSecondary
             onClick={() => {
@@ -552,6 +552,7 @@ const HeaderFileControls: React.FC<{
           <MenuDivider /> */}
 
           <MenuItem
+            data-testid="new-board-button"
             onClick={() => {
               setAnchorFileEl(null);
               newDashboard();
