@@ -33,8 +33,7 @@ const HelpCTAInner = styled(LE.HStack)`
 `;
 HelpCTAInner.displayName = 'S.HelpCTAInner';
 
-const HELP_LINK =
-  'https://wandb.me/prompts-discord';
+const HELP_LINK = 'https://wandb.me/prompts-discord';
 
 export const HelpCTA: React.FC<{}> = () => {
   return (
