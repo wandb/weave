@@ -3,6 +3,7 @@ import SegmentIntegration from '@segment/analytics.js-integration-segmentio';
 import getConfig from '../config';
 
 let isSetup = false;
+let ANALYTICS_DISABLED = getConfig().ANALYTICS_DISABLED ?? false;
 
 export const setupAnalytics = () => {
   // If on-prem, send events to Gorilla proxy
@@ -10,7 +11,6 @@ export const setupAnalytics = () => {
     const config = getConfig();
     isSetup = true;
     const IS_ONPREM = config.ONPREM ?? false;
-    const ANALYTICS_DISABLED = config.ANALYTICS_DISABLED ?? false;
     if (IS_ONPREM && !ANALYTICS_DISABLED) {
       const host = document.location.origin;
       if (host.startsWith('https://')) {
@@ -35,6 +35,9 @@ export const setupAnalytics = () => {
 setupAnalytics();
 
 export function trackPage(properties: object, options: object) {
+  if (ANALYTICS_DISABLED) {
+    return;
+  }
   (window.analytics as any)?.page?.(properties, options);
 }
 
@@ -42,6 +45,9 @@ export function trackEvent(
   eventName: string,
   eventData: Record<string, unknown>
 ) {
+  if (ANALYTICS_DISABLED) {
+    return;
+  }
   // Taken from W&B app's Analytics.
   if (
     Array.isArray(eventData) || // Segment accepts lists but won't process them
