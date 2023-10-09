@@ -205,7 +205,10 @@ class WandbApiAsync:
             result = await self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
             return None
-        return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+        try:
+            return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+        except AttributeError:
+            return None
 
 
 class WandbApi:
