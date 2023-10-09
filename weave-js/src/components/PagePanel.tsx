@@ -56,6 +56,7 @@ import {
   useIsSignupRequired,
   useWeaveViewer,
 } from '../context/WeaveViewerContext';
+import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {urlWandbFrontend} from '../util/urls';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
@@ -430,6 +431,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
               </div>
             )}
             {/* <ArtifactManager /> */}
+            {!inJupyter && <HelpCTA />}
           </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>
