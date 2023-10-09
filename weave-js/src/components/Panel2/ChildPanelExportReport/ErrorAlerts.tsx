@@ -15,14 +15,25 @@ const ReportQueryErrorAlert = ({error}: {error: ApolloError}) => {
   );
 };
 
-const UpsertReportErrorAlert = ({error}: {error: ApolloError}) => {
+const UpsertReportErrorAlert = ({
+  error,
+  isNewReport,
+}: {
+  error: ApolloError;
+  isNewReport: boolean;
+}) => {
   const statusCode = extractStatusCodeFromApolloError(error);
   return (
     <Alert severity="error" icon="warning">
       <span className="font-semibold">
-        We were unable to add panel to this report.
+        {isNewReport
+          ? 'We were unable to create a new report.'
+          : 'We were unable to add panel to this report.'}
       </span>
-      {statusCode === 404 && ' It may have been deleted recently.'}
+      {statusCode === 404 &&
+        (isNewReport
+          ? ' The project you selected may have been deleted recently.'
+          : ' It may have been deleted recently.')}
     </Alert>
   );
 };

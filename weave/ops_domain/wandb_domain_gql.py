@@ -87,9 +87,7 @@ def register_vectorized_gql_prop_op(
     assert isinstance(
         original_scalar_input_type, partial_object.PartialObjectTypeGeneratorType
     )
-    scalar_input_type = original_scalar_input_type.with_keys(
-        {prop_name: scalar_output_type}
-    )
+    scalar_input_type = original_scalar_input_type
 
     vectorized_op_name = "ArrowWeaveList" + scalar_op_name
     arrow_input_type = {first_arg_name: ArrowWeaveListType(scalar_input_type)}

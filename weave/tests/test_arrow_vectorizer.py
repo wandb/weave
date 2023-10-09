@@ -1361,27 +1361,6 @@ def test_vectorized_prop_op_gql_pick():
     ]
 
 
-def test_cant_vectorize_without_keys():
-    runs = [
-        wdt.Run({"id": "A", "key2": 1}),
-        wdt.Run({"id": "B", "key2": 1}),
-        wdt.Run({"id": "C", "key2": 1}),
-    ]
-    for run in runs:
-        tag_store.add_tags(run, {"mytag": "test" + run["id"]})
-    awl = arrow.to_arrow(runs)
-
-    fn = weave_internal.define_fn(
-        {"x": awl.object_type}, lambda x: run_ops.run_name(x)
-    ).val
-
-    vec_fn = arrow.vectorize(fn, strict=True)
-
-    # it finds a mapped list op, but not an AWL op
-    assert "ArrowWeaveList" not in vec_fn.from_op.name
-    assert "mapped" in vec_fn.from_op.name
-
-
 def test_vectorize_run_runtime():
     runs = [
         wdt.Run({"id": "A", "computeSeconds": 1}),
