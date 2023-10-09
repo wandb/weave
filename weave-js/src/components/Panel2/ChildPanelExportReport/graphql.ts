@@ -29,11 +29,14 @@ export const UPSERT_REPORT = gql(`
   mutation UpsertReport(
     $id: ID,
     $coverUrl: String,
+    $createdUsing: ViewSource,
     $description: String,
     $displayName: String,
+    $entityName: String,
     $name: String,
     $parentId: ID,
     $previewUrl: String,
+    $projectName: String,
     $spec: String,
     $type: String,
   ) {
@@ -41,11 +44,14 @@ export const UPSERT_REPORT = gql(`
       input: {
         id: $id,
         coverUrl: $coverUrl,
+        createdUsing: $createdUsing,
         description: $description,
         displayName: $displayName,
+        entityName: $entityName,
         name: $name,
         parentId: $parentId,
         previewUrl: $previewUrl,
+        projectName: $projectName,
         spec: $spec,
         type: $type,
       }

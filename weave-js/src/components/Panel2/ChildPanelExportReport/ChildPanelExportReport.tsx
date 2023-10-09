@@ -3,6 +3,7 @@ import {ID} from '@wandb/weave/common/util/id';
 import {coreAppUrl} from '@wandb/weave/config';
 import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {opRootViewer} from '@wandb/weave/core';
+import {ViewSource} from '@wandb/weave/generated/graphql';
 import {useNodeValue} from '@wandb/weave/react';
 import React, {useState} from 'react';
 import _ from 'lodash';
@@ -20,6 +21,7 @@ import {
   EntityOption,
   ProjectOption,
   ReportOption,
+  getEmptyReportConfig,
   isNewReportOption,
 } from './utils';
 
@@ -77,9 +79,16 @@ export const ChildPanelExportReport = ({
     let upsertBody;
 
     if (isNewReportSelected) {
-      // https://wandb.atlassian.net/browse/WB-15495
-      alert('TODO: handle new report option');
-      return;
+      upsertBody = {
+        createdUsing: ViewSource.WeaveUi,
+        description: '',
+        displayName: 'Untitled Report',
+        entityName,
+        name: ID(12),
+        projectName,
+        spec: JSON.stringify(getEmptyReportConfig([slateNode])),
+        type: 'runs/draft',
+      };
     } else {
       const publishedReport = reportQueryResult.data?.view;
       const drafts = publishedReport?.children?.edges.map(({node}) => node);
@@ -157,7 +166,10 @@ export const ChildPanelExportReport = ({
             <ErrorAlerts.ReportQuery error={reportQueryResult.error} />
           )}
           {upsertReportResult.error && (
-            <ErrorAlerts.UpsertReport error={upsertReportResult.error} />
+            <ErrorAlerts.UpsertReport
+              error={upsertReportResult.error}
+              isNewReport={isNewReportSelected}
+            />
           )}
         </div>
         <div className="border-t border-moon-250 px-16 py-20">

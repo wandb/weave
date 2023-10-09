@@ -1,8 +1,9 @@
+import {format, getYear} from 'date-fns';
 import {useMemo} from 'react';
 import {useBranchPointFromURIString} from '../../PagePanelComponents/hooks';
 import {uriFromNode, determineURISource} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {format, getYear} from 'date-fns';
+import {WeavePanelSlateNode} from './computeReportSlateNode';
 
 export const NEW_REPORT_LABEL = 'New report';
 export const DEFAULT_REPORT_OPTION = {
@@ -81,4 +82,28 @@ export function formatUpdatedAt({
   }
   // Handles when unit is "week", "month"
   return format(date, 'MMM dd');
+}
+
+/**
+ * Generates an empty config for a new slate report
+ * @param initialBlocks (optional) - initial contents for the report body
+ */
+export function getEmptyReportConfig(
+  initialBlocks: WeavePanelSlateNode[] = []
+) {
+  return {
+    blocks: [...initialBlocks, {type: 'paragraph', children: [{text: ''}]}],
+    discussionThreads: [],
+    panelSettings: {
+      xAxis: '_step',
+      smoothingWeight: 0,
+      smoothingType: 'exponential',
+      ignoreOutliers: false,
+      xAxisActive: false,
+      smoothingActive: false,
+      useRunsTableGroupingInPanels: true,
+    },
+    width: 'readable',
+    version: 5, // ReportSpecVersion.SlateReport
+  };
 }
