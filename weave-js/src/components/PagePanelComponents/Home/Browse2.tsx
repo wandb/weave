@@ -41,7 +41,6 @@ import {
   callsTableNode,
   callsTableOpCounts,
   callsTableSelect,
-  callsTableSelectTraces,
 } from './Browse2/callTree';
 
 import {Link, Paper} from './Browse2/CommonLib';
@@ -49,6 +48,7 @@ import {
   useFirstCall,
   useOpSignature,
   useTraceSpans,
+  useTraceSummaries,
 } from './Browse2/callTreeHooks';
 import {
   OpenAIChatInputView,
@@ -72,11 +72,12 @@ import {
   Tab,
   TextField,
 } from '@mui/material';
-import {DataGridPro as DataGrid} from '@mui/x-data-grid-pro';
+import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
 import {Home, FilterList} from '@mui/icons-material';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {LoadingButton} from '@mui/lab';
 import {AddRowToTable} from './Browse2/AddRow';
+import {urlPrefixed} from '@wandb/weave/config';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -808,7 +809,7 @@ const RunsTable: FC<{
     });
   }, [spans]);
   const columns = useMemo(() => {
-    const cols = [
+    const cols: GridColDef[] = [
       {
         field: 'timestamp',
         headerName: 'Timestamp',
@@ -857,7 +858,13 @@ const RunsTable: FC<{
     }
     colGroupingModel.push(inputGroup);
 
-    const outputOrder = Object.keys(_.omitBy(row0.output, v => v == null));
+    // All output keys as we don't have the order key yet.
+    let outputKeys: {[key: string]: true} = {};
+    spans.forEach(span => {
+      outputKeys = {...outputKeys, ...span.output};
+    });
+
+    const outputOrder = Object.keys(_.omitBy(outputKeys, v => v == null));
     const outputGroup: Exclude<
       React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
       undefined
@@ -1191,12 +1198,7 @@ const Browse2Traces: FC<{
   streamId: StreamId;
   selectedSpan?: TraceSpan;
 }> = ({streamId, selectedSpan}) => {
-  const tracesNode = useMemo(() => {
-    const callsRowsNode = callsTableNode(streamId);
-    return callsTableSelectTraces(callsRowsNode);
-  }, [streamId]);
-  const tracesQuery = useNodeValue(tracesNode);
-  const traces = tracesQuery.result ?? [];
+  const traces = useTraceSummaries(streamId);
   return (
     <div>
       {traces.map(trace => (
@@ -1396,7 +1398,10 @@ const Browse2ObjectVersionItemPage: FC = props => {
     const refinedItemNode = await weave.refineNode(itemNode, stack);
     makeBoardFromNode(SEED_BOARD_OP_NAME, refinedItemNode, newDashExpr => {
       setIsGenerating(false);
-      window.open('/?exp=' + weave.expToString(newDashExpr), '_blank');
+      window.open(
+        urlPrefixed('/?exp=' + weave.expToString(newDashExpr)),
+        '_blank'
+      );
     });
   }, [itemNode, makeBoardFromNode, stack, weave]);
 
@@ -1481,6 +1486,7 @@ const Browse2ObjectVersionItemPage: FC = props => {
           params.rootType === 'OpDef' ? undefined : (
             <Box display="flex" alignItems="flex-start">
               <LoadingButton
+                loading={isGenerating}
                 variant="outlined"
                 sx={{marginRight: 3}}
                 onClick={onNewBoard}>
@@ -1594,7 +1600,7 @@ interface Browse2Params {
   refExtra?: string;
 }
 
-const AppBarLink = props => (
+const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
   <MaterialLink
     sx={{
       color: theme => theme.palette.getContrastText(theme.palette.primary.main),
@@ -1610,6 +1616,7 @@ const AppBarLink = props => (
 
 const Browse2Breadcrumbs: FC = props => {
   const params = useParams<Browse2Params>();
+  const refFields = params.refExtra?.split('/') ?? [];
   return (
     <Breadcrumbs>
       {params.entity && (
@@ -1640,37 +1647,23 @@ const Browse2Breadcrumbs: FC = props => {
           {params.objVersion}
         </AppBarLink>
       )}
+      {refFields.map((field, idx) =>
+        field === 'index' ? (
+          <Typography>row</Typography>
+        ) : field === 'pick' ? (
+          <Typography>col</Typography>
+        ) : (
+          <AppBarLink
+            to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${
+              params.rootType
+            }/${params.objName}/${params.objVersion}/${refFields
+              .slice(0, idx + 1)
+              .join('/')}`}>
+            {field}
+          </AppBarLink>
+        )
+      )}
     </Breadcrumbs>
-  );
-};
-
-const RefExtraBreadCrumbs: FC<{refExtra: string}> = ({refExtra}) => {
-  const params = useParams<Browse2Params>();
-  const refFields = refExtra.split('/');
-  return (
-    <>
-      {refFields.map((field, idx) => {
-        return (
-          <>
-            {' / '}
-            {field === 'index' ? (
-              <span>row</span>
-            ) : field === 'pick' ? (
-              <span>col</span>
-            ) : (
-              <Link
-                to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${
-                  params.rootType
-                }/${params.objName}/${params.objVersion}/${refFields
-                  .slice(0, idx + 1)
-                  .join('/')}`}>
-                {field}
-              </Link>
-            )}
-          </>
-        );
-      })}
-    </>
   );
 };
 

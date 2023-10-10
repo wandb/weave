@@ -7,10 +7,10 @@ import {
   callsTableSelect,
   OpSignature,
   opSignatureFromSpan,
+  callsTableSelectTraces,
 } from './callTree';
 import {useNodeValue} from '@wandb/weave/react';
 import {constNumber, opIndex} from '@wandb/weave/core';
-import {result} from 'lodash';
 
 export const useTraceSpans = (streamId: StreamId, traceId: string): Span[] => {
   const traceSpansNode = useMemo(() => {
@@ -21,6 +21,21 @@ export const useTraceSpans = (streamId: StreamId, traceId: string): Span[] => {
   const traceSpansQuery = useNodeValue(traceSpansNode);
 
   return useMemo(() => traceSpansQuery.result ?? [], [traceSpansQuery.result]);
+};
+
+interface TraceSummaryRow {
+  trace_id: string;
+  span_count: number;
+}
+
+export const useTraceSummaries = (streamId: StreamId): TraceSummaryRow[] => {
+  const tracesNode = useMemo(() => {
+    const callsRowsNode = callsTableNode(streamId);
+    return callsTableSelectTraces(callsRowsNode);
+  }, [streamId]);
+  const tracesQuery = useNodeValue(tracesNode);
+
+  return useMemo(() => tracesQuery.result ?? [], [tracesQuery.result]);
 };
 
 export const useFirstCall = (
