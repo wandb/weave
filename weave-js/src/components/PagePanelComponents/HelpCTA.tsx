@@ -16,7 +16,6 @@ HelpCTAOuter.displayName = 'S.HelpCTAOuter';
 
 const HelpCTAInner = styled(LE.HStack)`
   padding: 0px 16px;
-  height: 40px;
   gap: 10px;
   border-radius: 20px;
   background-color: #ffe49e80;
@@ -38,20 +37,38 @@ const HELP_LINK = 'https://wandb.me/prompts-discord';
 export const HelpCTA: React.FC<{}> = () => {
   return (
     <HelpCTAOuter>
-      <HelpPill />
+      <HelpPill
+        icon={<IconHelpAlt />}
+        height={40}
+        onClick={() => {
+          // eslint-disable-next-line wandb/no-unprefixed-urls
+          window.open(HELP_LINK, '_blank');
+        }}
+        helpText="Get help or share feedback"
+      />
     </HelpCTAOuter>
   );
 };
 
-const HelpPill: React.FC<{}> = () => {
+export const HelpPill: React.FC<{
+  icon: React.ReactNode;
+  height: number;
+  helpText: string;
+  onClick: () => void;
+}> = props => {
   return (
     <HelpCTAInner
+      style={{
+        height: props.height,
+      }}
       onClick={() => {
-        // eslint-disable-next-line wandb/no-unprefixed-urls
-        window.open(HELP_LINK, '_blank');
+        if (props.onClick) {
+          props.onClick();
+          return;
+        }
       }}>
-      <IconHelpAlt />
-      <LE.Block>Get help or share feedback</LE.Block>
+      {props.icon}
+      <LE.Block>{props.helpText}</LE.Block>
     </HelpCTAInner>
   );
 };

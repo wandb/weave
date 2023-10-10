@@ -22,6 +22,8 @@ import {
   addNamedColumnToTable,
   enableSortByCol,
 } from '../PanelTable/tableState';
+import {HelpPill} from '../../PagePanelComponents/HelpCTA';
+import {IconOpenNewTab} from '../../Icon';
 
 const hardCodedConfig = {
   pinnedRows: {
@@ -105,6 +107,7 @@ export const PanelTraceTreeTraceTableViewerCommon: React.FC<{
   traceArrayNode: Node;
   initialTableState?: TableState;
   initialColumnWidths?: {[colId: string]: number};
+  helpCTALink?: string;
 }> = props => {
   const [selectedIndex, setSelectedIndex] = React.useState<null | number>(null);
   const [selectedTab, setSelectedTab] = React.useState(0);
@@ -169,6 +172,27 @@ export const PanelTraceTreeTraceTableViewerCommon: React.FC<{
 
   return (
     <S.LCTWrapper>
+      {props.helpCTALink != null && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 4,
+            right: 0,
+            zIndex: 1000,
+            justifyContent: 'center',
+            display: 'flex',
+          }}>
+          <HelpPill
+            icon={<IconOpenNewTab />}
+            height={30}
+            onClick={() => {
+              // eslint-disable-next-line wandb/no-unprefixed-urls
+              window.open(props.helpCTALink!, '_blank');
+            }}
+            helpText="View in Weave"
+          />
+        </div>
+      )}
       <S.LCTTableSection>
         <S.SimpleTabs
           panes={[

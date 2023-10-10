@@ -1,7 +1,9 @@
 import {
   constString,
   isAssignableTo,
+  isConstNode,
   isListLike,
+  isOutputNode,
   isTypedDict,
   isTypedDictLike,
   isUnion,
@@ -34,6 +36,7 @@ import {
   emptyTable,
   getRowExampleNode,
 } from '../PanelTable/tableState';
+import {useHistory} from 'react-router-dom';
 
 const inputType = {
   type: 'list' as const,
@@ -173,6 +176,45 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
     }
   }, [allTracerKeys, config?.traceKey, props]);
 
+  // This whole thing is a growth hack to point people to the weave app.
+  const helpCTALink: string | undefined = useMemo(() => {
+    let currNode: Node = tableNode;
+    if (traceKey == null) {
+      return undefined;
+    }
+    // TODO get URLs from environment settings, not this
+    // hard-coded check
+    if (
+      !(
+        window.location.host === 'app.wandb.ai' ||
+        window.location.host === 'app.wandb.test'
+      )
+    ) {
+      return undefined;
+    }
+    if (!window.location.search.includes('workspace=')) {
+      // only show in workspaces
+      return undefined;
+    }
+    const weaveAppBaseURL = window.location.origin.replace('app', 'weave');
+
+    while (isOutputNode(currNode)) {
+      if (currNode.fromOp.name === 'project-filteredRuns') {
+        const projectNode = currNode.fromOp.inputs['project'];
+        if (isOutputNode(projectNode)) {
+          const entityNameNode = projectNode.fromOp.inputs['entityName'];
+          const projectNameNode = projectNode.fromOp.inputs['projectName'];
+          if (isConstNode(entityNameNode) && isConstNode(projectNameNode)) {
+            return `${weaveAppBaseURL}/browse/wandb/${entityNameNode.val}/${projectNameNode.val}/run_logged_trace/${traceKey}`;
+          }
+        }
+      } else {
+        currNode = Object.values(currNode.fromOp.inputs)[0];
+      }
+    }
+    return undefined;
+  }, [tableNode, traceKey]);
+
   if (config?.traceKey == null) {
     return (
       <div
@@ -194,6 +236,7 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
       traceArrayNode={traceArrayNode}
       initialTableState={ts}
       initialColumnWidths={columnWidths}
+      helpCTALink={helpCTALink}
     />
   );
 };
