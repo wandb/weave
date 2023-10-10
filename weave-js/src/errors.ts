@@ -23,10 +23,21 @@ export function extractStatusCodeFromApolloError(err: any): number | undefined {
   return statusCode;
 }
 
+type DDErrorPayload = {
+  errorMessage?: string;
+  errorName?: string;
+  errorStack?: string;
+  hashedErrorMessage?: number;
+  hashedErrorStack?: number;
+  windowLocationURL?: string;
+  weaveContext?: any;
+  isServerError?: boolean;
+};
+
 export const weaveErrorToDDPayload = (
   error: Error,
   weave?: WeaveApp
-): {[prop: string]: any} => {
+): DDErrorPayload => {
   try {
     return {
       errorMessage: trimString(error.message),
@@ -34,9 +45,6 @@ export const weaveErrorToDDPayload = (
       errorStack: trimString(error.stack),
       hashedErrorMessage: hashStr(error.message),
       hashedErrorStack: hashStr(error.stack),
-      // segment analytics creates a context_page_url which is supposed to
-      // be the current page, but in practice, this seems to be broken
-      // about 15% of the time. Adding this manually for now.
       windowLocationURL: trimString(window.location.href),
       weaveContext: weave?.client.debugMeta(),
       isServerError: error instanceof UseNodeValueServerExecutionError,
@@ -54,7 +62,7 @@ export const trimString = (str?: string) => {
     return '';
   }
   if (str.length > MAX_CONFIG_STRING_LENGTH) {
-    return str.slice(0, MAX_CONFIG_STRING_LENGTH) + '...';
+    return str.slice(0, MAX_CONFIG_STRING_LENGTH);
   }
   return str;
 };

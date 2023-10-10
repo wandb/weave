@@ -40,9 +40,9 @@ const doDatadogRumInit = once(() => {
 });
 
 export type DDUserInfoType = {
-    username?: string;
-    name?: string;
-  }
+  username?: string;
+  name?: string;
+};
 export function datadogSetUserInfo(userInfo: DDUserInfoType) {
   if (
     window.WEAVE_CONFIG.ANALYTICS_DISABLED ||
