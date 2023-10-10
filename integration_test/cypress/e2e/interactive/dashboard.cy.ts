@@ -1,8 +1,8 @@
 import promisify from 'cypress-promise';
 import {exec} from '../testlib';
 
-const gotoBlankDashboard = async () => {
-  await promisify(exec('python cypress/e2e/interactive/blank.py', 10000));
+const gotoBlankDashboard = () => {
+  exec('python cypress/e2e/interactive/blank.py', 10000);
   // const url = result.stdout;
   // E.g. for devmode
   const url =
@@ -90,8 +90,8 @@ const sliderSetValue = (path: string[], value: number) => {
 };
 
 describe('dashboard', () => {
-  it('dashboard', async () => {
-    await gotoBlankDashboard();
+  it('dashboard', () => {
+    gotoBlankDashboard();
 
     // Setup sidebar
     panelTypeInputExpr(['sidebar', 'var0'], 'range(0, 100, 1)');
