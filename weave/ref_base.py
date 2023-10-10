@@ -6,6 +6,7 @@ import collections
 
 from . import uris
 from . import box
+from . import errors
 from . import weave_types as types
 from . import object_context
 
@@ -46,7 +47,9 @@ class Ref:
             return self._obj
 
         if not self.is_saved:
-            return None
+            # PR TODO: this path needs to happen in FSArtifact, as you can
+            # always get the value of a MemArtifact
+            raise errors.WeaveArtifactVersionNotFound
 
         obj = self._get()
 

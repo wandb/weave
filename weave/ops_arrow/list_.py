@@ -542,6 +542,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         self._validate()
 
+    def __add__(self, other) -> "ArrowWeaveList":
+        if isinstance(other, list):
+            other = ArrowWeaveList(other)
+        if not isinstance(other, ArrowWeaveList):
+            raise TypeError(f"Expected list or ArrowWeaveList, got {type(other)}")
+
+        from . import concat
+
+        return concat.concatenate(self, other)
+
     def _validate(self) -> None:
         if self._invalid_reason is None:
             self._validate_weave_type()

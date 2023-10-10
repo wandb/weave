@@ -325,6 +325,11 @@ def init_monitor(stream_key: str) -> Monitor:
     return _global_monitor
 
 
+def deinit_monitor() -> None:
+    global _global_monitor
+    _global_monitor = None
+
+
 def trace(
     preprocess: typing.Optional[typing.Callable] = None,
     postprocess: typing.Optional[typing.Callable] = None,

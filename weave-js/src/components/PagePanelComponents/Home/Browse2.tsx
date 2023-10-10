@@ -44,7 +44,7 @@ import {
   callsTableSelectTraces,
 } from './Browse2/callTree';
 
-import {Paper} from './Browse2/CommonLib';
+import {Link, Paper} from './Browse2/CommonLib';
 import {
   useFirstCall,
   useOpSignature,
@@ -76,6 +76,7 @@ import {DataGridPro as DataGrid} from '@mui/x-data-grid-pro';
 import {Home, FilterList} from '@mui/icons-material';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {LoadingButton} from '@mui/lab';
+import {AddRowToTable} from './Browse2/AddRow';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -1021,10 +1022,37 @@ const Browse2Trace: FC<{
     }
     return traceSpans.filter(ts => ts.span_id === selectedSpanId)[0];
   }, [selectedSpanId, traceSpans]);
+  const simpleInputOutputValue = useMemo(() => {
+    if (selectedSpan == null) {
+      return undefined;
+    }
+    const simpleInputOrder =
+      selectedSpan.inputs._input_order ??
+      Object.keys(selectedSpan.inputs).filter(
+        k => !k.startsWith('_') && k !== 'self'
+      );
+    const simpleInputs = _.fromPairs(
+      simpleInputOrder
+        .map(k => [k, selectedSpan.inputs[k]])
+        .filter(([k, v]) => v != null)
+    );
+
+    const simpleOutput = _.fromPairs(
+      Object.entries(selectedSpan.output).filter(([k, v]) => v != null)
+    );
+
+    return {
+      input: simpleInputs,
+      output: simpleOutput,
+    };
+  }, [selectedSpan]);
   const [tabId, setTabId] = React.useState(0);
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabId(newValue);
   };
+
+  const [addRowToTableOpen, setAddRowToTableOpen] = useState(false);
+
   return (
     <Grid container spacing={2} alignItems="flex-start">
       <Grid xs={3} item>
@@ -1046,10 +1074,7 @@ const Browse2Trace: FC<{
                 label="Feedback"
                 sx={{backgroundColor: globals.lightYellow}}
               />
-              <Tab
-                label="Datasets"
-                sx={{backgroundColor: globals.lightYellow}}
-              />
+              <Tab label="Datasets" />
             </Tabs>
             <Box pt={2}>
               {tabId === 0 &&
@@ -1081,9 +1106,22 @@ const Browse2Trace: FC<{
                     }}>
                     Placeholder
                   </Box>
-                  <Button sx={{backgroundColor: globals.lightYellow}}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setAddRowToTableOpen(true)}>
                     Add to dataset
                   </Button>
+                  {addRowToTableOpen && (
+                    <AddRowToTable
+                      entityName={streamId.entityName}
+                      open={addRowToTableOpen}
+                      handleClose={() => setAddRowToTableOpen(false)}
+                      initialFormState={{
+                        projectName: streamId.projectName,
+                        row: simpleInputOutputValue,
+                      }}
+                    />
+                  )}
                 </>
               )}
             </Box>
@@ -1555,8 +1593,6 @@ interface Browse2Params {
   objVersion?: string;
   refExtra?: string;
 }
-
-const Link = props => <MaterialLink {...props} component={RouterLink} />;
 
 const AppBarLink = props => (
   <MaterialLink

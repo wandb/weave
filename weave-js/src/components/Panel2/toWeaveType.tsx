@@ -154,7 +154,7 @@ export function toWeaveType(o: any): any {
   } else if (_.isObject(o)) {
     if ('_type' in o) {
       return {
-        type: (o as {_type: any})._type,
+        ...(o as {_type: any})._type,
         ..._.mapValues(_.omit(o, ['_type']), toWeaveType),
       };
     }

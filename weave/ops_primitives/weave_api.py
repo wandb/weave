@@ -64,7 +64,6 @@ def save(obj: typing.Any, name: typing.Optional[str]):
 # it completes a transaction
 @mutation
 def finish(obj: graph.Node[typing.Any], name: typing.Optional[str] = None) -> None:
-    print("SAVE", obj)
     nodes = graph.linearize(obj)
     if nodes is None:
         raise errors.WeaveInternalError("save must be called on a linear graph")
@@ -200,7 +199,7 @@ def op_get_return_type(uri):
     try:
         return ref.type
     except errors.WeaveArtifactVersionNotFound:
-        return types.UnknownType()
+        return types.NoneType()
 
 
 def get_const_val(list_type_or_node):
@@ -380,7 +379,53 @@ def get(uri):
     ref = ref_base.Ref.from_str(uri)
     # if not ref.is_saved:
     #     return None
-    res = ref.get()
+    try:
+        res = ref.get()
+    except errors.WeaveArtifactVersionNotFound:
+        return None
+    return res
+
+
+def _save_with_default(
+    get_uri,
+    default,
+    obj,
+    root_args,
+    make_new_type: typing.Callable[[types.Type], types.Type],
+    mutation_record: object_context.MutationRecord,
+):
+    return _save(get_uri, obj, root_args, make_new_type, mutation_record)
+
+
+@op(
+    name="withdefault-getReturnType",
+    input_type={"uri": types.String(), "default": types.Any()},
+    output_type=types.TypeType(),
+    hidden=True,
+    pure=False,
+)
+def get_withdefault_returntype(uri, default):
+    res = op_get_return_type(uri)
+    if res != types.NoneType():
+        return res
+    return types.TypeRegistry.type_of(default)
+
+
+@op(
+    pure=False,
+    setter=_save_with_default,
+    name="withdefault-get",
+    input_type={"uri": types.String(), "default": types.Any()},
+    output_type=types.Any(),
+    refine_output_type=get_withdefault_returntype,
+    render_info={"type": "function"},
+)
+def get_withdefault(uri, default):
+    ref = ref_base.Ref.from_str(uri)
+    try:
+        res = ref.get()
+    except errors.WeaveArtifactVersionNotFound:
+        return default
     return res
 
 
@@ -501,7 +546,9 @@ def mutate_op_body(
             # )
         args = list(inputs.values())
         args.append(res)
-        if i == 0 and node.from_op.name == "get":
+        if i == 0 and (
+            node.from_op.name == "get" or node.from_op.name == "withdefault-get"
+        ):
             # TODO hardcoded get to take root_args. Should just check if available on setter.
             args.append(root_args)
             args.append(make_new_type)

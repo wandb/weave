@@ -36,7 +36,9 @@ from . import memo
 def _op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
     """Returns true if rhs is subtype of lhs"""
     if isinstance(lhs, op_args.OpNamedArgs) and isinstance(rhs, op_args.OpNamedArgs):
-        if len(lhs.arg_types) != len(rhs.arg_types):
+        # PR: fixing to allow different length var lists to distinguish
+        # (supports get_with_default style op)
+        if len(lhs.arg_types) > len(rhs.arg_types):
             return False
         for self_type, other_type in list(
             zip(lhs.initial_arg_types.values(), rhs.initial_arg_types.values())
