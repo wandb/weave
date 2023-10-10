@@ -200,10 +200,10 @@ export const PanelTraceTreeFromHistoryTraceTableViewer: React.FC<
 
     while (isOutputNode(currNode)) {
       if (currNode.fromOp.name === 'project-filteredRuns') {
-        const projectNode = currNode.fromOp.inputs['project'];
+        const projectNode = currNode.fromOp.inputs.project;
         if (isOutputNode(projectNode)) {
-          const entityNameNode = projectNode.fromOp.inputs['entityName'];
-          const projectNameNode = projectNode.fromOp.inputs['projectName'];
+          const entityNameNode = projectNode.fromOp.inputs.entityName;
+          const projectNameNode = projectNode.fromOp.inputs.projectName;
           if (isConstNode(entityNameNode) && isConstNode(projectNameNode)) {
             return `${weaveAppBaseURL}/browse/wandb/${entityNameNode.val}/${projectNameNode.val}/run_logged_trace/${traceKey}`;
           }
