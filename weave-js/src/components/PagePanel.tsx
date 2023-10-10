@@ -58,7 +58,7 @@ import {
 } from '../context/WeaveViewerContext';
 import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {urlWandbFrontend} from '../util/urls';
-import {datadogSetUserInfo} from '../integrations';
+import {datadogSetUserInfo} from '../integrations/analytics/datadog';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
