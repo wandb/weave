@@ -1527,7 +1527,7 @@ const Browse2ObjectVersionItemPage: FC = props => {
                 {/* <Typography variant="h6" gutterBottom>
                   Value
                 </Typography> */}
-                <WeaveEditor node={itemNode} />
+                <WeaveEditor objType={params.rootType} node={itemNode} />
                 {/* <Box p={2} sx={{height: 1000}}>
                   {panel != null && (
                     <ChildPanel

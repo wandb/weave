@@ -1,5 +1,12 @@
 import * as _ from 'lodash';
-import React, {FC, useMemo, useState, useCallback, useEffect} from 'react';
+import React, {
+  FC,
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react';
 
 import {
   Node,
@@ -21,17 +28,18 @@ import {
   opObjGetAttr,
   opPick,
   typedDictPropertyTypes,
-  union,
   voidNode,
 } from '@wandb/weave/core';
 import {
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Grid,
+  TextField,
   Typography,
 } from '@material-ui/core';
 import {
@@ -40,7 +48,6 @@ import {
   parseRef,
   useNodeValue,
 } from '@wandb/weave/react';
-import {displayValueNoBarChart} from '@wandb/weave/common/util/runhelpers';
 import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
 import {useWeaveContext} from '@wandb/weave/context';
 import {Link} from './CommonLib';
@@ -51,7 +58,7 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {useLocation} from 'react-router-dom';
+import {useHistory, useLocation} from 'react-router-dom';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 
 const displaysAsSingleRow = (valueType: Type) => {
@@ -104,17 +111,18 @@ const useWeaveAddEdit = () => {
 };
 
 const WeaveEditorCommit: FC<{
+  objType: string;
   rootObjectRef: WandbArtifactRef;
   node: Node;
   edits: WeaveEditorEdit[];
   handleClose: () => void;
   handleClearEdits: () => void;
-}> = ({rootObjectRef, node, edits, handleClose, handleClearEdits}) => {
+}> = ({objType, rootObjectRef, node, edits, handleClose, handleClearEdits}) => {
   const weave = useWeaveContext();
+  const history = useHistory();
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
-  const [newUri, setNewUri] = useState<string | null>(null);
 
   const handleSubmit = useCallback(async () => {
     setWorking('addingRow');
@@ -122,7 +130,7 @@ const WeaveEditorCommit: FC<{
     let workingRootNode = node;
 
     for (const edit of edits) {
-      let targetNode = nodeToEasyNode(node as OutputNode);
+      let targetNode = nodeToEasyNode(workingRootNode as OutputNode);
       for (const pathEl of edit.path) {
         if (pathEl.type === 'getattr') {
           targetNode = targetNode.getAttr(pathEl.key);
@@ -152,18 +160,22 @@ const WeaveEditorCommit: FC<{
       rootObjectRef.projectName,
       rootObjectRef.artifactName
     );
-    setNewUri(finalRootUri);
     setWorking('done');
 
     handleClearEdits();
+    history.push(refPageUrl(objType, finalRootUri));
+    handleClose();
   }, [
-    edits,
     node,
-    rootObjectRef.artifactName,
+    weave,
     rootObjectRef.entityName,
     rootObjectRef.projectName,
+    rootObjectRef.artifactName,
     handleClearEdits,
-    weave,
+    history,
+    objType,
+    handleClose,
+    edits,
   ]);
   return (
     <Dialog fullWidth maxWidth="sm" open={true} onClose={handleClose}>
@@ -186,7 +198,7 @@ const WeaveEditorCommit: FC<{
               <Typography>Publishing new version...</Typography>
             )}
             {working === 'done' && <Typography>Done</Typography>}
-            {working === 'done' && (
+            {/* {working === 'done' && (
               <Box mt={2}>
                 <Typography>
                   <Link to={refPageUrl('Dataset', newUri!)}>
@@ -194,7 +206,7 @@ const WeaveEditorCommit: FC<{
                   </Link>
                 </Typography>
               </Box>
-            )}
+            )} */}
           </DialogContent>
           <DialogActions>
             <Button disabled={working !== 'done'} onClick={handleClose}>
@@ -208,8 +220,9 @@ const WeaveEditorCommit: FC<{
 };
 
 export const WeaveEditor: FC<{
+  objType: string;
   node: Node;
-}> = ({node}) => {
+}> = ({objType, node}) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
   const [refinedNode, setRefinedNode] = useState<NodeOrVoidNode>(voidNode());
@@ -264,6 +277,7 @@ export const WeaveEditor: FC<{
       </Button>
       {commitChangesOpen && (
         <WeaveEditorCommit
+          objType={objType}
           rootObjectRef={rootObjectRef}
           node={refinedNode}
           edits={edits}
@@ -280,9 +294,11 @@ const WeaveEditorField: FC<{
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
   const weave = useWeaveContext();
-  console.log('WEAVE EDITOR FIELD REFINE', node);
-  if (isAssignableTo(node.type, union([maybe('boolean'), maybe('string')]))) {
+  if (isAssignableTo(node.type, maybe('boolean'))) {
     return <WeaveEditorBoolean node={node} path={path} />;
+  }
+  if (isAssignableTo(node.type, maybe('string'))) {
+    return <WeaveEditorString node={node} path={path} />;
   }
   if (isAssignableTo(node.type, maybe('number'))) {
     return <WeaveEditorNumber node={node} path={path} />;
@@ -309,34 +325,91 @@ const WeaveEditorField: FC<{
 export const WeaveEditorBoolean: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node}) => {
-  console.log('NODE', node);
+}> = ({node, path}) => {
+  const addEdit = useWeaveAddEdit();
   const query = useNodeValue(node);
-  return (
-    <Typography>
-      {query.result === true
-        ? 'true'
-        : query.result === false
-        ? 'false'
-        : query.result}
-    </Typography>
+  const [curVal, setCurVal] = useState<boolean>(false);
+  const loadedOnce = useRef(false);
+  useEffect(() => {
+    if (loadedOnce.current) {
+      return;
+    }
+    if (query.loading) {
+      return;
+    }
+    loadedOnce.current = true;
+    setCurVal(query.result);
+  }, [curVal, query.loading, query.result]);
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      console.log('CHECKED', e.target.checked);
+      setCurVal(e.target.checked);
+      addEdit({path, newValue: !!e.target.checked});
+    },
+    [addEdit, path]
   );
+  return <Checkbox checked={curVal} onChange={onChange} />;
 };
 
 export const WeaveEditorString: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node}) => {
+}> = ({node, path}) => {
+  const addEdit = useWeaveAddEdit();
   const query = useNodeValue(node);
-  return <Typography>{query.result}</Typography>;
+  const [curVal, setCurVal] = useState<string>('');
+  const loadedOnce = useRef(false);
+  useEffect(() => {
+    if (loadedOnce.current) {
+      return;
+    }
+    if (query.loading) {
+      return;
+    }
+    loadedOnce.current = true;
+    setCurVal(query.result);
+  }, [curVal, query.loading, query.result]);
+  const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurVal(e.target.value);
+  }, []);
+  const commit = useCallback(() => {
+    addEdit({path, newValue: curVal});
+  }, [addEdit, curVal, path]);
+  return <TextField value={curVal} onChange={onChange} onBlur={commit} />;
 };
 
 export const WeaveEditorNumber: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node}) => {
+}> = ({node, path}) => {
+  const addEdit = useWeaveAddEdit();
   const query = useNodeValue(node);
-  return <Typography>{displayValueNoBarChart(query.result)}</Typography>;
+  const [curVal, setCurVal] = useState<string>('');
+  const loadedOnce = useRef(false);
+  useEffect(() => {
+    if (loadedOnce.current) {
+      return;
+    }
+    if (query.loading) {
+      return;
+    }
+    loadedOnce.current = true;
+    setCurVal(query.result);
+  }, [curVal, query.loading, query.result]);
+  const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurVal(e.target.value);
+  }, []);
+  const commit = useCallback(() => {
+    addEdit({path, newValue: curVal});
+  }, [addEdit, curVal, path]);
+  return (
+    <TextField
+      value={curVal}
+      onChange={onChange}
+      onBlur={commit}
+      inputProps={{inputMode: 'numeric', pattern: '[.0-9]*'}}
+    />
+  );
 };
 
 export const WeaveEditorTypedDict: FC<{

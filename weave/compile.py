@@ -840,6 +840,8 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     ]:
         return None
     new_node = typing.cast(graph.Node, weave_internal.use(node))
+    if new_node == None:
+        return graph.ConstNode(types.NoneType(), None)
 
     # The result will typically contain expressions that were sent down as
     # part of panel configs within Const nodes. They haven't been handled
