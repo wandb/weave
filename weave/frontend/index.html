@@ -87,28 +87,12 @@
         animation: 4s ease-out infinite logo-animation;
       }
     </style>
-    <script type="module" crossorigin src="/__frontend/assets/index.8e825949.js"></script>
+    <script type="module" crossorigin src="/__frontend/assets/index.29fd620f.js"></script>
     <link rel="stylesheet" href="/__frontend/assets/index.98f96f11.css">
   </head>
 
   <body id="weave-body">
     <div id="root">
-      <script class="define-insert-script">
-        window.insertScript = function insertScript(src) {
-          return new Promise((resolve, reject) => {
-            // Unconditionally add a script to the document.
-            var script = document.createElement('script');
-            script.src = src;
-            script.async = true;
-            script.onload = resolve;
-            script.onerror = reject;
-
-            document.body.appendChild(script);
-          });
-        };
-      </script>
-      <script src="/__frontend/track-v1.js"></script>
-
       <div id="weave-loader">
         <svg
           width="64"
@@ -147,6 +131,33 @@
       </div>
     </div>
 
+    <script>
+      /**
+       * A note to future Weave Devs - the following files are expected to be exact copies
+       * from the core app from `core/frontends/app/public`:
+       *    * `consentAwareAnalyticsInjector.js`
+       *    * `autotrack.js`
+       *    * `autotrack.js.map`
+       *    * `jquery-3.6.0.min.js'
+       *    * `sa.min.js`
+       * 
+       * The following snippet ensures that the correct env variables are set for consumption in such files.
+       */
+      
+      // window.CONFIG is not expected to be populated in weave app - but we retain the namespace for compatibility
+      window.CONFIG = window.CONFIG || {};
+      // window.WEAVE_CONFIG is expected to be populated the load of `./__frontend/env.js` above
+      window.WEAVE_CONFIG = window.WEAVE_CONFIG || {}; 
+
+      // This list should be kept in sync with the values used in `consentAwareAnalyticsInjector.js`.
+      window.CONFIG.ENVIRONMENT_NAME = window.CONFIG.ENVIRONMENT_NAME || window.WEAVE_CONFIG.ENVIRONMENT_NAME || 'production';
+      window.CONFIG.PUBLIC_URL = window.CONFIG.PUBLIC_URL || window.WEAVE_CONFIG.PUBLIC_URL || '/__frontend';
+      window.CONFIG.ENABLE_CHAMELEON = window.CONFIG.ENABLE_CHAMELEON || window.WEAVE_CONFIG.ENABLE_CHAMELEON || true;
+      window.CONFIG.DISABLE_TELEMETRY = window.CONFIG.DISABLE_TELEMETRY || window.WEAVE_CONFIG.DISABLE_TELEMETRY || false;
+      window.CONFIG.ANALYTICS_DISABLED = window.CONFIG.ANALYTICS_DISABLED || window.WEAVE_CONFIG.ANALYTICS_DISABLED || false;
+      window.CONFIG.ENVIRONMENT_IS_PRIVATE = window.CONFIG.ENVIRONMENT_IS_PRIVATE || window.WEAVE_CONFIG.ENVIRONMENT_IS_PRIVATE || false;
+    </script>
+    <script src="/__frontend/consentAwareAnalyticsInjector.js" ></script>
     
   </body>
 </html>

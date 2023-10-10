@@ -146,7 +146,23 @@ function useEnablePageAnalytics() {
   // fetch user
   useEffect(() => {
     if (!weaveViewer.loading) {
-      (window.analytics as any)?.identify(weaveViewer.data.user_id ?? '');
+      const injector = (window as any).WBAnalyticsInjector;
+      if (injector) {
+        const authenticated = !!weaveViewer.data.authenticated;
+        // In Weave, we only want to inject analytics if the user is authenticated.
+        // This means we don't have to muck with the consent banner.
+        if (authenticated) {
+          try {
+            injector.initializeTrackingScripts(authenticated).finally(() => {
+              (window.analytics as any)?.identify(
+                weaveViewer.data.user_id ?? ''
+              );
+            });
+          } catch (e) {
+            // console.error('Failed to inject analytics', e);
+          }
+        }
+      }
     }
   }, [urlPrefixed, backendWeaveViewerUrl, weaveViewer]);
 
