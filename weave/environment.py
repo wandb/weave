@@ -226,13 +226,5 @@ def gql_schema_path() -> typing.Optional[str]:
     return os.environ.get(WEAVE_GQL_SCHEMA_PATH) or None
 
 
-def env_is_private() -> bool:
-    return _env_as_bool("ENVIRONMENT_IS_PRIVATE", default="False")
-
-
-def env_name() -> str:
-    return os.getenv("ENVIRONMENT_NAME", "")
-
-
-def git_tag() -> str:
-    return os.getenv("GIT_TAG", "")
+def dd_env() -> str:
+    return os.getenv("DD_ENV", "")

@@ -6,11 +6,7 @@ declare global {
       WEAVE_BACKEND_HOST: string;
       ONPREM: boolean;
       WANDB_BASE_URL: string;
-      ENVIRONMENT_IS_PRIVATE: boolean;
-      ENVIRONMENT_NAME: string;
-      GIT_TAG: string;
-      SENTRY_ENVIRONMENT: string;
-      SENTRY_DSN: string;
+      DD_ENV: string;
     };
   }
 }
@@ -23,11 +19,7 @@ if (!window.WEAVE_CONFIG) {
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
     WANDB_BASE_URL: 'https://api.wandb.ai',
-    ENVIRONMENT_IS_PRIVATE: false,
-    ENVIRONMENT_NAME: '',
-    GIT_TAG: '',
-    SENTRY_ENVIRONMENT: '',
-    SENTRY_DSN: '',
+    DD_ENV: '',
   };
 }
 
