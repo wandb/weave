@@ -39,19 +39,23 @@ const doDatadogRumInit = once(() => {
   });
 });
 
-export function datadogSetUserInfo(userInfo: {
-  username?: string;
-  name?: string;
-}) {
-  if (window.WEAVE_CONFIG.ANALYTICS_DISABLED || window.WEAVE_CONFIG.DD_ENV === '') {
-    return
+export type DDUserInfoType = {
+    username?: string;
+    name?: string;
+  }
+export function datadogSetUserInfo(userInfo: DDUserInfoType) {
+  if (
+    window.WEAVE_CONFIG.ANALYTICS_DISABLED ||
+    window.WEAVE_CONFIG.DD_ENV === ''
+  ) {
+    return;
   }
   doDatadogRumInit();
   datadogRum.setUser({
     id: userInfo.username,
     name: userInfo.name,
   });
-  if (userInfo.username && userInfo.username !== 'anonymous') {
+  if (userInfo.username) {
     datadogRum.startSessionReplayRecording();
   }
 }

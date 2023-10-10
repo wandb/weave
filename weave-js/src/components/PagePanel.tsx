@@ -58,7 +58,10 @@ import {
 } from '../context/WeaveViewerContext';
 import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {urlWandbFrontend} from '../util/urls';
-import {datadogSetUserInfo} from '../integrations/analytics/datadog';
+import {
+  DDUserInfoType,
+  datadogSetUserInfo,
+} from '../integrations/analytics/datadog';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -212,7 +215,7 @@ const useInitializeDataDog = () => {
     if (weaveViewer.loading) {
       return;
     }
-    const userInfo = {username: 'anonymous'};
+    const userInfo: DDUserInfoType = {};
     if (weaveViewer.data.authenticated && weaveViewer.data.user_id) {
       userInfo.username = weaveViewer.data.user_id;
     }
