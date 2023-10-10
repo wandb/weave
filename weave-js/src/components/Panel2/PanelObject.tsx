@@ -275,7 +275,7 @@ const PanelObjectChild: React.FC<
     level: number;
     childNode: Node;
     childType: Type;
-    updateInput: (key: any, newInput: any) => void | undefined;
+    updateInput?: (key: any, newInput: any) => void;
   } & Omit<PanelObjectProps, 'updateInput'>
 > = ({
   k,
