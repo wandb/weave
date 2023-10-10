@@ -455,7 +455,7 @@ interface LocalArtifactRef {
   artifactPath: string;
 }
 
-interface WandbArtifactRef {
+export interface WandbArtifactRef {
   entityName: string;
   projectName: string;
   artifactName: string;

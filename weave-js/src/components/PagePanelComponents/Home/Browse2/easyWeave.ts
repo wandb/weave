@@ -61,12 +61,25 @@ class EasyNode implements OutputNode {
   getAttr(attrName: string) {
     return new EasyNode(
       callOpVeryUnsafe('Object-__getattr__', {
-        uri: this as Node,
-        default: constString(attrName),
+        obj: this as Node,
+        name: constString(attrName),
+      }) as OutputNode
+    );
+  }
+
+  pick(key: string) {
+    return new EasyNode(
+      callOpVeryUnsafe('pick', {
+        obj: this as Node,
+        key: constString(key),
       }) as OutputNode
     );
   }
 }
+
+export const nodeToEasyNode = (node: OutputNode) => {
+  return new EasyNode(node);
+};
 
 export const weaveGet = (uri: string, defaultVal?: any) => {
   if (defaultVal === undefined) {
@@ -123,6 +136,15 @@ const mutate = async (
   const calledMutation = callOpVeryUnsafe(mutateOpName, opArgs) as Node;
 
   return weave.client.action(calledMutation);
+};
+
+// Returns a local-artifact uri with the newly modified object
+export const mutationSet = (
+  weave: Weave,
+  objNode: Node,
+  val: any
+): Promise<string> => {
+  return mutate(weave, 'op-set', objNode, [weaveConst(val), {}]);
 };
 
 // Returns a local-artifact uri with the newly modified object

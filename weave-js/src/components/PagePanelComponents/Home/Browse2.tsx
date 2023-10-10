@@ -1,5 +1,5 @@
 import * as _ from 'lodash';
-import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
+import React, {FC, useCallback, useMemo, useState} from 'react';
 import {
   Switch,
   Route,
@@ -20,10 +20,7 @@ import {
   constString,
   opGet,
   Node,
-  linearize,
-  isConstNode,
 } from '@wandb/weave/core';
-import {ChildPanel, ChildPanelConfig, initPanel} from '../../Panel2/ChildPanel';
 import {usePanelContext} from '../../Panel2/PanelContext';
 import {useWeaveContext} from '@wandb/weave/context';
 import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
@@ -78,6 +75,7 @@ import {LicenseInfo} from '@mui/x-license-pro';
 import {LoadingButton} from '@mui/lab';
 import {AddRowToTable} from './Browse2/AddRow';
 import {urlPrefixed} from '@wandb/weave/config';
+import {WeaveEditor} from './Browse2/WeaveEditors';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -1374,7 +1372,7 @@ const Browse2RootObjectVersionUsers: FC<{uri: string}> = ({uri}) => {
 const Browse2ObjectVersionItemPage: FC = props => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const uri = makeObjRefUri(params);
-  const history = useHistory();
+  // const history = useHistory();
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(uri)});
     if (params.refExtra == null) {
@@ -1385,7 +1383,7 @@ const Browse2ObjectVersionItemPage: FC = props => {
   }, [uri, params.refExtra]);
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
-  const [panel, setPanel] = React.useState<ChildPanelConfig | undefined>();
+  // const [panel, setPanel] = React.useState<ChildPanelConfig | undefined>();
 
   const makeBoardFromNode = useMakeLocalBoardFromNode();
 
@@ -1405,67 +1403,68 @@ const Browse2ObjectVersionItemPage: FC = props => {
     });
   }, [itemNode, makeBoardFromNode, stack, weave]);
 
-  useEffect(() => {
-    const doInit = async () => {
-      const panel = await initPanel(
-        weave,
-        itemNode,
-        undefined,
-        undefined,
-        stack
-      );
-      setPanel(panel);
-    };
-    doInit();
-  }, [itemNode, stack, weave]);
-  const handleUpdateInput = useCallback(
-    (newExpr: Node) => {
-      const linearNodes = linearize(newExpr);
-      if (linearNodes == null) {
-        console.log("Can't linearize nodes for updateInput", newExpr);
-        return;
-      }
-      let newExtra: string[] = [];
-      for (const subNode of linearNodes) {
-        if (subNode.fromOp.name === 'Object-__getattr__') {
-          if (!isConstNode(subNode.fromOp.inputs.name)) {
-            console.log('updateInput can only handle const keys for now');
-            return;
-          }
-          newExtra.push(subNode.fromOp.inputs.name.val);
-        } else if (subNode.fromOp.name === 'index') {
-          if (!isConstNode(subNode.fromOp.inputs.index)) {
-            console.log('updateInput can only handle const index for now');
-            return;
-          }
-          newExtra.push('index');
-          newExtra.push(subNode.fromOp.inputs.index.val.toString());
-        } else if (subNode.fromOp.name === 'pick') {
-          if (!isConstNode(subNode.fromOp.inputs.key)) {
-            console.log('updateInput can only handle const keys for now');
-            return;
-          }
-          newExtra.push('pick');
-          newExtra.push(subNode.fromOp.inputs.key.val);
-        }
-      }
-      let newUri = `/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`;
-      if (params.refExtra != null) {
-        newUri += `/${params.refExtra}`;
-      }
-      newUri += `/${newExtra.join('/')}`;
-      history.push(newUri);
-    },
-    [
-      history,
-      params.entity,
-      params.objName,
-      params.objVersion,
-      params.project,
-      params.rootType,
-      params.refExtra,
-    ]
-  );
+  // Comment out to use a weave panel instead of the WeaveEditor
+  // useEffect(() => {
+  //   const doInit = async () => {
+  //     const panel = await initPanel(
+  //       weave,
+  //       itemNode,
+  //       undefined,
+  //       undefined,
+  //       stack
+  //     );
+  //     setPanel(panel);
+  //   };
+  //   doInit();
+  // }, [itemNode, stack, weave]);
+  // const handleUpdateInput = useCallback(
+  //   (newExpr: Node) => {
+  //     const linearNodes = linearize(newExpr);
+  //     if (linearNodes == null) {
+  //       console.log("Can't linearize nodes for updateInput", newExpr);
+  //       return;
+  //     }
+  //     let newExtra: string[] = [];
+  //     for (const subNode of linearNodes) {
+  //       if (subNode.fromOp.name === 'Object-__getattr__') {
+  //         if (!isConstNode(subNode.fromOp.inputs.name)) {
+  //           console.log('updateInput can only handle const keys for now');
+  //           return;
+  //         }
+  //         newExtra.push(subNode.fromOp.inputs.name.val);
+  //       } else if (subNode.fromOp.name === 'index') {
+  //         if (!isConstNode(subNode.fromOp.inputs.index)) {
+  //           console.log('updateInput can only handle const index for now');
+  //           return;
+  //         }
+  //         newExtra.push('index');
+  //         newExtra.push(subNode.fromOp.inputs.index.val.toString());
+  //       } else if (subNode.fromOp.name === 'pick') {
+  //         if (!isConstNode(subNode.fromOp.inputs.key)) {
+  //           console.log('updateInput can only handle const keys for now');
+  //           return;
+  //         }
+  //         newExtra.push('pick');
+  //         newExtra.push(subNode.fromOp.inputs.key.val);
+  //       }
+  //     }
+  //     let newUri = `/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`;
+  //     if (params.refExtra != null) {
+  //       newUri += `/${params.refExtra}`;
+  //     }
+  //     newUri += `/${newExtra.join('/')}`;
+  //     history.push(newUri);
+  //   },
+  //   [
+  //     history,
+  //     params.entity,
+  //     params.objName,
+  //     params.objVersion,
+  //     params.project,
+  //     params.rootType,
+  //     params.refExtra,
+  //   ]
+  // );
   return (
     <PageEl>
       <PageHeader
@@ -1525,10 +1524,11 @@ const Browse2ObjectVersionItemPage: FC = props => {
           <Grid container spacing={3}>
             <Grid item xs={8}>
               <Paper>
-                <Typography variant="h6" gutterBottom>
+                {/* <Typography variant="h6" gutterBottom>
                   Value
-                </Typography>
-                <Box p={2} sx={{height: 1000}}>
+                </Typography> */}
+                <WeaveEditor node={itemNode} />
+                {/* <Box p={2} sx={{height: 1000}}>
                   {panel != null && (
                     <ChildPanel
                       config={panel}
@@ -1537,7 +1537,7 @@ const Browse2ObjectVersionItemPage: FC = props => {
                       passthroughUpdate
                     />
                   )}
-                </Box>
+                </Box> */}
               </Paper>
             </Grid>
             <Grid item xs={4}>

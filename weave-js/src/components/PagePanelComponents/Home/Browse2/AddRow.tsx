@@ -1,4 +1,4 @@
-import React, {useState, FC, useCallback, useMemo} from 'react';
+import React, {useState, FC, useCallback} from 'react';
 
 import {
   Box,
