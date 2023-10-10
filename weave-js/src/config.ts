@@ -51,6 +51,13 @@ const backendWeaveViewerUrl = () => {
   return WEAVE_BACKEND_HOST + '/wb_viewer';
 };
 
+export const coreAppUrl = (path: string = '') => {
+  const origin = window.WEAVE_CONFIG.WANDB_BASE_URL
+    ? window.WEAVE_CONFIG.WANDB_BASE_URL.replace('api.', '')
+    : 'https://wandb.ai';
+  return origin + path;
+};
+
 export const urlPrefixed = (path: string, host: boolean = false) => {
   let url = new URL(window.location.origin + window.WEAVE_CONFIG.PREFIX);
   url = new URL(url.href.replace(/\/$/, '') + path);

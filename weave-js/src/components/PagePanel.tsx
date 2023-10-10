@@ -53,8 +53,11 @@ import {
 } from './PagePanelContext';
 import {
   useIsAuthenticated,
+  useIsSignupRequired,
   useWeaveViewer,
 } from '../context/WeaveViewerContext';
+import {HelpCTA} from './PagePanelComponents/HelpCTA';
+import {urlWandbFrontend} from '../util/urls';
 import {datadogSetUserInfo} from '../integrations';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
@@ -144,7 +147,23 @@ function useEnablePageAnalytics() {
   // fetch user
   useEffect(() => {
     if (!weaveViewer.loading) {
-      (window.analytics as any)?.identify(weaveViewer.data.user_id ?? '');
+      const injector = (window as any).WBAnalyticsInjector;
+      if (injector) {
+        const authenticated = !!weaveViewer.data.authenticated;
+        // In Weave, we only want to inject analytics if the user is authenticated.
+        // This means we don't have to muck with the consent banner.
+        if (authenticated) {
+          try {
+            injector.initializeTrackingScripts(authenticated).finally(() => {
+              (window.analytics as any)?.identify(
+                weaveViewer.data.user_id ?? ''
+              );
+            });
+          } catch (e) {
+            // console.error('Failed to inject analytics', e);
+          }
+        }
+      }
     }
   }, [urlPrefixed, backendWeaveViewerUrl, weaveViewer]);
 
@@ -226,6 +245,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   }
   const inJupyter = inJupyterCell();
   const authed = useIsAuthenticated();
+  const signupRequired = useIsSignupRequired();
   const isLocal = isServedLocally();
   const transparentlyMountExpString = useRef('');
 
@@ -372,6 +392,13 @@ const PagePanel = ({browserType}: PagePanelProps) => {
 
   const needsLogin = authed === false && isLocal === false;
   useEffect(() => {
+    if (signupRequired) {
+      const newOrigin = urlWandbFrontend();
+      const newUrl = `${newOrigin}/signup`;
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      window.location.replace(newUrl);
+      return;
+    }
     if (needsLogin) {
       const newOrigin = window.WEAVE_CONFIG.WANDB_BASE_URL;
       const newUrl = `${newOrigin}/oidc/login?${new URLSearchParams({
@@ -380,7 +407,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
       // eslint-disable-next-line wandb/no-unprefixed-urls
       window.location.replace(newUrl);
     }
-  }, [authed, isLocal, needsLogin]);
+  }, [authed, isLocal, needsLogin, signupRequired]);
 
   if (loading || authed === undefined) {
     return <Loader name="page-panel-loader" />;
@@ -437,6 +464,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
               </div>
             )}
             {/* <ArtifactManager /> */}
+            {!inJupyter && <HelpCTA />}
           </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>

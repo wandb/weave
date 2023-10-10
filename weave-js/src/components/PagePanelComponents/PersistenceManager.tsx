@@ -76,6 +76,7 @@ import {DeleteActionModal} from './DeleteActionModal';
 import {PublishModal} from './PublishModal';
 import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -338,6 +339,9 @@ const HeaderPersistenceControls: React.FC<{
               } else {
                 takeAction(storeAction);
               }
+              if (storeAction === 'commit') {
+                trackPublishBoardClicked('commit-changes', 'board-toolbar');
+              }
             }}>
             {persistenceActionToLabel[storeAction]}
           </WBButton>
@@ -439,7 +443,7 @@ const HeaderFileControls: React.FC<{
 
   return (
     <>
-      <HeaderCenterControls>
+      <HeaderCenterControls data-testid="header-center-controls">
         {entityProjectName && (
           <HeaderCenterControlsSecondary
             onClick={() => {
@@ -548,6 +552,7 @@ const HeaderFileControls: React.FC<{
           <MenuDivider /> */}
 
           <MenuItem
+            data-testid="new-board-button"
             onClick={() => {
               setAnchorFileEl(null);
               newDashboard();
