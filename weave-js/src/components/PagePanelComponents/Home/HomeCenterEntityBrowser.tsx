@@ -8,9 +8,12 @@ import {
   IconDelete,
   IconFullScreenModeExpand,
   IconAddNew,
+  IconLightbulbInfo,
 } from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
+import * as LayoutElements from './LayoutElements';
+import styled from 'styled-components';
 import moment from 'moment';
 import {
   Node,
@@ -49,6 +52,8 @@ import {
 } from '../../../urls';
 import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 import {urlWandbFrontend} from '../../../util/urls';
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import * as S from './styles';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -939,13 +944,46 @@ const CenterProjectTablesBrowser: React.FC<
   );
 };
 
+const EmptyTableMessageBlockContainer = styled(LayoutElements.HBlock)`
+  background-color: ${globals.MOON_100};
+  border-radius: 8px;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+`;
+EmptyTableMessageBlockContainer.displayName =
+  'S.EmptyTableMessageBlockContainer';
+
+const EmptyTableMessageIcon = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+`;
+EmptyTableMessageIcon.displayName = 'S.EmptyTableMessageIcon';
+
+const EmptyTableMessageText = styled.div`
+  padding: 15px 5px 15px 0px;
+  color: ${globals.MOON_600};
+`;
+EmptyTableMessageText.displayName = 'S.EmptyTableMessageText';
+
 const EmptyTableMessage = () => {
   return (
     <>
-      <div>This table has no data.</div>
       <div>
-        Table preview and board creation are not available until data has been
-        logged.
+        <EmptyTableMessageBlockContainer>
+          <EmptyTableMessageIcon>
+            <IconLightbulbInfo style={{color: `${globals.MOON_600}`}} />
+          </EmptyTableMessageIcon>
+          <EmptyTableMessageText>
+            <div style={{fontWeight: '600'}}>This table has no data.</div>
+            <div>
+              Table preview and board creation are not available until data has
+              been logged.
+            </div>
+          </EmptyTableMessageText>
+        </EmptyTableMessageBlockContainer>
       </div>
     </>
   );
