@@ -24,6 +24,9 @@ import {
 } from '../PanelTable/tableState';
 import {HelpPill} from '../../PagePanelComponents/HelpCTA';
 import {IconOpenNewTab} from '../../Icon';
+import {makeEventRecorder} from '../panellib/libanalytics';
+
+const recordEvent = makeEventRecorder('PanelTraceCommon');
 
 const hardCodedConfig = {
   pinnedRows: {
@@ -186,6 +189,7 @@ export const PanelTraceTreeTraceTableViewerCommon: React.FC<{
             icon={<IconOpenNewTab />}
             height={30}
             onClick={() => {
+              recordEvent('VIEW_IN_WEAVE');
               // eslint-disable-next-line wandb/no-unprefixed-urls
               window.open(props.helpCTALink!, '_blank');
             }}
