@@ -221,8 +221,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
             level={level}
             childNode={childNode}
             childType={propertyTypes[k]!}
-            updateInput={updateInput}
-            readOnly={updateInputFromProps == null}
+            updateInput={updateInputFromProps == null ? undefined : updateInput}
           />
         );
       }),
@@ -277,7 +276,6 @@ const PanelObjectChild: React.FC<
     childNode: Node;
     childType: Type;
     updateInput: (key: any, newInput: any) => void | undefined;
-    readOnly?: boolean;
   } & Omit<PanelObjectProps, 'updateInput'>
 > = ({
   k,
@@ -289,7 +287,6 @@ const PanelObjectChild: React.FC<
   updateContext,
   updateConfig,
   config,
-  readOnly,
 }) => {
   const nonNullableChildType = nonNullable(childType);
   let isNone = useNodeValue(opIsNone({val: childNode}), {
@@ -307,7 +304,7 @@ const PanelObjectChild: React.FC<
   return (
     <KeyValTable.Row>
       <KeyValTable.Key>
-        {readOnly ? (
+        {updateInput == null ? (
           k
         ) : (
           <KeyValTable.InputUpdateLink onClick={() => updateInput(k, null)}>
@@ -361,9 +358,10 @@ const PanelObjectChild: React.FC<
                   },
                 })
               }
-              // if parent keys are read-only, child keys should also be read-only
               updateInput={
-                readOnly ? undefined : newInput => updateInput(k, newInput)
+                updateInput == null
+                  ? undefined
+                  : newInput => updateInput(k, newInput)
               }
             />
           </div>
