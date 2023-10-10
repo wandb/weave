@@ -613,7 +613,7 @@ export const WeaveEditorTable: FC<{
 
       const newSourceRows = [
         ...curSourceRows.slice(0, originalRow._origIndex),
-        unflattenObject(updatedRow),
+        newSourceRow,
         ...curSourceRows.slice(originalRow._origIndex + 1),
       ];
       setSourceRows(newSourceRows);
