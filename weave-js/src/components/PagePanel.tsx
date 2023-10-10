@@ -58,6 +58,10 @@ import {
 } from '../context/WeaveViewerContext';
 import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {urlWandbFrontend} from '../util/urls';
+import {
+  DDUserInfoType,
+  datadogSetUserInfo,
+} from '../integrations/analytics/datadog';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -204,12 +208,28 @@ const usePoorMansLocation = () => {
   return window.location;
 };
 
+const useInitializeDataDog = () => {
+  const weaveViewer = useWeaveViewer();
+
+  useEffect(() => {
+    if (weaveViewer.loading) {
+      return;
+    }
+    const userInfo: DDUserInfoType = {};
+    if (weaveViewer.data.authenticated && weaveViewer.data.user_id) {
+      userInfo.username = weaveViewer.data.user_id;
+    }
+    datadogSetUserInfo(userInfo);
+  }, [weaveViewer]);
+};
+
 type PagePanelProps = {
   browserType: string | undefined;
 };
 
 const PagePanel = ({browserType}: PagePanelProps) => {
   useEnablePageAnalytics();
+  useInitializeDataDog();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
   const history = useHistory();
