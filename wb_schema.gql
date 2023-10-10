@@ -563,6 +563,7 @@ enum ViewSource {
   WANDB_UI
   WANDB_UI_SHARE_PANEL
   WANDB_SDK
+  WEAVE_UI
 }
 
 type View implements Node {

@@ -38,7 +38,8 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                                     {
                                         "role": types.optional(types.String()),
                                         "content": types.optional(types.String()),
-                                    }
+                                    },
+                                    not_required_keys=set(["role"]),
                                 )
                             )
                         )
@@ -64,15 +65,18 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                                                     "content": types.optional(
                                                         types.String()
                                                     ),
-                                                }
+                                                },
+                                                not_required_keys=set(["role"]),
                                             )
                                         ),
                                         "finish_reason": types.optional(types.String()),
-                                    }
+                                    },
+                                    not_required_keys=set(["finish_reason"]),
                                 )
                             )
                         ),
-                    }
+                    },
+                    not_required_keys=set(["id", "object"]),
                 )
             ),
             "timestamp": types.optional(types.Timestamp()),

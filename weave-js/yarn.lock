@@ -1527,20 +1527,32 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
-"@datadog/browser-core@1.26.3":
-  version "1.26.3"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-core/-/browser-core-1.26.3.tgz#b404861bc596abccf7b02a043c32bba40f3e0bbd"
-  integrity sha512-/YrSvljK4RnjiLBX18P23PtcpYUPnSUVafy+41MatN8ZjtdzFsdK4VxQWhLFygG/Au8pvXacU1Kg7CVRk7hbMQ==
-  dependencies:
-    tslib "^1.10.0"
+"@datadog/browser-core@4.50.1":
+  version "4.50.1"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-core/-/browser-core-4.50.1.tgz#f9014628c697c1cedfd85103094934286c4339ca"
+  integrity sha512-2ypS19XngsMu6W4qUBtDwvImFz886Im+PziOnEycO1w41TVS5LH8/vWBMvjSf8Suer+CeRjRN9IOu0ocRx9BVw==
 
-"@datadog/browser-logs@^1.12.7":
-  version "1.26.3"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-logs/-/browser-logs-1.26.3.tgz#cb67e14de54a9866b9628153c63a3373e615a279"
-  integrity sha512-bVE4hWV+vkUtG3bh3o0K+rWCGlMLtDmqoBvmjylWMbmLkHM/ua1QTqgQY2m36erS6MPXgQDVy4q0BAp9vwjFPA==
+"@datadog/browser-logs@^4.28.1":
+  version "4.50.1"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-logs/-/browser-logs-4.50.1.tgz#238b4562de657aed9b4804f97467c8282fb12708"
+  integrity sha512-uSM+T+hAQDH4lUjWNNyj8MfhQKp+sFo88UBaHUzpg0Kio/gZ+tIL7/HmTLCN5eLDWNJfH8eJuCb5Gtcvo14Pkg==
   dependencies:
-    "@datadog/browser-core" "1.26.3"
-    tslib "^1.10.0"
+    "@datadog/browser-core" "4.50.1"
+
+"@datadog/browser-rum-core@4.50.1":
+  version "4.50.1"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-rum-core/-/browser-rum-core-4.50.1.tgz#e0f6a261808212ef00433b6065a6a1481a596055"
+  integrity sha512-ABCzEjNiBq3izapvSq6uujdx9h7L4RM44n22qDhwSIBlQY6Psf9VlzlQ5fueCALoj2LgVy4rYDj5RHfGaF/lAQ==
+  dependencies:
+    "@datadog/browser-core" "4.50.1"
+
+"@datadog/browser-rum@^4.29.0":
+  version "4.50.1"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-rum/-/browser-rum-4.50.1.tgz#a74520a589d0cd25919503608abaff1960593bb4"
+  integrity sha512-Gcs8fMoufOr4Xlhwx0g6CHvgcXVNeCM+IyAtRAwoCBeezRhL18Jo1LALE+nsLegNKgNLO1f4vjm5TBx1WsnXWQ==
+  dependencies:
+    "@datadog/browser-core" "4.50.1"
+    "@datadog/browser-rum-core" "4.50.1"
 
 "@emotion/babel-plugin@^11.11.0":
   version "11.11.0"
@@ -14561,7 +14573,7 @@ tslib@>=1.10.0, tslib@^2.0.0, tslib@^2.0.1, tslib@^2.1.0, tslib@^2.5.0:
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.6.0.tgz#b295854684dbda164e181d259a22cd779dcd7bc3"
   integrity sha512-7At1WUettjcSRHXCyYtTselblcHl9PJFFVKiCAy/bY97+BPZXSQ2wbq0P9s8tK2G7dFQfNnlJnPAiArVBVBsfA==
 
-tslib@^1.10.0, tslib@^1.13.0, tslib@^1.7.1, tslib@^1.8.1, tslib@^1.9.3:
+tslib@^1.13.0, tslib@^1.7.1, tslib@^1.8.1, tslib@^1.9.3:
   version "1.14.1"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.14.1.tgz#cf2d38bdc34a134bcaf1091c41f6619e2f672d00"
   integrity sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==

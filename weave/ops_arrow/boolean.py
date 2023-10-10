@@ -115,11 +115,21 @@ def awl_cond(cases, results):
     cases = cases.without_tags()
     # Will crash if results are not of the same type.
     if isinstance(results, ArrowWeaveList):
+        first_non_null_type = None
+        null_fields = []
         results = results.without_tags()
-        result_values = [
-            results._arrow_data.field(i) for i in range(len(results._arrow_data.type))
-        ]
+        result_values = []
+        for i in range(len(results._arrow_data.type)):
+            field = results._arrow_data.field(i)
+            if pa.types.is_null(field.type):
+                null_fields.append(i)
+            elif first_non_null_type is None:
+                first_non_null_type = field.type
+            result_values.append(field)
         result_typed_dict = results.object_type
+        if first_non_null_type is not None:
+            for i in null_fields:
+                result_values[i] = result_values[i].cast(first_non_null_type)
     else:
         result_values = [pa.scalar(v) for v in results.values()]
         result_typed_dict = types.TypeRegistry.type_of(results)

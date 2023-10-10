@@ -6,6 +6,7 @@ declare global {
       WEAVE_BACKEND_HOST: string;
       ONPREM: boolean;
       WANDB_BASE_URL: string;
+      DD_ENV: string;
     };
   }
 }
@@ -18,6 +19,7 @@ if (!window.WEAVE_CONFIG) {
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
     WANDB_BASE_URL: 'https://api.wandb.ai',
+    DD_ENV: '',
   };
 }
 
