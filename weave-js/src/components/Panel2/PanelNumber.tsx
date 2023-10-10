@@ -32,7 +32,7 @@ export const PanelNumber: React.FC<
         overflowX: 'hidden',
         overflowY: 'auto',
         margin: 'auto',
-        textAlign: textAlign,
+        textAlign,
         wordBreak: 'normal',
         display: 'flex',
         flexDirection: 'column',
