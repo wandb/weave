@@ -24,7 +24,7 @@ export function extractStatusCodeFromApolloError(err: any): number | undefined {
   return statusCode;
 }
 
-export const errorToPayload = (
+export const weaveErrorToDDPayload = (
   error: Error,
   weave?: WeaveApp
 ): {[prop: string]: any} => {

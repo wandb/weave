@@ -29,7 +29,7 @@ import * as PanelLib from './panellib/libpanel';
 import * as TSTypeWithPath from './tsTypeWithPath';
 import {HOVER_DELAY_MS} from './Tooltip';
 import {ErrorPanel} from '../ErrorPanel';
-import {errorToPayload} from '../../errors';
+import {weaveErrorToDDPayload} from '../../errors';
 import {datadogRum} from '@datadog/browser-rum';
 import {WeaveApp} from '../..';
 
@@ -63,7 +63,7 @@ class PanelCompErrorBoundary extends React.Component<
 
     datadogRum.addAction(
       'weave_panel_error_boundary',
-      errorToPayload(error, this.props.weave)
+      weaveErrorToDDPayload(error, this.props.weave)
     );
 
     if (error instanceof CGReact.InvalidGraph) {
