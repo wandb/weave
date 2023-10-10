@@ -417,7 +417,7 @@ def _get_history_metrics(
     from .. import weave_internal
 
     created_by = artifactVersion["createdBy"]
-    if created_by["__typename"] != "Run":
+    if created_by == None or created_by["__typename"] != "Run":
         return {}
 
     run_name = created_by["name"]
