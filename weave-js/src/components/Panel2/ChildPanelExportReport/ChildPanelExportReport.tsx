@@ -1,4 +1,4 @@
-import {useMutation, useQuery} from '@apollo/client';
+import {useLazyQuery, useMutation} from '@apollo/client';
 import {ID} from '@wandb/weave/common/util/id';
 import {coreAppUrl} from '@wandb/weave/config';
 import * as Urls from '@wandb/weave/core/_external/util/urls';
@@ -12,8 +12,8 @@ import {Alert} from '../../Alert.styles';
 import {Button} from '../../Button';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
-import {ErrorAlerts} from './ErrorAlerts';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
+import {AddPanelErrorAlert} from './AddPanelErrorAlert';
 import {ReportSelection} from './ReportSelection';
 import {computeReportSlateNode} from './computeReportSlateNode';
 import {GET_REPORT, UPSERT_REPORT} from './graphql';
@@ -51,83 +51,91 @@ export const ChildPanelExportReport = ({
     null
   );
 
+  const [getReport] = useLazyQuery(GET_REPORT);
+  const [upsertReport] = useMutation(UPSERT_REPORT);
+  const [isAddingPanel, setIsAddingPanel] = useState(false);
+  const [error, setError] = useState<any>(null);
+
   const isNewReportSelected = isNewReportOption(selectedReport);
-
-  const [upsertReport, upsertReportResult] = useMutation(UPSERT_REPORT);
-  const reportQueryResult = useQuery(GET_REPORT, {
-    variables: {id: selectedReport?.id ?? ''},
-    skip: !selectedReport || isNewReportOption(selectedReport),
-  });
-
-  const isErrorDisplayed = reportQueryResult.error || upsertReportResult.error;
   const isAddPanelDisabled =
-    !selectedEntity ||
-    !selectedReport ||
-    !selectedProject ||
-    reportQueryResult.loading ||
-    reportQueryResult.error != null ||
-    upsertReportResult.loading;
+    !selectedEntity || !selectedReport || !selectedProject || isAddingPanel;
 
   const onAddPanel = async () => {
     if (isAddPanelDisabled) {
       return;
     }
 
-    const slateNode = computeReportSlateNode(fullConfig, selectedPath);
-    const entityName = selectedEntity.name;
-    const projectName = selectedProject.name;
-    let upsertBody;
+    try {
+      setIsAddingPanel(true);
 
-    if (isNewReportSelected) {
-      upsertBody = {
-        createdUsing: ViewSource.WeaveUi,
-        description: '',
-        displayName: 'Untitled Report',
-        entityName,
-        name: ID(12),
-        projectName,
-        spec: JSON.stringify(getEmptyReportConfig([slateNode])),
-        type: 'runs/draft',
-      };
-    } else {
-      const publishedReport = reportQueryResult.data?.view;
-      const drafts = publishedReport?.children?.edges.map(({node}) => node);
-      const viewerDraft = drafts?.find(draft => draft?.user?.id === viewer.id);
-      if (viewerDraft) {
-        const spec = JSON.parse(viewerDraft.spec);
-        spec.blocks.push(slateNode);
+      const slateNode = computeReportSlateNode(fullConfig, selectedPath);
+      const entityName = selectedEntity.name;
+      const projectName = selectedProject.name;
+      let upsertBody;
+
+      if (isNewReportSelected) {
         upsertBody = {
-          id: viewerDraft.id,
-          spec: JSON.stringify(spec),
-        };
-      } else {
-        const spec = JSON.parse(publishedReport?.spec);
-        spec.blocks.push(slateNode);
-        upsertBody = {
-          coverUrl: publishedReport?.coverUrl,
-          description: publishedReport?.description,
-          displayName: publishedReport?.displayName,
+          createdUsing: ViewSource.WeaveUi,
+          description: '',
+          displayName: 'Untitled Report',
+          entityName,
           name: ID(12),
-          parentId: publishedReport?.id,
-          previewUrl: publishedReport?.previewUrl,
-          spec: JSON.stringify(spec),
+          projectName,
+          spec: JSON.stringify(getEmptyReportConfig([slateNode])),
           type: 'runs/draft',
         };
+      } else {
+        const {data} = await getReport({
+          variables: {id: selectedReport.id!},
+          fetchPolicy: 'no-cache',
+        });
+        const publishedReport = data?.view;
+        const drafts = publishedReport?.children?.edges.map(({node}) => node);
+        const viewerDraft = drafts?.find(
+          draft => draft?.user?.id === viewer.id
+        );
+
+        if (viewerDraft) {
+          const spec = JSON.parse(viewerDraft.spec);
+          spec.blocks.push(slateNode);
+          upsertBody = {
+            id: viewerDraft.id,
+            spec: JSON.stringify(spec),
+          };
+        } else {
+          const spec = JSON.parse(publishedReport?.spec);
+          spec.blocks.push(slateNode);
+          upsertBody = {
+            coverUrl: publishedReport?.coverUrl,
+            description: publishedReport?.description,
+            displayName: publishedReport?.displayName,
+            name: ID(12),
+            parentId: publishedReport?.id,
+            previewUrl: publishedReport?.previewUrl,
+            spec: JSON.stringify(spec),
+            type: 'runs/draft',
+          };
+        }
       }
+
+      const result = await upsertReport({variables: upsertBody});
+      const upsertedDraft = result.data?.upsertView?.view!;
+      const reportDraftPath = Urls.reportEdit({
+        entityName,
+        projectName,
+        reportID: upsertedDraft.id,
+        reportName: upsertedDraft.displayName ?? '',
+      });
+
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      window.open(coreAppUrl(reportDraftPath), '_blank');
+      setIsAddingPanel(false);
+      closeDrawer();
+    } catch (err) {
+      console.error(err);
+      setError(err);
+      setIsAddingPanel(false);
     }
-
-    const result = await upsertReport({variables: upsertBody});
-    const upsertedDraft = result.data?.upsertView?.view!;
-    const reportDraftPath = Urls.reportEdit({
-      entityName,
-      projectName,
-      reportID: upsertedDraft.id,
-      reportName: upsertedDraft.displayName ?? '',
-    });
-
-    // eslint-disable-next-line wandb/no-unprefixed-urls
-    window.open(coreAppUrl(reportDraftPath), '_blank');
-    closeDrawer();
   };
 
   return (
@@ -154,20 +162,16 @@ export const ChildPanelExportReport = ({
             setSelectedEntity={setSelectedEntity}
             setSelectedReport={setSelectedReport}
             setSelectedProject={setSelectedProject}
-            onChange={upsertReportResult.reset}
+            onChange={() => setError(null)}
           />
-          {!isErrorDisplayed && (
+          {!error ? (
             <p className="mt-16 text-moon-500">
               Future changes to the board will not affect exported panels inside
               reports.
             </p>
-          )}
-          {reportQueryResult.error && (
-            <ErrorAlerts.ReportQuery error={reportQueryResult.error} />
-          )}
-          {upsertReportResult.error && (
-            <ErrorAlerts.UpsertReport
-              error={upsertReportResult.error}
+          ) : (
+            <AddPanelErrorAlert
+              error={error}
               isNewReport={isNewReportSelected}
             />
           )}
