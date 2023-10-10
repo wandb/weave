@@ -6,8 +6,11 @@ declare global {
       WEAVE_BACKEND_HOST: string;
       ONPREM: boolean;
       WANDB_BASE_URL: string;
-      DD_ENV?: string;
-      DD_CLIENT_TOKEN?: string;
+      ENVIRONMENT_IS_PRIVATE: boolean;
+      ENVIRONMENT_NAME: string;
+      GIT_TAG: string;
+      SENTRY_ENVIRONMENT: string;
+      SENTRY_DSN: string;
     };
   }
 }
@@ -20,6 +23,11 @@ if (!window.WEAVE_CONFIG) {
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
     WANDB_BASE_URL: 'https://api.wandb.ai',
+    ENVIRONMENT_IS_PRIVATE: false,
+    ENVIRONMENT_NAME: '',
+    GIT_TAG: '',
+    SENTRY_ENVIRONMENT: '',
+    SENTRY_DSN: '',
   };
 }
 
@@ -87,3 +95,29 @@ export const setConfig = (newConfig: Partial<Config>) => {
 export default function getConfig() {
   return config;
 }
+
+// The following is a selection of code from core/frontends/app/src/config.ts
+// in particular, we need the following for integrations.ts:
+// * backendHost
+// * datadogDebugOverride
+// * SENTRY_DSN
+// * SENTRY_ENVIRONMENT
+// * GIT_TAG
+// * DISABLE_TELEMETRY
+// * envIsCloudOnprem
+// * envIsLocal
+
+export const backendHost = (path?: string) => {
+  return window.WEAVE_CONFIG.WANDB_BASE_URL
+};
+
+export const datadogDebugOverride = () => {
+  return false
+};
+
+export const SENTRY_DSN = window.WEAVE_CONFIG.GIT_TAG
+export const SENTRY_ENVIRONMENT = window.WEAVE_CONFIG.ENVIRONMENT_NAME
+export const GIT_TAG = window.WEAVE_CONFIG.GIT_TAG
+export const DISABLE_TELEMETRY = window.WEAVE_CONFIG.ANALYTICS_DISABLED
+export const envIsCloudOnprem = window.WEAVE_CONFIG.ONPREM && window.WEAVE_CONFIG.ENVIRONMENT_NAME !== 'local';
+export const envIsLocal = window.WEAVE_CONFIG.ONPREM && window.WEAVE_CONFIG.ENVIRONMENT_NAME === 'local';

@@ -226,9 +226,13 @@ def gql_schema_path() -> typing.Optional[str]:
     return os.environ.get(WEAVE_GQL_SCHEMA_PATH) or None
 
 
-def datadog_env() -> typing.Optional[str]:
-    return os.getenv("DD_ENV")
+def env_is_private() -> bool:
+    return _env_as_bool("ENVIRONMENT_IS_PRIVATE", default="False")
 
 
-def datadog_client_token() -> typing.Optional[str]:
-    return os.getenv("DD_CLIENT_TOKEN")
+def env_name() -> str:
+    return os.getenv("ENVIRONMENT_NAME", "")
+
+
+def git_tag() -> str:
+    return os.getenv("GIT_TAG", "")
