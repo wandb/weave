@@ -869,7 +869,9 @@ const CenterProjectTablesBrowser: React.FC<
           title={row.name}
           row={row}
           setPreviewNode={setPreviewNode}
-          actions={sidebarActions}>
+          actions={sidebarActions}
+          emptyData={true}
+          emptyDataMessage={<EmptyTableMessage />}>
           <HomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
@@ -933,6 +935,18 @@ const CenterProjectTablesBrowser: React.FC<
         data={browserData}
         actions={browserActions}
       />
+    </>
+  );
+};
+
+const EmptyTableMessage = () => {
+  return (
+    <>
+      <div>This table has no data.</div>
+      <div>
+        Table preview and board creation are not available until data has been
+        logged.
+      </div>
     </>
   );
 };
