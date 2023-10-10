@@ -21,6 +21,8 @@ export const PanelNumber: React.FC<
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
+  const textAlign = props.textAlign ?? 'center';
+
   return (
     <div
       data-test-weave-id="number"
@@ -30,13 +32,13 @@ export const PanelNumber: React.FC<
         overflowX: 'hidden',
         overflowY: 'auto',
         margin: 'auto',
-        textAlign: props.textAlign ?? 'center',
+        textAlign: textAlign,
         wordBreak: 'normal',
         display: 'flex',
         flexDirection: 'column',
         alignContent: 'space-around',
         justifyContent: 'space-around',
-        alignItems: props.textAlign === 'center' ? 'center' : 'normal',
+        alignItems: textAlign === 'center' ? 'center' : 'normal',
       }}>
       {nodeValueQuery.result == null
         ? '-'

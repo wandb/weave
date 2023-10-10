@@ -3647,23 +3647,21 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                     ...getPanelStackDims(handler, tooltipNode.type, config),
                   }}>
                   {tooltipNode.nodeType !== 'void' && handler && (
-                    <>
-                      <PanelComp2
-                        input={tooltipNode}
-                        inputType={tooltipNode.type}
-                        loading={false}
-                        panelSpec={handler}
-                        configMode={false}
-                        context={props.context}
-                        config={
-                          config.series[seriesIndex ?? 0].table.columns[
-                            config.series[seriesIndex ?? 0].dims.tooltip
-                          ].panelConfig
-                        }
-                        updateConfig={updateTooltipConfig}
-                        updateContext={props.updateContext}
-                      />
-                    </>
+                    <PanelComp2
+                      input={tooltipNode}
+                      inputType={tooltipNode.type}
+                      loading={false}
+                      panelSpec={handler}
+                      configMode={false}
+                      context={props.context}
+                      config={
+                        config.series[seriesIndex ?? 0].table.columns[
+                          config.series[seriesIndex ?? 0].dims.tooltip
+                        ].panelConfig
+                      }
+                      updateConfig={updateTooltipConfig}
+                      updateContext={props.updateContext}
+                    />
                   )}
                 </div>
               </Portal>
