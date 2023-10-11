@@ -227,6 +227,9 @@
     "setupFiles": [
       "react-app-polyfill/jsdom"
     ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/setupTests.ts"
+    ],
     "testEnvironment": "jsdom",
     "transformIgnorePatterns": [
       "^.+\\.module\\.(css|sass|scss)$"
