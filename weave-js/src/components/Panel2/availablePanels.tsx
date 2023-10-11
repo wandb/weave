@@ -17,7 +17,6 @@ import * as PanelLib from './panellib/libpanel';
 import * as LibTypes from './panellib/libtypes';
 import * as PanelRegistry from './PanelRegistry';
 import {Spec as PanelTableMergeSpec} from './PanelTableMerge';
-import {colNamePolicyConcat} from '@wandb/weave/common/state/queryGraph/queryResult';
 
 const getTypeHandlerStacksInternal = (currentType: Type) => {
   const stacks = LibTypes._getTypeHandlerStacks(
