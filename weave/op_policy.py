@@ -18,7 +18,9 @@ CACHE_AND_PARALLEL_OP_NAMES = [
 
 CACHE_NON_PURE_OP_NAMES = [
     "gqlroot-wbgqlquery",
-    "get",
+    # Disabling this because it is messing with publishing
+    # TODO: Fix this
+    # "get",
 ]
 
 CACHE_OP_NAMES = (
