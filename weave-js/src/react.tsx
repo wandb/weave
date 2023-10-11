@@ -347,7 +347,7 @@ export const useNodeValue = <T extends Type>(
     if (error != null) {
       const message =
         'Node execution failed (useNodeValue): ' + errorToText(error);
-      console.error(message);
+      // console.error(message);
 
       throw new UseNodeValueServerExecutionError(message);
     }
@@ -979,7 +979,7 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
       // rethrow in render thread
       const message =
         'Node execution failed (useNodeWithServerType): ' + errorToText(error);
-      console.error(message);
+      // console.error(message);
       throw new Error(message);
     }
     return {

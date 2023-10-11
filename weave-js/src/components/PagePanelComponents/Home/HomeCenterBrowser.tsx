@@ -28,6 +28,7 @@ const CenterTable = styled.table`
   border-collapse: collapse;
 
   td {
+    padding: 0px 15px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
