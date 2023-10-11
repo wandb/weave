@@ -1,4 +1,3 @@
-import promisify from 'cypress-promise';
 import {exec} from '../testlib';
 
 const gotoBlankDashboard = () => {
