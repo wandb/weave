@@ -36,7 +36,6 @@ import {
   emptyTable,
   getRowExampleNode,
 } from '../PanelTable/tableState';
-import {useHistory} from 'react-router-dom';
 
 const inputType = {
   type: 'list' as const,
