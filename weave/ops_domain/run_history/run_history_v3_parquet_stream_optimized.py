@@ -180,12 +180,12 @@ def _get_history3(run: wdt.Run, columns=None):
     final_array = _unflatten_pa_table(sorted_table)
 
     # 7. Optionally: verify the AWL
-    reason = weave_arrow_type_check(final_type, final_array)
+    # reason = weave_arrow_type_check(final_type, final_array)
 
-    if reason != None:
-        raise errors.WeaveWBHistoryTranslationError(
-            f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
-        )
+    # if reason != None:
+    #     raise errors.WeaveWBHistoryTranslationError(
+    #         f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
+    #     )
     return ArrowWeaveList(
         final_array,
         final_type,
