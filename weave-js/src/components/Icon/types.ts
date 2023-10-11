@@ -110,7 +110,6 @@ export const IconNames = {
   OrchestrationLaunch: 'orchestration-launch',
   OrganizationCorporate: 'organization-corporate',
   OverflowHorizontal: 'overflow-horizontal',
-  OverflowVertical: 'overflow-vertical',
   PanTool: 'pan-tool',
   PanTool1: 'pan-tool-1',
   Panel: 'panel',

@@ -111,7 +111,6 @@ import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
-import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
@@ -538,9 +537,6 @@ export const IconOrganizationCorporate = (props: SVGIconProps) => (
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportOverflowHorizontal {...updateIconProps(props)} />
 );
-export const IconOverflowVertical = (props: SVGIconProps) => (
-  <ImportOverflowVertical {...updateIconProps(props)} />
-);
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
 );
@@ -891,7 +887,6 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
-  'overflow-vertical': IconOverflowVertical,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
