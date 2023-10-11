@@ -965,7 +965,7 @@ const EmptyTableMessageIcon = styled.div`
 EmptyTableMessageIcon.displayName = 'S.EmptyTableMessageIcon';
 
 const EmptyTableMessageText = styled.div`
-  padding: 15px 5px 15px 0px;
+  padding: 15px 20px 15px 0px;
   color: ${globals.MOON_600};
 `;
 EmptyTableMessageText.displayName = 'S.EmptyTableMessageText';
@@ -982,7 +982,8 @@ const EmptyTableMessage = () => {
             <div style={{fontWeight: '600'}}>This table has no data.</div>
             <div>
               Table preview and board creation are not available until data has
-              been logged.
+              been logged. Learn more about logging data to StreamTables{' '}
+              <a href="https://docs.wandb.ai/guides/weave/streamtable">here</a>.
             </div>
           </EmptyTableMessageText>
         </EmptyTableMessageBlockContainer>
