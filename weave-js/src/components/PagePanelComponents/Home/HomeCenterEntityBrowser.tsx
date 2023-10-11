@@ -779,6 +779,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconFullScreenModeExpand,
           label: 'Preview table',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             navigateToExpression(
               tableRowToNode(row.kind, entityName, projectName, row._id)
@@ -788,6 +789,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconCopy,
           label: 'Copy Weave expression',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
@@ -806,6 +808,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconAddNew,
           label: 'New board',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
