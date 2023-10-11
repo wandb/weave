@@ -196,6 +196,7 @@ export interface GetPanelStacksForTypeOpts {
   showDebug?: boolean;
   stackIdFilter?: (stackId: string) => boolean;
   allowedPanels?: string[];
+  disallowedPanels?: string[];
 }
 export function getPanelStacksForType(
   type: Type,
@@ -267,6 +268,18 @@ export function getPanelStacksForType(
     handlerStacks = handlerStacks.sort((hs1, hs2) => {
       return scoreHandlerStack(type, hs2) - scoreHandlerStack(type, hs1);
     });
+  }
+
+  if (opts.disallowedPanels != null) {
+    handlerStacks = handlerStacks.filter(
+      hs => !opts.disallowedPanels!.includes(PanelLib.getStackIdAndName(hs).id)
+    );
+  }
+
+  if (handlerStacks.length > 1) {
+    handlerStacks = handlerStacks.filter(
+      hs => PanelLib.getStackIdAndName(hs).id !== 'raw'
+    );
   }
 
   const stackIds = handlerStacks.map(PanelLib.getStackIdAndName);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import * as CGReact from '../../react';
 import * as Panel2 from './panel';
@@ -14,7 +14,21 @@ export const PanelRawFallback: React.FC<PanelRawFallbackProps> = props => {
   const inputValue = CGReact.useNodeValue(props.input);
   const loading = inputValue.loading;
 
-  const fullStr = String(JSON.stringify(inputValue?.result, undefined, 2));
+  const fullStr = useMemo(() => {
+    try {
+      const val = inputValue?.result ?? '';
+      if (typeof val === 'string') {
+        return val;
+      }
+      if (typeof val === 'object') {
+        return JSON.stringify(val, undefined, 2);
+      }
+      return String(val);
+    } catch (e) {
+      console.error(e);
+      return '';
+    }
+  }, [inputValue?.result]);
 
   if (loading) {
     return <Panel2Loader />;
