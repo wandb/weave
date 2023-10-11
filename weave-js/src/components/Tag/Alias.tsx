@@ -1,10 +1,10 @@
+import {Icon} from '@wandb/weave/components/Icon';
 import classNames from 'classnames';
 import React, {FC, ReactElement} from 'react';
 
-import {Icon} from '../Icon';
 import {Tailwind} from '../Tailwind';
 import {RemoveAction} from './RemoveAction';
-import {getTagColor, TagColorName} from './utils';
+import {getTagColorClass, TagColorName} from './utils';
 
 export const DEFAULT_ALIAS_ICON = 'email-at';
 
@@ -22,7 +22,7 @@ export const Alias: FC<AliasProps> = ({label, color, showIcon = false}) => {
           'night-aware',
           'min-h-22 flex max-h-22 w-fit items-center rounded-[3px] font-mono text-[13px]',
           showIcon ? 'pl-4 pr-6' : 'px-6',
-          getTagColor(color)
+          getTagColorClass(color)
         )}>
         {showIcon && (
           <Icon className="mr-4 h-14 w-14" name={DEFAULT_ALIAS_ICON} />
@@ -54,7 +54,7 @@ export const RemovableAlias: FC<RemovableAliasProps> = ({
         className={classNames(
           'night-aware',
           'min-h-22 flex max-h-22 w-fit items-center rounded-[3px] px-4 font-mono text-[13px]',
-          getTagColor(color)
+          getTagColorClass(color)
         )}>
         {showIcon && (
           <Icon className="mr-4 h-14 w-14" name={DEFAULT_ALIAS_ICON} />

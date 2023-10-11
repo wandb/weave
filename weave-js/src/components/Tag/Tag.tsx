@@ -1,70 +1,111 @@
+import {Icon} from '@wandb/weave/components/Icon';
 import classNames from 'classnames';
-import React, {FC, ReactElement} from 'react';
+import React, {FC, ReactElement, useMemo, useRef} from 'react';
+import {twMerge} from 'tailwind-merge';
 
-import {Icon} from '../Icon';
 import {Tailwind} from '../Tailwind';
 import {RemoveAction} from './RemoveAction';
-import {getTagColor, TagColorName} from './utils';
+import {TagTooltip} from './TagTooltip';
+import {
+  getRandomTagColor,
+  getTagColorClass,
+  getTagHoverClass,
+  isTagLabelTruncated,
+  TagColorName,
+} from './utils';
 
 export const DEFAULT_TAG_ICON = 'tag';
+
+/**
+ * A Tag not given a specific color would have its color change every render cycle. This calculates a default color as a stable value, and only adds it to the class list when color isn't defined
+ */
+export function useTagClasses({color}: {color?: TagColorName}) {
+  const defaultColorRef = React.useRef(color ?? getRandomTagColor());
+  const tagColor = color ?? defaultColorRef.current;
+
+  return useMemo(
+    () =>
+      classNames(
+        'night-aware',
+        'min-h-22 flex max-h-22 w-fit items-center rounded-[3px] text-[14px]',
+        getTagColorClass(tagColor),
+        getTagHoverClass(tagColor)
+      ),
+    [tagColor]
+  );
+}
 
 export type TagProps = {
   label: string;
   color?: TagColorName;
   showIcon?: boolean;
-};
-export const Tag: FC<TagProps> = ({label, color, showIcon = false}) => {
-  return (
-    <Tailwind>
-      <div
-        key={`tag-${label}`}
-        className={classNames(
-          'night-aware',
-          'min-h-22 flex max-h-22 w-fit items-center rounded-[3px] text-[14px]',
-          showIcon ? 'pl-4 pr-6' : 'px-6',
-          getTagColor(color)
-        )}>
-        {showIcon && (
-          <Icon className="mr-4 h-14 w-14" name={DEFAULT_TAG_ICON} />
-        )}
-        <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
-          {label}
-        </span>
-      </div>
-    </Tailwind>
-  );
+  // Wrapping the Tag in Tailwind can be a problem if the Tailwind wrapper is supplied higher up
+  // and there is a need to position the Tag as a direct child for something like flexbox
+  Wrapper?: React.ComponentType<any> | null;
 };
 
-export type RemovableTagProps = {
-  label: string;
+export const Tag: FC<TagProps> = ({
+  label,
+  color,
+  showIcon = false,
+  Wrapper = Tailwind,
+}) => {
+  const classes = useTagClasses({color});
+
+  const nakedTag = (
+    <div
+      key={`tag-${label}`}
+      className={twMerge(classes, showIcon ? 'pl-4 pr-6' : 'px-6')}>
+      {showIcon && <Icon className="mr-4 h-14 w-14" name={DEFAULT_TAG_ICON} />}
+      <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
+        {label}
+      </span>
+    </div>
+  );
+  if (Wrapper) {
+    return <Wrapper>{nakedTag}</Wrapper>;
+  }
+
+  return nakedTag;
+};
+
+export type RemovableTagProps = TagProps & {
   removeAction: ReactElement<typeof RemoveAction>;
-  color?: TagColorName;
-  showIcon?: boolean;
 };
 export const RemovableTag: FC<RemovableTagProps> = ({
   label,
   removeAction,
   color,
   showIcon = false,
+  Wrapper = Tailwind,
 }) => {
-  return (
-    <Tailwind>
+  const labelRef = useRef<HTMLParagraphElement>(null);
+  const isTooltipEnabled = isTagLabelTruncated(labelRef);
+  const classes = useTagClasses({color});
+
+  const nakedTag = (
+    <TagTooltip value={label} disabled={!isTooltipEnabled}>
       <div
         key={`tag-${label}`}
-        className={classNames(
-          'night-aware',
-          'min-h-22 flex max-h-22 w-fit items-center rounded-[3px] text-[14px]',
-          getTagColor(color),
-          showIcon ? 'px-4' : 'pl-6 pr-4'
-        )}>
+        className={twMerge(classes, showIcon ? 'px-4' : 'pl-6 pr-4')}>
         {showIcon && (
           <Icon className="mr-4 h-14 w-14" name={DEFAULT_TAG_ICON} />
         )}
-        <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
+        <p
+          className={twMerge(
+            'max-w-[172px]', // 172px =  MAX_TAG_LABEL_WIDTH_PX + 14 (account for remove action button)
+            'whitespace-nowrap" overflow-hidden text-ellipsis'
+          )}
+          ref={labelRef}>
           {label}
-        </span>
+        </p>
         {removeAction}
       </div>
-    </Tailwind>
+    </TagTooltip>
   );
+  if (Wrapper) {
+    return <Wrapper>{nakedTag}</Wrapper>;
+  }
+
+  return nakedTag;
 };
