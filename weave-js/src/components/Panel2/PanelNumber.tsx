@@ -20,7 +20,7 @@ const CustomFormatHelp = () => {
           style={{margin: 4}}
         />
       }
-      content="Supports a subset of Python's Format Specification Mini-Language. e.g. Value 1234 with format '+010,.1f' -> '+001,234.0'"
+      content="Syntax is inspired by Python's Format Specification Mini-Language. Supports precision, width with leading zeros, and commas for grouping. e.g. Value 1234 with format '+010,.1f' -> '+001,234.0'"
     />
   );
 };
