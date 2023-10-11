@@ -180,12 +180,12 @@ def _get_history3(run: wdt.Run, columns=None):
     final_array = _unflatten_pa_table(sorted_table)
 
     # 7. Optionally: verify the AWL
-    # reason = weave_arrow_type_check(final_type, final_array)
+    reason = weave_arrow_type_check(final_type, final_array)
 
-    # if reason != None:
-    #     raise errors.WeaveWBHistoryTranslationError(
-    #         f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
-    #     )
+    if reason != None:
+        raise errors.WeaveWBHistoryTranslationError(
+            f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
+        )
     return ArrowWeaveList(
         final_array,
         final_type,
@@ -460,6 +460,16 @@ def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
     offset_array = pa.nulls(num_rows, type=pa.int32())
     arrays = []
     for col_ndx, column_data in enumerate(columns):
+        if col_ndx == 0:
+            # We always take the entire first column, then replace with mask
+            # each subsequent column. This approach ensures that rows which have
+            # nulls for every single column can be properly represented (ie. by the
+            # first column)
+            new_data = column_data
+            arrays.append(new_data)
+            type_array = pa.array([col_ndx] * len(new_data), type=pa.int8())
+            offset_array = pa.array(list(range(len(new_data))), type=pa.int32())
+            continue
         is_usable = pa.compute.invert(_is_null(column_data))
         new_data = column_data.filter(is_usable)
         arrays.append(new_data)
@@ -473,10 +483,6 @@ def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
             is_usable,
             pa.array(list(range(len(new_data))), type=pa.int32()),
         )
-
-    arrays.append(pa.nulls(1, type=pa.int8()))
-    type_array = pa.compute.fill_null(type_array, len(arrays) - 1)
-    offset_array = pa.compute.fill_null(offset_array, 0)
 
     return pa.UnionArray.from_dense(type_array, offset_array, arrays)
 
