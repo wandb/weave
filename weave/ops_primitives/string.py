@@ -42,6 +42,10 @@ class String:
     def __contains__(str: str, sub: str) -> bool:  # type: ignore[misc]
         return sub in str
 
+    @op(name="string-is_in")
+    def is_in(lhs: str, rhs: list[str]) -> bool:  # type: ignore[misc]
+        return lhs in rhs
+
     @op(name="string-in")
     def in_(lhs: str, rhs: typing.Optional[str]) -> bool:  # type: ignore[misc]
         rhs = rhs or ""

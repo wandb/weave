@@ -57,6 +57,14 @@ def varbar(editable=True, items=None) -> panel_group.Group:
     )
 
 
+def main() -> panel_group.Group:
+    return panel_group.Group(
+        layoutMode="grid",
+        showExpressions=True,
+        enableAddPanel=True,
+    )
+
+
 def Board(
     vars: typing.Union[panel_group.Group, list, dict],
     panels: typing.Union[panel_group.Group, list[BoardPanel]],
