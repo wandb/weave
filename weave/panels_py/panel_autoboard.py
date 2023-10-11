@@ -436,12 +436,13 @@ with open(
     instructions_md = f.read()
 
 
-template_registry.register(
-    "py_board-seed_autoboard",
-    "Timeseries Auto-Board",
-    "Column-level analysis of timeseries data",
-    input_node_predicate=node_qualifies_for_autoboard,
-    # Not featuring because it is pretty buggy
-    # is_featured=True,
-    instructions_md=instructions_md,
-)
+# Removing this from registry for now since it is pretty buggy and not well tested.
+# template_registry.register(
+#     "py_board-seed_autoboard",
+#     "Timeseries Auto-Board",
+#     "Column-level analysis of timeseries data",
+#     input_node_predicate=node_qualifies_for_autoboard,
+#     # Not featuring because it is pretty buggy
+#     # is_featured=True,
+#     instructions_md=instructions_md,
+# )
