@@ -390,7 +390,7 @@ const TooltipContent: FC<{
         <FrameComp>
           {!noHeader && (
             <TooltipHeader>
-              <TooltipHeaderText>String preview</TooltipHeaderText>
+              <TooltipHeaderText>Preview</TooltipHeaderText>
               <TooltipButtons>
                 {extraButton && (
                   <Button

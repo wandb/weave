@@ -41,7 +41,7 @@ export const PanelRawFallback: React.FC<PanelRawFallbackProps> = props => {
   );
 
   return (
-    <S.StringContainer data-test-weave-id="string">
+    <S.StringContainer>
       <S.StringItem>
         <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
           {contentPlaintext}
