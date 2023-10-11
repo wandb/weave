@@ -49,9 +49,7 @@ const scrollToEEAndType = (path: string[], text: string) => {
   panel
     .click()
     .find('[data-test=expression-editor-container] [contenteditable=true]')
-    .realMouseMove(0, 0, {position: 'center'})
-    .realHover()
-    .realClick()
+    .click()
     .wait(200)
     .type(text)
     .wait(300)
