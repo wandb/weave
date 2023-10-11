@@ -221,11 +221,19 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
             level={level}
             childNode={childNode}
             childType={propertyTypes[k]!}
-            updateInput={updateInput}
+            updateInput={updateInputFromProps == null ? undefined : updateInput}
           />
         );
       }),
-    [keys, level, pickOrGetattr, propertyTypes, props, updateInput]
+    [
+      keys,
+      level,
+      pickOrGetattr,
+      propertyTypes,
+      props,
+      updateInput,
+      updateInputFromProps,
+    ]
   );
   const defaultExpanded = !isObjectType(nonNullableInput) || level === 0;
   const expanded = props.config?.expanded ?? defaultExpanded;
@@ -243,8 +251,10 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
         width: '100%',
         height: '100%',
         overflowY: 'auto',
+        paddingLeft: level === 0 ? '8px' : '0px',
+        paddingBottom: level === 0 ? '4px' : '0px',
       }}>
-      <KeyValTable.Table>
+      <div style={{display: 'table', fontSize: '13px'}}>
         {isObjectType(nonNullableInput) && (
           <div
             style={{display: 'flex', alignItems: 'center'}}
@@ -254,7 +264,7 @@ export const PanelObject: React.FC<PanelObjectProps> = props => {
           </div>
         )}
         {expanded && <KeyValTable.Rows>{keyChildren}</KeyValTable.Rows>}
-      </KeyValTable.Table>
+      </div>
     </div>
   );
 };
@@ -265,7 +275,7 @@ const PanelObjectChild: React.FC<
     level: number;
     childNode: Node;
     childType: Type;
-    updateInput: (key: any, newInput: any) => void | undefined;
+    updateInput?: (key: any, newInput: any) => void;
   } & Omit<PanelObjectProps, 'updateInput'>
 > = ({
   k,
@@ -294,21 +304,28 @@ const PanelObjectChild: React.FC<
   return (
     <KeyValTable.Row>
       <KeyValTable.Key>
-        <KeyValTable.InputUpdateLink onClick={() => updateInput(k, null)}>
-          {k}
-        </KeyValTable.InputUpdateLink>
+        {updateInput == null ? (
+          k
+        ) : (
+          <KeyValTable.InputUpdateLink onClick={() => updateInput(k, null)}>
+            {k}
+          </KeyValTable.InputUpdateLink>
+        )}
       </KeyValTable.Key>
       <KeyValTable.Val>
-        {isAssignableTo(nonNullableChildType, PanelStringSpec.inputType) ? (
+        {isAssignableTo(nonNullableChildType, PanelNumberSpec.inputType) ? (
+          <div style={{padding: '0px 1em'}}>
+            <PanelNumber
+              input={childNode as any}
+              context={context}
+              updateContext={updateContext}
+              // Get rid of updateConfig
+              updateConfig={() => {}}
+              textAlign="left"
+            />
+          </div>
+        ) : isAssignableTo(nonNullableChildType, PanelStringSpec.inputType) ? (
           <PanelString
-            input={childNode as any}
-            context={context}
-            updateContext={updateContext}
-            // Get rid of updateConfig
-            updateConfig={() => {}}
-          />
-        ) : isAssignableTo(nonNullableChildType, PanelNumberSpec.inputType) ? (
-          <PanelNumber
             input={childNode as any}
             context={context}
             updateContext={updateContext}
@@ -324,26 +341,34 @@ const PanelObjectChild: React.FC<
             updateConfig={() => {}}
           />
         ) : typeIsRenderableByPanelObject(nonNullableChildType) ? (
-          <PanelObject
-            input={childNode as any}
-            level={level + 1}
-            config={config?.children?.[k]}
-            context={context}
-            updateContext={updateContext}
-            // Get rid of updateConfig
-            updateConfig={newChildConfig =>
-              updateConfig({
-                ...config,
-                children: {
-                  ...config?.children,
-                  [k]: newChildConfig,
-                },
-              })
-            }
-            updateInput={newInput => updateInput(k, newInput)}
-          />
+          <div style={{paddingLeft: '1em', paddingTop: '1em'}}>
+            <PanelObject
+              input={childNode as any}
+              level={level + 1}
+              config={config?.children?.[k]}
+              context={context}
+              updateContext={updateContext}
+              // Get rid of updateConfig
+              updateConfig={newChildConfig =>
+                updateConfig({
+                  ...config,
+                  children: {
+                    ...config?.children,
+                    [k]: newChildConfig,
+                  },
+                })
+              }
+              updateInput={
+                updateInput == null
+                  ? undefined
+                  : newInput => updateInput(k, newInput)
+              }
+            />
+          </div>
         ) : (
-          <div>{defaultLanguageBinding.printType(childType, true)}</div>
+          <div style={{paddingLeft: '1em'}}>
+            {defaultLanguageBinding.printType(childType, true)}
+          </div>
         )}
       </KeyValTable.Val>
     </KeyValTable.Row>

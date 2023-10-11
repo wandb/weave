@@ -10,12 +10,19 @@ const inputType = {
   members: ['none' as const, 'number' as const],
 };
 type PanelNumberProps = Panel2.PanelProps<typeof inputType>;
+type PanelNumberExtraProps = {
+  textAlign?: 'left' | 'right' | 'center' | 'justify' | 'initial' | 'inherit';
+};
 
-export const PanelNumber: React.FC<PanelNumberProps> = props => {
+export const PanelNumber: React.FC<
+  PanelNumberProps & PanelNumberExtraProps
+> = props => {
   const nodeValueQuery = CGReact.useNodeValue(props.input);
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
+  const textAlign = props.textAlign ?? 'center';
+
   return (
     <div
       data-test-weave-id="number"
@@ -25,13 +32,13 @@ export const PanelNumber: React.FC<PanelNumberProps> = props => {
         overflowX: 'hidden',
         overflowY: 'auto',
         margin: 'auto',
-        textAlign: 'center',
+        textAlign,
         wordBreak: 'normal',
         display: 'flex',
         flexDirection: 'column',
         alignContent: 'space-around',
         justifyContent: 'space-around',
-        alignItems: 'center',
+        alignItems: textAlign === 'center' ? 'center' : 'normal',
       }}>
       {nodeValueQuery.result == null
         ? '-'
