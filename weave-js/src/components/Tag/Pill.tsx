@@ -1,6 +1,6 @@
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import classNames from 'classnames';
 import React, {FC} from 'react';
+import {twMerge} from 'tailwind-merge';
 
 import {Tailwind} from '../Tailwind';
 import {getTagColorClass, TagColorName} from './utils';
@@ -9,17 +9,19 @@ export type PillProps = {
   label: string;
   icon?: IconName;
   color?: TagColorName;
+  className?: string;
 };
-export const Pill: FC<PillProps> = ({label, icon, color}) => {
+export const Pill: FC<PillProps> = ({label, icon, color, className}) => {
   return (
     <Tailwind>
       <div
         key={`pill-${label}`}
-        className={classNames(
+        className={twMerge(
           'night-aware',
           'min-h-22 flex max-h-22 w-fit items-center rounded-2xl text-[14px]',
           icon ? 'pl-4 pr-7' : 'px-7',
-          getTagColorClass(color)
+          getTagColorClass(color),
+          className
         )}>
         {icon && <Icon className="mr-4 h-14 w-14" name={icon} />}
         <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
@@ -39,7 +41,7 @@ export const IconOnlyPill: FC<IconOnlyPillProps> = ({icon, color}) => {
     <Tailwind>
       <div
         key={`pill-${icon}`}
-        className={classNames(
+        className={twMerge(
           'night-aware',
           'min-h-22 flex max-h-22 w-fit items-center rounded-2xl',
           getTagColorClass(color)
