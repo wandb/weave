@@ -6,7 +6,11 @@ import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
 import * as LayoutElements from './LayoutElements';
 import _ from 'lodash';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
-import {MOON_250, MOON_350} from '@wandb/weave/common/css/color.styles';
+import {
+  MOON_100,
+  MOON_250,
+  MOON_350,
+} from '@wandb/weave/common/css/color.styles';
 import {DeleteActionModal} from '../DeleteActionModal';
 import {constString, opGet} from '@wandb/weave/core';
 import {useMakeMutation} from '@wandb/weave/react';
@@ -98,9 +102,9 @@ const CenterTableActionCellAction = styled(LayoutElements.HBlock)<{
   gap: 8px;
   font-size: 16px;
   cursor: ${props => (props.isDisabled ? 'default' : 'pointer')};
-  color: ${props => (props.isDisabled ? `${MOON_350}` : 'inherit')};
+  color: ${props => (props.isDisabled ? MOON_350 : 'inherit')};
   &:hover {
-    background-color: ${props => (props.isDisabled ? 'inherit' : '#f5f6f7')};
+    background-color: ${props => (props.isDisabled ? 'inherit' : MOON_100)};
   }
 `;
 CenterTableActionCellAction.displayName = 'S.CenterTableActionCellAction';

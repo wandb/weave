@@ -53,6 +53,7 @@ import {
 import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 import {urlWandbFrontend} from '../../../util/urls';
 import * as globals from '@wandb/weave/common/css/globals.styles';
+import {TargetBlank} from '@wandb/weave/common/util/links';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -972,22 +973,25 @@ EmptyTableMessageText.displayName = 'S.EmptyTableMessageText';
 
 const EmptyTableMessage = () => {
   return (
-    <>
-      <div>
-        <EmptyTableMessageBlockContainer>
-          <EmptyTableMessageIcon>
-            <IconLightbulbInfo style={{color: `${globals.MOON_600}`}} />
-          </EmptyTableMessageIcon>
-          <EmptyTableMessageText>
-            <div style={{fontWeight: '600'}}>This table has no data.</div>
-            <div>
-              Table preview and board creation are not available until data has
-              been logged. Learn more about logging data to StreamTables{' '}
-              <a href="https://docs.wandb.ai/guides/weave/streamtable">here</a>.
-            </div>
-          </EmptyTableMessageText>
-        </EmptyTableMessageBlockContainer>
-      </div>
-    </>
+    <div>
+      <EmptyTableMessageBlockContainer>
+        <EmptyTableMessageIcon>
+          <IconLightbulbInfo style={{color: globals.MOON_600}} />
+        </EmptyTableMessageIcon>
+        <EmptyTableMessageText>
+          <div style={{fontWeight: 600, marginBottom: '2px'}}>
+            This table has no data
+          </div>
+          <div>
+            Table preview and board creation are not available until data has
+            been logged. Learn more about logging data to StreamTables{' '}
+            <TargetBlank href="https://docs.wandb.ai/guides/weave/streamtable">
+              here
+            </TargetBlank>
+            .
+          </div>
+        </EmptyTableMessageText>
+      </EmptyTableMessageBlockContainer>
+    </div>
   );
 };
