@@ -68,6 +68,7 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/icons/KeyboardArrowRight',
   '@monaco-editor/loader',
   '@radix-ui/react-tabs',
+  '@radix-ui/react-checkbox',
   '@redux-saga/core',
   '@redux-saga/deferred',
   '@redux-saga/delay-p',
