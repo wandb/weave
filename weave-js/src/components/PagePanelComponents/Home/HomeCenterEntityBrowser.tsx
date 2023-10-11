@@ -875,7 +875,7 @@ const CenterProjectTablesBrowser: React.FC<
           row={row}
           setPreviewNode={setPreviewNode}
           actions={sidebarActions}
-          emptyData={true}
+          emptyData={row['number of rows'] === 0}
           emptyDataMessage={<EmptyTableMessage />}>
           <HomeExpressionPreviewParts
             expr={expr}
