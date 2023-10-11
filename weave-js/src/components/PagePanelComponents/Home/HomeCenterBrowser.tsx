@@ -24,6 +24,7 @@ const CenterTable = styled.table`
   border-collapse: collapse;
 
   td {
+    padding: 0px 15px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -358,14 +359,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
           <thead>
             <tr>
               {columns.map(c => (
-                <td
-                  style={{
-                    minWidth: '150px',
-                    padding: '0px 10px',
-                  }}
-                  key={c}>
-                  {c}
-                </td>
+                <td key={c}>{c}</td>
               ))}
               {hasOverflowActions && (
                 <td
@@ -382,14 +376,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                 onClick={() => primaryAction?.onClick(row, i)}
                 $highlighted={props.selectedRowId === row._id}>
                 {columns.map(c => (
-                  <td
-                    style={{
-                      minWidth: '150px',
-                      padding: '0px 10px',
-                    }}
-                    key={c}>
-                    {(row as any)[c]}
-                  </td>
+                  <td key={c}>{(row as any)[c]}</td>
                 ))}
                 {hasOverflowActions && (
                   <td>
