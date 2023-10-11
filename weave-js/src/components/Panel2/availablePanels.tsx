@@ -17,6 +17,7 @@ import * as PanelLib from './panellib/libpanel';
 import * as LibTypes from './panellib/libtypes';
 import * as PanelRegistry from './PanelRegistry';
 import {Spec as PanelTableMergeSpec} from './PanelTableMerge';
+import {colNamePolicyConcat} from '@wandb/weave/common/state/queryGraph/queryResult';
 
 const getTypeHandlerStacksInternal = (currentType: Type) => {
   const stacks = LibTypes._getTypeHandlerStacks(
@@ -170,6 +171,12 @@ function scoreHandlerStack(type: Type, hs: PanelStack) {
   ) {
     scoreHs -= 50;
   }
+
+  // Until combined 2d projection performance is addressed, bump it down in the rcommendation list (i.e. don't auto recommend it)
+  if (sidAndName.id.includes('merge.projection.plot')) {
+    scoreHs -= 100;
+  }
+
   return scoreHs;
 }
 
