@@ -53,7 +53,6 @@ import {
 import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 import {urlWandbFrontend} from '../../../util/urls';
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import * as S from './styles';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
