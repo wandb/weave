@@ -109,23 +109,17 @@ export class BasicClient implements Client {
         return;
       }
       obs.observers.add(observer);
-      if (obs.hasResult) {
+
+      if (
+        !options?.noCache &&
+        (obs.hasResult || obs.lastResult !== undefined)
+      ) {
         observer.next(obs.lastResult);
       } else {
-        let lastResult;
-        if (
-          !options?.noCache &&
-          this.isRemoteServer &&
-          this.localStorageLRU.has(observableId)
-        ) {
-          lastResult = this.localStorageLRU.get(observableId);
-        }
-        if (lastResult !== undefined) {
-          observer.next(lastResult);
-        } else {
-          this.setIsLoading(true);
-        }
+        obs.hasResult = false;
+        this.setIsLoading(true);
       }
+
       return () => {
         obs.observers.delete(observer);
         // TODO: bug here!
@@ -137,6 +131,14 @@ export class BasicClient implements Client {
       };
     });
 
+    let lastResult;
+    if (this.isRemoteServer) {
+      const hasCacheResult = this.localStorageLRU.has(observableId);
+      if (hasCacheResult) {
+        lastResult = this.localStorageLRU.get(observableId);
+      }
+    }
+
     this.observables.set(observableId, {
       id: observableId,
       observable,
@@ -144,7 +146,7 @@ export class BasicClient implements Client {
       node,
       hasResult: false,
       inFlight: false,
-      lastResult: undefined,
+      lastResult,
     });
     this.scheduleRequest();
     return observable;
