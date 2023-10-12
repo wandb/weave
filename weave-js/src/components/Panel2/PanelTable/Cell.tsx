@@ -65,6 +65,7 @@ export const Cell: React.FC<{
     {
       excludeTable: true,
       excludePlot: true,
+      disallowedPanels: ['Group', 'Expression'],
     }
   );
 
@@ -198,6 +199,7 @@ export const Value: React.FC<{
   const {handler, curPanelId} = usePanelStacksForType(valueNode.type, '', {
     excludeTable: true,
     excludePlot: true,
+    disallowedPanels: ['Group', 'Expression'],
   });
 
   return (

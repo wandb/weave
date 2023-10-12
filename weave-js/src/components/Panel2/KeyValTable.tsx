@@ -27,7 +27,7 @@ export const Key = styled.div`
   text-overflow: ellipsis;
   vertical-align: top;
   padding: 0 !important;
-  color: ${globals.gray500};
+  color: ${globals.MOON_500};
   grid-column: 1;
 `;
 Key.displayName = 'S.Key';
@@ -35,6 +35,7 @@ Key.displayName = 'S.Key';
 export const Val = styled.div`
   padding: 0 !important;
   grid-column: 2;
+  color: ${globals.MOON_800};
 `;
 Val.displayName = 'S.Val';
 

@@ -120,6 +120,8 @@ type HomePreviewSidebarTemplateProps<RT extends CenterBrowserDataType> = {
     onClick: () => void;
   };
   actions?: Array<CenterBrowserActionType<RT>>;
+  emptyData?: boolean;
+  emptyDataMessage?: React.ReactNode;
 };
 
 export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
@@ -167,7 +169,9 @@ export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
           />
         </CenterTableActionCellIcon>
       </LayoutElements.HBlock>
-      <LayoutElements.VSpace>{props.children}</LayoutElements.VSpace>
+      <LayoutElements.VSpace>
+        {props.emptyData ? props.emptyDataMessage : props.children}
+      </LayoutElements.VSpace>
       {(props.primaryAction || props.secondaryAction) && (
         <LayoutElements.HBlock
           style={{
