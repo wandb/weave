@@ -202,6 +202,20 @@ export class BasicClient implements Client {
     };
   }
 
+  public clearCacheForNode(node: GraphTypes.Node<any>): Promise<void> {
+    const observableId = this.hasher.typedNodeId(node);
+    if (this.observables.has(observableId)) {
+      const obs = this.observables.get(observableId);
+      if (obs == null) {
+        throw new Error('This should never happen');
+      }
+      obs.hasResult = false;
+      obs.lastResult = undefined;
+    }
+    this.localStorageLRU.del(observableId);
+    return Promise.resolve();
+  }
+
   private scheduleRequest() {
     if (this.nextRequestTimer != null) {
       clearTimeout(this.nextRequestTimer);
