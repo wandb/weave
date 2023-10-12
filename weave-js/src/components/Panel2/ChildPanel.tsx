@@ -665,6 +665,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       variant="ghost"
                       size="small"
                       icon="pencil-edit"
+                      data-testid="open-panel-editor"
                       onClick={() =>
                         setInteractingPanel(
                           'config',
