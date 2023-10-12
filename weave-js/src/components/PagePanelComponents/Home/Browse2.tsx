@@ -12,7 +12,6 @@ import {
 import styled from 'styled-components';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {URL_BROWSE2} from '../../../urls';
-import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import * as query from './query';
 import Editor from '@monaco-editor/react';
 import {
@@ -78,6 +77,11 @@ import {AddRowToTable} from './Browse2/AddRow';
 import {urlPrefixed} from '@wandb/weave/config';
 import {WeaveEditor} from './Browse2/WeaveEditors';
 import {opDefCodeNode} from './Browse2/dataModel';
+import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
+import {PageEl} from './Browse2/CommonLib';
+import {PageHeader} from './Browse2/CommonLib';
+import {LinkTable} from './Browse2/LinkTable';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -88,43 +92,6 @@ function useQuery() {
 
   return React.useMemo(() => new URLSearchParams(search), [search]);
 }
-
-const PageEl = styled.div``;
-
-const PageHeader: FC<{
-  objectType: string;
-  objectName?: string;
-  actions?: JSX.Element;
-}> = ({objectType, objectName, actions}) => {
-  return (
-    <Box
-      display="flex"
-      alignItems="flex-start"
-      justifyContent="space-between"
-      mb={4}>
-      <Box
-        display="flex"
-        alignItems="baseline"
-        maxWidth={actions != null ? 800 : undefined}
-        sx={{
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-        marginRight={3}>
-        <Typography variant="h4" component="span" style={{fontWeight: 'bold'}}>
-          {objectType}
-        </Typography>
-        {objectName != null && (
-          <Typography variant="h4" component="span" style={{marginLeft: '8px'}}>
-            {objectName}
-          </Typography>
-        )}
-      </Box>
-      {actions}
-    </Box>
-  );
-};
 
 const opDisplayName = (opName: string) => {
   if (opName.startsWith('wandb-artifact:')) {
@@ -138,60 +105,6 @@ const opDisplayName = (opName: string) => {
     }
   }
   return opName;
-};
-
-const LinkTable = <RowType extends {[key: string]: any}>({
-  rows,
-  handleRowClick,
-}: {
-  rows: RowType[];
-  handleRowClick: (row: RowType) => void;
-}) => {
-  const columns = useMemo(() => {
-    const row0 = rows[0];
-    if (row0 == null) {
-      return [];
-    }
-    const cols = Object.keys(row0).filter(
-      k => k !== 'id' && !k.startsWith('_')
-    );
-    return row0 == null
-      ? []
-      : cols.map((key, i) => ({
-          field: key,
-          headerName: key,
-          flex: i === 0 ? 1 : undefined,
-        }));
-  }, [rows]);
-  return (
-    <Box
-      sx={{
-        height: 460,
-        width: '100%',
-        '& .MuiDataGrid-root': {
-          border: 'none',
-        },
-        '& .MuiDataGrid-row': {
-          cursor: 'pointer',
-        },
-      }}>
-      <DataGrid
-        density="compact"
-        rows={rows}
-        columns={columns}
-        autoPageSize
-        // initialState={{
-        //   pagination: {
-        //     paginationModel: {
-        //       pageSize: 10,
-        //     },
-        //   },
-        // }}
-        disableRowSelectionOnClick
-        onRowClick={params => handleRowClick(params.row as RowType)}
-      />
-    </Box>
-  );
 };
 
 const Browse2Boards: FC<{entity: string; project: string}> = ({
@@ -232,74 +145,6 @@ const Browse2Boards: FC<{entity: string; project: string}> = ({
     <>
       <LinkTable rows={rows} handleRowClick={handleRowClick} />
     </>
-  );
-};
-
-const Browse2Home: FC = props => {
-  const isAuthenticated = useIsAuthenticated();
-  const userEntities = query.useUserEntities(isAuthenticated);
-  const rows = useMemo(
-    () =>
-      userEntities.result.map((entityName, i) => ({
-        id: i,
-        name: entityName,
-      })),
-    [userEntities.result]
-  );
-  const history = useHistory();
-  const handleRowClick = useCallback(
-    (row: any) => {
-      const entityName = row.name;
-      history.push(`/${URL_BROWSE2}/${entityName}`);
-    },
-    [history]
-  );
-  return (
-    <PageEl>
-      <PageHeader objectType="Home" />
-      <Paper>
-        <Typography variant="h6" gutterBottom>
-          Entities
-        </Typography>
-        <LinkTable rows={rows} handleRowClick={handleRowClick} />
-      </Paper>
-    </PageEl>
-  );
-};
-
-interface Browse2EntityParams {
-  entity: string;
-}
-
-const Browse2EntityPage: FC = props => {
-  const params = useParams<Browse2EntityParams>();
-  const entityProjects = query.useProjectsForEntity(params.entity);
-  const rows = useMemo(
-    () =>
-      entityProjects.result.map((entityProject, i) => ({
-        id: i,
-        name: entityProject,
-      })),
-    [entityProjects.result]
-  );
-  const history = useHistory();
-  const handleRowClick = useCallback(
-    (row: any) => {
-      const projectName = row.name;
-      history.push(`/${URL_BROWSE2}/${params.entity}/${projectName}`);
-    },
-    [history, params.entity]
-  );
-  return (
-    <PageEl>
-      <PageHeader objectType="Entity" objectName={params.entity} />
-      <Paper>
-        <Typography variant="h6" gutterBottom>
-          Projects
-        </Typography>
-        <LinkTable rows={rows} handleRowClick={handleRowClick} />
-      </Paper>
-    </PageEl>
   );
 };
 
@@ -1771,7 +1616,7 @@ export const Browse2: FC = props => {
             <Browse2EntityPage />
           </Route>
           <Route path={`/${URL_BROWSE2}`}>
-            <Browse2Home />
+            <Browse2HomePage />
           </Route>
         </Switch>
       </Container>
