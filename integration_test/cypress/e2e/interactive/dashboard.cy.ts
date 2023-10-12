@@ -48,8 +48,13 @@ const scrollToEEAndType = (path: string[], text: string) => {
     .trigger('mouseenter')
     .click()
     .find('[data-test=expression-editor-container] [contenteditable=true]')
+
     .realHover()
     .realClick()
+
+    .realHover()
+    .realClick()
+
     .type(text, {force: true})
     .wait(300)
     .type('{enter}', {force: true});
