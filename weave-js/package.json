@@ -39,6 +39,9 @@
     "@segment/analytics.js-core": "^4.1.11",
     "@segment/analytics.js-integration-segmentio": "^4.4.7",
     "@sentry/react": "^6.17.3",
+    "@testing-library/jest-dom": "5.11.8",
+    "@testing-library/react": "11.2.3",
+    "@testing-library/user-event": "14.4.3",
     "@types/react-syntax-highlighter": "^15.5.7",
     "@wandb/semantic": "file:./wandb-semantic-v0.0.1.tgz",
     "@wandb/ui": "file:./wandb-ui-0.1.0.tgz",
@@ -224,6 +227,9 @@
     ],
     "setupFiles": [
       "react-app-polyfill/jsdom"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/setupTests.ts"
     ],
     "testEnvironment": "jsdom",
     "transformIgnorePatterns": [
