@@ -50,25 +50,10 @@ const iconStyle = {
 
 const useLastVisitedPath = () => {
   const [lastVisitedPath] = useLocalStorage<string>('lastVisited', '');
-  const [lastVisitedEntity, lastVisitedProject] = useMemo(() => {
-    let e = null;
-    let p = null;
-    if (lastVisitedPath !== '') {
-      const crumbs = lastVisitedPath.split('/').slice(1);
-      if (
-        crumbs.length >= 3 &&
-        crumbs[0] === 'browse' &&
-        crumbs[1] === 'wandb'
-      ) {
-        e = crumbs[2];
-        if (crumbs.length >= 4) {
-          p = crumbs[3];
-        }
-      }
-    }
-    return [e, p];
-  }, [lastVisitedPath]);
-  return [lastVisitedEntity, lastVisitedProject];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [prefix, browse, scope, entityName, projectName] =
+    lastVisitedPath.split('/');
+  return {entityName, projectName};
 };
 
 export const PublishModal = ({
@@ -83,7 +68,8 @@ export const PublishModal = ({
   const [projectName, setProjectName] = useState('');
   const isValidName = isValidBoardName(boardName);
   const showError = boardName.length > 0 && !isValidName;
-  const [lastVisitedEntity, lastVisitedProject] = useLastVisitedPath();
+  const {entityName: lastVisitedEntity, projectName: lastVisitedProject} =
+    useLastVisitedPath();
 
   // Make sure we only make requests once this is open
   const isAuthenticated = useIsAuthenticated();
