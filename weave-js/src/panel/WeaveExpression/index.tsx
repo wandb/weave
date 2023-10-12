@@ -117,7 +117,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
       // Pressing a non-printable character like shift is not enough to cancel
       // the suggestion panel suppression.
       const isPrintableCharacter = ev.key.length === 1;
-      if (isPrintableCharacter) {
+      if (isPrintableCharacter || ev.key === 'Backspace') {
         setShowSuggestions(true);
       }
 
