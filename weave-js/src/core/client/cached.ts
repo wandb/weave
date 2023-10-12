@@ -5,7 +5,7 @@ import {Hasher, MemoizedHasher} from '../model/graph/editing/hash';
 import {Node} from '../model/graph/types';
 import {Type} from '../model/types';
 import {OpStore} from '../opStore/types';
-import {Client, SubscribeOptions} from './types';
+import {Client} from './types';
 
 type CachedNode = {
   obs: Observable<any>;
@@ -25,10 +25,7 @@ export class CachedClient implements Client {
     });
     this.opStore = client.opStore;
   }
-  subscribe<T extends Type>(
-    node: Node<T>,
-    options?: SubscribeOptions
-  ): Observable<any> {
+  subscribe<T extends Type>(node: Node<T>): Observable<any> {
     // Moving the cache from `query` to subscribe.
     // This allows us to maintain a cache of subscriptions
     // (which are used for both `query` and `subscribe`)
@@ -39,16 +36,10 @@ export class CachedClient implements Client {
     // on screen will not cause a re-query, but will instead use the
     // existing subscription for up to 30 seconds!
 
-
-    // If we are not caching, just return the subscription
-    if (options?.noCache) {
-      return this.client.subscribe(node, options);
-    }
-
     if (this.cache.has(node)) {
       return this.cache.get(node).obs;
     }
-    const obs = this.client.subscribe(node, options);
+    const obs = this.client.subscribe(node);
     const sub = obs.subscribe(res => {});
     this.cache.set(node, {obs, sub}, 30);
 
@@ -109,6 +100,12 @@ export class CachedClient implements Client {
       opStore: this.opStore.debugMeta(),
       client: this.client.debugMeta(),
     };
+  }
+
+  public clearCacheForNode(node: Node<any>): Promise<void> {
+    return this.client.clearCacheForNode(node).then(() => {
+      return this.cache.invalidate(node);
+    });
   }
 
   private onDispose(key: string, value: CachedNode): void {

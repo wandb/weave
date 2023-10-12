@@ -235,7 +235,6 @@ export const useNodeValue = <T extends Type>(
     memoCacheId?: number;
     callSite?: string;
     skip?: boolean;
-    noCache?: boolean;
   }
 ): {loading: boolean; result: TypeToTSTypeInner<T>} => {
   const memoCacheId = options?.memoCacheId ?? 0;
@@ -319,7 +318,7 @@ export const useNodeValue = <T extends Type>(
       // if (callSite != null) {
       //   console.log('useNodeValue subscribe', callSite, node);
       // }
-      const obs = client.subscribe(node, {noCache: !!options?.noCache});
+      const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
           // if (callSite != null) {
@@ -335,7 +334,7 @@ export const useNodeValue = <T extends Type>(
     } else {
       return;
     }
-  }, [client, node, memoCacheId, callSite, skip, options?.noCache]);
+  }, [client, node, memoCacheId, callSite, skip]);
   // useTraceUpdate('useNodeValue' + callSite, {
   //   client,
   //   node,

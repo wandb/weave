@@ -1,10 +1,4 @@
-import {
-  Client,
-  constNodeUnsafe,
-  isConstNode,
-  isOutputNode,
-  NodeOrVoidNode,
-} from '@wandb/weave/core';
+import {Client, constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
 import React, {
   Dispatch,
   useCallback,
@@ -498,19 +492,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   );
 };
 
-const nodeIsGetOpOfLatestURI = (node: any) => {
-  if (isOutputNode(node) && node.fromOp.name === 'get') {
-    const uriNode = node.fromOp.inputs.uri;
-    if (isConstNode(uriNode)) {
-      const uri = String(uriNode.val);
-      if (uri.includes(':latest')) {
-        return true;
-      }
-    }
-  }
-  return true;
-};
-
 export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {
     loading,
@@ -526,18 +507,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {stack} = usePanelContext();
   const setPanelConfig = updateConfig2;
   const loaded = useRef(false);
-  // Here, we set noCache to true if the input is a get op of the latest URI. We
-  // want to do this because PanelPanel is often updated by mutations (like
-  // publishing) and in such cases we want to avoid hitting the cache, or we get
-  // stale results. A more sophisticated solution would be to invalidate the
-  // cache when mutations effect this node, but that is far more complicated,
-  // and this is a good enough solution for now. The tradeoff here is that we
-  // are not caching the board state, so initial board loading will revert back
-  // to a slower loading process until we have a more sophisticated cache
-  // invalidation solution.
-  const panelQuery = CGReact.useNodeValue(props.input, {
-    noCache: nodeIsGetOpOfLatestURI(props.input),
-  });
+  const panelQuery = CGReact.useNodeValue(props.input);
   const {updateInput} = props;
   const updateServerPanel = useUpdateServerPanel(
     props.input,

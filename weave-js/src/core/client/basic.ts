@@ -8,13 +8,13 @@ import {OpStore} from '../opStore/types';
 import {RemoteHttpServer} from '../server';
 import {Server} from '../server/types';
 import {ID} from '../util/id';
-import {Client, SubscribeOptions} from './types';
+import {Client} from './types';
 import _ from 'lodash';
 import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
-  observable: Observable<any>;
+  observable: Observable<T>;
   node: GraphTypes.Node<T>;
   observers: Set<ZenObservable.SubscriptionObserver<T>>;
   hasResult: boolean;
@@ -90,8 +90,7 @@ export class BasicClient implements Client {
   }
 
   public subscribe<T extends Model.Type>(
-    node: GraphTypes.Node<T>,
-    options?: SubscribeOptions
+    node: GraphTypes.Node<T>
   ): Observable<any> {
     GlobalCGEventTracker.basicClientSubscriptions++;
     const observableId = this.hasher.typedNodeId(node);
@@ -102,7 +101,7 @@ export class BasicClient implements Client {
       }
       return obs.observable;
     }
-    const observable = new Observable(observer => {
+    const observable = new Observable<Model.Type>(observer => {
       const obs = this.observables.get(observableId);
       // console.log('SUB', observableId, obs);
       if (obs == null) {
@@ -110,12 +109,7 @@ export class BasicClient implements Client {
       }
       obs.observers.add(observer);
 
-      // If we accept the cached value, then send it immediately.
-      // else, mark the node as needing a result
-      if (
-        !options?.noCache &&
-        (obs.hasResult || obs.lastResult !== undefined)
-      ) {
+      if (obs.hasResult || obs.lastResult !== undefined) {
         observer.next(obs.lastResult);
       } else {
         obs.hasResult = false;
@@ -210,6 +204,20 @@ export class BasicClient implements Client {
       opStore: this.opStore.debugMeta(),
       server: this.server.debugMeta(),
     };
+  }
+
+  public clearCacheForNode(node: GraphTypes.Node<any>): Promise<void> {
+    const observableId = this.hasher.typedNodeId(node);
+    if (this.observables.has(observableId)) {
+      const obs = this.observables.get(observableId);
+      if (obs == null) {
+        throw new Error('This should never happen');
+      }
+      obs.hasResult = false;
+      obs.lastResult = undefined;
+    }
+    this.localStorageLRU.del(observableId);
+    return Promise.resolve();
   }
 
   private scheduleRequest() {
