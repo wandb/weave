@@ -43,6 +43,8 @@ export interface Call {
   name: string;
   inputs: {_input_order?: string[]; [key: string]: any};
   output: any;
+  status_code: string; // TODO enum
+  exception?: string;
   attributes: {[key: string]: any};
   summary: {latency_s: number; [key: string]: any};
   span_id: string;
@@ -131,6 +133,14 @@ export const callsTableSelect = (stNode: Node) => {
         output: opPick({
           obj: row,
           key: constString('output'),
+        }),
+        status_code: opPick({
+          obj: row,
+          key: constString('status_code'),
+        }),
+        exception: opPick({
+          obj: row,
+          key: constString('exception'),
         }),
         timestamp: opPick({
           obj: row,

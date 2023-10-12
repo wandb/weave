@@ -234,16 +234,20 @@ export const OpenAIChatOutputView: FC<{chatOutput: OpenAIChatOutput}> = ({
         </Typography>
       </Box>
       <div>
-        <OpenAIChatMessage message={chatOutput.choices[0].message} />
+        {chatOutput.choices?.length > 0 ? (
+          <OpenAIChatMessage message={chatOutput.choices[0].message} />
+        ) : (
+          <div>No response</div>
+        )}
       </div>
     </div>
   );
 };
 
 export const isOpenAIChatInput = (obj: any): obj is OpenAIChatInput => {
-  return obj.model !== undefined && obj.messages !== undefined;
+  return obj.model != null && obj.messages != null;
 };
 
 export const isOpenAIChatOutput = (obj: any): obj is OpenAIChatOutput => {
-  return obj != null && obj.model !== undefined && obj.choices !== undefined;
+  return obj != null && obj.model != null && obj.choices != null;
 };

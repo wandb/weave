@@ -12,6 +12,7 @@ from . import debug_compile
 
 
 from . import serialize
+from . import box
 from . import compile_domain
 from . import op_args
 from . import weave_types as types
@@ -840,7 +841,7 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     ]:
         return None
     new_node = typing.cast(graph.Node, weave_internal.use(node))
-    if new_node == None:
+    if new_node is None or isinstance(new_node, box.BoxedNone):
         return graph.ConstNode(types.NoneType(), None)
 
     # The result will typically contain expressions that were sent down as

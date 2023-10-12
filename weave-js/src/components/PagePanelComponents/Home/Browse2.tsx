@@ -14,6 +14,7 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import {URL_BROWSE2} from '../../../urls';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import * as query from './query';
+import Editor from '@monaco-editor/react';
 import {
   callOpVeryUnsafe,
   constNumber,
@@ -76,6 +77,7 @@ import {LoadingButton} from '@mui/lab';
 import {AddRowToTable} from './Browse2/AddRow';
 import {urlPrefixed} from '@wandb/weave/config';
 import {WeaveEditor} from './Browse2/WeaveEditors';
+import {opDefCodeNode} from './Browse2/dataModel';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -600,6 +602,8 @@ const CallViewSmall: FC<{
               variant="outlined"
               label={callOpName(call)}
               sx={{
+                backgroundColor:
+                  call.status_code === 'ERROR' ? globals.warning : undefined,
                 maxWidth: '200px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -640,19 +644,29 @@ const SpanDetails: FC<{call: Call}> = ({call}) => {
   return (
     <div style={{width: '100%'}}>
       <div style={{marginBottom: 24}}>
-        <Box display="flex" justifyContent="space-between">
-          <Typography variant="h5" gutterBottom>
-            Function
-          </Typography>
-          {isOpenAIChatInput(inputs) && (
-            <Button
-              variant="outlined"
-              sx={{backgroundColor: globals.lightYellow}}>
-              Open in LLM Playground
-            </Button>
-          )}
+        <Box mb={2}>
+          <Box display="flex" justifyContent="space-between">
+            <Typography variant="h5" gutterBottom>
+              Function
+            </Typography>
+            {isOpenAIChatInput(inputs) && (
+              <Button
+                variant="outlined"
+                sx={{backgroundColor: globals.lightYellow}}>
+                Open in LLM Playground
+              </Button>
+            )}
+          </Box>
+          <Chip label={call.name} />
         </Box>
-        <Chip label={call.name} />
+        <Typography variant="body2" gutterBottom>
+          Status: {call.status_code}
+        </Typography>
+        {call.exception != null && (
+          <Typography variant="body2" gutterBottom>
+            {call.exception}
+          </Typography>
+        )}
       </div>
       <div style={{marginBottom: 24}}>
         <Typography variant="h5" gutterBottom>
@@ -769,6 +783,16 @@ type DataGridColumnGroupingModel = Exclude<
 const RunsTable: FC<{
   spans: Span[];
 }> = ({spans}) => {
+  // Have to add _result when null, even though we try to do this in the python
+  // side
+  spans = useMemo(
+    () =>
+      spans.map(s => ({
+        ...s,
+        output: s.output == null ? {_result: null} : s.output,
+      })),
+    [spans]
+  );
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const history = useHistory();
   const tableData = useMemo(() => {
@@ -786,6 +810,7 @@ const RunsTable: FC<{
       return {
         id: call.span_id,
         trace_id: call.trace_id,
+        status_code: call.status_code,
         timestamp: call.timestamp,
         latency: monthRoundedTime(call.summary.latency_s, true),
         ..._.mapKeys(
@@ -815,6 +840,10 @@ const RunsTable: FC<{
       {
         field: 'latency',
         headerName: 'Latency',
+      },
+      {
+        field: 'status_code',
+        headerName: 'Status',
       },
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [
@@ -859,10 +888,14 @@ const RunsTable: FC<{
     // All output keys as we don't have the order key yet.
     let outputKeys: {[key: string]: true} = {};
     spans.forEach(span => {
-      outputKeys = {...outputKeys, ...span.output};
+      for (const [k, v] of Object.entries(span.output)) {
+        if (v != null) {
+          outputKeys[k] = true;
+        }
+      }
     });
 
-    const outputOrder = Object.keys(_.omitBy(outputKeys, v => v == null));
+    const outputOrder = Object.keys(outputKeys);
     const outputGroup: Exclude<
       React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
       undefined
@@ -882,7 +915,6 @@ const RunsTable: FC<{
 
     return {cols, colGroupingModel};
   }, [spans]);
-  console.log('COL GROUPING MODEL', columns);
   return (
     <Box
       sx={{
@@ -1042,8 +1074,12 @@ const Browse2Trace: FC<{
         .filter(([k, v]) => v != null)
     );
 
+    let output = selectedSpan.output;
+    if (output == null) {
+      output = {_result: null};
+    }
     const simpleOutput = _.fromPairs(
-      Object.entries(selectedSpan.output).filter(([k, v]) => v != null)
+      Object.entries(output).filter(([k, v]) => v != null)
     );
 
     return {
@@ -1249,23 +1285,35 @@ const Browse2TracesPage: FC = () => {
   );
 };
 
+const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
+  const opPyContents = useMemo(() => {
+    return opDefCodeNode(uri);
+  }, [uri]);
+  const opPyContentsQuery = useNodeValue(opPyContents);
+  const text = opPyContentsQuery.result ?? '';
+  return (
+    <Editor
+      height={500}
+      defaultLanguage="python"
+      loading={opPyContentsQuery.loading}
+      value={text}
+      options={{
+        readOnly: true,
+        minimap: {enabled: false},
+      }}
+    />
+  );
+};
+
 const Browse2OpDefPage: FC = () => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const uri = makeObjRefUri(params);
   const query = useQuery();
   const filters = useMemo(() => {
-    const filt: CallFilter = {opUri: uri};
-    query.forEach((val, key) => {
-      if (key === 'op') {
-        filt.opUri = val;
-      } else if (key === 'inputUri') {
-        if (filt.inputUris == null) {
-          filt.inputUris = [];
-        }
-        filt.inputUris.push(val);
-      }
-    });
-    return filt;
+    return {
+      opUri: uri,
+      inputUris: query.getAll('inputUri'),
+    };
   }, [query, uri]);
   const streamId = useMemo(
     () => ({
@@ -1279,16 +1327,18 @@ const Browse2OpDefPage: FC = () => {
   const firstCall = useFirstCall(streamId, uri);
   const opSignature = useOpSignature(streamId, uri);
 
-  // const firstCall = useMemo(() => {
-  //   const streamTableRowsNode = callsTableNode(streamId);
-  //   const filtered = callsTableFilter(streamTableRowsNode, {opUri: uri});
-  //   const selected = callsTableSelect(filtered);
-  //   return opIndex({arr: selected, index: constNumber(0)});
-  // }, [streamId, uri]);
   return (
     <div>
       <Box mb={2}>
         <Browse2Calls streamId={streamId} filters={filters} />
+      </Box>
+      <Box mb={2}>
+        <Paper>
+          <Typography variant="h6" gutterBottom>
+            Code
+          </Typography>
+          <Browse2OpDefCode uri={uri} />
+        </Paper>
       </Box>
       <Box mb={2}>
         <Paper>
@@ -1298,7 +1348,7 @@ const Browse2OpDefPage: FC = () => {
           <Box sx={{width: 400}}>
             {opSignature.result != null &&
               Object.keys(opSignature.result.inputTypes).map(k => (
-                <Box mb={2}>
+                <Box key={k} mb={2}>
                   <TextField
                     label={k}
                     fullWidth

@@ -480,10 +480,23 @@ def execute_sync_op(
             span.inputs["_arg_order"] = list(inputs.keys())
             for i, ref in enumerate(refs[:3]):
                 span.inputs["_ref%s" % i] = ref
-            res = op_def.resolve_fn(**inputs)
-            span.output, refs = auto_publish(project_name, res)
+            try:
+                res = op_def.resolve_fn(**inputs)
+            except Exception as e:
+                span.status_code = monitor.StatusCode.ERROR
+                span.exception = e
+                raise
+
+            if isinstance(res, box.BoxedNone):
+                res = None
+            log_res = res
+            if not isinstance(log_res, dict):
+                log_res = {"_result": log_res}
+            span.output, refs = auto_publish(project_name, log_res)
     else:
         res = op_def.resolve_fn(**inputs)
+        if isinstance(res, box.BoxedNone):
+            res = None
 
     # TODO: not simple name
     # TODO: capture publish time here?

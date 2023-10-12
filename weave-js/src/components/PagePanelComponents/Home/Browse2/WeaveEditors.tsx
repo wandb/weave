@@ -60,6 +60,7 @@ import {
 } from './easyWeave';
 import {useHistory, useLocation} from 'react-router-dom';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
+import LinkIcon from '@mui/icons-material/Link';
 
 const displaysAsSingleRow = (valueType: Type) => {
   if (isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))) {
@@ -375,7 +376,15 @@ export const WeaveEditorString: FC<{
   const commit = useCallback(() => {
     addEdit({path, newValue: curVal});
   }, [addEdit, curVal, path]);
-  return <TextField value={curVal} onChange={onChange} onBlur={commit} />;
+  return (
+    <TextField
+      value={curVal}
+      onChange={onChange}
+      onBlur={commit}
+      multiline
+      fullWidth
+    />
+  );
 };
 
 export const WeaveEditorNumber: FC<{
@@ -554,6 +563,7 @@ export const WeaveEditorTable: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
+  const location = useLocation();
   const addEdit = useWeaveAddEdit();
   const objectType = listObjectType(node.type);
   if (!isTypedDict(objectType)) {
@@ -622,10 +632,21 @@ export const WeaveEditorTable: FC<{
     },
     [path, addEdit, sourceRows]
   );
-  console.log('ROWS', gridRows);
   const columnSpec = useMemo(() => {
-    return typeToDataGridColumnSpec(objectType);
-  }, [objectType]);
+    return [
+      {
+        field: '_origIndex',
+        headerName: '',
+        width: 50,
+        renderCell: params => (
+          <Link to={location.pathname + '/index/' + params.row._origIndex}>
+            <LinkIcon />
+          </Link>
+        ),
+      },
+      ...typeToDataGridColumnSpec(objectType),
+    ];
+  }, [location.pathname, objectType]);
   return (
     <Box
       sx={{
