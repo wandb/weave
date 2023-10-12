@@ -278,7 +278,7 @@ export function getPanelStacksForType(
 
   if (handlerStacks.length > 1) {
     handlerStacks = handlerStacks.filter(
-      hs => PanelLib.getStackIdAndName(hs).id !== 'raw'
+      hs => !PanelLib.getStackIdAndName(hs).id.endsWith('raw')
     );
   }
 
