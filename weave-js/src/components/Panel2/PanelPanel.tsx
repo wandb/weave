@@ -526,6 +526,15 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {stack} = usePanelContext();
   const setPanelConfig = updateConfig2;
   const loaded = useRef(false);
+  // Here, we set noCache to true if the input is a get op of the latest URI. We
+  // want to do this because PanelPanel is often updated by mutations (like
+  // publishing) and in such cases we want to avoid hitting the cache, or we get
+  // stale results. A more sophisticated solution would be to invalidate the
+  // cache when mutations effect this node, but that is far more complicated,
+  // and this is a good enough solution for now. The tradeoff here is that we
+  // are not caching the board state, so initial board loading will revert back
+  // to a slower loading process until we have a more sophisticated cache
+  // invalidation solution.
   const panelQuery = CGReact.useNodeValue(props.input, {
     noCache: nodeIsGetOpOfLatestURI(props.input),
   });

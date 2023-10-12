@@ -110,6 +110,8 @@ export class BasicClient implements Client {
       }
       obs.observers.add(observer);
 
+      // If we accept the cached value, then send it immediately.
+      // else, mark the node as needing a result
       if (
         !options?.noCache &&
         (obs.hasResult || obs.lastResult !== undefined)

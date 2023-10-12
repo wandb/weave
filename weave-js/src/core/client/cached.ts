@@ -39,6 +39,8 @@ export class CachedClient implements Client {
     // on screen will not cause a re-query, but will instead use the
     // existing subscription for up to 30 seconds!
 
+
+    // If we are not caching, just return the subscription
     if (options?.noCache) {
       return this.client.subscribe(node, options);
     }
