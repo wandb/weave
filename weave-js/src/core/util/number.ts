@@ -1,6 +1,9 @@
 /**
  * Utilities for formatting numbers. These are inspired by Python's format specifier mini-language.
  */
+import numeral from 'numeral';
+
+import {trimEndChar} from './string';
 
 const FORMAT_NUMBER = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -68,6 +71,20 @@ const insertAt = (str: string, index: number, insert: string): string => {
 };
 
 export const formatNumber = (n: number, format: string): string => {
+  if (format === 'Automatic') {
+    // Use the same logic as displayValueNoBarChart
+    if (!Number.isFinite(n) || Number.isInteger(n)) {
+      return n.toString();
+    }
+    if (-1 < n && n < 1) {
+      let s = n.toPrecision(4);
+      if (!s.includes('e')) {
+        s = trimEndChar(s, '0');
+      }
+      return s;
+    }
+    return numeral(n).format('0.[000]');
+  }
   if (format === 'Number') {
     return FORMAT_NUMBER.format(n);
   }
@@ -96,7 +113,7 @@ export const formatNumber = (n: number, format: string): string => {
     }
   }
   if (format.startsWith('*')) {
-    if (Number.isNaN(n) || !Number.isFinite(n)) {
+    if (!Number.isFinite(n)) {
       return n.toLocaleString();
     }
 
