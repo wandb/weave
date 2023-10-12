@@ -40,13 +40,13 @@ export class CachedClient implements Client {
     // existing subscription for up to 30 seconds!
 
     if (options?.noCache) {
-      return this.client.subscribe(node);
+      return this.client.subscribe(node, options);
     }
 
     if (this.cache.has(node)) {
       return this.cache.get(node).obs;
     }
-    const obs = this.client.subscribe(node);
+    const obs = this.client.subscribe(node, options);
     const sub = obs.subscribe(res => {});
     this.cache.set(node, {obs, sub}, 30);
 

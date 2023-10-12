@@ -1,4 +1,10 @@
-import {Client, constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
+import {
+  Client,
+  constNodeUnsafe,
+  isConstNode,
+  isOutputNode,
+  NodeOrVoidNode,
+} from '@wandb/weave/core';
 import React, {
   Dispatch,
   useCallback,
@@ -492,6 +498,19 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   );
 };
 
+const nodeIsGetOpOfLatestURI = (node: any) => {
+  if (isOutputNode(node) && node.fromOp.name === 'get') {
+    const uriNode = node.fromOp.inputs.uri;
+    if (isConstNode(uriNode)) {
+      const uri = String(uriNode.val);
+      if (uri.includes(':latest')) {
+        return true;
+      }
+    }
+  }
+  return true;
+};
+
 export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {
     loading,
@@ -507,7 +526,9 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {stack} = usePanelContext();
   const setPanelConfig = updateConfig2;
   const loaded = useRef(false);
-  const panelQuery = CGReact.useNodeValue(props.input, {noCache: true});
+  const panelQuery = CGReact.useNodeValue(props.input, {
+    noCache: nodeIsGetOpOfLatestURI(props.input),
+  });
   const {updateInput} = props;
   const updateServerPanel = useUpdateServerPanel(
     props.input,

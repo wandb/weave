@@ -319,7 +319,7 @@ export const useNodeValue = <T extends Type>(
       // if (callSite != null) {
       //   console.log('useNodeValue subscribe', callSite, node);
       // }
-      const obs = client.subscribe(node);
+      const obs = client.subscribe(node, {noCache: !!options?.noCache});
       const sub = obs.subscribe(
         nodeRes => {
           // if (callSite != null) {
@@ -335,7 +335,7 @@ export const useNodeValue = <T extends Type>(
     } else {
       return;
     }
-  }, [client, node, memoCacheId, callSite, skip]);
+  }, [client, node, memoCacheId, callSite, skip, options?.noCache]);
   // useTraceUpdate('useNodeValue' + callSite, {
   //   client,
   //   node,
