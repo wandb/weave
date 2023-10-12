@@ -586,10 +586,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   let controlBar = props.controlBar ?? 'off';
-  const config = getConfig();
-  if (config.ENV_IS_CI) {
-    controlBar = 'editable';
-  }
 
   const isVarNameEditable = props.editable || controlBar === 'editable';
   const setSelectedPanel = useSetSelectedPanel();
