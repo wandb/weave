@@ -108,14 +108,11 @@ export class BasicClient implements Client {
         return;
       }
       obs.observers.add(observer);
-
       if (obs.hasResult || obs.lastResult !== undefined) {
         observer.next(obs.lastResult);
       } else {
-        obs.hasResult = false;
         this.setIsLoading(true);
       }
-
       return () => {
         obs.observers.delete(observer);
         // TODO: bug here!
@@ -134,7 +131,6 @@ export class BasicClient implements Client {
         lastResult = this.localStorageLRU.get(observableId);
       }
     }
-
     this.observables.set(observableId, {
       id: observableId,
       observable,

@@ -41,6 +41,7 @@ export class CachedClient implements Client {
     }
     const obs = this.client.subscribe(node);
     const sub = obs.subscribe(res => {});
+
     this.cache.set(node, {obs, sub}, 30);
 
     return obs;
