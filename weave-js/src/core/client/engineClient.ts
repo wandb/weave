@@ -44,6 +44,9 @@ export class EngineClient implements Client {
   public isPolling(): boolean {
     return false;
   }
+  public clearCacheForNode(node: GraphTypes.Node<any>): Promise<void> {
+    throw new Error('not implemented');
+  }
   addOnPollingChangeListener(callback: (polling: boolean) => void): void {
     return;
   }
