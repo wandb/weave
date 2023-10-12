@@ -19,6 +19,7 @@ import {TakeActionType} from './persistenceStateMachine';
 import * as M from './Modal.styles';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 
 const Error = styled.div`
   font-size: 14px;
@@ -47,6 +48,29 @@ const iconStyle = {
   marginRight: 8,
 };
 
+const parseLastVisitedPath = () => {
+  const [lastVisitedPath, _] = useLocalStorage<string>('lastVisited', '');
+  const [lastVisitedEntity, lastVisitedProject] = useMemo(() => {
+    let e = null,
+      p = null;
+    if (lastVisitedPath != '') {
+      const crumbs = lastVisitedPath.split('/').slice(1);
+      if (
+        crumbs.length >= 3 &&
+        crumbs[0] === 'browse' &&
+        crumbs[1] === 'wandb'
+      ) {
+        e = crumbs[2];
+        if (crumbs.length >= 4) {
+          p = crumbs[3];
+        }
+      }
+    }
+    return [e, p];
+  }, [lastVisitedPath]);
+  return [lastVisitedEntity, lastVisitedProject];
+};
+
 export const PublishModal = ({
   defaultName,
   open,
@@ -59,6 +83,7 @@ export const PublishModal = ({
   const [projectName, setProjectName] = useState('');
   const isValidName = isValidBoardName(boardName);
   const showError = boardName.length > 0 && !isValidName;
+  const [lastVisitedEntity, lastVisitedProject] = parseLastVisitedPath();
 
   // Make sure we only make requests once this is open
   const isAuthenticated = useIsAuthenticated();
@@ -92,20 +117,25 @@ export const PublishModal = ({
     }),
   });
 
-  // Initialize the entity selector to first option (user entity)
+  // Initialize entity selector to value from page location cache, username or first option
+  // in order of precedence.
   useEffect(() => {
     if (!userEntities.loading && entityOptions.length > 0) {
-      if (userName.result != null) {
-        for (const option of entityOptions) {
-          if (option.value === userName.result) {
-            setEntityName(userName.result);
-            return;
-          }
-        }
+      let defaultEntity = entityOptions[0].value as string;
+      if (
+        lastVisitedEntity != null &&
+        entityOptions.some(o => o.value === lastVisitedEntity)
+      ) {
+        defaultEntity = lastVisitedEntity;
+      } else if (
+        userName.result != null &&
+        entityOptions.some(o => o.value === userName.result)
+      ) {
+        defaultEntity = userName.result;
       }
-      setEntityName(entityOptions[0].value as string);
+      setEntityName(defaultEntity);
     }
-  }, [entityOptions, userEntities.loading, userName.result]);
+  }, [entityOptions, userEntities.loading, userName.result, lastVisitedEntity]);
 
   const projectDataNode = w.opProjectName({project: projectsNode});
   const projectNamesValue = useNodeValue(projectDataNode, {
@@ -124,13 +154,19 @@ export const PublishModal = ({
     text: name,
   }));
 
-  // Initalize the project selector to "weave" project if available,
-  // otherwise first project.
+  // Initialize project selector to value from page location cache, "weave" or first project
+  // in order of precedence.
   useEffect(() => {
     if (!projectNamesValue.loading && projectNames.length > 0) {
-      const defaultProjectName = projectNames.includes('weave')
-        ? 'weave'
-        : projectNames[0];
+      let defaultProjectName = projectNames[0];
+      if (
+        lastVisitedProject != null &&
+        projectNames.includes(lastVisitedProject)
+      ) {
+        defaultProjectName = lastVisitedProject;
+      } else if (projectNames.includes('weave')) {
+        defaultProjectName = 'weave';
+      }
       setProjectName(defaultProjectName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
