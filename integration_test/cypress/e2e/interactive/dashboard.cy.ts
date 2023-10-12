@@ -1,4 +1,4 @@
-import {exec} from '../testlib';
+import {exec, getPanel} from '../testlib';
 
 const gotoBlankDashboard = () => {
   exec('python cypress/e2e/interactive/blank.py', 10000);
@@ -26,10 +26,6 @@ const dashboardConvertToControl = (path: string[]) => {
   panel.find('i.sliders').click();
 };
 
-const getPanel = (path: string[]) => {
-  const attrPath = path.map(p => `[data-weavepath=${p}]`);
-  return cy.get(attrPath.join(' '));
-};
 
 const panelTypeInputExpr = (path: string[], text: string) => {
   const panel = getPanel(path);
