@@ -31,11 +31,11 @@ interface Config {
   ONPREM: boolean;
   PREFIX: string;
   WANDB_BASE_URL: string;
+  ENV_IS_CI: boolean;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;
   backendWeaveOpsUrl(): string;
-  ENV_IS_CI: boolean;
 }
 
 const WEAVE_BACKEND_HOST = window.WEAVE_CONFIG.WEAVE_BACKEND_HOST;

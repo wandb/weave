@@ -75,9 +75,6 @@ import {getConfigForPath} from './panelTree';
 import {usePanelPanelContext} from './PanelPanelContextProvider';
 import {Button} from '../Button';
 
-import getConfig from '../../config';
-import {config} from 'process';
-
 // This could be rendered as a code block with assignments, like
 // so.
 // ```
@@ -585,7 +582,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
 
-  let controlBar = props.controlBar ?? 'off';
+  const controlBar = props.controlBar ?? 'off';
 
   const isVarNameEditable = props.editable || controlBar === 'editable';
   const setSelectedPanel = useSetSelectedPanel();
