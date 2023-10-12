@@ -22,7 +22,10 @@ items = weave.save(
 )
 
 panel: wandb.Distribution = wandb.Distribution(
-    items, value_fn=lambda x: x["loss1"], label_fn=lambda x: x["str_val"], bin_size=1.5
+    items,
+    config=wandb.DistributionConfig(
+        value_fn=lambda x: x["loss1"], label_fn=lambda x: x["str_val"], bin_size=1.5
+    ),
 )
 
 panel = weave.panels.Board(
