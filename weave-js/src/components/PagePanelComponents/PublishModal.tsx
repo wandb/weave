@@ -48,12 +48,12 @@ const iconStyle = {
   marginRight: 8,
 };
 
-const parseLastVisitedPath = () => {
-  const [lastVisitedPath, _] = useLocalStorage<string>('lastVisited', '');
+const useLastVisitedPath = () => {
+  const [lastVisitedPath] = useLocalStorage<string>('lastVisited', '');
   const [lastVisitedEntity, lastVisitedProject] = useMemo(() => {
-    let e = null,
-      p = null;
-    if (lastVisitedPath != '') {
+    let e = null;
+    let p = null;
+    if (lastVisitedPath !== '') {
       const crumbs = lastVisitedPath.split('/').slice(1);
       if (
         crumbs.length >= 3 &&
@@ -83,7 +83,7 @@ export const PublishModal = ({
   const [projectName, setProjectName] = useState('');
   const isValidName = isValidBoardName(boardName);
   const showError = boardName.length > 0 && !isValidName;
-  const [lastVisitedEntity, lastVisitedProject] = parseLastVisitedPath();
+  const [lastVisitedEntity, lastVisitedProject] = useLastVisitedPath();
 
   // Make sure we only make requests once this is open
   const isAuthenticated = useIsAuthenticated();
