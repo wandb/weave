@@ -2,8 +2,6 @@ import {exec} from '../testlib';
 
 const gotoBlankDashboard = () => {
   exec('python cypress/e2e/interactive/blank.py', 10000);
-  // const url = result.stdout;
-  // E.g. for devmode
   const url =
     '/?fullScreen&expNode=%7B%22nodeType%22%3A%20%22output%22%2C%20%22type%22%3A%20%22any%22%2C%20%22fromOp%22%3A%20%7B%22name%22%3A%20%22get%22%2C%20%22inputs%22%3A%20%7B%22uri%22%3A%20%7B%22nodeType%22%3A%20%22const%22%2C%20%22type%22%3A%20%22string%22%2C%20%22val%22%3A%20%22local-artifact%3A///dashboard-list%3Alatest/obj%22%7D%7D%7D%7D';
   cy.viewport(1600, 900);
@@ -47,11 +45,12 @@ const panelTypeInputExpr = (path: string[], text: string) => {
 const scrollToEEAndType = (path: string[], text: string) => {
   const panel = getPanel(path);
   panel
+    .trigger('mouseenter')
     .click()
     .find('[data-test=expression-editor-container] [contenteditable=true]')
-    .click()
-    .wait(200)
-    .type(text)
+    .realHover()
+    .realClick()
+    .type(text, {force: true})
     .wait(300)
     .type('{enter}', {force: true});
 };
