@@ -5,7 +5,7 @@ import {Hasher, MemoizedHasher} from '../model/graph/editing/hash';
 import {Node} from '../model/graph/types';
 import {Type} from '../model/types';
 import {OpStore} from '../opStore/types';
-import {Client} from './types';
+import {Client, SubscribeOptions} from './types';
 
 type CachedNode = {
   obs: Observable<any>;
@@ -25,7 +25,10 @@ export class CachedClient implements Client {
     });
     this.opStore = client.opStore;
   }
-  subscribe<T extends Type>(node: Node<T>): Observable<any> {
+  subscribe<T extends Type>(
+    node: Node<T>,
+    options?: SubscribeOptions
+  ): Observable<any> {
     // Moving the cache from `query` to subscribe.
     // This allows us to maintain a cache of subscriptions
     // (which are used for both `query` and `subscribe`)
@@ -36,13 +39,16 @@ export class CachedClient implements Client {
     // on screen will not cause a re-query, but will instead use the
     // existing subscription for up to 30 seconds!
 
+    if (options?.noCache) {
+      return this.client.subscribe(node);
+    }
+
     if (this.cache.has(node)) {
       return this.cache.get(node).obs;
     }
     const obs = this.client.subscribe(node);
     const sub = obs.subscribe(res => {});
-
-    this.cache.set(node, {obs, sub}, 5);
+    this.cache.set(node, {obs, sub}, 30);
 
     return obs;
   }

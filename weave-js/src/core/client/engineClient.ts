@@ -4,7 +4,7 @@ import {Engine} from '../engine/types';
 import * as GraphTypes from '../model/graph/types';
 import * as Model from '../model/types';
 import {OpStore} from '../opStore/types';
-import {Client} from './types';
+import {Client, SubscribeOptions} from './types';
 
 /** Provides a Client interface on top of engine. Just
  * used for certain ops, like partitionedTableRows that use a shared
@@ -17,7 +17,8 @@ export class EngineClient implements Client {
   }
 
   public subscribe<T extends Model.Type>(
-    node: GraphTypes.Node<T>
+    node: GraphTypes.Node<T>,
+    options?: SubscribeOptions
   ): Observable<any> {
     throw new Error('not implemented');
   }

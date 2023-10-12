@@ -4,9 +4,15 @@ import type {Node} from '../model/graph/types';
 import type {Type} from '../model/types';
 import type {OpStore} from '../opStore/types';
 
+export type SubscribeOptions = {
+  noCache?: boolean;
+};
 export interface Client {
   readonly opStore: OpStore;
-  subscribe<T extends Type>(node: Node<T>): Observable<any>;
+  subscribe<T extends Type>(
+    node: Node<T>,
+    options?: SubscribeOptions
+  ): Observable<any>;
   query<T extends Type>(node: Node<T>): Promise<any>;
   // Same as query but uncached, used for mutations.
   action<T extends Type>(node: Node<T>): Promise<any>;

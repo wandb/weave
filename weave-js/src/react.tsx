@@ -235,6 +235,7 @@ export const useNodeValue = <T extends Type>(
     memoCacheId?: number;
     callSite?: string;
     skip?: boolean;
+    noCache?: boolean;
   }
 ): {loading: boolean; result: TypeToTSTypeInner<T>} => {
   const memoCacheId = options?.memoCacheId ?? 0;

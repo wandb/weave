@@ -507,7 +507,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {stack} = usePanelContext();
   const setPanelConfig = updateConfig2;
   const loaded = useRef(false);
-  const panelQuery = CGReact.useNodeValue(props.input);
+  const panelQuery = CGReact.useNodeValue(props.input, {noCache: true});
   const {updateInput} = props;
   const updateServerPanel = useUpdateServerPanel(
     props.input,

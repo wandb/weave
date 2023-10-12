@@ -8,13 +8,13 @@ import {OpStore} from '../opStore/types';
 import {RemoteHttpServer} from '../server';
 import {Server} from '../server/types';
 import {ID} from '../util/id';
-import {Client} from './types';
+import {Client, SubscribeOptions} from './types';
 import _ from 'lodash';
 import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
-  observable: Observable<T>;
+  observable: Observable<any>;
   node: GraphTypes.Node<T>;
   observers: Set<ZenObservable.SubscriptionObserver<T>>;
   hasResult: boolean;
@@ -90,7 +90,8 @@ export class BasicClient implements Client {
   }
 
   public subscribe<T extends Model.Type>(
-    node: GraphTypes.Node<T>
+    node: GraphTypes.Node<T>,
+    options?: SubscribeOptions
   ): Observable<any> {
     GlobalCGEventTracker.basicClientSubscriptions++;
     const observableId = this.hasher.typedNodeId(node);
@@ -101,17 +102,29 @@ export class BasicClient implements Client {
       }
       return obs.observable;
     }
-    const observable = new Observable<Model.Type>(observer => {
+    const observable = new Observable(observer => {
       const obs = this.observables.get(observableId);
       // console.log('SUB', observableId, obs);
       if (obs == null) {
         return;
       }
       obs.observers.add(observer);
-      if (obs.hasResult || obs.lastResult !== undefined) {
+      if (obs.hasResult) {
         observer.next(obs.lastResult);
       } else {
-        this.setIsLoading(true);
+        let lastResult;
+        if (
+          !options?.noCache &&
+          this.isRemoteServer &&
+          this.localStorageLRU.has(observableId)
+        ) {
+          lastResult = this.localStorageLRU.get(observableId);
+        }
+        if (lastResult !== undefined) {
+          observer.next(lastResult);
+        } else {
+          this.setIsLoading(true);
+        }
       }
       return () => {
         obs.observers.delete(observer);
@@ -124,13 +137,6 @@ export class BasicClient implements Client {
       };
     });
 
-    let lastResult;
-    if (this.isRemoteServer) {
-      const hasCacheResult = this.localStorageLRU.has(observableId);
-      if (hasCacheResult) {
-        lastResult = this.localStorageLRU.get(observableId);
-      }
-    }
     this.observables.set(observableId, {
       id: observableId,
       observable,
@@ -138,7 +144,7 @@ export class BasicClient implements Client {
       node,
       hasResult: false,
       inFlight: false,
-      lastResult,
+      lastResult: undefined,
     });
     this.scheduleRequest();
     return observable;
