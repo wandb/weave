@@ -57,3 +57,12 @@ export const PageHeader: FC<{
     </Box>
   );
 };
+interface ObjPath {
+  entity: string;
+  project: string;
+  objName: string;
+  objVersion: string;
+}
+export const makeObjRefUri = (objPath: ObjPath) => {
+  return `wandb-artifact:///${objPath.entity}/${objPath.project}/${objPath.objName}:${objPath.objVersion}/obj`;
+};

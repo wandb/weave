@@ -82,6 +82,9 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {PageEl} from './Browse2/CommonLib';
 import {PageHeader} from './Browse2/CommonLib';
 import {LinkTable} from './Browse2/LinkTable';
+import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
+import {makeObjRefUri} from './Browse2/CommonLib';
+import {Browse2ObjectTypePage} from './Browse2/Browse2ObjectTypePage';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -105,186 +108,6 @@ const opDisplayName = (opName: string) => {
     }
   }
   return opName;
-};
-
-const Browse2Boards: FC<{entity: string; project: string}> = ({
-  entity,
-  project,
-}) => {
-  const weave = useWeaveContext();
-  const objectsInfo = query.useProjectObjectsOfType(entity, project, 'Panel');
-  const rows = useMemo(
-    () =>
-      (objectsInfo.result ?? []).map((row, i) => ({
-        id: i,
-        _name: row.name,
-        name: row.name + ' ⮕',
-      })),
-    [objectsInfo.result]
-  );
-  const history = useHistory();
-  const handleRowClick = useCallback(
-    (row: any) => {
-      const boardNode = opGet({
-        uri: constString(
-          makeObjRefUri({
-            entity,
-            project,
-            objName: row._name,
-            objVersion: 'latest',
-          })
-        ),
-      });
-      return history.push(
-        `/?exp=${encodeURIComponent(weave.expToString(boardNode))}`
-      );
-    },
-    [entity, project, history, weave]
-  );
-  return (
-    <>
-      <LinkTable rows={rows} handleRowClick={handleRowClick} />
-    </>
-  );
-};
-
-interface Browse2ProjectParams {
-  entity: string;
-  project: string;
-}
-
-const Browse2ProjectPage: FC = props => {
-  const params = useParams<Browse2ProjectParams>();
-  const rootTypeCounts = query.useProjectAssetCountGeneral(
-    params.entity,
-    params.project
-  );
-  const rows = useMemo(
-    () =>
-      (rootTypeCounts.result ?? [])
-        .filter(
-          typeInfo =>
-            typeInfo.name !== 'stream_table' &&
-            typeInfo.name !== 'Panel' &&
-            typeInfo.name !== 'OpDef' &&
-            typeInfo.name !== 'wandb-history'
-        )
-        .map((row, i) => ({
-          id: i,
-
-          // TODO: Major hack to rename list to Table
-          name: row.name === 'list' ? 'Table' : row.name,
-          'object count': row['object count'],
-        })),
-    [rootTypeCounts.result]
-  );
-  const history = useHistory();
-  const handleRowClick = useCallback(
-    (row: any) => {
-      history.push(
-        `/${URL_BROWSE2}/${params.entity}/${params.project}/${row.name}`
-      );
-    },
-    [history, params.entity, params.project]
-  );
-  return (
-    <PageEl>
-      <PageHeader objectType="Project" objectName={params.project} />
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6}>
-          <Box mb={4}>
-            <Paper>
-              <Typography variant="h6" gutterBottom>
-                Object Types
-              </Typography>
-              <LinkTable rows={rows} handleRowClick={handleRowClick} />
-            </Paper>
-          </Box>
-          <Paper>
-            <Typography variant="h6" gutterBottom>
-              Boards
-            </Typography>
-            <Browse2Boards entity={params.entity} project={params.project} />
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Paper>
-            <Typography
-              variant="h6"
-              gutterBottom
-              display="flex"
-              justifyContent="space-between">
-              Functions
-              <Typography variant="h6" component="span">
-                <Link
-                  to={`/${URL_BROWSE2}/${params.entity}/${params.project}/trace`}>
-                  [See all runs]
-                </Link>
-              </Typography>
-            </Typography>
-            <Browse2RootObjectType
-              entity={params.entity}
-              project={params.project}
-              rootType="OpDef"
-            />
-          </Paper>
-        </Grid>
-      </Grid>
-      <div style={{marginBottom: 12}}></div>
-      <div style={{marginBottom: 12}}></div>
-    </PageEl>
-  );
-};
-
-interface Browse2RootObjectTypeParams {
-  entity: string;
-  project: string;
-  rootType: string;
-}
-
-const Browse2RootObjectType: FC<Browse2RootObjectTypeParams> = ({
-  entity,
-  project,
-  rootType,
-}) => {
-  const objectsInfo = query.useProjectObjectsOfType(entity, project, rootType);
-  const rows = useMemo(
-    () =>
-      (objectsInfo.result ?? []).map((row, i) => ({
-        id: i,
-        ...row,
-      })),
-    [objectsInfo.result]
-  );
-  const history = useHistory();
-  const handleRowClick = useCallback(
-    (row: any) => {
-      history.push(
-        `/${URL_BROWSE2}/${entity}/${project}/${rootType}/${row.name}`
-      );
-    },
-    [history, entity, project, rootType]
-  );
-  return (
-    <>
-      <LinkTable rows={rows} handleRowClick={handleRowClick} />
-    </>
-  );
-};
-
-const Browse2ObjectTypePage: FC = props => {
-  const params = useParams<Browse2RootObjectTypeParams>();
-  return (
-    <PageEl>
-      <PageHeader objectType="Object Type" objectName={params.rootType} />
-      <Paper>
-        <Typography variant="h6" gutterBottom>
-          {params.rootType + 's'}
-        </Typography>
-        <Browse2RootObjectType {...params} />
-      </Paper>
-    </PageEl>
-  );
 };
 
 interface Browse2RootObjectParams {
@@ -356,17 +179,6 @@ const Browse2ObjectPage: FC = props => {
       </div>
     </PageEl>
   );
-};
-
-interface ObjPath {
-  entity: string;
-  project: string;
-  objName: string;
-  objVersion: string;
-}
-
-const makeObjRefUri = (objPath: ObjPath) => {
-  return `wandb-artifact:///${objPath.entity}/${objPath.project}/${objPath.objName}:${objPath.objVersion}/obj`;
 };
 
 interface Browse2RootObjectVersionItemParams {
