@@ -1,6 +1,6 @@
 import React, {FC} from 'react';
 
-import {Link as RouterLink} from 'react-router-dom';
+import {Link as RouterLink, useLocation} from 'react-router-dom';
 import {Paper as MaterialPaper, Link as MaterialLink} from '@mui/material';
 import styled from 'styled-components';
 import {Typography, Box} from '@mui/material';
@@ -66,3 +66,16 @@ interface ObjPath {
 export const makeObjRefUri = (objPath: ObjPath) => {
   return `wandb-artifact:///${objPath.entity}/${objPath.project}/${objPath.objName}:${objPath.objVersion}/obj`;
 };
+export interface Browse2RootObjectVersionItemParams {
+  entity: string;
+  project: string;
+  rootType: string;
+  objName: string;
+  objVersion: string;
+  refExtra?: string;
+}
+export function useQuery() {
+  const {search} = useLocation();
+
+  return React.useMemo(() => new URLSearchParams(search), [search]);
+}
