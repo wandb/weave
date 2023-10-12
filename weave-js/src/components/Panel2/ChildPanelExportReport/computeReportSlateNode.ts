@@ -1,6 +1,6 @@
-import {ID, voidNode} from '@wandb/weave/core';
+import {ID} from '@wandb/weave/core';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {getConfigForPath} from '../panelTree';
+import {getConfigForPath, makeGroup, makePanel} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
 
 export type WeavePanelSlateNode = {
@@ -38,38 +38,33 @@ export const computeReportSlateNode = (
   targetPath: string[]
 ): WeavePanelSlateNode => {
   const targetConfig = getConfigForPath(fullConfig, targetPath);
-  const inputNodeVal = {
-    id: 'Group',
-    input_node: voidNode(),
-    config: {
-      items: {
-        panel: targetConfig,
-      },
+  const inputNodeVal = makeGroup(
+    {
+      panel: targetConfig,
+    },
+    {
       disableDeletePanel: true,
       enableAddPanel: true, // actually means "is editable"
       layoutMode: 'vertical',
-      showExpressions: true,
-    },
-    vars: {},
-  };
+    }
+  );
 
   return {
     type: 'weave-panel',
     children: [{text: ''}],
     config: {
       isWeave1Panel: true,
-      panelConfig: {
-        id: 'Panel',
-        config: {
+      panelConfig: makePanel(
+        'Panel',
+        {
           documentId: ID(12),
         },
-        input_node: {
+        {
           nodeType: 'const',
           type: toWeaveType(inputNodeVal),
           val: inputNodeVal,
-        },
-        vars: {},
-      },
+        }
+      ),
     },
   };
 };
