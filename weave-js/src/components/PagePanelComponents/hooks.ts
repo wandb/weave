@@ -4,6 +4,8 @@ import {
   constString,
   maybe,
   typedDict,
+  opRef,
+  opRefBranchPoint,
 } from '@wandb/weave/core';
 import {useClientContext, useNodeValue} from '@wandb/weave/react';
 import {useCallback, useMemo, useState} from 'react';
@@ -16,19 +18,15 @@ export const useBranchPointFromURIString = (
     () =>
       uri == null || !isLocalURI(uri)
         ? constNone()
-        : (callOpVeryUnsafe(
-            'Ref-branch_point',
+        : (opRefBranchPoint(
             {
-              ref: callOpVeryUnsafe(
-                'ref',
+              ref: opRef(
                 {
                   uri: constString(uri),
                 },
-                {type: 'FilesystemArtifactRef' as any}
               ),
             },
-            maybe(typedDict({}))
-          ) as any),
+          )),
     [uri]
   );
   const hasRemoteVal = useNodeValue(hasRemoteNode);

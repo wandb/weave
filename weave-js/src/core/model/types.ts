@@ -412,6 +412,16 @@ export interface NewRun {
   _state: {_val: string};
   _prints: string[];
 }
+
+export interface FilesystemArtifact {
+  type: 'FilesystemArtifact';
+}
+
+export interface FilesystemArtifactRef {
+  type: 'FilesystemArtifactRef';
+}
+
+
 // End Weave Python additions
 
 export type ComplexType =
@@ -423,6 +433,8 @@ export type ComplexType =
   | PanelType
   | PanelSubType
   | NewImage
+  | FilesystemArtifact
+  | FilesystemArtifactRef
   // End Weave Python additions
   | HistogramType
   | TypedDictType
