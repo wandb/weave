@@ -1,12 +1,18 @@
 import React from 'react';
 import styled from 'styled-components';
 import {IconWeaveLogo} from '../../Panel2/Icons';
+import {useHistory} from 'react-router-dom';
 
 export const HomeTopBar: React.FC = () => {
+  const history = useHistory();
   return (
     <TopBar>
       <TopBarLeft>
-        <WeaveLogo />
+        <WeaveLogo
+          onClick={() => {
+            history.push('/');
+          }}
+        />
         Weave
       </TopBarLeft>
     </TopBar>
@@ -32,4 +38,7 @@ const WeaveLogo = styled(IconWeaveLogo)`
   width: 32px;
   height: 32px;
   margin-right: 12px;
+  &:hover {
+    cursor: pointer;
+  }
 `;
