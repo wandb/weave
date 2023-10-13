@@ -1,6 +1,5 @@
 import {LegacyWBIcon} from '@wandb/weave/common/components/elements/LegacyWBIcon';
 import {
-  callOpVeryUnsafe,
   constString,
   findChainedAncestors,
   opRef,

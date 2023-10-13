@@ -1,10 +1,8 @@
 // This file provides utilities for artifact dependencies.
 import {
-  callOpVeryUnsafe,
   constFunction,
   constString,
   isVoidNode,
-  list,
   listObjectType,
   Node,
   opArray,

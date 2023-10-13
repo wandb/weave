@@ -1,12 +1,7 @@
 import {SetPreviewNodeType} from './common';
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
-import {
-  Node,
-  Type,
-  callOpVeryUnsafe,
-  opGetFeaturedBoardTemplates,
-} from '@wandb/weave/core';
+import {Type, opGetFeaturedBoardTemplates} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {Panel2Loader} from '../../Panel2/PanelComp';
 

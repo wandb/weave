@@ -17,10 +17,7 @@ import styled from 'styled-components';
 import moment from 'moment';
 import {
   Node,
-  OutputNode,
-  callOpVeryUnsafe,
   constString,
-  list,
   opConcat,
   opFileTable,
   opFilesystemArtifactFile,
@@ -33,7 +30,6 @@ import {
   opStreamTableRows,
   opTableRows,
   opWBTraceTreeConvertToSpans,
-  typedDict,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
@@ -53,7 +49,6 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
-import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 import {urlWandbFrontend} from '../../../util/urls';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';

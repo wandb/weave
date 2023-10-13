@@ -1,6 +1,5 @@
 import {useWeaveContext} from '@wandb/weave/context';
 import {
-  callOpVeryUnsafe,
   constFunction,
   constString,
   Node,

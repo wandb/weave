@@ -87,6 +87,25 @@ export const opFilesystemArtifactWeaveType = (inputs: {
   );
 };
 
+export const opFilesystemArtifactMetadata = (inputs: {
+  self: Node<{type: 'FilesystemArtifact'}>;
+}) => {
+  return directlyConstructOpCall('FilesystemArtifact-metadata', inputs, {
+    type: 'typedDict',
+    propertyTypes: {},
+  });
+};
+
+export const opFilesystemArtifactLatestVersion = (inputs: {
+  artifact: Node<{type: 'FilesystemArtifact'}>;
+}) => {
+  return directlyConstructOpCall(
+    'FilesystemArtifact-getLatestVersion',
+    inputs,
+    {type: 'FilesystemArtifact'}
+  );
+};
+
 // Only works on FilesystemArtifactRef right now, not generic.
 export const opRef = (inputs: {uri: Node<'string'>}) => {
   return directlyConstructOpCall('ref', inputs, {
@@ -173,4 +192,11 @@ export const opArtifactVersionDependencyOf = (inputs: {
     inputs,
     list('artifactVersion')
   );
+};
+
+export const opLocalArtifacts = (inputs: {}) => {
+  return directlyConstructOpCall('op-local_artifacts', inputs, {
+    type: 'list',
+    objectType: {type: 'FilesystemArtifact'},
+  });
 };
