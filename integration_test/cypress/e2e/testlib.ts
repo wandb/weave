@@ -51,3 +51,8 @@ export function checkAllPanelsRendered() {
     }
   });
 }
+
+export const getPanel = (path: string[]) => {
+  const attrPath = path.map(p => `[data-weavepath=${p}]`);
+  return cy.get(attrPath.join(' '));
+};
