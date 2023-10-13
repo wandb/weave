@@ -17,6 +17,7 @@ import styled from 'styled-components';
 import moment from 'moment';
 import {
   Node,
+  OutputNode,
   callOpVeryUnsafe,
   constString,
   list,
@@ -29,6 +30,7 @@ import {
   opProjectRuns,
   opRootProject,
   opRunHistory3,
+  opStreamTableRows,
   opTableRows,
   opWBTraceTreeConvertToSpans,
   typedDict,
@@ -672,13 +674,9 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     const node = opGet({uri: constString(uri)});
     node.type = {type: 'stream_table'} as any;
-    newExpr = callOpVeryUnsafe(
-      'stream_table-rows',
-      {
-        self: node,
-      },
-      list(typedDict({}))
-    ) as any;
+    newExpr = opStreamTableRows({
+      self: node as any,
+    });
   } else {
     // This is a hack. Would be nice to have better mapping
     // Note that this will not work for tables with spaces in their name
@@ -690,7 +688,9 @@ const tableRowToNode = (
     newExpr = opTableRows({
       table: opFileTable({
         file: opFilesystemArtifactFile({
-          artifactVersion: opGet({uri: constString(uri)}),
+          artifactVersion: opGet({
+            uri: constString(uri),
+          }) as any,
           path: constString(tableName),
         }),
       }),

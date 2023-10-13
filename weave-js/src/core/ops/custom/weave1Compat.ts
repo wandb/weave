@@ -3,7 +3,7 @@
  * typescript, we want to have stubs that correctly build the graph.
  */
 
-import {Node, Type, list, maybe, typedDict} from '../../model';
+import {Node, OutputNode, Type, list, maybe, typedDict} from '../../model';
 import {SpanWeaveWithTimestampType} from '../../../components/Panel2/PanelTraceTree/util';
 
 // This is similar to callOpVeryUnsafe, but with proper typing.
@@ -11,7 +11,7 @@ function directlyConstructOpCall<T extends Type = 'any'>(
   opName: string,
   inputs: Record<string, Node>,
   outputType: T
-): Node<T> {
+): OutputNode<T> {
   return {
     nodeType: 'output',
     type: outputType,
@@ -48,6 +48,36 @@ export const opFilesystemArtifactPreviousUri = (inputs: {
     'string'
   );
 };
+
+export const opFilesystemArtifactArtifactName = (inputs: {
+    artifact: Node<{type: 'FilesystemArtifact'}>;
+  }) => {
+    return directlyConstructOpCall(
+        'FilesystemArtifact-artifactName',
+      inputs,
+      'string'
+    );
+  };
+
+  export const opFilesystemArtifactArtifactVersion = (inputs: {
+    artifact: Node<{type: 'FilesystemArtifact'}>;
+  }) => {
+    return directlyConstructOpCall(
+        'FilesystemArtifact-artifactVersion',
+      inputs,
+      'string'
+    );
+  };
+
+  export const opFilesystemArtifactCreatedAt = (inputs: {
+    artifact: Node<{type: 'FilesystemArtifact'}>;
+  }) => {
+    return directlyConstructOpCall(
+        'FilesystemArtifact-createdAt',
+      inputs,
+      {type: 'timestamp'}
+    );
+  };
 
 export const opRef = (inputs: {uri: Node<'string'>}) => {
   return directlyConstructOpCall('ref', inputs, {
@@ -88,5 +118,29 @@ export const opSaveToUri= (inputs: {obj: Node<'any'>, name:Node<'string'>}) => {
         'wb_trace_tree-convertToSpans',
         inputs,
         list(list(SpanWeaveWithTimestampType))
+      );
+  }
+
+  export const opStreamTableRows = (inputs: {self: Node<{type: 'stream_table'}>}) => {
+    return directlyConstructOpCall(
+        'stream_table-rows',
+        inputs,
+        list(typedDict({}))
+      );
+  }
+
+  export const opGetFeaturedBoardTemplates = (inputs: {}) => {
+    return directlyConstructOpCall(
+        'py_board-get_featured_board_templates',
+        inputs,
+        list(typedDict({}))
+      );
+  }
+
+  export const opRunHistoryLineCount = (inputs: {run: Node<'run'>}) => {
+    return directlyConstructOpCall(
+        'run-historyLineCount',
+        inputs,
+        'number'
       );
   }

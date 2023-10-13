@@ -1,7 +1,12 @@
 import {SetPreviewNodeType} from './common';
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
-import {Node, Type, callOpVeryUnsafe} from '@wandb/weave/core';
+import {
+  Node,
+  Type,
+  callOpVeryUnsafe,
+  opGetFeaturedBoardTemplates,
+} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {Panel2Loader} from '../../Panel2/PanelComp';
 
@@ -54,10 +59,7 @@ type TemplateType = {
 export const HomeCenterTemplates: React.FC<{
   setPreviewNode: SetPreviewNodeType;
 }> = ({setPreviewNode}) => {
-  const featuredTemplatesNode = callOpVeryUnsafe(
-    'py_board-get_featured_board_templates',
-    {}
-  ) as Node;
+  const featuredTemplatesNode = opGetFeaturedBoardTemplates({});
   const featuredTemplates = useNodeValue(featuredTemplatesNode);
   if (featuredTemplates.result?.length === 0) {
     // not expecting this to happen, but just in case

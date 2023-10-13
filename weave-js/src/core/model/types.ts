@@ -421,6 +421,10 @@ export interface FilesystemArtifactRef {
   type: 'FilesystemArtifactRef';
 }
 
+export interface StreamTable {
+  type: 'stream_table'
+}
+
 // End Weave Python additions
 
 export type ComplexType =
@@ -434,6 +438,7 @@ export type ComplexType =
   | NewImage
   | FilesystemArtifact
   | FilesystemArtifactRef
+  | StreamTable
   // End Weave Python additions
   | HistogramType
   | TypedDictType
