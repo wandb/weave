@@ -63,6 +63,7 @@ import {Spec as UnknownSpec} from './PanelUnknown';
 import {Spec as VideoSpec} from './PanelVideo';
 import {Spec as WBObjectSpec} from './PanelWBObject';
 import {Spec as WebVizSpec} from './PanelWebViz';
+import {Spec as RawFallbackSpec} from './PanelRawFallback';
 
 // TODO: Wrap Panel components with makeSpec calls
 
@@ -161,6 +162,8 @@ const initSpecs = () => {
       PanelTraceSpec,
       PanelTraceSpanSpec,
       PanelTraceSpanModelSpec,
+
+      RawFallbackSpec,
 
       // Organizational
       // LayoutContainerSpec,

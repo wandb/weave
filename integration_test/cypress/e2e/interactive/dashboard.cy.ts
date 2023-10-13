@@ -1,10 +1,7 @@
-import promisify from 'cypress-promise';
-import {exec} from '../testlib';
+import {exec, getPanel} from '../testlib';
 
-const gotoBlankDashboard = async () => {
-  await promisify(exec('python cypress/e2e/interactive/blank.py', 10000));
-  // const url = result.stdout;
-  // E.g. for devmode
+const gotoBlankDashboard = () => {
+  exec('python cypress/e2e/interactive/blank.py', 10000);
   const url =
     '/?fullScreen&expNode=%7B%22nodeType%22%3A%20%22output%22%2C%20%22type%22%3A%20%22any%22%2C%20%22fromOp%22%3A%20%7B%22name%22%3A%20%22get%22%2C%20%22inputs%22%3A%20%7B%22uri%22%3A%20%7B%22nodeType%22%3A%20%22const%22%2C%20%22type%22%3A%20%22string%22%2C%20%22val%22%3A%20%22local-artifact%3A///dashboard-list%3Alatest/obj%22%7D%7D%7D%7D';
   cy.viewport(1600, 900);
@@ -29,10 +26,6 @@ const dashboardConvertToControl = (path: string[]) => {
   panel.find('i.sliders').click();
 };
 
-const getPanel = (path: string[]) => {
-  const attrPath = path.map(p => `[data-weavepath=${p}]`);
-  return cy.get(attrPath.join(' '));
-};
 
 const panelTypeInputExpr = (path: string[], text: string) => {
   const panel = getPanel(path);
@@ -48,12 +41,17 @@ const panelTypeInputExpr = (path: string[], text: string) => {
 const scrollToEEAndType = (path: string[], text: string) => {
   const panel = getPanel(path);
   panel
+    .trigger('mouseenter')
     .click()
     .find('[data-test=expression-editor-container] [contenteditable=true]')
+
     .realHover()
     .realClick()
-    .wait(200)
-    .type(text)
+
+    .realHover()
+    .realClick()
+
+    .type(text, {force: true})
     .wait(300)
     .type('{enter}', {force: true});
 };
@@ -90,8 +88,8 @@ const sliderSetValue = (path: string[], value: number) => {
 };
 
 describe('dashboard', () => {
-  it('dashboard', async () => {
-    await gotoBlankDashboard();
+  it('dashboard', () => {
+    gotoBlankDashboard();
 
     // Setup sidebar
     panelTypeInputExpr(['sidebar', 'var0'], 'range(0, 100, 1)');

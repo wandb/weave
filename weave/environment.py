@@ -228,3 +228,7 @@ def gql_schema_path() -> typing.Optional[str]:
 
 def dd_env() -> str:
     return os.getenv("DD_ENV", "")
+
+
+def env_is_ci() -> bool:
+    return util.parse_boolean_env_var("WEAVE_CI")

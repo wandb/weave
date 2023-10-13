@@ -279,6 +279,7 @@ export const ColumnHeader: React.FC<{
   } = usePanelStacksForType(workingSelectFunction.type, workingPanelId, {
     excludeTable: true,
     excludePlot: true,
+    disallowedPanels: ['Group', 'Expression'],
   });
 
   let columnTypeForGroupByChecks = stripTag(workingSelectFunction.type);
