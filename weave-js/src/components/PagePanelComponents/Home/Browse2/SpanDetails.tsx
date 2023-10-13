@@ -8,7 +8,39 @@ import {
   isOpenAIChatInput,
   isOpenAIChatOutput,
 } from './openai';
-import {Button, Typography, Box, Chip} from '@mui/material';
+import {Button, Grid, Typography, Box, Chip} from '@mui/material';
+import {DisplayControlChars} from './CommonLib';
+import {SmallRef, parseRefMaybe} from './SmallRef';
+
+const ObjectView: FC<{obj: any}> = ({obj}) => {
+  if (_.isPlainObject(obj)) {
+    return (
+      <Grid container spacing={1}>
+        {Object.entries(obj).flatMap(([key, value]) => {
+          const singleRow = !_.isPlainObject(value);
+          return [
+            <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
+              <Typography>{key}</Typography>
+            </Grid>,
+            <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
+              <Box ml={singleRow ? 0 : 2}>
+                <ObjectView obj={value} />
+              </Box>
+            </Grid>,
+          ];
+        })}
+      </Grid>
+    );
+  }
+  if (typeof obj === 'string') {
+    const ref = parseRefMaybe(obj);
+    if (ref != null) {
+      return <SmallRef objRef={ref} />;
+    }
+    return <DisplayControlChars text={obj} />;
+  }
+  return <Typography>{JSON.stringify(obj)}</Typography>;
+};
 
 export const SpanDetails: FC<{call: Call}> = ({call}) => {
   const actualInputs = Object.entries(call.inputs).filter(
@@ -46,43 +78,55 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
         <Typography variant="h5" gutterBottom>
           Inputs
         </Typography>
-        {isOpenAIChatInput(inputs) ? (
-          <OpenAIChatInputView chatInput={inputs} />
-        ) : (
-          <pre style={{fontSize: 12}}>
-            {JSON.stringify(inputs, undefined, 2)}
-          </pre>
-        )}
+        <Box pl={2} pr={2}>
+          {isOpenAIChatInput(inputs) ? (
+            <OpenAIChatInputView chatInput={inputs} />
+          ) : (
+            <ObjectView obj={inputs} />
+          )}
+        </Box>
       </div>
       <div style={{marginBottom: 24}}>
         <Typography variant="h6" gutterBottom>
           Output
         </Typography>
-        {isOpenAIChatOutput(call.output) ? (
-          <OpenAIChatOutputView chatOutput={call.output} />
-        ) : (
-          <pre style={{fontSize: 12}}>
-            {JSON.stringify(call.output, undefined, 2)}
-          </pre>
-        )}
+        <Box pl={2} pr={2}>
+          {isOpenAIChatOutput(call.output) ? (
+            <OpenAIChatOutputView chatOutput={call.output} />
+          ) : (
+            <ObjectView
+              obj={_.fromPairs(
+                Object.entries(call.output).filter(([k, v]) => v != null)
+              )}
+            />
+          )}
+        </Box>
       </div>
       {call.attributes != null && (
         <div style={{marginBottom: 12}}>
           <div>
             <b>Attributes</b>
           </div>
-          <pre style={{fontSize: 12}}>
-            {JSON.stringify(call.attributes, undefined, 2)}
-          </pre>
+          <Box pl={2} pr={2}>
+            <ObjectView
+              obj={_.fromPairs(
+                Object.entries(call.attributes).filter(([k, v]) => v != null)
+              )}
+            />
+          </Box>
         </div>
       )}
       <div style={{marginBottom: 12}}>
         <Typography variant="h6" gutterBottom>
           Summary
         </Typography>
-        <pre style={{fontSize: 12}}>
-          {JSON.stringify(call.summary, undefined, 2)}
-        </pre>
+        <Box pl={2} pr={2}>
+          <ObjectView
+            obj={_.fromPairs(
+              Object.entries(call.summary).filter(([k, v]) => v != null)
+            )}
+          />
+        </Box>
       </div>
     </div>
   );

@@ -1,21 +1,68 @@
 import * as _ from 'lodash';
-import React, {FC, useMemo} from 'react';
+import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {useParams, useHistory} from 'react-router-dom';
 import {URL_BROWSE2} from '../../../../urls';
 import {monthRoundedTime} from '@wandb/weave/time';
 import {Call, Span} from './callTree';
 import {Box} from '@mui/material';
-import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
+import {
+  DataGridPro as DataGrid,
+  GridColDef,
+  GridColumnGroup,
+  useGridApiRef,
+} from '@mui/x-data-grid-pro';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
+import {SmallRef} from './SmallRef';
+import {parseRef} from '@wandb/weave/react';
+import {flattenObject} from './browse2Util';
 
 type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
 
+function addToTree(
+  node: GridColumnGroup,
+  fields: string[],
+  fullPath: string
+): void {
+  if (!fields.length) return;
+
+  if (fields.length === 1) {
+    node.children.push({
+      field: fullPath,
+    });
+    return;
+  }
+
+  for (const child of node.children) {
+    if ('groupId' in child && child.groupId === fields[0]) {
+      addToTree(child as GridColumnGroup, fields.slice(1), fullPath);
+      return;
+    }
+  }
+
+  const newNode: GridColumnGroup = {groupId: fields[0], children: []};
+  node.children.push(newNode);
+  addToTree(newNode, fields.slice(1), fullPath);
+}
+
+function buildTree(strings: string[], rootGroupName: string): GridColumnGroup {
+  const root: GridColumnGroup = {groupId: rootGroupName, children: []};
+
+  for (const str of strings) {
+    const fields = str.split('.');
+    addToTree(root, fields, rootGroupName + '.' + str);
+  }
+
+  return root;
+}
+
 export const RunsTable: FC<{
+  loading: boolean;
   spans: Span[];
-}> = ({spans}) => {
+}> = ({loading, spans}) => {
+  const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
   // side
   spans = useMemo(
@@ -54,12 +101,17 @@ export const RunsTable: FC<{
         ),
         ..._.mapValues(
           _.mapKeys(
-            _.omitBy(call.output, v => v == null),
+            _.omitBy(flattenObject(call.output), v => v == null),
             (v, k) => {
-              return 'output_' + k;
+              return 'output.' + k;
             }
           ),
-          JSON.stringify
+          v =>
+            typeof v === 'string' ||
+            typeof v === 'boolean' ||
+            typeof v === 'number'
+              ? v
+              : JSON.stringify(v)
         ),
       };
     });
@@ -79,18 +131,7 @@ export const RunsTable: FC<{
         headerName: 'Status',
       },
     ];
-    const colGroupingModel: DataGridColumnGroupingModel = [
-      {
-        headerName: '',
-        groupId: 'timestamp',
-        children: [{field: 'timestamp'}],
-      },
-      {
-        headerName: '',
-        groupId: 'latency',
-        children: [{field: 'latency'}],
-      },
-    ];
+    const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
     if (row0 == null) {
       return {cols: [], colGroupingModel: []};
@@ -112,7 +153,15 @@ export const RunsTable: FC<{
       cols.push({
         field: 'input_' + key,
         headerName: key,
-        flex: 1,
+        renderCell: params => {
+          if (
+            typeof params.row['input_' + key] === 'string' &&
+            params.row['input_' + key].startsWith('wandb-artifact:///')
+          ) {
+            return <SmallRef objRef={parseRef(params.row['input_' + key])} />;
+          }
+          return params.row['input_' + key];
+        },
       });
       inputGroup.children.push({field: 'input_' + key});
     }
@@ -121,33 +170,56 @@ export const RunsTable: FC<{
     // All output keys as we don't have the order key yet.
     let outputKeys: {[key: string]: true} = {};
     spans.forEach(span => {
-      for (const [k, v] of Object.entries(span.output)) {
+      for (const [k, v] of Object.entries(flattenObject(span.output))) {
         if (v != null) {
           outputKeys[k] = true;
         }
       }
     });
+    // sort shallowest keys first
+    outputKeys = _.fromPairs(
+      Object.entries(outputKeys).sort((a, b) => {
+        const aDepth = a[0].split('.').length;
+        const bDepth = b[0].split('.').length;
+        return aDepth - bDepth;
+      })
+    );
 
     const outputOrder = Object.keys(outputKeys);
-    const outputGroup: Exclude<
-      React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
-      undefined
-    >[number] = {
-      groupId: 'output',
-      children: [],
-    };
+    const outputGrouping = buildTree(outputOrder, 'output');
+    colGroupingModel.push(outputGrouping);
     for (const key of outputOrder) {
       cols.push({
-        field: 'output_' + key,
-        headerName: key,
-        flex: 1,
+        field: 'output.' + key,
+        headerName: key.split('.').slice(-1)[0],
+        renderCell: params => {
+          if (
+            typeof params.row['output.' + key] === 'string' &&
+            params.row['output.' + key].startsWith('wandb-artifact:///')
+          ) {
+            return <SmallRef objRef={parseRef(params.row['output.' + key])} />;
+          }
+          return params.row['output.' + key];
+        },
       });
-      outputGroup.children.push({field: 'output_' + key});
     }
-    colGroupingModel.push(outputGroup);
 
     return {cols, colGroupingModel};
   }, [spans]);
+  const autosized = useRef(false);
+  useEffect(() => {
+    if (autosized.current) {
+      return;
+    }
+    if (loading) {
+      return;
+    }
+    autosized.current = true;
+    apiRef.current.autosizeColumns({
+      includeHeaders: true,
+      expand: true,
+    });
+  }, [apiRef, loading]);
   return (
     <Box
       sx={{
@@ -161,6 +233,8 @@ export const RunsTable: FC<{
         },
       }}>
       <DataGrid
+        autosizeOnMount
+        apiRef={apiRef}
         density="compact"
         experimentalFeatures={{columnGrouping: true}}
         rows={tableData}

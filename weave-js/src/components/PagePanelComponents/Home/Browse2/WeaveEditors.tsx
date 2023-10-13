@@ -61,6 +61,7 @@ import {
 import {useHistory, useLocation} from 'react-router-dom';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 import LinkIcon from '@mui/icons-material/Link';
+import {flattenObject, unflattenObject} from './browse2Util';
 
 const displaysAsSingleRow = (valueType: Type) => {
   if (isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))) {
@@ -94,11 +95,13 @@ interface WeaveEditorEdit {
 }
 
 interface WeaveEditorContextValue {
+  editable: boolean;
   edits: WeaveEditorEdit[];
   addEdit: (edit: WeaveEditorEdit) => void;
 }
 
 const WeaveEditorContext = React.createContext<WeaveEditorContextValue>({
+  editable: false,
   edits: [],
   addEdit: () => {},
 });
@@ -107,8 +110,12 @@ const useWeaveEditorContext = () => {
   return React.useContext(WeaveEditorContext);
 };
 
-const useWeaveAddEdit = () => {
+const useWeaveEditorContextAddEdit = () => {
   return useWeaveEditorContext().addEdit;
+};
+
+const useWeaveEditorContextEditable = () => {
+  return useWeaveEditorContext().editable;
 };
 
 const WeaveEditorCommit: FC<{
@@ -223,7 +230,8 @@ const WeaveEditorCommit: FC<{
 export const WeaveEditor: FC<{
   objType: string;
   node: Node;
-}> = ({objType, node}) => {
+  editable: boolean;
+}> = ({editable, objType, node}) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
   const [refinedNode, setRefinedNode] = useState<NodeOrVoidNode>(voidNode());
@@ -255,7 +263,10 @@ export const WeaveEditor: FC<{
     },
     [edits]
   );
-  const contextVal = useMemo(() => ({edits, addEdit}), [edits, addEdit]);
+  const contextVal = useMemo(
+    () => ({editable, edits, addEdit}),
+    [editable, edits, addEdit]
+  );
   const [commitChangesOpen, setCommitChangesOpen] = useState(false);
   useEffect(() => {
     const doRefine = async () => {
@@ -327,7 +338,7 @@ export const WeaveEditorBoolean: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
-  const addEdit = useWeaveAddEdit();
+  const addEdit = useWeaveEditorContextAddEdit();
   const query = useNodeValue(node);
   const [curVal, setCurVal] = useState<boolean>(false);
   const loadedOnce = useRef(false);
@@ -356,7 +367,7 @@ export const WeaveEditorString: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
-  const addEdit = useWeaveAddEdit();
+  const addEdit = useWeaveEditorContextAddEdit();
   const query = useNodeValue(node);
   const [curVal, setCurVal] = useState<string>('');
   const loadedOnce = useRef(false);
@@ -391,7 +402,7 @@ export const WeaveEditorNumber: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
-  const addEdit = useWeaveAddEdit();
+  const addEdit = useWeaveEditorContextAddEdit();
   const query = useNodeValue(node);
   const [curVal, setCurVal] = useState<string>('');
   const loadedOnce = useRef(false);
@@ -523,48 +534,12 @@ const typeToDataGridColumnSpec = (type: Type): GridColDef[] => {
   return [];
 };
 
-const flattenObject = (
-  obj: {[key: string]: any},
-  parentKey: string = '',
-  result: {[key: string]: any} = {}
-) => {
-  for (const key in obj) {
-    const newKey = parentKey ? `${parentKey}.${key}` : key;
-    if (Array.isArray(obj[key])) {
-      result[newKey] = obj[key];
-    } else if (typeof obj[key] === 'object') {
-      flattenObject(obj[key], newKey, result);
-    } else {
-      result[newKey] = obj[key];
-    }
-  }
-  return result;
-};
-
-const unflattenObject = (obj: {[key: string]: any}) => {
-  const result: {[key: string]: any} = {};
-  for (const key in obj) {
-    const keys = key.split('.');
-    let current = result;
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      if (i === keys.length - 1) {
-        current[k] = obj[key];
-      } else {
-        current[k] = current[k] || {};
-      }
-      current = current[k];
-    }
-  }
-  return result;
-};
-
 export const WeaveEditorTable: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
   const location = useLocation();
-  const addEdit = useWeaveAddEdit();
+  const addEdit = useWeaveEditorContextAddEdit();
   const objectType = listObjectType(node.type);
   if (!isTypedDict(objectType)) {
     throw new Error('invalid node for WeaveEditorList');

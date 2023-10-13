@@ -463,7 +463,7 @@ export interface WandbArtifactRef {
   artifactPath: string;
 }
 
-type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
+export type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
 
 export const isWandbArtifactRef = (
   ref: ArtifactRef
@@ -510,6 +510,18 @@ export const parseRef = (ref: string): ArtifactRef => {
     artifactVersion: 'latest',
     artifactPath,
   };
+};
+
+export const refUri = (ref: ArtifactRef): string => {
+  if (isWandbArtifactRef(ref)) {
+    let uri = `wandb-artifact:///${ref.entityName}/${ref.projectName}/${ref.artifactName}:${ref.artifactVersion}`;
+    if (ref.artifactPath) {
+      uri = `${uri}/${ref.artifactPath}`;
+    }
+    return uri;
+  } else {
+    return `local-artifact:///${ref.artifactName}/${ref.artifactPath}`;
+  }
 };
 
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {

@@ -46,7 +46,7 @@ export const Browse2Calls: FC<{
           ))}
         </div>
       )}
-      <RunsTable spans={selectedData} />
+      <RunsTable loading={selectedQuery.loading} spans={selectedData} />
     </Paper>
   );
 };

@@ -4,6 +4,7 @@ import {Link as RouterLink, useLocation} from 'react-router-dom';
 import {Paper as MaterialPaper, Link as MaterialLink} from '@mui/material';
 import styled from 'styled-components';
 import {Typography, Box} from '@mui/material';
+import * as globals from '@wandb/weave/common/css/globals.styles';
 
 export const Link = (props: React.ComponentProps<typeof RouterLink>) => (
   <MaterialLink {...props} component={RouterLink} />
@@ -63,9 +64,11 @@ interface ObjPath {
   objName: string;
   objVersion: string;
 }
+
 export const makeObjRefUri = (objPath: ObjPath) => {
   return `wandb-artifact:///${objPath.entity}/${objPath.project}/${objPath.objName}:${objPath.objVersion}/obj`;
 };
+
 export interface Browse2RootObjectVersionItemParams {
   entity: string;
   project: string;
@@ -79,3 +82,29 @@ export function useQuery() {
 
   return React.useMemo(() => new URLSearchParams(search), [search]);
 }
+const escapeAndRenderControlChars = (str: string) => {
+  const controlCharMap: {[key: string]: string | undefined} = {
+    '\n': '\\n',
+    '\t': '\\t',
+    '\r': '\\r',
+  };
+
+  return str.split('').map((char, index) => {
+    if (controlCharMap[char]) {
+      return (
+        <span key={index}>
+          <span style={{color: globals.darkRed}}>{controlCharMap[char]}</span>
+          {char === '\n' ? (
+            <br />
+          ) : (
+            <span style={{width: '2em', display: 'inline-block'}}></span>
+          )}
+        </span>
+      );
+    }
+    return char;
+  });
+};
+export const DisplayControlChars = ({text}: {text: string}) => {
+  return <Typography>{escapeAndRenderControlChars(text)}</Typography>;
+};

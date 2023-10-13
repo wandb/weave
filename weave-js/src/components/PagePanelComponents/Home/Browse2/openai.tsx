@@ -1,5 +1,4 @@
 import React, {FC} from 'react';
-import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 import {Popup} from 'semantic-ui-react';
 import {
@@ -10,6 +9,7 @@ import {
   SmartToy,
 } from '@mui/icons-material';
 import {Box, Chip, Typography} from '@mui/material';
+import {DisplayControlChars} from './CommonLib';
 
 interface ChatMessageSystem {
   role: 'system';
@@ -68,34 +68,6 @@ interface OpenAIChatOutput {
   choices: OpenAIChatOutputChoice[];
 }
 
-const escapeAndRenderControlChars = (str: string) => {
-  const controlCharMap: {[key: string]: string | undefined} = {
-    '\n': '\\n',
-    '\t': '\\t',
-    '\r': '\\r',
-  };
-
-  return str.split('').map((char, index) => {
-    if (controlCharMap[char]) {
-      return (
-        <span key={index}>
-          <span style={{color: globals.darkRed}}>{controlCharMap[char]}</span>
-          {char === '\n' ? (
-            <br />
-          ) : (
-            <span style={{width: '2em', display: 'inline-block'}}></span>
-          )}
-        </span>
-      );
-    }
-    return char;
-  });
-};
-
-const DisplayControlChars = ({text}: {text: string}) => {
-  return <Typography>{escapeAndRenderControlChars(text)}</Typography>;
-};
-
 export const OpenAIChatFunctionCall: FC<{
   functionCall: ChatMessageFunctionCall;
 }> = ({functionCall}) => {
@@ -109,7 +81,6 @@ export const OpenAIChatFunctionCall: FC<{
 };
 
 const ChatMessageEl = styled.div<{callResponse: 'call' | 'response'}>`
-  padding: 16px;
   border-radius: 4px;
   margin-bottom: 12px;
   background-color: ${props =>
