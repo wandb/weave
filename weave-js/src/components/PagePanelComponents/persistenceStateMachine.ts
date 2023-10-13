@@ -250,16 +250,13 @@ export const useStateMachine = (
         throw new Error(`Invalid action: ${action}`);
       }
       if (action === 'save') {
-        const saveNode = opSaveToUri(
-
-          {
-            obj: inputNode,
-            name:
-              actionOptions.name != null
-                ? constString(actionOptions.name)
-                : constNone(),
-          },
-        );
+        const saveNode = opSaveToUri({
+          obj: inputNode,
+          name:
+            actionOptions.name != null
+              ? constString(actionOptions.name)
+              : constNone(),
+        });
         const saveUri: string | null = await executor(saveNode as any);
         if (saveUri == null) {
           throw new Error(`Failed to save`);

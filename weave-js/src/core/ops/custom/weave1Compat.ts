@@ -50,44 +50,42 @@ export const opFilesystemArtifactPreviousUri = (inputs: {
 };
 
 export const opFilesystemArtifactArtifactName = (inputs: {
-    artifact: Node<{type: 'FilesystemArtifact'}>;
-  }) => {
-    return directlyConstructOpCall(
-        'FilesystemArtifact-artifactName',
-      inputs,
-      'string'
-    );
-  };
+  artifact: Node<{type: 'FilesystemArtifact'}>;
+}) => {
+  return directlyConstructOpCall(
+    'FilesystemArtifact-artifactName',
+    inputs,
+    'string'
+  );
+};
 
-  export const opFilesystemArtifactArtifactVersion = (inputs: {
-    artifact: Node<{type: 'FilesystemArtifact'}>;
-  }) => {
-    return directlyConstructOpCall(
-        'FilesystemArtifact-artifactVersion',
-      inputs,
-      'string'
-    );
-  };
+export const opFilesystemArtifactArtifactVersion = (inputs: {
+  artifact: Node<{type: 'FilesystemArtifact'}>;
+}) => {
+  return directlyConstructOpCall(
+    'FilesystemArtifact-artifactVersion',
+    inputs,
+    'string'
+  );
+};
 
-  export const opFilesystemArtifactCreatedAt = (inputs: {
-    artifact: Node<{type: 'FilesystemArtifact'}>;
-  }) => {
-    return directlyConstructOpCall(
-        'FilesystemArtifact-createdAt',
-      inputs,
-      {type: 'timestamp'}
-    );
-  };
+export const opFilesystemArtifactCreatedAt = (inputs: {
+  artifact: Node<{type: 'FilesystemArtifact'}>;
+}) => {
+  return directlyConstructOpCall('FilesystemArtifact-createdAt', inputs, {
+    type: 'timestamp',
+  });
+};
 
-  export const opFilesystemArtifactWeaveType = (inputs: {
-    artifact: Node<{type: 'FilesystemArtifact'}>;
-  }) => {
-    return directlyConstructOpCall(
-        'FilesystemArtifact-weaveType',
-      inputs,
-      'type'
-    );
-  };
+export const opFilesystemArtifactWeaveType = (inputs: {
+  artifact: Node<{type: 'FilesystemArtifact'}>;
+}) => {
+  return directlyConstructOpCall(
+    'FilesystemArtifact-weaveType',
+    inputs,
+    'type'
+  );
+};
 
 // Only works on FilesystemArtifactRef right now, not generic.
 export const opRef = (inputs: {uri: Node<'string'>}) => {
@@ -114,60 +112,65 @@ export const opGenerateCodeForObject = (inputs: {obj: Node<'any'>}) => {
   );
 };
 
+export const opSaveToUri = (inputs: {
+  obj: Node<'any'>;
+  name: Node<'string'>;
+}) => {
+  return directlyConstructOpCall(
+    '__internal__-generateCodeForObject',
+    inputs,
+    'string'
+  );
+};
 
-export const opSaveToUri= (inputs: {obj: Node<'any'>, name:Node<'string'>}) => {
-    return directlyConstructOpCall(
-      '__internal__-generateCodeForObject',
-      inputs,
-      'string'
-    );
-  };
+export const opWBTraceTreeConvertToSpans = (inputs: {
+  tree: Node<{type: 'wb_trace_tree'}>;
+}) => {
+  return directlyConstructOpCall(
+    'wb_trace_tree-convertToSpans',
+    inputs,
+    list(list(SpanWeaveWithTimestampType))
+  );
+};
 
+export const opStreamTableRows = (inputs: {
+  self: Node<{type: 'stream_table'}>;
+}) => {
+  return directlyConstructOpCall(
+    'stream_table-rows',
+    inputs,
+    list(typedDict({}))
+  );
+};
 
-  export const opWBTraceTreeConvertToSpans = (inputs: {tree: Node<{type: 'wb_trace_tree'}>}) => {
-    return directlyConstructOpCall(
-        'wb_trace_tree-convertToSpans',
-        inputs,
-        list(list(SpanWeaveWithTimestampType))
-      );
-  }
+export const opGetFeaturedBoardTemplates = (inputs: {}) => {
+  return directlyConstructOpCall(
+    'py_board-get_featured_board_templates',
+    inputs,
+    list(typedDict({}))
+  );
+};
 
-  export const opStreamTableRows = (inputs: {self: Node<{type: 'stream_table'}>}) => {
-    return directlyConstructOpCall(
-        'stream_table-rows',
-        inputs,
-        list(typedDict({}))
-      );
-  }
+export const opGetFeaturedBoardTemplatesForNode = (inputs: {
+  input_node: Node;
+}) => {
+  return directlyConstructOpCall(
+    'py_board-get_board_templates_for_node',
+    inputs,
+    list(typedDict({}))
+  );
+};
 
-  export const opGetFeaturedBoardTemplates = (inputs: {}) => {
-    return directlyConstructOpCall(
-        'py_board-get_featured_board_templates',
-        inputs,
-        list(typedDict({}))
-      );
-  }
+export const opRunHistoryLineCount = (inputs: {run: Node<'run'>}) => {
+  return directlyConstructOpCall('run-historyLineCount', inputs, 'number');
+};
 
-  export const opGetFeaturedBoardTemplatesForNode = (inputs: {input_node: Node}) => {
-    return directlyConstructOpCall(
-        'py_board-get_board_templates_for_node',
-        inputs,
-        list(typedDict({}))
-      );
-  }
-
-  export const opRunHistoryLineCount = (inputs: {run: Node<'run'>}) => {
-    return directlyConstructOpCall(
-        'run-historyLineCount',
-        inputs,
-        'number'
-      );
-  }
-
-  export const opArtifactVersionDependencyOf = (inputs: {artifactVersion: Node<'artifactVersion'>}) => {
-    return directlyConstructOpCall(
-        'artifactVersion-dependencyOf',
-        inputs,
-        list('artifactVersion')
-      );
-  }
+export const opArtifactVersionDependencyOf = (inputs: {
+  artifactVersion: Node<'artifactVersion'>;
+}) => {
+  return directlyConstructOpCall(
+    'artifactVersion-dependencyOf',
+    inputs,
+    list('artifactVersion')
+  );
+};

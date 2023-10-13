@@ -422,7 +422,7 @@ export interface FilesystemArtifactRef {
 }
 
 export interface StreamTable {
-  type: 'stream_table'
+  type: 'stream_table';
 }
 
 // End Weave Python additions
