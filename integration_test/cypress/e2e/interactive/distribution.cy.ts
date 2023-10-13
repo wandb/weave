@@ -1,4 +1,4 @@
-import {exec, getPanel} from '../testlib';
+import {exec, getPanel, openPanelConfig} from '../testlib';
 
 describe('distribution interactions', () => {
   it('can configure a python panel from scratch by clicking', () => {
@@ -19,23 +19,23 @@ describe('distribution interactions', () => {
         cy.wait(1000);
 
         const panel = getPanel(['main', 'panel0']);
-        panel.trigger('mouseenter').click();
-
-        cy.get('[data-testid="open-panel-editor"]').click();
+        openPanelConfig(panel);
         cy.wait(1000);
 
         const value = '(item) => item["loss1"]';
+
+        cy.get('[data-test=weave-sidebar]')
+          .find(
+            '[data-test=expression-editor-container] [contenteditable=true]'
+          )
+          .contains(value);
 
         // modify the expression to select some data.
         // this is currently broken. it fails with an error
         // in mutation.ts. todo: renable when we want declarable
         // python panels to work again.
         /*
-        cy.get('[data-test=weave-sidebar]')
-          .find(
-            '[data-test=expression-editor-container] [contenteditable=true]'
-          )
-          .contains(value)
+
           .click()
           .type('{rightarrow}'.repeat(value.length))
           .type('{backspace}'.repeat(9))
