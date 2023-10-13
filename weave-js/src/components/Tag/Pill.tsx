@@ -1,4 +1,4 @@
-import {Icon, IconName} from '@wandb/weave/components/Icon';
+import {Icon, IconName} from '../Icon';
 import React, {FC} from 'react';
 import {twMerge} from 'tailwind-merge';
 
