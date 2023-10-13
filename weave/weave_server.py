@@ -117,11 +117,13 @@ def log_system_info():
     underscore_netrc_exists = os.path.exists(os.path.expanduser("~/_netrc"))
     WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
     WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
+    WEAVE_WANDB_GQL_HEADERS = environment.weave_wandb_gql_headers()
     FRONTEND_ENV = json.dumps(frontend_env(), indent=2)
 
     logger.info("Network Config:")
     logger.info(f"  WEAVE_SERVER_URL    = {WEAVE_SERVER_URL}")
     logger.info(f"  WANDB_BASE_URL      = {WANDB_BASE_URL}")
+    logger.info(f"  WEAVE_WANDB_GQL_HEADERS = {WEAVE_WANDB_GQL_HEADERS}")
 
     logger.info("Cache Config:")
     logger.info(f"  WEAVE_LOCAL_ARTIFACT_DIR  = {WEAVE_LOCAL_ARTIFACT_DIR}")
