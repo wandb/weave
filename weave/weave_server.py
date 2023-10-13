@@ -121,8 +121,8 @@ def log_system_info():
     FRONTEND_ENV = json.dumps(frontend_env(), indent=2)
 
     logger.info("Network Config:")
-    logger.info(f"  WEAVE_SERVER_URL    = {WEAVE_SERVER_URL}")
-    logger.info(f"  WANDB_BASE_URL      = {WANDB_BASE_URL}")
+    logger.info(f"  WEAVE_SERVER_URL        = {WEAVE_SERVER_URL}")
+    logger.info(f"  WANDB_BASE_URL          = {WANDB_BASE_URL}")
     logger.info(f"  WEAVE_WANDB_GQL_HEADERS = {WEAVE_WANDB_GQL_HEADERS}")
 
     logger.info("Cache Config:")
