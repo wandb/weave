@@ -139,7 +139,7 @@ def _direct_publish(
     assume_weave_type: typing.Optional[types.Type] = None,
     *,
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
-):
+) -> artifact_wandb.WandbArtifactRef:
     weave_type = assume_weave_type or _get_weave_type(obj)
 
     target_project_from_context = get_publish_target_project()

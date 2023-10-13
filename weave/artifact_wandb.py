@@ -796,6 +796,10 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             path=uri.path,
         )
 
+    @property
+    def ui_url(self):
+        return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
+
 
 types.WandbArtifactRefType.instance_class = WandbArtifactRef
 types.WandbArtifactRefType.instance_classes = WandbArtifactRef

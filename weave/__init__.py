@@ -1,7 +1,7 @@
-from . import context_state as _context
+from . import context_state as _context_state
 from . import logs as _logging
 
-_loading_builtins_token = _context.set_loading_built_ins()
+_loading_builtins_token = _context_state.set_loading_built_ins()
 
 from . import weave_types as types
 from . import storage
@@ -33,9 +33,18 @@ from . import ops_arrow as _ops_arrow
 
 WeaveList = _ops_arrow.ArrowWeaveList
 
+from .base_types import *
+
 _wandb_api.init()
 
-_context.clear_loading_built_ins(_loading_builtins_token)
+# Ensure there is a client available for eager mode
+from . import context as _context
+
+_context.get_client()
+# Eager by default
+_context_state._eager_mode.set(True)
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)
 
 # Wow, this works! you can do just "weave" in a notebook and render
 # something. Maybe render ecosystem panel?

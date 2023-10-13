@@ -1,12 +1,16 @@
 import typing
+import re
 from . import graph as _graph
 from . import graph_mapper as _graph_mapper
 from . import storage as _storage
+from . import ref_base as _ref_base
+from . import artifact_wandb as _artifact_wandb
 from . import trace as _trace
 from . import weave_internal as _weave_internal
 from . import errors as _errors
 from . import ops as _ops
 from . import context as _context
+from weave import monitoring as _monitoring
 
 # exposed as part of api
 from . import weave_types as types
@@ -52,14 +56,6 @@ def save(node_or_obj, name=None):
             # or the "latest" branch if only a name was provided.
             uri = ref.branch_uri
         return _ops.get(str(uri))
-
-
-def publish(node_or_obj, name=None):
-    if isinstance(node_or_obj, _graph.Node):
-        node_or_obj = use(node_or_obj)
-
-    ref = _storage.publish(node_or_obj, name)
-    return _weave_internal.make_const_node(ref.type, ref.obj)
 
 
 def get(ref_str):
@@ -108,3 +104,40 @@ def weave(obj: typing.Any) -> RuntimeConstNode:
 
 def from_pandas(df):
     return _ops.pandas_to_awl(df)
+
+
+#### Newer API below
+
+
+def init(project_name: str) -> None:
+    entity_name, project_name = project_name.split("/", 1)
+    _monitoring.init_monitor(f"{entity_name}/{project_name}/stream")
+    print(f"View project at http://localhost:3000/browse2/{entity_name}/{project_name}")
+
+
+def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
+    if "/" not in name:
+        mon = _monitoring.default_monitor()
+        if not mon._streamtable:
+            raise ValueError(
+                "Call weave.init() first, or pass <project>/<name> for name"
+            )
+        project_name = mon._streamtable._project_name
+        name = f"{project_name}/{name}"
+
+    ref = _storage.publish(obj, name)  # type: ignore
+    print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
+
+    # Have to manually put the ref on the obj, this is supposed to happen at
+    # a lower level, but we use a mapper in _direct_publish that I think changes
+    # the object identity
+    _ref_base._put_ref(obj, ref)
+    return ref
+
+
+def ref(uri: str) -> _artifact_wandb.WandbArtifactRef:
+    ref = _ref_base.Ref.from_str(uri)
+    if not isinstance(ref, _artifact_wandb.WandbArtifactRef):
+        raise ValueError(f"Expected a wandb artifact ref, got {ref}")
+    ref.type
+    return ref

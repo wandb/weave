@@ -443,11 +443,13 @@ def _auto_publish(project_name: str, obj: typing.Any, output_refs: list):
         types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
     ):
         return obj
+    from .api import publish
+
     ref = storage.get_ref(obj)
     if not ref:
-        ref = storage.publish(
+        ref = publish(
             obj,
-            f"{project_name}/{obj.__class__.__name__}",
+            f"{obj.__class__.__name__}",
         )
     output_refs.append(ref)
     return ref
@@ -470,9 +472,11 @@ def execute_sync_op(
         project_name = st._project_name
         if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
             op_def._ref = None
-            op_def_ref = storage.publish(
+            from .api import publish
+
+            op_def_ref = publish(
                 op_def,
-                f"{project_name}/{op_def.name}",
+                f"{op_def.name}",
             )
         mon_span_inputs, refs = auto_publish(project_name, inputs)
         with mon.span(str(op_def_ref)) as span:

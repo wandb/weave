@@ -23,6 +23,10 @@ from .. import object_context
 
 @weave_class(weave_type=types.RefType)
 class RefNodeMethods:
+    @op()
+    def type(self) -> types.Type:
+        return storage._get_ref(self).type
+
     @op(output_type=lambda input_type: input_type["self"].object_type)
     def get(self):
         return storage.deref(self)

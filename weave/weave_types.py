@@ -1062,6 +1062,8 @@ def deserialize_object_type(t: dict) -> ObjectType:
     )
 
     all_attr_types = {**type_attr_types, "instance_classes": new_object_class}
+    if "_base_type" in t:
+        all_attr_types["_base_type"] = deserialize_object_type(t["_base_type"])
     new_type_class = type(type_class_name, (ObjectType,), all_attr_types)
     setattr(new_type_class, "__annotations__", {})
     for k, v in type_attr_types.items():
@@ -1181,6 +1183,16 @@ class RefType(Type):
     @classmethod
     def type_of_instance(cls, obj):
         return cls(obj.type)
+
+    def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
+        # Use issubclass, we have RunLocalType defined as a subclass of RunType
+        if not issubclass(other_type.__class__, RefType):
+            if self.object_type == NoneType():
+                # If output is None, we don't want to be assignable to basically
+                # all ops (since ops are nullable)
+                return None
+            return other_type.assign_type(self.object_type)
+        return None
 
     # TODO: Address this comment. I'm sure this introduced the same type
     #     blowup as before again. Slows everything down. But in this PR

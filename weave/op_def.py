@@ -375,11 +375,12 @@ class OpDef:
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
     def eager_call(_self, *args, **kwargs):
-        if _self.is_async:
-            output_node = _self.lazy_call(*args, **kwargs)
-            return weave_internal.use(output_node)
-        else:
-            return _self.resolve_fn(*args, **kwargs)
+        output_node = _self.lazy_call(*args, **kwargs)
+        if (any(isinstance(n, graph.Node) for n in args)) or (
+            any(isinstance(n, graph.Node) for n in kwargs.values())
+        ):
+            return output_node
+        return weave_internal.use(output_node)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
