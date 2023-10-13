@@ -8,6 +8,8 @@ import {
   opRefBranchPoint,
   opFilesystemArtifactRootFromUri,
   opFilesystemArtifactPreviousUri,
+  opGet,
+  opGenerateCodeForObject,
 } from '@wandb/weave/core';
 import {useClientContext, useNodeValue} from '@wandb/weave/react';
 import {useCallback, useMemo, useState} from 'react';
@@ -60,19 +62,11 @@ const useGetCodeFromURI = (uri: string | null) => {
     const codeStringNode =
       uri == null
         ? constNone()
-        : (callOpVeryUnsafe(
-            '__internal__-generateCodeForObject',
-            {
-              uri: callOpVeryUnsafe(
-                'get',
-                {
-                  uri: constString(uri),
-                },
-                'any' as const
-              ),
-            },
-            'string' as const
-          ) as any);
+        : opGenerateCodeForObject({
+            obj: opGet({
+              uri: constString(uri),
+            }),
+          });
     return client.query(codeStringNode);
   }, [client, uri]);
 };

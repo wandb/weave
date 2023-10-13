@@ -30,6 +30,7 @@ import {
   opRootProject,
   opRunHistory3,
   opTableRows,
+  opWBTraceTreeConvertToSpans,
   typedDict,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
@@ -500,15 +501,13 @@ const legacyTraceRowToSimpleNode = (
   });
 };
 
-const convertSimpleLegacyNodeToNewFormat = (node: Node) => {
+const convertSimpleLegacyNodeToNewFormat = (
+  node: Node<{type: 'wb_trace_tree'}>
+) => {
   return opConcat({
-    arr: callOpVeryUnsafe(
-      'wb_trace_tree-convertToSpans',
-      {
-        tree: node,
-      },
-      list(list(SpanWeaveWithTimestampType))
-    ) as Node,
+    arr: opWBTraceTreeConvertToSpans({
+      tree: node,
+    }),
   });
 };
 

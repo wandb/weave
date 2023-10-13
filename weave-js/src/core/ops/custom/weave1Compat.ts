@@ -3,7 +3,8 @@
  * typescript, we want to have stubs that correctly build the graph.
  */
 
-import {Node, Type, maybe, typedDict} from '../../model';
+import {Node, Type, list, maybe, typedDict} from '../../model';
+import {SpanWeaveWithTimestampType} from '../../../components/Panel2/PanelTraceTree/util';
 
 // This is similar to callOpVeryUnsafe, but with proper typing.
 function directlyConstructOpCall<T extends Type = 'any'>(
@@ -63,3 +64,29 @@ export const opRefBranchPoint = (inputs: {
     maybe(typedDict({}))
   );
 };
+
+export const opGenerateCodeForObject = (inputs: {obj: Node<'any'>}) => {
+  return directlyConstructOpCall(
+    '__internal__-generateCodeForObject',
+    inputs,
+    'string'
+  );
+};
+
+
+export const opSaveToUri= (inputs: {obj: Node<'any'>, name:Node<'string'>}) => {
+    return directlyConstructOpCall(
+      '__internal__-generateCodeForObject',
+      inputs,
+      'string'
+    );
+  };
+
+
+  export const opWBTraceTreeConvertToSpans = (inputs: {tree: Node<{type: 'wb_trace_tree'}>}) => {
+    return directlyConstructOpCall(
+        'wb_trace_tree-convertToSpans',
+        inputs,
+        list(list(SpanWeaveWithTimestampType))
+      );
+  }
