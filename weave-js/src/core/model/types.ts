@@ -421,7 +421,6 @@ export interface FilesystemArtifactRef {
   type: 'FilesystemArtifactRef';
 }
 
-
 // End Weave Python additions
 
 export type ComplexType =

@@ -6,6 +6,8 @@ import {
   typedDict,
   opRef,
   opRefBranchPoint,
+  opFilesystemArtifactRootFromUri,
+  opFilesystemArtifactPreviousUri,
 } from '@wandb/weave/core';
 import {useClientContext, useNodeValue} from '@wandb/weave/react';
 import {useCallback, useMemo, useState} from 'react';
@@ -18,15 +20,11 @@ export const useBranchPointFromURIString = (
     () =>
       uri == null || !isLocalURI(uri)
         ? constNone()
-        : (opRefBranchPoint(
-            {
-              ref: opRef(
-                {
-                  uri: constString(uri),
-                },
-              ),
-            },
-          )),
+        : opRefBranchPoint({
+            ref: opRef({
+              uri: constString(uri),
+            }),
+          }),
     [uri]
   );
   const hasRemoteVal = useNodeValue(hasRemoteNode);
@@ -40,19 +38,11 @@ export const usePreviousVersionFromURIString = (
     () =>
       uri == null || !isLocalURI(uri)
         ? constNone()
-        : (callOpVeryUnsafe(
-            'FilesystemArtifact-previousURI',
-            {
-              artifact: callOpVeryUnsafe(
-                'FilesystemArtifact-rootFromURI',
-                {
-                  uri: constString(uri),
-                },
-                {type: 'FilesystemArtifact' as any}
-              ) as any,
-            },
-            {type: 'string' as any}
-          ) as any),
+        : opFilesystemArtifactPreviousUri({
+            artifact: opFilesystemArtifactRootFromUri({
+              uri: constString(uri),
+            }),
+          }),
     [uri]
   );
   const hasRemoteVal = useNodeValue(previousURINode);
