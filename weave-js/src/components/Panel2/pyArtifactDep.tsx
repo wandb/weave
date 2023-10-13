@@ -113,7 +113,7 @@ const getArtifactDependencyOfForNode = (node: Node<'artifactVersion'>) => {
 };
 
 export const useArtifactDependencyOfForNode = (
-  node: Node | null
+  node: Node<'artifactVersion'> | null
 ): {
   loading: boolean;
   result: Array<{

@@ -495,7 +495,7 @@ const legacyTraceRowToSimpleNode = (
       }),
     }),
     key: constString(legacyTraceKey),
-  });
+  }) as Node<{type: 'wb_trace_tree'}>;
 };
 
 const convertSimpleLegacyNodeToNewFormat = (
