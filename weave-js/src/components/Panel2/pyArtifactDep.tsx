@@ -14,6 +14,7 @@ import {
   opArtifactVersionArtifactSequence,
   opArtifactVersionCreatedAt,
   opArtifactVersionCreatedBy,
+  opArtifactVersionDependencyOf,
   opContains,
   opDict,
   opEntityName,
@@ -30,14 +31,10 @@ import {
 } from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 
-const getArtifactDependencyOfForNode = (node: Node) => {
-  const dependencyOfNode = callOpVeryUnsafe(
-    'artifactVersion-dependencyOf',
-    {
-      input_node: node,
-    },
-    list('artifactVersion')
-  );
+const getArtifactDependencyOfForNode = (node: Node<'artifactVersion'>) => {
+  const dependencyOfNode = opArtifactVersionDependencyOf({
+    artifactVersion: node,
+  });
 
   const artifactSeqDetails = opMap({
     arr: dependencyOfNode as any,

@@ -3,6 +3,8 @@ import {
   callOpVeryUnsafe,
   constString,
   findChainedAncestors,
+  opRef,
+  opRefBranchPoint,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo, useState} from 'react';
 
@@ -37,12 +39,9 @@ const getAllArtifacts = (node: PanelTreeNode): string[] => {
 export const ObjectEditStatus: React.FC<{artRef: string}> = ({artRef}) => {
   const branchPointNode = useMemo(
     () =>
-      callOpVeryUnsafe('Ref-branch_point', {
-        ref: callOpVeryUnsafe('ref', {uri: constString(artRef)}, {
-          // Only works on FilesystemArtifactRef right now, not generic.
-          type: 'FilesystemArtifactRef',
-        } as any),
-      }) as any,
+      opRefBranchPoint({
+        ref: opRef({uri: constString(artRef)}),
+      }),
     [artRef]
   );
   // console.log('BRANCH POINT NODE', branchPointNode);

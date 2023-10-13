@@ -79,6 +79,17 @@ export const opFilesystemArtifactArtifactName = (inputs: {
     );
   };
 
+  export const opFilesystemArtifactWeaveType = (inputs: {
+    artifact: Node<{type: 'FilesystemArtifact'}>;
+  }) => {
+    return directlyConstructOpCall(
+        'FilesystemArtifact-weaveType',
+      inputs,
+      'type'
+    );
+  };
+
+// Only works on FilesystemArtifactRef right now, not generic.
 export const opRef = (inputs: {uri: Node<'string'>}) => {
   return directlyConstructOpCall('ref', inputs, {
     type: 'FilesystemArtifactRef',
@@ -137,10 +148,26 @@ export const opSaveToUri= (inputs: {obj: Node<'any'>, name:Node<'string'>}) => {
       );
   }
 
+  export const opGetFeaturedBoardTemplatesForNode = (inputs: {input_node: Node}) => {
+    return directlyConstructOpCall(
+        'py_board-get_board_templates_for_node',
+        inputs,
+        list(typedDict({}))
+      );
+  }
+
   export const opRunHistoryLineCount = (inputs: {run: Node<'run'>}) => {
     return directlyConstructOpCall(
         'run-historyLineCount',
         inputs,
         'number'
+      );
+  }
+
+  export const opArtifactVersionDependencyOf = (inputs: {artifactVersion: Node<'artifactVersion'>}) => {
+    return directlyConstructOpCall(
+        'artifactVersion-dependencyOf',
+        inputs,
+        list('artifactVersion')
       );
   }
