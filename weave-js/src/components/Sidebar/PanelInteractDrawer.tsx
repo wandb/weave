@@ -24,6 +24,8 @@ export default PanelInteractDrawer;
 const WIDTH_PX = 328;
 
 export const Container = styled.div<{active: boolean; sticky: boolean}>`
+  background: white;
+  z-index: 10;
   flex-shrink: 0;
   font-size: 15px;
   overflow: hidden;
