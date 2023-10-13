@@ -54,6 +54,7 @@ import * as Styles from './PanelExpression/styles';
 import {
   useCloseDrawer,
   usePanelInputExprIsHighlightedByPath,
+  useSelectedDocumentId,
   useSelectedPath,
   useSetInteractingChildPanel,
   useSetPanelInputExprIsHighlighted,
@@ -565,6 +566,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     el => el != null && el !== ''
   );
 
+  const selectedDocumentId = useSelectedDocumentId();
   const pathStr = useMemo(() => ['<root>', ...fullPath].join('.'), [fullPath]);
   const selectedPath = useSelectedPath();
   const selectedPathStr = useMemo(() => {
@@ -575,6 +577,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   }, [selectedPath]);
 
   const isPanelSelected =
+    selectedDocumentId === documentId &&
     selectedPathStr !== '<root>' &&
     selectedPathStr !== '<root>.main' &&
     pathStr.startsWith(selectedPathStr);
