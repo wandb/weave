@@ -9,7 +9,7 @@ import {
 } from '../testlib';
 
 describe('plotboard', () => {
-  it('dashboard: multi series', () => {
+  it('configure plot panel', () => {
     gotoBlankDashboard();
 
     // Setup sidebar
