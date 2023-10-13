@@ -251,10 +251,9 @@ export const useStateMachine = (
       if (action === 'save') {
         const saveNode = opSaveToUri({
           obj: inputNode as Node<'any'>,
-          name:
-            (actionOptions.name != null
-              ? constString(actionOptions.name)
-              : constNone()) as Node<'string'>,
+          name: (actionOptions.name != null
+            ? constString(actionOptions.name)
+            : constNone()) as Node<'string'>,
         });
         const saveUri: string | null = await executor(saveNode as any);
         if (saveUri == null) {
