@@ -20,9 +20,9 @@ import {
   callOpVeryUnsafe,
   constString,
   list,
-  opArtifactVersionFile,
   opConcat,
   opFileTable,
+  opFilesystemArtifactFile,
   opGet,
   opIsNone,
   opPick,
@@ -690,7 +690,7 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest`;
     newExpr = opTableRows({
       table: opFileTable({
-        file: opArtifactVersionFile({
+        file: opFilesystemArtifactFile({
           artifactVersion: opGet({uri: constString(uri)}),
           path: constString(tableName),
         }),
