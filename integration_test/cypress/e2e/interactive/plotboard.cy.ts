@@ -43,25 +43,5 @@ describe('plotboard', () => {
         cy.wait(200);
       });
     });
-
-    /*
-        panelChangeId(['main', 'panel0'], 'plot');
-        tableAppendColumn(['main', 'panel0'], 'row ** var1');
-        tableCheckContainsValue(['main', 'panel0'], '5.657');
-    
-        // Add another table panel
-        addMainPanel();
-        scrollToEEAndType(['main', 'panel1'], 'panel0.all_rows');
-        tableCheckContainsValue(['main', 'panel1'], '5.657');
-    
-        // Add plot panel
-        addMainPanel();
-        scrollToEEAndType(['main', 'panel2'], 'panel0.all_rows');
-    
-        // sliderSetValue(['sidebar', 'var2'], 0.5);
-        panelTypeInputExpr(['sidebar', 'var1'], '0.5');
-        tableCheckContainsValue(['main', 'panel0'], '1.414');
-        tableCheckContainsValue(['main', 'panel1'], '1.414');
-        */
   });
 });
