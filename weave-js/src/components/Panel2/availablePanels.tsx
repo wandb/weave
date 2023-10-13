@@ -170,6 +170,12 @@ function scoreHandlerStack(type: Type, hs: PanelStack) {
   ) {
     scoreHs -= 50;
   }
+
+  // Until combined 2d projection performance is addressed, bump it down in the recommendation list (i.e. don't auto recommend it)
+  if (sidAndName.id.includes('projection.plot')) {
+    scoreHs -= 100;
+  }
+
   return scoreHs;
 }
 
