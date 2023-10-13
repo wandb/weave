@@ -105,4 +105,9 @@ class Sdist(sdist):  # type: ignore
         super().run()
 
 
-setup(cmdclass={"build": Build, "editable_wheel": EditableWheel, "sdist": Sdist})
+setup(
+    cmdclass={"build": Build, "editable_wheel": EditableWheel, "sdist": Sdist},
+    entry_points={
+        "console_scripts": ["weave = weave.__main__:main"],
+    },
+)
