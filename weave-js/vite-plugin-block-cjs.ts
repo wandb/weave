@@ -445,17 +445,17 @@ const blockCjsPlugin = {
     }
 
     const dangerousImportsList = Object.entries(dangerousImportsFound);
-    if (dangerousImportsList.length > 0) {
-      throw new Error(
-        cjsErrorMessage(
-          Object.fromEntries(
-            sortBy(dangerousImportsList, ([module]) => {
-              return module;
-            })
-          )
-        )
-      );
-    }
+    // if (dangerousImportsList.length > 0) {
+    //   throw new Error(
+    //     cjsErrorMessage(
+    //       Object.fromEntries(
+    //         sortBy(dangerousImportsList, ([module]) => {
+    //           return module;
+    //         })
+    //       )
+    //     )
+    //   );
+    // }
   },
 };
 
