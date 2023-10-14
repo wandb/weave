@@ -364,8 +364,7 @@ export class RemoteHttpServer implements Server {
           // network error, always retry these, does not count against max retries
           this.trace(`fetch failed: ${(err as Error).message}`, err);
           this.backoff();
-          // Our gunicorn timeout is 120 seconds, so if we've been waiting longer than that,
-          // we know it's a timeout and not a network error
+          // if we've been waiting for more than the timeout, we know it's a timeout and not a network error
           if (performance.now() - startTime >= WEAVE_1_SERVER_TIMEOUT_MS) {
             // This is a timeout, not a network error
             setRetryOrFail();
