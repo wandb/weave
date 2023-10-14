@@ -42,7 +42,10 @@ CACHE_OP_NAMES = (
         "op-umap_project",
         "op-openai_embed",
         "op-hdbscan_cluster",
+        "wb_trace_tree-refine_convert_to_spans_output_type",
         "wb_trace_tree-convertToSpans",
+        "wb_trace_tree_list-refine_list_convert_to_spans_output_type",
+        "wb_trace_tree_list-convertToSpans",
     ]
     + CACHE_AND_PARALLEL_OP_NAMES
     + CACHE_NON_PURE_OP_NAMES

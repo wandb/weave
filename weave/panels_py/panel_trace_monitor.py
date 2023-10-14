@@ -30,7 +30,7 @@ BOARD_DESCRIPTION = "Analyze traces from LLM chains, applications or any ML pipe
 # BOARD_INPUT_WEAVE_TYPE is the weave type of the input node.
 
 
-BOARD_INPUT_WEAVE_TYPE = types.List(panel_trace.span_typed_dict_type)
+BOARD_INPUT_WEAVE_TYPE = types.List(types.optional(panel_trace.span_typed_dict_type))
 
 
 board_name = "py_board-" + BOARD_ID

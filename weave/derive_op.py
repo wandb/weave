@@ -80,6 +80,7 @@ disallow_mapping_type_name_list = [
     "groupresult",
     "dataframeTable",
     "ArrowWeaveList",
+    "wb_trace_tree",
 ]
 
 

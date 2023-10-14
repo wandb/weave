@@ -8,6 +8,9 @@ import hashlib
 import uuid
 
 import typeguard
+from weave.ops_arrow.convert import to_arrow
+
+from weave.ops_arrow.list_ import ArrowWeaveList
 
 from .. import stream_data_interfaces
 from wandb.sdk.data_types.trace_tree import Span as WBSpan
@@ -266,9 +269,10 @@ class TraceSpanDictWithTimestamp(stream_data_interfaces.TraceSpanDict):
 
 
 @op(
+    name="wb_trace_tree-refine_convert_to_spans_output_type",
     hidden=True,
 )
-def refine_convert_output_type(
+def refine_convert_to_spans_output_type(
     tree: WBTraceTree,
 ) -> types.Type:
     with op_def.no_refine():
@@ -304,18 +308,15 @@ def create_id_from_seed(seed: str) -> str:
     return str(uuid.UUID(m.hexdigest()))
 
 
-@weave.op(
-    name="wb_trace_tree-convertToSpans", refine_output_type=refine_convert_output_type
-)
-def convert_to_spans(
-    tree: WBTraceTree,
+def trace_tree_to_spans(
+    root_span_dumps, model_hash, model_dict_dumps
 ) -> typing.List[TraceSpanDictWithTimestamp]:
-    loaded_dump = json.loads(tree.root_span_dumps)
+    loaded_dump = json.loads(root_span_dumps)
     wb_span = span_dict_to_wb_span(loaded_dump)
 
     # Ensure stable span id (since some old traces don't have them)
     if wb_span.span_id is None:
-        wb_span.span_id = create_id_from_seed(tree.root_span_dumps)
+        wb_span.span_id = create_id_from_seed(root_span_dumps)
 
     spans: typing.List[
         TraceSpanDictWithTimestamp
@@ -325,10 +326,100 @@ def convert_to_spans(
     if len(spans) > 0:
         spans[0]["attributes"] = spans[0]["attributes"] or {}
         spans[0]["attributes"]["model"] = {  # type: ignore
-            "id": tree.model_hash,
-            "obj": tree.model_dict_dumps,
+            "id": model_hash,
+            "obj": model_dict_dumps,
         }
 
     for span in spans:
         span["timestamp"] = datetime.datetime.fromtimestamp(span["start_time_s"])
     return spans
+
+
+@weave.op(
+    name="wb_trace_tree-convertToSpans",
+    refine_output_type=refine_convert_to_spans_output_type,
+)
+def convert_to_spans(
+    tree: WBTraceTree,
+) -> typing.List[TraceSpanDictWithTimestamp]:
+    return trace_tree_to_spans(
+        tree.root_span_dumps, tree.model_hash, tree.model_dict_dumps
+    )
+
+
+@op(
+    name="wb_trace_tree_list-refine_list_convert_to_spans_output_type",
+    hidden=True,
+)
+def refine_list_convert__to_spans_output_type(
+    tree: typing.List[typing.Optional[WBTraceTree]],
+) -> types.Type:
+    with op_def.no_refine():
+        node = list_convert_to_spans(tree)
+    res = weave.use(node)
+    final = types.TypeRegistry.type_of(res)
+    return final
+
+
+@weave.op(
+    name="wb_trace_tree_list-convertToSpans",
+    refine_output_type=refine_list_convert__to_spans_output_type,
+)
+def list_convert_to_spans(
+    tree: typing.List[typing.Optional[WBTraceTree]],
+) -> ArrowWeaveList[typing.List[TraceSpanDictWithTimestamp]]:
+    if isinstance(tree, ArrowWeaveList):
+        spans = [
+            trace_tree_to_spans(
+                t["root_span_dumps"], t["model_hash"], t["model_dict_dumps"]
+            )
+            if t != None
+            else None
+            for t in tree.to_pylist_notags()
+        ]
+    else:
+        spans = [
+            trace_tree_to_spans(t.root_span_dumps, t.model_hash, t.model_dict_dumps)
+            if t != None
+            else None
+            for t in tree
+        ]
+
+    samples = []
+    count = 0
+    for span in spans:
+        if span is not None:
+            for s in span:
+                samples.append(s)
+                count += 1
+        if count >= 100:
+            break
+    wb_type = types.TypeRegistry.type_of(samples)
+    wb_type = types.List(
+        types.union(
+            types.NoneType(),
+            wb_type.object_type,
+            types.TypedDict(
+                {
+                    "span_id": types.String(),
+                    "name": types.String(),
+                    "trace_id": types.String(),
+                    "status_code": types.String(),
+                    "start_time_s": types.Number(),
+                    "end_time_s": types.Number(),
+                    "parent_id": types.optional(types.String()),
+                    "attributes": types.optional(types.TypedDict({})),
+                    "inputs": types.optional(types.TypedDict({})),
+                    "output": types.optional(types.TypedDict({})),
+                    "summary": types.optional(types.TypedDict({})),
+                    "exception": types.optional(types.String()),
+                    "timestamp": types.Timestamp(),
+                }
+            ),
+        )
+    )
+
+    return to_arrow(
+        spans,
+        wb_type=types.List(wb_type),
+    )
