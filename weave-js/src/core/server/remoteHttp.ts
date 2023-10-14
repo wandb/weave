@@ -371,7 +371,10 @@ export class RemoteHttpServer implements Server {
           const totalWaitTime = performance.now() - startTime;
           if (totalWaitTime >= WEAVE_1_SERVER_TIMEOUT_MS - 1000) {
             // This is a timeout, not a network error
-            rejectAll({message: `Weave request failed - backend timeout after ${totalWaitTime} milliseconds.`, traceback:[]});
+            rejectAll({
+              message: `Weave request failed - backend timeout after ${totalWaitTime} milliseconds.`,
+              traceback: [],
+            });
           } else {
             setState('waiting');
           }
@@ -431,7 +434,10 @@ export class RemoteHttpServer implements Server {
               this.backoff(10);
               setRetryOrFail();
             } else {
-              rejectAll({message: 'Weave request failed: ' + fetchResponse.status, traceback:[]});
+              rejectAll({
+                message: 'Weave request failed: ' + fetchResponse.status,
+                traceback: [],
+              });
             }
           }
         }
