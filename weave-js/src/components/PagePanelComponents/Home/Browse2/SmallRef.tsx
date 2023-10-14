@@ -18,6 +18,7 @@ import {Dataset as DatasetIcon} from '@mui/icons-material';
 import {CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon} from '@mui/icons-material';
 import {SmartToy as SmartToyIcon} from '@mui/icons-material';
 import {TableRows as TableRowsIcon} from '@mui/icons-material';
+import {DataObject as DataObjectIcon} from '@mui/icons-material';
 import {Link} from './CommonLib';
 import {URL_BROWSE2} from '@wandb/weave/urls';
 import {Box, Typography} from '@material-ui/core';
@@ -56,6 +57,8 @@ export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
     icon = <SmartToyIcon />;
   } else if (rootTypeName === 'list') {
     icon = <TableRowsIcon />;
+  } else if (rootTypeName === 'OpDef') {
+    icon = <DataObjectIcon />;
   }
   let Item = (
     <Box display="flex" alignItems="center">
@@ -65,17 +68,8 @@ export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
   );
   if (refTypeQuery.loading) {
     return Item;
-    // return <Chip icon={icon} label={label} />;
   }
-  return (
-    <Link to={refUIUrl(rootTypeName, objRef)}>
-      {Item}
-      {/* <Chip icon={icon} label={label} />
-      <Typography variant="body1">
-        {icon} {label}
-      </Typography> */}
-    </Link>
-  );
+  return <Link to={refUIUrl(rootTypeName, objRef)}>{Item}</Link>;
 };
 
 export const parseRefMaybe = (s: string): ArtifactRef | null => {

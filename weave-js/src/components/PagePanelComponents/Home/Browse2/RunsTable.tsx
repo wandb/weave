@@ -1,6 +1,6 @@
 import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
-import {useParams, useHistory} from 'react-router-dom';
+import {useParams, useHistory, Link} from 'react-router-dom';
 import {URL_BROWSE2} from '../../../../urls';
 import {monthRoundedTime} from '@wandb/weave/time';
 import {Call, Span} from './callTree';
@@ -74,7 +74,6 @@ export const RunsTable: FC<{
     [spans]
   );
   const params = useParams<Browse2RootObjectVersionItemParams>();
-  const history = useHistory();
   const tableData = useMemo(() => {
     return spans.map((call: Call) => {
       const argOrder = call.inputs._input_order;
@@ -118,6 +117,18 @@ export const RunsTable: FC<{
   }, [spans]);
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
+      {
+        field: 'span_id',
+        headerName: 'Trace span',
+        renderCell: rowParams => {
+          return (
+            <Link
+              to={`/${URL_BROWSE2}/${params.entity}/${params.project}/trace/${rowParams.row.trace_id}/${rowParams.row.id}`}>
+              {rowParams.row.id}
+            </Link>
+          );
+        },
+      },
       {
         field: 'timestamp',
         headerName: 'Timestamp',
@@ -205,7 +216,7 @@ export const RunsTable: FC<{
     }
 
     return {cols, colGroupingModel};
-  }, [spans]);
+  }, [params.entity, params.project, spans]);
   const autosized = useRef(false);
   useEffect(() => {
     if (autosized.current) {
@@ -248,11 +259,6 @@ export const RunsTable: FC<{
           },
         }}
         disableRowSelectionOnClick
-        onRowClick={rowParams =>
-          history.push(
-            `/${URL_BROWSE2}/${params.entity}/${params.project}/trace/${rowParams.row.trace_id}/${rowParams.row.id}`
-          )
-        }
       />
     </Box>
   );

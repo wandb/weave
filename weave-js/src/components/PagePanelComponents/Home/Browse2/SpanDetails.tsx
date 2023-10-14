@@ -63,7 +63,11 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
               </Button>
             )}
           </Box>
-          <Chip label={call.name} />
+          {parseRefMaybe(call.name) != null ? (
+            <SmallRef objRef={parseRefMaybe(call.name)!} />
+          ) : (
+            call.name
+          )}
         </Box>
         <Typography variant="body2" gutterBottom>
           Status: {call.status_code}
