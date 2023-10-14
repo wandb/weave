@@ -4,10 +4,9 @@
  */
 
 import {Node, OutputNode, Type, list, maybe, typedDict} from '../../model';
-import {SpanWeaveWithTimestampType} from '../../../components/Panel2/PanelTraceTree/util';
 
 // This is similar to callOpVeryUnsafe, but with proper typing.
-function directlyConstructOpCall<T extends Type = 'any'>(
+export function directlyConstructOpCall<T extends Type = 'any'>(
   opName: string,
   inputs: Record<string, Node>,
   outputType: T
@@ -142,15 +141,6 @@ export const opSaveToUri = (inputs: {
   );
 };
 
-export const opWBTraceTreeConvertToSpans = (inputs: {
-  tree: Node<{type: 'wb_trace_tree'}>;
-}) => {
-  return directlyConstructOpCall(
-    'wb_trace_tree-convertToSpans',
-    inputs,
-    list(list(SpanWeaveWithTimestampType))
-  );
-};
 
 export const opStreamTableRows = (inputs: {
   self: Node<{type: 'stream_table'}>;

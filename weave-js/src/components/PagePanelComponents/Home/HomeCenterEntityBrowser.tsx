@@ -18,6 +18,8 @@ import moment from 'moment';
 import {
   Node,
   constString,
+  directlyConstructOpCall,
+  list,
   opConcat,
   opFileTable,
   opFilesystemArtifactFile,
@@ -29,7 +31,6 @@ import {
   opRunHistory3,
   opStreamTableRows,
   opTableRows,
-  opWBTraceTreeConvertToSpans,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
@@ -52,6 +53,7 @@ import {
 import {urlWandbFrontend} from '../../../util/urls';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';
+import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -496,6 +498,16 @@ const legacyTraceRowToSimpleNode = (
     }),
     key: constString(legacyTraceKey),
   }) as Node<{type: 'wb_trace_tree'}>;
+};
+
+const opWBTraceTreeConvertToSpans = (inputs: {
+  tree: Node<{type: 'wb_trace_tree'}>;
+}) => {
+  return directlyConstructOpCall(
+    'wb_trace_tree-convertToSpans',
+    inputs,
+    list(list(SpanWeaveWithTimestampType))
+  );
 };
 
 const convertSimpleLegacyNodeToNewFormat = (
