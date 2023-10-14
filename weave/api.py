@@ -5,6 +5,7 @@ from . import graph_mapper as _graph_mapper
 from . import storage as _storage
 from . import ref_base as _ref_base
 from . import artifact_wandb as _artifact_wandb
+from . import wandb_api as _wandb_api
 from . import trace as _trace
 from . import weave_internal as _weave_internal
 from . import errors as _errors
@@ -110,7 +111,17 @@ def from_pandas(df):
 
 
 def init(project_name: str) -> None:
-    entity_name, project_name = project_name.split("/", 1)
+    fields = project_name.split("/")
+    if len(fields) == 1:
+        api = _wandb_api.get_wandb_api_sync()
+        entity_name = api.default_entity_name()
+        project_name = fields[0]
+    elif len(fields) == 2:
+        entity_name, project_name = fields
+    else:
+        raise ValueError(
+            'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
+        )
     _monitoring.init_monitor(f"{entity_name}/{project_name}/stream")
     print(f"View project at http://localhost:3000/browse2/{entity_name}/{project_name}")
 
