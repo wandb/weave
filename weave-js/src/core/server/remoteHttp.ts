@@ -289,7 +289,10 @@ export class RemoteHttpServer implements Server {
           const entry = nodeEntries[i];
           if (entry.retries >= this.opts.maxRetries) {
             this.trace(`Cancelling node after ${entry.retries} retries`);
-            this.resolveNode(entry.node, null);
+            this.rejectNode(entry.node, {
+              message: `Weave request failed after ${entry.retries} retries`,
+              traceback: [],
+            });
           } else {
             entry.state = 'waiting';
             entry.retries++;
