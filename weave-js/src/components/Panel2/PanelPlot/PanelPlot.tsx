@@ -883,7 +883,9 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
               updateConfig(newConfig);
             }
           }}>
-          <S.AddNewSeriesText>New series</S.AddNewSeriesText>
+          <S.AddNewSeriesText data-testid="add-new-series-text">
+            New series
+          </S.AddNewSeriesText>
           <S.AddNewSeriesButton>
             <IconAddNew width="18" height="18" />
           </S.AddNewSeriesButton>
@@ -1552,6 +1554,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         enableDashUi={enableDashUi}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
+          data-testid={`dropdown-${dimName}`}
           placeholder={dimension.defaultState().compareValue}
           value={dimension.state().value}
           options={dimension.options}

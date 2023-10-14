@@ -1,3 +1,5 @@
+import {config} from 'cypress/types/bluebird';
+
 // Log the full error output. From here: https://github.com/cypress-io/cypress/issues/5470
 export const exec = (command: string, timeout: number) => {
   return cy.exec(command, {failOnNonZeroExit: false, timeout}).then(result => {
@@ -55,4 +57,110 @@ export function checkAllPanelsRendered() {
 export const getPanel = (path: string[]) => {
   const attrPath = path.map(p => `[data-weavepath=${p}]`);
   return cy.get(attrPath.join(' '));
+};
+
+export const openPanelConfig = (panel: Cypress.Chainable) => {
+  panel.trigger('mouseenter').click();
+  const editorPanel = panel.find('[data-testid="open-panel-editor"]');
+  editorPanel.click();
+  return editorPanel;
+};
+
+export const gotoBlankDashboard = () => {
+  exec('python cypress/e2e/interactive/blank.py', 10000);
+  const url =
+    '/?fullScreen&expNode=%7B%22nodeType%22%3A%20%22output%22%2C%20%22type%22%3A%20%22any%22%2C%20%22fromOp%22%3A%20%7B%22name%22%3A%20%22get%22%2C%20%22inputs%22%3A%20%7B%22uri%22%3A%20%7B%22nodeType%22%3A%20%22const%22%2C%20%22type%22%3A%20%22string%22%2C%20%22val%22%3A%20%22local-artifact%3A///dashboard-list%3Alatest/obj%22%7D%7D%7D%7D';
+  cy.viewport(1600, 900);
+  cy.visit(url);
+  cy.get('canvas').should('be.visible');
+  cy.get('[data-testid="header-center-controls"]').should('be.visible').click();
+  cy.get('[data-testid="new-board-button"]').should('be.visible').click();
+};
+
+export const addSidebarPanel = () => {
+  getPanel(['sidebar']).contains('New variable').click();
+};
+
+export const addMainPanel = () => {
+  getPanel(['main'])
+    .find('button[data-test="new-panel-button"]')
+    .click({force: true});
+};
+
+export const dashboardConvertToControl = (path: string[]) => {
+  const panel = getPanel(path);
+  panel.find('i.sliders').click();
+};
+
+export const panelTypeInputExpr = (path: string[], text: string) => {
+  const panel = getPanel(path);
+  panel
+    .find('[data-test=expression-editor-container] [contenteditable=true]')
+    .click()
+    .clear()
+    .type(text)
+    .wait(300)
+    .type('{enter}', {force: true});
+};
+
+export const scrollToEEAndType = (path: string[], text: string) => {
+  const panel = getPanel(path);
+  panel
+    .trigger('mouseenter')
+    .click()
+    .find('[data-test=expression-editor-container] [contenteditable=true]')
+
+    .realHover()
+    .realClick()
+
+    .realHover()
+    .realClick()
+
+    .type(text, {force: true})
+    .wait(300)
+    .type('{enter}', {force: true});
+};
+
+export const panelChangeId = (path: string[], text: string) => {
+  const panel = getPanel(path);
+  panel.find('[data-test-comp=PanelNameEditor] [contenteditable=true]').click();
+  cy.get('[data-test=wb-menu-item]').contains(text).click();
+};
+
+export const tableAppendColumn = (path: string[], expr) => {
+  const panel = getPanel(path);
+  panel.find('i.column-actions-trigger').click({force: true});
+  // TODO: these should be panel.find... but that didn't work on my first try
+  cy.get('[data-test=wb-menu-item]').contains('Insert 1 right').click();
+  cy.get('[data-test=column-header').last().click();
+
+  cy.get('.wb-table-action-popup')
+    .find('[data-test=expression-editor-container] [contenteditable=true]')
+    .click()
+    .type('{backspace}{backspace}{backspace}{backspace}{backspace}')
+    .type(expr);
+  cy.get('#root').click({force: true});
+};
+
+export const tableCheckContainsValue = (path: string[], value: string) => {
+  const panel = getPanel(path);
+  panel.find('.BaseTable__row-cell div').contains(value);
+};
+
+export const sliderSetValue = (path: string[], value: number) => {
+  const panel = getPanel(path);
+  panel.find('input[type=range]').invoke('val', value).trigger('input');
+};
+
+export const setPlotConfig = (
+  configDivElement: Cypress.Chainable,
+  eeText: string
+) => {
+  configDivElement
+    .find('[data-test=expression-editor-container] [contenteditable=true]')
+    .click()
+    .clear()
+    .type(eeText)
+    .wait(300)
+    .type('{enter}', {force: true});
 };
