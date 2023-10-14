@@ -296,7 +296,7 @@ export class RemoteHttpServer implements Server {
           }
         });
 
-      const rejectAll = (e: any) =>
+      const rejectAll = (e: {message: string; traceback: string[]}) =>
         indexes.forEach(i => this.rejectNode(nodeEntries[i].node, e));
 
       const resolveOrReject = (response: {
@@ -365,10 +365,11 @@ export class RemoteHttpServer implements Server {
           this.trace(`fetch failed: ${(err as Error).message}`, err);
           this.backoff();
           // if we've been waiting for more than the timeout, we know it's a timeout and not a network error
-          if (performance.now() - startTime >= WEAVE_1_SERVER_TIMEOUT_MS) {
+          const totalWaitTime = performance.now() - startTime;
+          if (totalWaitTime >= WEAVE_1_SERVER_TIMEOUT_MS - 1000) {
             // This is a timeout, not a network error
-            setRetryOrFail();
-          } else {
+            rejectAll({message: `Weave request failed - backend timeout after ${totalWaitTime} milliseconds.`, traceback:[]});
+            } else {
             setState('waiting');
           }
         }
@@ -427,7 +428,7 @@ export class RemoteHttpServer implements Server {
               this.backoff(10);
               setRetryOrFail();
             } else {
-              rejectAll('Weave request failed: ' + fetchResponse.status);
+              rejectAll({message: 'Weave request failed: ' + fetchResponse.status, traceback:[]});
             }
           }
         }
