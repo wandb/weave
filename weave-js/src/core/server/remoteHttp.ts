@@ -9,6 +9,7 @@ import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
 import type {Server} from './types';
 
 const BATCH_INTERVAL_MS = () => batchIntervalOverride() ?? 50;
+const WEAVE_1_SERVER_TIMEOUT_MS = 1000 * 60 * 2; // 2 minutes
 
 // from https://www.jpwilliams.dev/how-to-unpack-the-return-type-of-a-promise-in-typescript
 // when all of our apps are on TS 4.x we can use Awaited<> instead
@@ -348,6 +349,7 @@ export class RemoteHttpServer implements Server {
           data: new Array(nodes.length).fill(null),
         };
         let fetchResponse: any = null;
+        const startTime = performance.now();
         try {
           fetchResponse = await this.opts.fetch(this.opts.weaveUrl, {
             credentials: 'include',
@@ -362,7 +364,14 @@ export class RemoteHttpServer implements Server {
           // network error, always retry these, does not count against max retries
           this.trace(`fetch failed: ${(err as Error).message}`, err);
           this.backoff();
-          setState('waiting');
+          // Our gunicorn timeout is 120 seconds, so if we've been waiting longer than that,
+          // we know it's a timeout and not a network error
+          if (performance.now() - startTime >= WEAVE_1_SERVER_TIMEOUT_MS) {
+            // This is a timeout, not a network error
+            setRetryOrFail();
+          } else {
+            setState('waiting');
+          }
         }
 
         if (!this.opts.isShadow && fetchResponse != null) {
