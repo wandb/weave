@@ -316,7 +316,10 @@ describe('RemoteHttpServer', () => {
     const result = server.query([constNumber(42)]);
     return result.catch(e => {
       expect(fetch).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
-      expect(e).toEqual({"message": "Weave request failed after 3 retries", "traceback": []})
+      expect(e).toEqual({
+        message: 'Weave request failed after 3 retries',
+        traceback: [],
+      });
     });
   });
 
