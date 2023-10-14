@@ -268,6 +268,21 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                 return graph.OutputNode(
                     node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node}
                 )
+    elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
+        from .ops_arrow.arrow import ArrowWeaveListType
+        from .ops_arrow.list_ops import _concat_output_type
+
+        # The operation of flattening a lists of arrow weave lists is exactly equal to the far
+        # more efficient, vectorized concat operation. If this is the case, use it!.
+        arr_node = node.from_op.inputs["arr"]
+        if types.List().assign_type(arr_node.type) and ArrowWeaveListType().assign_type(
+            arr_node.type.object_type
+        ):
+            return graph.OutputNode(
+                _concat_output_type({"arr": arr_node.type}),
+                "ArrowWeaveList-concat",
+                {"arr": arr_node},
+            )
     return None
 
 
