@@ -2781,6 +2781,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.color = {
           field: fixKeyForVega(dims.color),
           type: colorAxisType,
+          scale:
+            colorAxisType === 'quantitative' || colorAxisType === 'temporal'
+              ? {scheme: 'plasma'}
+              : {range: globals.WB_RUN_COLORS},
         };
         if (
           vegaReadyTable.columnSelectFunctions[dims.label].type !== 'invalid'
@@ -2799,6 +2803,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           legend: concreteConfig.legendSettings.color.noLegend
             ? false
             : {...defaultFontStyleDict},
+          scale: {range: globals.WB_RUN_COLORS},
         };
       }
 
@@ -3264,8 +3269,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     concreteConfig.axisSettings,
     concreteConfig.legendSettings,
   ]);
-
-  console.log('vegaSpec', vegaSpec);
 
   // get the series object from the config by its index
   const getSeriesBySeriesIndex = useCallback(
