@@ -369,7 +369,7 @@ export class RemoteHttpServer implements Server {
           if (totalWaitTime >= WEAVE_1_SERVER_TIMEOUT_MS - 1000) {
             // This is a timeout, not a network error
             rejectAll({message: `Weave request failed - backend timeout after ${totalWaitTime} milliseconds.`, traceback:[]});
-            } else {
+          } else {
             setState('waiting');
           }
         }
