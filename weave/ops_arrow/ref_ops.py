@@ -23,13 +23,21 @@ nullable_binary_input_type = {
     output_type=ArrowWeaveListType(types.Boolean()),
 )
 def ref_equal(self, other):
-    if isinstance(other, ArrowWeaveList):
-        other = other._arrow_data
-    else:
-        from .. import storage
+    from .. import storage
 
-        other_ref = storage._get_ref(other)
-        other = str(other_ref)
+    # Weave engine automatically derefs, so we need to undo that via
+    # _get_ref here.
+    other_ref = storage._get_ref(other)
+    if not other_ref:
+        # if there's not a ref, maybe this is a vector of refs?
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        else:
+            # Otherwise... this shouldn't happen I think?
+            raise ValueError(
+                f"Cannot compare ArrowWeaveListRef to {type(other)}: {other}"
+            )
+    other = str(other_ref)
     self_ = self.map_column(
         lambda col, path: ArrowWeaveList(col._arrow_data, types.String())
     )
