@@ -1485,7 +1485,10 @@ def is_taggedvalue_arrowweavelist(
 def is_list_arrowweavelist(
     val: ArrowWeaveList,
 ) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.List]]:
-    return types.List().assign_type(val.object_type)
+    # Don't use assignability to List here! Because Ref<List> is assignable to List
+    return isinstance(val.object_type, types.List) or isinstance(
+        val.object_type, ArrowWeaveListType
+    )
 
 
 def dataframe_to_arrow(df):

@@ -1,5 +1,5 @@
 import typing
-import re
+import dataclasses
 from . import graph as _graph
 from . import graph_mapper as _graph_mapper
 from . import storage as _storage
@@ -115,15 +115,30 @@ def init(project_name: str) -> None:
     print(f"View project at http://localhost:3000/browse2/{entity_name}/{project_name}")
 
 
+@dataclasses.dataclass
+class _Settings:
+    entity_name: str
+    project_name: str
+
+
+def _get_settings() -> typing.Optional[_Settings]:
+    mon = _monitoring.default_monitor()
+    if not mon._streamtable:
+        return None
+    return _Settings(
+        entity_name=mon._streamtable._entity_name,
+        project_name=mon._streamtable._project_name,
+    )
+
+
 def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
     if "/" not in name:
-        mon = _monitoring.default_monitor()
-        if not mon._streamtable:
+        settings = _get_settings()
+        if not settings:
             raise ValueError(
                 "Call weave.init() first, or pass <project>/<name> for name"
             )
-        project_name = mon._streamtable._project_name
-        name = f"{project_name}/{name}"
+        name = f"{settings.project_name}/{name}"
 
     ref = _storage.publish(obj, name)  # type: ignore
     print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
@@ -136,6 +151,17 @@ def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
 
 
 def ref(uri: str) -> _artifact_wandb.WandbArtifactRef:
+    if not "://" in uri:
+        settings = _get_settings()
+        if not settings:
+            raise ValueError("Call weave.init() first, or pass a fully qualified uri")
+        if "/" in uri:
+            raise ValueError("'/' not currently supported in short-form URI")
+        name_version = uri
+        if ":" not in name_version:
+            name_version = f"{name_version}:latest"
+        uri = f"wandb-artifact:///{settings.entity_name}/{settings.project_name}/{name_version}/obj"
+
     ref = _ref_base.Ref.from_str(uri)
     if not isinstance(ref, _artifact_wandb.WandbArtifactRef):
         raise ValueError(f"Expected a wandb artifact ref, got {ref}")
