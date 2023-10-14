@@ -141,7 +141,6 @@ export const opSaveToUri = (inputs: {
   );
 };
 
-
 export const opStreamTableRows = (inputs: {
   self: Node<{type: 'stream_table'}>;
 }) => {
