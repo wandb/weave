@@ -1,5 +1,4 @@
 import React, {FC, useMemo} from 'react';
-import {Chip} from '@mui/material';
 import {
   ArtifactRef,
   isWandbArtifactRef,
@@ -21,7 +20,7 @@ import {TableRows as TableRowsIcon} from '@mui/icons-material';
 import {DataObject as DataObjectIcon} from '@mui/icons-material';
 import {Link} from './CommonLib';
 import {URL_BROWSE2} from '@wandb/weave/urls';
-import {Box, Typography} from '@material-ui/core';
+import {Box, Typography} from '@mui/material';
 
 const getRootType = (t: Type): Type => {
   if (

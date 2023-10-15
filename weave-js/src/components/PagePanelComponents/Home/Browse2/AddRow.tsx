@@ -9,7 +9,7 @@ import {
   DialogTitle,
   Grid,
   Typography,
-} from '@material-ui/core';
+} from '@mui/material';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ProjectNamePicker} from './ProjectPicker';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';

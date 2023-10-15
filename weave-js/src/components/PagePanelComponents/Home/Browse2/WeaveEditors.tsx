@@ -41,7 +41,7 @@ import {
   Grid,
   TextField,
   Typography,
-} from '@material-ui/core';
+} from '@mui/material';
 import {
   WandbArtifactRef,
   isWandbArtifactRef,
@@ -62,6 +62,7 @@ import {useHistory, useLocation} from 'react-router-dom';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 import LinkIcon from '@mui/icons-material/Link';
 import {flattenObject, unflattenObject} from './browse2Util';
+import {SmallRef, parseRefMaybe} from './SmallRef';
 
 const displaysAsSingleRow = (valueType: Type) => {
   if (isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))) {
@@ -95,13 +96,11 @@ interface WeaveEditorEdit {
 }
 
 interface WeaveEditorContextValue {
-  editable: boolean;
   edits: WeaveEditorEdit[];
   addEdit: (edit: WeaveEditorEdit) => void;
 }
 
 const WeaveEditorContext = React.createContext<WeaveEditorContextValue>({
-  editable: false,
   edits: [],
   addEdit: () => {},
 });
@@ -112,10 +111,6 @@ const useWeaveEditorContext = () => {
 
 const useWeaveEditorContextAddEdit = () => {
   return useWeaveEditorContext().addEdit;
-};
-
-const useWeaveEditorContextEditable = () => {
-  return useWeaveEditorContext().editable;
 };
 
 const WeaveEditorCommit: FC<{
@@ -230,8 +225,7 @@ const WeaveEditorCommit: FC<{
 export const WeaveEditor: FC<{
   objType: string;
   node: Node;
-  editable: boolean;
-}> = ({editable, objType, node}) => {
+}> = ({objType, node}) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
   const [refinedNode, setRefinedNode] = useState<NodeOrVoidNode>(voidNode());
@@ -263,10 +257,7 @@ export const WeaveEditor: FC<{
     },
     [edits]
   );
-  const contextVal = useMemo(
-    () => ({editable, edits, addEdit}),
-    [editable, edits, addEdit]
-  );
+  const contextVal = useMemo(() => ({edits, addEdit}), [edits, addEdit]);
   const [commitChangesOpen, setCommitChangesOpen] = useState(false);
   useEffect(() => {
     const doRefine = async () => {
@@ -330,6 +321,9 @@ const WeaveEditorField: FC<{
   }
   if (isAssignableTo(node.type, maybe({type: 'Object'}))) {
     return <WeaveEditorObject node={node} path={path} />;
+  }
+  if (isAssignableTo(node.type, maybe({type: 'OpDef'}))) {
+    return <WeaveViewOpDef node={node} />;
   }
   return <div>[No editor for type {weave.typeToString(node.type)}]</div>;
 };
@@ -645,4 +639,21 @@ export const WeaveEditorTable: FC<{
       />
     </Box>
   );
+};
+
+export const WeaveViewOpDef: FC<{
+  node: Node;
+}> = ({node}) => {
+  const opDefQuery = useNodeValue(node);
+  const opDefRef = useMemo(
+    () => parseRefMaybe(opDefQuery.result ?? ''),
+    [opDefQuery.result]
+  );
+  if (opDefQuery.loading) {
+    return <div>loading</div>;
+  } else if (opDefRef != null) {
+    return <SmallRef objRef={opDefRef} />;
+  } else {
+    return <div>invalid op def</div>;
+  }
 };

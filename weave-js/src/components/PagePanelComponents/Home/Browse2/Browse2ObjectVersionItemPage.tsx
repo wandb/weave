@@ -167,13 +167,16 @@ export const Browse2ObjectVersionItemPage: FC = props => {
         }
         actions={
           params.rootType === 'OpDef' ? undefined : (
-            <Box display="flex" alignItems="flex-start">
+            <Box
+              display="flex"
+              alignItems="flex-start"
+              justifyContent="space-between">
               <LoadingButton
                 loading={isGenerating}
                 variant="outlined"
                 sx={{marginRight: 3}}
                 onClick={onNewBoard}>
-                <span>Open in board</span>
+                Open in board
               </LoadingButton>
               <Button
                 variant="outlined"
@@ -249,7 +252,7 @@ export const Browse2ObjectVersionItemPage: FC = props => {
                   </Box>
                 </Paper>
               </Box>
-              <Box mt={4}>
+              {/* <Box mt={4}>
                 <Paper>
                   <Typography variant="h6" gutterBottom>
                     Referenced by Objects
@@ -266,7 +269,7 @@ export const Browse2ObjectVersionItemPage: FC = props => {
                     Placeholder
                   </Box>
                 </Paper>
-              </Box>
+              </Box> */}
             </Grid>
           </Grid>
         </>
