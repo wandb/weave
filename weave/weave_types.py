@@ -136,15 +136,13 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
+        if is_serialized_object_type(d):
+            return deserialize_object_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            # TODO: this needs to happen earlier in case it's in incompatible object type
-            # with the one we already have and we need an ObjectType cache
-            if is_serialized_object_type(d):
-                return deserialize_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
@@ -1401,7 +1399,7 @@ def merge_types(a: Type, b: Type) -> Type:
             next_prop_types[key] = merge_types(self_prop_type, other_prop_type)
         return TypedDict(next_prop_types)
     if isinstance(a, ObjectType) and isinstance(b, ObjectType):
-        if a.name == b.name:
+        if a.name == b.name and not set(a.type_attrs()).difference(b.type_attrs()):
             next_type_attrs = {}
             for key in a.type_attrs():
                 next_type_attrs[key] = merge_types(getattr(a, key), getattr(b, key))
@@ -1409,6 +1407,9 @@ def merge_types(a: Type, b: Type) -> Type:
 
     if isinstance(a, List) and isinstance(b, List):
         return List(merge_types(a.object_type, b.object_type))
+
+    if isinstance(a, RefType) and isinstance(b, RefType) and a.__class__ == b.__class__:
+        return a.__class__(merge_types(a.object_type, b.object_type))
 
     if isinstance(a, UnknownType):
         return b
