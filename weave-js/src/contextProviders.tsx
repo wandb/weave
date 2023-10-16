@@ -36,32 +36,35 @@ export const getGlobalWeaveContext = () => {
   return new Weave(GLOBAL_CLIENT);
 };
 
-export const ComputeGraphContextProviderFromClient: React.FC<{client: Client}> =
-  React.memo(({client, children}) => {
-    const context = useMemo(() => ({client}), [client]);
-    GLOBAL_CLIENT = client;
+export const ComputeGraphContextProviderFromClient: React.FC<{
+  client: Client;
+  style?: React.CSSProperties;
+}> = React.memo(({client, children, style}) => {
+  const context = useMemo(() => ({client}), [client]);
+  GLOBAL_CLIENT = client;
 
-    const [isLoading, setIsLoading] = useState(false);
-    useEffect(() => {
-      const subscription = context.client
-        .loadingObservable()
-        .subscribe(setIsLoading);
-      return () => subscription.unsubscribe();
-    }, [context]);
+  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    const subscription = context.client
+      .loadingObservable()
+      .subscribe(setIsLoading);
+    return () => subscription.unsubscribe();
+  }, [context]);
 
-    return (
-      <div
-        data-test="compute-graph-provider"
-        data-test-num-shadow-server-requests-counter={
-          GlobalCGEventTracker.shadowServerRequests
-        }
-        className={isLoading ? 'loading cg-executing' : ''}>
-        <ClientContext.Provider value={context}>
-          {children}
-        </ClientContext.Provider>
-      </div>
-    );
-  });
+  return (
+    <div
+      data-test="compute-graph-provider"
+      data-test-num-shadow-server-requests-counter={
+        GlobalCGEventTracker.shadowServerRequests
+      }
+      className={isLoading ? 'loading cg-executing' : ''}
+      style={style}>
+      <ClientContext.Provider value={context}>
+        {children}
+      </ClientContext.Provider>
+    </div>
+  );
+});
 ComputeGraphContextProviderFromClient.displayName =
   'ComputeGraphContextProviderFromClient';
 
@@ -89,7 +92,8 @@ const useRemoteEcosystemClient = (
 export const RemoteEcosystemComputeGraphContextProvider: React.FC<{
   isAdmin?: boolean;
   tokenFunc?: () => Promise<string | undefined>;
-}> = React.memo(({isAdmin, tokenFunc, children}) => {
+  style?: React.CSSProperties;
+}> = React.memo(({isAdmin, tokenFunc, children, style}) => {
   const tf = useMemo(() => {
     const dummy = async () => undefined;
     return tokenFunc != null ? tokenFunc : dummy;
@@ -102,6 +106,7 @@ export const RemoteEcosystemComputeGraphContextProvider: React.FC<{
     <ComputeGraphContextProviderFromClient
       client={client}
       children={children}
+      style={style}
     />
   );
 });
@@ -121,35 +126,35 @@ const UNHIDE_PANELS = [
   PanelSelectEditor,
 ];
 
-export const NotebookComputeGraphContextProvider: React.FC = React.memo(
-  ({children}) => {
-    // Default state when in jupyter notebook weave session
-    const defaultWBFeatureState: WeaveFeatures = useMemo(
-      () => ({
-        actions: true,
-        fullscreenMode: true,
-        dashUi: true,
-        betaFeatures: {
-          'weave-python-ecosystem': true,
-          'weave-devpopup': false,
-        },
-      }),
-      []
-    );
+export const NotebookComputeGraphContextProvider: React.FC<{
+  style?: React.CSSProperties;
+}> = React.memo(({children, style}) => {
+  // Default state when in jupyter notebook weave session
+  const defaultWBFeatureState: WeaveFeatures = useMemo(
+    () => ({
+      actions: true,
+      fullscreenMode: true,
+      dashUi: true,
+      betaFeatures: {
+        'weave-python-ecosystem': true,
+        'weave-devpopup': false,
+      },
+    }),
+    []
+  );
 
-    TABLE_CONFIG_DEFAULTS.rowSize = RowSize.Small;
-    for (const panel of UNHIDE_PANELS) {
-      panel.hidden = false;
-    }
-
-    return (
-      <WeaveFeaturesContext.Provider value={defaultWBFeatureState}>
-        <RemoteEcosystemComputeGraphContextProvider>
-          {children}
-        </RemoteEcosystemComputeGraphContextProvider>
-      </WeaveFeaturesContext.Provider>
-    );
+  TABLE_CONFIG_DEFAULTS.rowSize = RowSize.Small;
+  for (const panel of UNHIDE_PANELS) {
+    panel.hidden = false;
   }
-);
+
+  return (
+    <WeaveFeaturesContext.Provider value={defaultWBFeatureState}>
+      <RemoteEcosystemComputeGraphContextProvider style={style}>
+        {children}
+      </RemoteEcosystemComputeGraphContextProvider>
+    </WeaveFeaturesContext.Provider>
+  );
+});
 NotebookComputeGraphContextProvider.displayName =
   'NotebookComputeGraphContextProvider';

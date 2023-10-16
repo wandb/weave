@@ -22,6 +22,8 @@ import {
   constNodeUnsafe,
   dereferenceAllVars,
   isNodeOrVoidNode,
+  isOutputNode,
+  isVoidNode,
   NodeOrVoidNode,
   pushFrame,
   Stack,
@@ -760,6 +762,19 @@ const useSectionConfig = (
   return {gridConfig, updateGridConfig2};
 };
 
+const shouldHideExpression = (node: NodeOrVoidNode): boolean => {
+  if (isOutputNode(node)) {
+    if ((node.fromOp.name = 'get')) {
+      return true;
+    } else {
+      return _.some(Object.values(node.fromOp.inputs), shouldHideExpression);
+    }
+  } else {
+    return isVoidNode(node);
+  }
+  return false;
+};
+
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {stack, path: groupPath} = usePanelContext();
@@ -926,7 +941,14 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           sidebar: config.items.sidebar,
         });
       } else if (isVarBar) {
-        return entries.filter(([key]) => key !== 'source_data');
+        console.log({entries});
+        return entries.filter(
+          ([key, val]) =>
+            key !== 'source_data' &&
+            (isNodeOrVoidNode(val) ||
+              val?.id !== 'Expression' ||
+              !shouldHideExpression(val.input_node))
+        );
       }
     }
     return entries;
