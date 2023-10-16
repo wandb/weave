@@ -319,8 +319,8 @@ def _refine_history_type_inner(
             continue
 
         type_counts: list[TypeCount] = key_details["typeCounts"]
-        wt = types.merge_many_types(
-            [history_key_type_count_to_weave_type(tc) for tc in type_counts]
+        wt = types.union(
+            *[history_key_type_count_to_weave_type(tc) for tc in type_counts]
         )
 
         if wt == types.UnknownType():

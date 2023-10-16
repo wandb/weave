@@ -22,7 +22,6 @@ from .list_ import (
     is_object_arrowweavelist,
     is_taggedvalue_arrowweavelist,
     is_list_arrowweavelist,
-    is_ref_arrowweavelist,
     unsafe_awl_construction,
     offsets_starting_at_zero,
     make_vec_none,
@@ -272,16 +271,8 @@ def _concatenate_non_unions(
         return ArrowWeaveList(
             data, new_weave_type, self._artifact, invalid_reason="Possibly nullable"
         )
-    elif (
+    elif self.object_type == other.object_type:
         # Types exactly equal case
-        self.object_type == other.object_type
-        or (
-            # Types are refs, so arrow type is string
-            is_ref_arrowweavelist(self)
-            and is_ref_arrowweavelist(other)
-            and self.object_type.__class__ == other.object_type.__class__
-        )
-    ):
         indent_print(depth, "Extend case equal", self.object_type, other.object_type)
         if len(self) == 0:
             data = other._arrow_data
@@ -290,10 +281,7 @@ def _concatenate_non_unions(
         else:
             data = pa_concat_arrays([self._arrow_data, other._arrow_data])
         return ArrowWeaveList(
-            data,
-            types.merge_types(self.object_type, other.object_type),
-            self._artifact,
-            invalid_reason="Possibly nullable",
+            data, self.object_type, self._artifact, invalid_reason="Possibly nullable"
         )
     return None
 
