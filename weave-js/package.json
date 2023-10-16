@@ -21,7 +21,8 @@
     "prettier": "prettier --config .prettierrc --check \"src/**/*.ts\" \"src/**/*.tsx\"",
     "prettier-fix": "prettier --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
     "lint": "yarn eslint & yarn tslint & yarn prettier & wait",
-    "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait"
+    "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait",
+    "cycles": "dependency-cruiser --progress performance-log src"
   },
   "dependencies": {
     "@apollo/client": "^3.8.4",
@@ -179,6 +180,7 @@
     "babel-eslint": "^10.1.0",
     "canvas": "^2.9.1",
     "concurrently": "^7.5.0",
+    "dependency-cruiser": "^14.1.1",
     "detect-browser": "^5.2.1",
     "esbuild": "^0.17.15",
     "esbuild-jest": "^0.5.0",
