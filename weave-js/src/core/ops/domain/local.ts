@@ -336,7 +336,7 @@ export const opGet = makeOp({
   },
 });
 
-export const opStreamTableRows = makeOp({
+export const opStreamTableRows2 = makeOp({
   hidden: true,
   name: 'stream_table-rows',
   renderInfo: {type: 'function'},
