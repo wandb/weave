@@ -336,32 +336,32 @@ export const opGet = makeOp({
   },
 });
 
-// export const opStreamTableRows = makeOp({
-//   hidden: true,
-//   name: 'stream_table-rows',
-//   renderInfo: {type: 'function'},
-//   description: 'hello',
-//   argDescriptions: {
-//     conf: 'hello',
-//     size: 'hello',
-//   },
-//   returnValueDescription: 'hello',
-//   argTypes: {
-//     stream_table: {type: 'stream_table'} as any,
-//   },
-//   returnType: inputTypes => list(typedDict({})),
-//   resolver: ({path}) => {
-//     throw new Error('not implemented');
-//   },
-//   // resolveOutputType: async (node, executableNode, client) => {
-//   //   const typeNode = opGetReturnType(executableNode.fromOp.inputs as any);
-//   //   const newType: Type = await client.query(typeNode);
-//   //   return {
-//   //     ...node,
-//   //     type: newType,
-//   //   };
-//   // },
-// });
+export const opStreamTableRows2 = makeOp({
+  hidden: true,
+  name: 'stream_table-rows',
+  renderInfo: {type: 'function'},
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    stream_table: {type: 'stream_table'} as any,
+  },
+  returnType: inputTypes => list(typedDict({})),
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+  // resolveOutputType: async (node, executableNode, client) => {
+  //   const typeNode = opGetReturnType(executableNode.fromOp.inputs as any);
+  //   const newType: Type = await client.query(typeNode);
+  //   return {
+  //     ...node,
+  //     type: newType,
+  //   };
+  // },
+});
 
 export const opSave = makeOp({
   hidden: true,
