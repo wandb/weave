@@ -1546,7 +1546,7 @@ export function opJoinAllReturnType(
   Maybe<M#, TYPE> -> maybe ID and inner type (ID also indicates if it is nullable)
   Tagged<T#, TYPE> -> tag ID and inner type
   List<L#, TYPE> -> list ID and inner type - ID also indicates length of list
-  Dict<D#, {...}> -> dict ID and inner type 
+  Dict<D#, {...}> -> dict ID and inner type
 
   Maybe<M1,
     Tagged<T1,
@@ -1568,7 +1568,7 @@ export function opJoinAllReturnType(
       >
     >
   >
-  
+
 
   Becomes:
   Maybe<M1,
@@ -1576,7 +1576,7 @@ export function opJoinAllReturnType(
       List<LX,
         Tagged<JOIN_KEY,
           Dict<D1,{
-            col_1: List<L1, 
+            col_1: List<L1,
               Maybe<M2,
                 Tagged<T2,
                   Maybe<M3,
@@ -1600,7 +1600,7 @@ export function opJoinAllReturnType(
       List<LX,
         Tagged<JOIN_KEY,
           Dict<D1,{
-            col_1: List<L1, 
+            col_1: List<L1,
               Maybe<M2 or M3,
                 Tagged<Tagged<T2,T3>,
                   C1T
@@ -1620,7 +1620,7 @@ export function opJoinAllReturnType(
       List<LX,
         Tagged<JOIN_KEY,
           Dict<D1,{
-            col_1: List<L1, 
+            col_1: List<L1,
               Tagged<Tagged<T2,T3>,
                 C1T
               >
@@ -2200,18 +2200,19 @@ export const opRange = makeOp({
   // hidden: true,
   name: 'range',
   argTypes: {
-    // TODO: what are the types in python?
-    // we should match python range behavior.
-    start: 'number',
-    stop: 'number',
-    step: 'number',
+    start: 'int',
+    stop: 'int',
+    step: 'int',
   },
-  description: `TODO`,
+  description:
+    'Return a list of numbers from start to stop, incrementing by step.',
   renderInfo: {type: 'function'},
   argDescriptions: {
-    todo: 'todo',
+    start: 'Number to start at',
+    stop: 'Number to stop at, not included in result',
+    step: 'Amount to increment or decrement by on each iteration',
   },
-  returnValueDescription: `The joined ${docType('string')}.`,
+  returnValueDescription: 'A list of numbers',
   returnType: inputsTypes => list('number'),
   resolver: ({start, stop, step}) => {
     const result: number[] = [];
