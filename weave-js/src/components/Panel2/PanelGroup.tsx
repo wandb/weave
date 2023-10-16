@@ -958,8 +958,6 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     return entries;
   }, [appMode, config.items, isVarBar]);
 
-  console.log({isMain, groupPath});
-
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
       <div
