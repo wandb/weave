@@ -38,7 +38,7 @@ import React, {
 } from 'react';
 import styled from 'styled-components';
 
-import {useIsWeaveAppMode, useWeaveContext} from '../../context';
+import {useWeaveAppMode, useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {consoleLog} from '../../util';
 import {Tooltip} from '../Tooltip';
@@ -586,7 +586,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
-  const appMode = useIsWeaveAppMode();
+  const appMode = useWeaveAppMode();
   const showControlBar = controlBar !== 'off';
 
   const isVarNameEditable = props.editable || controlBar === 'editable';

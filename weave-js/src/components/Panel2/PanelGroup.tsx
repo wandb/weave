@@ -73,7 +73,7 @@ import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {inJupyterCell} from '../PagePanelComponents/util';
 import {usePagePanelControlRequestAction} from '../PagePanelContext';
-import {useIsWeaveAppMode} from '@wandb/weave/context';
+import {useWeaveAppMode} from '@wandb/weave/context';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -772,7 +772,6 @@ const shouldHideExpression = (node: NodeOrVoidNode): boolean => {
   } else {
     return isVoidNode(node);
   }
-  return false;
 };
 
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
@@ -925,7 +924,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const isMain = _.isEqual(groupPath, [`main`]);
 
   const inJupyter = inJupyterCell();
-  const appMode = useIsWeaveAppMode();
+  const appMode = useWeaveAppMode();
   const showAddPanelBar = !inJupyter && config.enableAddPanel && !appMode;
 
   // Super hack
@@ -935,10 +934,15 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
     if (appMode) {
       if (_.isEqual(['sidebar', 'main'], keys)) {
-        // Reverse the order of the entries so that the sidebar is second
+        if (appMode.showControls) {
+          // Reverse the order of the entries so that the sidebar is second
+          return Object.entries({
+            main: config.items.main,
+            sidebar: config.items.sidebar,
+          });
+        }
         return Object.entries({
           main: config.items.main,
-          sidebar: config.items.sidebar,
         });
       } else if (isVarBar) {
         console.log({entries});
