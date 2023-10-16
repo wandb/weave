@@ -38,7 +38,7 @@ import React, {
 } from 'react';
 import styled from 'styled-components';
 
-import {useWeaveContext} from '../../context';
+import {useIsWeaveAppMode, useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {consoleLog} from '../../util';
 import {Tooltip} from '../Tooltip';
@@ -586,10 +586,12 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
+  const appMode = useIsWeaveAppMode();
+  const showControlBar = controlBar !== 'off';
 
   const isVarNameEditable = props.editable || controlBar === 'editable';
   const setSelectedPanel = useSetSelectedPanel();
-  const showEditControls = isPanelSelected || isHoverPanel;
+  const showEditControls = (isPanelSelected || isHoverPanel) && !appMode;
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -606,7 +608,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       }}
       onMouseEnter={() => setIsHoverPanel(true)}
       onMouseLeave={() => setIsHoverPanel(false)}>
-      {controlBar !== 'off' && (
+      {showControlBar && (
         <Styles.EditorBar>
           <EditorBarContent className="edit-bar" ref={editorBarRef}>
             {(!isVarNameEditable || !showEditControls) &&

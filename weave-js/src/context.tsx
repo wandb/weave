@@ -78,6 +78,6 @@ export const usePanelSettings = (type: PanelSettingPanel) => {
   return useWeaveFeaturesContext().panelSettings?.[type] ?? {};
 };
 
-export const useAppMode = () => {
+export const useIsWeaveAppMode = () => {
   return !!useWeaveFeaturesContext().appMode;
 };
