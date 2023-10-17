@@ -987,8 +987,8 @@ def _compile(
     # TODO: is it ok to have this before final refine?
     with tracer.trace("compile:await"):
         results = results.batch_map(_track_errors(compile_await))
-    with tracer.trace("compile:execute"):
-        results = results.batch_map(_track_errors(compile_execute))
+    # with tracer.trace("compile:execute"):
+    #     results = results.batch_map(_track_errors(compile_execute))
     with tracer.trace("compile:function_calls"):
         results = results.batch_map(_track_errors(compile_function_calls))
     with tracer.trace("compile:quote"):

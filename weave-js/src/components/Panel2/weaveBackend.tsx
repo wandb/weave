@@ -113,14 +113,11 @@ const useUserPanelVars = (
 
   const calledRender = useMemo(() => {
     const renderOpArgs: {[key: string]: NodeOrVoidNode} = {
-      // We actually pass the panel as varNode expression instead of as
-      // the value. We're effectively "weavifying" the panel op here.
-      // This makes it so we don't have to recall the panel on every render.
-      // TODO: this should be built into the system at a deeper level.
-      self: constNodeUnsafe(
-        functionType({}, itemNode.type),
-        varNode(itemNode.type, 'self')
-      ),
+      self: itemNode,
+      // self: constNodeUnsafe(
+      //   functionType({}, itemNode.type),
+      //   varNode(itemNode.type, 'self')
+      // ),
     };
     return !skip && props.config?.[renderAsPanelConfigAttr] == null
       ? (callOpVeryUnsafe(renderOpName, renderOpArgs) as Node)

@@ -480,3 +480,16 @@ class RuntimeVarNode(graph.VarNode, DispatchMixin):
 
 class RuntimeConstNode(graph.ConstNode, DispatchMixin):
     pass
+
+
+def make_dispatchable(n: graph.Node):
+    if isinstance(n, graph.ConstNode):
+        return RuntimeConstNode(n.type, n.val)
+    elif isinstance(n, graph.VarNode):
+        return RuntimeVarNode(n.type, n.name)
+    elif isinstance(n, graph.OutputNode):
+        return RuntimeOutputNode(n.type, n.from_op.name, n.from_op.inputs)
+    elif isinstance(n, graph.VoidNode):
+        return n
+    else:
+        raise errors.WeaveInternalError("Unknown node type %s" % type(n))

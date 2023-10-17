@@ -123,7 +123,10 @@ export class InvalidGraph {
   constructor(public message: string, public node: NodeOrVoidNode) {}
 }
 
-const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
+export const clientEval = (
+  node: NodeOrVoidNode,
+  env: Stack
+): NodeOrVoidNode => {
   if (node.nodeType === 'var') {
     const resolved = resolveVar(env, node.varName);
     if (
@@ -654,6 +657,7 @@ export const makeCallAction = (
       inputs.val.nodeType === 'const'
     ) {
       const clientSetResult = clientSet(absoluteTarget, inputs.val.val);
+      console.log('CLIENT SET RESULT', clientSetResult);
       if (clientSetResult.ok) {
         return onDone(clientSetResult.value);
       }

@@ -1,5 +1,14 @@
+import {clientEval} from '../react';
 import {findChainedAncestor, linearize, replaceNode} from './hl';
-import {ConstNode, NodeOrVoidNode, Op, OutputNode, VarNode} from './model';
+import {
+  ConstNode,
+  NodeOrVoidNode,
+  Op,
+  OutputNode,
+  VarNode,
+  isConstNode,
+  isNodeOrVoidNode,
+} from './model';
 import {StaticOpStore} from './opStore';
 import {opDefIsLowLevel} from './runtimeHelpers';
 
@@ -94,15 +103,28 @@ export const clientSet = (target: NodeOrVoidNode, value: any): SetResult => {
     return {ok: true, value};
   }
   let arg0 = Object.values(accessorNodes[0].fromOp.inputs)[0];
-  const results: any[] = [];
   const opInputs: Array<{[key: string]: any}> = [];
   // Execute forward
   for (const node of accessorNodes) {
-    const inputs = {...node.fromOp.inputs};
-    inputs[Object.keys(inputs)[0]] = arg0;
-    arg0 = callResolverSimple(node.fromOp.name, inputs, node.fromOp);
+    const nodeInputs = {
+      ...node.fromOp.inputs,
+      [Object.keys(node.fromOp.inputs)[0]]: arg0,
+    };
+    console.log('NODE INPUTS', nodeInputs);
+    const inputs: {[key: string]: any} = {};
+    for (const [k, n] of Object.entries(nodeInputs)) {
+      if (!isConstNode(n)) {
+        return {ok: false};
+      }
+      inputs[k] = n.val;
+    }
+    arg0 = {
+      nodeType: 'const',
+      type: 'any',
+      val: callResolverSimple(node.fromOp.name, inputs, node.fromOp),
+    };
+    console.log('RESULT', arg0);
     opInputs.push(inputs);
-    results.push(arg0);
   }
 
   let res = value;

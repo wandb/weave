@@ -137,6 +137,7 @@ class ForwardGraph:
         if node in self._node_to_forward_node:
             return
         if isinstance(node, graph.VarNode) and not self._allow_var_nodes:
+            breakpoint()
             raise errors.WeaveBadRequest(
                 "Found var node when constructing ForwardGraph: %s" % node
             )

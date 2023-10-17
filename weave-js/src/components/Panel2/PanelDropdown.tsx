@@ -96,6 +96,7 @@ export const PanelDropdown: React.FC<PanelDropdownProps> = props => {
   const isMultiple = isList(valueNode.type);
 
   const valueQuery = useNodeValue(valueNode as any);
+  console.log('VALUE QUERY', valueQuery);
   const chosen = useMemo(() => valueQuery.result ?? [], [valueQuery]);
   const setVal = useMutation(valueNode, 'set');
   const options = useMemo(() => {

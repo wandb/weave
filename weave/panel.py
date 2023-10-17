@@ -8,6 +8,7 @@ from . import storage
 from . import weave_types as types
 from . import weave_internal
 from . import panel_util
+from . import dispatch
 from . import errors
 from .ops import get as op_get
 
@@ -101,7 +102,7 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
             for name, val in vars.items():
                 self.vars[name] = panel_util.make_node(val)
 
-        self.input_node = input_node
+        self.input_node = dispatch.make_dispatchable(input_node)
         self.input_node, _ = run_variable_lambdas(self.input_node, self.vars)
 
         if not isinstance(self.input_node, graph.Node):
