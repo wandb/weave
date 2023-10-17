@@ -39,16 +39,54 @@ type SliderThumbProps = React.ComponentProps<typeof RadixSlider.Thumb>;
 export const Thumb = ({className, ...props}: SliderThumbProps) => (
   <RadixSlider.Thumb
     className={twMerge(
-      'block h-[22px] w-[22px] rounded-full border-[1px] border-solid border-moon-350 bg-white',
+      'block h-[22px] w-[22px] rounded-full border-[1px] border-solid border-moon-350 bg-white focus:outline focus:outline-[2px] focus:outline-teal-500 ',
       className
     )}
     {...props}
   />
 );
 
-export const Slider = {
-  Root,
-  Track,
-  Range,
-  Thumb,
+type DisplayProps = {
+  className?: string;
+  isDirty?: boolean;
+  isDisabled?: boolean;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  value: number | undefined;
 };
+
+export const Display = React.forwardRef(
+  (p: DisplayProps, ref: React.Ref<HTMLInputElement>) => {
+    const {
+      className,
+      isDirty = true,
+      isDisabled = false,
+      max,
+      min,
+      step,
+      onChange,
+      value,
+      ...props
+    } = p;
+    return (
+      <input
+        className={twMerge(
+          'ml-8  h-[40px] w-[56px] rounded border-[1px] border-solid border-moon-250 text-center focus:outline focus:outline-[2px] focus:outline-teal-500',
+          isDirty ? 'text-moon-800' : 'text-moon-250',
+          className
+        )}
+        disabled={isDisabled}
+        max={max}
+        min={min}
+        step={step}
+        onChange={e => onChange(Number(e.target.value))}
+        ref={ref}
+        type="number"
+        value={value}
+        {...props}
+      />
+    );
+  }
+);

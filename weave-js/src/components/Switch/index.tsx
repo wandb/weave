@@ -8,7 +8,7 @@ export const Root = ({
 }: React.ComponentProps<typeof Switch.Root>) => (
   <Switch.Root
     className={twMerge(
-      'flex h-[24px] w-[44px] items-center rounded-[12px] p-[1px] transition-colors duration-100 ease-out',
+      'flex h-[24px] w-[44px] items-center rounded-[12px] p-[1px] transition-colors duration-100 ease-out focus:outline focus:outline-[2px] focus:outline-teal-500',
       props.checked ? ' bg-teal-500' : 'bg-moon-350',
       className
     )}
