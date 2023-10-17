@@ -25,6 +25,9 @@ from ..ops_primitives import list_
 from .. import mappers_arrow
 from ..op_def import map_type
 
+from ..ops_arrow import constructors
+
+
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
 
@@ -1789,3 +1792,10 @@ def test_keys_ops():
     all_keys_node = keys_node.flatten().unique()
 
     assert weave.use(all_keys_node).to_pylist_raw() == ["a", "b", "c"]
+
+
+def test_repeat_0():
+    data = {"a": 1}
+    repeated = constructors.repeat(data, 0)
+    assert len(repeated) == 0
+    assert repeated.type == pa.struct({"a": pa.int64()})
