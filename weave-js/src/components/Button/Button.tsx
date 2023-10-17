@@ -102,6 +102,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 'gap-8 px-12 py-8 text-base': isLarge,
                 'h-40 w-40 p-0': isLarge && isIconOnly,
 
+                // focus
+                'focus:outline focus:outline-[2px] focus:outline-teal-500':
+                  true,
+
                 // primary
                 'bg-teal-500 text-white hover:bg-teal-450': isPrimary,
                 'bg-teal-450': isPrimary && active,

@@ -34,6 +34,7 @@ export const Checkbox = ({checked, className, ...props}: CheckboxProps) => {
           'inline-flex items-center justify-center',
           'h-18 w-18',
           'rounded border-[1.5px] border-moon-800 dark:border-moon-250',
+          'focus:outline focus:outline-[2px] focus:outline-teal-500',
           {className}
         )}
         checked={checked}
