@@ -95,7 +95,9 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
           Output
         </Typography>
         <Box pl={2} pr={2}>
-          {isOpenAIChatOutput(call.output) ? (
+          {call.output == null ? (
+            <div>null</div>
+          ) : isOpenAIChatOutput(call.output) ? (
             <OpenAIChatOutputView chatOutput={call.output} />
           ) : (
             <ObjectView
