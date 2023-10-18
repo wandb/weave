@@ -7,6 +7,7 @@ export const panelIdAlternativeMapping: {[jsId: string]: string} = {
   table: 'tablePanel',
   number: 'PanelNumber',
   string: 'PanelString',
+  'confusion-matrix': 'ConfusionMatrix',
   boolean: 'PanelBoolean',
   date: 'PanelDate',
   // Below are defined in `panel_legacy.py`

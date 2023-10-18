@@ -9,6 +9,7 @@ from .panel_labeled_item import LabeledItem
 from .panel_card import Card, CardTab
 from .panel_group import Group, GroupLayoutFlow, GroupPanel, GroupPanelLayout
 from .panel_each import Each
+from ..panels_py.conf_matrix import ConfusionMatrix
 
 from .panel_facet_tabs import FacetTabs
 from .panel_sections import Sections
@@ -44,7 +45,6 @@ from .panel_object_picker import ObjectPicker, ObjectPickerConfig
 
 # basic
 from .panel_basic import *
-from .panel_string import PanelString
 
 # domain
 from .panel_domain import *
