@@ -69,9 +69,10 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
                 # None haxxx
                 # TODO: remove
                 obj_val = obj.get(k)
-                if obj_val is not None:
-                    v = serializer.apply(obj_val)
-                    result[k] = v
+                # PR, this causes an issue with UnknownType, which returns None
+                # if obj_val is not None:
+                v = serializer.apply(obj_val)
+                result[k] = v
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
@@ -256,6 +257,8 @@ class UnknownToPyUnknown(mappers.Mapper):
     def apply(self, obj):
         # This should never be called. Unknown for the object type
         # of empty lists
+        # PR: return None instead of crash
+        return None
         raise Exception("invalid %s" % obj)
 
 

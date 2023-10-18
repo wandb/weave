@@ -97,18 +97,12 @@ class DefaultToPy(mappers.Mapper):
         # attaches a ref to them. We want to publish those ops so that for example
         # ops attached to Weave Objects are published as well.
 
-        # Need to clear the ref, otherwise we get infinite recursion
-        # But our _ref_base.clear_ref function doesn't work...
+        # Just clear the ref... we don't need to recursively publish, it will
+        # happen later.
         if hasattr(obj, "_ref"):
             obj._ref = None
 
-        published_ref = storage._direct_publish(
-            obj,
-            existing_ref.name,
-            assume_weave_type=self.type,
-        )
-
-        return published_ref.obj
+        return obj
 
 
 def map_to_python_remote_(type, mapper, artifact, path=[], mapper_options=None):

@@ -601,6 +601,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             yield f
 
     @contextlib.contextmanager
+    def writeable_file_path(self, path):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            full_path = os.path.join(tmpdir, path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            yield full_path
+            self._writeable_artifact.add_file(full_path, path)
+
+    @contextlib.contextmanager
     def new_dir(self, path):
         if not self._writeable_artifact:
             raise errors.WeaveInternalError("cannot add new file to readonly artifact")

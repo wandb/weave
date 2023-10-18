@@ -69,6 +69,10 @@ def type(
                     raise errors.WeaveDefinitionError(
                         f"{target}.{field.name} is not a valid python type (a class or type)"
                     )
+                # if weave_type == types.UnknownType():
+                #     raise errors.WeaveDefinitionError(
+                #         f"Weave doesn't yet handle the type '{field.type}' at {target}.{field.name}"
+                #     )
 
                 if types.type_is_variable(weave_type):
                     # this is a Weave type with a type variable in it

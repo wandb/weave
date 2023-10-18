@@ -145,7 +145,8 @@ class TypeRegistry:
             # with the one we already have and we need an ObjectType cache
             if is_serialized_object_type(d):
                 return deserialize_object_type(d)
-            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
+            # PR: just return Unknown instead of crash
+            return UnknownType()
         return type_.from_dict(d)
 
 
