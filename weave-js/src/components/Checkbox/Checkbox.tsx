@@ -33,8 +33,9 @@ export const Checkbox = ({checked, className, ...props}: CheckboxProps) => {
           'night-aware',
           'inline-flex items-center justify-center',
           'h-18 w-18',
-          'rounded border-[1.5px] border-moon-800 dark:border-moon-250',
+          'rounded border-[1.5px]  dark:border-moon-250',
           'focus:outline focus:outline-[2px] focus:outline-teal-500',
+          checked ? 'border-moon-800' : 'border-moon-500',
           {className}
         )}
         checked={checked}
