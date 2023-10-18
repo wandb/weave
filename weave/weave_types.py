@@ -1652,6 +1652,8 @@ def type_is_variable(t: Type) -> bool:
         return True
     elif isinstance(t, UnionType):
         return True
+    elif isinstance(t, Dict):
+        return True
     elif isinstance(t, TypedDict):
         # Should we just make type_vars for TypedDict be its property types?
         # That would simplify a lot.

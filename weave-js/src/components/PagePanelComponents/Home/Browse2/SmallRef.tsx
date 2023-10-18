@@ -14,10 +14,10 @@ import {
   Type,
 } from '@wandb/weave/core';
 import {Dataset as DatasetIcon} from '@mui/icons-material';
-import {CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon} from '@mui/icons-material';
 import {SmartToy as SmartToyIcon} from '@mui/icons-material';
 import {TableRows as TableRowsIcon} from '@mui/icons-material';
 import {DataObject as DataObjectIcon} from '@mui/icons-material';
+import {Spoke as SpokeIcon} from '@mui/icons-material';
 import {Link} from './CommonLib';
 import {URL_BROWSE2} from '@wandb/weave/urls';
 import {Box, Typography} from '@mui/material';
@@ -49,7 +49,7 @@ export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
   const rootType = getRootType(refType);
   const label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
   const rootTypeName = getTypeName(rootType);
-  let icon = <CheckBoxOutlineBlankIcon />;
+  let icon = <SpokeIcon />;
   if (rootTypeName === 'Dataset') {
     icon = <DatasetIcon />;
   } else if (rootTypeName === 'Model') {

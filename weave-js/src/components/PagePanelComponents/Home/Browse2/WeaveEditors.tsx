@@ -440,7 +440,15 @@ export const WeaveEditorTypedDict: FC<{
         .flatMap(([key, valueType]) => {
           const singleRow = displaysAsSingleRow(valueType);
           return [
-            <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
+            <Grid
+              item
+              key={key + '-key'}
+              xs={singleRow ? 2 : 12}
+              sx={{
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}>
               <Typography>
                 <Link to={loc.pathname + '/pick/' + key}>{key}</Link>
               </Typography>
@@ -448,7 +456,10 @@ export const WeaveEditorTypedDict: FC<{
             <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
               <Box ml={singleRow ? 0 : 2}>
                 <WeaveEditorField
-                  node={opPick({obj: node, key: constString(key)})}
+                  node={opPick({
+                    obj: node,
+                    key: constString(key.replace('.', '\\.')),
+                  })}
                   path={[...path, {type: 'pick', key}]}
                 />
               </Box>

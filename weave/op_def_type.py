@@ -147,7 +147,11 @@ class OpDefType(types.Type):
         sys.path.insert(0, os.path.abspath(module_dir))
         with context_state.loading_op_location(artifact.uri_obj):
             # This has a side effect of registering the op
-            mod = __import__(import_name)
+            # PR: Return None if we can't load the op?
+            try:
+                mod = __import__(import_name)
+            except:
+                return None
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
         if not is_wandb_artifact:
