@@ -1,4 +1,4 @@
-import {Icon} from '@wandb/weave/components/Icon';
+import {Icon} from '../Icon';
 import React, {FC} from 'react';
 
 import {Tailwind} from '../Tailwind';
