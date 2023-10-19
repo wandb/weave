@@ -467,7 +467,7 @@ def execute_sync_op(
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
     st = mon._streamtable
-    if st:
+    if op_def.location and st:
         op_def_ref = storage._get_ref(op_def)
         project_name = st._project_name
         if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
@@ -481,7 +481,7 @@ def execute_sync_op(
         mon_span_inputs, refs = auto_publish(project_name, inputs)
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
-            span.inputs["_arg_order"] = list(inputs.keys())
+            span.inputs["_keys"] = list(inputs.keys())
             for i, ref in enumerate(refs[:3]):
                 span.inputs["_ref%s" % i] = ref
             try:
@@ -497,6 +497,9 @@ def execute_sync_op(
             if not isinstance(log_res, dict):
                 log_res = {"_result": log_res}
             span.output, refs = auto_publish(project_name, log_res)
+            for i, ref in enumerate(refs[:3]):
+                span.output["_ref%s" % i] = ref
+            span.output["_keys"] = list(log_res.keys())
     else:
         res = op_def.resolve_fn(**inputs)
         if isinstance(res, box.BoxedNone):

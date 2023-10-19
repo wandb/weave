@@ -302,6 +302,12 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         f.close()
 
     @contextlib.contextmanager
+    def writeable_file_path(self, path):
+        full_path = os.path.join(self._write_dirname, path)
+        self._makedir(os.path.dirname(full_path))
+        yield full_path
+
+    @contextlib.contextmanager
     def new_dir(self, path):
         full_path = self._get_write_path(path)
         self._makedir(full_path)

@@ -11,6 +11,8 @@ from . import weave_internal as _weave_internal
 from . import errors as _errors
 from . import ops as _ops
 from . import context as _context
+from . import graph_client as _graph_client
+from . import graph_client_context as _graph_client_context
 from weave import monitoring as _monitoring
 
 # exposed as part of api
@@ -110,10 +112,13 @@ def from_pandas(df):
 #### Newer API below
 
 
-def init(project_name: str) -> None:
+def init(project_name: str) -> _graph_client.GraphClient:
+    from . import wandb_api
+    from . import monitoring
+
     fields = project_name.split("/")
     if len(fields) == 1:
-        api = _wandb_api.get_wandb_api_sync()
+        api = wandb_api.get_wandb_api_sync()
         entity_name = api.default_entity_name()
         project_name = fields[0]
     elif len(fields) == 2:
@@ -122,35 +127,21 @@ def init(project_name: str) -> None:
         raise ValueError(
             'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
         )
-    _monitoring.init_monitor(f"{entity_name}/{project_name}/stream")
+    client = _graph_client.GraphClient(entity_name, project_name)
+    _graph_client_context._graph_client.set(client)
     print("Ensure you have the prototype UI running with `weave ui`")
     print(f"View project at http://localhost:3000/browse2/{entity_name}/{project_name}")
-
-
-@dataclasses.dataclass
-class _Settings:
-    entity_name: str
-    project_name: str
-
-
-def _get_settings() -> typing.Optional[_Settings]:
-    mon = _monitoring.default_monitor()
-    if not mon._streamtable:
-        return None
-    return _Settings(
-        entity_name=mon._streamtable._entity_name,
-        project_name=mon._streamtable._project_name,
-    )
+    return client
 
 
 def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
     if "/" not in name:
-        settings = _get_settings()
-        if not settings:
+        client = _graph_client_context.get_graph_client()
+        if not client:
             raise ValueError(
                 "Call weave.init() first, or pass <project>/<name> for name"
             )
-        name = f"{settings.project_name}/{name}"
+        name = f"{client.project_name}/{name}"
 
     ref = _storage.publish(obj, name)  # type: ignore
     print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
@@ -164,15 +155,15 @@ def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
 
 def ref(uri: str) -> _artifact_wandb.WandbArtifactRef:
     if not "://" in uri:
-        settings = _get_settings()
-        if not settings:
+        client = _graph_client_context.get_graph_client()
+        if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
         if "/" in uri:
             raise ValueError("'/' not currently supported in short-form URI")
         name_version = uri
         if ":" not in name_version:
             name_version = f"{name_version}:latest"
-        uri = f"wandb-artifact:///{settings.entity_name}/{settings.project_name}/{name_version}/obj"
+        uri = f"wandb-artifact:///{client.entity_name}/{client.project_name}/{name_version}/obj"
 
     ref = _ref_base.Ref.from_str(uri)
     if not isinstance(ref, _artifact_wandb.WandbArtifactRef):

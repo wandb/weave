@@ -470,6 +470,8 @@ class DispatchMixin:
     __ne__ = _dispatch_dunder("__ne__")  # type: ignore
     __neg__ = _dispatch_dunder("__neg__")
     __contains__ = _dispatch_dunder("__contains__")
+    __and__ = _dispatch_dunder("and")
+    __or__ = _dispatch_dunder("and")
 
 
 class RuntimeOutputNode(graph.OutputNode, DispatchMixin):
