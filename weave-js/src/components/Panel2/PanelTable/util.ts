@@ -273,11 +273,13 @@ export const getTableMeasurements = (args: {
     1,
     Math.floor(contentSpace / rowHeight)
   );
-  const rowsPerPage =
+  const rowsPerPage = 
     totalRowCount == null
       ? unboundedRowsPerPage
       : Math.min(unboundedRowsPerPage, totalRowCount + numPinnedRows);
-  const adaptiveRowHeight = Math.floor(contentSpace / Math.max(rowsPerPage, 1));
+  const adaptiveRowHeight = Math.floor(contentSpace / Math.max(unboundedRowsPerPage, 1));
+    // This disables row-growing...
+  // const adaptiveRowHeight = Math.floor(contentSpace / Math.max(rowsPerPage, 1));
 
   const minIndexOffset = 0;
   const maxIndexOffset =
