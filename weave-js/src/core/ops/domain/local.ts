@@ -21,6 +21,7 @@ import {
   listObjectType,
   nonNullable,
   taggedValue,
+  timestampBin,
   Type,
   typedDict,
   typedDictPropertyTypes,
@@ -336,20 +337,64 @@ export const opGet = makeOp({
   },
 });
 
-export const opStreamTableRows2 = makeOp({
+
+export const opTimestampsBinsNice = makeOp({
+  hidden: true,
+  name: 'timestamps-binsnice',
+  renderInfo: {type: 'function'},
+  description: 'hello',
+  argDescriptions: {},
+  returnValueDescription: 'hello',
+  argTypes: {
+    arr: {
+      type: 'list',
+      objectType: "any",
+    },
+    target_n_bins: 'int',
+  },
+  returnType: inputTypes => list(typedDict({timestamp: {type: "timestamp"}})),
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+})
+
+
+export const opTimestampBin = makeOp({
+  hidden: true,
+  name: 'timestamp-bin',
+  renderInfo: {type: 'function'},
+  description: 'hello',
+  argDescriptions: {},
+  returnValueDescription: 'hello',
+  argTypes: {
+    bin_fn: 'any',
+    in_: 'any',
+  },
+  returnType: inputTypes => list(timestampBin),
+})
+
+// Only for launch observability dash, hard coded row types
+export const opStreamTableOpservabilityRows = makeOp({
   hidden: true,
   name: 'stream_table-rows',
   renderInfo: {type: 'function'},
   description: 'hello',
-  argDescriptions: {
-    conf: 'hello',
-    size: 'hello',
-  },
+  argDescriptions: {},
   returnValueDescription: 'hello',
   argTypes: {
     stream_table: {type: 'stream_table'} as any,
   },
-  returnType: inputTypes => list(typedDict({})),
+  // using date works for some viz, breaks binning
+  returnType: inputTypes => list(typedDict({
+    state: 'string',
+    run_queue_item_id: 'string',
+    run_id: 'string',
+    timestamp: {type: 'timestamp', unit: 'ms'},
+    // timestamp: 'date',
+    metrics: typedDict({}),
+    entity: 'string',
+    queue: 'string',
+  })),
   resolver: ({path}) => {
     throw new Error('not implemented');
   },

@@ -137,6 +137,22 @@ export const opDateToNumber = makeDateOp({
   },
 });
 
+export const opTimestampToDate = makeDateOp({
+  hidden: true,
+  name: `timestamp-toDate`,
+  argTypes: {timestamp: 'string'},
+  description: `Returns the date from timestamp`,
+  argDescriptions: {date: 'The date'},
+  returnValueDescription: `date`,
+  returnType: inputTypes => 'date',
+  resolver: inputs => {
+    const {timestamp} = inputs;
+    // convert string to date
+    return moment(timestamp).toDate();
+  },
+})
+
+
 export const opDatesMax = makeDimDownDateOp({
   hidden: true,
   name: 'dates-max',
