@@ -1,30 +1,16 @@
-import React, {FC, useMemo} from 'react';
-import {useNodeValue} from '@wandb/weave/react';
-import {
-  CallFilter,
-  StreamId,
-  callsTableFilter,
-  callsTableNode,
-  callsTableSelect,
-} from './callTree';
+import React, {FC} from 'react';
+import {CallFilter, StreamId} from './callTree';
 import {Paper} from './CommonLib';
 import {Typography} from '@mui/material';
 import {FilterList} from '@mui/icons-material';
 import {RunsTable} from './RunsTable';
+import {useRunsWithFeedback} from './callTreeHooks';
 
 export const Browse2Calls: FC<{
   streamId: StreamId;
   filters: CallFilter;
 }> = ({streamId, filters}) => {
-  const selected = useMemo(() => {
-    const streamTableRowsNode = callsTableNode(streamId);
-    const filtered = callsTableFilter(streamTableRowsNode, filters);
-    return callsTableSelect(filtered);
-  }, [filters, streamId]);
-
-  const selectedQuery = useNodeValue(selected);
-
-  const selectedData = selectedQuery.result ?? [];
+  const selectedQuery = useRunsWithFeedback(streamId, filters);
 
   return (
     <Paper>
@@ -46,7 +32,7 @@ export const Browse2Calls: FC<{
           ))}
         </div>
       )}
-      <RunsTable loading={selectedQuery.loading} spans={selectedData} />
+      <RunsTable loading={selectedQuery.loading} spans={selectedQuery.result} />
     </Paper>
   );
 };

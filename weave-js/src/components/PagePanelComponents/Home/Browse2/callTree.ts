@@ -44,8 +44,8 @@ export interface CallFilter {
 
 export interface Call {
   name: string;
-  inputs: {_input_order?: string[]; [key: string]: any};
-  output: any;
+  inputs: {_keys?: string[]; [key: string]: any};
+  output: undefined | {_keys?: string[]; [key: string]: any};
   status_code: string; // TODO enum
   exception?: string;
   attributes: {[key: string]: any};
@@ -59,6 +59,7 @@ export interface Call {
 }
 
 export type Span = Call;
+export type SpanWithFeedback = Span & {feedback: any};
 
 export interface TraceSpan {
   traceId: string;
@@ -337,6 +338,7 @@ const feedbackTableType: Type = {
   objectType: {
     type: 'typedDict',
     propertyTypes: {
+      run_id: 'string',
       feedback_id: 'string',
       timestamp: 'any',
       feedback: 'any',

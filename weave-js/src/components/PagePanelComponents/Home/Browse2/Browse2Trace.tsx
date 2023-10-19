@@ -2,21 +2,14 @@ import * as _ from 'lodash';
 import React, {FC, useMemo, useState} from 'react';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {flatToTrees} from '../../../Panel2/PanelTraceTree/util';
-import {
-  Span,
-  StreamId,
-  feedbackTableObjNode,
-  listSelectAll,
-  runFeedbackNode,
-} from './callTree';
+import {Span, StreamId, feedbackTableObjNode} from './callTree';
 import {v4 as uuidv4} from 'uuid';
 import {Paper} from './CommonLib';
-import {useTraceSpans} from './callTreeHooks';
+import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
 import {Button, Typography, Box, Grid, Tabs, Tab} from '@mui/material';
 import {AddRowToTable} from './AddRow';
 import {SpanDetails} from './SpanDetails';
 import {SpanWithChildren, SpanTreeNode} from './SpanWithChildren';
-import {useNodeValue} from '@wandb/weave/react';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {mutationStreamTableLog} from './easyWeave';
 import {useWeaveContext} from '@wandb/weave/context';
@@ -47,18 +40,18 @@ const SpanFeedback: FC<{streamId: StreamId; spanId: string}> = ({
   streamId,
   spanId,
 }) => {
-  const feedbackNode = listSelectAll(
-    runFeedbackNode(streamId.entityName, streamId.projectName, spanId)
+  const lastFeedbackQuery = useLastRunFeedback(
+    streamId.entityName,
+    streamId.projectName,
+    spanId
   );
-  const feedbackQuery = useNodeValue(feedbackNode);
-  const feedback = feedbackQuery.result ?? [];
-  const lastFeedback = feedback[feedback.length - 1]?.feedback ?? {};
-  console.log('FEEDBACKQUERY', feedbackQuery);
 
-  return feedbackQuery.loading ? (
+  return lastFeedbackQuery.loading ? (
     <div>loading...</div>
   ) : (
-    <SpanFeedbackLoaded {...{streamId, spanId, lastFeedback}} />
+    <SpanFeedbackLoaded
+      {...{streamId, spanId, lastFeedback: lastFeedbackQuery.result}}
+    />
   );
 };
 
@@ -110,14 +103,19 @@ export const Browse2Trace: FC<{
     if (selectedSpanId == null) {
       return undefined;
     }
-    return traceSpans.filter(ts => ts.span_id === selectedSpanId)[0];
+    return traceSpans.result.filter(ts => ts.span_id === selectedSpanId)[0];
   }, [selectedSpanId, traceSpans]);
+  const lastFeedbackQuery = useLastRunFeedback(
+    streamId.entityName,
+    streamId.projectName,
+    spanId ?? ''
+  );
   const simpleInputOutputValue = useMemo(() => {
     if (selectedSpan == null) {
       return undefined;
     }
     const simpleInputOrder =
-      selectedSpan.inputs._input_order ??
+      selectedSpan.inputs._keys ??
       Object.keys(selectedSpan.inputs).filter(
         k => !k.startsWith('_') && k !== 'self'
       );
@@ -127,19 +125,23 @@ export const Browse2Trace: FC<{
         .filter(([k, v]) => v != null)
     );
 
-    let output = selectedSpan.output;
-    if (output == null) {
-      output = {_result: null};
-    }
-    const simpleOutput = _.fromPairs(
-      Object.entries(output).filter(([k, v]) => v != null)
-    );
-
-    return {
+    const res: {[key: string]: any} = {
       input: simpleInputs,
-      output: simpleOutput,
     };
-  }, [selectedSpan]);
+    const output = selectedSpan.output;
+    if (output != null) {
+      const outputOrder =
+        output._keys ??
+        Object.keys(output).filter(
+          k => !k.startsWith('_') && output[k] != null
+        );
+      res['output'] = _.fromPairs(outputOrder.map(k => [k, output[k]]));
+    }
+    if (lastFeedbackQuery.result != null) {
+      res['feedback'] = lastFeedbackQuery.result;
+    }
+    return res;
+  }, [lastFeedbackQuery.result, selectedSpan]);
   const [tabId, setTabId] = React.useState(0);
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabId(newValue);
@@ -152,7 +154,7 @@ export const Browse2Trace: FC<{
       <Grid xs={3} item>
         <Paper>
           <VerticalTraceView
-            traceSpans={traceSpans}
+            traceSpans={traceSpans.result}
             selectedSpanId={selectedSpanId}
             setSelectedSpanId={setSelectedSpanId}
             callStyle="short"

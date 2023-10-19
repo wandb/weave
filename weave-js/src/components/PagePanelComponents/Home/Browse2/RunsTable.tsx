@@ -1,9 +1,9 @@
 import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
-import {useParams, useHistory, Link} from 'react-router-dom';
+import {useParams, Link} from 'react-router-dom';
 import {URL_BROWSE2} from '../../../../urls';
 import {monthRoundedTime} from '@wandb/weave/time';
-import {Call, Span} from './callTree';
+import {SpanWithFeedback} from './callTree';
 import {Box} from '@mui/material';
 import {
   DataGridPro as DataGrid,
@@ -60,7 +60,7 @@ function buildTree(strings: string[], rootGroupName: string): GridColumnGroup {
 
 export const RunsTable: FC<{
   loading: boolean;
-  spans: Span[];
+  spans: SpanWithFeedback[];
 }> = ({loading, spans}) => {
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
@@ -75,7 +75,7 @@ export const RunsTable: FC<{
   );
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const tableData = useMemo(() => {
-    return spans.map((call: Call) => {
+    return spans.map((call: SpanWithFeedback) => {
       const argOrder = call.inputs._input_order;
       let args = _.fromPairs(
         Object.entries(call.inputs).filter(
@@ -100,7 +100,10 @@ export const RunsTable: FC<{
         ),
         ..._.mapValues(
           _.mapKeys(
-            _.omitBy(flattenObject(call.output), v => v == null),
+            _.omitBy(
+              flattenObject(call.output!),
+              (v, k) => v == null || k === '_keys'
+            ),
             (v, k) => {
               return 'output.' + k;
             }
@@ -112,9 +115,14 @@ export const RunsTable: FC<{
               ? v
               : JSON.stringify(v)
         ),
+        ..._.mapKeys(
+          flattenObject(call.feedback ?? {}),
+          (v, k) => 'feedback.' + k
+        ),
       };
     });
   }, [spans]);
+  console.log('TABLE DATA', tableData);
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -181,8 +189,8 @@ export const RunsTable: FC<{
     // All output keys as we don't have the order key yet.
     let outputKeys: {[key: string]: true} = {};
     spans.forEach(span => {
-      for (const [k, v] of Object.entries(flattenObject(span.output))) {
-        if (v != null) {
+      for (const [k, v] of Object.entries(flattenObject(span.output!))) {
+        if (v != null && k !== '_keys') {
           outputKeys[k] = true;
         }
       }
@@ -211,6 +219,44 @@ export const RunsTable: FC<{
             return <SmallRef objRef={parseRef(params.row['output.' + key])} />;
           }
           return params.row['output.' + key];
+        },
+      });
+    }
+
+    let feedbackKeys: {[key: string]: true} = {};
+    spans.forEach(span => {
+      for (const [k, v] of Object.entries(flattenObject(span.feedback!))) {
+        if (v != null && k !== '_keys') {
+          feedbackKeys[k] = true;
+        }
+      }
+    });
+    // sort shallowest keys first
+    feedbackKeys = _.fromPairs(
+      Object.entries(feedbackKeys).sort((a, b) => {
+        const aDepth = a[0].split('.').length;
+        const bDepth = b[0].split('.').length;
+        return aDepth - bDepth;
+      })
+    );
+
+    const feedbackOrder = Object.keys(feedbackKeys);
+    const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
+    colGroupingModel.push(feedbackGrouping);
+    for (const key of feedbackOrder) {
+      cols.push({
+        field: 'feedback.' + key,
+        headerName: key.split('.').slice(-1)[0],
+        renderCell: params => {
+          if (
+            typeof params.row['feedback.' + key] === 'string' &&
+            params.row['feedback.' + key].startsWith('wandb-artifact:///')
+          ) {
+            return (
+              <SmallRef objRef={parseRef(params.row['feedback.' + key])} />
+            );
+          }
+          return params.row['feedback.' + key];
         },
       });
     }

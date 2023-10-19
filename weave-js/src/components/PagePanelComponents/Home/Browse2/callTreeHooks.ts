@@ -8,19 +8,41 @@ import {
   OpSignature,
   opSignatureFromSpan,
   callsTableSelectTraces,
+  listSelectAll,
+  runFeedbackNode,
+  CallFilter,
+  SpanWithFeedback,
+  feedbackTableNode,
 } from './callTree';
 import {useNodeValue} from '@wandb/weave/react';
 import {constNumber, opIndex} from '@wandb/weave/core';
 
-export const useTraceSpans = (streamId: StreamId, traceId: string): Span[] => {
+export const useRuns = (
+  streamId: StreamId,
+  filters: CallFilter
+): {loading: boolean; result: Span[]} => {
   const traceSpansNode = useMemo(() => {
     const rowsNode = callsTableNode(streamId);
-    const filtered = callsTableFilter(rowsNode, {traceId: traceId});
+    const filtered = callsTableFilter(rowsNode, filters);
     return callsTableSelect(filtered);
-  }, [streamId, traceId]);
+  }, [filters, streamId]);
   const traceSpansQuery = useNodeValue(traceSpansNode);
 
-  return useMemo(() => traceSpansQuery.result ?? [], [traceSpansQuery.result]);
+  return useMemo(
+    () =>
+      ({
+        loading: traceSpansQuery.loading,
+        result: traceSpansQuery.result ?? [],
+      } ?? []),
+    [traceSpansQuery.loading, traceSpansQuery.result]
+  );
+};
+
+export const useTraceSpans = (
+  streamId: StreamId,
+  traceId: string
+): {loading: boolean; result: Span[]} => {
+  return useRuns(streamId, {traceId});
 };
 
 interface TraceSummaryRow {
@@ -67,4 +89,77 @@ export const useOpSignature = (
     }),
     [firstCall, firstCallQuery.loading]
   );
+};
+
+export const useAllFeedback = (entityName: string, projectName: string) => {
+  const feedbackNode = useMemo(
+    () => listSelectAll(feedbackTableNode(entityName, projectName)),
+    [entityName, projectName]
+  );
+  const feedbackQuery = useNodeValue(feedbackNode);
+  return useMemo(() => {
+    const feedback = feedbackQuery.result ?? [];
+    return {
+      loading: feedbackQuery.loading,
+      result: feedback,
+    };
+  }, [feedbackQuery.loading, feedbackQuery.result]);
+};
+
+export const useLastRunFeedback = (
+  entityName: string,
+  projectName: string,
+  runId: string
+) => {
+  const feedbackNode = useMemo(
+    () => listSelectAll(runFeedbackNode(entityName, projectName, runId)),
+    [entityName, projectName, runId]
+  );
+  const feedbackQuery = useNodeValue(feedbackNode);
+  return useMemo(() => {
+    const feedback = feedbackQuery.result ?? [];
+    return {
+      loading: feedbackQuery.loading,
+      result: feedback[feedback.length - 1]?.feedback ?? {},
+    };
+  }, [feedbackQuery.loading, feedbackQuery.result]);
+};
+
+export const useRunsWithFeedback = (
+  streamId: StreamId,
+  filters: CallFilter
+): {loading: boolean; result: SpanWithFeedback[]} => {
+  const runsQuery = useRuns(streamId, filters);
+
+  // Gets all feedback and does a frontend join!
+  // We should use a real join!
+  const feedbackQuery = useAllFeedback(
+    streamId.entityName,
+    streamId.projectName
+  );
+
+  return useMemo(() => {
+    if (runsQuery.loading || feedbackQuery.loading) {
+      return {loading: true, result: []};
+    }
+    const runs = runsQuery.result;
+    const feedback = feedbackQuery.result ?? [];
+    const lastFeedbackByRunId: {[key: string]: any} = {};
+    for (const row of feedback) {
+      lastFeedbackByRunId[row.run_id] = row.feedback;
+    }
+    const result = runs.map(run => ({
+      ...run,
+      feedback: lastFeedbackByRunId[run.span_id],
+    }));
+    return {
+      loading: false,
+      result,
+    };
+  }, [
+    feedbackQuery.loading,
+    feedbackQuery.result,
+    runsQuery.loading,
+    runsQuery.result,
+  ]);
 };
