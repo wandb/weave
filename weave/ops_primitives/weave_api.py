@@ -602,6 +602,19 @@ def append(
     )
 
 
+@op(mutation=True, name="stream_table-log")
+def stream_table_log(self: graph.Node, val: typing.Any) -> typing.Any:
+    st_obj = weave_internal.use(self)
+    from weave.monitoring import StreamTable
+
+    st = StreamTable(
+        table_name=st_obj.table_name,
+        project_name=st_obj.project_name,
+        entity_name=st_obj.entity_name,
+    )
+    st.log(val)
+
+
 def _get_uri_from_node(node: graph.Node[typing.Any], op_title: str) -> str:
     if not isinstance(node, graph.OutputNode):
         raise errors.WeaveInternalError(f"{op_title} target must be an OutputNode")

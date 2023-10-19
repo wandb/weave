@@ -90,7 +90,7 @@ class GraphClient:
     def add_feedback(self, run_id: str, feedback: dict[str, typing.Any]) -> None:
         feedback_id = str(uuid.uuid4())
         self.run_feedback_st.log(
-            {"run_id": run_id, "feedback_id": feedback_id, **feedback}
+            {"run_id": run_id, "feedback_id": feedback_id, "feedback": feedback}
         )
 
     def run_feedback(self, run_id: str) -> WeaveIter[dict[str, typing.Any]]:

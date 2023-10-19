@@ -16,6 +16,7 @@ from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
 from .. import graph
 from .. import stream_data_interfaces
+from .. import graph_client_context
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +305,9 @@ def _init_monitor_streamtable(stream_key: str) -> typing.Optional[StreamTable]:
 def default_monitor() -> Monitor:
     """Get the global Monitor."""
     global _global_monitor
+    client = graph_client_context.get_graph_client()
+    if client:
+        _global_monitor = Monitor(client.runs_st)
     if _global_monitor is None:
         _global_monitor = Monitor(None)
     return _global_monitor
@@ -317,6 +321,9 @@ def new_monitor(stream_key: str) -> Monitor:
 def init_monitor(stream_key: str) -> Monitor:
     """Initialize the global monitor and return it."""
     global _global_monitor
+    client = graph_client_context.get_graph_client()
+    if client:
+        raise ValueError("weave.init already called, init_monitor is invalid.")
     stream_table = _init_monitor_streamtable(stream_key)
     if _global_monitor is None:
         _global_monitor = Monitor(stream_table)

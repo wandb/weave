@@ -156,6 +156,14 @@ export const mutationAppend = (
   return mutate(weave, 'op-append', objNode, [weaveConst(row), {}]);
 };
 
+export const mutationStreamTableLog = (
+  weave: Weave,
+  streamTableNode: Node,
+  row: {[key: string]: any}
+): Promise<string> => {
+  return mutate(weave, 'stream_table-log', streamTableNode, [weaveConst(row)]);
+};
+
 export const mutationPublishArtifact = (
   weave: Weave,
   objNode: Node,

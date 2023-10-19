@@ -2,21 +2,24 @@ import * as _ from 'lodash';
 import React, {FC, useMemo, useState} from 'react';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {flatToTrees} from '../../../Panel2/PanelTraceTree/util';
-import {Span, StreamId} from './callTree';
+import {
+  Span,
+  StreamId,
+  feedbackTableObjNode,
+  listSelectAll,
+  runFeedbackNode,
+} from './callTree';
+import {v4 as uuidv4} from 'uuid';
 import {Paper} from './CommonLib';
 import {useTraceSpans} from './callTreeHooks';
-import {
-  Button,
-  Typography,
-  Box,
-  Grid,
-  Tabs,
-  Tab,
-  TextField,
-} from '@mui/material';
+import {Button, Typography, Box, Grid, Tabs, Tab} from '@mui/material';
 import {AddRowToTable} from './AddRow';
 import {SpanDetails} from './SpanDetails';
 import {SpanWithChildren, SpanTreeNode} from './SpanWithChildren';
+import {useNodeValue} from '@wandb/weave/react';
+import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
+import {mutationStreamTableLog} from './easyWeave';
+import {useWeaveContext} from '@wandb/weave/context';
 
 const VerticalTraceView: FC<{
   traceSpans: Span[];
@@ -39,29 +42,62 @@ const VerticalTraceView: FC<{
     />
   );
 };
-const SpanFeedback: FC<{streamId: string; traceId: string; spanId: string}> = ({
+
+const SpanFeedback: FC<{streamId: StreamId; spanId: string}> = ({
   streamId,
-  traceId,
   spanId,
 }) => {
+  const feedbackNode = listSelectAll(
+    runFeedbackNode(streamId.entityName, streamId.projectName, spanId)
+  );
+  const feedbackQuery = useNodeValue(feedbackNode);
+  const feedback = feedbackQuery.result ?? [];
+  const lastFeedback = feedback[feedback.length - 1]?.feedback ?? {};
+  console.log('FEEDBACKQUERY', feedbackQuery);
+
+  return feedbackQuery.loading ? (
+    <div>loading...</div>
+  ) : (
+    <SpanFeedbackLoaded {...{streamId, spanId, lastFeedback}} />
+  );
+};
+
+const SpanFeedbackLoaded: FC<{
+  streamId: StreamId;
+  spanId: string;
+  lastFeedback: {[key: string]: any};
+}> = ({streamId, spanId, lastFeedback}) => {
+  const weave = useWeaveContext();
+  const {
+    value: feedbackValue,
+    valid: feedbackValid,
+    props: objectEditorProps,
+  } = useObjectEditorState(lastFeedback);
+
   return (
     <>
-      <TextField
-        label="feedback"
-        multiline
-        fullWidth
-        minRows={10}
-        maxRows={20}
-        sx={{
-          backgroundColor: globals.lightYellow,
-        }}
-      />
+      <ObjectEditor {...objectEditorProps} label="Feedback" />
       <Box display="flex" justifyContent="flex-end" pt={2}>
-        <Button sx={{backgroundColor: globals.lightYellow}}>Update</Button>
+        <Button
+          disabled={!feedbackValid}
+          onClick={() =>
+            mutationStreamTableLog(
+              weave,
+              feedbackTableObjNode(streamId.entityName, streamId.projectName),
+              {
+                run_id: spanId,
+                feedback_id: uuidv4(),
+                feedback: feedbackValue,
+              }
+            )
+          }>
+          Update
+        </Button>
       </Box>
     </>
   );
 };
+
 export const Browse2Trace: FC<{
   streamId: StreamId;
   traceId: string;
@@ -128,10 +164,7 @@ export const Browse2Trace: FC<{
           <Paper>
             <Tabs value={tabId} onChange={handleTabChange}>
               <Tab label="Run" />
-              <Tab
-                label="Feedback"
-                sx={{backgroundColor: globals.lightYellow}}
-              />
+              <Tab label="Feedback" />
               <Tab label="Datasets" />
             </Tabs>
             <Box pt={2}>
@@ -142,11 +175,7 @@ export const Browse2Trace: FC<{
                   <SpanDetails call={selectedSpan} />
                 ))}
               {tabId === 1 && (
-                <SpanFeedback
-                  streamId={streamId.streamName}
-                  traceId={traceId}
-                  spanId={selectedSpanId}
-                />
+                <SpanFeedback streamId={streamId} spanId={selectedSpanId} />
               )}
               {tabId === 2 && (
                 <>

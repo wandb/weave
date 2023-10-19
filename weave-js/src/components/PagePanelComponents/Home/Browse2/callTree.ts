@@ -25,6 +25,9 @@ import {
   opNumberMult,
   InputTypes,
   OutputType,
+  isTypedDictLike,
+  typedDictPropertyTypes,
+  isListLike,
 } from '@wandb/weave/core';
 
 export interface StreamId {
@@ -327,4 +330,77 @@ export const opSignatureFromSpan = (span: Span): OpSignature => {
     inputTypes,
     outputType,
   };
+};
+
+const feedbackTableType: Type = {
+  type: 'list',
+  objectType: {
+    type: 'typedDict',
+    propertyTypes: {
+      feedback_id: 'string',
+      timestamp: 'any',
+      feedback: 'any',
+    },
+  },
+};
+
+export const feedbackTableObjNode = (
+  entityName: string,
+  projectName: string
+) => {
+  const predsRefStr = `wandb-artifact:///${entityName}/${projectName}/run-feedback:latest/obj`;
+  return opGet({
+    uri: constString(predsRefStr),
+  });
+};
+
+export const feedbackTableNode = (entityName: string, projectName: string) => {
+  const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
+    stream_table: feedbackTableObjNode(entityName, projectName),
+  }) as Node;
+  streamTableRowsNode.type = feedbackTableType;
+  return streamTableRowsNode;
+};
+
+export const runFeedbackNode = (
+  entityName: string,
+  projectName: string,
+  runId: string
+) => {
+  const feedbackNode = feedbackTableNode(entityName, projectName);
+  return opFilter({
+    arr: feedbackNode,
+    filterFn: constFunction({row: listObjectType(feedbackNode.type)}, ({row}) =>
+      opStringEqual({
+        lhs: opPick({
+          obj: row,
+          key: constString('run_id'),
+        }),
+        rhs: constString(runId),
+      })
+    ),
+  });
+};
+
+export const selectAll = (item: Node) => {
+  if (!isTypedDictLike(item.type)) {
+    throw new Error('Expected typed dict');
+  }
+  const keys = Object.keys(typedDictPropertyTypes(item.type));
+  const dictOpArgs = _.fromPairs(
+    keys.map(k => [k, opPick({obj: item, key: constString(k)})])
+  );
+  return opDict(dictOpArgs as any);
+};
+
+export const listSelectAll = (list: Node) => {
+  if (!isListLike(list.type)) {
+    throw new Error('Expected list');
+  }
+  return opMap({
+    arr: list,
+    mapFn: constFunction({row: listObjectType(list.type)}, ({row}) =>
+      selectAll(row)
+    ),
+  });
 };
