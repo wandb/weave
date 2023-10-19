@@ -123,6 +123,7 @@ def init(project_name: str) -> None:
             'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
         )
     _monitoring.init_monitor(f"{entity_name}/{project_name}/stream")
+    print("Ensure you have the prototype UI running with `weave ui`")
     print(f"View project at http://localhost:3000/browse2/{entity_name}/{project_name}")
 
 
