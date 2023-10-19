@@ -423,38 +423,37 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   return (
     <ThemeProvider theme={themes.light}>
       <PanelRenderedConfigContextProvider>
-        <PanelInteractContextProvider>
-          <WeaveRoot className="weave-root" fullScreen={fullScreen}>
-            {config.input_node.nodeType === 'void' ? (
-              <Home
-                updateConfig={updateConfig}
-                inJupyter={inJupyter}
-                browserType={browserType}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}>
-                {(!inJupyter || moarfullScreen) && !previewMode && (
-                  <PersistenceManager
-                    inputNode={config.input_node}
-                    inputConfig={config.config}
-                    updateNode={updateInputNode}
-                    goHome={goHome}
-                  />
-                )}
-                <PageContent
-                  config={config}
-                  previewMode={previewMode}
-                  updateConfig={updateConfig}
-                  updateConfig2={updateConfig2}
+        <WeaveRoot className="weave-root" fullScreen={fullScreen}>
+          {config.input_node.nodeType === 'void' ? (
+            <Home
+              updateConfig={updateConfig}
+              inJupyter={inJupyter}
+              browserType={browserType}
+            />
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+              {(!inJupyter || moarfullScreen) && !previewMode && (
+                <PersistenceManager
+                  inputNode={config.input_node}
+                  inputConfig={config.config}
+                  updateNode={updateInputNode}
                   goHome={goHome}
                 />
-                {/* <div
+              )}
+              <PageContent
+                config={config}
+                previewMode={previewMode}
+                updateConfig={updateConfig}
+                updateConfig2={updateConfig2}
+                goHome={goHome}
+              />
+              {/* <div
                   style={{
                     flex: '0 0 22px',
                     height: '16px',
@@ -464,12 +463,11 @@ const PagePanel = ({browserType}: PagePanelProps) => {
                   }}>
                     PLACEHOLDER FOR EXECUTION DETAILS
                   </div> */}
-              </div>
-            )}
-            {/* <ArtifactManager /> */}
-            {!inJupyter && <HelpCTA />}
-          </WeaveRoot>
-        </PanelInteractContextProvider>
+            </div>
+          )}
+          {/* <ArtifactManager /> */}
+          {!inJupyter && <HelpCTA />}
+        </WeaveRoot>
       </PanelRenderedConfigContextProvider>
     </ThemeProvider>
   );
