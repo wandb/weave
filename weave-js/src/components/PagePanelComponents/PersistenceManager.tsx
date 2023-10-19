@@ -225,7 +225,9 @@ const HeaderLeftControls = styled.div`
   flex: 1 1 30px;
 `;
 
-const WeaveLogo = styled(IconWeaveLogo)<{open: boolean}>`
+const WeaveLogo = styled(IconWeaveLogo).attrs({
+  className: 'night-aware',
+})<{open: boolean}>`
   width: 32px;
   height: 32px;
   transform: rotate(${props => (props.open ? 180 : 0)}deg);

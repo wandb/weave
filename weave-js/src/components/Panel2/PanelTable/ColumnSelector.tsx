@@ -8,12 +8,12 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {Dropdown, Grid, Icon, List} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
+import {Button} from '../../Button';
 import * as S from './ColumnSelector.styles';
 import ColumnSelectorField from './ColumnSelectorField';
 import ColumnSelectorListContainer from './ColumnSelectorListContainer';
 import * as Table from './tableState';
 import {ColumnEntry} from './tableState';
-import {Button} from '../../Button';
 
 const MAX_COLUMNS_SHOWN = 100;
 
