@@ -27,7 +27,7 @@ type ResetRequestType = {
   resolve: () => void;
 };
 
-const POLL_INTERVAL = 5000;
+const POLL_INTERVAL = 10_000;
 
 export class BasicClient implements Client {
   readonly opStore: OpStore;
