@@ -110,6 +110,10 @@ export class CachedClient implements Client {
     });
   }
 
+  public resetServerCacheKey(): Promise<void> {
+    return this.client.resetServerCacheKey();
+  }
+
   private onDispose(key: string, value: CachedNode): void {
     value.sub.unsubscribe();
   }

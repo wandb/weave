@@ -394,21 +394,23 @@ export const useNodeValueExecutor = () => {
   return useCallback(
     async (node: NodeOrVoidNode): Promise<any> => {
       return new Promise((resolve, reject) => {
-        if (!isVoidNode(node)) {
-          const obs = client!.subscribe(node);
-          const sub = obs.subscribe(
-            res => {
-              sub.unsubscribe();
-              resolve(res);
-            },
-            err => {
-              sub.unsubscribe();
-              reject(err);
-            }
-          );
-        } else {
-          return resolve(null);
-        }
+        client.clearCacheForNode(node as any).then(() => {
+          if (!isVoidNode(node)) {
+            const obs = client!.subscribe(node);
+            const sub = obs.subscribe(
+              res => {
+                sub.unsubscribe();
+                resolve(res);
+              },
+              err => {
+                sub.unsubscribe();
+                reject(err);
+              }
+            );
+          } else {
+            return resolve(null);
+          }
+        });
       });
     },
     [client]

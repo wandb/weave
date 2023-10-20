@@ -364,6 +364,11 @@ export class BasicClient implements Client {
     }
   }
 
+  public resetServerCacheKey(): Promise<void> {
+    this.server.refreshBackendCacheKey()
+    return Promise.resolve();
+  } 
+
   private async executeForwardListeners(
     targetNodes: GraphTypes.Node[],
     resetBackendExecutionCache?: boolean
