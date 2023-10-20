@@ -764,7 +764,7 @@ const useSectionConfig = (
 
 const shouldHideExpression = (node: NodeOrVoidNode): boolean => {
   if (isOutputNode(node)) {
-    if ((node.fromOp.name = 'get')) {
+    if (node.fromOp.name === 'get') {
       return true;
     } else {
       return _.some(Object.values(node.fromOp.inputs), shouldHideExpression);

@@ -528,7 +528,9 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
           client: weave.client,
           root: loadedPanel,
           persist: (newRoot: ChildPanelFullConfig) => {
-            !appMode && updateServerPanel(newRoot);
+            if (!appMode) {
+              updateServerPanel(newRoot);
+            }
           },
         });
 

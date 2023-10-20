@@ -216,6 +216,11 @@ export class BasicClient implements Client {
     return Promise.resolve();
   }
 
+  public resetServerCacheKey(): Promise<void> {
+    this.server.refreshBackendCacheKey()
+    return Promise.resolve();
+  } 
+
   private scheduleRequest() {
     if (this.nextRequestTimer != null) {
       clearTimeout(this.nextRequestTimer);
@@ -363,11 +368,6 @@ export class BasicClient implements Client {
       res();
     }
   }
-
-  public resetServerCacheKey(): Promise<void> {
-    this.server.refreshBackendCacheKey()
-    return Promise.resolve();
-  } 
 
   private async executeForwardListeners(
     targetNodes: GraphTypes.Node[],
