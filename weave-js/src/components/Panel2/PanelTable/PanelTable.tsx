@@ -97,7 +97,7 @@ const numberOfHeaders = 1;
 const headerHeight = 30;
 const footerHeight = 25;
 const rowHeightSettings = {
-  [RowSize.Small]: 30,
+  [RowSize.Small]: 25,
   [RowSize.Medium]: 60,
   [RowSize.Large]: 120,
   [RowSize.XLarge]: 240,

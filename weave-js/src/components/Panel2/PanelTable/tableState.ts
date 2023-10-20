@@ -251,6 +251,19 @@ function allPathsFromStreamTable(allPaths: PathType[]): boolean {
   return true;
 }
 
+function pathsFromProxy(allPaths: PathType[]): boolean {
+  return allPaths.find(p => p.path[0] === 'attributes' && p.path[1] === 'client_row_id') != null;
+}
+
+function modifyAllPathsForProxy(allPaths: PathType[]): PathType[] {
+  console.log(allPaths)
+  return _.sortBy(allPaths.filter(p => {
+    return (['inputs', 'output', 'summary', 'timestamp'].includes(p.path[0]) )
+  }), p => {
+    return p.path
+  })
+
+}
 // Try to pick nice default columns to make a table for the given object
 // type. See the initial columns test in tableState.test.ts to see examples
 // of current behavior.
@@ -267,7 +280,9 @@ export function autoTableColumnExpressions(
   let allPaths = allObjPaths(objectType).filter(
     path => !isNDArrayLike(path.type) && !isAssignableTo(path.type, 'none')
   );
-
+  if (pathsFromProxy(allPaths)) {
+    allPaths = modifyAllPathsForProxy(allPaths);
+  }
   if (allPathsFromMonitoring(allPaths)) {
     allPaths = allPaths.filter(
       p => !excludedMonitoringColumns.includes(p.path[0])
