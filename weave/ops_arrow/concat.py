@@ -81,7 +81,8 @@ def _concatenate_typeddicts(
     if not all_keys:
         # Both are empty
         return ArrowWeaveList(
-            pa_concat_arrays([l1._arrow_data, l2._arrow_data]),
+            pa.nulls(len(l1._arrow_data) + len(l2._arrow_data), pa.struct({})),
+            # pa_concat_arrays([l1._arrow_data, l2._arrow_data]),
             types.TypedDict({}),
             invalid_reason="Possibly nullable",
         )
