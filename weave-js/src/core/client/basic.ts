@@ -46,7 +46,7 @@ export class BasicClient implements Client {
 
     return () => this.loadingListeners.delete(id);
   });
-  private shouldPoll: boolean = false;
+  private shouldPoll: boolean = true;
   private pollingListeners: Array<(poll: boolean) => void> = [];
   private readonly hasher: Hasher;
   private isRemoteServer: boolean = false;
