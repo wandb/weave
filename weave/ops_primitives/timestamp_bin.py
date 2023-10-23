@@ -66,6 +66,9 @@ def timestamp_bins_fixed(bin_size_s: float):
     render_info={"type": "function"},
 )
 def timestamp_bins_nice(arr, target_n_bins):
+    if (len(arr) == 0):
+        return use(timestamp_bins_fixed(600))
+
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     exact_bin_size = ((arr_max - arr_min) / target_n_bins).total_seconds()  # type: ignore
