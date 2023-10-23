@@ -120,7 +120,10 @@ const inputType = {
   type: 'union' as const,
   members: ['none' as const, 'number' as const],
 };
-type PanelNumberProps = Panel2.PanelProps<typeof inputType>;
+type PanelNumberProps = Panel2.PanelProps<
+  typeof inputType,
+  {propFormat: string}
+>;
 type PanelNumberExtraProps = {
   textAlign?: 'left' | 'right' | 'center' | 'justify' | 'initial' | 'inherit';
 };
