@@ -87,6 +87,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'night-aware',
               "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
               'disabled:pointer-events-none disabled:opacity-40',
+              'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
               {
                 // small
                 'gap-6 px-6 py-3 text-sm leading-[18px]': isSmall,
@@ -101,10 +102,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 // large
                 'gap-8 px-12 py-8 text-base': isLarge,
                 'h-40 w-40 p-0': isLarge && isIconOnly,
-
-                // focus
-                'focus:outline focus:outline-[2px] focus:outline-teal-500':
-                  true,
 
                 // primary
                 'bg-teal-500 text-white hover:bg-teal-450': isPrimary,

@@ -39,7 +39,8 @@ type SliderThumbProps = React.ComponentProps<typeof RadixSlider.Thumb>;
 export const Thumb = ({className, ...props}: SliderThumbProps) => (
   <RadixSlider.Thumb
     className={twMerge(
-      'block h-[22px] w-[22px] rounded-full border-[1px] border-solid border-moon-350 bg-white focus:outline focus:outline-[2px] focus:outline-teal-500 ',
+      'block h-[22px] w-[22px] rounded-full border-[1px] border-solid border-moon-350 bg-white',
+      'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
       className
     )}
     {...props}
@@ -73,7 +74,8 @@ export const Display = React.forwardRef(
     return (
       <input
         className={twMerge(
-          'ml-8  h-[40px] w-[56px] rounded border-[1px] border-solid border-moon-250 text-center focus:outline focus:outline-[2px] focus:outline-teal-500',
+          'ml-8  h-[40px] w-[56px] rounded border-[1px] border-solid border-moon-250 text-center',
+          'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
           isDirty ? 'text-moon-800' : 'text-moon-250',
           className
         )}
