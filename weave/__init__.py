@@ -33,8 +33,6 @@ from . import ops_arrow as _ops_arrow
 
 WeaveList = _ops_arrow.ArrowWeaveList
 
-from .base_types import *
-
 _wandb_api.init()
 
 # Ensure there is a client available for eager mode
