@@ -53,8 +53,8 @@ import {toWeaveType} from './components/Panel2/toWeaveType';
 import {
   ClientContext,
   useWeaveContext,
-  useWeaveSkipNodeRefinementInReactHooks,
-  useWeaveUseNodeValueUsesClientEval,
+  useWeaveDisableRefinementInReactHooks,
+  useWeaveEnableClientEvalInUseNodeValue,
 } from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
@@ -245,7 +245,7 @@ export const useNodeValue = <T extends Type>(
   const memoCacheId = options?.memoCacheId ?? 0;
   const callSite = options?.callSite;
   const skip = options?.skip;
-  const shouldUseClientEval = useWeaveUseNodeValueUsesClientEval();
+  const enableClientEval = useWeaveEnableClientEvalInUseNodeValue();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
@@ -263,8 +263,8 @@ export const useNodeValue = <T extends Type>(
   node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
 
   node = useMemo(
-    () => (shouldUseClientEval ? clientEval(node, stack) : node),
-    [shouldUseClientEval, node, stack]
+    () => (enableClientEval ? clientEval(node, stack) : node),
+    [enableClientEval, node, stack]
   ) as NodeOrVoidNode<T>;
 
   GlobalCGReactTracker.useNodeValue++;
@@ -1002,9 +1002,9 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
 // instead of during rendering.
 export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirectly =
   (node, paramFrame) => {
-    const skipNodeRefinement = useWeaveSkipNodeRefinementInReactHooks();
+    const disableRefinement = useWeaveDisableRefinementInReactHooks();
     // In dashUI, no-op. We manage document refinement in panelTree
-    if (skipNodeRefinement) {
+    if (disableRefinement) {
       return {
         initialLoading: false,
         loading: false,

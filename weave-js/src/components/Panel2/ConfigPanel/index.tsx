@@ -12,7 +12,7 @@ import * as _ from 'lodash';
 import React, {FC, ReactNode, useCallback, useState} from 'react';
 import styled, {ThemeProvider, css} from 'styled-components';
 
-import {useWeaveShouldUseSidebarConfigStyling} from '../../../context';
+import {useWeaveEnableSidebarConfigStyling} from '../../../context';
 import {WeaveExpression} from '../../../panel/WeaveExpression';
 import {themes} from '../Editor.styles';
 import * as S from './styles';
@@ -130,9 +130,9 @@ export const ConfigOption: React.FC<
     postfixComponent?: React.ReactElement;
   } & {[key: string]: any}
 > = props => {
-  const shouldUseSidebarConfigStyling = useWeaveShouldUseSidebarConfigStyling();
+  const enableSidebarConfigStyling = useWeaveEnableSidebarConfigStyling();
 
-  if (shouldUseSidebarConfigStyling) {
+  if (enableSidebarConfigStyling) {
     return <ConfigOptionNew {...props} />;
   }
 
@@ -192,9 +192,9 @@ const ConfigOptionNew: React.FC<
 export const ModifiedDropdownConfigField: React.FC<
   React.ComponentProps<typeof ModifiedDropdown>
 > = props => {
-  const shouldUseSidebarConfigStyling = useWeaveShouldUseSidebarConfigStyling();
+  const enableSidebarConfigStyling = useWeaveEnableSidebarConfigStyling();
 
-  if (shouldUseSidebarConfigStyling) {
+  if (enableSidebarConfigStyling) {
     return (
       <ConfigFieldWrapper withIcon>
         <ConfigFieldModifiedDropdown
@@ -227,10 +227,10 @@ export const NumberInputConfigField: React.FC<
 export const ExpressionConfigField: React.FC<
   React.ComponentProps<typeof WeaveExpression>
 > = props => {
-  const shouldUseSidebarConfigStyling = useWeaveShouldUseSidebarConfigStyling();
+  const enableSidebarConfigStyling = useWeaveEnableSidebarConfigStyling();
 
   const wrap = (content: ReactNode) =>
-    shouldUseSidebarConfigStyling ? (
+    enableSidebarConfigStyling ? (
       <ConfigFieldWrapper>{content}</ConfigFieldWrapper>
     ) : (
       <div style={{flex: '1 1 auto', width: '100%'}}>{content}</div>
@@ -251,10 +251,10 @@ export const ExpressionConfigField: React.FC<
 export const TextInputConfigField: React.FC<
   React.ComponentProps<typeof TextInput>
 > = props => {
-  const shouldUseSidebarConfigStyling = useWeaveShouldUseSidebarConfigStyling();
+  const enableSidebarConfigStyling = useWeaveEnableSidebarConfigStyling();
 
   const wrap = (content: ReactNode) =>
-    shouldUseSidebarConfigStyling ? (
+    enableSidebarConfigStyling ? (
       <ConfigFieldWrapper>{content}</ConfigFieldWrapper>
     ) : (
       <div style={{flex: '1 1 auto', width: '100%'}}>{content}</div>

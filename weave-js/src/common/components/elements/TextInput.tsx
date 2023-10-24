@@ -3,7 +3,7 @@ import {InputOnChangeData} from 'semantic-ui-react';
 import {TextInput as TextInputNew} from './TextInputNew';
 
 import * as S from './TextInput.styles';
-import {useWeaveShouldUseSidebarConfigStyling} from '../../../context';
+import {useWeaveEnableSidebarConfigStyling} from '../../../context';
 
 interface TextInputProps {
   dataTest: string;
@@ -17,7 +17,7 @@ interface TextInputProps {
 export const TextInput: FC<TextInputProps> = React.memo(props => {
   const {dataTest, label, onChange, placeholder, sublabel, value} = props;
 
-  const useSidebarConfigStyling = useWeaveShouldUseSidebarConfigStyling();
+  const useSidebarConfigStyling = useWeaveEnableSidebarConfigStyling();
   if (useSidebarConfigStyling) {
     return <TextInputNew {...props} />;
   }
