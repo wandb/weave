@@ -774,7 +774,10 @@ export function makeDimensionShared(
 ): PlotConfig {
   return config.series.length > 1
     ? produce(config, draft => {
-        const replacementDim = dimConstructors[dimName](freeze(series, true), weave);
+        const replacementDim = dimConstructors[dimName](
+          freeze(series, true),
+          weave
+        );
         draft.series = draft.series.map(s => {
           return replacementDim.imputeOtherSeriesWithThisState(s);
         });
