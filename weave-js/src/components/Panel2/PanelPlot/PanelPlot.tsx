@@ -80,7 +80,7 @@ import {calculatePosition} from 'vega-tooltip';
 
 import {
   useWeaveContext,
-  useWeaveEnableRedesignedPlotConfig,
+  useWeaveEnableRedesignedPlotConfigEnabled,
 } from '../../../context';
 import * as LLReact from '../../../react';
 import {getPanelStackDims, getPanelStacksForType} from '../availablePanels';
@@ -184,11 +184,11 @@ function useIsDashboard() {
 function defaultPlot(
   inputNode: Node,
   stack: Stack,
-  enableRedesignedPlotConfig: boolean
+  enableRedesignedPlotConfigEnabled: boolean
 ): PlotConfig {
   return PlotState.setDefaultSeriesNames(
     PlotState.defaultPlot(inputNode, stack),
-    enableRedesignedPlotConfig
+    enableRedesignedPlotConfigEnabled
   );
 }
 
@@ -198,14 +198,15 @@ const useConfig = (
 ): {config: PlotConfig; isRefining: boolean} => {
   const {stack} = usePanelContext();
   const weave = useWeaveContext();
-  const enableRedesignedPlotConfig = useWeaveEnableRedesignedPlotConfig();
+  const redesignedPlotConfigEnabled =
+    useWeaveEnableRedesignedPlotConfigEnabled();
 
   const newConfig = useMemo(() => {
     return PlotState.setDefaultSeriesNames(
       PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
-      !!enableRedesignedPlotConfig
+      !!enableRedesignedPlotConfigEnabled
     );
-  }, [propsConfig, inputNode, stack, enableRedesignedPlotConfig]);
+  }, [propsConfig, inputNode, stack, enableRedesignedPlotConfigEnabled]);
 
   const defaultColNameStrippedConfig = useMemo(
     () =>
@@ -385,7 +386,8 @@ const useConcreteConfig = (
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
-  const enableRedesignedPlotConfig = useWeaveEnableRedesignedPlotConfig();
+  const redesignedPlotConfigEnabled =
+    useWeaveEnableRedesignedPlotConfigEnabled();
   const inputNode = input;
 
   const weave = useWeaveContext();
@@ -399,7 +401,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       if (!newConfig) {
         // if config is undefined, just use the default plot
         propsUpdateConfig(
-          defaultPlot(input, stack, !!enableRedesignedPlotConfig)
+          defaultPlot(input, stack, !!enableRedesignedPlotConfigEnabled)
         );
       } else {
         propsUpdateConfig({
@@ -408,7 +410,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         });
       }
     },
-    [config, propsUpdateConfig, input, stack, enableRedesignedPlotConfig]
+    [config, propsUpdateConfig, input, stack, enableRedesignedPlotConfigEnabled]
   );
 
   const resetConfig = useCallback(() => {
@@ -776,7 +778,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
 
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const configTabs = useMemo(() => {
-    if (enableRedesignedPlotConfig) {
+    if (enableRedesignedPlotConfigEnabled) {
       return (
         <LayoutTabs
           tabNames={['Data', 'Labels']}
@@ -820,7 +822,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       />
     );
   }, [
-    enableRedesignedPlotConfig,
+    enableRedesignedPlotConfigEnabled,
     scaleConfigEnabled,
     activeTabIndex,
     seriesConfigDom,
@@ -901,7 +903,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
 
   return useMemo(
     () =>
-      enableRedesignedPlotConfig ? (
+      redesignedPlotConfigEnabled ? (
         <>
           <ConfigSection label={`Properties`}>
             {dashboardConfigOptions}
@@ -921,7 +923,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         </>
       ),
     [
-      enableRedesignedPlotConfig,
+      enableRedesignedPlotConfigEnabled,
       dashboardConfigOptions,
       cellFrame,
       labelConfigDom,
@@ -1059,7 +1061,7 @@ const ConfigDimLabel: React.FC<
   Omit<DimComponentInputType, 'extraOptions'> & {
     postfixComponent?: React.ReactElement;
     multiline?: boolean;
-    enableRedesignedPlotConfig?: boolean;
+    enableRedesignedPlotConfigEnabled?: boolean;
   }
 > = props => {
   const dimName = props.dimension.name;
@@ -1067,7 +1069,7 @@ const ConfigDimLabel: React.FC<
     props.isShared || props.config.series.length === 1
       ? ''
       : ` ${props.config.series.indexOf(props.dimension.series) + 1}`;
-  const label = props.enableRedesignedPlotConfig
+  const label = props.enableRedesignedPlotConfigEnabled
     ? DASHBOARD_DIM_NAME_MAP[dimName]
     : DIM_NAME_MAP[dimName] + seriesIndexStr;
 
@@ -1076,7 +1078,7 @@ const ConfigDimLabel: React.FC<
       style={{
         paddingLeft: 10 * props.indentation,
         borderLeft:
-          props.indentation > 0 && props.enableRedesignedPlotConfig
+          props.indentation > 0 && props.enableRedesignedPlotConfigEnabled
             ? `2px solid ${globals.MOON_200}`
             : 'none',
       }}>
@@ -1171,7 +1173,8 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     multiline,
   } = props;
   const weave = useWeaveContext();
-  const enableRedesignedPlotConfig = useWeaveEnableRedesignedPlotConfig();
+  const redesignedPlotConfigEnabled =
+    useWeaveEnableRedesignedPlotConfigEnabled();
   const makeUnsharedDimDropdownOptions = useCallback(
     (series: SeriesConfig, dimName: (typeof PLOT_DIMS_UI)[number]) => {
       const removeSeriesDropdownOption =
@@ -1212,16 +1215,16 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return enableRedesignedPlotConfig
+      return enableRedesignedPlotConfigEnabled
         ? []
         : [
             removeSeriesDropdownOption,
             addSeriesDropdownOption,
             collapseDimDropdownOption,
-            enableRedesignedPlotConfig,
+            enableRedesignedPlotConfigEnabled,
           ];
     },
-    [config, updateConfig, weave, enableRedesignedPlotConfig]
+    [config, updateConfig, weave, enableRedesignedPlotConfigEnabled]
   );
 
   const makeSharedDimDropdownOptions = useCallback(
@@ -1240,9 +1243,9 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return enableRedesignedPlotConfig ? [] : [expandDim];
+      return redesignedPlotConfigEnabled ? [] : [expandDim];
     },
-    [config, updateConfig, enableRedesignedPlotConfig]
+    [config, updateConfig, enableRedesignedPlotConfigEnabled]
   );
 
   const uiStateOptions = useMemo(() => {
@@ -1293,7 +1296,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         },
         {
           text: 'Select via dropdown',
-          icon: !enableRedesignedPlotConfig ? (
+          icon: !redesignedPlotConfigEnabled ? (
             'wbic-ic-list'
           ) : dimension.mode() === `dropdown` ? (
             <IconCheckmark />
@@ -1318,7 +1321,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         },
         {
           text: 'Enter a Weave Expression',
-          icon: !enableRedesignedPlotConfig ? (
+          icon: !redesignedPlotConfigEnabled ? (
             'wbic-ic-xaxis'
           ) : dimension.mode() === `expression` ? (
             <IconCheckmark />
@@ -1347,7 +1350,13 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         },
       ],
     ];
-  }, [config, updateConfig, isShared, dimension, enableRedesignedPlotConfig]);
+  }, [
+    config,
+    updateConfig,
+    isShared,
+    dimension,
+    enableRedesignedPlotConfigEnabled,
+  ]);
 
   const topLevelDimOptions = useCallback(
     (dimName: (typeof PLOT_DIMS_UI)[number]) => {
@@ -1376,7 +1385,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   );
 
   const postFixComponent = useMemo(() => {
-    if (!enableRedesignedPlotConfig) {
+    if (!enableRedesignedPlotConfigEnabled) {
       return (
         <PopupDropdown
           position="left center"
@@ -1508,7 +1517,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     }
   }, [
     dimOptions,
-    enableRedesignedPlotConfig,
+    enableRedesignedPlotConfigEnabled,
     config,
     dimension.name,
     dimension.series,
@@ -1555,8 +1564,8 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       <ConfigDimLabel
         {...props}
         postfixComponent={postFixComponent}
-        multiline={enableRedesignedPlotConfig && multiline}
-        enableRedesignedPlotConfig={enableRedesignedPlotConfig}>
+        multiline={redesignedPlotConfigEnabled && multiline}
+        enableRedesignedPlotConfigEnabled={enableRedesignedPlotConfigEnabled}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
           data-testid={`dropdown-${dimName}`}
@@ -1585,8 +1594,8 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         <ConfigDimLabel
           {...props}
           postfixComponent={postFixComponent}
-          multiline={enableRedesignedPlotConfig && multiline}
-          enableRedesignedPlotConfig={enableRedesignedPlotConfig}>
+          multiline={redesignedPlotConfigEnabled && multiline}
+          enableRedesignedPlotConfigEnabled={enableRedesignedPlotConfigEnabled}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}
@@ -1980,7 +1989,7 @@ const useLatestData = (
 */
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
-  const isDash = useWeaveEnableRedesignedPlotConfig();
+  const isDash = useWeaveEnableRedesignedPlotConfigEnabled();
   const weave = useWeaveContext();
   const {
     input,

@@ -6,7 +6,7 @@ import {
   vectorizePromiseFn,
 } from './hooks';
 import * as Table from './tableState';
-import {useWeaveDisableRefinementInReactHooks} from '@wandb/weave/context';
+import {useWeaveRefinementInReactHooksDisabled} from '@wandb/weave/context';
 
 // This refines all table state expressions when their input variable values
 // change. This is is complicated by the fact that grouped v. ungrouped
@@ -108,7 +108,7 @@ const useTableStatesWithRefinedExpressionsUnguarded = makePromiseUsable(
 
 export const useTableStateWithRefinedExpressions: typeof useTableStateWithRefinedExpressionsUnguarded =
   (tableState, inputNode, stack, weave) => {
-    const disableRefinement = useWeaveDisableRefinementInReactHooks();
+    const disableRefinement = useWeaveRefinementInReactHooksDisabled();
     // In dashUI, no-op. We manage document refinement in panelTree
     if (disableRefinement) {
       return {
@@ -130,7 +130,7 @@ export const useTableStateWithRefinedExpressions: typeof useTableStateWithRefine
 
 export const useTableStatesWithRefinedExpressions: typeof useTableStatesWithRefinedExpressionsUnguarded =
   (list, inputNode, stack, weave) => {
-    const disableRefinement = useWeaveDisableRefinementInReactHooks();
+    const disableRefinement = useWeaveRefinementInReactHooksDisabled();
     // In dashUI, no-op. We manage document refinement in panelTree
     if (disableRefinement) {
       return {

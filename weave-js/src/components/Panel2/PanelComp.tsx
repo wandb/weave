@@ -16,7 +16,7 @@ import {Button, Modal, Popup} from 'semantic-ui-react';
 
 import {
   useWeaveFeaturesContext,
-  useWeaveEnableErrorBoundaryInPanelComp2,
+  useWeaveErrorBoundaryInPanelComp2Enabled,
 } from '../../context';
 // import {useExpressionHoverHandlers} from './PanelContext';
 import {useWeaveContext} from '../../context';
@@ -222,7 +222,7 @@ export function useUpdateConfig2<C>(props: {
 
 // PanelComp2 is the primary proxy for rendering all Weave Panels.
 export const PanelComp2Inner = (props: PanelComp2Props) => {
-  const enableErrorBoundary = useWeaveEnableErrorBoundaryInPanelComp2();
+  const enableErrorBoundary = useWeaveErrorBoundaryInPanelComp2Enabled();
   const {panelSpec, configMode} = props;
   const updateConfig2 = useUpdateConfig2(props);
   let unboundedContent = useMemo(() => {

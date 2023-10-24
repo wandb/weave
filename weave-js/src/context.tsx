@@ -22,21 +22,21 @@ export interface WeaveFeatures {
   betaFeatures: WeaveWBBetaFeatures;
   panelSettings?: Record<PanelSettingPanel, unknown>;
   dashUi?: boolean;
-  // `enableClientEvalInUseNodeValue` was previously bound to `dashUi`, but has been refactored out.
+  // `clientEvalInUseNodeValueEnabled` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
-  enableClientEvalInUseNodeValue?: boolean;
-  // `disableRefinementInReactHooks` was previously bound to `dashUi`, but has been refactored out.
+  clientEvalInUseNodeValueEnabled?: boolean;
+  // `refinementInReactHooksDisabled` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
-  disableRefinementInReactHooks?: boolean;
-  // `enableSidebarConfigStyling` was previously bound to `dashUi`, but has been refactored out.
+  refinementInReactHooksDisabled?: boolean;
+  // `sidebarConfigStylingEnabled` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
-  enableSidebarConfigStyling?: boolean;
-  // `enableErrorBoundaryInPanelComp2` was previously bound to `dashUi`, but has been refactored out.
+  sidebarConfigStylingEnabled?: boolean;
+  // `errorBoundaryInPanelComp2Enabled` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
-  enableErrorBoundaryInPanelComp2?: boolean;
-  // `enableRedesignedPlotConfig` was previously bound to `dashUi`, but has been refactored out.
+  errorBoundaryInPanelComp2Enabled?: boolean;
+  // `enableRedesignedPlotConfigEnabled` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
-  enableRedesignedPlotConfig?: boolean;
+  enableRedesignedPlotConfigEnabled?: boolean;
 }
 
 export const ClientContext = React.createContext<ClientState>({
@@ -92,22 +92,22 @@ export const useWeaveDashUiEnable = () => {
   return useContext(WeaveFeaturesContext).dashUi;
 };
 
-export const useWeaveEnableClientEvalInUseNodeValue = () => {
-  return !!useContext(WeaveFeaturesContext).enableClientEvalInUseNodeValue;
+export const useWeaveClientEvalInUseNodeValueEnabled = () => {
+  return !!useContext(WeaveFeaturesContext).clientEvalInUseNodeValueEnabled;
 };
 
-export const useWeaveDisableRefinementInReactHooks = () => {
-  return !!useContext(WeaveFeaturesContext).disableRefinementInReactHooks;
+export const useWeaveRefinementInReactHooksDisabled = () => {
+  return !!useContext(WeaveFeaturesContext).refinementInReactHooksDisabled;
 };
 
-export const useWeaveEnableSidebarConfigStyling = () => {
-  return !!useContext(WeaveFeaturesContext).enableSidebarConfigStyling;
+export const useWeaveSidebarConfigStylingEnabled = () => {
+  return !!useContext(WeaveFeaturesContext).sidebarConfigStylingEnabled;
 };
 
-export const useWeaveEnableErrorBoundaryInPanelComp2 = () => {
-  return !!useContext(WeaveFeaturesContext).enableErrorBoundaryInPanelComp2;
+export const useWeaveErrorBoundaryInPanelComp2Enabled = () => {
+  return !!useContext(WeaveFeaturesContext).errorBoundaryInPanelComp2Enabled;
 };
 
-export const useWeaveEnableRedesignedPlotConfig = () => {
-  return !!useContext(WeaveFeaturesContext).enableRedesignedPlotConfig;
+export const useWeaveRedesignedPlotConfigEnabled = () => {
+  return !!useContext(WeaveFeaturesContext).enableRedesignedPlotConfigEnabled;
 };

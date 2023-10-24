@@ -53,8 +53,8 @@ import {toWeaveType} from './components/Panel2/toWeaveType';
 import {
   ClientContext,
   useWeaveContext,
-  useWeaveDisableRefinementInReactHooks,
-  useWeaveEnableClientEvalInUseNodeValue,
+  useWeaveRefinementInReactHooksDisabled,
+  useWeaveClientEvalInUseNodeValueEnabled,
 } from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
@@ -245,7 +245,7 @@ export const useNodeValue = <T extends Type>(
   const memoCacheId = options?.memoCacheId ?? 0;
   const callSite = options?.callSite;
   const skip = options?.skip;
-  const enableClientEval = useWeaveEnableClientEvalInUseNodeValue();
+  const enableClientEval = useWeaveClientEvalInUseNodeValueEnabled();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
@@ -1002,7 +1002,7 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
 // instead of during rendering.
 export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirectly =
   (node, paramFrame) => {
-    const disableRefinement = useWeaveDisableRefinementInReactHooks();
+    const disableRefinement = useWeaveRefinementInReactHooksDisabled();
     // In dashUI, no-op. We manage document refinement in panelTree
     if (disableRefinement) {
       return {
