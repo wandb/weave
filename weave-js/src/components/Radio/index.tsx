@@ -15,7 +15,8 @@ export const Item = ({
 }: React.ComponentProps<typeof RadioGroup.Item>) => (
   <RadioGroup.Item
     className={twMerge(
-      'flex h-[15px] w-[15px] items-center justify-center rounded-full border-[1px] border-solid border-moon-500 focus:outline focus:outline-[2px] focus:outline-teal-500 data-[state=checked]:border-moon-800',
+      'flex h-[15px] w-[15px] items-center justify-center rounded-full border-[1px] border-solid border-moon-500 data-[state=checked]:border-moon-800',
+      'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
       className
     )}
     {...props}
