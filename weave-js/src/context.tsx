@@ -23,6 +23,9 @@ export interface WeaveFeatures {
   // `useNodeValueUsesClientEval` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
   useNodeValueUsesClientEval?: boolean;
+  // `skipNodeRefinementInReactHooks` was previously bound to `dashUi`, but has been refactored out.
+  // We should remove this flag once we're confident that the new behavior is stable.
+  skipNodeRefinementInReactHooks?: boolean;
   betaFeatures: WeaveWBBetaFeatures;
   panelSettings?: Record<PanelSettingPanel, unknown>;
 }
@@ -78,6 +81,10 @@ export const useWeaveDashUiEnable = () => {
 
 export const useWeaveUseNodeValueUsesClientEval = () => {
   return !!useContext(WeaveFeaturesContext).useNodeValueUsesClientEval;
+};
+
+export const useWeaveSkipNodeRefinementInReactHooks = () => {
+  return !!useContext(WeaveFeaturesContext).skipNodeRefinementInReactHooks;
 };
 
 export const usePanelSettings = (type: PanelSettingPanel) => {

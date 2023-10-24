@@ -54,6 +54,7 @@ import {
   ClientContext,
   useWeaveContext,
   useWeaveDashUiEnable,
+  useWeaveSkipNodeRefinementInReactHooks,
   useWeaveUseNodeValueUsesClientEval,
 } from './context';
 import {getUnresolvedVarNodes} from './core/callers';
@@ -1002,9 +1003,9 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
 // instead of during rendering.
 export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirectly =
   (node, paramFrame) => {
-    const dashEnabled = useWeaveDashUiEnable();
+    const skipNodeRefinement = useWeaveSkipNodeRefinementInReactHooks();
     // In dashUI, no-op. We manage document refinement in panelTree
-    if (dashEnabled) {
+    if (skipNodeRefinement) {
       return {
         initialLoading: false,
         loading: false,

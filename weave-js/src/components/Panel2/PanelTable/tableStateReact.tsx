@@ -6,7 +6,7 @@ import {
   vectorizePromiseFn,
 } from './hooks';
 import * as Table from './tableState';
-import {useWeaveDashUiEnable} from '@wandb/weave/context';
+import {useWeaveSkipNodeRefinementInReactHooks} from '@wandb/weave/context';
 
 // This refines all table state expressions when their input variable values
 // change. This is is complicated by the fact that grouped v. ungrouped
@@ -108,9 +108,9 @@ const useTableStatesWithRefinedExpressionsUnguarded = makePromiseUsable(
 
 export const useTableStateWithRefinedExpressions: typeof useTableStateWithRefinedExpressionsUnguarded =
   (tableState, inputNode, stack, weave) => {
-    const dashEnabled = useWeaveDashUiEnable();
+    const skipNodeRefinement = useWeaveSkipNodeRefinementInReactHooks();
     // In dashUI, no-op. We manage document refinement in panelTree
-    if (dashEnabled) {
+    if (skipNodeRefinement) {
       return {
         initialLoading: false,
         loading: false,
@@ -130,9 +130,9 @@ export const useTableStateWithRefinedExpressions: typeof useTableStateWithRefine
 
 export const useTableStatesWithRefinedExpressions: typeof useTableStatesWithRefinedExpressionsUnguarded =
   (list, inputNode, stack, weave) => {
-    const dashEnabled = useWeaveDashUiEnable();
+    const skipNodeRefinement = useWeaveSkipNodeRefinementInReactHooks();
     // In dashUI, no-op. We manage document refinement in panelTree
-    if (dashEnabled) {
+    if (skipNodeRefinement) {
       return {
         initialLoading: false,
         loading: false,
