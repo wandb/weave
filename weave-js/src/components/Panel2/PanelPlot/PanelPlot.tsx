@@ -80,7 +80,7 @@ import {calculatePosition} from 'vega-tooltip';
 
 import {
   useWeaveContext,
-  useWeaveEnableRedesignedPlotConfigEnabled,
+  useWeaveRedesignedPlotConfigEnabled,
 } from '../../../context';
 import * as LLReact from '../../../react';
 import {getPanelStackDims, getPanelStacksForType} from '../availablePanels';
@@ -198,8 +198,7 @@ const useConfig = (
 ): {config: PlotConfig; isRefining: boolean} => {
   const {stack} = usePanelContext();
   const weave = useWeaveContext();
-  const redesignedPlotConfigEnabled =
-    useWeaveEnableRedesignedPlotConfigEnabled();
+  const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
 
   const newConfig = useMemo(() => {
     return PlotState.setDefaultSeriesNames(
@@ -386,8 +385,7 @@ const useConcreteConfig = (
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
-  const redesignedPlotConfigEnabled =
-    useWeaveEnableRedesignedPlotConfigEnabled();
+  const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
   const inputNode = input;
 
   const weave = useWeaveContext();
@@ -1173,8 +1171,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     multiline,
   } = props;
   const weave = useWeaveContext();
-  const redesignedPlotConfigEnabled =
-    useWeaveEnableRedesignedPlotConfigEnabled();
+  const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
   const makeUnsharedDimDropdownOptions = useCallback(
     (series: SeriesConfig, dimName: (typeof PLOT_DIMS_UI)[number]) => {
       const removeSeriesDropdownOption =
@@ -1989,7 +1986,7 @@ const useLatestData = (
 */
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
-  const isDash = useWeaveEnableRedesignedPlotConfigEnabled();
+  const isDash = useWeaveRedesignedPlotConfigEnabled();
   const weave = useWeaveContext();
   const {
     input,
