@@ -147,6 +147,7 @@ export const initPanel = async (
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
     stackIdFilter: allowPanel,
+    excludePanelPanel: stack.length > 0,
   });
   if (id == null) {
     return {vars: {}, input_node: voidNode(), id: '', config: undefined};
@@ -227,6 +228,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     {
       allowedPanels: props.allowedPanels,
       stackIdFilter: allowPanel,
+      excludePanelPanel: stack.length > 0,
     }
   );
 

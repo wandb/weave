@@ -199,6 +199,7 @@ export interface GetPanelStacksForTypeOpts {
   excludePlot?: boolean;
   excludeMultiTable?: boolean;
   excludeBarChart?: boolean;
+  excludePanelPanel?: boolean;
   showDebug?: boolean;
   stackIdFilter?: (stackId: string) => boolean;
   allowedPanels?: string[];
@@ -251,6 +252,12 @@ export function getPanelStacksForType(
     if (opts.excludeBarChart) {
       handlerStacks = handlerStacks.filter(
         hs => !PanelLib.getStackIdAndName(hs).id.endsWith('barchart')
+      );
+    }
+
+    if (opts.excludePanelPanel) {
+      handlerStacks = handlerStacks.filter(
+        hs => !PanelLib.getStackIdAndName(hs).id.endsWith('panel')
       );
     }
 
