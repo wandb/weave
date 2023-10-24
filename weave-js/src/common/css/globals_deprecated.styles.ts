@@ -455,11 +455,16 @@ export const RED_LIGHT_2 = RED_LIGHT2;
 export const SPU = '0.5rem'; // standard spacing unit = 8px
 
 /* Responsive styling standards */
+/** @deprecated use MEDIUM_BREAKPOINT instead */
 export const TABLET_BREAKPOINT = '768px'; // 48rem
+/** @deprecated use MEDIUM_BREAKPOINT instead */
 export const TABLET_BREAKPOINT_WIDTH = 768;
 
+/** @deprecated */
 export const TABLET_WIDTH = 1320;
+/** @deprecated */
 export const SMALL_TABLET_WIDTH = 1000;
+/** @deprecated */
 export const MOBILE_WIDTH = 600;
 
 /* Borders */
