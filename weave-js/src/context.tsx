@@ -77,7 +77,7 @@ export const useWeaveDashUiEnable = () => {
 };
 
 export const useWeaveUseNodeValueUsesClientEval = () => {
-  return useContext(WeaveFeaturesContext).useNodeValueUsesClientEval;
+  return !!useContext(WeaveFeaturesContext).useNodeValueUsesClientEval;
 };
 
 export const usePanelSettings = (type: PanelSettingPanel) => {
