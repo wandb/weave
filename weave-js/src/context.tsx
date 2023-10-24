@@ -20,6 +20,9 @@ export interface WeaveFeatures {
   actions?: boolean;
   fullscreenMode?: boolean;
   dashUi?: boolean;
+  // `useNodeValueUsesClientEval` was previously bound to `dashUi`, but has been refactored out.
+  // We should remove this flag once we're confident that the new behavior is stable.
+  useNodeValueUsesClientEval?: boolean;
   betaFeatures: WeaveWBBetaFeatures;
   panelSettings?: Record<PanelSettingPanel, unknown>;
 }
@@ -71,6 +74,10 @@ export const useWeaveFeaturesContext = () => {
 
 export const useWeaveDashUiEnable = () => {
   return useContext(WeaveFeaturesContext).dashUi;
+};
+
+export const useWeaveUseNodeValueUsesClientEval = () => {
+  return useContext(WeaveFeaturesContext).useNodeValueUsesClientEval;
 };
 
 export const usePanelSettings = (type: PanelSettingPanel) => {

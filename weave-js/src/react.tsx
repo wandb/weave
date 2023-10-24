@@ -50,7 +50,12 @@ import {
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
-import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
+import {
+  ClientContext,
+  useWeaveContext,
+  useWeaveDashUiEnable,
+  useWeaveUseNodeValueUsesClientEval,
+} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
@@ -240,7 +245,7 @@ export const useNodeValue = <T extends Type>(
   const memoCacheId = options?.memoCacheId ?? 0;
   const callSite = options?.callSite;
   const skip = options?.skip;
-  const dashUiEnabled = useWeaveDashUiEnable();
+  const shouldUseClientEval = useWeaveUseNodeValueUsesClientEval();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
@@ -258,8 +263,8 @@ export const useNodeValue = <T extends Type>(
   node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
 
   node = useMemo(
-    () => (dashUiEnabled ? clientEval(node, stack) : node),
-    [dashUiEnabled, node, stack]
+    () => (shouldUseClientEval ? clientEval(node, stack) : node),
+    [shouldUseClientEval, node, stack]
   ) as NodeOrVoidNode<T>;
 
   GlobalCGReactTracker.useNodeValue++;
