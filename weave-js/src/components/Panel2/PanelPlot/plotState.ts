@@ -30,7 +30,7 @@ import {
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
-import {immerable, produce} from 'immer';
+import {freeze, produce} from 'immer';
 import _ from 'lodash';
 
 import * as TableState from '../PanelTable/tableState';
@@ -774,7 +774,7 @@ export function makeDimensionShared(
 ): PlotConfig {
   return config.series.length > 1
     ? produce(config, draft => {
-        const replacementDim = dimConstructors[dimName](series, weave);
+        const replacementDim = dimConstructors[dimName](freeze(series, true), weave);
         draft.series = draft.series.map(s => {
           return replacementDim.imputeOtherSeriesWithThisState(s);
         });
