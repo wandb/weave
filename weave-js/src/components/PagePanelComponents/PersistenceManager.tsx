@@ -1,3 +1,5 @@
+import {useMutation as useApolloMutation} from '@apollo/client';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as globals from '@wandb/weave/common/css/globals.styles';
@@ -38,6 +40,7 @@ import {
   IconUp as IconUpUnstyled,
   IconWeaveLogo,
 } from '../Panel2/Icons';
+import {UPDATE_ARTIFACT_COLLECTION} from './graphql';
 import {
   useBranchPointFromURIString,
   usePreviousVersionFromURIString,
@@ -247,6 +250,10 @@ export const PersistenceManager: React.FC<{
     [nodeState, isAuthenticated]
   );
 
+  console.log({availableActions});
+  console.log({nodeState});
+  console.log({isAuthenticated});
+
   const headerRef = useRef<HTMLDivElement>(null);
   return (
     <MainHeaderWrapper ref={headerRef}>
@@ -380,6 +387,16 @@ const HeaderFileControls: React.FC<{
   const [actionDeleteOpen, setActionDeleteOpen] = useState(false);
   const [acting, setActing] = useState(false);
   const isLocal = maybeURI != null && isLocalURI(maybeURI);
+  const [updateArtifactCollection] = useApolloMutation(
+    UPDATE_ARTIFACT_COLLECTION
+  );
+  console.log({isLocal});
+  console.log({maybeURI});
+  console.log({branchPoint});
+  console.log({inputNode});
+  console.log({renameAction});
+  const boom = useNodeValue(inputNode);
+  console.log({boom});
   const entityProjectName = determineURISource(maybeURI, branchPoint);
   const {name: currName, version: currentVersion} =
     determineURIIdentifier(maybeURI);
@@ -598,7 +615,24 @@ const HeaderFileControls: React.FC<{
           actionName={renameAction}
           open={actionRenameOpen}
           onClose={() => setActionRenameOpen(false)}
-          onRename={newName => {
+          onRename={async newName => {
+            // TODO: what happens when changes are made?
+            // TODO: we probably want to check branchPoint.originalURI
+            // if (renameAction === 'rename_remote') {
+            //   try {
+            //     await updateArtifactCollection({
+            //       variables: {
+            //         artifactSequenceID: '', // TODO: fill it in
+            //         name: newName,
+            //       },
+            //     });
+            //   } catch (e) {
+            //     console.error('Failed to rename artifact collection.');
+            //     toast(
+            //       'Something went wrong while trying to rename this board.'
+            //     );
+            //   }
+            // }
             setActing(true);
             takeAction(renameAction, {name: newName}, () => {
               setActing(false);
