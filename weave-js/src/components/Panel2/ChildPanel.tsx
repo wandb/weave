@@ -148,6 +148,7 @@ export const initPanel = async (
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
     stackIdFilter: allowPanel,
+    // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
     excludePanelPanel: excludePanelPanel(stack),
   });
   if (id == null) {
@@ -229,6 +230,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     {
       allowedPanels: props.allowedPanels,
       stackIdFilter: allowPanel,
+    // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
       excludePanelPanel: excludePanelPanel(stack),
     }
   );
