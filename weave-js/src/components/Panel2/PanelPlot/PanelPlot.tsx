@@ -204,9 +204,9 @@ const useConfig = (
   const newConfig = useMemo(() => {
     return PlotState.setDefaultSeriesNames(
       PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
-      !!enableRedesignedPlotConfigEnabled
+      !!redesignedPlotConfigEnabled
     );
-  }, [propsConfig, inputNode, stack, enableRedesignedPlotConfigEnabled]);
+  }, [propsConfig, inputNode, stack, redesignedPlotConfigEnabled]);
 
   const defaultColNameStrippedConfig = useMemo(
     () =>
