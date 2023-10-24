@@ -242,7 +242,7 @@ export const ExpressionConfigField: React.FC<
         noBox={true}
         setExpression={props.setExpression}
         expr={props.expr}
-        liveUpdate={!dashEnabled}
+        liveUpdate={!sidebarConfigStylingEnabled}
       />
     </ThemeProvider>
   );

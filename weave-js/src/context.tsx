@@ -21,22 +21,31 @@ export interface WeaveFeatures {
   fullscreenMode?: boolean;
   betaFeatures: WeaveWBBetaFeatures;
   panelSettings?: Record<PanelSettingPanel, unknown>;
-  dashUi?: boolean;
-  // `clientEvalInUseNodeValueEnabled` was previously bound to `dashUi`, but has been refactored out.
-  // We should remove this flag once we're confident that the new behavior is stable.
+  // The following flags:
+  //
+  // * clientEvalInUseNodeValueEnabled
+  // * refinementInReactHooksDisabled
+  // * sidebarConfigStylingEnabled
+  // * errorBoundaryInPanelComp2Enabled
+  // * redesignedPlotConfigEnabled
+  //
+  // are all feature flags that were previously bound to `dashUi`, but have
+  // been refactored out. They are ALL instances of bad tech debt, and should
+  // be removed once we're confident that the new behavior is stable. In
+  // particular, we need to get rid of these to actually integrate Weave in
+  // the app. We need to systematically remove all of these flags. Some of
+  // them are easy to remove: for example, `redesignedPlotConfigEnabled`,
+  // while others will require UI work, like `sidebarConfigStylingEnabled` -
+  // this requires unifying the config bar for Weave panels in workspaces and
+  // reports with that of the weave homepage. Finally, some like
+  // `refinementInReactHooksDisabled` are particularly hard because the
+  // condition for the flag depends on more subtle concepts like whether or
+  // not a node is constructed in the react code.
   clientEvalInUseNodeValueEnabled?: boolean;
-  // `refinementInReactHooksDisabled` was previously bound to `dashUi`, but has been refactored out.
-  // We should remove this flag once we're confident that the new behavior is stable.
   refinementInReactHooksDisabled?: boolean;
-  // `sidebarConfigStylingEnabled` was previously bound to `dashUi`, but has been refactored out.
-  // We should remove this flag once we're confident that the new behavior is stable.
   sidebarConfigStylingEnabled?: boolean;
-  // `errorBoundaryInPanelComp2Enabled` was previously bound to `dashUi`, but has been refactored out.
-  // We should remove this flag once we're confident that the new behavior is stable.
   errorBoundaryInPanelComp2Enabled?: boolean;
-  // `enableRedesignedPlotConfigEnabled` was previously bound to `dashUi`, but has been refactored out.
-  // We should remove this flag once we're confident that the new behavior is stable.
-  enableRedesignedPlotConfigEnabled?: boolean;
+  redesignedPlotConfigEnabled?: boolean; // we might just want to use `sidebarConfigStylingEnabled` here.
 }
 
 export const ClientContext = React.createContext<ClientState>({
@@ -89,21 +98,26 @@ export const usePanelSettings = (type: PanelSettingPanel) => {
 };
 
 export const useWeaveClientEvalInUseNodeValueEnabled = () => {
+  // See comment on `WeaveFeatures` - we should not introduce more uses of this.
   return !!useContext(WeaveFeaturesContext).clientEvalInUseNodeValueEnabled;
 };
 
 export const useWeaveRefinementInReactHooksDisabled = () => {
+  // See comment on `WeaveFeatures` - we should not introduce more uses of this.
   return !!useContext(WeaveFeaturesContext).refinementInReactHooksDisabled;
 };
 
 export const useWeaveSidebarConfigStylingEnabled = () => {
+  // See comment on `WeaveFeatures` - we should not introduce more uses of this.
   return !!useContext(WeaveFeaturesContext).sidebarConfigStylingEnabled;
 };
 
 export const useWeaveErrorBoundaryInPanelComp2Enabled = () => {
+  // See comment on `WeaveFeatures` - we should not introduce more uses of this.
   return !!useContext(WeaveFeaturesContext).errorBoundaryInPanelComp2Enabled;
 };
 
 export const useWeaveRedesignedPlotConfigEnabled = () => {
-  return !!useContext(WeaveFeaturesContext).enableRedesignedPlotConfigEnabled;
+  // See comment on `WeaveFeatures` - we should not introduce more uses of this.
+  return !!useContext(WeaveFeaturesContext).redesignedPlotConfigEnabled;
 };

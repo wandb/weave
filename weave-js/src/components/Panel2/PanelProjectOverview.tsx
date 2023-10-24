@@ -316,6 +316,9 @@ const PanelProjectOverviewSimple: React.FC<
 const PanelProjectOverview: React.FC<
   PanelProjectOverviewProps & {isRoot?: boolean}
 > = props => {
+  if (false) {
+    return <PanelProjectOverviewNew {...props} />;
+  }
   return <PanelProjectOverviewSimple {...props} />;
 };
 
