@@ -37,10 +37,11 @@ export interface WeaveFeatures {
   // them are easy to remove: for example, `redesignedPlotConfigEnabled`,
   // while others will require UI work, like `sidebarConfigStylingEnabled` -
   // this requires unifying the config bar for Weave panels in workspaces and
-  // reports with that of the weave homepage. Finally, some like
+  // reports with that of the weave homepage (or at least setting the context
+  // var based on the sidebar styling itself, not `isDash`). Finally, some like
   // `refinementInReactHooksDisabled` are particularly hard because the
-  // condition for the flag depends on more subtle concepts like whether or
-  // not a node is constructed in the react code.
+  // condition for the flag depends on more subtle concepts like whether or not
+  // a node is constructed in the react code.
   clientEvalInUseNodeValueEnabled?: boolean;
   refinementInReactHooksDisabled?: boolean;
   sidebarConfigStylingEnabled?: boolean;
