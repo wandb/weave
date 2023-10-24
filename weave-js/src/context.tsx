@@ -88,10 +88,6 @@ export const usePanelSettings = (type: PanelSettingPanel) => {
   return useWeaveFeaturesContext().panelSettings?.[type] ?? {};
 };
 
-export const useWeaveDashUiEnable = () => {
-  return useContext(WeaveFeaturesContext).dashUi;
-};
-
 export const useWeaveClientEvalInUseNodeValueEnabled = () => {
   return !!useContext(WeaveFeaturesContext).clientEvalInUseNodeValueEnabled;
 };
