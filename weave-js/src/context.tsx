@@ -31,6 +31,9 @@ export interface WeaveFeatures {
   // `shouldUseSidebarConfigStyling` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
   shouldUseSidebarConfigStyling?: boolean;
+  // `injectErrorBoundaryInPanelComp2` was previously bound to `dashUi`, but has been refactored out.
+  // We should remove this flag once we're confident that the new behavior is stable.
+  injectErrorBoundaryInPanelComp2?: boolean;
 }
 
 export const ClientContext = React.createContext<ClientState>({
@@ -92,6 +95,10 @@ export const useWeaveSkipNodeRefinementInReactHooks = () => {
 
 export const useWeaveShouldUseSidebarConfigStyling = () => {
   return !!useContext(WeaveFeaturesContext).shouldUseSidebarConfigStyling;
+};
+
+export const useWeaveInjectErrorBoundaryInPanelComp2 = () => {
+  return !!useContext(WeaveFeaturesContext).injectErrorBoundaryInPanelComp2;
 };
 
 export const usePanelSettings = (type: PanelSettingPanel) => {
