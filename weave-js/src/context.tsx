@@ -42,11 +42,55 @@ export interface WeaveFeatures {
   // `refinementInReactHooksDisabled` are particularly hard because the
   // condition for the flag depends on more subtle concepts like whether or not
   // a node is constructed in the react code.
+  //
+  // `clientEvalInUseNodeValueEnabled` refactor suggestion: determine why this
+  // is presumably only usable in the weave app and not in main app. My hunch is
+  // that this is OK to have ON in the main app, but we need to verify. If so,
+  // just enable everywhere and remove the conditions. It might be only ok under
+  // the condition that we are using weave1 backend. If so, then we should
+  // change the caller's condition to be based on the weave1 backend.
   clientEvalInUseNodeValueEnabled?: boolean;
+  //
+  // `refinementInReactHooksDisabled` refactor suggestion: this one is hard. My
+  // belief is that we can safely disable refinement almost always (since
+  // ChildPanel and ExpressionEditor both refine their expressions before
+  // passing them on to child components). However, in the case that we
+  // construct the graph in react code itself (manually calling ops), then we
+  // actually need to refine. The problem is determining if a graph has an
+  // ancestor node that is manually constructed, or if it is constructed as part
+  // of the expression editor, and refined. In fact, i think this is currently
+  // buggy, but we don't show any panels in the weave app that have in-component
+  // graph construction so we get lucky. We should fix this, and then remove
+  // this flag.
   refinementInReactHooksDisabled?: boolean;
+  //
+  // `sidebarConfigStylingEnabled` refactor suggestion: This is easier.
+  // Essentially a number of config components are styled differently based on
+  // this flag. The weave app config bar is a sticky, full-height bar that has
+  // fixed width and scrolls internally. In contrast, the main app uses a
+  // floating modal that is unbounded in height. This difference creates
+  // inconsistencies in the styling of the config components. We should probably
+  // fix the modal config to have the same fixed width and scrolling behavior as
+  // the weave app, and then remove this flag.
   sidebarConfigStylingEnabled?: boolean;
+  //
+  // `errorBoundaryInPanelComp2Enabled` refactor suggestion: This one is
+  // interesting. In the main app, we have error boundaries at the boundary
+  // between the app and weave panels (ex. RootQueryPanel or ArtifactHomepage).
+  // In contrast, the Weave app puts error boundaries at each `PanelComp2`
+  // layer. The benefit of the app experience is that we more intelligently
+  // handle "undos" when an error occurs. This should not be hard to resolve,
+  // just need to take the time to do it.
   errorBoundaryInPanelComp2Enabled?: boolean;
-  redesignedPlotConfigEnabled?: boolean; // we might just want to use `sidebarConfigStylingEnabled` here.
+  //
+  // `redesignedPlotConfigEnabled` refactor suggestion: This one is easy. When
+  // refactoring panel plot, we were conservative and did not want to change the
+  // behavior of the main app. My reading though is that all the changes are
+  // valid and good. We should audit the callsites and make 1 of two changes for
+  // each one: 1) if the callsite effects the config, change it to
+  // `sidebarConfigStylingEnabled`; 2) if the callsite is something else, just
+  // remove it.
+  redesignedPlotConfigEnabled?: boolean;
 }
 
 export const ClientContext = React.createContext<ClientState>({
