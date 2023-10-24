@@ -19,6 +19,8 @@ export type PanelSettingPanel = 'JupyterViewer';
 export interface WeaveFeatures {
   actions?: boolean;
   fullscreenMode?: boolean;
+  betaFeatures: WeaveWBBetaFeatures;
+  panelSettings?: Record<PanelSettingPanel, unknown>;
   dashUi?: boolean;
   // `useNodeValueUsesClientEval` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
@@ -26,8 +28,9 @@ export interface WeaveFeatures {
   // `skipNodeRefinementInReactHooks` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
   skipNodeRefinementInReactHooks?: boolean;
-  betaFeatures: WeaveWBBetaFeatures;
-  panelSettings?: Record<PanelSettingPanel, unknown>;
+  // `shouldUseSidebarConfigStyling` was previously bound to `dashUi`, but has been refactored out.
+  // We should remove this flag once we're confident that the new behavior is stable.
+  shouldUseSidebarConfigStyling?: boolean;
 }
 
 export const ClientContext = React.createContext<ClientState>({
@@ -85,6 +88,10 @@ export const useWeaveUseNodeValueUsesClientEval = () => {
 
 export const useWeaveSkipNodeRefinementInReactHooks = () => {
   return !!useContext(WeaveFeaturesContext).skipNodeRefinementInReactHooks;
+};
+
+export const useWeaveShouldUseSidebarConfigStyling = () => {
+  return !!useContext(WeaveFeaturesContext).shouldUseSidebarConfigStyling;
 };
 
 export const usePanelSettings = (type: PanelSettingPanel) => {

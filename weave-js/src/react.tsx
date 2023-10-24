@@ -53,7 +53,6 @@ import {toWeaveType} from './components/Panel2/toWeaveType';
 import {
   ClientContext,
   useWeaveContext,
-  useWeaveDashUiEnable,
   useWeaveSkipNodeRefinementInReactHooks,
   useWeaveUseNodeValueUsesClientEval,
 } from './context';
