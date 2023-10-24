@@ -14,6 +14,7 @@ from . import context as _context
 from . import graph_client as _graph_client
 from . import graph_client_context as _graph_client_context
 from weave import monitoring as _monitoring
+from weave.monitoring import monitor as _monitor
 
 # exposed as part of api
 from . import weave_types as types
@@ -170,3 +171,18 @@ def ref(uri: str) -> _artifact_wandb.WandbArtifactRef:
         raise ValueError(f"Expected a wandb artifact ref, got {ref}")
     ref.type
     return ref
+
+
+import contextlib
+
+
+@contextlib.contextmanager
+def attributes(attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
+    cur_attributes = {**_monitor._attributes.get()}
+    cur_attributes.update(attributes)
+
+    token = _monitor._attributes.set(cur_attributes)
+    try:
+        yield
+    finally:
+        _monitor._attributes.reset(token)

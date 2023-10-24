@@ -92,11 +92,14 @@ export const RunsTable: FC<{
         status_code: call.status_code,
         timestamp: call.timestamp,
         latency: monthRoundedTime(call.summary.latency_s, true),
-        ..._.mapKeys(
-          _.omitBy(args, v => v == null),
-          (v, k) => {
-            return 'input_' + k;
-          }
+        ..._.mapValues(
+          _.mapKeys(
+            _.omitBy(args, v => v == null),
+            (v, k) => {
+              return 'input_' + k;
+            }
+          ),
+          v => (_.isPlainObject(v) ? v : JSON.stringify(v))
         ),
         ..._.mapValues(
           _.mapKeys(
@@ -118,6 +121,10 @@ export const RunsTable: FC<{
         ..._.mapKeys(
           flattenObject(call.feedback ?? {}),
           (v, k) => 'feedback.' + k
+        ),
+        ..._.mapKeys(
+          flattenObject(call.attributes ?? {}),
+          (v, k) => 'attributes.' + k
         ),
       };
     });
@@ -154,6 +161,44 @@ export const RunsTable: FC<{
     const row0 = spans[0];
     if (row0 == null) {
       return {cols: [], colGroupingModel: []};
+    }
+
+    let attributesKeys: {[key: string]: true} = {};
+    spans.forEach(span => {
+      for (const [k, v] of Object.entries(flattenObject(span.attributes!))) {
+        if (v != null && k !== '_keys') {
+          attributesKeys[k] = true;
+        }
+      }
+    });
+    // sort shallowest keys first
+    attributesKeys = _.fromPairs(
+      Object.entries(attributesKeys).sort((a, b) => {
+        const aDepth = a[0].split('.').length;
+        const bDepth = b[0].split('.').length;
+        return aDepth - bDepth;
+      })
+    );
+
+    const attributesOrder = Object.keys(attributesKeys);
+    const attributesGrouping = buildTree(attributesOrder, 'attributes');
+    colGroupingModel.push(attributesGrouping);
+    for (const key of attributesOrder) {
+      cols.push({
+        field: 'attributes.' + key,
+        headerName: key.split('.').slice(-1)[0],
+        renderCell: params => {
+          if (
+            typeof params.row['attributes.' + key] === 'string' &&
+            params.row['attributes.' + key].startsWith('wandb-artifact:///')
+          ) {
+            return (
+              <SmallRef objRef={parseRef(params.row['attributes.' + key])} />
+            );
+          }
+          return params.row['attributes.' + key];
+        },
+      });
     }
 
     const inputOrder =

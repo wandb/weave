@@ -53,7 +53,7 @@ class WeaveIter(typing.Generic[WeaveIterObjectType]):
             raise ValueError("index must be int or slice")
 
     def __iter__(self) -> typing.Iterator[WeaveIterObjectType]:
-        page_size = 10
+        page_size = 100
         page_num = 0
         with context_state.lazy_execution():
             count = weave_internal.use(self.node.count())

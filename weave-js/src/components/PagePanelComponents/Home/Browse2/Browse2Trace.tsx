@@ -151,7 +151,10 @@ export const Browse2Trace: FC<{
 
   return (
     <Grid container spacing={2} alignItems="flex-start">
-      <Grid xs={3} item>
+      <Grid
+        xs={3}
+        item
+        sx={{height: '100vh', overflowY: 'auto', position: 'sticky', top: 0}}>
         <Paper>
           <VerticalTraceView
             traceSpans={traceSpans.result}
@@ -161,7 +164,10 @@ export const Browse2Trace: FC<{
           />
         </Paper>
       </Grid>
-      <Grid xs={9} item>
+      <Grid
+        xs={9}
+        item
+        sx={{height: '100vh', overflowY: 'auto', position: 'sticky', top: 0}}>
         {selectedSpanId != null && (
           <Paper>
             <Tabs value={tabId} onChange={handleTabChange}>

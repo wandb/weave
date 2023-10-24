@@ -38,14 +38,34 @@ class Run:
         return self._attrs["status_code"]
 
     @property
+    def attributes(self) -> dict[str, typing.Any]:
+        if self._attrs.get("attributes") == None:
+            return {}
+        return {k: v for k, v in self._attrs["attributes"].items() if v != None}
+
+    @property
     def inputs(self) -> dict[str, typing.Any]:
-        return {k: self._attrs["inputs"][k] for k in self._attrs["inputs"]["_keys"]}
+        keys = self._attrs["inputs"].get("_keys")
+        if keys is None:
+            keys = [
+                k
+                for k in self._attrs["inputs"].keys()
+                if self._attrs["inputs"][k] != None
+            ]
+        return {k: self._attrs["inputs"][k] for k in keys}
 
     @property
     def output(self) -> typing.Any:
         if self.status_code != "SUCCESS":
             return None
-        output = {k: self._attrs["output"][k] for k in self._attrs["output"]["_keys"]}
+        keys = self._attrs["output"].get("_keys")
+        if keys is None:
+            keys = [
+                k
+                for k in self._attrs["output"].keys()
+                if self._attrs["output"][k] != None
+            ]
+        output = {k: self._attrs["output"][k] for k in keys}
         if "_result" in output:
             return output["_result"]
         return output

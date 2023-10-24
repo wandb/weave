@@ -176,6 +176,10 @@ export const callsTableSelect = (stNode: Node) => {
           }),
           rhs: constNumber(1000),
         }),
+        attributes: opPick({
+          obj: row,
+          key: constString('attributes'),
+        } as any) as any,
         summary: opPick({
           obj: row,
           key: constString('summary'),

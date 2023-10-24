@@ -57,6 +57,11 @@ class Registry:
             ref = storage.save(op, name=op.name + ":latest")
             version = ref.version
             location = ref.artifact.path_uri("obj")
+        if location:
+            # PR: Something is f'd and we don't get the right "obj" on location
+            # TODO: Fix
+            location.path = "obj"
+
         version = location.version if location is not None else None
         op.version = version
         op.location = location

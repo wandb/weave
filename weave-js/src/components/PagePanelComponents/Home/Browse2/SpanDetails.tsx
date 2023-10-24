@@ -78,6 +78,32 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
           </Typography>
         )}
       </div>
+      {call.attributes != null && (
+        <div style={{marginBottom: 12}}>
+          <Typography variant="h6" gutterBottom>
+            Attributes
+          </Typography>
+          <Box pl={2} pr={2}>
+            <ObjectView
+              obj={_.fromPairs(
+                Object.entries(call.attributes).filter(([k, v]) => v != null)
+              )}
+            />
+          </Box>
+        </div>
+      )}
+      <div style={{marginBottom: 12}}>
+        <Typography variant="h6" gutterBottom>
+          Summary
+        </Typography>
+        <Box pl={2} pr={2}>
+          <ObjectView
+            obj={_.fromPairs(
+              Object.entries(call.summary).filter(([k, v]) => v != null)
+            )}
+          />
+        </Box>
+      </div>
       <div style={{marginBottom: 24}}>
         <Typography variant="h5" gutterBottom>
           Inputs
@@ -106,32 +132,6 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
               )}
             />
           )}
-        </Box>
-      </div>
-      {call.attributes != null && (
-        <div style={{marginBottom: 12}}>
-          <div>
-            <b>Attributes</b>
-          </div>
-          <Box pl={2} pr={2}>
-            <ObjectView
-              obj={_.fromPairs(
-                Object.entries(call.attributes).filter(([k, v]) => v != null)
-              )}
-            />
-          </Box>
-        </div>
-      )}
-      <div style={{marginBottom: 12}}>
-        <Typography variant="h6" gutterBottom>
-          Summary
-        </Typography>
-        <Box pl={2} pr={2}>
-          <ObjectView
-            obj={_.fromPairs(
-              Object.entries(call.summary).filter(([k, v]) => v != null)
-            )}
-          />
         </Box>
       </div>
     </div>

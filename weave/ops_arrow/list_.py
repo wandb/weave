@@ -487,6 +487,23 @@ def unsafe_awl_construction(reason: str):
 ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 
+def dict_of_columns_to_awl(d: dict[str, typing.Any]) -> "ArrowWeaveList":
+    from . import constructors
+
+    cols = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            cols[k] = dict_of_columns_to_awl(v)
+        elif isinstance(v, list):
+            cols[k] = ArrowWeaveList(v)
+        else:
+            cols[k] = v
+    res = constructors.vectorized_container_constructor_preprocessor(cols)
+    arrow_data = pa.StructArray.from_arrays(res.arrays, list(cols.keys()))
+    object_type = types.TypedDict(res.prop_types)
+    return ArrowWeaveList(arrow_data, object_type)
+
+
 class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     _arrow_data: pa.Array
     object_type: types.Type
@@ -506,11 +523,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         # Note we combine chunks here, to make the internal interface easy
         # to use. In the future we could refactor to retain chunked form.
         if isinstance(arrow_data, dict):
-            res = constructors.vectorized_container_constructor_preprocessor(arrow_data)
-            self._arrow_data = pa.StructArray.from_arrays(
-                res.arrays, list(arrow_data.keys())
-            )
-            object_type = types.TypedDict(res.prop_types)
+            awl = dict_of_columns_to_awl(arrow_data)
+            self._arrow_data = awl._arrow_data
+            object_type = awl.object_type
         elif isinstance(arrow_data, list):
             loaded = convert.to_arrow(arrow_data)
             self._arrow_data = loaded._arrow_data
