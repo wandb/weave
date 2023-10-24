@@ -34,6 +34,9 @@ export interface WeaveFeatures {
   // `injectErrorBoundaryInPanelComp2` was previously bound to `dashUi`, but has been refactored out.
   // We should remove this flag once we're confident that the new behavior is stable.
   injectErrorBoundaryInPanelComp2?: boolean;
+  // `enableRedesignedPlotConfig` was previously bound to `dashUi`, but has been refactored out.
+  // We should remove this flag once we're confident that the new behavior is stable.
+  enableRedesignedPlotConfig?: boolean;
 }
 
 export const ClientContext = React.createContext<ClientState>({
@@ -81,6 +84,10 @@ export const useWeaveFeaturesContext = () => {
   return useContext(WeaveFeaturesContext);
 };
 
+export const usePanelSettings = (type: PanelSettingPanel) => {
+  return useWeaveFeaturesContext().panelSettings?.[type] ?? {};
+};
+
 export const useWeaveDashUiEnable = () => {
   return useContext(WeaveFeaturesContext).dashUi;
 };
@@ -101,6 +108,6 @@ export const useWeaveInjectErrorBoundaryInPanelComp2 = () => {
   return !!useContext(WeaveFeaturesContext).injectErrorBoundaryInPanelComp2;
 };
 
-export const usePanelSettings = (type: PanelSettingPanel) => {
-  return useWeaveFeaturesContext().panelSettings?.[type] ?? {};
+export const useWeaveEnableRedesignedPlotConfig = () => {
+  return !!useContext(WeaveFeaturesContext).enableRedesignedPlotConfig;
 };
