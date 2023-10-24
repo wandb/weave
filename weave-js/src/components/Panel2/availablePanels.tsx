@@ -257,7 +257,7 @@ export function getPanelStacksForType(
 
     if (opts.excludePanelPanel) {
       handlerStacks = handlerStacks.filter(
-        hs => !PanelLib.getStackIdAndName(hs).id.endsWith('panel')
+        hs => !(PanelLib.getStackIdAndName(hs).id =='panel')
       );
     }
 
@@ -427,3 +427,7 @@ export function getTransformPanel(panelId: string) {
 export function panelSpecById(panelId: string) {
   return PanelRegistry.PanelSpecs().find(p => p.id === panelId);
 }
+
+// PanelPanel is currently not able to be nested within othe childpanel
+// based on stack, exclude panelpanel if nested
+export const excludePanelPanel = (stack: PanelStack[]) => stack.length > 0;
