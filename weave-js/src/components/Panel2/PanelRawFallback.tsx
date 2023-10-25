@@ -5,13 +5,21 @@ import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import * as S from './PanelString.styles';
 import {TooltipTrigger} from './Tooltip';
+import {constNone, isAssignableTo} from '@wandb/weave/core';
 
 const inputType = 'any' as const;
 
 type PanelRawFallbackProps = Panel2.PanelProps<typeof inputType>;
 
 export const PanelRawFallback: React.FC<PanelRawFallbackProps> = props => {
-  const inputValue = CGReact.useNodeValue(props.input);
+  const safeInput = useMemo(() => {
+    if (isAssignableTo(props.input.type, 'invalid')) {
+      return constNone();
+    }
+    return props.input;
+  }, [props.input]);
+
+  const inputValue = CGReact.useNodeValue(safeInput);
   const loading = inputValue.loading;
 
   const fullStr = useMemo(() => {
