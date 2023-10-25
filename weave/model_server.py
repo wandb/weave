@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from fastapi import FastAPI
 import weave
 
+model = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

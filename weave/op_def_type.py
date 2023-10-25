@@ -145,12 +145,16 @@ class OpDefType(types.Type):
         # module_path = ".".join(parts)
 
         sys.path.insert(0, os.path.abspath(module_dir))
-        with context_state.loading_op_location(artifact.uri_obj):
+        with context_state.loading_op_location(artifact.uri_obj.with_path(name)):
             # This has a side effect of registering the op
             # PR: Return None if we can't load the op?
             try:
                 mod = __import__(import_name)
-            except:
+            except Exception as e:
+                print("Op loading exception. This might be fine!")
+                import traceback
+
+                traceback.print_exc()
                 return None
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from

@@ -1653,6 +1653,8 @@ def type_is_variable(t: Type) -> bool:
         return True
     elif isinstance(t, UnionType):
         return True
+    elif isinstance(t, ObjectType):
+        return True
     elif isinstance(t, Dict):
         return True
     elif isinstance(t, TypedDict):
