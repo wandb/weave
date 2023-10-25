@@ -24,6 +24,10 @@ class GraphClient:
     entity_name: str
     project_name: str
 
+    @property
+    def entity_project(self) -> str:
+        return f"{self.entity_name}/{self.project_name}"
+
     @functools.cached_property
     def runs_st(self) -> monitoring.StreamTable:
         return monitoring.StreamTable(f"{self.entity_name}/{self.project_name}/stream")

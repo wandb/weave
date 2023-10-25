@@ -1,4 +1,6 @@
+import time
 import typing
+import os
 import dataclasses
 from . import graph as _graph
 from . import graph_mapper as _graph_mapper
@@ -10,7 +12,9 @@ from . import trace as _trace
 from . import weave_internal as _weave_internal
 from . import errors as _errors
 from . import ops as _ops
+from . import util as _util
 from . import context as _context
+from . import context_state as _context_state
 from . import graph_client as _graph_client
 from . import graph_client_context as _graph_client_context
 from weave import monitoring as _monitoring
@@ -186,3 +190,43 @@ def attributes(attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
         yield
     finally:
         _monitor._attributes.reset(token)
+
+
+def serve(
+    model_ref: _artifact_wandb.WandbArtifactRef,
+    method_name: typing.Optional[str] = None,
+    port: int = 9996,
+    thread: bool = False,
+) -> typing.Optional[str]:
+    import uvicorn
+    from .serve_fastapi import object_method_app
+
+    client = _graph_client_context.require_graph_client()
+
+    print(f"Serving {model_ref}")
+    print(f"Server docs at http://localhost:{port}/docs")
+    os.environ["PROJECT_NAME"] = client.entity_project
+    os.environ["MODEL_REF"] = str(model_ref)
+
+    wandb_api_ctx = _wandb_api.get_wandb_api_context()
+    app = object_method_app(model_ref, method_name=method_name)
+    trace_attrs = _monitor._attributes.get()
+
+    def run():
+        with _wandb_api.wandb_api_context(wandb_api_ctx):
+            with _context_state.eager_execution():
+                with _context.execution_client():
+                    with attributes(trace_attrs):
+                        uvicorn.run(app, host="0.0.0.0", port=port)
+
+    if _util.is_notebook():
+        thread = True
+    if thread:
+        from threading import Thread
+
+        t = Thread(target=run, daemon=True)
+        t.start()
+        time.sleep(1)
+        return "http://localhost:%d" % port
+    else:
+        run()
