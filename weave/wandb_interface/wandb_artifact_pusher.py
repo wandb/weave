@@ -11,6 +11,53 @@ from wandb.sdk.interface.interface import InterfaceBase
 
 from weave import wandb_client_api
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+from wandb.apis import public as wb_public
+
+
+def artifact_commithash_by_digest(
+    entity_name: str, project_name: str, artifact_name: str, digest: str
+) -> typing.Optional[str]:
+    query = wb_public.gql(
+        """
+    query ArtifactVersionFromDigest(
+        $entityName: String!,
+        $projectName: String!,
+        $artName: String!,
+        $digest: String!,
+    ) {
+        project(name: $projectName, entityName: $entityName) {
+            artifactCollection(name: $artName) {
+                artifactMembership(aliasName: $digest) {
+                    commitHash
+                    artifact {
+                        id
+                    }
+                }
+            }
+        }
+    }
+    """
+    )
+    res = wandb_client_api.wandb_public_api().client.execute(
+        query,
+        # variable_values={"id": hex_to_b64_id(server_id)},
+        variable_values={
+            "entityName": entity_name,
+            "projectName": project_name,
+            "artName": artifact_name,
+            "digest": digest,
+        },
+    )
+    project = res.get("project")
+    if project is None:
+        return None
+    artifact_collection = project.get("artifactCollection")
+    if artifact_collection is None:
+        return None
+    artifact_membership = artifact_collection.get("artifactMembership")
+    if artifact_membership is None:
+        return None
+    return artifact_membership.get("commitHash")
 
 
 @dataclasses.dataclass
@@ -44,6 +91,23 @@ def write_artifact_to_wandb(
     # must provide an entity name.
     entity_name = entity_name or wandb_client_api.wandb_public_api().default_entity
 
+    # Finalize the artifact, and return early if the digest already exists on the
+    # server.
+    artifact.finalize()
+    existing_commit_hash = artifact_commithash_by_digest(
+        entity_name=entity_name,
+        project_name=project_name,
+        artifact_name=artifact_name,
+        digest=artifact.digest,
+    )
+    if existing_commit_hash is not None:
+        return WeaveWBArtifactURIComponents(
+            entity_name=entity_name,
+            project_name=project_name,
+            artifact_name=artifact_name,
+            version_str=existing_commit_hash,
+        )
+
     if _lite_run is None:
         lite_run = InMemoryLazyLiteRun(
             entity_name, project_name, group="weave_artifact_pushers", _hide_in_wb=True
@@ -58,8 +122,6 @@ def write_artifact_to_wandb(
         project_name=lite_run.run.project,
     )
 
-    # Finalize the artifact and construct the manifest.
-    artifact.finalize()
     manifest_dict = _manifest_json_from_proto(
         InterfaceBase()._make_artifact(artifact).manifest  # type: ignore[abstract, attr-defined]
     )
