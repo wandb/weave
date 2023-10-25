@@ -30,6 +30,9 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
+[project.scripts]
+weave = "weave.cli:cli"
+
 [project.urls]
 Company = "https://wandb.com"
 Documentation = "https://docs.wandb.com/"

@@ -20,6 +20,8 @@ aioprocessing>=2.0.1
 janus>=1.0.0
 analytics-python>=1.2.9
 typeguard>=4.1.3
+# Used for the cli
+Click>=7.1,!=8.0.0  # copied from wandb library
 # Used for domain ops
 graphql-core>3
 # Used for debugging

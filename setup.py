@@ -107,7 +107,4 @@ class Sdist(sdist):  # type: ignore
 
 setup(
     cmdclass={"build": Build, "editable_wheel": EditableWheel, "sdist": Sdist},
-    entry_points={
-        "console_scripts": ["weave = weave.__main__:main"],
-    },
 )
