@@ -27,7 +27,7 @@ type ResetRequestType = {
   resolve: () => void;
 };
 
-const POLL_INTERVAL = 15000;
+const POLL_INTERVAL = 15_000;
 
 export class BasicClient implements Client {
   readonly opStore: OpStore;
@@ -215,6 +215,11 @@ export class BasicClient implements Client {
     this.localStorageLRU.del(observableId);
     return Promise.resolve();
   }
+
+  public resetServerCacheKey(): Promise<void> {
+    this.server.refreshBackendCacheKey()
+    return Promise.resolve();
+  } 
 
   private scheduleRequest() {
     if (this.nextRequestTimer != null) {

@@ -22,6 +22,8 @@ import {
   constNodeUnsafe,
   dereferenceAllVars,
   isNodeOrVoidNode,
+  isOutputNode,
+  isVoidNode,
   NodeOrVoidNode,
   pushFrame,
   Stack,
@@ -71,6 +73,7 @@ import {useUpdateConfig2} from './PanelComp';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {inJupyterCell} from '../PagePanelComponents/util';
 import {usePagePanelControlRequestAction} from '../PagePanelContext';
+import {useWeaveAppMode} from '@wandb/weave/context';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -195,6 +198,7 @@ export const Group = styled.div<{
     p.isVarBar &&
     css`
       border-right: 1px solid ${GRAY_350};
+      border-left: 1px solid ${GRAY_350};
       .edit-bar {
         border-bottom: none;
         border-top: 1px solid ${GRAY_350};
@@ -204,6 +208,7 @@ export const Group = styled.div<{
       > :first-child .edit-bar {
         border-top: none;
       }
+      background-color: white;
     `}
 
   ${props => props.compStyle}
@@ -757,6 +762,18 @@ const useSectionConfig = (
   return {gridConfig, updateGridConfig2};
 };
 
+const shouldHideExpression = (node: NodeOrVoidNode): boolean => {
+  if (isOutputNode(node)) {
+    if (node.fromOp.name === 'get') {
+      return true;
+    } else {
+      return _.some(Object.values(node.fromOp.inputs), shouldHideExpression);
+    }
+  } else {
+    return isVoidNode(node);
+  }
+};
+
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {stack, path: groupPath} = usePanelContext();
@@ -907,6 +924,39 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const isMain = _.isEqual(groupPath, [`main`]);
 
   const inJupyter = inJupyterCell();
+  const appMode = useWeaveAppMode();
+  const showAddPanelBar = !inJupyter && config.enableAddPanel && !appMode;
+
+  // Super hack
+  const configItemEntries = React.useMemo(() => {
+    const entries = Object.entries(config.items);
+    const keys = Object.keys(config.items);
+
+    if (appMode) {
+      if (_.isEqual(['sidebar', 'main'], keys)) {
+        if (appMode.showControls) {
+          // Reverse the order of the entries so that the sidebar is second
+          return Object.entries({
+            main: config.items.main,
+            sidebar: config.items.sidebar,
+          });
+        }
+        return Object.entries({
+          main: config.items.main,
+        });
+      } else if (isVarBar) {
+        console.log({entries});
+        return entries.filter(
+          ([key, val]) =>
+            key !== 'source_data' &&
+            (isNodeOrVoidNode(val) ||
+              val?.id !== 'Expression' ||
+              !shouldHideExpression(val.input_node))
+        );
+      }
+    }
+    return entries;
+  }, [appMode, config.items, isVarBar]);
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
@@ -916,7 +966,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           height: !isMain ? '100%' : undefined,
           backgroundColor: isMain ? MOON_50 : undefined,
         }}>
-        {!inJupyter && config.enableAddPanel && (
+        {showAddPanelBar && (
           <ActionBar>
             <Button
               variant="ghost"
@@ -934,7 +984,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           updateConfig2={updateGridConfig2}
           renderPanel={renderSectionPanel}
         />
-        {!inJupyter && config.enableAddPanel != null && (
+        {showAddPanelBar && (
           <AddPanelBarContainer ref={addPanelBarRef}>
             <AddPanelBar onClick={handleAddPanel}>
               <IconAddNew />
@@ -974,7 +1024,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       layered={config.layoutMode === 'layer'}
       preferHorizontal={config.layoutMode === 'horizontal'}
       compStyle={config.style}>
-      {Object.entries(config.items).map(([name, item]) => {
+      {configItemEntries.map(([name, item]) => {
         const childPanelConfig = getFullChildPanel(item).config;
         // Hacky: pull width up from child to here.
         // TODO: fix
@@ -987,6 +1037,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         if (config.panelInfo?.[name]?.hidden) {
           return null;
         }
+
         return (
           <GroupItem
             key={name}
@@ -998,7 +1049,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           </GroupItem>
         );
       })}
-      {config.enableAddPanel &&
+      {showAddPanelBar &&
         (isVarBar ? (
           <AddVarButton onClick={handleAddPanel}>
             New variable

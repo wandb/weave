@@ -22,6 +22,9 @@ export interface WeaveFeatures {
   dashUi?: boolean;
   betaFeatures: WeaveWBBetaFeatures;
   panelSettings?: Record<PanelSettingPanel, unknown>;
+  appMode?: {
+    showControls?: boolean;
+  };
 }
 
 export const ClientContext = React.createContext<ClientState>({
@@ -75,4 +78,8 @@ export const useWeaveDashUiEnable = () => {
 
 export const usePanelSettings = (type: PanelSettingPanel) => {
   return useWeaveFeaturesContext().panelSettings?.[type] ?? {};
+};
+
+export const useWeaveAppMode = () => {
+  return useWeaveFeaturesContext().appMode;
 };

@@ -10,4 +10,5 @@ export interface Server {
   ): Promise<any[]>;
   // subscribe(payload: BatchedGraphs): ZenObservable.SubscriptionObserver<any>[];
   debugMeta(): {id: string} & {[prop: string]: any};
+  refreshBackendCacheKey(windowSizeMs?: number): void;
 }

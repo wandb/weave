@@ -97,7 +97,7 @@ const numberOfHeaders = 1;
 const headerHeight = 30;
 const footerHeight = 25;
 const rowHeightSettings = {
-  [RowSize.Small]: 30,
+  [RowSize.Small]: 25,
   [RowSize.Medium]: 60,
   [RowSize.Large]: 120,
   [RowSize.XLarge]: 240,
@@ -482,6 +482,52 @@ const PanelTableInner: React.FC<
   const downloadDataAsCSV = useCallback(() => {
     downloadCSV(rowsNode, tableState, weave, stack);
   }, [rowsNode, stack, tableState, weave]);
+
+  // // PRELOAD EXPERIMENT
+  // useEffect(() => {
+  //   const state = {
+  //     valid: true,
+  //   };
+  //   const doLoad = async () => {
+  //     console.log('PRELOAD Start');
+  //     const numPagesAhead = 1;
+  //     const allProms = _.range(rowsPerPage * (numPagesAhead + 1)).flatMap(
+  //       val => {
+  //         const rowNode = opIndex({
+  //           arr: rowsNode,
+  //           index: constNumber(adjustedIndexOffset + val),
+  //         });
+  //         const cellNodes = Object.values(tableState.columnSelectFunctions).map(
+  //           selectFunction => {
+  //             const cellNode = weave.callFunction(selectFunction, {
+  //               row: rowNode,
+  //             });
+  //             // return cellNode;
+  //             // if (state.valid) {
+  //             console.log('PRELOADING', cellNode);
+  //             return weave.client.query(cellNode);
+  //             // }
+  //           }
+  //         );
+  //         return cellNodes;
+  //       }
+  //     );
+  //     const res = await Promise.all(allProms);
+  //     console.log('PRELOAD DONE', res);
+  //   };
+  //   setTimeout(() => {
+  //     doLoad();
+  //   }, 1000);
+  //   return () => {
+  //     state.valid = false;
+  //   };
+  // }, [
+  //   rowsPerPage,
+  //   rowsNode,
+  //   adjustedIndexOffset,
+  //   tableState.columnSelectFunctions,
+  //   weave,
+  // ]);
 
   const headerRendererForColumn = useCallback(
     (colId: string, {headerIndex}: any) => {

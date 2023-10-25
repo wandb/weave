@@ -90,6 +90,8 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                 <PanelBankSectionComponent
                   panelBankWidth={panelBankWidth}
                   panelBankHeight={panelBankHeight}
+                  // gridItemMargin={[0, 0]}
+                  gridContainerPadding={[16, 16]}
                   panelBankSectionConfigRef={config}
                   updateConfig={updateConfig2}
                   activePanelRefs={config.panels}

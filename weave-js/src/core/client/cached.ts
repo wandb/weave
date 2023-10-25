@@ -36,13 +36,14 @@ export class CachedClient implements Client {
     // on screen will not cause a re-query, but will instead use the
     // existing subscription for up to 30 seconds!
 
-    if (this.cache.has(node)) {
-      return this.cache.get(node).obs;
-    }
+    // HACKS: Removing this cache
+    // if (this.cache.has(node)) {
+    //   return this.cache.get(node).obs;
+    // }
     const obs = this.client.subscribe(node);
-    const sub = obs.subscribe(res => {});
+    // const sub = obs.subscribe(res => {});
 
-    this.cache.set(node, {obs, sub}, 30);
+    // this.cache.set(node, {obs, sub}, 30);
 
     return obs;
   }
@@ -107,6 +108,10 @@ export class CachedClient implements Client {
     return this.client.clearCacheForNode(node).then(() => {
       return this.cache.invalidate(node);
     });
+  }
+
+  public resetServerCacheKey(): Promise<void> {
+    return this.client.resetServerCacheKey();
   }
 
   private onDispose(key: string, value: CachedNode): void {

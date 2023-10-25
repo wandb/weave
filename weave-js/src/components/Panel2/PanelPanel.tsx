@@ -13,7 +13,7 @@ import React, {
 import {useReducer} from 'reinspect';
 
 import _ from 'lodash';
-import {useWeaveContext} from '../../context';
+import {useWeaveAppMode, useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
 import {consoleLog} from '../../util';
@@ -510,6 +510,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const loaded = useRef(false);
   const panelQuery = CGReact.useNodeValue(props.input);
   const {updateInput} = props;
+  const appMode = useWeaveAppMode();
   const updateServerPanel = useUpdateServerPanel(
     props.input,
     updateInput as any
@@ -526,8 +527,11 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
           type: 'init',
           client: weave.client,
           root: loadedPanel,
-          persist: (newRoot: ChildPanelFullConfig) =>
-            updateServerPanel(newRoot),
+          persist: (newRoot: ChildPanelFullConfig) => {
+            if (!appMode) {
+              updateServerPanel(newRoot);
+            }
+          },
         });
 
         // Asynchronously refine all the expressions in the document.
@@ -565,6 +569,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
       return;
     }
   }, [
+    appMode,
     dispatch,
     panelQuery.loading,
     panelQuery.result,
