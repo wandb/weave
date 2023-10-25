@@ -6,6 +6,7 @@ import {
   list,
   listObjectType,
   nullableTaggableValue,
+  Stack,
   Type,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
@@ -430,4 +431,4 @@ export function panelSpecById(panelId: string) {
 
 // PanelPanel is currently not able to be nested within othe childpanel
 // based on stack, exclude panelpanel if nested
-export const excludePanelPanel = (stack: PanelStack[]) => stack.length > 0;
+export const excludePanelPanel = (stack: Stack) => stack.length > 0;
