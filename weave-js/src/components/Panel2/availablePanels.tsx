@@ -257,7 +257,7 @@ export function getPanelStacksForType(
 
     if (opts.excludePanelPanel) {
       handlerStacks = handlerStacks.filter(
-        hs => !(PanelLib.getStackIdAndName(hs).id ==='panel')
+        hs => !(PanelLib.getStackIdAndName(hs).id === 'panel')
       );
     }
 

@@ -230,7 +230,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     {
       allowedPanels: props.allowedPanels,
       stackIdFilter: allowPanel,
-    // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
+      // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
       excludePanelPanel: excludePanelPanel(stack),
     }
   );
