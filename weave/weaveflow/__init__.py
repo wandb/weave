@@ -7,4 +7,5 @@ from .evaluate import *
 from .model_eval import *
 
 from .openai import *
+from .anyscale import *
 from .huggingface import *
