@@ -10,6 +10,10 @@ import {
   isConstNode,
   isOutputNode,
   mapNodes,
+  opRootProject,
+  opGet,
+  constString,
+  opProjectArtifact,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
@@ -250,9 +254,9 @@ export const PersistenceManager: React.FC<{
     [nodeState, isAuthenticated]
   );
 
-  console.log({availableActions});
-  console.log({nodeState});
-  console.log({isAuthenticated});
+  console.log({maybeURI});
+  const inputNode = props.inputNode;
+  console.log({inputNode});
 
   const headerRef = useRef<HTMLDivElement>(null);
   return (
@@ -417,6 +421,27 @@ const HeaderFileControls: React.FC<{
   const inputType = useNodeWithServerType(inputNode).result?.type;
   const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
 
+  const entityName = useMemo(
+    () => entityProjectName?.entity ?? '',
+    [entityProjectName]
+  );
+
+  const projectName = useMemo(
+    () => entityProjectName?.project ?? '',
+    [entityProjectName]
+  );
+
+  const artifactNode = useMemo(() => {
+    return opProjectArtifact({
+      project: opRootProject({
+        entityName: constString(entityName),
+        projectName: constString(projectName),
+      }),
+      artifactName: constString(currName ?? ''),
+    } as any);
+  }, [entityProjectName, currName, currentVersion]);
+  const artifactNodeValue = useNodeValue(artifactNode);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if ((isMac && !e.metaKey) || (!isMac && !e.ctrlKey)) {
@@ -466,7 +491,7 @@ const HeaderFileControls: React.FC<{
             onClick={() => {
               setAnchorFileEl(headerEl);
             }}>
-            {entityProjectName.entity}/{entityProjectName.project}/
+            {entityName}/{projectName}/
           </HeaderCenterControlsSecondary>
         )}
         <HeaderCenterControlsPrimary
@@ -618,21 +643,30 @@ const HeaderFileControls: React.FC<{
           onRename={async newName => {
             // TODO: what happens when changes are made?
             // TODO: we probably want to check branchPoint.originalURI
-            // if (renameAction === 'rename_remote') {
-            //   try {
-            //     await updateArtifactCollection({
-            //       variables: {
-            //         artifactSequenceID: '', // TODO: fill it in
-            //         name: newName,
-            //       },
-            //     });
-            //   } catch (e) {
-            //     console.error('Failed to rename artifact collection.');
-            //     toast(
-            //       'Something went wrong while trying to rename this board.'
-            //     );
-            //   }
-            // }
+            if (renameAction === 'rename_remote') {
+              const artifactSequenceID =
+                !artifactNodeValue.loading && artifactNodeValue.result
+                  ? artifactNodeValue.result.id
+                  : '';
+              try {
+                await updateArtifactCollection({
+                  variables: {
+                    artifactSequenceID,
+                    name: newName,
+                  },
+                });
+              } catch (e) {
+                console.error('Failed to rename artifact collection.');
+                toast(
+                  'Something went wrong while trying to rename this board.'
+                );
+              }
+              // Refresh the board
+              const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
+              updateNode(opGet({uri: constString(uri)}));
+              setActionRenameOpen(false);
+              return;
+            }
             setActing(true);
             takeAction(renameAction, {name: newName}, () => {
               setActing(false);
