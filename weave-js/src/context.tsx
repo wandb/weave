@@ -21,6 +21,8 @@ export interface WeaveFeatures {
   fullscreenMode?: boolean;
   betaFeatures: WeaveWBBetaFeatures;
   panelSettings?: Record<PanelSettingPanel, unknown>;
+  // Deprecated. Do not introduce new uses of this flag.
+  dashUi?: boolean;
   // The following flags:
   //
   // * clientEvalInUseNodeValueEnabled
