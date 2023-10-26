@@ -78,6 +78,9 @@ type Query {
 
 type Mutation {
   upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
+  deleteArtifactSequence(
+    input: DeleteArtifactSequenceInput!
+  ): DeleteArtifactCollectionPayload
 }
 
 scalar DateTime
@@ -629,6 +632,16 @@ input UpsertViewInput {
 type UpsertViewPayload {
   view: View
   inserted: Boolean
+  clientMutationId: String
+}
+
+input DeleteArtifactSequenceInput {
+  artifactSequenceID: ID!
+  clientMutationId: String
+}
+
+type DeleteArtifactCollectionPayload {
+  artifactCollection: ArtifactCollection!
   clientMutationId: String
 }
 
