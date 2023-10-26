@@ -430,7 +430,7 @@ const HeaderFileControls: React.FC<{
       }),
       artifactName: constString(currName ?? ''),
     } as any);
-  }, [entityProjectName, currName, currentVersion]);
+  }, [entityName, projectName, currName]);
 
   const artifactNodeValue = useNodeValue(artifactNode);
 
@@ -442,7 +442,7 @@ const HeaderFileControls: React.FC<{
     } else {
       goHome?.();
     }
-  }, [entityName, projectName]);
+  }, [entityName, projectName, history, goHome]);
 
   const deleteRemoteBoard = useCallback(async () => {
     const artifactSequenceID =
@@ -459,7 +459,11 @@ const HeaderFileControls: React.FC<{
       console.error('Failed to delete artifact collection.');
       toast('Something went wrong while trying to delete this board.');
     }
-  }, [artifactNodeValue.result, artifactNodeValue.loading]);
+  }, [
+    artifactNodeValue.result,
+    artifactNodeValue.loading,
+    deleteArtifactCollection,
+  ]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
