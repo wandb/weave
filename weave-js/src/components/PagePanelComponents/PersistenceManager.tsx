@@ -319,6 +319,7 @@ const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
   commit: 'Publish changes',
   rename_local: 'Rename',
+  commit_rename: 'Rename',
   publish_as: 'Publish As',
   publish_new: 'Publish board',
   rename_remote: 'Rename',
@@ -443,6 +444,28 @@ const HeaderFileControls: React.FC<{
     } as any);
   }, [entityProjectName, currName, currentVersion]);
   const artifactNodeValue = useNodeValue(artifactNode);
+
+  const renameRemoteBoard = useCallback(
+    async (artifactSequenceID, newName) => {
+      try {
+        await updateArtifactCollection({
+          variables: {
+            artifactSequenceID,
+            name: newName,
+          },
+        });
+        // Refresh the board
+        const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
+        updateNode(opGet({uri: constString(uri)}));
+        setActing(false);
+        setActionRenameOpen(false);
+      } catch (e) {
+        console.error('Failed to rename artifact collection.');
+        toast('Something went wrong while trying to rename this board.');
+      }
+    },
+    [entityName, projectName, updateNode]
+  );
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -643,54 +666,23 @@ const HeaderFileControls: React.FC<{
           open={actionRenameOpen}
           onClose={() => setActionRenameOpen(false)}
           onRename={async newName => {
-            // TODO: what happens when changes are made?
-            // TODO: we probably want to check branchPoint.originalURI
             const artifactSequenceID =
               !artifactNodeValue.loading && artifactNodeValue.result
                 ? artifactNodeValue.result.id
                 : '';
             if (renameAction === 'rename_remote') {
-              try {
-                await updateArtifactCollection({
-                  variables: {
-                    artifactSequenceID,
-                    name: newName,
-                  },
-                });
-              } catch (e) {
-                console.error('Failed to rename artifact collection.');
-                toast(
-                  'Something went wrong while trying to rename this board.'
-                );
-              }
-              // Refresh the board
-              const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
-              updateNode(opGet({uri: constString(uri)}));
-              setActionRenameOpen(false);
+              renameRemoteBoard(artifactSequenceID, newName);
               return;
-            }
-            setActing(true);
-            takeAction(renameAction, {name: newName}, () => {
-              try {
-                updateArtifactCollection({
-                  variables: {
-                    artifactSequenceID,
-                    name: newName,
-                  },
-                }).then(() => {
-                  // Refresh the board
-                  const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
-                  updateNode(opGet({uri: constString(uri)}));
-                  setActing(false);
-                  setActionRenameOpen(false);
+            } else if (renameAction === 'commit_rename') {
+              setActing(true);
+              takeAction('commit', {name: newName}, () => {
+                renameRemoteBoard(artifactSequenceID, newName).then(() => {
+                  // console.log("Board renamed successfully.")
                 });
-              } catch (e) {
-                console.error('Failed to rename artifact collection.');
-                toast(
-                  'Something went wrong while trying to rename this board.'
-                );
-              }
-            });
+              });
+            } else {
+              takeAction(renameAction, {name: newName});
+            }
           }}
         />
       )}
