@@ -1,18 +1,64 @@
 from dataclasses import dataclass
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import typing
 import tempfile
-from weave import environment
+from weave import environment, __version__
+from weave.uris import WeaveURI
 from urllib import parse
 import sys
+
+DOCKER_FILE = """
+FROM python:3.11
+"""
+
+def generate_dockerfile(model_ref: str, 
+                        project_name: typing.Optional[str] = None, 
+                        base_image: typing.Optional[str] = "python:3.11") -> str:
+    """Generates a Dockerfile to run the weave op"""
+    if project_name is None:
+        project_name = WeaveURI.parse(model_ref).project_name
+    return f"""
+FROM {base_image}
+
+ENV PYTHONUNBUFFERED 1
+WORKDIR /app
+
+COPY requirements/* .
+RUN pip install --no-cache-dir -r requirements.txt
+ENV PROJECT_NAME {project_name}
+
+EXPOSE 8080
+CMD ["weave", "serve", "{model_ref}", "--port=8080"]
+"""
+
+def generate_requirements_txt(model_ref: str, dir: str, dev = False) -> str:
+    """Generate a requirements.txt file."""
+    cwd = Path(os.getcwd())
+    if dev and (cwd / "build_dist.py").exists():
+        print("Building weave for development...")
+        env = os.environ.copy()
+        env.update({"WEAVE_SKIP_BUILD": "1"})
+        execute([sys.executable, str(cwd / "build_dist.py")], env=env, capture=False)
+        wheel = f"weave-{__version__}-py3-none-any.whl"
+        execute(["cp", str(cwd / "dist" / wheel), dir], capture=False)
+        weave = f"/app/{wheel}"
+    else:
+        weave = "weave @ git+https://github.com/wandb/weave@weaveflow"
+    # TODO: add any additional reqs the op needs
+    return f"""
+uvicorn[standard]
+fastapi
+{weave}
+"""
 
 def execute(args: list[str], 
             timeout: typing.Optional[float] = None, 
             cwd: typing.Optional[str] = None,
-            env: dict[str, str] = {}, 
+            env: typing.Optional[dict[str, str]] = None, 
             capture = True) -> typing.Any:
     process = subprocess.Popen(
         args,
@@ -20,7 +66,7 @@ def execute(args: list[str],
         stderr=subprocess.PIPE if capture else sys.stderr,
         stdin=subprocess.PIPE if capture else sys.stdin,
         universal_newlines=True,
-        env=env,
+        env=env or os.environ.copy(),
         cwd=cwd
     )
     out, err = process.communicate(timeout=timeout)
@@ -52,29 +98,22 @@ def enforce_login():
     except (subprocess.TimeoutExpired, ValueError):
         raise ValueError("Not logged in to gcloud. Please run `gcloud auth login`.")
 
-def generate_requirements_txt(model_ref: str) -> str:
-    """Generate a requirements.txt file."""
-    # TODO: add any additional reqs the op needs
-    return """functions-framework==3.*
-mangum
-fastapi
-weave @ git+https://github.com/wandb/weave@weaveflow
-"""
-
-def compile(model_ref: str) -> str:
+def compile(model_ref: str, wandb_project: typing.Optional[str] = None, base_image: typing.Optional[str] = None, dev = False) -> str:
     """Compile the weave application."""
     dir = tempfile.mkdtemp()
-    cur_dir = os.path.dirname(os.path.realpath(__file__))
-    shutil.copy(os.path.join(cur_dir, "main.py.template"), os.path.join(dir, "main.py"))
-    with open(os.path.join(dir, "requirements.txt"), "w") as f:
-        f.write(generate_requirements_txt(model_ref))
+    reqs = os.path.join(dir, "requirements")
+    os.mkdir(reqs)
+    with open(os.path.join(reqs, "requirements.txt"), "w") as f:
+        f.write(generate_requirements_txt(model_ref, reqs, dev))
+    with open(os.path.join(dir, "Dockerfile"), "w") as f:
+        f.write(generate_dockerfile(model_ref, wandb_project, base_image))
     return dir
 
 def deploy(model_ref: str,
            wandb_project: typing.Optional[str] = None, 
            gcp_project: typing.Optional[str] = None,
            region: typing.Optional[str] = None,
-           runtime: typing.Optional[str] = "python311",
+           base_image: typing.Optional[str] = "python:3.11",
            memory: typing.Optional[str] = "500Mb"):
     """Deploy the weave application."""
     enforce_login()
@@ -82,51 +121,42 @@ def deploy(model_ref: str,
         region = gcloud(["config", "get", "compute/region", "--format=json"])
         if region is []:
             raise ValueError("No default region set. Run `gcloud config set functions/region <region>` or set the region argument.")
-    dir = compile(model_ref)
-    ref = Ref.from_ref(model_ref)
-    name = f"{ref.project}-{ref.name}"
-    project = wandb_project or ref.project
+    dir = compile(model_ref, wandb_project)
+    ref = WeaveURI.parse(model_ref)
+    name = f"{ref.project_name}-{ref.name}"
+    project = wandb_project or ref.project_name
     key = environment.weave_wandb_api_key()
     args = [
-        "functions",
+        "run",
         "deploy",
         name,
-        "--gen2",
         f"--region={region}",
         f"--memory={memory}",
-        f"--runtime={runtime}",
-        f"--set-env-vars=MODEL_REF={model_ref},PROJECT_NAME={project}",
-        #TODO: Move these into secrets
-        f"--set-env-vars=WANDB_API_KEY={key},OPENAI_API_KEY={os.getenv('OPENAI_API_KEY')}",
+        f"--set-env-vars=PROJECT_NAME={project}",
+        f"--set-secrets=WANDB_API_KEY={key},OPENAI_API_KEY={os.getenv('OPENAI_API_KEY')}",
         f"--source={dir}",
-        "--entry-point=api",
-        "--trigger-http",
         "--allow-unauthenticated",
-        "--format=json"
     ]
     if gcp_project is not None:
         args.append(f"--project={gcp_project}")
     gcloud(args, capture=False)
     shutil.rmtree(dir)
 
-def develop(model_ref: str):
-    dir = compile(model_ref)
-    venv_path = os.path.join(dir, "venv")
-    print(f"Setting up virtual environment in: {dir}")
-    execute([sys.executable, '-m', 'venv', venv_path], cwd=dir, capture=False)
-    command = f"""
-set -e
-source {venv_path}/bin/activate
-echo "Installing requirements"
-pip install -r requirements.txt
-export MODEL_REF={model_ref}
-echo "Running function"
-functions-framework-python --target api
-"""
-    env = os.environ.copy()
-    env["PATH"] = f"{venv_path}/bin:{env['PATH']}"
-    execute(["bash", "-c", command], cwd=dir, env=env, capture=False)
-    #shutil.rmtree(dir)
+def develop(model_ref: str, base_image: typing.Optional[str] = "python:3.11"):
+    dir = compile(model_ref, base_image=base_image, dev=True)
+    name = WeaveURI.parse(model_ref).name
+    docker = shutil.which("docker")
+    if docker is None:
+        raise ValueError("docker command required: https://docs.docker.com/get-docker/")
+    print("Building container from: ", dir)
+    execute([docker, "buildx", "build", "-t", name, "--load", "."], cwd=dir, capture=False)
+    env = {"WANDB_API_KEY": environment.weave_wandb_api_key()}
+    env.update(os.environ.copy())
+    print("Running container at http://localhost:8080")
+    execute([docker, "run", "-p", "8080:8080", "-e", "WANDB_API_KEY", "-e", "OPENAI_API_KEY", name], env=env, capture=False)
+    if os.getenv("DEBUG") == None:
+        print("Cleaning up...")
+        shutil.rmtree(dir)
 
 @dataclass
 class Ref:
