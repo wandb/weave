@@ -116,8 +116,6 @@ function typeWithRetry(
   retries: number = 10,
   delay: number = 1000
 ) {
-  // Your check here, for example:
-
   const panel = getPanel(path);
 
   panel
