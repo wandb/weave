@@ -2789,6 +2789,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.color = {
           field: fixKeyForVega(dims.color),
           type: colorAxisType,
+          scale:
+            colorAxisType === 'quantitative' || colorAxisType === 'temporal'
+              ? {scheme: 'plasma'}
+              : {range: globals.WB_RUN_COLORS},
         };
         if (
           vegaReadyTable.columnSelectFunctions[dims.label].type !== 'invalid'
@@ -2807,6 +2811,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           legend: concreteConfig.legendSettings.color.noLegend
             ? false
             : {...defaultFontStyleDict},
+          scale: {range: globals.WB_RUN_COLORS},
         };
       }
 
@@ -3590,15 +3595,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   }, [config.series, updateConfig, isLineTooltip, toolTipPos]);
 
   const loaderComp = <Panel2Loader />;
-
-  // Hardcode plot colors for now.
-  if (vegaSpec.encoding.color == null) {
-    vegaSpec.encoding.color = {};
-  }
-  if (vegaSpec.encoding.color.scale == null) {
-    vegaSpec.encoding.color.scale = {};
-  }
-  vegaSpec.encoding.color.scale.range = globals.WB_RUN_COLORS;
 
   return (
     <div
