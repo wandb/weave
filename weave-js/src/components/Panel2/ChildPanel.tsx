@@ -63,6 +63,7 @@ import {
 import PanelNameEditor from './PanelNameEditor';
 import {TableState} from './PanelTable/tableState';
 import {
+  excludePanelPanel,
   getPanelStacksForType,
   panelSpecById,
   usePanelStacksForType,
@@ -147,6 +148,8 @@ export const initPanel = async (
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
     stackIdFilter: allowPanel,
+    // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
+    excludePanelPanel: excludePanelPanel(stack),
   });
   if (id == null) {
     return {vars: {}, input_node: voidNode(), id: '', config: undefined};
@@ -227,6 +230,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     {
       allowedPanels: props.allowedPanels,
       stackIdFilter: allowPanel,
+      // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
+      excludePanelPanel: excludePanelPanel(stack),
     }
   );
 
