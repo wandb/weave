@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v1
         with:
-          node-version: "16.x"
+          node-version: '18.x'
       - id: 'build'
         run: |
           ./weave/frontend/build.sh

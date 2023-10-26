@@ -69,7 +69,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v1
         with:
-          node-version: "16.x"
+          node-version: "18.x"
       - run: |
           set -e
           cd weave-js
@@ -78,6 +78,7 @@ jobs:
           yarn eslint --max-warnings=0
           yarn tslint
           yarn prettier
+          yarn cycles
           yarn run tsc
 
   test:
