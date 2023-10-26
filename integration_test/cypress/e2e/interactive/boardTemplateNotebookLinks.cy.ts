@@ -1,14 +1,4 @@
-import {
-  gotoBlankDashboard,
-  panelTypeInputExpr,
-  addSidebarPanel,
-  scrollToEEAndType,
-  panelChangeId,
-  tableAppendColumn,
-  tableCheckContainsValue,
-  addMainPanel,
-  goToHomePage,
-} from '../testlib';
+import {goToHomePage} from '../testlib';
 
 describe('board template notebook links', () => {
   it('check that board template notebook links to colab work', () => {
@@ -17,6 +7,8 @@ describe('board template notebook links', () => {
 
     cy.get('[data-testid="template-card"]').each(($el, index, $list) => {
       cy.wrap($el)
+        .trigger('mouseenter')
+        .realHover()
         .trigger('mouseenter')
         .realHover()
         .contains('Try it out')
@@ -33,8 +25,11 @@ describe('board template notebook links', () => {
             /^https:\/\/colab\.research\.google\.com\/github/
           );
 
-          // replace with url of actual notebook
-
+          // replace with url of actual notebook. this is a hack
+          // because we can't actually make assertions on the notebook
+          // due to cross-origin restrictions in cypress. this checks
+          // that the notebook is available by making the request
+          // that colab would make to load the notebook.
           const newHref = href
             .replace(
               'https://colab.research.google.com/github',
@@ -42,7 +37,7 @@ describe('board template notebook links', () => {
             )
             .replace('blob/', '');
 
-          // load the notebook
+          // load the notebook.
           cy.request(newHref).then(response => {
             // check that the status code is 200
             expect(response.status).to.eq(200);
