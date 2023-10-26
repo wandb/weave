@@ -1,0 +1,14 @@
+import os
+import functions_framework
+from weave.deploy.asgi import GcpMangum
+from weave import serve_fastapi
+
+app = serve_fastapi.object_method_app(
+    os.environ["MODEL_REF"],
+    os.getenv("METHOD_NAME", None)
+)
+api_handler = GcpMangum(app)
+
+@functions_framework.http
+def api(request):
+    return api_handler(request)

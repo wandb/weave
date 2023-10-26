@@ -1,15 +1,17 @@
 import click
+import os
 import time
 import typing
 from weave import server, __version__
-import uvicorn
-import os
 
 # from .model_server import app
 from . import api
 from . import uris
 from . import artifact_wandb
+from .deploy import gcp as google
 
+# TODO: does this work?
+os.environ["PYTHONUNBUFFERED"] = "1"
 
 @click.group()
 @click.version_option(version=__version__)
@@ -32,9 +34,10 @@ def start_ui() -> None:
 @click.argument("model_ref")
 @click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
+@click.option("--env", default="development", help="Environment to tag the model with.")
 @click.option("--port", default=9996, type=int)
 def serve(
-    model_ref: str, method: typing.Optional[str], project: str, port: int
+    model_ref: str, method: typing.Optional[str], project: str, env: str, port: int
 ) -> None:
     print(f"Serving {model_ref}")
     parsed_ref = uris.WeaveURI.parse(model_ref).to_ref()
@@ -42,7 +45,7 @@ def serve(
         raise ValueError(f"Expected a wandb artifact ref, got {parsed_ref}")
     api.init(project)
     # TODO: provide more control over attributes
-    with api.attributes({"env": "production"}):
+    with api.attributes({"env": env}):
         api.serve(parsed_ref, method_name=method, port=port)
 
 
@@ -57,6 +60,13 @@ def deploy() -> None:
 @click.option("--gcp-project", help="GCP project name.")
 def gcp(model_ref: str, project: str, gcp_project: str) -> None:
     print(f"Deploying model {model_ref}...")
+    try:
+        google.deploy(model_ref, wandb_project=project, gcp_project=gcp_project)
+    except ValueError as e:
+        if os.getenv("DEBUG") == "true":
+            raise e
+        else:
+            raise click.ClickException(str(e)+"\nRun with DEBUG=true to see full exception.")
     print("Model deployed")
 
 
