@@ -112,20 +112,29 @@ export const panelTypeInputExpr = (path: string[], text: string) => {
 
 export const scrollToEEAndType = (path: string[], text: string) => {
   const panel = getPanel(path);
-  panel
+
+  const ee = panel
     .trigger('mouseenter')
     .click()
-    .find('[data-test=expression-editor-container] [contenteditable=true]')
+    .find('[data-test=expression-editor-container] [contenteditable=true]');
 
-    .realHover()
-    .realClick()
+  let currentText: string = '';
+  for (let i = 0; i < 15; i++) {
+    ee.invoke('text').then(t => {
+      currentText = t;
+    });
 
-    .realHover()
-    .realClick()
+    if (currentText === text) {
+      break;
+    }
 
-    .type(text, {force: true})
-    .wait(300)
-    .type('{enter}', {force: true});
+    ee.realHover()
+      .realClick()
+
+      .type(text, {force: true})
+      .wait(300)
+      .type('{enter}', {force: true});
+  }
 };
 
 export const panelChangeId = (path: string[], text: string) => {
