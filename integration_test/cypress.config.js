@@ -9,6 +9,7 @@ module.exports = defineConfig({
   chromeWebSecurity: false,
   e2e: {
     baseUrl: BASE_URL,
+    experimentalSessionAndOrigin: true,
     setupNodeEvents(on, config) {
       // implement node event listeners here
       // ❗ Must be declared at the top of the function to prevent conflicts

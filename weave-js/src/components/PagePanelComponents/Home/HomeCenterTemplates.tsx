@@ -102,6 +102,7 @@ const TemplateCard: React.FC<{
   const [isHover, setIsHover] = React.useState(false);
   return (
     <Template
+      data-testid="template-card"
       onMouseEnter={() => {
         setIsHover(true);
       }}
