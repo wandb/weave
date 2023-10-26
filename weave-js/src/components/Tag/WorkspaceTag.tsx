@@ -1,4 +1,4 @@
-import {Tag as TagType} from '@wandb/weave/common/types/graphql';
+import {Tag as TagType} from '../../common/types/graphql';
 import React from 'react';
 
 import {RemoveAction} from './RemoveAction';

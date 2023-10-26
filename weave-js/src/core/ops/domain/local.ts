@@ -394,7 +394,7 @@ export const opRefGet = makeOp({
   returnType: inputTypes => {
     const selfType = inputTypes.self.type;
     if (isUnion(selfType)) {
-      return union(selfType.members.map(m => m.objectType));
+      return union(selfType.members.map(m => m.objectType as Type));
     }
     return (inputTypes.self.type as any).objectType;
   },

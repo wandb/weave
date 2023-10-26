@@ -17,20 +17,20 @@ import styled from 'styled-components';
 import moment from 'moment';
 import {
   Node,
-  callOpVeryUnsafe,
   constString,
+  directlyConstructOpCall,
   list,
-  opArtifactVersionFile,
   opConcat,
   opFileTable,
+  opFilesystemArtifactFile,
   opGet,
   opIsNone,
   opPick,
   opProjectRuns,
   opRootProject,
   opRunHistory3,
+  opStreamTableRows,
   opTableRows,
-  typedDict,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
@@ -50,10 +50,10 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
-import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 import {urlWandbFrontend} from '../../../util/urls';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';
+import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -497,18 +497,26 @@ const legacyTraceRowToSimpleNode = (
       }),
     }),
     key: constString(legacyTraceKey),
-  });
+  }) as Node<{type: 'wb_trace_tree'}>;
 };
 
-const convertSimpleLegacyNodeToNewFormat = (node: Node) => {
+const opWBTraceTreeConvertToSpans = (inputs: {
+  tree: Node<{type: 'wb_trace_tree'}>;
+}) => {
+  return directlyConstructOpCall(
+    'wb_trace_tree-convertToSpans',
+    inputs,
+    list(list(SpanWeaveWithTimestampType))
+  );
+};
+
+const convertSimpleLegacyNodeToNewFormat = (
+  node: Node<{type: 'wb_trace_tree'}>
+) => {
   return opConcat({
-    arr: callOpVeryUnsafe(
-      'wb_trace_tree-convertToSpans',
-      {
-        tree: node,
-      },
-      list(list(SpanWeaveWithTimestampType))
-    ) as Node,
+    arr: opWBTraceTreeConvertToSpans({
+      tree: node,
+    }),
   });
 };
 
@@ -673,13 +681,9 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     const node = opGet({uri: constString(uri)});
     node.type = {type: 'stream_table'} as any;
-    newExpr = callOpVeryUnsafe(
-      'stream_table-rows',
-      {
-        self: node,
-      },
-      list(typedDict({}))
-    ) as any;
+    newExpr = opStreamTableRows({
+      self: node as any,
+    });
   } else {
     // This is a hack. Would be nice to have better mapping
     // Note that this will not work for tables with spaces in their name
@@ -690,8 +694,10 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest`;
     newExpr = opTableRows({
       table: opFileTable({
-        file: opArtifactVersionFile({
-          artifactVersion: opGet({uri: constString(uri)}),
+        file: opFilesystemArtifactFile({
+          artifactVersion: opGet({
+            uri: constString(uri),
+          }) as any,
           path: constString(tableName),
         }),
       }),

@@ -8,6 +8,7 @@ import {
   isOutputNode,
   Node,
   opGet,
+  opGetFeaturedBoardTemplatesForNode,
   Type,
 } from '@wandb/weave/core';
 import {
@@ -34,12 +35,9 @@ export const useBoardGeneratorsForNode = (
     op_name: string;
   }>;
 } => {
-  const genBoardsNode = callOpVeryUnsafe(
-    'py_board-get_board_templates_for_node',
-    {
-      input_node: node,
-    }
-  );
+  const genBoardsNode = opGetFeaturedBoardTemplatesForNode({
+    input_node: node,
+  });
   const res: {
     loading: boolean;
     result: Array<{

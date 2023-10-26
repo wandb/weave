@@ -1,10 +1,10 @@
 import {useWeaveContext} from '@wandb/weave/context';
 import {
-  callOpVeryUnsafe,
   constFunction,
   constString,
   Node,
   opDropNa,
+  opFilesystemArtifactWeaveType,
   opFilter,
   opMap,
   opStringEqual,
@@ -39,13 +39,9 @@ const useUniqueTypeNames = (allObjectsNode: Node) => {
           {row: {type: 'FilesystemArtifact' as any}},
           ({row}) =>
             opTypeName({
-              type: callOpVeryUnsafe(
-                'FilesystemArtifact-weaveType',
-                {
-                  artifact: row,
-                },
-                'type'
-              ) as any,
+              type: opFilesystemArtifactWeaveType({
+                artifact: row as Node<{type: 'FilesystemArtifact'}>,
+              }),
             })
         ),
       }),
@@ -64,13 +60,9 @@ const applyTypeFilter = (allObjectsNode: Node, typename: string) => {
       ({row}) =>
         opStringEqual({
           lhs: opTypeName({
-            type: callOpVeryUnsafe(
-              'FilesystemArtifact-weaveType',
-              {
-                artifact: row,
-              },
-              'type'
-            ) as any,
+            type: opFilesystemArtifactWeaveType({
+              artifact: row as Node<{type: 'FilesystemArtifact'}>,
+            }),
           }),
           rhs: constString(typename),
         })

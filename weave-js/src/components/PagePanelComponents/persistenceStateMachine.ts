@@ -1,11 +1,11 @@
 import {
   NodeOrVoidNode,
-  callOpVeryUnsafe,
   constString,
   constNone,
-  maybe,
   opGet,
   isVoidNode,
+  opSaveToUri,
+  Node,
 } from '@wandb/weave/core';
 import {useNodeValueExecutor, useMakeMutation} from '@wandb/weave/react';
 import {useState, useCallback} from 'react';
@@ -249,17 +249,12 @@ export const useStateMachine = (
         throw new Error(`Invalid action: ${action}`);
       }
       if (action === 'save') {
-        const saveNode = callOpVeryUnsafe(
-          'save_to_uri',
-          {
-            obj: inputNode,
-            name:
-              actionOptions.name != null
-                ? constString(actionOptions.name)
-                : constNone(),
-          },
-          maybe('string')
-        );
+        const saveNode = opSaveToUri({
+          obj: inputNode as Node<'any'>,
+          name: (actionOptions.name != null
+            ? constString(actionOptions.name)
+            : constNone()) as Node<'string'>,
+        });
         const saveUri: string | null = await executor(saveNode as any);
         if (saveUri == null) {
           throw new Error(`Failed to save`);

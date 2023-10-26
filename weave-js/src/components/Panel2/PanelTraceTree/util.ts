@@ -1,6 +1,6 @@
 import * as _ from 'lodash';
-import {FlatSpan, SpanType} from '@wandb/weave/core/model/media/traceTree';
-import {Type} from '@wandb/weave/core';
+import {FlatSpan, SpanType} from '../../../core/model/media/traceTree';
+import {Type} from '../../../core';
 
 export const SpanWeaveType = {
   type: 'typedDict' as const,

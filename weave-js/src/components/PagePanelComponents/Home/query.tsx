@@ -206,11 +206,7 @@ const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
 };
 
 const opProjectHistoryType = ({project}: {project: w.Node}) => {
-  return w.callOpVeryUnsafe(
-    'refine_history3_type',
-    {run: w.opProjectRuns({project})},
-    'type'
-  );
+  return w.opRunHistoryType3({run: w.opProjectRuns({project})});
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {
@@ -322,15 +318,11 @@ const opArtifactsBasicMetadata = ({artifacts}: {artifacts: w.Node}) => {
             artifactVersion: latestVersionNode,
           }),
         }),
-        numRows: w.callOpVeryUnsafe(
-          'run-historyLineCount',
-          {
-            run: w.opArtifactVersionCreatedBy({
-              artifactVersion: latestVersionNode,
-            }),
-          },
-          'number'
-        ) as any,
+        numRows: w.opRunHistoryLineCount({
+          run: w.opArtifactVersionCreatedBy({
+            artifactVersion: latestVersionNode,
+          }) as w.OutputNode<'run'>,
+        }),
       } as any);
     }),
   });
@@ -499,27 +491,16 @@ export const useLocalDashboards = (): {
     mapFn: w.constFunction(
       {row: {type: 'FilesystemArtifact' as any}},
       ({row}) => {
-        const nameNode = w.callOpVeryUnsafe(
-          'FilesystemArtifact-artifactName',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
-        const versionNode = w.callOpVeryUnsafe(
-          'FilesystemArtifact-artifactVersion',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
-        const createdAtNode = w.callOpVeryUnsafe(
-          'FilesystemArtifact-createdAt',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
+        const artifactNode = row as w.Node<{type: 'FilesystemArtifact'}>;
+        const nameNode = w.opFilesystemArtifactArtifactName({
+          artifact: artifactNode,
+        });
+        const versionNode = w.opFilesystemArtifactArtifactVersion({
+          artifact: artifactNode,
+        });
+        const createdAtNode = w.opFilesystemArtifactCreatedAt({
+          artifact: artifactNode,
+        });
         return w.opDict({
           name: nameNode,
           version: versionNode,
