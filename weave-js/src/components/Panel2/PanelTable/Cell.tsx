@@ -5,6 +5,7 @@ import {
   NodeOrVoidNode,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
+import styled from 'styled-components';
 
 import {ActionsTrigger} from '../../../actions';
 import {useWeaveContext, useWeaveFeaturesContext} from '../../../context';
@@ -15,6 +16,21 @@ import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TH from './hooks';
 import * as Table from './tableState';
+import { hexToRGB } from '../../../common/css/utils';
+import { OBLIVION } from '../../../common/css/color.styles';
+import { usePanelTableContext } from './PanelTableContext';
+
+const CellWrapper = styled.div<{isHovered: boolean}>`
+background-color: ${({isHovered}) => (isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit')};
+:hover {
+    background-color: ${hexToRGB(OBLIVION, 0.08)};
+}
+  // div > div > div {
+  //   align-content: flex-start !important;
+  //   justify-content: flex-start !important;
+  //   align-items: flex-start !important;
+  // }
+`;
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -46,6 +62,7 @@ export const Cell: React.FC<{
   simpleTable,
 }) => {
   const weave = useWeaveContext();
+  const {hoveredColId, setHoveredColId} = usePanelTableContext();
   const {actions: actionsEnabled} = useWeaveFeaturesContext();
 
   const updatePanelConfig = TH.useUpdatePanelConfig(
@@ -117,11 +134,16 @@ export const Cell: React.FC<{
       input: selectFunction,
     };
   }, [selectFunction, inputNode, rowNode, weave]);
+
+  const [panelIsHovered, setPanelIsHovered] = React.useState(false);
   return (
-    <div
+    <CellWrapper
       ref={domRef}
       data-test-should-render={shouldRender}
       style={{width: '100%', height: '100%'}}
+      onMouseEnter={() => setHoveredColId && setHoveredColId(colId)}
+      onMouseLeave={() => setHoveredColId && setHoveredColId('')}
+      isHovered={hoveredColId === colId}
       // style={{
       //   ...getPanelStackDims(handler, selectedNode.type, config),
       // }}>
@@ -169,7 +191,7 @@ export const Cell: React.FC<{
           </PanelContextProvider>
         )
       )}
-    </div>
+    </CellWrapper>
   );
 };
 

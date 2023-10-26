@@ -2,8 +2,10 @@ import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 import {IconButton} from '../IconButton';
+import {hexToRGB} from '../../common/css/utils';
+import {OBLIVION} from '../../common/css/color.styles';
 
-export const ColumnHeader = styled.div`
+export const ColumnHeader = styled.div<{isHovered: boolean}>`
   display: flex;
   align-items: stretch;
   white-space: nowrap;
@@ -14,14 +16,19 @@ export const ColumnHeader = styled.div`
     visibility: hidden;
   }
   :hover .column-controls {
-    box-shadow: -4px 0px 4px 4px rgba(255, 255, 255, 0.75);
-    background: rgba(255, 255, 255, 0.75);
+    // box-shadow: -4px 0px 4px 4px rgba(255, 255, 255, 0.75);
+    // background: rgba(255, 255, 255, 0.75);
   }
   :hover .column-actions-trigger {
     visibility: visible;
   }
   .column-actions-trigger:hover {
     color: ${globals.primary};
+  }
+  background-color: ${props =>
+    props.isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
+  :hover {
+    background-color: ${hexToRGB(OBLIVION, 0.08)};
   }
 `;
 ColumnHeader.displayName = 'S.ColumnHeader';
@@ -34,6 +41,7 @@ export const ColumnName = styled.div`
     color: ${globals.primary};
   }
   overflow: hidden;
+  // TODO: Comment out for table text align
   text-align: center;
 `;
 ColumnName.displayName = 'S.ColumnName';
@@ -41,33 +49,40 @@ ColumnName.displayName = 'S.ColumnName';
 export const ColumnNameText = styled.span`
   width: 100%;
   height: 100%;
+  // TODO: Comment out for table text align
   text-align: center;
 `;
 ColumnNameText.displayName = 'S.ColumnNameText';
 
-export const IndexColumnVal = styled.div`
+export const IndexColumnVal = styled.div<{isHovered?: boolean}>`
   width: 100%;
   height: 100%;
-  text-align: center;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   :hover {
     color: ${globals.primary};
-    background-color: #eee;
+    background-color: ${hexToRGB(OBLIVION, 0.08)};
   }
+  background-color: ${props =>
+    props.isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
+
+  // TODO: Comment out for table text align
+  text-align: center;
 `;
 IndexColumnVal.displayName = 'S.IndexColumnVal';
 
 export const IndexColumnText = styled.div`
-  text-align: center;
   flex: 1 1 auto;
   height: 20px;
   display: flex;
-  align-content: space-around;
-  justify-content: space-around;
-  align-items: center;
   font-weight: 600;
+
+  // TODO: Comment out for table text align
+  text-align: center;
+  // align-content: space-around;
+  // justify-content: space-around;
+  align-items: center;
 `;
 IndexColumnText.displayName = 'S.IndexColumnText';
 
@@ -98,32 +113,46 @@ export const FilterIcon = styled(WBIcon)`
 `;
 FilterIcon.displayName = 'S.FilterIcon';
 
-export const ColumnAction = styled.div`
+export const ColumnAction = styled.div<{isHovered?: boolean}>`
   cursor: pointer;
   padding: 5px 0px 0px 0px;
   flex: 0 0 auto;
   height: 100%;
-  box-shadow: -4px 0px 4px 4px white;
+  // box-shadow: -4px 0px 4px 4px white;
   background: white;
   font-size: 20px;
+
+  :hover {
+    background-color: ${hexToRGB(OBLIVION, 0.08)};
+  }
+  background-color: transparent;
 `;
 ColumnAction.displayName = 'S.ColumnAction';
 
-export const TableAction = styled.div<{highlight?: boolean}>`
+export const TableAction = styled.div<{
+  highlight?: boolean;
+  isHovered: boolean;
+}>`
   cursor: pointer;
-  padding: 5px 4px 0px 9px;
+  padding: 5px 4px 0px 4px;
   flex: 0 0 auto;
   height: 100%;
   width: 100%;
   color: ${props => (props.highlight ? 'white' : 'inherit')};
   background-color: ${props =>
-    props.highlight ? 'rgb(3, 183, 206)' : 'inherit'};
+    props.highlight
+      ? 'rgb(3, 183, 206)'
+      : props.isHovered
+      ? hexToRGB(OBLIVION, 0.04)
+      : 'inherit'};
   :hover {
     color: ${globals.primary};
     background-color: ${props =>
-      props.highlight ? 'rgb(3, 183, 206)' : '#eee'};
+      props.highlight ? 'rgb(3, 183, 206)' : hexToRGB(OBLIVION, 0.08)};
   }
   box-shadow: #f8f8f8 -2px 0px 8px 4px;
+  display: inline-flex;
+  justify-content: center;
 `;
 TableAction.displayName = 'S.TableAction';
 
@@ -242,3 +271,9 @@ export const CloseIconButton = styled(IconButton)`
   top: 12px;
 `;
 CloseIconButton.displayName = 'S.CloseIconButton';
+
+export const IndexCellCheckboxWrapper = styled.div<{isSelected: boolean}>`
+  ${({isSelected}) => (isSelected ? '' : 'visibility: hidden;')}
+  margin-left: 21px;
+`;
+IndexCellCheckboxWrapper.displayName = 'S.IndexCellCheckboxWrapper';

@@ -86,13 +86,18 @@ import {
   useUpdateConfigKey,
 } from './util';
 import {Link} from './Link';
+import {Checkbox} from '../../Checkbox';
+import {
+  PanelTableContextProvider,
+  usePanelTableContext,
+} from './PanelTableContext';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
 
 const baseColumnWidth = 95;
 const minColumnWidth = 30;
-const rowControlsWidth = 30;
+const rowControlsWidth = 60;
 const numberOfHeaders = 1;
 const headerHeight = 30;
 const footerHeight = 25;
@@ -482,6 +487,7 @@ const PanelTableInner: React.FC<
   const downloadDataAsCSV = useCallback(() => {
     downloadCSV(rowsNode, tableState, weave, stack);
   }, [rowsNode, stack, tableState, weave]);
+  const [hoveredColId, setHoveredColId] = useState('');
 
   const headerRendererForColumn = useCallback(
     (colId: string, {headerIndex}: any) => {
@@ -587,6 +593,8 @@ const PanelTableInner: React.FC<
       props.config.simpleTable,
       updateContext,
       input,
+      hoveredColId,
+      setHoveredColId,
     ]
   );
 
@@ -680,7 +688,10 @@ const PanelTableInner: React.FC<
             highlight={isFiltered ?? false}
             onClick={() => {
               setFilterOpen(!filterOpen);
-            }}>
+            }}
+            isHovered={hoveredColId === 'index'}
+            onMouseEnter={() => setHoveredColId('index')}
+            onMouseLeave={() => setHoveredColId('')}>
             <S.TableIcon
               name="filter"
               // Pass undefined when false to avoid console warning.
@@ -1079,7 +1090,11 @@ const PanelTableInner: React.FC<
         ConfiguredTable
       ) : (
         <WeaveActionContextProvider newActions={actions}>
-          {ConfiguredTable}
+          <PanelTableContextProvider
+            setHoveredColId={setHoveredColId}
+            hoveredColId={hoveredColId}>
+            {ConfiguredTable}
+          </PanelTableContextProvider>
         </WeaveActionContextProvider>
       )}
     </GrowToParent>
@@ -1129,42 +1144,59 @@ const IndexCell: React.FC<{
   const index = LLReact.useNodeValue(
     opGetIndexCheckpointTag({obj: props.rowNode})
   );
+  const {hoveredColId, setHoveredColId} = usePanelTableContext();
+
   if (index.loading) {
     return <S.IndexColumnVal />;
   } else {
+    const isSelected =
+      index.result != null && index.result === props.activeRowIndex;
     return (
       <S.IndexColumnVal
         onClick={() => {
           if (!props.simpleTable) {
             props.setRowAsPinned(index.result);
           }
-        }}>
+        }}
+        onMouseEnter={() => setHoveredColId('index')}
+        onMouseLeave={() => setHoveredColId('')}
+        isHovered={hoveredColId === 'index'}>
         <S.IndexColumnText
           style={{
-            color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
-            ...(index.result != null && index.result === props.activeRowIndex
-              ? {
-                  fontWeight: 'bold',
-                  backgroundColor: '#d4d4d4',
-                }
-              : {}),
+            color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result
           }}>
-          {props.simpleTable ? (
-            <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
-          ) : (
-            <Popup
-              // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
-              popperModifiers={{
-                preventOverflow: {
-                  boundariesElement: 'offsetParent',
-                },
+          <S.IndexCellCheckboxWrapper
+            className="index-cell-checkbox"
+            isSelected={isSelected}>
+            <Checkbox
+              onClick={() => {
+                if (!props.simpleTable) {
+                  props.setRowAsPinned(index.result);
+                }
               }}
-              position="top center"
-              popperDependencies={[index.result, runNameNodeValue.result]}
-              content={runNameNodeValue.result ?? ''}
-              trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
+              checked={isSelected}
             />
-          )}
+          </S.IndexCellCheckboxWrapper>
+          <div style={{width: '100%'}}>
+            {props.simpleTable ? (
+              <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+            ) : (
+              <Popup
+                // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
+                popperModifiers={{
+                  preventOverflow: {
+                    boundariesElement: 'offsetParent',
+                  },
+                }}
+                position="top center"
+                popperDependencies={[index.result, runNameNodeValue.result]}
+                content={runNameNodeValue.result ?? ''}
+                trigger={
+                  <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+                }
+              />
+            )}
+          </div>
         </S.IndexColumnText>
       </S.IndexColumnVal>
     );
