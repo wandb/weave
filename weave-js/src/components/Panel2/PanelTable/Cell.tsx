@@ -27,6 +27,7 @@ const CellWrapper = styled.div<{isHovered: boolean}>`
     background-color: ${hexToRGB(OBLIVION, 0.08)};
   }
 `;
+CellWrapper.displayName = 'S.CellWrapper';
 
 const recordEvent = makeEventRecorder('Table');
 
