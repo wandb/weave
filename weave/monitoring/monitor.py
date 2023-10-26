@@ -221,6 +221,8 @@ class Monitor:
 
     def trace(
         self,
+        *,
+        static_attributes: typing.Optional[typing.Dict[str, typing.Any]] = None,
         preprocess: typing.Optional[typing.Callable] = None,
         postprocess: typing.Optional[typing.Callable] = None,
     ) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
@@ -230,7 +232,9 @@ class Monitor:
                 async def async_wrapper(
                     *args: typing.Any, **kwargs: typing.Any
                 ) -> typing.Any:
-                    attributes = kwargs.pop("monitor_attributes", {})
+                    attributes = {}
+                    attributes.update(static_attributes or {})
+                    attributes.update(kwargs.pop("monitor_attributes", {}))
                     with self.attributes(attributes):
                         with self.span(get_function_name(fn)) as span:
                             span.inputs = _arguments_to_dict(fn, args, kwargs)
@@ -247,7 +251,9 @@ class Monitor:
             else:
 
                 def sync_wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-                    attributes = kwargs.pop("monitor_attributes", {})
+                    attributes = {}
+                    attributes.update(static_attributes or {})
+                    attributes.update(kwargs.pop("monitor_attributes", {}))
                     with self.attributes(attributes):
                         with self.span(get_function_name(fn)) as span:
                             span.inputs = _arguments_to_dict(fn, args, kwargs)
