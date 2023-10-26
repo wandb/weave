@@ -77,6 +77,13 @@ export const gotoBlankDashboard = () => {
   cy.get('[data-testid="new-board-button"]').should('be.visible').click();
 };
 
+export const goToHomePage = () => {
+  const url = '/';
+  cy.viewport(1600, 900);
+  cy.visit(url);
+  cy.contains('Board templates').should('be.visible');
+};
+
 export const addSidebarPanel = () => {
   getPanel(['sidebar']).contains('New variable').click();
 };
