@@ -27,6 +27,7 @@ import React, {
   useState,
 } from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
+import {useHistory} from 'react-router-dom';
 
 import {Popover} from '@material-ui/core';
 import styled, {css} from 'styled-components';
@@ -83,6 +84,7 @@ import {DELETE_ARTIFACT_SEQUENCE} from './graphql';
 import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import {urlProjectAssets} from '@wandb/weave/urls';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -382,6 +384,7 @@ const HeaderFileControls: React.FC<{
   takeAction,
   updateNode,
 }) => {
+  const history = useHistory();
   const [actionRenameOpen, setActionRenameOpen] = useState(false);
   const [actionDeleteOpen, setActionDeleteOpen] = useState(false);
   const [acting, setActing] = useState(false);
@@ -434,8 +437,12 @@ const HeaderFileControls: React.FC<{
   const resetAfterDeletion = useCallback(() => {
     setActing(false);
     setActionDeleteOpen(false);
-    goHome?.();
-  }, []);
+    if (entityName && projectName) {
+      history.push(urlProjectAssets(entityName, projectName, 'board'));
+    } else {
+      goHome?.();
+    }
+  }, [entityName, projectName]);
 
   const deleteRemoteBoard = useCallback(async () => {
     const artifactSequenceID =
