@@ -16,20 +16,16 @@ import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TH from './hooks';
 import * as Table from './tableState';
-import { hexToRGB } from '../../../common/css/utils';
-import { OBLIVION } from '../../../common/css/color.styles';
-import { usePanelTableContext } from './PanelTableContext';
+import {hexToRGB} from '../../../common/css/utils';
+import {OBLIVION} from '../../../common/css/color.styles';
+import {usePanelTableContext} from './PanelTableContext';
 
 const CellWrapper = styled.div<{isHovered: boolean}>`
-background-color: ${({isHovered}) => (isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit')};
-:hover {
+  background-color: ${({isHovered}) =>
+    isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
+  :hover {
     background-color: ${hexToRGB(OBLIVION, 0.08)};
-}
-  // div > div > div {
-  //   align-content: flex-start !important;
-  //   justify-content: flex-start !important;
-  //   align-items: flex-start !important;
-  // }
+  }
 `;
 
 const recordEvent = makeEventRecorder('Table');
@@ -135,7 +131,6 @@ export const Cell: React.FC<{
     };
   }, [selectFunction, inputNode, rowNode, weave]);
 
-  const [panelIsHovered, setPanelIsHovered] = React.useState(false);
   return (
     <CellWrapper
       ref={domRef}

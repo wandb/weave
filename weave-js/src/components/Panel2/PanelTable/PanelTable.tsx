@@ -593,8 +593,6 @@ const PanelTableInner: React.FC<
       props.config.simpleTable,
       updateContext,
       input,
-      hoveredColId,
-      setHoveredColId,
     ]
   );
 
@@ -778,6 +776,8 @@ const PanelTableInner: React.FC<
     shiftIsPressed,
     setRowAsPinned,
     setRowAsActive,
+    hoveredColId,
+    setHoveredColId,
   ]);
 
   const indexInputRef = useRef<HTMLInputElement>(null);
@@ -1163,7 +1163,7 @@ const IndexCell: React.FC<{
         isHovered={hoveredColId === 'index'}>
         <S.IndexColumnText
           style={{
-            color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result
+            color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
           }}>
           <S.IndexCellCheckboxWrapper
             className="index-cell-checkbox"

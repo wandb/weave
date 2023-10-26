@@ -15,10 +15,6 @@ export const ColumnHeader = styled.div<{isHovered: boolean}>`
   .column-actions-trigger {
     visibility: hidden;
   }
-  :hover .column-controls {
-    // box-shadow: -4px 0px 4px 4px rgba(255, 255, 255, 0.75);
-    // background: rgba(255, 255, 255, 0.75);
-  }
   :hover .column-actions-trigger {
     visibility: visible;
   }
@@ -41,7 +37,6 @@ export const ColumnName = styled.div`
     color: ${globals.primary};
   }
   overflow: hidden;
-  // TODO: Comment out for table text align
   text-align: center;
 `;
 ColumnName.displayName = 'S.ColumnName';
@@ -49,7 +44,6 @@ ColumnName.displayName = 'S.ColumnName';
 export const ColumnNameText = styled.span`
   width: 100%;
   height: 100%;
-  // TODO: Comment out for table text align
   text-align: center;
 `;
 ColumnNameText.displayName = 'S.ColumnNameText';
@@ -57,6 +51,7 @@ ColumnNameText.displayName = 'S.ColumnNameText';
 export const IndexColumnVal = styled.div<{isHovered?: boolean}>`
   width: 100%;
   height: 100%;
+  text-align: center;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -66,23 +61,18 @@ export const IndexColumnVal = styled.div<{isHovered?: boolean}>`
   }
   background-color: ${props =>
     props.isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
-
-  // TODO: Comment out for table text align
-  text-align: center;
 `;
 IndexColumnVal.displayName = 'S.IndexColumnVal';
 
 export const IndexColumnText = styled.div`
+  text-align: center;
   flex: 1 1 auto;
   height: 20px;
   display: flex;
-  font-weight: 600;
-
-  // TODO: Comment out for table text align
-  text-align: center;
-  // align-content: space-around;
-  // justify-content: space-around;
+  align-content: space-around;
+  justify-content: space-around;
   align-items: center;
+  font-weight: 600;
 `;
 IndexColumnText.displayName = 'S.IndexColumnText';
 
