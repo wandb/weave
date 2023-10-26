@@ -74,6 +74,7 @@ jobs:
           set -e
           cd weave-js
           yarn install --frozen-lockfile
+          yarn generate
           yarn eslint --max-warnings=0
           yarn tslint
           yarn prettier
@@ -191,6 +192,7 @@ jobs:
           GITHUB_TOKEN:
             ${{ secrets.GITHUB_TOKEN }}
             # - uses: actions/upload-artifact@v3
+          CYPRESS_DEPLOYSENTINEL_UPLOAD_ON_PASSES: true
       - name: Upload logs
         uses: actions/upload-artifact@v3
         if: failure()

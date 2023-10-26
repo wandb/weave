@@ -4,6 +4,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 type ViewerDataType = {
   authenticated: boolean;
+  signupRequired: boolean;
   user_id?: string;
 };
 
@@ -32,6 +33,11 @@ export const useIsAuthenticated = () => {
   return weaveViewer.loading ? undefined : weaveViewer.data.authenticated;
 };
 
+export const useIsSignupRequired = () => {
+  const weaveViewer = useWeaveViewer();
+  return weaveViewer.loading ? undefined : weaveViewer.data.signupRequired;
+};
+
 export const WeaveViewerContextProvider: React.FC = ({children}) => {
   const viewerData = useWeaveViewerData();
   return (
@@ -50,10 +56,11 @@ const useWeaveViewerData = (skip: boolean = false) => {
   >({
     loading: true,
   });
-  const setNoViewerData = useCallback(() => {
+  const setNoViewerData = useCallback((signupRequired: boolean) => {
     setViewerData({
       data: {
         authenticated: false,
+        signupRequired,
       },
       loading: false,
     });
@@ -65,7 +72,7 @@ const useWeaveViewerData = (skip: boolean = false) => {
 
   useEffect(() => {
     if (skip) {
-      setNoViewerData();
+      setNoViewerData(false);
     }
     const additionalHeaders: Record<string, string> = {};
     if (anonApiKey != null && anonApiKey !== '') {
@@ -84,20 +91,30 @@ const useWeaveViewerData = (skip: boolean = false) => {
         if (!isMounted.current) {
           return;
         }
-        if (res.status !== 200) {
-          setNoViewerData();
-          return;
-        } else {
+        if (res.status === 200) {
           return res.json();
         }
+        if (res.status === 403) {
+          return res.text();
+        }
+        setNoViewerData(false);
+        return;
       })
-      .then(json => {
+      .then(body => {
         if (!isMounted.current) {
           return;
         }
+        if (typeof body === 'string') {
+          // This was a 403.
+          const signupRequired = body === 'Signup required';
+          setNoViewerData(signupRequired);
+          return;
+        }
+        const json = body;
         setViewerData({
           data: {
             authenticated: !!(json?.authenticated ?? false),
+            signupRequired: false,
             user_id: json?.user_id,
           },
           loading: false,
@@ -107,7 +124,7 @@ const useWeaveViewerData = (skip: boolean = false) => {
         if (!isMounted.current) {
           return;
         }
-        setNoViewerData();
+        setNoViewerData(false);
       });
 
     return () => {

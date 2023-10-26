@@ -394,7 +394,7 @@ export const opRefGet = makeOp({
   returnType: inputTypes => {
     const selfType = inputTypes.self.type;
     if (isUnion(selfType)) {
-      return union(selfType.members.map(m => m.objectType));
+      return union(selfType.members.map(m => m.objectType as Type));
     }
     return (inputTypes.self.type as any).objectType;
   },
@@ -468,8 +468,13 @@ export const opGeoSelected = makeOp({
 });
 
 export const opFacetSelected = makeOp({
-  hidden: true,
+  hidden: false,
   name: 'Facet-selected',
+  description: 'Show selected rows of a Facet panel',
+  argDescriptions: {
+    self: 'The facet panel',
+  },
+  returnValueDescription: 'selected rows',
   argTypes: {
     self: {type: 'Facet'} as any,
   },

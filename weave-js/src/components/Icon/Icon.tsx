@@ -111,7 +111,6 @@ import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
-import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
@@ -136,6 +135,9 @@ import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
 import {ReactComponent as ImportRocketLaunch} from '../../assets/icons/icon-rocket-launch.svg';
+import {ReactComponent as ImportRowHeightLarge} from '../../assets/icons/icon-row-height-large.svg';
+import {ReactComponent as ImportRowHeightMedium} from '../../assets/icons/icon-row-height-medium.svg';
+import {ReactComponent as ImportRowHeightSmall} from '../../assets/icons/icon-row-height-small.svg';
 import {ReactComponent as ImportRun} from '../../assets/icons/icon-run.svg';
 import {ReactComponent as ImportRunningRepeat} from '../../assets/icons/icon-running-repeat.svg';
 import {ReactComponent as ImportScikitLogo} from '../../assets/icons/icon-scikit-logo.svg';
@@ -538,9 +540,6 @@ export const IconOrganizationCorporate = (props: SVGIconProps) => (
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportOverflowHorizontal {...updateIconProps(props)} />
 );
-export const IconOverflowVertical = (props: SVGIconProps) => (
-  <ImportOverflowVertical {...updateIconProps(props)} />
-);
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
 );
@@ -612,6 +611,15 @@ export const IconRobotServiceMember = (props: SVGIconProps) => (
 );
 export const IconRocketLaunch = (props: SVGIconProps) => (
   <ImportRocketLaunch {...updateIconProps(props)} />
+);
+export const IconRowHeightLarge = (props: SVGIconProps) => (
+  <ImportRowHeightLarge {...updateIconProps(props)} />
+);
+export const IconRowHeightMedium = (props: SVGIconProps) => (
+  <ImportRowHeightMedium {...updateIconProps(props)} />
+);
+export const IconRowHeightSmall = (props: SVGIconProps) => (
+  <ImportRowHeightSmall {...updateIconProps(props)} />
 );
 export const IconRun = (props: SVGIconProps) => (
   <ImportRun {...updateIconProps(props)} />
@@ -891,7 +899,6 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
-  'overflow-vertical': IconOverflowVertical,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
@@ -916,6 +923,9 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
   'rocket-launch': IconRocketLaunch,
+  'row-height-large': IconRowHeightLarge,
+  'row-height-medium': IconRowHeightMedium,
+  'row-height-small': IconRowHeightSmall,
   run: IconRun,
   'running-repeat': IconRunningRepeat,
   'scikit-logo': IconScikitLogo,

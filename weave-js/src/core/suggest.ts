@@ -519,8 +519,9 @@ async function autosuggestNodes(
           result.push(vNode);
           // result = result.concat(results.suggestions);
         }
-      } else if (graph.nodeType === 'void') {
-        // Suggest root ops when there are no variables in the frame
+      }
+      if (graph.nodeType === 'void') {
+        // Suggest root ops
         result = result.concat(
           rootOps(client.opStore).map(opDef => {
             const rootOpInputs = _.mapValues(

@@ -1,10 +1,11 @@
 import {
   NodeOrVoidNode,
-  callOpVeryUnsafe,
   constString,
   constNone,
-  maybe,
   opGet,
+  isVoidNode,
+  opSaveToUri,
+  Node,
 } from '@wandb/weave/core';
 import {useNodeValueExecutor, useMakeMutation} from '@wandb/weave/react';
 import {useState, useCallback} from 'react';
@@ -15,6 +16,7 @@ import {
   uriFromNode,
   toArtifactSafeName,
 } from './util';
+import {useWeaveContext} from '@wandb/weave/context';
 
 type LocalPersistenceStateId =
   | 'local_untracked'
@@ -219,6 +221,17 @@ export const useStateMachine = (
   const executor = useNodeValueExecutor();
   const makeMutation = useMakeMutation();
   const [acting, setActing] = useState(false);
+  const weave = useWeaveContext();
+
+  const updateAndClearNode = useCallback(
+    async (newInput: NodeOrVoidNode) => {
+      if (!isVoidNode(newInput)) {
+        await weave.client.clearCacheForNode(newInput);
+      }
+      updateNode(newInput);
+    },
+    [updateNode, weave.client]
+  );
   const takeAction: TakeActionType = useCallback(
     async (
       action: PersistenceAction,
@@ -236,22 +249,17 @@ export const useStateMachine = (
         throw new Error(`Invalid action: ${action}`);
       }
       if (action === 'save') {
-        const saveNode = callOpVeryUnsafe(
-          'save_to_uri',
-          {
-            obj: inputNode,
-            name:
-              actionOptions.name != null
-                ? constString(actionOptions.name)
-                : constNone(),
-          },
-          maybe('string')
-        );
+        const saveNode = opSaveToUri({
+          obj: inputNode as Node<'any'>,
+          name: (actionOptions.name != null
+            ? constString(actionOptions.name)
+            : constNone()) as Node<'string'>,
+        });
         const saveUri: string | null = await executor(saveNode as any);
         if (saveUri == null) {
           throw new Error(`Failed to save`);
         }
-        updateNode(opGet({uri: constString(saveUri)}));
+        updateAndClearNode(opGet({uri: constString(saveUri)}));
       } else if (action === 'rename_local') {
         const newName = toArtifactSafeName(actionOptions.name);
         await makeMutation(inputNode, 'rename_artifact', {
@@ -259,7 +267,7 @@ export const useStateMachine = (
         });
         // NOTICE: This should only occur for local artifacts
         // TODO: Support various aliases?
-        updateNode(
+        updateAndClearNode(
           opGet({
             uri: constString(`local-artifact:///${newName}:latest/obj`),
           })
@@ -283,12 +291,12 @@ export const useStateMachine = (
                 : constNone(),
           },
           newRoot => {
-            updateNode(newRoot);
+            updateAndClearNode(newRoot);
           }
         );
       } else if (action === 'commit') {
         await makeMutation(inputNode, 'merge_artifact', {}, newRoot => {
-          updateNode(newRoot);
+          updateAndClearNode(newRoot);
         });
       } else if (action === 'delete_local' || action === 'delete_remote') {
         await makeMutation(inputNode, 'delete_artifact', {});
@@ -300,7 +308,7 @@ export const useStateMachine = (
         onActionFinished();
       }
     },
-    [executor, inputNode, makeMutation, nodeState, updateNode]
+    [executor, inputNode, makeMutation, nodeState, updateAndClearNode]
   );
 
   return {nodeState, takeAction, acting};

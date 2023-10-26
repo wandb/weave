@@ -2,7 +2,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
 import * as Tabs from '@wandb/weave/components/Tabs';
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import * as LayoutElements from './LayoutElements';
 import styled from 'styled-components';
 import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
@@ -14,7 +14,6 @@ import {
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import {Node, NodeOrVoidNode} from '@wandb/weave/core';
 import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
-import {PreviewNode} from './PreviewNode';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
   useBoardGeneratorsForNode,
@@ -38,6 +37,8 @@ import {BoardsTab} from './BoardsTab';
 import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
 import * as S from './styles';
 import {maybePluralize} from '../../../core/util/string';
+import {Unclickable} from './PreviewNode';
+import {trackNewBoardFromTemplateClicked} from '@wandb/weave/util/events';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -119,6 +120,8 @@ type HomePreviewSidebarTemplateProps<RT extends CenterBrowserDataType> = {
     onClick: () => void;
   };
   actions?: Array<CenterBrowserActionType<RT>>;
+  emptyData?: boolean;
+  emptyDataMessage?: React.ReactNode;
 };
 
 export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
@@ -146,7 +149,7 @@ export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
         {/* <LayoutElements.Block>
           <IconOverflowHorizontal />
         </LayoutElements.Block> */}
-        {props.row && (
+        {props.row && props.actions && props.actions.length > 0 && (
           <CenterTableActionCellIcon>
             <ActionCell actions={props.actions} row={props.row} />
           </CenterTableActionCellIcon>
@@ -166,7 +169,9 @@ export const HomePreviewSidebarTemplate = <RT extends CenterBrowserDataType>(
           />
         </CenterTableActionCellIcon>
       </LayoutElements.HBlock>
-      <LayoutElements.VSpace>{props.children}</LayoutElements.VSpace>
+      <LayoutElements.VSpace>
+        {props.emptyData ? props.emptyDataMessage : props.children}
+      </LayoutElements.VSpace>
       {(props.primaryAction || props.secondaryAction) && (
         <LayoutElements.HBlock
           style={{
@@ -255,7 +260,8 @@ const getRecommendedTemplateInfo = (generators: Template[]) => {
 export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
   navigateToExpression: NavigateToExpressionType;
-}> = ({expr, navigateToExpression}) => {
+  generatorAllowList?: string[];
+}> = ({expr, navigateToExpression, generatorAllowList}) => {
   const refinedExpression = useNodeWithServerType(expr);
   const generators = useBoardGeneratorsForNode(expr);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -263,8 +269,20 @@ export const HomeExpressionPreviewParts: React.FC<{
 
   const isLoadingTemplates =
     generators.loading || refinedExpression.loading || isGenerating;
-  const hasTemplates = !isLoadingTemplates && generators.result.length > 1;
-  const recommendedTemplateInfo = getRecommendedTemplateInfo(generators.result);
+  const finalGenerators = useMemo(() => {
+    if (generators.loading || !generators.result) {
+      return [];
+    }
+
+    if (!generatorAllowList) {
+      return generators.result;
+    }
+    return generators.result.filter(generator =>
+      generatorAllowList.includes(generator.op_name)
+    );
+  }, [generatorAllowList, generators.loading, generators.result]);
+  const hasTemplates = !isLoadingTemplates && finalGenerators.length > 1;
+  const recommendedTemplateInfo = getRecommendedTemplateInfo(finalGenerators);
 
   // Create an Artifact version node to look up the artifacts that depend on this one.
   // TODO: Implement a less brittle way of pulling the URI from the get op.
@@ -314,7 +332,7 @@ export const HomeExpressionPreviewParts: React.FC<{
               recommendedTemplateInfo={recommendedTemplateInfo}
               isLoadingTemplates={isLoadingTemplates}
               setIsGenerating={setIsGenerating}
-              generators={generators.result}
+              generators={finalGenerators}
               setTabValue={setTabValue}
               hasTemplates={hasTemplates}
             />
@@ -331,7 +349,7 @@ export const HomeExpressionPreviewParts: React.FC<{
                 recommendedTemplateInfo={recommendedTemplateInfo}
                 isLoadingTemplates={isLoadingTemplates}
                 setIsGenerating={setIsGenerating}
-                generators={generators.result}
+                generators={finalGenerators}
               />
             </TabContentWrapper>
           </Tabs.Content>
@@ -379,131 +397,135 @@ const OverviewTab = ({
   hasTemplates: boolean;
 }) => {
   const weave = useWeaveContext();
-  const inputExpr = weave.expToString(expr);
   const makeBoardFromNode = useMakeLocalBoardFromNode();
   const [copyButtonText, setCopyButtonText] = useState<'Copy' | 'Copied'>(
     'Copy'
   );
+  const showSeedBoard = generators.find(g => g.op_name === SEED_BOARD_OP_NAME)
+    ? true
+    : false;
 
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
-      <LayoutElements.VBlock style={{gap: '8px'}}>
-        <LayoutElements.BlockHeader>
-          PREVIEW
-          <Button
-            onClick={() => {
-              navigateToExpression(expr);
-            }}
-            size="small"
-            variant="ghost"
-            icon="full-screen-mode-expand">
-            Expand
-          </Button>
-        </LayoutElements.BlockHeader>
-        <LayoutElements.Block>
-          <PreviewNode inputExpr={inputExpr} />
-        </LayoutElements.Block>
-      </LayoutElements.VBlock>
-      <LayoutElements.VBlock style={{gap: '8px'}}>
-        <LayoutElements.BlockHeader>
-          EXPRESSION
-          <Button
-            onClick={() => {
-              navigator.clipboard.writeText(weave.expToString(expr));
-              setCopyButtonText('Copied');
-              setTimeout(() => {
-                setCopyButtonText('Copy');
-              }, 3000);
-            }}
-            size="small"
-            variant="ghost"
-            icon="copy">
-            {copyButtonText}
-          </Button>
-        </LayoutElements.BlockHeader>
-        <LayoutElements.Block>
-          <WeaveExpression
-            expr={expr}
-            onMount={() => {}}
-            onFocus={() => {}}
-            onBlur={() => {}}
-            frozen
-          />
-          {/* </Unclickable> */}
-        </LayoutElements.Block>
-      </LayoutElements.VBlock>
       {/*  Only show the create a board section if a board can be created ie there exists at least one template */}
       {isLoadingTemplates ? (
         <Loader />
       ) : (
-        generators.length > 0 && (
-          <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
-            <LayoutElements.BlockHeader>
-              CREATE A BOARD
-              {hasTemplates && (
-                <Button
-                  onClick={() => {
-                    setTabValue('Templates');
-                  }}
-                  size="small"
-                  variant="ghost">
-                  View all templates
-                </Button>
-              )}
-            </LayoutElements.BlockHeader>
-            <LayoutElements.VStack
-              style={{
-                gap: '8px',
-              }}>
-              {recommendedTemplateInfo &&
-                recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
-                  <>
-                    <DashboardTemplate
-                      key={recommendedTemplateInfo.op_name}
-                      title={recommendedTemplateInfo.display_name}
-                      subtitle={recommendedTemplateInfo.description}
-                      onButtonClick={() => {
-                        setIsGenerating(true);
-                        makeBoardFromNode(
-                          recommendedTemplateInfo.op_name,
-                          refinedExpression.result as any,
-                          newDashExpr => {
-                            setIsGenerating(false);
-                            navigateToExpression(newDashExpr);
-                          }
-                        );
-                      }}
-                      isExpanded={true}
-                      isRecommended={true}
-                    />
-                    <Label style={{display: 'flex', justifyContent: 'center'}}>
-                      or
-                    </Label>
-                  </>
+        <>
+          {generators.length > 0 && (
+            <LayoutElements.VBlock style={{gap: '8px', paddingBottom: '32px'}}>
+              <LayoutElements.BlockHeader>
+                CREATE A BOARD
+                {hasTemplates && (
+                  <Button
+                    onClick={() => {
+                      setTabValue('Templates');
+                    }}
+                    size="small"
+                    variant="ghost">
+                    View all templates
+                  </Button>
                 )}
-              <DashboardTemplate
-                key={SEED_BOARD_OP_NAME}
-                subtitle="Seed a board with a simple visualization of this table."
-                onButtonClick={() => {
-                  setIsGenerating(true);
-                  makeBoardFromNode(
-                    SEED_BOARD_OP_NAME,
-                    refinedExpression.result as any,
-                    newDashExpr => {
-                      setIsGenerating(false);
-                      navigateToExpression(newDashExpr);
+              </LayoutElements.BlockHeader>
+              <LayoutElements.VStack
+                style={{
+                  gap: '8px',
+                }}>
+                {recommendedTemplateInfo &&
+                  recommendedTemplateInfo.op_name !== SEED_BOARD_OP_NAME && (
+                    <>
+                      <DashboardTemplate
+                        key={recommendedTemplateInfo.op_name}
+                        title={recommendedTemplateInfo.display_name}
+                        subtitle={recommendedTemplateInfo.description}
+                        onButtonClick={() => {
+                          setIsGenerating(true);
+                          makeBoardFromNode(
+                            recommendedTemplateInfo.op_name,
+                            refinedExpression.result as any,
+                            newDashExpr => {
+                              setIsGenerating(false);
+                              navigateToExpression(newDashExpr);
+                            }
+                          );
+                          const templateName = processTemplateNameForTracking(
+                            recommendedTemplateInfo.display_name
+                          );
+                          trackNewBoardFromTemplateClicked(
+                            'table-overview-tab',
+                            templateName
+                          );
+                        }}
+                        isExpanded={true}
+                        isRecommended={true}
+                      />
+                      {showSeedBoard && (
+                        <Label
+                          style={{display: 'flex', justifyContent: 'center'}}>
+                          or
+                        </Label>
+                      )}
+                    </>
+                  )}
+                {showSeedBoard && (
+                  <DashboardTemplate
+                    key={SEED_BOARD_OP_NAME}
+                    subtitle="Seed a board with a simple visualization of this table."
+                    onButtonClick={() => {
+                      setIsGenerating(true);
+                      makeBoardFromNode(
+                        SEED_BOARD_OP_NAME,
+                        refinedExpression.result as any,
+                        newDashExpr => {
+                          setIsGenerating(false);
+                          navigateToExpression(newDashExpr);
+                        }
+                      );
+                      trackNewBoardFromTemplateClicked(
+                        'table-overview-tab',
+                        'simple-table-visualization'
+                      );
+                    }}
+                    isExpanded={true}
+                    buttonVariant={
+                      generators.length === 1 ? 'primary' : 'secondary'
                     }
-                  );
+                    buttonText="New board"
+                  />
+                )}
+              </LayoutElements.VStack>
+            </LayoutElements.VBlock>
+          )}
+          <LayoutElements.VBlock style={{gap: '8px'}}>
+            <LayoutElements.BlockHeader>
+              EXPRESSION
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(weave.expToString(expr));
+                  setCopyButtonText('Copied');
+                  setTimeout(() => {
+                    setCopyButtonText('Copy');
+                  }, 3000);
                 }}
-                isExpanded={true}
-                buttonVariant={
-                  generators.length === 1 ? 'primary' : 'secondary'
-                }
-                buttonText="New board"
-              />
-            </LayoutElements.VStack>
+                size="small"
+                variant="ghost"
+                icon="copy">
+                {copyButtonText}
+              </Button>
+            </LayoutElements.BlockHeader>
+            <LayoutElements.Block>
+              <Unclickable>
+                <WeaveExpression
+                  expr={expr}
+                  onMount={() => {}}
+                  onFocus={() => {}}
+                  onBlur={() => {}}
+                  frozen
+                />
+              </Unclickable>
+            </LayoutElements.Block>
           </LayoutElements.VBlock>
-        )
+        </>
       )}
     </LayoutElements.VStack>
   );
@@ -565,6 +587,13 @@ const TemplateTab = ({
                 navigateToExpression(newDashExpr);
               }
             );
+            const templateName = processTemplateNameForTracking(
+              recommendedTemplateInfo.display_name
+            );
+            trackNewBoardFromTemplateClicked(
+              'table-template-tab',
+              templateName
+            );
           }}
           onClick={() => {
             setExpandedTemplate(recommendedTemplateInfo.op_name);
@@ -598,6 +627,13 @@ const TemplateTab = ({
             }}
             onClick={() => {
               setExpandedTemplate(template.op_name);
+              const templateName = processTemplateNameForTracking(
+                template.display_name
+              );
+              trackNewBoardFromTemplateClicked(
+                'table-template-tab',
+                templateName
+              );
             }}
             isExpanded={expandedTemplate === template.op_name}
           />
@@ -706,3 +742,7 @@ export const HomeBoardPreview: React.FC<{
     </HomePreviewSidebarTemplate>
   );
 };
+
+function processTemplateNameForTracking(templateName: string) {
+  return templateName.toLowerCase().trim().split(' ').join('_');
+}

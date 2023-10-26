@@ -34,9 +34,59 @@ export const setupAnalytics = () => {
 
 setupAnalytics();
 
-/**
- * TODO: Connect to router.
- */
 export function trackPage(properties: object, options: object) {
   (window.analytics as any)?.page?.(properties, options);
+}
+
+export function trackEvent(
+  eventName: string,
+  eventData: Record<string, unknown>
+) {
+  // Taken from W&B app's Analytics.
+  if (
+    Array.isArray(eventData) || // Segment accepts lists but won't process them
+    typeof eventData !== 'object' || // exclude the primitives
+    eventData === null // typeof null => 'object' :grimace:
+    // note this still leaves holes for Date / Error / any other weird "object" types
+  ) {
+    throw new Error('Analytics data must be a non-array object.');
+  }
+
+  (window.analytics as any)?.track?.(eventName, eventData);
+}
+
+export function trackWeaveAppEvent(
+  eventName: string,
+  payload?: {[key: string]: string}
+) {
+  const data: {[key: string]: any} = {event_name: eventName};
+  if (payload) {
+    Object.assign(data, payload);
+  }
+  trackEvent('Weave App Event', data);
+}
+
+export function trackNewBlankBoardClicked(source: string) {
+  trackWeaveAppEvent('create_board', {
+    event_type: 'new_blank_board',
+    event_source: source,
+  });
+}
+
+export function trackNewBoardFromTemplateClicked(
+  source: string,
+  template: string
+) {
+  trackWeaveAppEvent('create_board', {
+    event_type: 'board_template',
+    event_source: source,
+    template_name: template,
+  });
+}
+
+export function trackPublishBoardClicked(eventType: string, source: string) {
+  trackWeaveAppEvent('publish_board', {
+    event_type: eventType,
+    event_source: source,
+  });
 }

@@ -70,10 +70,15 @@ def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
 
 def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
     cookie = weave_env.weave_wandb_cookie()
+    headers = weave_env.weave_wandb_gql_headers()
     if cookie:
         # This is a special case for testing. It should never be used in production.
         cookies = {"wandb": cookie}
-        headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
+        headers = {
+            "use-admin-privileges": "true",
+            "x-origin": "https://app.wandb.test",
+            **headers,
+        }
         return set_wandb_api_context("admin", None, headers, cookies)
     api_key = weave_env.weave_wandb_api_key()
     if api_key:
@@ -188,6 +193,28 @@ class WandbApiAsync:
             return None
         return file["directUrl"]
 
+    VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
+        """
+        query DefaultEntity {
+            viewer {
+                defaultEntity {
+                    name
+                }
+            }
+        }        
+        """
+    )
+
+    async def default_entity_name(self) -> typing.Optional[str]:
+        try:
+            result = await self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        try:
+            return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+        except AttributeError:
+            return None
+
 
 class WandbApi:
     def query(self, query: graphql.DocumentNode, **kwargs: typing.Any) -> typing.Any:
@@ -273,6 +300,25 @@ class WandbApi:
         if file is None:
             return None
         return file["directUrl"]
+
+    VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
+        """
+        query DefaultEntity {
+            viewer {
+                defaultEntity {
+                    name
+                }
+            }
+        }        
+        """
+    )
+
+    def default_entity_name(self) -> typing.Optional[str]:
+        try:
+            result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
 
 
 async def get_wandb_api() -> WandbApiAsync:

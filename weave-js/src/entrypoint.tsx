@@ -1,9 +1,12 @@
 import './globalStyleImports';
 
+import {ApolloProvider} from '@apollo/client';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import {BrowserRouter as Router, Switch, Route} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
+
+import {apolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
@@ -76,30 +79,32 @@ const Main = ({browserType}: MainProps) => (
 
 const basename = getConfig().PREFIX;
 ReactDOM.render(
-  <Router basename={basename}>
-    <Switch>
-      <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
-        <Main browserType={URL_RECENT} />
-      </Route>
-      <Route path={[`/${URL_BROWSE}/${URL_TEMPLATES}/:templateName?`]}>
-        <Main browserType={URL_TEMPLATES} />
-      </Route>
-      <Route
-        path={[
-          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?/:preview?`,
-          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?`,
-          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?`,
-          `/${URL_BROWSE}/${URL_WANDB}/:entity?`,
-        ]}>
-        <Main browserType={URL_WANDB} />
-      </Route>
-      <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
-        <Main browserType={URL_LOCAL} />
-      </Route>
-      <Route path="/">
-        <Main />
-      </Route>
-    </Switch>
-  </Router>,
+  <ApolloProvider client={apolloClient}>
+    <Router basename={basename}>
+      <Switch>
+        <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
+          <Main browserType={URL_RECENT} />
+        </Route>
+        <Route path={[`/${URL_BROWSE}/${URL_TEMPLATES}/:templateName?`]}>
+          <Main browserType={URL_TEMPLATES} />
+        </Route>
+        <Route
+          path={[
+            `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?/:preview?`,
+            `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?`,
+            `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?`,
+            `/${URL_BROWSE}/${URL_WANDB}/:entity?`,
+          ]}>
+          <Main browserType={URL_WANDB} />
+        </Route>
+        <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
+          <Main browserType={URL_LOCAL} />
+        </Route>
+        <Route path="/">
+          <Main />
+        </Route>
+      </Switch>
+    </Router>
+  </ApolloProvider>,
   document.getElementById('root')
 );

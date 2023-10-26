@@ -117,10 +117,13 @@ def log_system_info():
     underscore_netrc_exists = os.path.exists(os.path.expanduser("~/_netrc"))
     WANDB_API_KEY = "REDACTED" if os.environ.get("WANDB_API_KEY") else None
     WEAVE_WANDB_COOKIE = "REDACTED" if os.environ.get("WEAVE_WANDB_COOKIE") else None
+    WEAVE_WANDB_GQL_HEADERS = environment.weave_wandb_gql_headers()
+    FRONTEND_ENV = json.dumps(frontend_env(), indent=2)
 
     logger.info("Network Config:")
-    logger.info(f"  WEAVE_SERVER_URL    = {WEAVE_SERVER_URL}")
-    logger.info(f"  WANDB_BASE_URL      = {WANDB_BASE_URL}")
+    logger.info(f"  WEAVE_SERVER_URL        = {WEAVE_SERVER_URL}")
+    logger.info(f"  WANDB_BASE_URL          = {WANDB_BASE_URL}")
+    logger.info(f"  WEAVE_WANDB_GQL_HEADERS = {WEAVE_WANDB_GQL_HEADERS}")
 
     logger.info("Cache Config:")
     logger.info(f"  WEAVE_LOCAL_ARTIFACT_DIR  = {WEAVE_LOCAL_ARTIFACT_DIR}")
@@ -130,6 +133,7 @@ def log_system_info():
     logger.info(f"  ~/_netrc exists     = {underscore_netrc_exists}")
     logger.info(f"  WANDB_API_KEY       = {WANDB_API_KEY}")
     logger.info(f"  WEAVE_WANDB_COOKIE  = {WEAVE_WANDB_COOKIE}")
+    logger.info(f"  FRONTEND_ENV        = {FRONTEND_ENV}")
 
 
 def make_app():
@@ -392,6 +396,8 @@ def frontend_env():
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
         "WANDB_BASE_URL": environment.wandb_base_url(),
+        "DD_ENV": environment.dd_env(),
+        "ENV_IS_CI": environment.env_is_ci(),
     }
 
 

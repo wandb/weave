@@ -268,6 +268,36 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                 return graph.OutputNode(
                     node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node}
                 )
+    elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
+        from .ops_arrow.arrow import ArrowWeaveListType
+        from .ops_arrow.list_ops import _concat_output_type
+
+        # The operation of flattening a lists of arrow weave lists is exactly equal to the far
+        # more efficient, vectorized concat operation. If this is the case, use it!.
+        arr_node = node.from_op.inputs["arr"]
+        if types.List().assign_type(arr_node.type) and ArrowWeaveListType().assign_type(
+            arr_node.type.object_type
+        ):
+            return graph.OutputNode(
+                _concat_output_type({"arr": arr_node.type}),
+                "ArrowWeaveList-concat",
+                {"arr": arr_node},
+            )
+    elif isinstance(node, graph.OutputNode) and node.from_op.name == "concat":
+        from .ops_arrow.arrow import ArrowWeaveListType
+        from .ops_arrow.list_ops import flatten_return_type
+
+        # The operation of concat on a awl of lists is exactly equal to the far
+        # more efficient, vectorized flatten operation. If this is the case, use it!.
+        arr_node = node.from_op.inputs["arr"]
+        if ArrowWeaveListType().assign_type(arr_node.type) and types.List().assign_type(
+            arr_node.type.object_type
+        ):
+            return graph.OutputNode(
+                flatten_return_type({"arr": arr_node.type}),
+                "ArrowWeaveList-flatten",
+                {"arr": arr_node},
+            )
     return None
 
 
@@ -797,10 +827,15 @@ def compile_refine_and_propagate_gql(
                     re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
                 )
                 if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
-                    raise errors.WeaveBadRequest(
+                    err = errors.WeaveBadRequest(
                         "Error while dispatching: %s. This is most likely a client error"
                         % from_op.name
                     )
+                    err.fingerprint = [
+                        "error-while-dispatching-client-error",
+                        from_op.name,
+                    ]
+                    raise err
                 else:
                     raise
             except:
@@ -836,6 +871,7 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
         "panel_table-all_rows",
         "stream_table-rows",
         "panel_trace-active_span",
+        "Facet-selected",
     ]:
         return None
     new_node = typing.cast(graph.Node, weave_internal.use(node))

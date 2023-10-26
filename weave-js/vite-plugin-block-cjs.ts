@@ -14,6 +14,7 @@ const ALLOWED_CJS_MODULES = [
   '@babel/runtime',
   '@wandb/ui',
   '@wandb/weave',
+  '@wry/equality',
   '@apollo',
   'apollo-client',
   'classnames',
@@ -66,6 +67,10 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/icons/KeyboardArrowDown',
   '@material-ui/icons/KeyboardArrowRight',
   '@monaco-editor/loader',
+  '@radix-ui/react-checkbox',
+  '@radix-ui/react-radio-group',
+  '@radix-ui/react-slider',
+  '@radix-ui/react-switch',
   '@radix-ui/react-tabs',
   '@redux-saga/core',
   '@redux-saga/deferred',
@@ -366,7 +371,7 @@ Here are the new dependencies, along with the modules importing them: ${JSON.str
   2
 )}
 
-Please run invoker_prod_preview.ini and check that each dependency works as expected, then add them to ALLOWED_CJS_MODULES in vite-plugin-block-cjs.ts.
+Please run invoker_fe_prod_preview.ini and check that each dependency works as expected, then add them to ALLOWED_CJS_MODULES in vite-plugin-block-cjs.ts.
 
 The error that motivated this check is https://github.com/vitejs/vite/issues/4209 (so if it's fixed, consider tearing this out)
 `;

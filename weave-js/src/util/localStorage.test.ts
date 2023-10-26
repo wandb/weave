@@ -1,4 +1,4 @@
-import {getStorage, safeLocalStorage} from './localStorage';
+import {getStorage, safeLocalStorage} from '../core/util/localStorage';
 
 describe('Localstorage w/ error handling', () => {
   describe('feature detect local storage', () => {

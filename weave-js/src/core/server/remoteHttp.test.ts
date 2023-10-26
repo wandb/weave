@@ -122,7 +122,7 @@ describe('RemoteHttpServer', () => {
       {
         weaveUrl: 'https://weave-host/execute',
         fetch,
-        contiguousBatchesOnly: true,
+        mergeInexpensiveBatches: false,
       },
       StaticOpStore.getInstance()
     );
@@ -183,7 +183,7 @@ describe('RemoteHttpServer', () => {
       {
         weaveUrl: 'https://weave-host/execute',
         fetch,
-        contiguousBatchesOnly: true,
+        mergeInexpensiveBatches: false,
       },
       StaticOpStore.getInstance()
     );
@@ -314,9 +314,12 @@ describe('RemoteHttpServer', () => {
     );
 
     const result = server.query([constNumber(42)]);
-    return result.then(r => {
+    return result.catch(e => {
       expect(fetch).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
-      expect(r).toEqual([null]);
+      expect(e).toEqual({
+        message: 'Weave request failed after 3 retries',
+        traceback: [],
+      });
     });
   });
 
@@ -344,6 +347,7 @@ describe('RemoteHttpServer', () => {
     const server = new RemoteHttpServer(
       {
         weaveUrl: 'https://weave-host/execute',
+        contiguousBatchesOnly: false,
         fetch,
       },
       StaticOpStore.getInstance()
@@ -382,6 +386,7 @@ describe('RemoteHttpServer', () => {
     const server = new RemoteHttpServer(
       {
         weaveUrl: 'https://weave-host/execute',
+        contiguousBatchesOnly: false,
         fetch,
       },
       StaticOpStore.getInstance()
@@ -432,7 +437,7 @@ describe('RemoteHttpServer', () => {
     const server = new RemoteHttpServer(
       {
         weaveUrl: 'https://weave-host/execute',
-        contiguousBatchesOnly: true,
+        mergeInexpensiveBatches: false,
         fetch,
       },
       StaticOpStore.getInstance()
@@ -483,7 +488,7 @@ describe('RemoteHttpServer', () => {
     const server = new RemoteHttpServer(
       {
         weaveUrl: 'https://weave-host/execute',
-        contiguousBatchesOnly: true,
+        mergeInexpensiveBatches: false,
         fetch,
       },
       StaticOpStore.getInstance()
@@ -583,7 +588,7 @@ describe('RemoteHttpServer', () => {
         const server = new RemoteHttpServer(
           {
             weaveUrl: 'https://weave-host/execute',
-            contiguousBatchesOnly: true,
+            mergeInexpensiveBatches: false,
             fetch,
           },
           StaticOpStore.getInstance()

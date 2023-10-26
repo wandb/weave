@@ -8,6 +8,7 @@ from .. import graph
 from .. import weave_types as types
 from .. import async_demo
 from .. import compile
+from ..ops_arrow import to_arrow
 
 
 def test_automatic_await_compile():
@@ -228,3 +229,61 @@ def test_compile_through_function_call(user_by_api_key_in_env):
     pick = called_node.pick("val")
     res = weave.use(pick)
     assert res.to_pylist_notags() == list(range(10))
+
+
+def test_compile_list_flatten_to_awl_concat():
+    # 4 cases: list of lists, list of awls, awl of lists, awl of awls
+    # When the outer list-structure is a list, we want to dispatch to concat, preferably AWL-concat
+    # when the outer list-structure is an AWL, we want to dispatch ensure that we use AWL ops
+    # list of lists
+    list_list_node = weave.ops.make_list(a=[1], b=[2])
+    list_list_node_concat = list_list_node.concat()
+    list_list_node_flatten = list_list_node.flatten()
+    list_list_node_concat_compiled = compile.compile([list_list_node_concat])[0]
+    list_list_node_flatten_compiled = compile.compile([list_list_node_flatten])[0]
+    assert list_list_node_concat_compiled.from_op.name == "concat"
+    assert list_list_node_flatten_compiled.from_op.name == "flatten"
+    # list of awls
+    list_awl_node = weave.ops.make_list(a=to_arrow([1]), b=to_arrow([2]))
+    list_awl_node_concat = list_awl_node.concat()
+    list_awl_node_flatten = list_awl_node.flatten()
+    list_awl_node_concat_compiled = compile.compile([list_awl_node_concat])[0]
+    list_awl_node_flatten_compiled = compile.compile([list_awl_node_flatten])[0]
+    assert list_awl_node_concat_compiled.from_op.name == "ArrowWeaveList-concat"
+    # **THIS IS THE SPECIAL CASE 1**: the flatten operation is transformed into a concat!
+    assert list_awl_node_flatten_compiled.from_op.name == "ArrowWeaveList-concat"
+    # awl of lists
+    awl_list_node = weave.save(to_arrow([[1], [2]]))
+    awl_list_node_concat = awl_list_node.concat()
+    awl_list_node_flatten = awl_list_node.flatten()
+    awl_list_node_concat_compiled = compile.compile([awl_list_node_concat])[0]
+    awl_list_node_flatten_compiled = compile.compile([awl_list_node_flatten])[0]
+    # **THIS IS THE SPECIAL CASE 2**: the concat operation is transformed into a flatten!
+    assert awl_list_node_concat_compiled.from_op.name == "ArrowWeaveList-flatten"
+    assert awl_list_node_flatten_compiled.from_op.name == "ArrowWeaveList-flatten"
+    # awl of awls
+    awl_awl_node = weave.save(to_arrow([to_arrow([1]), to_arrow([2])]))
+    awl_awl_node_concat = awl_awl_node.concat()
+    awl_awl_node_flatten = awl_awl_node.flatten()
+    awl_awl_node_concat_compiled = compile.compile([awl_awl_node_concat])[0]
+    awl_awl_node_flatten_compiled = compile.compile([awl_awl_node_flatten])[0]
+    assert awl_awl_node_concat_compiled.from_op.name == "ArrowWeaveList-concat"
+    assert awl_awl_node_flatten_compiled.from_op.name == "ArrowWeaveList-flatten"
+
+    results = weave.use(
+        [
+            list_list_node_concat,
+            list_list_node_flatten,
+            list_awl_node_concat,
+            list_awl_node_flatten,
+            awl_list_node_concat,
+            awl_list_node_flatten,
+            awl_awl_node_concat,
+            awl_awl_node_flatten,
+        ]
+    )
+
+    for result in results[:2]:
+        assert result == [1, 2]
+    for result in results[2:]:
+        assert result.to_pylist_notags() == [1, 2]

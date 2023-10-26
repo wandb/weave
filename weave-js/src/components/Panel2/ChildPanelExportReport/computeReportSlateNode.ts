@@ -1,10 +1,9 @@
-import {voidNode} from '@wandb/weave/core';
-import {v4 as uuid} from 'uuid';
+import {ID} from '@wandb/weave/core';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {getConfigForPath} from '../panelTree';
+import {getConfigForPath, makeGroup, makePanel} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
 
-type WeavePanelSlateNode = {
+export type WeavePanelSlateNode = {
   type: 'weave-panel';
   /**
    * A weave-panel slate node in a report is a "void element", which
@@ -39,38 +38,34 @@ export const computeReportSlateNode = (
   targetPath: string[]
 ): WeavePanelSlateNode => {
   const targetConfig = getConfigForPath(fullConfig, targetPath);
-  const inputNodeVal = {
-    id: 'Group',
-    input_node: voidNode(),
-    config: {
-      items: {
-        panel: targetConfig,
-      },
+  const inputNodeVal = makeGroup(
+    {
+      panel: targetConfig,
+    },
+    {
       disableDeletePanel: true,
       enableAddPanel: true, // actually means "is editable"
+      equalSize: true,
       layoutMode: 'vertical',
-      showExpressions: true,
-    },
-    vars: {},
-  };
+    }
+  );
 
   return {
     type: 'weave-panel',
     children: [{text: ''}],
     config: {
       isWeave1Panel: true,
-      panelConfig: {
-        id: 'Panel',
-        config: {
-          documentId: uuid(),
+      panelConfig: makePanel(
+        'Panel',
+        {
+          documentId: ID(12),
         },
-        input_node: {
+        {
           nodeType: 'const',
           type: toWeaveType(inputNodeVal),
           val: inputNodeVal,
-        },
-        vars: {},
-      },
+        }
+      ),
     },
   };
 };

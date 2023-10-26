@@ -64,6 +64,7 @@ export const useProjectsForEntityWithWeaveObject = (
     num_boards: number;
     num_stream_tables: number;
     num_logged_tables: number;
+    num_logged_traces: number;
   }>;
   loading: boolean;
 } => {
@@ -83,6 +84,7 @@ export const useProjectsForEntityWithWeaveObject = (
         num_boards: opProjectBoardCount({project: row}),
         num_stream_tables: opProjectRunStreamCount({project: row}),
         num_logged_tables: opProjectLoggedTableCount({project: row}),
+        projectHistoryType: opProjectHistoryType({project: row}),
       } as any);
     }),
   });
@@ -91,18 +93,38 @@ export const useProjectsForEntityWithWeaveObject = (
 
   return useMemo(() => {
     // this filter step is done client side - very bad!
+    const rawResult: Array<{
+      name: string;
+      updatedAt: number;
+      num_boards: number;
+      num_stream_tables: number;
+      num_logged_tables: number;
+      projectHistoryType: w.Type;
+    }> = entityProjectNamesValue.result ?? [];
     const result: Array<{
       name: string;
       updatedAt: number;
       num_boards: number;
       num_stream_tables: number;
       num_logged_tables: number;
-    }> = entityProjectNamesValue.result ?? [];
+      num_logged_traces: number;
+    }> = rawResult.map(r => {
+      return {
+        ...r,
+        num_logged_traces: projectHistoryTypeToLegacyTraceKeys(
+          r.projectHistoryType as w.Type
+        ).length,
+      };
+    });
 
     return {
       result: result.filter(
         res =>
-          res.num_boards + res.num_logged_tables + res.num_stream_tables > 0
+          res.num_boards +
+            res.num_logged_tables +
+            res.num_stream_tables +
+            res.num_logged_traces >
+          0
       ),
       loading: entityProjectNamesValue.loading,
     };
@@ -184,11 +206,7 @@ const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
 };
 
 const opProjectHistoryType = ({project}: {project: w.Node}) => {
-  return w.callOpVeryUnsafe(
-    'refine_history3_type',
-    {run: w.opProjectRuns({project})},
-    'type'
-  );
+  return w.opRunHistoryType3({run: w.opProjectRuns({project})});
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {
@@ -300,15 +318,11 @@ const opArtifactsBasicMetadata = ({artifacts}: {artifacts: w.Node}) => {
             artifactVersion: latestVersionNode,
           }),
         }),
-        numRows: w.callOpVeryUnsafe(
-          'run-historyLineCount',
-          {
-            run: w.opArtifactVersionCreatedBy({
-              artifactVersion: latestVersionNode,
-            }),
-          },
-          'number'
-        ) as any,
+        numRows: w.opRunHistoryLineCount({
+          run: w.opArtifactVersionCreatedBy({
+            artifactVersion: latestVersionNode,
+          }) as w.OutputNode<'run'>,
+        }),
       } as any);
     }),
   });
@@ -375,39 +389,31 @@ export const useProjectLegacyTraces = (
 const projectHistoryTypeToLegacyTraceKeys = (
   projectHistoryType: w.Type
 ): string[] => {
-  if (w.isTaggedValue(projectHistoryType)) {
-    projectHistoryType = projectHistoryType.value;
-    if (w.isList(projectHistoryType)) {
-      projectHistoryType = projectHistoryType.objectType;
-      if (w.isTaggedValue(projectHistoryType)) {
-        projectHistoryType = projectHistoryType.value;
-        if (
-          !w.isSimpleTypeShape(projectHistoryType) &&
-          projectHistoryType.type === 'ArrowWeaveList'
-        ) {
-          projectHistoryType = projectHistoryType.objectType;
-          if (w.isTypedDict(projectHistoryType)) {
-            const legacyTraceKeys = Object.entries(
-              projectHistoryType.propertyTypes
-            )
-              .filter(([key, value]) => {
-                return (
-                  value != null &&
-                  w.isAssignableTo(
-                    value,
-                    w.maybe({
-                      type: 'wb_trace_tree',
-                    })
-                  )
-                );
-              })
-              .map(([key, value]) => key);
-            return legacyTraceKeys;
-          }
-        }
+  if (w.isListLike(projectHistoryType)) {
+    projectHistoryType = w.listObjectType(projectHistoryType);
+    if (w.isListLike(projectHistoryType)) {
+      projectHistoryType = w.listObjectType(projectHistoryType);
+      if (w.isTypedDictLike(projectHistoryType)) {
+        const legacyTraceKeys = Object.entries(
+          w.typedDictPropertyTypes(projectHistoryType)
+        )
+          .filter(([key, value]) => {
+            return (
+              value != null &&
+              w.isAssignableTo(
+                value,
+                w.maybe({
+                  type: 'wb_trace_tree',
+                })
+              )
+            );
+          })
+          .map(([key, value]) => key);
+        return legacyTraceKeys;
       }
     }
   }
+
   return [];
 };
 
@@ -485,27 +491,16 @@ export const useLocalDashboards = (): {
     mapFn: w.constFunction(
       {row: {type: 'FilesystemArtifact' as any}},
       ({row}) => {
-        const nameNode = w.callOpVeryUnsafe(
-          'FilesystemArtifact-artifactName',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
-        const versionNode = w.callOpVeryUnsafe(
-          'FilesystemArtifact-artifactVersion',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
-        const createdAtNode = w.callOpVeryUnsafe(
-          'FilesystemArtifact-createdAt',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
+        const artifactNode = row as w.Node<{type: 'FilesystemArtifact'}>;
+        const nameNode = w.opFilesystemArtifactArtifactName({
+          artifact: artifactNode,
+        });
+        const versionNode = w.opFilesystemArtifactArtifactVersion({
+          artifact: artifactNode,
+        });
+        const createdAtNode = w.opFilesystemArtifactCreatedAt({
+          artifact: artifactNode,
+        });
         return w.opDict({
           name: nameNode,
           version: versionNode,

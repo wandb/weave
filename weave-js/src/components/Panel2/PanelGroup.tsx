@@ -918,7 +918,11 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         }}>
         {!inJupyter && config.enableAddPanel && (
           <ActionBar>
-            <Button variant="ghost" onClick={handleAddPanel} icon="add-new">
+            <Button
+              variant="ghost"
+              onClick={handleAddPanel}
+              icon="add-new"
+              data-test="new-panel-button">
               New panel
             </Button>
           </ActionBar>

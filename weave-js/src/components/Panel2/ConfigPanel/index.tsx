@@ -12,7 +12,7 @@ import * as _ from 'lodash';
 import React, {FC, ReactNode, useCallback, useState} from 'react';
 import styled, {ThemeProvider, css} from 'styled-components';
 
-import {useWeaveDashUiEnable} from '../../../context';
+import {useWeaveSidebarConfigStylingEnabled} from '../../../context';
 import {WeaveExpression} from '../../../panel/WeaveExpression';
 import {themes} from '../Editor.styles';
 import * as S from './styles';
@@ -130,9 +130,9 @@ export const ConfigOption: React.FC<
     postfixComponent?: React.ReactElement;
   } & {[key: string]: any}
 > = props => {
-  const dashEnabled = useWeaveDashUiEnable();
+  const sidebarConfigStylingEnabled = useWeaveSidebarConfigStylingEnabled();
 
-  if (dashEnabled) {
+  if (sidebarConfigStylingEnabled) {
     return <ConfigOptionNew {...props} />;
   }
 
@@ -192,9 +192,9 @@ const ConfigOptionNew: React.FC<
 export const ModifiedDropdownConfigField: React.FC<
   React.ComponentProps<typeof ModifiedDropdown>
 > = props => {
-  const dashEnabled = useWeaveDashUiEnable();
+  const sidebarConfigStylingEnabled = useWeaveSidebarConfigStylingEnabled();
 
-  if (dashEnabled) {
+  if (sidebarConfigStylingEnabled) {
     return (
       <ConfigFieldWrapper withIcon>
         <ConfigFieldModifiedDropdown
@@ -227,10 +227,10 @@ export const NumberInputConfigField: React.FC<
 export const ExpressionConfigField: React.FC<
   React.ComponentProps<typeof WeaveExpression>
 > = props => {
-  const dashEnabled = useWeaveDashUiEnable();
+  const sidebarConfigStylingEnabled = useWeaveSidebarConfigStylingEnabled();
 
   const wrap = (content: ReactNode) =>
-    dashEnabled ? (
+    sidebarConfigStylingEnabled ? (
       <ConfigFieldWrapper>{content}</ConfigFieldWrapper>
     ) : (
       <div style={{flex: '1 1 auto', width: '100%'}}>{content}</div>
@@ -242,7 +242,7 @@ export const ExpressionConfigField: React.FC<
         noBox={true}
         setExpression={props.setExpression}
         expr={props.expr}
-        liveUpdate={!dashEnabled}
+        liveUpdate={!sidebarConfigStylingEnabled}
       />
     </ThemeProvider>
   );
@@ -251,10 +251,10 @@ export const ExpressionConfigField: React.FC<
 export const TextInputConfigField: React.FC<
   React.ComponentProps<typeof TextInput>
 > = props => {
-  const dashEnabled = useWeaveDashUiEnable();
+  const sidebarConfigStylingEnabled = useWeaveSidebarConfigStylingEnabled();
 
   const wrap = (content: ReactNode) =>
-    dashEnabled ? (
+    sidebarConfigStylingEnabled ? (
       <ConfigFieldWrapper>{content}</ConfigFieldWrapper>
     ) : (
       <div style={{flex: '1 1 auto', width: '100%'}}>{content}</div>
@@ -289,6 +289,7 @@ export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
     border: 2px solid ${globals.TEAL_400};
   }
 `;
+ConfigFieldWrapper.displayName = 'S.ConfigFieldWrapper';
 
 export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
   &&& {
@@ -334,13 +335,16 @@ export const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
     }
   }
 `;
+ConfigFieldModifiedDropdown.displayName = 'S.ConfigFieldModifiedDropdown';
 
 const IconDown = styled(IconDownUnstyled)`
   width: 18px;
   height: 18px;
 `;
+IconDown.displayName = 'S.IconDown';
 
 const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
   padding: 3px;
 `;
+ConfigDimMenuButton.displayName = 'S.ConfigDimMenuButton';

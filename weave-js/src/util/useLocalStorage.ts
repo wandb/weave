@@ -3,7 +3,7 @@
 
 import {useState} from 'react';
 
-import {safeLocalStorage} from './localStorage';
+import {safeLocalStorage} from '../core/util/localStorage';
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
   // State to store our value
