@@ -108,7 +108,6 @@ export const ColumnAction = styled.div<{isHovered?: boolean}>`
   padding: 5px 0px 0px 0px;
   flex: 0 0 auto;
   height: 100%;
-  // box-shadow: -4px 0px 4px 4px white;
   background: white;
   font-size: 20px;
 
