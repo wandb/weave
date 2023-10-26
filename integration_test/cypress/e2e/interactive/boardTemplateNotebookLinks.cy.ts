@@ -6,7 +6,8 @@ describe('board template notebook links', () => {
     cy.contains('Board templates').click();
 
     cy.get('[data-testid="template-card"]').each(($el, index, $list) => {
-      cy.wrap($el)
+      const currentEl = cy.get('[data-testid="template-card"]').eq(index);
+      currentEl
         .trigger('mouseenter')
         .realHover()
         .trigger('mouseenter')
@@ -17,6 +18,7 @@ describe('board template notebook links', () => {
       cy.get(
         'img[src="https://colab.research.google.com/assets/colab-badge.svg"]'
       )
+
         .parent('a')
         .each(($innerEl, index, $list) => {
           const href = $innerEl.prop('href');
@@ -42,7 +44,18 @@ describe('board template notebook links', () => {
             // check that the status code is 200
             expect(response.status).to.eq(200);
           });
+
+          cy.origin(
+            'https://colab.research.google.com',
+            {args: {href}},
+            ({href}) => {
+              cy.visit(href);
+              cy.contains('pip install').scrollIntoView().should('be.visible');
+            }
+          );
         });
+      goToHomePage();
+      cy.contains('Board templates').click();
     });
   });
 });
