@@ -58,7 +58,12 @@ def deploy() -> None:
 @click.argument("model_ref")
 @click.option("--project", help="W&B project name.")
 @click.option("--gcp-project", help="GCP project name.")
-def gcp(model_ref: str, project: str, gcp_project: str) -> None:
+@click.option("--dev", is_flag=True, help="Run the function locally.")
+def gcp(model_ref: str, project: str, gcp_project: str, dev = False) -> None:
+    if dev:
+        print(f"Developing model {model_ref}...")
+        google.develop(model_ref)
+        return
     print(f"Deploying model {model_ref}...")
     try:
         google.deploy(model_ref, wandb_project=project, gcp_project=gcp_project)
