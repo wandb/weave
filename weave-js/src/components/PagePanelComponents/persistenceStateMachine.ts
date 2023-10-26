@@ -99,12 +99,11 @@ const persistenceActions: {
   },
   cloud_uncommitted_with_remote: {
     storeAction: 'commit',
-    renameAction: 'publish_as',
+    renameAction: 'commit',
     deleteAction: 'delete_remote',
   },
   cloud_published: {
     storeAction: null,
-    // TODO: verify this is the right place
     renameAction: 'rename_remote', // 'rename_remote' - uncomment after implementing
     deleteAction: 'delete_remote',
   },

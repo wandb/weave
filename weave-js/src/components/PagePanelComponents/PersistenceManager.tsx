@@ -248,6 +248,8 @@ export const PersistenceManager: React.FC<{
     hasRemote
   );
 
+  console.log({nodeState});
+
   const isAuthenticated = useIsAuthenticated();
   const availableActions = useMemo(
     () => getAvailableActions(nodeState, isAuthenticated ?? false),
@@ -643,11 +645,11 @@ const HeaderFileControls: React.FC<{
           onRename={async newName => {
             // TODO: what happens when changes are made?
             // TODO: we probably want to check branchPoint.originalURI
+            const artifactSequenceID =
+              !artifactNodeValue.loading && artifactNodeValue.result
+                ? artifactNodeValue.result.id
+                : '';
             if (renameAction === 'rename_remote') {
-              const artifactSequenceID =
-                !artifactNodeValue.loading && artifactNodeValue.result
-                  ? artifactNodeValue.result.id
-                  : '';
               try {
                 await updateArtifactCollection({
                   variables: {
@@ -669,8 +671,25 @@ const HeaderFileControls: React.FC<{
             }
             setActing(true);
             takeAction(renameAction, {name: newName}, () => {
-              setActing(false);
-              setActionRenameOpen(false);
+              try {
+                updateArtifactCollection({
+                  variables: {
+                    artifactSequenceID,
+                    name: newName,
+                  },
+                }).then(() => {
+                  // Refresh the board
+                  const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
+                  updateNode(opGet({uri: constString(uri)}));
+                  setActing(false);
+                  setActionRenameOpen(false);
+                });
+              } catch (e) {
+                console.error('Failed to rename artifact collection.');
+                toast(
+                  'Something went wrong while trying to rename this board.'
+                );
+              }
             });
           }}
         />
