@@ -8,7 +8,7 @@ import typing
 import tempfile
 from weave import environment, __version__
 from weave.uris import WeaveURI
-from urllib import parse
+import re
 import sys
 
 DOCKER_FILE = """
@@ -109,21 +109,35 @@ def compile(model_ref: str, wandb_project: typing.Optional[str] = None, base_ima
         f.write(generate_dockerfile(model_ref, wandb_project, base_image))
     return dir
 
+
+# This is a sketch or the commands needed to downscope permissions and use secrets
+# Name must be 6-30 chars
+# gcloud iam service-accounts create weave-default --display-name "Weave Default Service Account"
+# gcloud iam service-accounts add-iam-policy-binding \
+#    weave-default@playground-111.iam.gserviceaccount.com \
+#    --member="user:vanpelt@wandb.com" \
+#    --role="roles/iam.serviceAccountUser"
+# TODO: create secret
+# gcloud secrets add-iam-policy-binding CVP_WANDB_API_KEY \
+#  --project=playground-111 \
+#  --role=roles/secretmanager.secretAccessor \
+#  --member=serviceAccount:weave-default@playground-111.iam.gserviceaccount.com
 def deploy(model_ref: str,
-           wandb_project: typing.Optional[str] = None, 
+           wandb_project: typing.Optional[str] = None,
            gcp_project: typing.Optional[str] = None,
            region: typing.Optional[str] = None,
+           service_account: typing.Optional[str] = None,
            base_image: typing.Optional[str] = "python:3.11",
-           memory: typing.Optional[str] = "500Mb"):
+           memory: typing.Optional[str] = "500Mi"):
     """Deploy the weave application."""
     enforce_login()
     if region is None:
         region = gcloud(["config", "get", "compute/region", "--format=json"])
         if region is []:
             raise ValueError("No default region set. Run `gcloud config set functions/region <region>` or set the region argument.")
-    dir = compile(model_ref, wandb_project)
+    dir = compile(model_ref, wandb_project, base_image)
     ref = WeaveURI.parse(model_ref)
-    name = f"{ref.project_name}-{ref.name}"
+    name = safe_name(f"{ref.project_name}-{ref.name}")
     project = wandb_project or ref.project_name
     key = environment.weave_wandb_api_key()
     args = [
@@ -133,18 +147,33 @@ def deploy(model_ref: str,
         f"--region={region}",
         f"--memory={memory}",
         f"--set-env-vars=PROJECT_NAME={project}",
-        f"--set-secrets=WANDB_API_KEY={key},OPENAI_API_KEY={os.getenv('OPENAI_API_KEY')}",
+        # TODO: IAM permission shit show
+        # f"--set-secrets=WANDB_API_KEY=CVP_WANDB_API_KEY:latest,CVP_OPENAI_API_KEY=CVP_OPENAI_API_KEY:latest",
+        f"--set-env-vars=WANDB_API_KEY={key},OPENAI_API_KEY={os.getenv('OPENAI_API_KEY')}",
         f"--source={dir}",
         "--allow-unauthenticated",
     ]
+    if service_account is not None:
+        args.append(f"--service-account={service_account}")
     if gcp_project is not None:
         args.append(f"--project={gcp_project}")
     gcloud(args, capture=False)
     shutil.rmtree(dir)
 
+def safe_name(name: str) -> str:
+    """The name must use only lowercase alphanumeric characters and dashes,
+    cannot begin or end with a dash, and cannot be longer than 63 characters."""
+    fixed_name = re.sub(r'[^a-z0-9-]', '-', fixed_name.lower()).strip('-')
+    if len(fixed_name) == 0:
+        return "weave-op"
+    elif len(fixed_name) > 63:
+        return fixed_name[:63]
+    else:
+        return fixed_name
+
 def develop(model_ref: str, base_image: typing.Optional[str] = "python:3.11"):
     dir = compile(model_ref, base_image=base_image, dev=True)
-    name = WeaveURI.parse(model_ref).name
+    name = safe_name(WeaveURI.parse(model_ref).name)
     docker = shutil.which("docker")
     if docker is None:
         raise ValueError("docker command required: https://docs.docker.com/get-docker/")
@@ -157,24 +186,3 @@ def develop(model_ref: str, base_image: typing.Optional[str] = "python:3.11"):
     if os.getenv("DEBUG") == None:
         print("Cleaning up...")
         shutil.rmtree(dir)
-
-@dataclass
-class Ref:
-    source: str
-    entity: str
-    project: str
-    name: str
-    version: str
-
-    @classmethod
-    def from_ref(cls, model_ref: str) -> 'Ref':
-        scheme, _, path, _, _, _ = parse.urlparse(model_ref)
-        parts = path.strip("/").split("/")
-        parts = [parse.unquote(part) for part in parts]
-        if len(parts) < 3:
-            raise ValueError(f"Invalid WB Artifact URI: {model_ref}")
-        name, version = parts[2].split(":")
-        return cls(source=scheme,
-                   entity=parts[0],
-                   project=parts[1],
-                   name=name, version=version)
