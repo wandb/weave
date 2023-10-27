@@ -77,6 +77,7 @@ type Query {
 }
 
 type Mutation {
+  deleteView(input: DeleteViewInput!): DeleteViewPayload
   upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
   deleteArtifactSequence(
     input: DeleteArtifactSequenceInput!
@@ -609,6 +610,18 @@ type ViewConnection {
 type ViewEdge {
   node: View
   cursor: String!
+}
+
+input DeleteViewInput {
+  id: ID
+  deleteDrafts: Boolean = false
+  clientMutationId: String
+}
+
+type DeleteViewPayload {
+  success: Boolean
+  pendingDrafts: Boolean
+  clientMutationId: String
 }
 
 input UpsertViewInput {

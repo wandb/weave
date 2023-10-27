@@ -985,6 +985,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           width = widthItem?.split(':')[1];
         }
         if (config.panelInfo?.[name]?.hidden) {
+          // ISSUE: `name` may not be not unique. Should use path instead?
           return null;
         }
         return (
