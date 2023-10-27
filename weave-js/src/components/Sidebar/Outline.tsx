@@ -17,7 +17,7 @@ import {
   usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
-import {IconLockClosed} from '../Icon';
+import {IconHideHidden, IconLockClosed} from '../Icon';
 import {Tooltip} from '../Tooltip';
 
 const OutlineItem = styled.div``;
@@ -166,6 +166,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   }, [children]);
 
   const shouldHideMenu = shouldDisablePanelDelete(localConfig, path);
+  const isPanelHidden = config.config.panelInfo?.[name]?.hidden;
 
   return (
     <OutlineItem>
@@ -220,6 +221,19 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
             isOpen={isOutlineMenuOpen}
             onOpen={() => setIsOutlineMenuOpen(true)}
             onClose={() => setIsOutlineMenuOpen(false)}
+          />
+        )}
+        {isPanelHidden && (
+          <Tooltip
+            content="This panel is a part of the group but it is hidden from view."
+            trigger={
+              <IconHideHidden
+                style={{marginRight: '10px'}}
+                color={globals.MOON_500}
+                height={18}
+                width={18}
+              />
+            }
           />
         )}
       </OutlineItemTitle>
