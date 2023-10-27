@@ -432,7 +432,9 @@ const HeaderFileControls: React.FC<{
     } as any);
   }, [entityName, projectName, currName]);
 
-  const artifactNodeValue = useNodeValue(artifactNode);
+  const artifactNodeValue = useNodeValue(artifactNode, {
+    skip: entityName === '' || projectName === '',
+  });
 
   const resetAfterDeletion = useCallback(() => {
     setActing(false);
