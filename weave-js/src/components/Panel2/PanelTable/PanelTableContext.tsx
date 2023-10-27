@@ -14,12 +14,13 @@ export const usePanelTableContext = () => React.useContext(PanelTableContext);
 export const PanelTableContextProvider = ({
   setHoveredColId,
   hoveredColId,
-  ...props
-}: PanelTableContextValue) => {
+  children
+}: PanelTableContextValue & {children: React.ReactNode}) => {
   return (
     <PanelTableContext.Provider
       value={{setHoveredColId, hoveredColId}}
-      {...props}
-    />
+    >
+        {children}
+    </PanelTableContext.Provider>
   );
 };
