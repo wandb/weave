@@ -54,6 +54,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
 }) => {
   const isViewerWandbEmployee = useIsViewerWandbEmployee();
   const setInteractingPanel = useSetInteractingPanel();
+  const {isNumItemsLocked} = config.config;
 
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
@@ -167,12 +168,15 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         onClick: () => handleUnnest(path),
       });
     }
-    items.push({
-      key: 'duplicate',
-      content: 'Duplicate',
-      icon: <IconCopy />,
-      onClick: () => handleDuplicate(path),
-    });
+
+    if (!isNumItemsLocked) {
+      items.push({
+        key: 'duplicate',
+        content: 'Duplicate',
+        icon: <IconCopy />,
+        onClick: () => handleDuplicate(path),
+      });
+    }
 
     if (path.find(p => p === 'main') != null && path.length > 1) {
       items.push({
@@ -197,20 +201,24 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       }
     }
 
-    items.push({
-      key: 'divider-1',
-      content: <Divider />,
-      disabled: true,
-    });
-    items.push({
-      key: 'delete',
-      content: 'Delete',
-      icon: <IconDelete />,
-      onClick: handleDelete,
-    });
+    if (!isNumItemsLocked) {
+      items.push({
+        key: 'divider-1',
+        content: <Divider />,
+        disabled: true,
+      });
+      items.push({
+        key: 'delete',
+        content: 'Delete',
+        icon: <IconDelete />,
+        onClick: handleDelete,
+      });
+    }
+
     return items;
   }, [
     localConfig?.id,
+    isNumItemsLocked,
     path,
     handleDelete,
     handleUnnest,
@@ -219,6 +227,10 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     handleSplit,
     setInteractingPanel,
   ]);
+
+  if (!menuItems.length) {
+    return null;
+  }
 
   return (
     <PopupMenu

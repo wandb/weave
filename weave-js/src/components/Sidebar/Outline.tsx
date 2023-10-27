@@ -19,6 +19,7 @@ import {
 } from '../Panel2/PanelInteractContext';
 import {IconHideHidden, IconLockClosed} from '../Icon';
 import {Tooltip} from '../Tooltip';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
 
 const OutlineItem = styled.div``;
 OutlineItem.displayName = 'S.OutlineItem';
@@ -259,7 +260,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
 };
 
 export interface OutlineProps {
-  config: ChildPanelFullConfig;
+  config: ChildPanelFullConfig<PanelGroupConfig>;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2: (
     change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig
