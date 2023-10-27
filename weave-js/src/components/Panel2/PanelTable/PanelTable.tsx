@@ -281,9 +281,10 @@ const PanelTableInner: React.FC<
 
   const {stack} = usePanelContext();
   const tableIsPanelVariable = useTableIsPanelVariable(stack);
-  const rowControlsWidth = tableIsPanelVariable
-    ? rowControlsWidthWide
-    : rowControlsWidthSmall;
+  const rowControlsWidth = useMemo(
+    () => (tableIsPanelVariable ? rowControlsWidthWide : rowControlsWidthSmall),
+    [tableIsPanelVariable]
+  );
 
   const updateIndexOffset = useUpdateConfigKey('indexOffset', updateConfig);
   const updateTableState = useUpdateConfigKey('tableState', updateConfig);
@@ -785,6 +786,7 @@ const PanelTableInner: React.FC<
     setRowAsActive,
     hoveredColId,
     setHoveredColId,
+    rowControlsWidth,
   ]);
 
   const indexInputRef = useRef<HTMLInputElement>(null);
