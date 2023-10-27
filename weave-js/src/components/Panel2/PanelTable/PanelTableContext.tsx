@@ -1,18 +1,25 @@
 import React from 'react';
 
-export const PanelTableContext = React.createContext<{
+type PanelTableContextValue = {
   setHoveredColId: (value: string) => void;
   hoveredColId: string;
-}>({setHoveredColId: () => {}, hoveredColId: ''});
+};
+
+export const PanelTableContext = React.createContext<PanelTableContextValue>({
+  setHoveredColId: () => {},
+  hoveredColId: '',
+});
+
 export const usePanelTableContext = () => React.useContext(PanelTableContext);
 export const PanelTableContextProvider = ({
   setHoveredColId,
   hoveredColId,
-  children,
-}) => {
+  ...props
+}: PanelTableContextValue) => {
   return (
-    <PanelTableContext.Provider value={{setHoveredColId, hoveredColId}}>
-      {children}
-    </PanelTableContext.Provider>
+    <PanelTableContext.Provider
+      value={{setHoveredColId, hoveredColId}}
+      {...props}
+    />
   );
 };
