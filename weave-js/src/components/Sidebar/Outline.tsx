@@ -9,7 +9,6 @@ import {ChildPanelConfig, ChildPanelFullConfig} from '../Panel2/ChildPanel';
 import {
   IconCaret as IconCaretUnstyled,
   IconOverflowHorizontal as IconOverflowHorizontalUnstyled,
-  IconWeave as IconWeaveUnstyled,
 } from '../Panel2/Icons';
 import {panelChildren} from '../Panel2/panelTree';
 import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
@@ -17,7 +16,7 @@ import {
   usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
-import {IconLockClosed} from '../Icon';
+import {Icon, IconHideHidden, IconLockClosed, IconName} from '../Icon';
 import {Tooltip} from '../Tooltip';
 
 const OutlineItem = styled.div``;
@@ -79,13 +78,12 @@ OutlineItemIcon.displayName = 'S.OutlineItemIcon';
 
 const OutlineItemName = styled.div`
   flex-shrink: 0;
-  max-width: 100px;
   overflow-wrap: break-word;
 `;
 OutlineItemName.displayName = 'S.OutlineItemName';
 
 const OutlineItemPanelID = styled.div`
-  color: ${globals.GRAY_500};
+  color: ${globals.MOON_450};
   font-size: 15px;
   font-family: 'Inconsolata', monospace;
   margin-left: 10px;
@@ -111,11 +109,6 @@ const IconOverflowHorizontal = styled(IconOverflowHorizontalUnstyled)`
 `;
 IconOverflowHorizontal.displayName = 'S.IconOverflowHorizontal';
 
-const IconWeave = styled(IconWeaveUnstyled)`
-  ${iconStyles}
-`;
-IconWeave.displayName = 'S.IconWeave';
-
 export type OutlinePanelProps = OutlineProps & {
   name: string;
   localConfig: ChildPanelFullConfig;
@@ -133,6 +126,33 @@ export const shouldDisablePanelDelete = (
   // we can remove the 2 lines below in like 6 months
   path.length === 0 ||
   (path.length === 1 && ['main', 'sidebar'].includes(path[0]));
+
+const PANEL_TYPE_TO_ICON: Record<string, IconName> = {
+  Group: 'group',
+  boolean: 'boolean',
+  number: 'number',
+  string: 'text-language-alt',
+  date: 'date',
+  DateRange: 'date',
+  FilterEditor: 'filter-alt',
+  table: 'table',
+  plot: 'chart-horizontal-bars',
+  Histogram: 'chart-vertical-bars',
+  object: 'list-bullets',
+  Expression: 'code-alt',
+};
+const getPanelTypeIcon = (panelId: string | undefined) => {
+  if (!panelId) {
+    return 'panel';
+  }
+  if (panelId.startsWith('row.')) {
+    panelId = panelId.slice(4);
+  }
+  if (panelId.startsWith('maybe.')) {
+    panelId = panelId.slice(6);
+  }
+  return PANEL_TYPE_TO_ICON[panelId] ?? 'panel';
+};
 
 const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   const {
@@ -165,7 +185,9 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     }
   }, [children]);
 
+  const iconName = getPanelTypeIcon(curPanelId);
   const shouldHideMenu = shouldDisablePanelDelete(localConfig, path);
+  const isPanelHidden = config.config.panelInfo?.[name]?.hidden;
 
   return (
     <OutlineItem>
@@ -191,7 +213,17 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
           {children != null && <IconCaret />}
         </OutlineItemToggle>
         <OutlineItemIcon>
-          <IconWeave />
+          <Tooltip
+            trigger={
+              <Icon
+                name={iconName}
+                width={18}
+                height={18}
+                color={globals.MOON_400}
+              />
+            }
+            content={curPanelId}
+          />
         </OutlineItemIcon>
 
         <OutlineItemName>{name}</OutlineItemName>
@@ -220,6 +252,19 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
             isOpen={isOutlineMenuOpen}
             onOpen={() => setIsOutlineMenuOpen(true)}
             onClose={() => setIsOutlineMenuOpen(false)}
+          />
+        )}
+        {isPanelHidden && (
+          <Tooltip
+            content="This panel is a part of the group but it is hidden from view."
+            trigger={
+              <IconHideHidden
+                style={{marginRight: '10px'}}
+                color={globals.MOON_500}
+                height={18}
+                width={18}
+              />
+            }
           />
         )}
       </OutlineItemTitle>

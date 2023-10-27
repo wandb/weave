@@ -1,11 +1,10 @@
 import {useLazyQuery, useMutation} from '@apollo/client';
-import {ID} from '@wandb/weave/common/util/id';
 import {coreAppUrl} from '@wandb/weave/config';
 import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {opRootViewer} from '@wandb/weave/core';
-import {ViewSource} from '@wandb/weave/generated/graphql';
+import {UpsertReportMutationVariables} from '@wandb/weave/generated/graphql';
 import {useNodeValue} from '@wandb/weave/react';
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import _ from 'lodash';
 
 import {Alert} from '../../Alert.styles';
@@ -14,15 +13,19 @@ import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {AddPanelErrorAlert} from './AddPanelErrorAlert';
+import {ReportDraftDialog} from './ReportDraftDialog';
 import {ReportSelection} from './ReportSelection';
 import {computeReportSlateNode} from './computeReportSlateNode';
-import {GET_REPORT, UPSERT_REPORT} from './graphql';
+import {DELETE_REPORT_DRAFT, GET_REPORT, UPSERT_REPORT} from './graphql';
 import {
   EntityOption,
   ProjectOption,
   ReportOption,
-  getEmptyReportConfig,
+  editDraftVariables,
+  getReportDraftByUser,
   isNewReportOption,
+  newDraftVariables,
+  newReportVariables,
 } from './utils';
 
 type ChildPanelExportReportProps = {
@@ -51,90 +54,118 @@ export const ChildPanelExportReport = ({
     null
   );
 
-  const [getReport] = useLazyQuery(GET_REPORT);
+  const [getReport, {data: reportQueryData}] = useLazyQuery(GET_REPORT);
   const [upsertReport] = useMutation(UPSERT_REPORT);
+  const [deleteReportDraft] = useMutation(DELETE_REPORT_DRAFT);
   const [isAddingPanel, setIsAddingPanel] = useState(false);
+  const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
   const [error, setError] = useState<any>(null);
 
+  const slateNode = useMemo(
+    () =>
+      fullConfig && selectedPath
+        ? computeReportSlateNode(fullConfig, selectedPath)
+        : undefined,
+    [fullConfig, selectedPath]
+  );
+  const publishedReport = reportQueryData?.view;
+  const activeReportDraft = useMemo(
+    () =>
+      publishedReport && viewer
+        ? getReportDraftByUser(publishedReport, viewer.id)
+        : undefined,
+    [publishedReport, viewer]
+  );
+
   const isNewReportSelected = isNewReportOption(selectedReport);
-  const isAddPanelDisabled =
-    !selectedEntity || !selectedReport || !selectedProject || isAddingPanel;
+  const hasRequiredData =
+    slateNode != null &&
+    selectedEntity != null &&
+    selectedReport != null &&
+    selectedProject != null;
+  const hasActiveDraft = publishedReport != null && activeReportDraft != null;
+  const isAddPanelDisabled = !hasRequiredData || isAddingPanel;
+
+  const handleError = (err: any) => {
+    console.error(err);
+    setError(err);
+    setIsAddingPanel(false);
+  };
+
+  const submit = async (variables: UpsertReportMutationVariables) => {
+    if (!hasRequiredData) {
+      return;
+    }
+    const result = await upsertReport({variables});
+    const upsertedDraft = result.data?.upsertView?.view!;
+    const reportDraftPath = Urls.reportEdit({
+      entityName: selectedEntity.name,
+      projectName: selectedProject.name,
+      reportID: upsertedDraft.id,
+      reportName: upsertedDraft.displayName ?? '',
+    });
+    // eslint-disable-next-line wandb/no-unprefixed-urls
+    window.open(coreAppUrl(reportDraftPath), '_blank');
+    setIsAddingPanel(false);
+    closeDrawer();
+  };
 
   const onAddPanel = async () => {
     if (isAddPanelDisabled) {
       return;
     }
-
     try {
       setIsAddingPanel(true);
-
-      const slateNode = computeReportSlateNode(fullConfig, selectedPath);
-      const entityName = selectedEntity.name;
-      const projectName = selectedProject.name;
-      let upsertBody;
-
       if (isNewReportSelected) {
-        upsertBody = {
-          createdUsing: ViewSource.WeaveUi,
-          description: '',
-          displayName: 'Untitled Report',
-          entityName,
-          name: ID(12),
-          projectName,
-          spec: JSON.stringify(getEmptyReportConfig([slateNode])),
-          type: 'runs/draft',
-        };
-      } else {
-        const {data} = await getReport({
-          variables: {id: selectedReport.id!},
-          fetchPolicy: 'no-cache',
-        });
-        const publishedReport = data?.view;
-        const drafts = publishedReport?.children?.edges.map(({node}) => node);
-        const viewerDraft = drafts?.find(
-          draft => draft?.user?.id === viewer.id
+        return submit(
+          newReportVariables(
+            selectedEntity.name,
+            selectedProject.name,
+            slateNode
+          )
         );
-
-        if (viewerDraft) {
-          const spec = JSON.parse(viewerDraft.spec);
-          spec.blocks.push(slateNode);
-          upsertBody = {
-            id: viewerDraft.id,
-            spec: JSON.stringify(spec),
-          };
-        } else {
-          const spec = JSON.parse(publishedReport?.spec);
-          spec.blocks.push(slateNode);
-          upsertBody = {
-            coverUrl: publishedReport?.coverUrl,
-            description: publishedReport?.description,
-            displayName: publishedReport?.displayName,
-            name: ID(12),
-            parentId: publishedReport?.id,
-            previewUrl: publishedReport?.previewUrl,
-            spec: JSON.stringify(spec),
-            type: 'runs/draft',
-          };
-        }
       }
-
-      const result = await upsertReport({variables: upsertBody});
-      const upsertedDraft = result.data?.upsertView?.view!;
-      const reportDraftPath = Urls.reportEdit({
-        entityName,
-        projectName,
-        reportID: upsertedDraft.id,
-        reportName: upsertedDraft.displayName ?? '',
+      const {data} = await getReport({
+        variables: {id: selectedReport.id!},
+        fetchPolicy: 'no-cache',
       });
-
-      // eslint-disable-next-line wandb/no-unprefixed-urls
-      window.open(coreAppUrl(reportDraftPath), '_blank');
-      setIsAddingPanel(false);
-      closeDrawer();
+      const report = data?.view;
+      if (!report) {
+        throw new Error('Report not found');
+      }
+      const draft = getReportDraftByUser(report, viewer.id);
+      if (draft) {
+        return setIsDraftDialogOpen(true);
+      } else {
+        return submit(newDraftVariables(report, slateNode));
+      }
     } catch (err) {
-      console.error(err);
-      setError(err);
-      setIsAddingPanel(false);
+      handleError(err);
+    }
+  };
+
+  const onContinueDraft = async () => {
+    if (!hasActiveDraft || !slateNode) {
+      return;
+    }
+    try {
+      await submit(editDraftVariables(activeReportDraft, slateNode));
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
+  const onDiscardDraft = async () => {
+    if (!hasActiveDraft || !slateNode) {
+      return;
+    }
+    try {
+      await deleteReportDraft({
+        variables: {id: activeReportDraft.id},
+      });
+      await submit(newDraftVariables(publishedReport, slateNode));
+    } catch (err) {
+      handleError(err);
     }
   };
 
@@ -184,6 +215,16 @@ export const ChildPanelExportReport = ({
             onClick={onAddPanel}>
             Add panel
           </Button>
+          {hasActiveDraft && (
+            <ReportDraftDialog
+              isOpen={isDraftDialogOpen}
+              setIsOpen={setIsDraftDialogOpen}
+              draftCreatedAt={activeReportDraft.createdAt}
+              onCancel={() => setIsAddingPanel(false)}
+              onContinue={onContinueDraft}
+              onDiscard={onDiscardDraft}
+            />
+          )}
         </div>
       </div>
     </Tailwind>
