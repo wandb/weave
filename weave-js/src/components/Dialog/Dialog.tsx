@@ -51,9 +51,9 @@ export const Overlay = React.forwardRef(
  */
 const contentClassName = classNames(
   'night-aware',
-  'rounded border border-moon-250 bg-white py-6 shadow-md',
+  'rounded border border-moon-250 bg-white py-24 px-32 shadow-md',
   'dark:border-moon-750 dark:bg-moon-900 dark:text-moon-200',
-  'absolute left-[25%] top-[25%] '
+  'absolute left-[25%] top-[25%]'
 );
 export const Content = React.forwardRef(
   ({className, children, ...props}: RadixDialog.DialogContentProps, ref) => (
@@ -77,8 +77,11 @@ export const Close = ({className, ...props}: RadixDialog.DialogCloseProps) => (
 /**
  * https://www.radix-ui.com/primitives/docs/components/dialog#title
  */
-export const Title = (props: RadixDialog.DialogTitleProps) => (
-  <RadixDialog.Title {...props} />
+export const Title = ({className, ...props}: RadixDialog.DialogTitleProps) => (
+  <RadixDialog.Title
+    className={twMerge('leading-40 text-2xl font-semibold', className)}
+    {...props}
+  />
 );
 
 /**

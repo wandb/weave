@@ -26,16 +26,18 @@ export const ReportDraftDialog = ({
       <Dialog.Portal>
         <Dialog.Overlay className="z-[999]" />
         <Dialog.Content
-          className="z-[999]"
+          className="z-[999] w-[540px]"
           onEscapeKeyDown={onCancel}
           onInteractOutside={onCancel}>
           <Dialog.Title>Add to active draft?</Dialog.Title>
-          <Dialog.Description>
+          <Dialog.Description className="mb-24 mt-8">
             You started a draft for this report{' '}
             <Timeago date={draftCreatedAt + 'Z'} />. Would you like to continue
             editing this draft or discard it and start a new one?
           </Dialog.Description>
-          <Button onClick={onContinue}>Add to active draft</Button>
+          <Button className="mr-8" onClick={onContinue}>
+            Add to active draft
+          </Button>
           <Button variant="destructive" onClick={onDiscard}>
             Discard and start new draft
           </Button>
