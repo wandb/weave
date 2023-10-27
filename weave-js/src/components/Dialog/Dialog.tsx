@@ -53,7 +53,7 @@ const contentClassName = classNames(
   'night-aware',
   'rounded border border-moon-250 bg-white py-24 px-32 shadow-md',
   'dark:border-moon-750 dark:bg-moon-900 dark:text-moon-200',
-  'absolute left-[25%] top-[25%]'
+  'absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]' // centers modal on screen
 );
 export const Content = React.forwardRef(
   ({className, children, ...props}: RadixDialog.DialogContentProps, ref) => (
