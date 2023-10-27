@@ -78,6 +78,7 @@ import {
   BaseTableDataType,
   getTableMeasurements,
   nodeIsValidList,
+  useTableIsPanelVariable,
   useAutomatedTableState,
   useBaseTableColumnDefinitions,
   useBaseTableData,
@@ -97,7 +98,8 @@ const inputType = TableType.GeneralTableLikeType;
 
 const baseColumnWidth = 95;
 const minColumnWidth = 30;
-const rowControlsWidth = 60;
+const rowControlsWidthWide = 60;
+const rowControlsWidthSmall = 30;
 const numberOfHeaders = 1;
 const headerHeight = 30;
 const footerHeight = 25;
@@ -276,6 +278,12 @@ const PanelTableInner: React.FC<
   }
 
   const rowActions = props.rowActions;
+
+  const {stack} = usePanelContext();
+  const tableIsPanelVariable = useTableIsPanelVariable(stack);
+  const rowControlsWidth = tableIsPanelVariable
+    ? rowControlsWidthWide
+    : rowControlsWidthSmall;
 
   const updateIndexOffset = useUpdateConfigKey('indexOffset', updateConfig);
   const updateTableState = useUpdateConfigKey('tableState', updateConfig);
@@ -483,7 +491,6 @@ const PanelTableInner: React.FC<
     pinnedRowsForCurrentGrouping,
     pinnableTotalRowCount
   );
-  const {stack} = usePanelContext();
   const downloadDataAsCSV = useCallback(() => {
     downloadCSV(rowsNode, tableState, weave, stack);
   }, [rowsNode, stack, tableState, weave]);
@@ -1108,8 +1115,9 @@ const IndexCell: React.FC<{
   activeRowIndex?: number;
   simpleTable?: boolean;
 }> = props => {
-  const {frame} = usePanelContext();
+  const {frame, stack} = usePanelContext();
   const weave = useWeaveContext();
+  const tableIsPanelVariable = useTableIsPanelVariable(stack);
 
   if (
     props.runNode != null &&
@@ -1151,6 +1159,9 @@ const IndexCell: React.FC<{
   } else {
     const isSelected =
       index.result != null && index.result === props.activeRowIndex;
+    const simpleValue = (
+      <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+    );
     return (
       <S.IndexColumnVal
         onClick={() => {
@@ -1165,21 +1176,23 @@ const IndexCell: React.FC<{
           style={{
             color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
           }}>
-          <S.IndexCellCheckboxWrapper
-            className="index-cell-checkbox"
-            isSelected={isSelected}>
-            <Checkbox
-              onClick={() => {
-                if (!props.simpleTable) {
-                  props.setRowAsPinned(index.result);
-                }
-              }}
-              checked={isSelected}
-            />
-          </S.IndexCellCheckboxWrapper>
+          {tableIsPanelVariable && (
+            <S.IndexCellCheckboxWrapper
+              className="index-cell-checkbox"
+              isSelected={isSelected}>
+              <Checkbox
+                onClick={() => {
+                  if (!props.simpleTable) {
+                    props.setRowAsPinned(index.result);
+                  }
+                }}
+                checked={isSelected}
+              />
+            </S.IndexCellCheckboxWrapper>
+          )}
           <div style={{width: '100%'}}>
-            {props.simpleTable ? (
-              <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+            {props.simpleTable || !runNameNodeValue.result ? (
+              simpleValue
             ) : (
               <Popup
                 // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
@@ -1191,9 +1204,7 @@ const IndexCell: React.FC<{
                 position="top center"
                 popperDependencies={[index.result, runNameNodeValue.result]}
                 content={runNameNodeValue.result ?? ''}
-                trigger={
-                  <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
-                }
+                trigger={simpleValue}
               />
             )}
           </div>
