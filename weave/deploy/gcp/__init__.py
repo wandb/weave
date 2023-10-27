@@ -163,7 +163,7 @@ def deploy(model_ref: str,
 def safe_name(name: str) -> str:
     """The name must use only lowercase alphanumeric characters and dashes,
     cannot begin or end with a dash, and cannot be longer than 63 characters."""
-    fixed_name = re.sub(r'[^a-z0-9-]', '-', fixed_name.lower()).strip('-')
+    fixed_name = re.sub(r'[^a-z0-9-]', '-', name.lower()).strip('-')
     if len(fixed_name) == 0:
         return "weave-op"
     elif len(fixed_name) > 63:

@@ -61,15 +61,19 @@ def deploy() -> None:
 @click.argument("model_ref")
 @click.option("--project", help="W&B project name.")
 @click.option("--gcp-project", help="GCP project name.")
+@click.option("--service-account", help="GCP service account.")
 @click.option("--dev", is_flag=True, help="Run the function locally.")
-def gcp(model_ref: str, project: str, gcp_project: str, dev = False) -> None:
+def gcp(model_ref: str, project: str, gcp_project: str, service_account: str, dev = False) -> None:
     if dev:
         print(f"Developing model {model_ref}...")
         google.develop(model_ref)
         return
     print(f"Deploying model {model_ref}...")
     try:
-        google.deploy(model_ref, wandb_project=project, gcp_project=gcp_project)
+        google.deploy(model_ref,
+                      wandb_project=project,
+                      gcp_project=gcp_project,
+                      service_account=service_account)
     except ValueError as e:
         if os.getenv("DEBUG") == "true":
             raise e
