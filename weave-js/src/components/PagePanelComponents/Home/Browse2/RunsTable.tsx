@@ -99,13 +99,18 @@ export const RunsTable: FC<{
               return 'input_' + k;
             }
           ),
-          v => (_.isPlainObject(v) ? v : JSON.stringify(v))
+          v =>
+            typeof v === 'string' ||
+            typeof v === 'boolean' ||
+            typeof v === 'number'
+              ? v
+              : JSON.stringify(v)
         ),
         ..._.mapValues(
           _.mapKeys(
             _.omitBy(
               flattenObject(call.output!),
-              (v, k) => v == null || k === '_keys'
+              (v, k) => v == null || k.startsWith('_')
             ),
             (v, k) => {
               return 'output.' + k;
@@ -235,7 +240,7 @@ export const RunsTable: FC<{
     let outputKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(flattenObject(span.output!))) {
-        if (v != null && k !== '_keys') {
+        if (v != null && !k.startsWith('_')) {
           outputKeys[k] = true;
         }
       }
