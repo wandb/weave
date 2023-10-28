@@ -128,7 +128,9 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
           ) : (
             <ObjectView
               obj={_.fromPairs(
-                Object.entries(call.output).filter(([k, v]) => v != null)
+                Object.entries(call.output).filter(
+                  ([k, v]) => !k.startsWith('_') && v != null
+                )
               )}
             />
           )}
