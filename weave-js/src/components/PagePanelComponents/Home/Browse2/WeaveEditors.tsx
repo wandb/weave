@@ -100,6 +100,19 @@ interface WeaveEditorContextValue {
   addEdit: (edit: WeaveEditorEdit) => void;
 }
 
+const weaveEditorPathUrlPathPart = (path: WeaveEditorPathEl[]) => {
+  // Return the url path for a given editor path
+  return path.flatMap(pathEl => {
+    if (pathEl.type === 'getattr') {
+      return [pathEl.key];
+    } else if (pathEl.type === 'pick') {
+      return ['pick', pathEl.key];
+    } else {
+      throw new Error('invalid pathEl type');
+    }
+  });
+};
+
 const WeaveEditorContext = React.createContext<WeaveEditorContextValue>({
   edits: [],
   addEdit: () => {},
@@ -450,7 +463,15 @@ export const WeaveEditorTypedDict: FC<{
                 textOverflow: 'ellipsis',
               }}>
               <Typography>
-                <Link to={loc.pathname + '/pick/' + key}>{key}</Link>
+                <Link
+                  to={[
+                    loc.pathname,
+                    ...weaveEditorPathUrlPathPart(path),
+                    'pick',
+                    key,
+                  ].join('/')}>
+                  {key}
+                </Link>
               </Typography>
             </Grid>,
             <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
@@ -484,7 +505,14 @@ export const WeaveEditorObject: FC<{
           return [
             <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
               <Typography>
-                <Link to={loc.pathname + '/' + key}>{key}</Link>
+                <Link
+                  to={[
+                    loc.pathname,
+                    ...weaveEditorPathUrlPathPart(path),
+                    key,
+                  ].join('/')}>
+                  {key}
+                </Link>
               </Typography>
             </Grid>,
             <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
@@ -519,6 +547,22 @@ const typeToDataGridColumnSpec = (type: Type): GridColDef[] => {
           colType = 'number';
         } else if (isAssignableTo(valueType, maybe('string'))) {
           editable = true;
+        } else if (
+          isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))
+        ) {
+          return [
+            {
+              type: 'string',
+              editable: false,
+              field: key,
+              headerName: key,
+              renderCell: params => {
+                return (
+                  <Typography>{`[${params.row[key].length} item list]`}</Typography>
+                );
+              },
+            },
+          ];
         }
         return [
           {
@@ -619,14 +663,20 @@ export const WeaveEditorTable: FC<{
         headerName: '',
         width: 50,
         renderCell: params => (
-          <Link to={location.pathname + '/index/' + params.row._origIndex}>
+          <Link
+            to={[
+              location.pathname,
+              ...weaveEditorPathUrlPathPart(path),
+              'index',
+              params.row._origIndex,
+            ].join('/')}>
             <LinkIcon />
           </Link>
         ),
       },
       ...typeToDataGridColumnSpec(objectType),
     ];
-  }, [location.pathname, objectType]);
+  }, [location.pathname, objectType, path]);
   return (
     <Box
       sx={{

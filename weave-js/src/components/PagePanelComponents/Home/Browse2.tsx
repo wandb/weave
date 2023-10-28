@@ -86,9 +86,21 @@ const Browse2Breadcrumbs: FC = props => {
       )}
       {refFields.map((field, idx) =>
         field === 'index' ? (
-          <Typography>row</Typography>
+          <Typography
+            sx={{
+              color: theme =>
+                theme.palette.getContrastText(theme.palette.primary.main),
+            }}>
+            row
+          </Typography>
         ) : field === 'pick' ? (
-          <Typography>col</Typography>
+          <Typography
+            sx={{
+              color: theme =>
+                theme.palette.getContrastText(theme.palette.primary.main),
+            }}>
+            col
+          </Typography>
         ) : (
           <AppBarLink
             to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${
