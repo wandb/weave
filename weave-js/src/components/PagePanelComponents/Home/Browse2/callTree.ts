@@ -39,6 +39,7 @@ export interface StreamId {
 export interface CallFilter {
   opUri?: string;
   inputUris?: string[];
+  outputUris?: string[];
   traceId?: string;
 }
 
@@ -222,6 +223,19 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
             rhs: constNodeUnsafe(refWeaveType, inputUri),
           }) as any,
         }) as any
+      );
+    }
+  }
+  if (filters.outputUris != null) {
+    for (const outputUri of filters.outputUris) {
+      filterClauses.push(
+        opRefEqual({
+          lhs: opPick({
+            obj: rowVar,
+            key: constString('output._ref0'),
+          }),
+          rhs: constNodeUnsafe(refWeaveType, outputUri),
+        })
       );
     }
   }

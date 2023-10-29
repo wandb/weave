@@ -24,6 +24,7 @@ import {Browse2RootObjectVersionUsers} from './Browse2RootObjectVersionUsers';
 import {Browse2OpDefPage} from './Browse2OpDefPage';
 import {Browse2CallsPage} from './Browse2CallsPage';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
+import {Browse2RootObjectVersionOutputOf} from './Browse2RootObjectVersionOutputOf';
 
 const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
@@ -234,6 +235,14 @@ export const Browse2ObjectVersionItemPage: FC = props => {
                 </Typography>
                 <Browse2RootObjectVersionUsers uri={uri} />
               </Paper>
+              <Box mt={4}>
+                <Paper>
+                  <Typography variant="h6" gutterBottom>
+                    Output of run
+                  </Typography>
+                  <Browse2RootObjectVersionOutputOf uri={uri} />
+                </Paper>
+              </Box>
               <Box mt={4}>
                 <Paper>
                   <Typography variant="h6" gutterBottom>

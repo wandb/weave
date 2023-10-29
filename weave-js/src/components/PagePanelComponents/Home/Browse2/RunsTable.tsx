@@ -110,7 +110,7 @@ export const RunsTable: FC<{
           _.mapKeys(
             _.omitBy(
               flattenObject(call.output!),
-              (v, k) => v == null || k.startsWith('_')
+              (v, k) => v == null || (k.startsWith('_') && k !== '_result')
             ),
             (v, k) => {
               return 'output.' + k;
@@ -240,7 +240,7 @@ export const RunsTable: FC<{
     let outputKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(flattenObject(span.output!))) {
-        if (v != null && !k.startsWith('_')) {
+        if (v != null && (!k.startsWith('_') || k === '_result')) {
           outputKeys[k] = true;
         }
       }
