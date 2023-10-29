@@ -79,6 +79,21 @@ def get_code_deps(fn, decl_locals):
     return import_code
 
 
+def get_import_statements_for_annotations(func) -> list[str]:
+    """Ensures we have imports for all the types used in the function annotations."""
+    annotations = func.__annotations__
+    imports_needed = set()
+
+    for annotation in annotations.values():
+        if hasattr(annotation, "__module__") and hasattr(annotation, "__name__"):
+            module_name = annotation.__module__
+            class_name = annotation.__name__
+            if module_name != "builtins":
+                imports_needed.add(f"from {module_name} import {class_name}")
+
+    return list(imports_needed)
+
+
 class OpDefType(types.Type):
     instance_class = op_def.OpDef
     instance_classes = op_def.OpDef
@@ -93,6 +108,10 @@ class OpDefType(types.Type):
             # Try to figure out module imports from the function body
             # (in a real hacky way as a POC)
             code += get_code_deps(obj.raw_resolve_fn, obj._decl_locals)
+            code += (
+                "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
+                + "\n\n"
+            )
 
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.raw_resolve_fn.__annotations__
