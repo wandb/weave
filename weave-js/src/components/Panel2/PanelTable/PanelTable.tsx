@@ -590,7 +590,7 @@ const PanelTableInner: React.FC<
     ]
   );
 
-  const [shiftIsPressed, setShiftIsPressed] = useState(false);
+  const shiftIsPressedRef = useRef(false);
 
   const isFiltered = tableState.preFilterFunction.nodeType === 'output';
   const isGrouped = tableState.groupBy.length > 0;
@@ -661,7 +661,7 @@ const PanelTableInner: React.FC<
             rowNode={rowData.rowNode}
             setRowAsPinned={(index: number) => {
               if (!props.config.simpleTable) {
-                if (shiftIsPressed) {
+                if (shiftIsPressedRef.current) {
                   setRowAsPinned(index, !rowData.isPinned);
                 } else {
                   setRowAsActive(index);
@@ -764,7 +764,6 @@ const PanelTableInner: React.FC<
     runNode,
     activeRowIndex,
     props.config.simpleTable,
-    shiftIsPressed,
     setRowAsPinned,
     setRowAsActive,
   ]);
@@ -939,18 +938,15 @@ const PanelTableInner: React.FC<
 
   const baseTableRef = useRef<BaseTable<BaseTableDataType>>(null);
 
-  const captureKeyDown = useCallback(
-    e => {
-      if (e.key === 'Shift') {
-        setShiftIsPressed(true);
-      }
-    },
-    [setShiftIsPressed]
-  );
+  const captureKeyDown = useCallback(e => {
+    if (e.key === 'Shift') {
+      shiftIsPressedRef.current = true;
+    }
+  }, []);
 
   const captureKeyUp = useCallback(e => {
     if (e.key === 'Shift') {
-      setShiftIsPressed(false);
+      shiftIsPressedRef.current = false;
     }
   }, []);
 
@@ -970,18 +966,13 @@ const PanelTableInner: React.FC<
           return;
         }
         // TODO: make all these shiftIsPressed features discoverable!!!!
-        if (shiftIsPressed) {
+        if (shiftIsPressedRef.current) {
           setAllColumnWidths(resizeWidth);
         } else {
           setSingleColumnWidth(column.colId, resizeWidth);
         }
       },
-      [
-        props.config.simpleTable,
-        shiftIsPressed,
-        setAllColumnWidths,
-        setSingleColumnWidth,
-      ]
+      [props.config.simpleTable, setAllColumnWidths, setSingleColumnWidth]
     );
 
   const setFilterFunction: React.ComponentProps<
