@@ -1161,8 +1161,8 @@ const IndexCell: React.FC<{
   }
   const isSelected =
     index.result != null && index.result === props.activeRowIndex;
-  const simpleValue = <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>;
   const runName = runNameNodeValue.result ?? '';
+  const basicIndexContent = <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>;
 
   return (
     <S.IndexColumnVal
@@ -1194,7 +1194,7 @@ const IndexCell: React.FC<{
         )}
         <div style={{width: '100%'}}>
           {props.simpleTable || !runName ? (
-            simpleValue
+            basicIndexContent
           ) : (
             <Popup
               // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
@@ -1206,7 +1206,7 @@ const IndexCell: React.FC<{
               position="top center"
               popperDependencies={[index.result, runName]}
               content={runName}
-              trigger={simpleValue}
+              trigger={basicIndexContent}
             />
           )}
         </div>
