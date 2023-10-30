@@ -1122,44 +1122,44 @@ const IndexCell: React.FC<{
   );
   if (index.loading) {
     return <S.IndexColumnVal />;
-  } else {
-    return (
-      <S.IndexColumnVal
-        onClick={() => {
-          if (!props.simpleTable) {
-            props.setRowAsPinned(index.result);
-          }
-        }}>
-        <S.IndexColumnText
-          style={{
-            color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
-            ...(index.result != null && index.result === props.activeRowIndex
-              ? {
-                  fontWeight: 'bold',
-                  backgroundColor: '#d4d4d4',
-                }
-              : {}),
-          }}>
-          {props.simpleTable ? (
-            <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
-          ) : (
-            <Popup
-              // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
-              popperModifiers={{
-                preventOverflow: {
-                  boundariesElement: 'offsetParent',
-                },
-              }}
-              position="top center"
-              popperDependencies={[index.result, runNameNodeValue.result]}
-              content={runNameNodeValue.result ?? ''}
-              trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
-            />
-          )}
-        </S.IndexColumnText>
-      </S.IndexColumnVal>
-    );
   }
+  const runName = runNameNodeValue.result ?? '';
+  return (
+    <S.IndexColumnVal
+      onClick={() => {
+        if (!props.simpleTable) {
+          props.setRowAsPinned(index.result);
+        }
+      }}>
+      <S.IndexColumnText
+        style={{
+          color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
+          ...(index.result != null && index.result === props.activeRowIndex
+            ? {
+                fontWeight: 'bold',
+                backgroundColor: '#d4d4d4',
+              }
+            : {}),
+        }}>
+        {props.simpleTable || !runName ? (
+          <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+        ) : (
+          <Popup
+            // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
+            popperModifiers={{
+              preventOverflow: {
+                boundariesElement: 'offsetParent',
+              },
+            }}
+            position="top center"
+            popperDependencies={[index.result, runName]}
+            content={runName}
+            trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
+          />
+        )}
+      </S.IndexColumnText>
+    </S.IndexColumnVal>
+  );
 };
 
 const ActionCell: React.FC<{

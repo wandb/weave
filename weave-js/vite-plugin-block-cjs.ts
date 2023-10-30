@@ -69,6 +69,7 @@ const ALLOWED_CJS_MODULES = [
   '@monaco-editor/loader',
   '@radix-ui/react-checkbox',
   '@radix-ui/react-dialog',
+  '@radix-ui/react-dropdown-menu',
   '@radix-ui/react-radio-group',
   '@radix-ui/react-slider',
   '@radix-ui/react-switch',

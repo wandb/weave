@@ -182,6 +182,8 @@ export function editDraftVariables(
  * @param slateNode The node to add to the new report draft
  */
 export function newDraftVariables(
+  entityName: string,
+  projectName: string,
   report: PublishedReport,
   slateNode: WeavePanelSlateNode
 ): UpsertReportMutationVariables {
@@ -191,9 +193,11 @@ export function newDraftVariables(
     coverUrl: report.coverUrl,
     description: report.description,
     displayName: report.displayName,
+    entityName,
     name: ID(12),
     parentId: report.id,
     previewUrl: report.previewUrl,
+    projectName,
     spec: JSON.stringify(spec),
     type: 'runs/draft',
   };
