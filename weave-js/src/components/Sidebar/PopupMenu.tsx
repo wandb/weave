@@ -63,6 +63,7 @@ const PopupMenuComp: React.FC<PopupMenuProps> = ({
   );
 };
 
+/** @deprecated use `@wandb/components/DropdownMenu` instead */
 export const PopupMenu = memo(PopupMenuComp);
 
 const Popup = styled(SemanticPopup)`
