@@ -1,5 +1,4 @@
 import {
-  callOpVeryUnsafe,
   constBoolean,
   constFunction,
   constNodeUnsafe,
@@ -13,8 +12,13 @@ import {
   opArtifactMembershipForAlias,
   opArtifactVersionMetadata,
   opBooleanEqual,
+  opFilesystemArtifactArtifactName,
+  opFilesystemArtifactArtifactVersion,
+  opFilesystemArtifactLatestVersion,
+  opFilesystemArtifactMetadata,
   opFilter,
   opGet,
+  opLocalArtifacts,
   opMap,
   opPick,
   opStringAdd,
@@ -226,19 +230,13 @@ export const opFilterArtifactsToWeaveObjects = (
 
 const opLatestLocalArtifacts = () => {
   return opMap({
-    arr: callOpVeryUnsafe(
-      'op-local_artifacts',
-      {},
-      {type: 'list', objectType: {type: 'FilesystemArtifact' as any}}
-    ) as any,
+    arr: opLocalArtifacts({}),
     mapFn: constFunction(
       {row: {type: 'FilesystemArtifact' as any}},
       ({row}) => {
-        return callOpVeryUnsafe(
-          'FilesystemArtifact-getLatestVersion',
-          {artifact: row},
-          {type: 'FilesystemArtifact' as any}
-        ) as any;
+        return opFilesystemArtifactLatestVersion({
+          artifact: row as Node<{type: 'FilesystemArtifact'}>,
+        });
       }
     ),
   });
@@ -251,13 +249,9 @@ const opFilterFilesystemArtifactsToWeaveObjects = (
   return opFilter({
     arr: artifactsNode,
     filterFn: constFunction({row: 'FilesystemArtifact' as any}, ({row}) => {
-      const metadataObj = callOpVeryUnsafe(
-        'FilesystemArtifact-metadata',
-        {
-          self: row,
-        },
-        {type: 'typedDict', propertyTypes: {}}
-      ) as any;
+      const metadataObj = opFilesystemArtifactMetadata({
+        self: row as Node<{type: 'FilesystemArtifact'}>,
+      });
       const isWeaveObj = opBooleanEqual({
         lhs: opPick({
           obj: metadataObj,
@@ -293,20 +287,12 @@ export const opObjectsToName = (allObjectsNode: Node) => {
     mapFn: constFunction(
       {row: {type: 'FilesystemArtifact' as any}},
       ({row}) => {
-        const nameNode = callOpVeryUnsafe(
-          'FilesystemArtifact-artifactName',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
-        const versionNode = callOpVeryUnsafe(
-          'FilesystemArtifact-artifactVersion',
-          {
-            artifact: row,
-          },
-          'string'
-        ) as any;
+        const nameNode = opFilesystemArtifactArtifactName({
+          artifact: row as Node<{type: 'FilesystemArtifact'}>,
+        });
+        const versionNode = opFilesystemArtifactArtifactVersion({
+          artifact: row as Node<{type: 'FilesystemArtifact'}>,
+        });
         return opStringConcat(nameNode, ':', versionNode);
       }
     ),

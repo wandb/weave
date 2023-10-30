@@ -20,7 +20,7 @@ type TailwindProps = {
 // existing elements, as long as you can test that they still look good.
 export const Tailwind: React.FC<TailwindProps> = ({style, children}) => {
   return (
-    <div className="tw-style" style={style}>
+    <div className="tw-style" data-testid="tailwind-wrapper" style={style}>
       {children}
     </div>
   );

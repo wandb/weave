@@ -600,8 +600,8 @@ def test_flatten_and_tags(use_arrow):
     item_tag_res = weave.use(item_tag_getter(flattened[0]))
     list_tag_res = weave.use(list_tag_getter(flattened[0]))
 
-    # if use_arrow:
-    #     data_res = data_res
+    if use_arrow:
+        data_res = data_res.to_pylist_notags()
 
     assert data_res == [
         "item_1_1",

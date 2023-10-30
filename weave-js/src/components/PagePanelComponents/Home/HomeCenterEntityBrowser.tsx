@@ -8,26 +8,29 @@ import {
   IconDelete,
   IconFullScreenModeExpand,
   IconAddNew,
+  IconLightbulbInfo,
 } from '@wandb/weave/components/Icon';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
+import * as LayoutElements from './LayoutElements';
+import styled from 'styled-components';
 import moment from 'moment';
 import {
   Node,
-  callOpVeryUnsafe,
   constString,
+  directlyConstructOpCall,
   list,
-  opArtifactVersionFile,
   opConcat,
   opFileTable,
+  opFilesystemArtifactFile,
   opGet,
   opIsNone,
   opPick,
   opProjectRuns,
   opRootProject,
   opRunHistory3,
+  opStreamTableRows,
   opTableRows,
-  typedDict,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
@@ -47,6 +50,9 @@ import {
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
+import {urlWandbFrontend} from '../../../util/urls';
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import {TargetBlank} from '@wandb/weave/common/util/links';
 import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
 
 type CenterEntityBrowserPropsType = {
@@ -119,8 +125,8 @@ export const CenterEntityBrowserInner: React.FC<
           label: 'View in Weights and Biases',
           onClick: row => {
             // Open a new tab with the W&B project URL
-            // TODO: make this work for local. Probably need to bring over `urlPrefixed`
-            const url = `https://wandb.ai/${props.entityName}/${row.project}/overview`;
+            const prefix = urlWandbFrontend();
+            const url = `${prefix}/${props.entityName}/${row.project}/overview`;
             // eslint-disable-next-line wandb/no-unprefixed-urls
             window.open(url, '_blank');
           },
@@ -491,18 +497,26 @@ const legacyTraceRowToSimpleNode = (
       }),
     }),
     key: constString(legacyTraceKey),
-  });
+  }) as Node<{type: 'wb_trace_tree'}>;
 };
 
-const convertSimpleLegacyNodeToNewFormat = (node: Node) => {
+const opWBTraceTreeConvertToSpans = (inputs: {
+  tree: Node<{type: 'wb_trace_tree'}>;
+}) => {
+  return directlyConstructOpCall(
+    'wb_trace_tree-convertToSpans',
+    inputs,
+    list(list(SpanWeaveWithTimestampType))
+  );
+};
+
+const convertSimpleLegacyNodeToNewFormat = (
+  node: Node<{type: 'wb_trace_tree'}>
+) => {
   return opConcat({
-    arr: callOpVeryUnsafe(
-      'wb_trace_tree-convertToSpans',
-      {
-        tree: node,
-      },
-      list(list(SpanWeaveWithTimestampType))
-    ) as Node,
+    arr: opWBTraceTreeConvertToSpans({
+      tree: node,
+    }),
   });
 };
 
@@ -667,13 +681,9 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     const node = opGet({uri: constString(uri)});
     node.type = {type: 'stream_table'} as any;
-    newExpr = callOpVeryUnsafe(
-      'stream_table-rows',
-      {
-        self: node,
-      },
-      list(typedDict({}))
-    ) as any;
+    newExpr = opStreamTableRows({
+      self: node as any,
+    });
   } else {
     // This is a hack. Would be nice to have better mapping
     // Note that this will not work for tables with spaces in their name
@@ -684,8 +694,10 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest`;
     newExpr = opTableRows({
       table: opFileTable({
-        file: opArtifactVersionFile({
-          artifactVersion: opGet({uri: constString(uri)}),
+        file: opFilesystemArtifactFile({
+          artifactVersion: opGet({
+            uri: constString(uri),
+          }) as any,
           path: constString(tableName),
         }),
       }),
@@ -773,6 +785,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconFullScreenModeExpand,
           label: 'Preview table',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             navigateToExpression(
               tableRowToNode(row.kind, entityName, projectName, row._id)
@@ -782,6 +795,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconCopy,
           label: 'Copy Weave expression',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
@@ -800,6 +814,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconAddNew,
           label: 'New board',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
@@ -868,7 +883,9 @@ const CenterProjectTablesBrowser: React.FC<
           title={row.name}
           row={row}
           setPreviewNode={setPreviewNode}
-          actions={sidebarActions}>
+          actions={sidebarActions}
+          emptyData={row['number of rows'] === 0}
+          emptyDataMessage={<EmptyTableMessage />}>
           <HomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
@@ -933,5 +950,54 @@ const CenterProjectTablesBrowser: React.FC<
         actions={browserActions}
       />
     </>
+  );
+};
+
+const EmptyTableMessageBlockContainer = styled(LayoutElements.HBlock)`
+  background-color: ${globals.MOON_100};
+  border-radius: 8px;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+`;
+EmptyTableMessageBlockContainer.displayName =
+  'S.EmptyTableMessageBlockContainer';
+
+const EmptyTableMessageIcon = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+`;
+EmptyTableMessageIcon.displayName = 'S.EmptyTableMessageIcon';
+
+const EmptyTableMessageText = styled.div`
+  padding: 15px 20px 15px 0px;
+  color: ${globals.MOON_600};
+`;
+EmptyTableMessageText.displayName = 'S.EmptyTableMessageText';
+
+const EmptyTableMessage = () => {
+  return (
+    <div>
+      <EmptyTableMessageBlockContainer>
+        <EmptyTableMessageIcon>
+          <IconLightbulbInfo style={{color: globals.MOON_600}} />
+        </EmptyTableMessageIcon>
+        <EmptyTableMessageText>
+          <div style={{fontWeight: 600, marginBottom: '2px'}}>
+            This table has no data
+          </div>
+          <div>
+            Table preview and board creation are not available until data has
+            been logged. Learn more about logging data to StreamTables{' '}
+            <TargetBlank href="https://docs.wandb.ai/guides/weave/streamtable">
+              here
+            </TargetBlank>
+            .
+          </div>
+        </EmptyTableMessageText>
+      </EmptyTableMessageBlockContainer>
+    </div>
   );
 };

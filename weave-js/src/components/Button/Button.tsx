@@ -87,6 +87,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'night-aware',
               "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
               'disabled:pointer-events-none disabled:opacity-40',
+              'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
               {
                 // small
                 'gap-6 px-6 py-3 text-sm leading-[18px]': isSmall,

@@ -14,7 +14,10 @@ import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useRef, useState} from 'react';
 import {Button, Modal, Popup} from 'semantic-ui-react';
 
-import {useWeaveDashUiEnable, useWeaveFeaturesContext} from '../../context';
+import {
+  useWeaveFeaturesContext,
+  useWeaveErrorBoundaryInPanelComp2Enabled,
+} from '../../context';
 // import {useExpressionHoverHandlers} from './PanelContext';
 import {useWeaveContext} from '../../context';
 import {useDeepMemo} from '../../hookUtils';
@@ -29,10 +32,14 @@ import * as PanelLib from './panellib/libpanel';
 import * as TSTypeWithPath from './tsTypeWithPath';
 import {HOVER_DELAY_MS} from './Tooltip';
 import {ErrorPanel} from '../ErrorPanel';
+import {weaveErrorToDDPayload} from '../../errors';
+import {datadogRum} from '@datadog/browser-rum';
+import {WeaveApp} from '../..';
 
 class PanelCompErrorBoundary extends React.Component<
   {
     inPanelMaybe: boolean;
+    weave: WeaveApp;
     onInvalidGraph?: (node: NodeOrVoidNode) => void;
   },
   {hasError: boolean; customMessage?: string}
@@ -56,6 +63,11 @@ class PanelCompErrorBoundary extends React.Component<
     if (error instanceof CGReact.NullResult && this.props.inPanelMaybe) {
       throw error;
     }
+
+    datadogRum.addAction(
+      'weave_panel_error_boundary',
+      weaveErrorToDDPayload(error, this.props.weave)
+    );
 
     if (error instanceof CGReact.InvalidGraph) {
       this.props.onInvalidGraph?.(error.node);
@@ -210,7 +222,7 @@ export function useUpdateConfig2<C>(props: {
 
 // PanelComp2 is the primary proxy for rendering all Weave Panels.
 export const PanelComp2Inner = (props: PanelComp2Props) => {
-  const dashUiEnabled = useWeaveDashUiEnable();
+  const enableErrorBoundary = useWeaveErrorBoundaryInPanelComp2Enabled();
   const {panelSpec, configMode} = props;
   const updateConfig2 = useUpdateConfig2(props);
   let unboundedContent = useMemo(() => {
@@ -272,16 +284,19 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
   }, [panelSpec, props, configMode, updateConfig2]);
 
   const {panelMaybeNode} = usePanelContext();
+  const weave = useWeaveContext();
 
   unboundedContent = useMemo(() => {
-    return dashUiEnabled ? (
-      <PanelCompErrorBoundary inPanelMaybe={panelMaybeNode != null}>
+    return enableErrorBoundary ? (
+      <PanelCompErrorBoundary
+        inPanelMaybe={panelMaybeNode != null}
+        weave={weave}>
         {unboundedContent}
       </PanelCompErrorBoundary>
     ) : (
       unboundedContent
     );
-  }, [dashUiEnabled, panelMaybeNode, unboundedContent]);
+  }, [enableErrorBoundary, panelMaybeNode, unboundedContent, weave]);
 
   if (props.input.nodeType === 'void') {
     return (

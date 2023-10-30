@@ -50,7 +50,12 @@ import {
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
-import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
+import {
+  ClientContext,
+  useWeaveContext,
+  useWeaveRefinementInReactHooksDisabled,
+  useWeaveClientEvalInUseNodeValueEnabled,
+} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
@@ -240,7 +245,7 @@ export const useNodeValue = <T extends Type>(
   const memoCacheId = options?.memoCacheId ?? 0;
   const callSite = options?.callSite;
   const skip = options?.skip;
-  const dashUiEnabled = useWeaveDashUiEnable();
+  const enableClientEval = useWeaveClientEvalInUseNodeValueEnabled();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
@@ -258,8 +263,8 @@ export const useNodeValue = <T extends Type>(
   node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
 
   node = useMemo(
-    () => (dashUiEnabled ? clientEval(node, stack) : node),
-    [dashUiEnabled, node, stack]
+    () => (enableClientEval ? clientEval(node, stack) : node),
+    [enableClientEval, node, stack]
   ) as NodeOrVoidNode<T>;
 
   GlobalCGReactTracker.useNodeValue++;
@@ -347,7 +352,7 @@ export const useNodeValue = <T extends Type>(
     if (error != null) {
       const message =
         'Node execution failed (useNodeValue): ' + errorToText(error);
-      console.error(message);
+      // console.error(message);
 
       throw new UseNodeValueServerExecutionError(message);
     }
@@ -979,7 +984,7 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
       // rethrow in render thread
       const message =
         'Node execution failed (useNodeWithServerType): ' + errorToText(error);
-      console.error(message);
+      // console.error(message);
       throw new Error(message);
     }
     return {
@@ -997,9 +1002,9 @@ export const useNodeWithServerTypeDoNotCallMeDirectly = (
 // instead of during rendering.
 export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirectly =
   (node, paramFrame) => {
-    const dashEnabled = useWeaveDashUiEnable();
+    const disableRefinement = useWeaveRefinementInReactHooksDisabled();
     // In dashUI, no-op. We manage document refinement in panelTree
-    if (dashEnabled) {
+    if (disableRefinement) {
       return {
         initialLoading: false,
         loading: false,

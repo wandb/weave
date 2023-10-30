@@ -1,6 +1,6 @@
+import {Icon} from '../Icon';
 import React, {FC} from 'react';
 
-import {Icon} from '../Icon';
 import {Tailwind} from '../Tailwind';
 
 export type RemoveActionProps = Record<string, any>;

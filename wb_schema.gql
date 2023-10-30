@@ -1,11 +1,19 @@
 # This file is a hand-selected subset of the W&B GQL spec that is used by weave python.
-# Its type definitions are used by gql_to_weave.py to convert GQL queries to weave types.
-# If you add a new GQL op that you want to support in weave, you'll need to add any fields
-# in its query_function to this file.
+# On the backend, it's used by gql_to_weave.py to convert GQL queries to weave types.
+# On the frontend, it's used for autogenerating TypeScript definitions for GQL queries.
+# If you need to support a new GQL op in weave, you must add the relevant type definitions here.
 
 schema {
   query: Query
+  mutation: Mutation
 }
+
+directive @audit on FIELD_DEFINITION
+directive @constraints(
+  min: Int
+  max: Int
+  pattern: String
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
 type Query {
   user(id: ID, userName: String): User
@@ -66,6 +74,14 @@ type Query {
     last: Int
   ): RepoInsightsRowConnection
   repo(id: ID!): Repo
+}
+
+type Mutation {
+  deleteView(input: DeleteViewInput!): DeleteViewPayload
+  upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
+  deleteArtifactSequence(
+    input: DeleteArtifactSequenceInput!
+  ): DeleteArtifactCollectionPayload
 }
 
 scalar DateTime
@@ -551,6 +567,7 @@ enum ViewSource {
   WANDB_UI
   WANDB_UI_SHARE_PANEL
   WANDB_SDK
+  WEAVE_UI
 }
 
 type View implements Node {
@@ -593,6 +610,52 @@ type ViewConnection {
 type ViewEdge {
   node: View
   cursor: String!
+}
+
+input DeleteViewInput {
+  id: ID
+  deleteDrafts: Boolean = false
+  clientMutationId: String
+}
+
+type DeleteViewPayload {
+  success: Boolean
+  pendingDrafts: Boolean
+  clientMutationId: String
+}
+
+input UpsertViewInput {
+  id: ID
+  entityName: String
+  projectName: String
+  name: String @constraints(max: 128)
+  displayName: String @constraints(max: 128)
+  description: String
+  type: String
+  spec: String
+  parentId: ID
+  locked: Boolean
+  previewUrl: String @constraints(max: 256)
+  coverUrl: String @constraints(max: 256)
+  clientMutationId: String
+  showcasedAt: DateTime
+  createdUsing: ViewSource
+}
+
+type UpsertViewPayload {
+  view: View
+  inserted: Boolean
+  clientMutationId: String
+}
+
+input DeleteArtifactSequenceInput {
+  artifactSequenceID: ID!
+  clientMutationId: String
+}
+
+type DeleteArtifactCollectionPayload {
+  artifactCollection: ArtifactCollection!
+  clientMutationId: String
 }
 
 interface Error {

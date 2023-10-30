@@ -464,6 +464,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             )}
             <Button
               icon="close"
+              data-testid="close-panel-panel-config"
               variant="ghost"
               size="small"
               onClick={closeDrawer}

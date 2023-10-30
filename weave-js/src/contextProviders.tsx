@@ -128,7 +128,10 @@ export const NotebookComputeGraphContextProvider: React.FC = React.memo(
       () => ({
         actions: true,
         fullscreenMode: true,
-        dashUi: true,
+        clientEvalInUseNodeValueEnabled: true,
+        sidebarConfigStylingEnabled: true,
+        errorBoundaryInPanelComp2Enabled: true,
+        redesignedPlotConfigEnabled: true,
         betaFeatures: {
           'weave-python-ecosystem': true,
           'weave-devpopup': false,

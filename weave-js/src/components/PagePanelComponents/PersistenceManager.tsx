@@ -1,3 +1,5 @@
+import {useMutation as useApolloMutation} from '@apollo/client';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as globals from '@wandb/weave/common/css/globals.styles';
@@ -8,6 +10,9 @@ import {
   isConstNode,
   isOutputNode,
   mapNodes,
+  opProjectArtifact,
+  opRootProject,
+  constString,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
@@ -22,6 +27,7 @@ import React, {
   useState,
 } from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
+import {useHistory} from 'react-router-dom';
 
 import {Popover} from '@material-ui/core';
 import styled, {css} from 'styled-components';
@@ -74,8 +80,11 @@ import _ from 'lodash';
 import {mapPanels} from '../Panel2/panelTree';
 import {DeleteActionModal} from './DeleteActionModal';
 import {PublishModal} from './PublishModal';
+import {DELETE_ARTIFACT_SEQUENCE} from './graphql';
 import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import {urlProjectAssets} from '@wandb/weave/urls';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -338,6 +347,9 @@ const HeaderPersistenceControls: React.FC<{
               } else {
                 takeAction(storeAction);
               }
+              if (storeAction === 'commit') {
+                trackPublishBoardClicked('commit-changes', 'board-toolbar');
+              }
             }}>
             {persistenceActionToLabel[storeAction]}
           </WBButton>
@@ -372,9 +384,13 @@ const HeaderFileControls: React.FC<{
   takeAction,
   updateNode,
 }) => {
+  const history = useHistory();
   const [actionRenameOpen, setActionRenameOpen] = useState(false);
   const [actionDeleteOpen, setActionDeleteOpen] = useState(false);
   const [acting, setActing] = useState(false);
+  const [deleteArtifactCollection] = useApolloMutation(
+    DELETE_ARTIFACT_SEQUENCE
+  );
   const isLocal = maybeURI != null && isLocalURI(maybeURI);
   const entityProjectName = determineURISource(maybeURI, branchPoint);
   const {name: currName, version: currentVersion} =
@@ -395,6 +411,61 @@ const HeaderFileControls: React.FC<{
 
   const inputType = useNodeWithServerType(inputNode).result?.type;
   const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
+
+  const entityName = useMemo(
+    () => entityProjectName?.entity ?? '',
+    [entityProjectName]
+  );
+
+  const projectName = useMemo(
+    () => entityProjectName?.project ?? '',
+    [entityProjectName]
+  );
+
+  const artifactNode = useMemo(() => {
+    return opProjectArtifact({
+      project: opRootProject({
+        entityName: constString(entityName),
+        projectName: constString(projectName),
+      }),
+      artifactName: constString(currName ?? ''),
+    } as any);
+  }, [entityName, projectName, currName]);
+
+  const artifactNodeValue = useNodeValue(artifactNode, {
+    skip: entityName === '' || projectName === '',
+  });
+
+  const resetAfterDeletion = useCallback(() => {
+    setActing(false);
+    setActionDeleteOpen(false);
+    if (entityName && projectName) {
+      history.push(urlProjectAssets(entityName, projectName, 'board'));
+    } else {
+      goHome?.();
+    }
+  }, [entityName, projectName, history, goHome]);
+
+  const deleteRemoteBoard = useCallback(async () => {
+    const artifactSequenceID =
+      !artifactNodeValue.loading && artifactNodeValue.result
+        ? artifactNodeValue.result.id
+        : '';
+    try {
+      await deleteArtifactCollection({
+        variables: {
+          artifactSequenceID,
+        },
+      });
+    } catch (e) {
+      console.error('Failed to delete artifact collection.');
+      toast('Something went wrong while trying to delete this board.');
+    }
+  }, [
+    artifactNodeValue.result,
+    artifactNodeValue.loading,
+    deleteArtifactCollection,
+  ]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -439,7 +510,7 @@ const HeaderFileControls: React.FC<{
 
   return (
     <>
-      <HeaderCenterControls>
+      <HeaderCenterControls data-testid="header-center-controls">
         {entityProjectName && (
           <HeaderCenterControlsSecondary
             onClick={() => {
@@ -548,6 +619,7 @@ const HeaderFileControls: React.FC<{
           <MenuDivider /> */}
 
           <MenuItem
+            data-testid="new-board-button"
             onClick={() => {
               setAnchorFileEl(null);
               newDashboard();
@@ -607,13 +679,14 @@ const HeaderFileControls: React.FC<{
           open={actionDeleteOpen}
           onClose={() => setActionDeleteOpen(false)}
           acting={acting}
-          onDelete={() => {
+          onDelete={async () => {
             setActing(true);
-            takeAction(deleteAction, {}, () => {
-              setActing(false);
-              setActionRenameOpen(false);
-              goHome?.();
-            });
+            if (deleteAction === 'delete_remote') {
+              await deleteRemoteBoard();
+              resetAfterDeletion();
+            } else {
+              takeAction(deleteAction, {}, resetAfterDeletion);
+            }
           }}
         />
       )}

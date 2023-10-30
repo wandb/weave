@@ -918,7 +918,11 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         }}>
         {!inJupyter && config.enableAddPanel && (
           <ActionBar>
-            <Button variant="ghost" onClick={handleAddPanel} icon="add-new">
+            <Button
+              variant="ghost"
+              onClick={handleAddPanel}
+              icon="add-new"
+              data-test="new-panel-button">
               New panel
             </Button>
           </ActionBar>
@@ -981,6 +985,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           width = widthItem?.split(':')[1];
         }
         if (config.panelInfo?.[name]?.hidden) {
+          // ISSUE: `name` may not be not unique. Should use path instead?
           return null;
         }
         return (

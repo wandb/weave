@@ -1,4 +1,3 @@
-import {useWeaveDashUiEnable} from '@wandb/weave/context';
 import {opProjectArtifacts, opProjectRuns} from '@wandb/weave/core';
 import {
   opArtifactType,
@@ -317,8 +316,7 @@ const PanelProjectOverviewSimple: React.FC<
 const PanelProjectOverview: React.FC<
   PanelProjectOverviewProps & {isRoot?: boolean}
 > = props => {
-  const inDash = useWeaveDashUiEnable();
-  if (inDash) {
+  if (false) {
     return <PanelProjectOverviewNew {...props} />;
   }
   return <PanelProjectOverviewSimple {...props} />;

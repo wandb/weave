@@ -1,7 +1,6 @@
-import {voidNode} from '@wandb/weave/core';
-import {v4 as uuid} from 'uuid';
+import {ID} from '@wandb/weave/core';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {getConfigForPath} from '../panelTree';
+import {getConfigForPath, makeGroup, makePanel} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
 
 export type WeavePanelSlateNode = {
@@ -39,38 +38,47 @@ export const computeReportSlateNode = (
   targetPath: string[]
 ): WeavePanelSlateNode => {
   const targetConfig = getConfigForPath(fullConfig, targetPath);
-  const inputNodeVal = {
-    id: 'Group',
-    input_node: voidNode(),
-    config: {
-      items: {
-        panel: targetConfig,
-      },
+  const inputNodeVal = makeGroup(
+    {
+      // NOTE: order matters! `vars` must be above `panel`
+      vars: makeGroup(
+        {
+          // TODO: resolve vars and add items here
+          // https://wandb.atlassian.net/browse/WB-14443
+        },
+        {childNameBase: 'var'}
+      ),
+      panel: targetConfig,
+    },
+    {
       disableDeletePanel: true,
       enableAddPanel: true, // actually means "is editable"
+      equalSize: true,
       layoutMode: 'vertical',
-      showExpressions: true,
-    },
-    vars: {},
-  };
+      panelInfo: {
+        vars: {
+          hidden: true,
+        },
+      },
+    }
+  );
 
   return {
     type: 'weave-panel',
     children: [{text: ''}],
     config: {
       isWeave1Panel: true,
-      panelConfig: {
-        id: 'Panel',
-        config: {
-          documentId: uuid(),
+      panelConfig: makePanel(
+        'Panel',
+        {
+          documentId: ID(12),
         },
-        input_node: {
+        {
           nodeType: 'const',
           type: toWeaveType(inputNodeVal),
           val: inputNodeVal,
-        },
-        vars: {},
-      },
+        }
+      ),
     },
   };
 };

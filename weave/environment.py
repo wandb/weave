@@ -5,7 +5,7 @@
 import configparser
 import enum
 import os
-import pathlib
+import json
 import typing
 from . import util
 from . import errors
@@ -151,6 +151,19 @@ def sigterm_sighandler_enabled() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_SIGTERM_SIGHANDLER")
 
 
+def weave_wandb_gql_headers() -> typing.Dict[str, str]:
+    # expects a json string
+    raw = os.environ.get("WEAVE_WANDB_GQL_HEADERS")
+    if raw:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            raise errors.WeaveConfigurationError(
+                "WEAVE_WANDB_GQL_HEADERS should be a json string"
+            )
+    return {}
+
+
 def weave_wandb_cookie() -> typing.Optional[str]:
     cookie = os.environ.get("WEAVE_WANDB_COOKIE")
     if cookie:
@@ -224,3 +237,11 @@ def usage_analytics_enabled() -> bool:
 
 def gql_schema_path() -> typing.Optional[str]:
     return os.environ.get(WEAVE_GQL_SCHEMA_PATH) or None
+
+
+def dd_env() -> str:
+    return os.getenv("DD_ENV", "")
+
+
+def env_is_ci() -> bool:
+    return util.parse_boolean_env_var("WEAVE_CI")

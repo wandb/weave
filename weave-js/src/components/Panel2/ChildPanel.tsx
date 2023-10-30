@@ -54,6 +54,7 @@ import * as Styles from './PanelExpression/styles';
 import {
   useCloseDrawer,
   usePanelInputExprIsHighlightedByPath,
+  useSelectedDocumentId,
   useSelectedPath,
   useSetInteractingChildPanel,
   useSetPanelInputExprIsHighlighted,
@@ -62,6 +63,7 @@ import {
 import PanelNameEditor from './PanelNameEditor';
 import {TableState} from './PanelTable/tableState';
 import {
+  excludePanelPanel,
   getPanelStacksForType,
   panelSpecById,
   usePanelStacksForType,
@@ -146,6 +148,8 @@ export const initPanel = async (
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
     stackIdFilter: allowPanel,
+    // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
+    excludePanelPanel: excludePanelPanel(stack),
   });
   if (id == null) {
     return {vars: {}, input_node: voidNode(), id: '', config: undefined};
@@ -226,6 +230,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     {
       allowedPanels: props.allowedPanels,
       stackIdFilter: allowPanel,
+      // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
+      excludePanelPanel: excludePanelPanel(stack),
     }
   );
 
@@ -565,6 +571,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     el => el != null && el !== ''
   );
 
+  const selectedDocumentId = useSelectedDocumentId();
   const pathStr = useMemo(() => ['<root>', ...fullPath].join('.'), [fullPath]);
   const selectedPath = useSelectedPath();
   const selectedPathStr = useMemo(() => {
@@ -575,6 +582,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   }, [selectedPath]);
 
   const isPanelSelected =
+    selectedDocumentId === documentId &&
     selectedPathStr !== '<root>' &&
     selectedPathStr !== '<root>.main' &&
     pathStr.startsWith(selectedPathStr);
@@ -583,6 +591,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
+
   const isVarNameEditable = props.editable || controlBar === 'editable';
   const setSelectedPanel = useSetSelectedPanel();
   const showEditControls = isPanelSelected || isHoverPanel;
@@ -664,6 +673,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       variant="ghost"
                       size="small"
                       icon="pencil-edit"
+                      data-testid="open-panel-editor"
                       onClick={() =>
                         setInteractingPanel(
                           'config',
