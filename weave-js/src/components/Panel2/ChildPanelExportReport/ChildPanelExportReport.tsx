@@ -172,8 +172,8 @@ export const ChildPanelExportReport = ({
       });
       await submit(
         newDraftVariables(
-          selectedEntity?.name,
-          selectedProject?.name,
+          selectedEntity.name,
+          selectedProject.name,
           publishedReport,
           slateNode
         )
