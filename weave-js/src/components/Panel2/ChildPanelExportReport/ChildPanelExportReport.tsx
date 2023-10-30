@@ -137,7 +137,14 @@ export const ChildPanelExportReport = ({
       if (draft) {
         return setIsDraftDialogOpen(true);
       } else {
-        return submit(newDraftVariables(report, slateNode));
+        return submit(
+          newDraftVariables(
+            selectedEntity.name,
+            selectedProject.name,
+            report,
+            slateNode
+          )
+        );
       }
     } catch (err) {
       handleError(err);
@@ -156,14 +163,21 @@ export const ChildPanelExportReport = ({
   };
 
   const onDiscardDraft = async () => {
-    if (!hasActiveDraft || !slateNode) {
+    if (!hasActiveDraft || !hasRequiredData) {
       return;
     }
     try {
       await deleteReportDraft({
         variables: {id: activeReportDraft.id},
       });
-      await submit(newDraftVariables(publishedReport, slateNode));
+      await submit(
+        newDraftVariables(
+          selectedEntity?.name,
+          selectedProject?.name,
+          publishedReport,
+          slateNode
+        )
+      );
     } catch (err) {
       handleError(err);
     }
