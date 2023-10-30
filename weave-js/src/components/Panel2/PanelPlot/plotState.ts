@@ -30,7 +30,7 @@ import {
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
-import {freeze, produce} from 'immer';
+import {freeze, produce, immerable} from 'immer';
 import _ from 'lodash';
 
 import * as TableState from '../PanelTable/tableState';
