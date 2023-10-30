@@ -1,5 +1,6 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
+import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
 import styled from 'styled-components';
@@ -20,7 +21,6 @@ import {
   IconRetry,
   IconSplit,
 } from '../Panel2/Icons';
-import {PopupMenu} from './PopupMenu';
 import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
 
 const Divider = styled.div`
@@ -221,14 +221,29 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   ]);
 
   return (
-    <PopupMenu
-      trigger={trigger}
-      position={`bottom right`}
-      items={menuItems}
-      onClose={onClose}
-      onOpen={onOpen}
+    <DropdownMenu.Root
       open={isOpen}
-    />
+      onOpenChange={open => (open ? onOpen?.() : onClose?.())}>
+      <DropdownMenu.Trigger>
+        {React.cloneElement(trigger, {active: isOpen})}
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          className="z-[100]"
+          onCloseAutoFocus={e => e.preventDefault()}>
+          {menuItems.map(item => (
+            <DropdownMenu.Item
+              key={item.key}
+              onClick={item.onClick}
+              disabled={item.disabled}>
+              {item.icon}
+              {item.content}
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 };
 
