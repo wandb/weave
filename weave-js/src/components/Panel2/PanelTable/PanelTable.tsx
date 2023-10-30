@@ -1158,62 +1158,61 @@ const IndexCell: React.FC<{
 
   if (index.loading) {
     return <S.IndexColumnVal />;
-  } else {
-    const isSelected =
-      index.result != null && index.result === props.activeRowIndex;
-    const simpleValue = (
-      <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
-    );
-    return (
-      <S.IndexColumnVal
-        onClick={() => {
-          if (!props.simpleTable) {
-            props.setRowAsPinned(index.result);
-          }
-        }}
-        onMouseEnter={() => setHoveredColId('index')}
-        onMouseLeave={() => setHoveredColId('')}
-        isHovered={hoveredColId === 'index'}>
-        <S.IndexColumnText
-          style={{
-            color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
-          }}>
-          {tableIsPanelVariable && (
-            <S.IndexCellCheckboxWrapper
-              className="index-cell-checkbox"
-              isSelected={isSelected}>
-              <Checkbox
-                onClick={() => {
-                  if (!props.simpleTable) {
-                    props.setRowAsPinned(index.result);
-                  }
-                }}
-                checked={isSelected}
-              />
-            </S.IndexCellCheckboxWrapper>
-          )}
-          <div style={{width: '100%'}}>
-            {props.simpleTable || !runNameNodeValue.result ? (
-              simpleValue
-            ) : (
-              <Popup
-                // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
-                popperModifiers={{
-                  preventOverflow: {
-                    boundariesElement: 'offsetParent',
-                  },
-                }}
-                position="top center"
-                popperDependencies={[index.result, runNameNodeValue.result]}
-                content={runNameNodeValue.result ?? ''}
-                trigger={simpleValue}
-              />
-            )}
-          </div>
-        </S.IndexColumnText>
-      </S.IndexColumnVal>
-    );
   }
+  const isSelected =
+    index.result != null && index.result === props.activeRowIndex;
+  const simpleValue = <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>;
+  const runName = runNameNodeValue.result ?? '';
+
+  return (
+    <S.IndexColumnVal
+      onClick={() => {
+        if (!props.simpleTable) {
+          props.setRowAsPinned(index.result);
+        }
+      }}
+      onMouseEnter={() => setHoveredColId('index')}
+      onMouseLeave={() => setHoveredColId('')}
+      isHovered={hoveredColId === 'index'}>
+      <S.IndexColumnText
+        style={{
+          color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
+        }}>
+        {tableIsPanelVariable && (
+          <S.IndexCellCheckboxWrapper
+            className="index-cell-checkbox"
+            isSelected={isSelected}>
+            <Checkbox
+              onClick={() => {
+                if (!props.simpleTable) {
+                  props.setRowAsPinned(index.result);
+                }
+              }}
+              checked={isSelected}
+            />
+          </S.IndexCellCheckboxWrapper>
+        )}
+        <div style={{width: '100%'}}>
+          {props.simpleTable || !runName ? (
+            simpleValue
+          ) : (
+            <Popup
+              // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
+              popperModifiers={{
+                preventOverflow: {
+                  boundariesElement: 'offsetParent',
+                },
+              }}
+              position="top center"
+              popperDependencies={[index.result, runName]}
+              content={runName}
+              trigger={simpleValue}
+            />
+          )}
+        </div>
+      </S.IndexColumnText>
+    </S.IndexColumnVal>
+  );
 };
 
 const ActionCell: React.FC<{
