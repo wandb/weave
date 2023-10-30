@@ -20,4 +20,14 @@ export const UPDATE_ARTIFACT_COLLECTION = gql(`
       }
     }
   }
+  `);
+
+export const DELETE_ARTIFACT_SEQUENCE = gql(`
+  mutation DeleteArtifactSequence($artifactSequenceID: ID!) {
+    deleteArtifactSequence(input: {artifactSequenceID: $artifactSequenceID}) {
+      artifactCollection {
+        id
+      }
+    }
+  }
 `);

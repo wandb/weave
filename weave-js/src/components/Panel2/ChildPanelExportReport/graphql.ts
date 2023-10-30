@@ -13,6 +13,7 @@ export const GET_REPORT = gql(`
         edges {
           node {
             id
+            createdAt
             displayName
             spec
             user {
@@ -60,6 +61,14 @@ export const UPSERT_REPORT = gql(`
         id
         displayName
       }
+    }
+  }
+`);
+
+export const DELETE_REPORT_DRAFT = gql(`
+  mutation DeleteReportDraft($id: ID) {
+    deleteView(input: {id: $id}) {
+      success
     }
   }
 `);

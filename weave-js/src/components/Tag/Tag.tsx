@@ -1,4 +1,4 @@
-import {Icon} from '../Icon';
+import {Icon, IconName} from '../Icon';
 import classNames from 'classnames';
 import React, {FC, ReactElement, useMemo, useRef} from 'react';
 import {twMerge} from 'tailwind-merge';
@@ -39,6 +39,7 @@ export type TagProps = {
   label: string;
   color?: TagColorName;
   showIcon?: boolean;
+  iconName?: IconName;
   // Wrapping the Tag in Tailwind can be a problem if the Tailwind wrapper is supplied higher up
   // and there is a need to position the Tag as a direct child for something like flexbox
   Wrapper?: React.ComponentType<any> | null;
@@ -48,6 +49,7 @@ export const Tag: FC<TagProps> = ({
   label,
   color,
   showIcon = false,
+  iconName,
   Wrapper = Tailwind,
 }) => {
   const classes = useTagClasses({color});
@@ -56,7 +58,9 @@ export const Tag: FC<TagProps> = ({
     <div
       key={`tag-${label}`}
       className={twMerge(classes, showIcon ? 'pl-4 pr-6' : 'px-6')}>
-      {showIcon && <Icon className="mr-4 h-14 w-14" name={DEFAULT_TAG_ICON} />}
+      {showIcon && (
+        <Icon className="mr-4 h-14 w-14" name={iconName ?? DEFAULT_TAG_ICON} />
+      )}
       <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
         {label}
       </span>
@@ -77,6 +81,7 @@ export const RemovableTag: FC<RemovableTagProps> = ({
   removeAction,
   color,
   showIcon = false,
+  iconName,
   Wrapper = Tailwind,
 }) => {
   const labelRef = useRef<HTMLParagraphElement>(null);
@@ -89,7 +94,10 @@ export const RemovableTag: FC<RemovableTagProps> = ({
         key={`tag-${label}`}
         className={twMerge(classes, showIcon ? 'px-4' : 'pl-6 pr-4')}>
         {showIcon && (
-          <Icon className="mr-4 h-14 w-14" name={DEFAULT_TAG_ICON} />
+          <Icon
+            className="mr-4 h-14 w-14"
+            name={iconName ?? DEFAULT_TAG_ICON}
+          />
         )}
         <p
           className={twMerge(

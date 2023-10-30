@@ -40,12 +40,26 @@ export const computeReportSlateNode = (
   const targetConfig = getConfigForPath(fullConfig, targetPath);
   const inputNodeVal = makeGroup(
     {
+      // NOTE: order matters! `vars` must be above `panel`
+      vars: makeGroup(
+        {
+          // TODO: resolve vars and add items here
+          // https://wandb.atlassian.net/browse/WB-14443
+        },
+        {childNameBase: 'var'}
+      ),
       panel: targetConfig,
     },
     {
       disableDeletePanel: true,
       enableAddPanel: true, // actually means "is editable"
+      equalSize: true,
       layoutMode: 'vertical',
+      panelInfo: {
+        vars: {
+          hidden: true,
+        },
+      },
     }
   );
 

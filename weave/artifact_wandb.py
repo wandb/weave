@@ -213,7 +213,7 @@ def _collection_and_alias_id_mapping_to_uri(
                 num_timeout_retries=1,
             )
     except requests.exceptions.HTTPError as e:
-        if e.response != None and e.response.status_code == 400:
+        if e.response is not None and e.response.status_code == 400:
             # This is a special case: the client id corresponds to an artifact that was
             # never uploaded, so the client id doesn't exist in the W&B server.
 
