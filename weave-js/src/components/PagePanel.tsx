@@ -62,6 +62,7 @@ import {
   DDUserInfoType,
   datadogSetUserInfo,
 } from '../integrations/analytics/datadog';
+import {BetaIndicator} from './PagePanelComponents/BetaIndicator';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -468,6 +469,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
             )}
             {/* <ArtifactManager /> */}
             {!inJupyter && <HelpCTA />}
+            {!inJupyter && <BetaIndicator />}
           </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>
