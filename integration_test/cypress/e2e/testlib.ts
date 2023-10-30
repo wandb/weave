@@ -77,6 +77,13 @@ export const gotoBlankDashboard = () => {
   cy.get('[data-testid="new-board-button"]').should('be.visible').click();
 };
 
+export const goToHomePage = () => {
+  const url = '/';
+  cy.viewport(1600, 900);
+  cy.visit(url);
+  cy.contains('Board templates').should('be.visible');
+};
+
 export const addSidebarPanel = () => {
   getPanel(['sidebar']).contains('New variable').click();
 };
@@ -103,22 +110,41 @@ export const panelTypeInputExpr = (path: string[], text: string) => {
     .type('{enter}', {force: true});
 };
 
-export const scrollToEEAndType = (path: string[], text: string) => {
+function typeWithRetry(
+  path: string[],
+  text: string,
+  retries: number = 10,
+  delay: number = 1000
+) {
   const panel = getPanel(path);
+
   panel
     .trigger('mouseenter')
     .click()
     .find('[data-test=expression-editor-container] [contenteditable=true]')
-
-    .realHover()
-    .realClick()
-
     .realHover()
     .realClick()
 
     .type(text, {force: true})
     .wait(300)
     .type('{enter}', {force: true});
+
+  getPanel(path)
+    .find('[data-test=expression-editor-container] [contenteditable=true]')
+    .then($el => {
+      if ($el.text() !== text) {
+        if (retries > 0) {
+          cy.wait(delay);
+          typeWithRetry(path, text, retries - 1, delay);
+        } else {
+          throw new Error('Condition not met');
+        }
+      }
+    });
+}
+
+export const scrollToEEAndType = (path: string[], text: string) => {
+  typeWithRetry(path, text);
 };
 
 export const panelChangeId = (path: string[], text: string) => {
