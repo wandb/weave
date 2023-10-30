@@ -1,9 +1,9 @@
 import * as RadixDropdownMenu from '@radix-ui/react-dropdown-menu';
-import {Icon} from '@wandb/weave/components/Icon';
 import classNames from 'classnames';
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
 
+import {Icon} from '../Icon';
 import {Tailwind} from '../Tailwind';
 
 /**
