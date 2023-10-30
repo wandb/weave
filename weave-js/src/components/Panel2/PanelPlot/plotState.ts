@@ -645,10 +645,10 @@ export const dimConstructors: Record<
 
 export function setDefaultSeriesNames(
   config: PlotConfig,
-  enableDashUi: boolean
+  redesignedPlotConfigEnabled: boolean
 ): PlotConfig {
   return produce(config, draft => {
-    if (enableDashUi) {
+    if (redesignedPlotConfigEnabled) {
       draft.series.forEach((s, i) => {
         if (s.seriesName == null) {
           s.seriesName = `Series ${i + 1}`;
