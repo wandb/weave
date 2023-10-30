@@ -373,6 +373,6 @@ export const useBaseTableData = (
 // This is used to determine if a PanelTable is a ChildPanel
 // We do not want to render row selection styles if the activeData of the PanelTable cannot be used
 // If PanelTable is a ChildPanel, there will exist a variable in the stack that is an input
-export const useTableIsPanelVariable = (stack: Stack) => {
+export const tableIsPanelVariable = (stack: Stack) => {
   return stack && stack.find(node => node.name === 'input') !== undefined;
 };

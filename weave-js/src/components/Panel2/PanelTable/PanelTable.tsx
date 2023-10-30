@@ -78,7 +78,7 @@ import {
   BaseTableDataType,
   getTableMeasurements,
   nodeIsValidList,
-  useTableIsPanelVariable,
+  tableIsPanelVariable,
   useAutomatedTableState,
   useBaseTableColumnDefinitions,
   useBaseTableData,
@@ -280,10 +280,11 @@ const PanelTableInner: React.FC<
   const rowActions = props.rowActions;
 
   const {stack} = usePanelContext();
-  const tableIsPanelVariable = useTableIsPanelVariable(stack);
+  const tableIsPanelVariableVal = tableIsPanelVariable(stack);
   const rowControlsWidth = useMemo(
-    () => (tableIsPanelVariable ? rowControlsWidthWide : rowControlsWidthSmall),
-    [tableIsPanelVariable]
+    () =>
+      tableIsPanelVariableVal ? rowControlsWidthWide : rowControlsWidthSmall,
+    [tableIsPanelVariableVal]
   );
 
   const updateIndexOffset = useUpdateConfigKey('indexOffset', updateConfig);
@@ -397,11 +398,17 @@ const PanelTableInner: React.FC<
 
   const setRowAsActive = useCallback(
     (row: number) => {
-      updateConfig({
-        activeRowForGrouping: {
+      const activeRowForGrouping =
+        {
           ...config.activeRowForGrouping,
           [compositeGroupKey]: row,
-        },
+        } ?? {};
+      // if row is less than 0, delete the active row
+      if (row < 0) {
+        delete activeRowForGrouping[compositeGroupKey];
+      }
+      updateConfig({
+        activeRowForGrouping,
       });
     },
     [compositeGroupKey, config.activeRowForGrouping, updateConfig]
@@ -675,7 +682,7 @@ const PanelTableInner: React.FC<
             rowNode={rowData.rowNode}
             setRowAsPinned={(index: number) => {
               if (!props.config.simpleTable) {
-                if (shiftIsPressed) {
+                if (shiftIsPressed && index > -1) {
                   setRowAsPinned(index, !rowData.isPinned);
                 } else {
                   setRowAsActive(index);
@@ -1119,7 +1126,7 @@ const IndexCell: React.FC<{
 }> = props => {
   const {frame, stack} = usePanelContext();
   const weave = useWeaveContext();
-  const tableIsPanelVariable = useTableIsPanelVariable(stack);
+  const tableIsPanelVariableVal = tableIsPanelVariable(stack);
 
   if (
     props.runNode != null &&
@@ -1162,15 +1169,21 @@ const IndexCell: React.FC<{
   const isSelected =
     index.result != null && index.result === props.activeRowIndex;
   const runName = runNameNodeValue.result ?? '';
-  const basicIndexContent = <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>;
-
+  const basicIndexContent = (
+    <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+  );
+  const indexOnClick = () => {
+    if (!props.simpleTable) {
+      if (isSelected) {
+        props.setRowAsPinned(-1);
+      } else {
+        props.setRowAsPinned(index.result);
+      }
+    }
+  };
   return (
     <S.IndexColumnVal
-      onClick={() => {
-        if (!props.simpleTable) {
-          props.setRowAsPinned(index.result);
-        }
-      }}
+      onClick={indexOnClick}
       onMouseEnter={() => setHoveredColId('index')}
       onMouseLeave={() => setHoveredColId('')}
       isHovered={hoveredColId === 'index'}>
@@ -1178,18 +1191,11 @@ const IndexCell: React.FC<{
         style={{
           color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
         }}>
-        {tableIsPanelVariable && (
+        {tableIsPanelVariableVal && (
           <S.IndexCellCheckboxWrapper
             className="index-cell-checkbox"
             isSelected={isSelected}>
-            <Checkbox
-              onClick={() => {
-                if (!props.simpleTable) {
-                  props.setRowAsPinned(index.result);
-                }
-              }}
-              checked={isSelected}
-            />
+            <Checkbox onClick={indexOnClick} checked={isSelected} />
           </S.IndexCellCheckboxWrapper>
         )}
         <div style={{width: '100%'}}>
