@@ -322,7 +322,7 @@ const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
   commit: 'Publish changes',
   rename_local: 'Rename',
-  commit_rename: 'Rename',
+  commit_rename: 'Rename & publish',
   publish_as: 'Publish As',
   publish_new: 'Publish board',
   rename_remote: 'Rename',
@@ -710,17 +710,12 @@ const HeaderFileControls: React.FC<{
           open={actionRenameOpen}
           onClose={() => setActionRenameOpen(false)}
           onRename={async newName => {
-            const artifactSequenceID =
-              !artifactNodeValue.loading && artifactNodeValue.result
-                ? artifactNodeValue.result.id
-                : '';
             if (renameAction === 'rename_remote') {
-              renameRemoteBoard(artifactSequenceID, newName);
-              return;
+              renameRemoteBoard(newName);
             } else if (renameAction === 'commit_rename') {
               setActing(true);
               takeAction('commit', {name: newName}, () => {
-                renameRemoteBoard(artifactSequenceID, newName).then(() => {
+                renameRemoteBoard(newName).then(() => {
                   // console.log("Board renamed successfully.")
                 });
               });
