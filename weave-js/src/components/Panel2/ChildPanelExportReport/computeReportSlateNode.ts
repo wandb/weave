@@ -27,22 +27,15 @@ export type WeavePanelSlateNode = {
 
 const getVarItemsForPath = (
   fullConfig: ChildPanelFullConfig,
-  targetPath: string[],
   targetConfig: ChildPanelFullConfig
 ) => {
   const varItems: Record<string, ChildPanelFullConfig> = {};
   // perf: need func that just gets stack for target instead of map over full config
   mapPanels(fullConfig, [], (config, stack) => {
     if (config === targetConfig) {
-      const {usedStack} = dereferenceAllVars(config.input_node, stack);
-      // issue: usedStack doesn't include tables & plots
-      usedStack.forEach(frame => {
-        varItems[frame.name] = makePanel(
-          'Expression', // issue: not all vars are expressions
-          undefined,
-          frame.value
-        );
-      });
+      stack.reverse().forEach(frame => {
+        varItems[frame.name] =(frame.value as any).val
+      })
     }
     return config;
   });
@@ -62,12 +55,11 @@ export const computeReportSlateNode = (
   targetPath: string[]
 ): WeavePanelSlateNode => {
   const targetConfig = getConfigForPath(fullConfig, targetPath);
-  const varItems = getVarItemsForPath(fullConfig, targetPath, targetConfig);
+  const varItems = getVarItemsForPath(fullConfig, targetConfig);
   const inputNodeVal = makeGroup(
     {
       // NOTE: order matters! `vars` must come before `panel`
       vars: makeGroup(varItems, {
-        allowedPanels: ['Expression'], // issue: again, not all vars are expressions
         childNameBase: 'var',
         layoutMode: 'vertical',
       }),
