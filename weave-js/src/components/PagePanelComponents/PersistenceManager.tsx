@@ -449,7 +449,7 @@ const HeaderFileControls: React.FC<{
       }),
       artifactName: constString(currName ?? ''),
     } as any);
-  }, [entityProjectName, currName, currentVersion]);
+  }, [entityName, projectName, currName]);
 
   const artifactNodeValue = useNodeValue(artifactNode, {
     skip: entityName === '' || projectName === '',
@@ -457,9 +457,9 @@ const HeaderFileControls: React.FC<{
 
   const artifactSequenceID = useMemo(() => {
     return !artifactNodeValue.loading && artifactNodeValue.result
-        ? artifactNodeValue.result.id as any
-        : '';
-  }, [artifactNodeValue.result, artifactNodeValue.loading])
+      ? (artifactNodeValue.result.id as any)
+      : '';
+  }, [artifactNodeValue.result, artifactNodeValue.loading]);
 
   const renameRemoteBoard = useCallback(
     async (newName: string) => {
@@ -480,7 +480,13 @@ const HeaderFileControls: React.FC<{
         toast('Something went wrong while trying to rename this board.');
       }
     },
-    [entityName, projectName, updateNode, artifactSequenceID]
+    [
+      entityName,
+      projectName,
+      updateNode,
+      artifactSequenceID,
+      updateArtifactCollection,
+    ]
   );
 
   const resetAfterDeletion = useCallback(() => {
@@ -504,12 +510,7 @@ const HeaderFileControls: React.FC<{
       console.error('Failed to delete artifact collection.');
       toast('Something went wrong while trying to delete this board.');
     }
-  }, [
-    artifactNodeValue.result,
-    artifactNodeValue.loading,
-    deleteArtifactCollection,
-    artifactSequenceID
-  ]);
+  }, [deleteArtifactCollection, artifactSequenceID]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
