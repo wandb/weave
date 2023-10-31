@@ -1,7 +1,8 @@
-import {ID, dereferenceAllVars} from '@wandb/weave/core';
+import {ID, isAssignableTo, isConstNode} from '@wandb/weave/core';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {getConfigForPath, makeGroup, makePanel, mapPanels} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
+import {weaveTypeIsPanel} from '../../PagePanelComponents/util';
 
 export type WeavePanelSlateNode = {
   type: 'weave-panel';
@@ -25,6 +26,7 @@ export type WeavePanelSlateNode = {
   };
 };
 
+// Currently this returns a superset of what is actually needed
 const getVarItemsForPath = (
   fullConfig: ChildPanelFullConfig,
   targetConfig: ChildPanelFullConfig
@@ -33,9 +35,20 @@ const getVarItemsForPath = (
   // perf: need func that just gets stack for target instead of map over full config
   mapPanels(fullConfig, [], (config, stack) => {
     if (config === targetConfig) {
+      console.log({stack});
       stack.reverse().forEach(frame => {
-        varItems[frame.name] =(frame.value as any).val
-      })
+        if (isConstNode(frame.value) && weaveTypeIsPanel(frame.value.type)) {
+          if (!isAssignableTo(frame.value.type, {type: 'Group' as any})) {
+            varItems[frame.name] = frame.value.val;
+          }
+        } else {
+          varItems[frame.name] = makePanel(
+            'Expression',
+            undefined,
+            frame.value
+          );
+        }
+      });
     }
     return config;
   });
