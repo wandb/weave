@@ -105,7 +105,7 @@ const persistenceActions: {
   },
   cloud_published: {
     storeAction: null,
-    renameAction: 'rename_remote', // 'rename_remote' - uncomment after implementing
+    renameAction: 'rename_remote',
     deleteAction: 'delete_remote',
   },
 };
