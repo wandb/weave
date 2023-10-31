@@ -46,7 +46,10 @@ export const computeReportSlateNode = (
           // TODO: resolve vars and add items here
           // https://wandb.atlassian.net/browse/WB-14443
         },
-        {childNameBase: 'var'}
+        {
+          childNameBase: 'var',
+          layoutMode: 'vertical',
+        }
       ),
       panel: targetConfig,
     },

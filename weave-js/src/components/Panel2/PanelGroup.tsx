@@ -86,33 +86,42 @@ interface PanelInfo {
   hidden?: boolean;
 }
 export interface PanelGroupConfig {
-  // Determines how to lay out children, and also how to render each child's ControlBar
-  // (ie whether ControlBar is off, or shows the title only, or a fully editable var name, panel
-  // id, and expression).
+  /**
+   * Determines how to lay out children, and also how to render each child's ControlBar
+   * (ie whether ControlBar is off, or shows the title only, or a fully editable var name, panel
+   * id, and expression).
+   */
   layoutMode: (typeof LAYOUT_MODES)[number];
-  // Determines if we use equal sizing for horizontal and vertical layouts.
+  /** Determines if we use equal sizing for horizontal and vertical layouts. */
   equalSize?: boolean;
-
-  // This is totally ignored now!
+  /** @deprecated This is totally ignored now! */
   showExpressions?: boolean | 'titleBar';
-  // Applied to some children, a hack that lets us configure width of the VarBar in a horizontal
-  // layout.
-  // TODO: need to make this parameterized instead.
+  /**
+   * Applied to some children, a hack that lets us configure width of the VarBar in a horizontal
+   * layout.
+   * TODO: need to make this parameterized instead.
+   */
   style?: string;
-  // Children
+  /**
+   * Children
+   */
   items: {[key: string]: ChildPanelConfig};
-  // Should stick panel specific information here.
+  /**
+   * Should stick panel specific information here.
+   */
   panelInfo?: {[key: string]: PanelInfo};
-  // Grid and Flow layout information.
-  gridConfig: PanelBankSectionConfig;
-
-  // Specifies which panels are allowed to be chosen by the panel picker for children of this
-  // group. This is only used to restrict the VarBar to controls.
-  // TODO: remove this! It is really annoying that this is part of the board state. We have to
-  // keep it synchronized for new board creation in panelTree.ts and panel_board.py.
-  // We should probably hardcode the allowed panels just for the varbar instead.
+  /**
+   * Grid and Flow layout information.
+   */
+  gridConfig?: PanelBankSectionConfig;
+  /**
+   * Specifies which panels are allowed to be chosen by the panel picker for children of this
+   * group. This is only used to restrict the VarBar to controls.
+   * TODO: remove this! It is really annoying that this is part of the board state. We have to
+   * keep it synchronized for new board creation in panelTree.ts and panel_board.py.
+   * We should probably hardcode the allowed panels just for the varbar instead.
+   */
   allowedPanels?: string[];
-
   /**
    * This actually means "is editable". Controls whether users can
    * add, delete, or edit the expression of any direct child items.
@@ -129,7 +138,9 @@ export interface PanelGroupConfig {
    * from editing the items that already exist in the group.
    */
   isNumItemsLocked?: boolean;
-
+  /**
+   * Used to name newly created child items. Defaults to "panel".
+   */
   childNameBase?: string;
 }
 
@@ -412,11 +423,15 @@ export const addPanelToGroupConfig = (
     draft.items[
       nextPanelName(Object.keys(currentConfig.items), childNameBase)
     ] = childConfig;
-    if (currentConfig.layoutMode === 'flow') {
+    if (
+      currentConfig.layoutMode === 'flow' &&
+      currentConfig.gridConfig?.flowConfig &&
+      draft.gridConfig?.flowConfig
+    ) {
       // If there is only one panel, and one row and column, add a second
       // column. This is a nice behavior in notebooks.
-      const nRows = currentConfig.gridConfig?.flowConfig.rowsPerPage ?? 1;
-      const nCols = currentConfig.gridConfig?.flowConfig.columnsPerPage ?? 1;
+      const nRows = currentConfig.gridConfig.flowConfig.rowsPerPage ?? 1;
+      const nCols = currentConfig.gridConfig.flowConfig.columnsPerPage ?? 1;
       if (
         Object.keys(currentConfig.items).length === 1 &&
         nRows === 1 &&
@@ -679,7 +694,7 @@ export const PanelGroupItem: React.FC<{
 
           // This updates the grid config with the new name, since we use names as ids
           // if we had unique ids, we wouldnt have to do this
-          if (config.gridConfig != null) {
+          if (config.gridConfig != null && draft.gridConfig != null) {
             const gridConfigIndex = config.gridConfig.panels.findIndex(
               p => p.id === name
             );

@@ -13,9 +13,10 @@ import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {AddPanelErrorAlert} from './AddPanelErrorAlert';
+import {ReportDraftDialog} from './ReportDraftDialog';
 import {ReportSelection} from './ReportSelection';
 import {computeReportSlateNode} from './computeReportSlateNode';
-import {GET_REPORT, UPSERT_REPORT} from './graphql';
+import {DELETE_REPORT_DRAFT, GET_REPORT, UPSERT_REPORT} from './graphql';
 import {
   EntityOption,
   ProjectOption,
@@ -53,9 +54,11 @@ export const ChildPanelExportReport = ({
     null
   );
 
-  const [getReport] = useLazyQuery(GET_REPORT);
+  const [getReport, {data: reportQueryData}] = useLazyQuery(GET_REPORT);
   const [upsertReport] = useMutation(UPSERT_REPORT);
+  const [deleteReportDraft] = useMutation(DELETE_REPORT_DRAFT);
   const [isAddingPanel, setIsAddingPanel] = useState(false);
+  const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
   const [error, setError] = useState<any>(null);
 
   const slateNode = useMemo(
@@ -65,6 +68,14 @@ export const ChildPanelExportReport = ({
         : undefined,
     [fullConfig, selectedPath]
   );
+  const publishedReport = reportQueryData?.view;
+  const activeReportDraft = useMemo(
+    () =>
+      publishedReport && viewer
+        ? getReportDraftByUser(publishedReport, viewer.id)
+        : undefined,
+    [publishedReport, viewer]
+  );
 
   const isNewReportSelected = isNewReportOption(selectedReport);
   const hasRequiredData =
@@ -72,6 +83,7 @@ export const ChildPanelExportReport = ({
     selectedEntity != null &&
     selectedReport != null &&
     selectedProject != null;
+  const hasActiveDraft = publishedReport != null && activeReportDraft != null;
   const isAddPanelDisabled = !hasRequiredData || isAddingPanel;
 
   const handleError = (err: any) => {
@@ -123,10 +135,49 @@ export const ChildPanelExportReport = ({
       }
       const draft = getReportDraftByUser(report, viewer.id);
       if (draft) {
-        return submit(editDraftVariables(draft, slateNode));
+        return setIsDraftDialogOpen(true);
       } else {
-        return submit(newDraftVariables(report, slateNode));
+        return submit(
+          newDraftVariables(
+            selectedEntity.name,
+            selectedProject.name,
+            report,
+            slateNode
+          )
+        );
       }
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
+  const onContinueDraft = async () => {
+    if (!hasActiveDraft || !slateNode) {
+      return;
+    }
+    try {
+      await submit(editDraftVariables(activeReportDraft, slateNode));
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
+  const onDiscardDraft = async () => {
+    if (!hasActiveDraft || !hasRequiredData) {
+      return;
+    }
+    try {
+      await deleteReportDraft({
+        variables: {id: activeReportDraft.id},
+      });
+      await submit(
+        newDraftVariables(
+          selectedEntity.name,
+          selectedProject.name,
+          publishedReport,
+          slateNode
+        )
+      );
     } catch (err) {
       handleError(err);
     }
@@ -178,6 +229,16 @@ export const ChildPanelExportReport = ({
             onClick={onAddPanel}>
             Add panel
           </Button>
+          {hasActiveDraft && (
+            <ReportDraftDialog
+              isOpen={isDraftDialogOpen}
+              setIsOpen={setIsDraftDialogOpen}
+              draftCreatedAt={activeReportDraft.createdAt}
+              onCancel={() => setIsAddingPanel(false)}
+              onContinue={onContinueDraft}
+              onDiscard={onDiscardDraft}
+            />
+          )}
         </div>
       </div>
     </Tailwind>

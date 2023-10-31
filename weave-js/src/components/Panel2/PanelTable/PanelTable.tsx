@@ -590,7 +590,7 @@ const PanelTableInner: React.FC<
     ]
   );
 
-  const [shiftIsPressed, setShiftIsPressed] = useState(false);
+  const shiftIsPressedRef = useRef(false);
 
   const isFiltered = tableState.preFilterFunction.nodeType === 'output';
   const isGrouped = tableState.groupBy.length > 0;
@@ -661,7 +661,7 @@ const PanelTableInner: React.FC<
             rowNode={rowData.rowNode}
             setRowAsPinned={(index: number) => {
               if (!props.config.simpleTable) {
-                if (shiftIsPressed) {
+                if (shiftIsPressedRef.current) {
                   setRowAsPinned(index, !rowData.isPinned);
                 } else {
                   setRowAsActive(index);
@@ -764,7 +764,6 @@ const PanelTableInner: React.FC<
     runNode,
     activeRowIndex,
     props.config.simpleTable,
-    shiftIsPressed,
     setRowAsPinned,
     setRowAsActive,
   ]);
@@ -939,18 +938,15 @@ const PanelTableInner: React.FC<
 
   const baseTableRef = useRef<BaseTable<BaseTableDataType>>(null);
 
-  const captureKeyDown = useCallback(
-    e => {
-      if (e.key === 'Shift') {
-        setShiftIsPressed(true);
-      }
-    },
-    [setShiftIsPressed]
-  );
+  const captureKeyDown = useCallback(e => {
+    if (e.key === 'Shift') {
+      shiftIsPressedRef.current = true;
+    }
+  }, []);
 
   const captureKeyUp = useCallback(e => {
     if (e.key === 'Shift') {
-      setShiftIsPressed(false);
+      shiftIsPressedRef.current = false;
     }
   }, []);
 
@@ -970,18 +966,13 @@ const PanelTableInner: React.FC<
           return;
         }
         // TODO: make all these shiftIsPressed features discoverable!!!!
-        if (shiftIsPressed) {
+        if (shiftIsPressedRef.current) {
           setAllColumnWidths(resizeWidth);
         } else {
           setSingleColumnWidth(column.colId, resizeWidth);
         }
       },
-      [
-        props.config.simpleTable,
-        shiftIsPressed,
-        setAllColumnWidths,
-        setSingleColumnWidth,
-      ]
+      [props.config.simpleTable, setAllColumnWidths, setSingleColumnWidth]
     );
 
   const setFilterFunction: React.ComponentProps<
@@ -1131,44 +1122,44 @@ const IndexCell: React.FC<{
   );
   if (index.loading) {
     return <S.IndexColumnVal />;
-  } else {
-    return (
-      <S.IndexColumnVal
-        onClick={() => {
-          if (!props.simpleTable) {
-            props.setRowAsPinned(index.result);
-          }
-        }}>
-        <S.IndexColumnText
-          style={{
-            color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
-            ...(index.result != null && index.result === props.activeRowIndex
-              ? {
-                  fontWeight: 'bold',
-                  backgroundColor: '#d4d4d4',
-                }
-              : {}),
-          }}>
-          {props.simpleTable ? (
-            <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
-          ) : (
-            <Popup
-              // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
-              popperModifiers={{
-                preventOverflow: {
-                  boundariesElement: 'offsetParent',
-                },
-              }}
-              position="top center"
-              popperDependencies={[index.result, runNameNodeValue.result]}
-              content={runNameNodeValue.result ?? ''}
-              trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
-            />
-          )}
-        </S.IndexColumnText>
-      </S.IndexColumnVal>
-    );
   }
+  const runName = runNameNodeValue.result ?? '';
+  return (
+    <S.IndexColumnVal
+      onClick={() => {
+        if (!props.simpleTable) {
+          props.setRowAsPinned(index.result);
+        }
+      }}>
+      <S.IndexColumnText
+        style={{
+          color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
+          ...(index.result != null && index.result === props.activeRowIndex
+            ? {
+                fontWeight: 'bold',
+                backgroundColor: '#d4d4d4',
+              }
+            : {}),
+        }}>
+        {props.simpleTable || !runName ? (
+          <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+        ) : (
+          <Popup
+            // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
+            popperModifiers={{
+              preventOverflow: {
+                boundariesElement: 'offsetParent',
+              },
+            }}
+            position="top center"
+            popperDependencies={[index.result, runName]}
+            content={runName}
+            trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
+          />
+        )}
+      </S.IndexColumnText>
+    </S.IndexColumnVal>
+  );
 };
 
 const ActionCell: React.FC<{
