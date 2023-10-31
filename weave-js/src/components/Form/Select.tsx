@@ -29,6 +29,7 @@ import ReactSelect, {
   Props,
   StylesConfig,
 } from 'react-select';
+import AsyncSelect, {AsyncProps} from 'react-select/async';
 
 export const SelectSizes = {
   Small: 'small',
@@ -67,38 +68,45 @@ const OUTWARD_MARGINS: Record<SelectSize, string> = {
   large: '-12px',
 } as const;
 
-interface AdditionalProps {
+const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
+  small: 2,
+  medium: 6,
+  large: 8,
+} as const;
+
+type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;
-}
+};
 
-// See: https://react-select.com/typescript
-export const Select = <
+// Toggle icon when open
+const DropdownIndicator = <
   Option,
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
 >(
-  props: Props<Option, IsMulti, Group> & AdditionalProps
+  indicatorProps: DropdownIndicatorProps<Option, IsMulti, Group>
 ) => {
-  // Toggle icon when open
-  const DropdownIndicator = (
-    indicatorProps: DropdownIndicatorProps<Option, IsMulti, Group>
-  ) => {
-    const iconName = indicatorProps.selectProps.menuIsOpen
-      ? 'chevron-up'
-      : 'chevron-down';
-    return (
-      <components.DropdownIndicator {...indicatorProps}>
-        <Icon name={iconName} width={16} height={16} color={MOON_500} />
-      </components.DropdownIndicator>
-    );
-  };
+  const iconName = indicatorProps.selectProps.menuIsOpen
+    ? 'chevron-up'
+    : 'chevron-down';
+  return (
+    <components.DropdownIndicator {...indicatorProps}>
+      <Icon name={iconName} width={16} height={16} color={MOON_500} />
+    </components.DropdownIndicator>
+  );
+};
 
-  const GroupHeading = (
-    groupHeadingProps: GroupHeadingProps<Option, IsMulti, Group>
-  ) => {
-    const showDivider = props.groupDivider ?? false;
+const getGroupHeading = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  size: SelectSize,
+  showDivider: boolean
+) => {
+  return (groupHeadingProps: GroupHeadingProps<Option, IsMulti, Group>) => {
     const isFirstGroup =
       groupHeadingProps.selectProps.options.findIndex(
         option => option === groupHeadingProps.data
@@ -108,24 +116,42 @@ export const Select = <
         {showDivider && !isFirstGroup && (
           <div
             style={{
-              backgroundColor: `${MOON_250}`,
+              backgroundColor: MOON_250,
               height: '1px',
               margin: `0 ${OUTWARD_MARGINS[size]} 6px ${OUTWARD_MARGINS[size]}`,
-            }}></div>
+            }}
+          />
         )}
         {groupHeadingProps.children}
       </components.GroupHeading>
     );
   };
+};
 
-  // Override styling to come closer to design spec.
-  // See: https://react-select.com/home#custom-styles
-  // See: https://github.com/JedWatson/react-select/issues/2728
-  const size = props.size ?? 'medium';
+type StylesProps = {
+  size?: SelectSize;
+  errorState?: boolean;
+};
+
+// Override styling to come closer to design spec.
+// See: https://react-select.com/home#custom-styles
+// See: https://github.com/JedWatson/react-select/issues/2728
+const getStyles = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: StylesProps
+) => {
   const errorState = props.errorState ?? false;
-  const styles: StylesConfig<Option, IsMulti, Group> = {
+  const size = props.size ?? 'medium';
+  return {
     // No vertical line to left of dropdown indicator
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
+    clearIndicator: baseStyles => ({
+      ...baseStyles,
+      padding: CLEAR_INDICATOR_PADDING[size],
+    }),
     input: baseStyles => {
       return {
         ...baseStyles,
@@ -218,10 +244,47 @@ export const Select = <
         },
       };
     },
-  };
+  } as StylesConfig<Option, IsMulti, Group>;
+};
+
+// See: https://react-select.com/typescript
+export const Select = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: Props<Option, IsMulti, Group> & AdditionalProps
+) => {
+  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
+  const size = props.size ?? 'medium';
+  const showDivider = props.groupDivider ?? false;
+  const GroupHeading = getGroupHeading(size, showDivider);
 
   return (
     <ReactSelect
+      {...props}
+      components={Object.assign(
+        {DropdownIndicator, GroupHeading},
+        props.components
+      )}
+      styles={styles}
+    />
+  );
+};
+
+export const SelectAsync = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: AsyncProps<Option, IsMulti, Group> & AdditionalProps
+) => {
+  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
+  const size = props.size ?? 'medium';
+  const showDivider = props.groupDivider ?? false;
+  const GroupHeading = getGroupHeading(size, showDivider);
+  return (
+    <AsyncSelect
       {...props}
       components={Object.assign(
         {DropdownIndicator, GroupHeading},
