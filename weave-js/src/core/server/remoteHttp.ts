@@ -9,6 +9,7 @@ import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
 import type {Server} from './types';
 
 const BATCH_INTERVAL_MS = () => batchIntervalOverride() ?? 50;
+const WEAVE_1_SERVER_TIMEOUT_MS = 1000 * 60 * 2; // 2 minutes
 
 // from https://www.jpwilliams.dev/how-to-unpack-the-return-type-of-a-promise-in-typescript
 // when all of our apps are on TS 4.x we can use Awaited<> instead
@@ -288,14 +289,17 @@ export class RemoteHttpServer implements Server {
           const entry = nodeEntries[i];
           if (entry.retries >= this.opts.maxRetries) {
             this.trace(`Cancelling node after ${entry.retries} retries`);
-            this.resolveNode(entry.node, null);
+            this.rejectNode(entry.node, {
+              message: `Weave request failed after ${entry.retries} retries`,
+              traceback: [],
+            });
           } else {
             entry.state = 'waiting';
             entry.retries++;
           }
         });
 
-      const rejectAll = (e: any) =>
+      const rejectAll = (e: {message: string; traceback: string[]}) =>
         indexes.forEach(i => this.rejectNode(nodeEntries[i].node, e));
 
       const resolveOrReject = (response: {
@@ -348,6 +352,7 @@ export class RemoteHttpServer implements Server {
           data: new Array(nodes.length).fill(null),
         };
         let fetchResponse: any = null;
+        const startTime = performance.now();
         try {
           fetchResponse = await this.opts.fetch(this.opts.weaveUrl, {
             credentials: 'include',
@@ -362,7 +367,17 @@ export class RemoteHttpServer implements Server {
           // network error, always retry these, does not count against max retries
           this.trace(`fetch failed: ${(err as Error).message}`, err);
           this.backoff();
-          setState('waiting');
+          // if we've been waiting for more than the timeout, we know it's a timeout and not a network error
+          const totalWaitTime = performance.now() - startTime;
+          if (totalWaitTime >= WEAVE_1_SERVER_TIMEOUT_MS - 1000) {
+            // This is a timeout, not a network error
+            rejectAll({
+              message: `Weave request failed - backend timeout after ${totalWaitTime} milliseconds.`,
+              traceback: [],
+            });
+          } else {
+            setState('waiting');
+          }
         }
 
         if (!this.opts.isShadow && fetchResponse != null) {
@@ -419,7 +434,10 @@ export class RemoteHttpServer implements Server {
               this.backoff(10);
               setRetryOrFail();
             } else {
-              rejectAll('Weave request failed: ' + fetchResponse.status);
+              rejectAll({
+                message: 'Weave request failed: ' + fetchResponse.status,
+                traceback: [],
+              });
             }
           }
         }

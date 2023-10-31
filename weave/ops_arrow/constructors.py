@@ -16,6 +16,8 @@ from . import convert
 
 def repeat(value: typing.Any, count: int) -> pa.Array:
     value_single = convert.to_arrow([value])._arrow_data
+    if count == 0:
+        return pa.array([], value_single.type)
     return pa.repeat(value_single[0], count)
 
 
@@ -67,6 +69,7 @@ def vectorized_container_constructor_preprocessor(
 ) -> VectorizedContainerConstructorResults:
     if len(input_dict) == 0:
         return VectorizedContainerConstructorResults([], {}, 0, None)
+
     arrays = []
     prop_types = {}
     awl_artifact = None

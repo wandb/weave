@@ -14,7 +14,10 @@ import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useRef, useState} from 'react';
 import {Button, Modal, Popup} from 'semantic-ui-react';
 
-import {useWeaveDashUiEnable, useWeaveFeaturesContext} from '../../context';
+import {
+  useWeaveFeaturesContext,
+  useWeaveErrorBoundaryInPanelComp2Enabled,
+} from '../../context';
 // import {useExpressionHoverHandlers} from './PanelContext';
 import {useWeaveContext} from '../../context';
 import {useDeepMemo} from '../../hookUtils';
@@ -219,7 +222,7 @@ export function useUpdateConfig2<C>(props: {
 
 // PanelComp2 is the primary proxy for rendering all Weave Panels.
 export const PanelComp2Inner = (props: PanelComp2Props) => {
-  const dashUiEnabled = useWeaveDashUiEnable();
+  const enableErrorBoundary = useWeaveErrorBoundaryInPanelComp2Enabled();
   const {panelSpec, configMode} = props;
   const updateConfig2 = useUpdateConfig2(props);
   let unboundedContent = useMemo(() => {
@@ -284,7 +287,7 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
   const weave = useWeaveContext();
 
   unboundedContent = useMemo(() => {
-    return dashUiEnabled ? (
+    return enableErrorBoundary ? (
       <PanelCompErrorBoundary
         inPanelMaybe={panelMaybeNode != null}
         weave={weave}>
@@ -293,7 +296,7 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
     ) : (
       unboundedContent
     );
-  }, [dashUiEnabled, panelMaybeNode, unboundedContent, weave]);
+  }, [enableErrorBoundary, panelMaybeNode, unboundedContent, weave]);
 
   if (props.input.nodeType === 'void') {
     return (

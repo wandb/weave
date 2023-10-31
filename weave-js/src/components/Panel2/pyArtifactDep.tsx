@@ -1,10 +1,8 @@
 // This file provides utilities for artifact dependencies.
 import {
-  callOpVeryUnsafe,
   constFunction,
   constString,
   isVoidNode,
-  list,
   listObjectType,
   Node,
   opArray,
@@ -14,6 +12,7 @@ import {
   opArtifactVersionArtifactSequence,
   opArtifactVersionCreatedAt,
   opArtifactVersionCreatedBy,
+  opArtifactVersionDependencyOf,
   opContains,
   opDict,
   opEntityName,
@@ -30,14 +29,10 @@ import {
 } from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 
-const getArtifactDependencyOfForNode = (node: Node) => {
-  const dependencyOfNode = callOpVeryUnsafe(
-    'artifactVersion-dependencyOf',
-    {
-      input_node: node,
-    },
-    list('artifactVersion')
-  );
+const getArtifactDependencyOfForNode = (node: Node<'artifactVersion'>) => {
+  const dependencyOfNode = opArtifactVersionDependencyOf({
+    artifactVersion: node,
+  });
 
   const artifactSeqDetails = opMap({
     arr: dependencyOfNode as any,
@@ -118,7 +113,7 @@ const getArtifactDependencyOfForNode = (node: Node) => {
 };
 
 export const useArtifactDependencyOfForNode = (
-  node: Node | null
+  node: Node<'artifactVersion'> | null
 ): {
   loading: boolean;
   result: Array<{

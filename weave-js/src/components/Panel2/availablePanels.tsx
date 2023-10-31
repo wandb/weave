@@ -6,6 +6,7 @@ import {
   list,
   listObjectType,
   nullableTaggableValue,
+  Stack,
   Type,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
@@ -170,6 +171,12 @@ function scoreHandlerStack(type: Type, hs: PanelStack) {
   ) {
     scoreHs -= 50;
   }
+
+  // Until combined 2d projection performance is addressed, bump it down in the recommendation list (i.e. don't auto recommend it)
+  if (sidAndName.id.includes('projection.plot')) {
+    scoreHs -= 100;
+  }
+
   return scoreHs;
 }
 
@@ -193,6 +200,7 @@ export interface GetPanelStacksForTypeOpts {
   excludePlot?: boolean;
   excludeMultiTable?: boolean;
   excludeBarChart?: boolean;
+  excludePanelPanel?: boolean;
   showDebug?: boolean;
   stackIdFilter?: (stackId: string) => boolean;
   allowedPanels?: string[];
@@ -245,6 +253,12 @@ export function getPanelStacksForType(
     if (opts.excludeBarChart) {
       handlerStacks = handlerStacks.filter(
         hs => !PanelLib.getStackIdAndName(hs).id.endsWith('barchart')
+      );
+    }
+
+    if (opts.excludePanelPanel) {
+      handlerStacks = handlerStacks.filter(
+        hs => !(PanelLib.getStackIdAndName(hs).id === 'panel')
       );
     }
 
@@ -414,3 +428,7 @@ export function getTransformPanel(panelId: string) {
 export function panelSpecById(panelId: string) {
   return PanelRegistry.PanelSpecs().find(p => p.id === panelId);
 }
+
+// PanelPanel is currently not able to be nested within othe childpanel
+// based on stack, exclude panelpanel if nested
+export const excludePanelPanel = (stack: Stack) => stack.length > 0;

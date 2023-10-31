@@ -69,7 +69,13 @@ export const computeReportSlateNode = (
     {
       disableDeletePanel: true,
       enableAddPanel: true, // actually means "is editable"
+      equalSize: true,
       layoutMode: 'vertical',
+      panelInfo: {
+        vars: {
+          hidden: true,
+        },
+      },
     }
   );
 
