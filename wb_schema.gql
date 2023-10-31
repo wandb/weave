@@ -79,6 +79,9 @@ type Query {
 type Mutation {
   deleteView(input: DeleteViewInput!): DeleteViewPayload
   upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
+  updateArtifactSequence(
+    input: UpdateArtifactSequenceInput!
+  ): UpdateArtifactCollectionPayload
   deleteArtifactSequence(
     input: DeleteArtifactSequenceInput!
   ): DeleteArtifactCollectionPayload
@@ -645,6 +648,18 @@ input UpsertViewInput {
 type UpsertViewPayload {
   view: View
   inserted: Boolean
+  clientMutationId: String
+}
+
+input UpdateArtifactSequenceInput {
+  artifactSequenceID: ID!
+  name: String @constraints(max: 128)
+  description: String
+  clientMutationId: String
+}
+
+type UpdateArtifactCollectionPayload {
+  artifactCollection: ArtifactCollection!
   clientMutationId: String
 }
 
