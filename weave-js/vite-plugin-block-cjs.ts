@@ -22,6 +22,8 @@ const ALLOWED_CJS_MODULES = [
   'monaco-editor',
   'monaco-yaml',
   'query-string',
+  'decode-uri-component',
+  'split-on-first',
   'querystring',
   'react-timeago',
   'styled-components',

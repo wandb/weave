@@ -32,6 +32,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactElement | string;
   active?: boolean;
   tooltip?: string;
+  twWrapperStyles?: React.CSSProperties;
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -46,6 +47,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       children,
       className = '',
       tooltip,
+      twWrapperStyles = {},
       ...htmlAttributes
     },
     ref
@@ -75,6 +77,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const wrapperStyles = {
       display: 'inline-flex',
       width: className.includes('w-full') ? '100%' : undefined,
+      ...twWrapperStyles,
     };
 
     const button = (

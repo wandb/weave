@@ -120,7 +120,6 @@ export const computeReportSlateNode = (
   const varItems = getVarItemsForPath(fullConfig, targetConfig);
   const inputNodeVal = makeGroup(
     {
-      // NOTE: order matters! `vars` must come before `panel`
       vars: makeGroup(varItems, {
         childNameBase: 'var',
         layoutMode: 'vertical',
