@@ -251,17 +251,11 @@ export const PersistenceManager: React.FC<{
     hasRemote
   );
 
-  console.log({nodeState});
-
   const isAuthenticated = useIsAuthenticated();
   const availableActions = useMemo(
     () => getAvailableActions(nodeState, isAuthenticated ?? false),
     [nodeState, isAuthenticated]
   );
-
-  console.log({maybeURI});
-  const inputNode = props.inputNode;
-  console.log({inputNode});
 
   const headerRef = useRef<HTMLDivElement>(null);
   return (
@@ -404,13 +398,6 @@ const HeaderFileControls: React.FC<{
   const [updateArtifactCollection] = useApolloMutation(
     UPDATE_ARTIFACT_COLLECTION
   );
-  console.log({isLocal});
-  console.log({maybeURI});
-  console.log({branchPoint});
-  console.log({inputNode});
-  console.log({renameAction});
-  const boom = useNodeValue(inputNode);
-  console.log({boom});
   const entityProjectName = determineURISource(maybeURI, branchPoint);
   const {name: currName, version: currentVersion} =
     determineURIIdentifier(maybeURI);
