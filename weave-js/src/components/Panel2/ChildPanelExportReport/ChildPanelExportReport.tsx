@@ -98,12 +98,15 @@ export const ChildPanelExportReport = ({
     }
     const result = await upsertReport({variables});
     const upsertedDraft = result.data?.upsertView?.view!;
-    const reportDraftPath = Urls.reportEdit({
-      entityName: selectedEntity.name,
-      projectName: selectedProject.name,
-      reportID: upsertedDraft.id,
-      reportName: upsertedDraft.displayName ?? '',
-    });
+    const reportDraftPath = Urls.reportEdit(
+      {
+        entityName: selectedEntity.name,
+        projectName: selectedProject.name,
+        reportID: upsertedDraft.id,
+        reportName: upsertedDraft.displayName ?? '',
+      },
+      `#${slateNode.config.panelConfig.config.documentId}`
+    );
     // eslint-disable-next-line wandb/no-unprefixed-urls
     window.open(coreAppUrl(reportDraftPath), '_blank');
     setIsAddingPanel(false);
