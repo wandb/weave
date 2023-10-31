@@ -1,4 +1,4 @@
-import {ID, isAssignableTo, isConstNode} from '@wandb/weave/core';
+import {ID, isAssignableTo, isConstNode, isVarNode} from '@wandb/weave/core';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {getConfigForPath, makeGroup, makePanel, mapPanels} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
@@ -26,20 +26,46 @@ export type WeavePanelSlateNode = {
   };
 };
 
-// Currently this returns a superset of what is actually needed
+/**
+ * Naive implementation to find all the variable references in an object.
+ * Ideally we would have a more structured way to walk the object, but it
+ * is not obvious to me how we can do this for any arbitrary panel/variable
+ * since the config might contain variables at any level of nesting.
+ */
+const getVarNamesForObj = (obj: any) => {
+  const names: string[] = [];
+  if (isVarNode(obj)) {
+    names.push(obj.varName);
+  }
+  if (obj && typeof obj === 'object') {
+    Object.values(obj).forEach((val: any) => {
+      if (typeof val === 'object') {
+        names.push(...getVarNamesForObj(val));
+      }
+    });
+  }
+
+  return names;
+};
+
+/**
+ * Returns the minimal set of dependent variables as a dictionary of panels.
+ */
 const getVarItemsForPath = (
   fullConfig: ChildPanelFullConfig,
   targetConfig: ChildPanelFullConfig
-) => {
+): Record<string, ChildPanelFullConfig> => {
   const varItems: Record<string, ChildPanelFullConfig> = {};
-  // perf: need func that just gets stack for target instead of map over full config
+
+  // First, extract the stack for a given panel.
   mapPanels(fullConfig, [], (config, stack) => {
     if (config === targetConfig) {
-      console.log({stack});
-      stack.reverse().forEach(frame => {
+      stack.forEach(frame => {
         if (isConstNode(frame.value) && weaveTypeIsPanel(frame.value.type)) {
           if (!isAssignableTo(frame.value.type, {type: 'Group' as any})) {
             varItems[frame.name] = frame.value.val;
+          } else {
+            // Skip groups - their children will make it in later
           }
         } else {
           varItems[frame.name] = makePanel(
@@ -52,7 +78,30 @@ const getVarItemsForPath = (
     }
     return config;
   });
-  return varItems;
+
+  // Next, filter out only the needed variables (assumes no duplicate var names)
+  const configQueue = [targetConfig];
+  const addedNames: string[] = [];
+  const filteredVarItems: Record<string, ChildPanelFullConfig> = {};
+
+  while (configQueue.length > 0) {
+    const config = configQueue.shift();
+    const names = getVarNamesForObj(config);
+    Object.entries(varItems).forEach(([name, item]) => {
+      if (!addedNames.includes(name) && names.includes(name)) {
+        configQueue.push(item);
+        addedNames.push(name);
+      }
+    });
+  }
+
+  // Reverse the order so that the variables are in the order they are
+  // defined in the dashboard
+  addedNames.reverse().forEach(name => {
+    filteredVarItems[name] = varItems[name];
+  });
+
+  return filteredVarItems;
 };
 
 /**
