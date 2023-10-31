@@ -44,6 +44,7 @@ import {
 } from './PanelGroup';
 import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {difference} from '@wandb/weave/common/util/data';
+import {ID} from '@wandb/weave/common/util/id';
 
 export type PanelTreeNode = ChildPanelConfig;
 
@@ -189,8 +190,8 @@ export const makePanel = (
 };
 
 export const makeGroup = (
-  items: {[key: string]: ChildPanelConfig},
-  options?: {[key: string]: any}
+  items: PanelGroupConfig['items'],
+  options?: Omit<PanelGroupConfig, 'items'>
 ) => {
   return makePanel('Group', {items, ...options});
 };
@@ -499,11 +500,12 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
   }
   let main = node;
   const mainConfig = {
-    layoutMode: 'grid',
+    layoutMode: 'grid' as const,
     showExpressions: true,
     enableAddPanel: true,
     disableDeletePanel: true,
     gridConfig: {
+      id: ID(),
       panels: [
         {
           id: 'panel0',
@@ -569,11 +571,12 @@ export const ensureDashboardFromItems = (
   vars: {[name: string]: NodeOrVoidNode}
 ): ChildPanelFullConfig => {
   const mainConfig = {
-    layoutMode: 'grid',
+    layoutMode: 'grid' as const,
     showExpressions: true,
     enableAddPanel: true,
     disableDeletePanel: true,
     gridConfig: {
+      id: ID(),
       panels: Object.entries(seedItems).map(([name, item], ndx) => ({
         id: name,
         layout: {
