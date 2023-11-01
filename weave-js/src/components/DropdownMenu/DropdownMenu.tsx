@@ -50,21 +50,20 @@ const contentClassName = classNames(
 /**
  * https://www.radix-ui.com/docs/primitives/components/dropdown-menu#content
  */
-export const Content = React.forwardRef(
-  (
-    {className, children, ...props}: RadixDropdownMenu.DropdownMenuContentProps,
-    ref
-  ) => (
-    <Tailwind>
-      <RadixDropdownMenu.Content
-        className={twMerge(contentClassName, className)}
-        sideOffset={5}
-        {...props}>
-        {children}
-      </RadixDropdownMenu.Content>
-    </Tailwind>
-  )
-);
+export const Content = React.forwardRef<
+  HTMLDivElement,
+  RadixDropdownMenu.DropdownMenuContentProps
+>(({className, children, ...props}, ref) => (
+  <Tailwind>
+    <RadixDropdownMenu.Content
+      ref={ref}
+      className={twMerge(contentClassName, className)}
+      sideOffset={5}
+      {...props}>
+      {children}
+    </RadixDropdownMenu.Content>
+  </Tailwind>
+));
 
 /**
  * https://www.radix-ui.com/primitives/docs/components/dropdown-menu#group
@@ -157,22 +156,21 @@ export const SubTrigger = ({
 /**
  * https://www.radix-ui.com/docs/primitives/components/dropdown-menu#subcontent
  */
-export const SubContent = React.forwardRef(
-  (
-    {children, className, ...props}: RadixDropdownMenu.MenuSubTriggerProps,
-    ref
-  ) => (
-    <Tailwind>
-      <RadixDropdownMenu.SubContent
-        className={twMerge(contentClassName, className)}
-        sideOffset={13}
-        alignOffset={-7}
-        {...props}>
-        {children}
-      </RadixDropdownMenu.SubContent>
-    </Tailwind>
-  )
-);
+export const SubContent = React.forwardRef<
+  HTMLDivElement,
+  RadixDropdownMenu.MenuSubTriggerProps
+>(({children, className, ...props}, ref) => (
+  <Tailwind>
+    <RadixDropdownMenu.SubContent
+      ref={ref}
+      className={twMerge(contentClassName, className)}
+      sideOffset={13}
+      alignOffset={-7}
+      {...props}>
+      {children}
+    </RadixDropdownMenu.SubContent>
+  </Tailwind>
+));
 
 /**
  * - {@link RadixDropdownMenu.DropdownMenuRadioGroupProps}
