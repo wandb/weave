@@ -30,7 +30,6 @@ import {
 import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {Button as OldButton} from 'semantic-ui-react';
 import {Button} from '../Button';
 import styled, {css} from 'styled-components';
 
@@ -133,6 +132,12 @@ export interface PanelGroupConfig {
    * Does not affect whether each of its items can be deleted.
    */
   disableDeletePanel?: boolean;
+  /**
+   * Controls whether items can be added to or deleted from the
+   * group. Unlike `enableAddPanel`, this does not prohibit users
+   * from editing the items that already exist in the group.
+   */
+  isNumItemsLocked?: boolean;
   /**
    * Used to name newly created child items. Defaults to "panel".
    */
@@ -616,9 +621,9 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
         </ConfigPanel.ChildConfigContainer>
       </ConfigPanel.ConfigSection>
       <ConfigPanel.ConfigSection>
-        <OldButton size="mini" onClick={handleAddPanel}>
+        <Button className="w-full" variant="secondary" onClick={handleAddPanel}>
           Add Child
-        </OldButton>
+        </Button>
       </ConfigPanel.ConfigSection>
     </>
   );
@@ -925,12 +930,11 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
-  // const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   const isMain = _.isEqual(groupPath, [`main`]);
-
   const inJupyter = inJupyterCell();
+  const isAddPanelAllowed = !!config.enableAddPanel && !config.isNumItemsLocked;
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
@@ -940,7 +944,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           height: !isMain ? '100%' : undefined,
           backgroundColor: isMain ? MOON_50 : undefined,
         }}>
-        {!inJupyter && config.enableAddPanel && (
+        {!inJupyter && isAddPanelAllowed && (
           <ActionBar>
             <Button
               variant="ghost"
@@ -958,7 +962,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           updateConfig2={updateGridConfig2}
           renderPanel={renderSectionPanel}
         />
-        {!inJupyter && config.enableAddPanel != null && (
+        {!inJupyter && isAddPanelAllowed && (
           <AddPanelBarContainer ref={addPanelBarRef}>
             <AddPanelBar onClick={handleAddPanel}>
               <IconAddNew />
@@ -1023,16 +1027,19 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           </GroupItem>
         );
       })}
-      {config.enableAddPanel &&
+      {isAddPanelAllowed &&
         (isVarBar ? (
           <AddVarButton onClick={handleAddPanel}>
             New variable
             <IconAddNew />
           </AddVarButton>
         ) : (
-          <OldButton onClick={handleAddPanel} size="tiny">
-            Add {props.config?.childNameBase ?? 'panel'}
-          </OldButton>
+          <Button
+            className="w-full"
+            variant="secondary"
+            onClick={handleAddPanel}>
+            {`Add ${props.config?.childNameBase ?? 'panel'}`}
+          </Button>
         ))}
     </Group>
   );
