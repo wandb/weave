@@ -136,6 +136,9 @@ export const computeReportSlateNode = (
         vars: {
           hidden: true,
         },
+        panel: {
+          controlBar: 'editable',
+        },
       },
     }
   );
