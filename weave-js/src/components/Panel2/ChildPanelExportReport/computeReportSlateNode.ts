@@ -1,7 +1,8 @@
-import {ID} from '@wandb/weave/core';
+import {ID, isAssignableTo, isConstNode, isVarNode} from '@wandb/weave/core';
 import {ChildPanelFullConfig} from '../ChildPanel';
-import {getConfigForPath, makeGroup, makePanel} from '../panelTree';
+import {getConfigForPath, makeGroup, makePanel, mapPanels} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
+import {weaveTypeIsPanel} from '../../PagePanelComponents/util';
 
 export type WeavePanelSlateNode = {
   type: 'weave-panel';
@@ -26,6 +27,84 @@ export type WeavePanelSlateNode = {
 };
 
 /**
+ * Naive implementation to find all the variable references in an object.
+ * Ideally we would have a more structured way to walk the object, but it
+ * is not obvious to me how we can do this for any arbitrary panel/variable
+ * since the config might contain variables at any level of nesting.
+ */
+const getVarNamesForObj = (obj: any) => {
+  const names: string[] = [];
+  if (isVarNode(obj)) {
+    names.push(obj.varName);
+  }
+  if (obj && typeof obj === 'object') {
+    Object.values(obj).forEach((val: any) => {
+      if (typeof val === 'object') {
+        names.push(...getVarNamesForObj(val));
+      }
+    });
+  }
+
+  return names;
+};
+
+/**
+ * Returns the minimal set of dependent variables as a dictionary of panels.
+ */
+const getVarItemsForPath = (
+  fullConfig: ChildPanelFullConfig,
+  targetConfig: ChildPanelFullConfig
+): Record<string, ChildPanelFullConfig> => {
+  const varItems: Record<string, ChildPanelFullConfig> = {};
+
+  // First, extract the stack for a given panel.
+  mapPanels(fullConfig, [], (config, stack) => {
+    if (config === targetConfig) {
+      stack.forEach(frame => {
+        if (isConstNode(frame.value) && weaveTypeIsPanel(frame.value.type)) {
+          if (!isAssignableTo(frame.value.type, {type: 'Group' as any})) {
+            varItems[frame.name] = frame.value.val;
+          } else {
+            // Skip groups - their children will make it in later
+          }
+        } else {
+          varItems[frame.name] = makePanel(
+            'Expression',
+            undefined,
+            frame.value
+          );
+        }
+      });
+    }
+    return config;
+  });
+
+  // Next, filter out only the needed variables (assumes no duplicate var names)
+  const configQueue = [targetConfig];
+  const addedNames: string[] = [];
+  const filteredVarItems: Record<string, ChildPanelFullConfig> = {};
+
+  while (configQueue.length > 0) {
+    const config = configQueue.shift();
+    const names = getVarNamesForObj(config);
+    Object.entries(varItems).forEach(([name, item]) => {
+      if (!addedNames.includes(name) && names.includes(name)) {
+        configQueue.push(item);
+        addedNames.push(name);
+      }
+    });
+  }
+
+  // Reverse the order so that the variables are in the order they are
+  // defined in the dashboard
+  addedNames.reverse().forEach(name => {
+    filteredVarItems[name] = varItems[name];
+  });
+
+  return filteredVarItems;
+};
+
+/**
  * Given a full child panel config and the path to a target panel,
  * get the target config and map it into a slate node that can be
  * displayed in a report
@@ -38,19 +117,13 @@ export const computeReportSlateNode = (
   targetPath: string[]
 ): WeavePanelSlateNode => {
   const targetConfig = getConfigForPath(fullConfig, targetPath);
+  const varItems = getVarItemsForPath(fullConfig, targetConfig);
   const inputNodeVal = makeGroup(
     {
-      // NOTE: order matters! `vars` must be above `panel`
-      vars: makeGroup(
-        {
-          // TODO: resolve vars and add items here
-          // https://wandb.atlassian.net/browse/WB-14443
-        },
-        {
-          childNameBase: 'var',
-          layoutMode: 'vertical',
-        }
-      ),
+      vars: makeGroup(varItems, {
+        childNameBase: 'var',
+        layoutMode: 'vertical',
+      }),
       panel: targetConfig,
     },
     {
