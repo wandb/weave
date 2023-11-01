@@ -10,6 +10,7 @@ import {
   addChild,
   getPath,
   isGroupNode,
+  isInsideMain,
   makePanel,
   setPath,
 } from '../Panel2/panelTree';
@@ -178,7 +179,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       });
     }
 
-    if (path.find(p => p === 'main') != null && path.length > 1) {
+    if (isInsideMain(path)) {
       items.push({
         key: 'split',
         content: 'Split',
