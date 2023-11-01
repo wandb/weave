@@ -494,6 +494,28 @@ const isDashboard = (node: PanelTreeNode): node is Dashboard => {
   );
 };
 
+/**
+ * Returns whether a path points to the "main" group in a {@link Dashboard}
+ */
+export const isMain = (path: string[]): boolean => {
+  return path[0] === 'main' && path.length === 1;
+};
+
+/**
+ * Returns whether a path points to a panel *inside* the "main" group
+ * in a {@link Dashboard}. **This excludes "main" itself!**
+ *
+ * @param path  path to the target panel
+ * @param depth max depth of panels to include. For example, depth 1 will
+ *              only return true for top-level panels in main.
+ */
+export const isInsideMain = (path: string[], depth = Infinity): boolean => {
+  if (depth < 1) {
+    throw new Error('depth must be at least 1');
+  }
+  return path[0] === 'main' && path.length > 1 && path.length <= 1 + depth;
+};
+
 export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
   if (isDashboard(node)) {
     return node;

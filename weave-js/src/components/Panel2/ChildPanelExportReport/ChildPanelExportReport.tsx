@@ -13,6 +13,7 @@ import {Button} from '../../Button';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
+import {isInsideMain} from '../panelTree';
 import {AddPanelErrorAlert} from './AddPanelErrorAlert';
 import {ReportDraftDialog} from './ReportDraftDialog';
 import {ReportSelection} from './ReportSelection';
@@ -47,7 +48,7 @@ export const ChildPanelExportReport = ({
 
   // Export is only allowed for panels *inside* main (excluding main itself)
   useEffect(() => {
-    if (selectedPath[0] !== 'main' || selectedPath.length < 2) {
+    if (!isInsideMain(selectedPath)) {
       closeDrawer();
     }
   }, [selectedPath, closeDrawer]);

@@ -73,7 +73,7 @@ import {getStackIdAndName} from './panellib/libpanel';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
 import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
-import {getConfigForPath} from './panelTree';
+import {getConfigForPath, isInsideMain, isMain} from './panelTree';
 import {usePanelPanelContext} from './PanelPanelContextProvider';
 import {Button} from '../Button';
 
@@ -604,7 +604,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
       onClick={event => {
-        if (fullPath.length <= 2 && fullPath[0] === 'main') {
+        if (isMain(fullPath) || isInsideMain(fullPath, 1)) {
           setSelectedPanel(fullPath);
           event.stopPropagation();
         }
