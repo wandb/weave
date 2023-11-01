@@ -1031,20 +1031,16 @@ img.ui.avatar.image {
 }
 
 .night-mode {
-    transition: @nightModeTransition;
     filter: @nightModeFilter;
     img, video, iframe, .inverted.segment, .editable-image, .run-logs, .search-nav, .media-card__fullscreen,
     .night-aware, .night-aware-exclude-children {
-        transition: @nightModeTransition;
         filter: @nightModeFilterRevert;
     }
     .night-aware-exclude-children > :not(.night-aware):not(.night-aware-exclude-children) {
-        transition: @nightModeTransition;
         filter: @nightModeFilter;
     }
     .night-aware-exclude-children > .night-aware,
     .night-aware-exclude-children > .night-aware-exclude-children {
-        transition: @nightModeTransition;
         filter: none;
     }
     .empty-watermark img, .editable-image img, img.image-icon, img.disable-night-mode-filter-revert, .search-nav * {
