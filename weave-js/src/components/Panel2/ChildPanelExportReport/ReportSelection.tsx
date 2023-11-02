@@ -100,7 +100,10 @@ export const ReportSelection = ({
     }),
   });
   const projects = useNodeValue(projectMetaNode, {
-    skip: selectedEntity == null || entities.loading,
+    skip:
+      selectedEntity == null ||
+      entities.loading ||
+      !isNewReportOption(selectedReport),
   });
 
   useEffect(() => {
