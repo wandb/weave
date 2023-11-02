@@ -305,9 +305,6 @@ def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
     )
 
 
-logger = logging.getLogger("root")
-
-
 def _merge(name) -> str:
     """Save the object, propagating changes back to the original artifact"""
     merge_spec = _get_merge_spec_unsafe(name)

@@ -179,10 +179,8 @@ class InMemoryLazyLiteRun:
 
         if self._pusher is not None:
             # Wait for the FilePusher and FileStream to finish
-            tracer = engine_trace.tracer()
-            with tracer.trace("Closing FilePusher"):
-                self.pusher.finish()
-                self.pusher.join()
+            self.pusher.finish()
+            self.pusher.join()
 
         # Reset fields
         self._stream = None
