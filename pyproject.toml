@@ -56,6 +56,7 @@ dependencies = {file = ["requirements.txt"]}
 examples = {file = ["requirements.ecosystem.txt"]}
 ecosystem = {file = ["requirements.ecosystem.txt"]}
 datadog = {file = ["requirements.datadog.txt"]}
+modal = {file = ["requirements.modal.txt"]}
 
 [tool.pytest.ini_options]
 testpaths = ["weave"]

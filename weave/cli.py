@@ -82,5 +82,26 @@ def gcp(model_ref: str, project: str, gcp_project: str, service_account: str, de
     print("Model deployed")
 
 
+@deploy.command(help="Deploy to Modal Labs.")
+@click.argument("model_ref")
+@click.option("--project", help="W&B project name.")
+@click.option("--dev", is_flag=True, help="Run the function locally.")
+def modal(model_ref: str, project: str, dev = False) -> None:
+    from .deploy import modal as mdp
+    if dev:
+        print(f"Developing model {model_ref}...")
+        mdp.develop(model_ref)
+        return
+    print(f"Deploying model {model_ref}...")
+    try:
+        mdp.deploy(model_ref,
+                      wandb_project=project)
+    except ValueError as e:
+        if os.getenv("DEBUG") == "true":
+            raise e
+        else:
+            raise click.ClickException(str(e)+"\nRun with DEBUG=true to see full exception.")
+    print("Model deployed")
+
 if __name__ == "__main__":
     cli()
