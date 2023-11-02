@@ -67,6 +67,7 @@ import {
   isConstructor,
 } from './core/mutate';
 import {UseNodeValueServerExecutionError} from './errors';
+import {useCompileGetLatestNodes} from './reactCompile';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**
@@ -266,6 +267,8 @@ export const useNodeValue = <T extends Type>(
     () => (enableClientEval ? clientEval(node, stack) : node),
     [enableClientEval, node, stack]
   ) as NodeOrVoidNode<T>;
+
+  // node = useCompileGetLatestNodes(node);
 
   GlobalCGReactTracker.useNodeValue++;
   node = useDeepMemo({node, memoCacheId}).node;

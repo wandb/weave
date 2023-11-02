@@ -144,6 +144,14 @@ def previous_uri(
 ) -> typing.Optional[str]:
     return artifact.previous_uri()
 
+@op(
+    name="FilesystemArtifact-uri",
+)
+def previous_uri(
+    artifact: artifact_fs.FilesystemArtifact,
+) -> str:
+    return artifact.uri
+
 
 @op(
     name="FilesystemArtifact-createdAt",

@@ -48,6 +48,16 @@ export const opFilesystemArtifactPreviousUri = (inputs: {
   );
 };
 
+export const opFilesystemArtifactUri = (inputs: {
+  artifact: Node<{type: 'FilesystemArtifact'}>;
+}) => {
+  return directlyConstructOpCall(
+    'FilesystemArtifact-uri',
+    inputs,
+    'string'
+  );
+};
+
 export const opFilesystemArtifactArtifactName = (inputs: {
   artifact: Node<{type: 'FilesystemArtifact'}>;
 }) => {
