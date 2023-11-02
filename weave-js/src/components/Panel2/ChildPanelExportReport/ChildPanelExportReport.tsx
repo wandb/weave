@@ -4,7 +4,8 @@ import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {opRootViewer} from '@wandb/weave/core';
 import {UpsertReportMutationVariables} from '@wandb/weave/generated/graphql';
 import {useNodeValue} from '@wandb/weave/react';
-import React, {useMemo, useState} from 'react';
+import classNames from 'classnames';
+import React, {useEffect, useMemo, useState} from 'react';
 import _ from 'lodash';
 
 import {Alert} from '../../Alert.styles';
@@ -12,6 +13,7 @@ import {Button} from '../../Button';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
+import {isInsideMain} from '../panelTree';
 import {AddPanelErrorAlert} from './AddPanelErrorAlert';
 import {ReportDraftDialog} from './ReportDraftDialog';
 import {ReportSelection} from './ReportSelection';
@@ -43,6 +45,25 @@ export const ChildPanelExportReport = ({
   const {result: fullConfig} = useNodeValue(rootConfig.input_node);
   const selectedPath = useSelectedPath();
   const closeDrawer = useCloseDrawer();
+
+  // Export is only allowed for panels *inside* main (excluding main itself)
+  useEffect(() => {
+    if (!isInsideMain(selectedPath)) {
+      closeDrawer();
+    }
+  }, [selectedPath, closeDrawer]);
+
+  // If selected path changes while the drawer is open, highlight the
+  // new panel name to alert the user that the target panel changed.
+  const panelName = useMemo(() => _.last(selectedPath), [selectedPath]);
+  const [isPanelNameHighlighted, setIsPanelNameHighlighted] = useState<
+    null | boolean
+  >(null); // initial `null` lets us skip highlight when drawer is first opened
+  useEffect(() => {
+    setIsPanelNameHighlighted(prev => (prev === null ? false : true));
+    const timeout = setTimeout(() => setIsPanelNameHighlighted(false), 1500);
+    return () => clearTimeout(timeout);
+  }, [selectedPath]);
 
   const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(
     null
@@ -191,7 +212,14 @@ export const ChildPanelExportReport = ({
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-moon-250 px-16 py-12">
           <h2 className="text-lg font-semibold">
-            Add {_.last(selectedPath)} to report
+            Add{' '}
+            <span
+              className={classNames('transition', {
+                'bg-gold-300/[0.5]': isPanelNameHighlighted,
+              })}>
+              {panelName}
+            </span>{' '}
+            to report
           </h2>
           <Button icon="close" variant="ghost" onClick={closeDrawer} />
         </div>

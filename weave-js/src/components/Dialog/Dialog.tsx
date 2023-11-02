@@ -55,17 +55,19 @@ const contentClassName = classNames(
   'dark:border-moon-750 dark:bg-moon-900 dark:text-moon-200',
   'absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]' // centers modal on screen
 );
-export const Content = React.forwardRef(
-  ({className, children, ...props}: RadixDialog.DialogContentProps, ref) => (
-    <Tailwind>
-      <RadixDialog.Content
-        className={twMerge(contentClassName, className)}
-        {...props}>
-        {children}
-      </RadixDialog.Content>
-    </Tailwind>
-  )
-);
+export const Content = React.forwardRef<
+  HTMLDivElement,
+  RadixDialog.DialogContentProps
+>(({className, children, ...props}, ref) => (
+  <Tailwind>
+    <RadixDialog.Content
+      ref={ref}
+      className={twMerge(contentClassName, className)}
+      {...props}>
+      {children}
+    </RadixDialog.Content>
+  </Tailwind>
+));
 
 /**
  * https://www.radix-ui.com/primitives/docs/components/dialog#close
