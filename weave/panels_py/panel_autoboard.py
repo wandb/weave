@@ -28,6 +28,7 @@ import typing
 import weave
 from .. import weave_internal
 from ..panels import panel_plot
+from .. import util
 
 from .generator_templates import template_registry
 
@@ -430,10 +431,7 @@ def seed_autoboard(
     return auto_panels(input_node, config)  # type: ignore
 
 
-with open(
-    os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md"), "r"
-) as f:
-    instructions_md = f.read()
+instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md"))
 
 
 template_registry.register(

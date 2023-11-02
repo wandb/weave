@@ -2,6 +2,7 @@ import os
 
 import weave
 from weave.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
+from .. import util
 from .. import dispatch
 from .. import weave_internal as internal
 from .. import weave_types as types
@@ -262,11 +263,7 @@ def board(
     return panels.Board(vars=varbar, panels=overview_tab)
 
 
-with open(
-    os.path.join(os.path.dirname(__file__), "instructions", "panel_trace_monitor.md"),
-    "r",
-) as f:
-    instructions_md = f.read()
+instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_trace_monitor.md"))
 
 template_registry.register(
     board_name,
