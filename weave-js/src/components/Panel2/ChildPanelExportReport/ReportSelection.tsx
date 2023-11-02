@@ -40,7 +40,8 @@ export const ReportSelection = ({
   setSelectedProject,
   onChange,
 }: ReportSelectionProps) => {
-  const {entityName} = useEntityAndProject(rootConfig);
+  const {entityName: entityNameFromUrl, projectName: projectNameFromUrl} =
+    useEntityAndProject(rootConfig);
 
   // Get all of user's entities
   const entitiesMetaNode = w.opMap({
@@ -54,7 +55,7 @@ export const ReportSelection = ({
   });
   const entities = useNodeValue(entitiesMetaNode);
   const selectedEntityNode = w.opRootEntity({
-    entityName: w.constString(selectedEntity?.name ?? entityName),
+    entityName: w.constString(selectedEntity?.name ?? entityNameFromUrl),
   });
 
   // Get list of reports across all entities and projects
@@ -99,21 +100,18 @@ export const ReportSelection = ({
     }),
   });
   const projects = useNodeValue(projectMetaNode, {
-    skip:
-      selectedEntity == null ||
-      entities.loading ||
-      isNewReportOption(selectedReport),
+    skip: selectedEntity == null || entities.loading,
   });
 
   useEffect(() => {
     // Default initial entity value based on url
     if (!entities.loading && entities.result.length > 0) {
       const foundEntity = entities.result.find(
-        (item: EntityOption) => item.name === entityName
+        (item: EntityOption) => item.name === entityNameFromUrl
       );
       setSelectedEntity(foundEntity ?? entities.result[0]);
     }
-  }, [entityName, entities, setSelectedEntity]);
+  }, [entityNameFromUrl, entities, setSelectedEntity]);
 
   useEffect(() => {
     // Default report value to `New report` option if no reports are found
@@ -125,6 +123,20 @@ export const ReportSelection = ({
       setSelectedReport(DEFAULT_REPORT_OPTION);
     }
   }, [reports, setSelectedReport, selectedReport]);
+
+  useEffect(() => {
+    // If `New report` option is selected, set default project based on url
+    if (
+      isNewReportOption(selectedReport) &&
+      !projects.loading &&
+      projects.result.length > 0
+    ) {
+      const foundProject = projects.result.find(
+        (item: ProjectOption) => item.name === projectNameFromUrl
+      );
+      setSelectedProject(foundProject ?? null);
+    }
+  }, [projectNameFromUrl, projects, selectedReport, setSelectedProject]);
 
   return (
     <div className="mt-8 flex-1">
