@@ -38,7 +38,8 @@ export type PersistenceDeleteActionType = 'delete_local' | 'delete_remote';
 export type PersistenceRenameActionType =
   | 'rename_local' // Only applicable when no remote branch exists
   | 'publish_as' // (publishes a dirty local branch or untracked with remote to a new remote branch)
-  | 'rename_remote'; // Directly renames a remote branch (effectively a re-publish) - not supported by backend today.
+  | 'rename_remote' // Directly renames a remote branch (effectively a re-publish) - not supported by backend today.
+  | 'commit_rename'; // Commits local changes to remote branch first & then renames
 export type PersistenceStoreActionType =
   | 'save' // Start tracking changes locally
   | 'commit' // Commits local changes to remote branch directly
@@ -99,12 +100,12 @@ const persistenceActions: {
   },
   cloud_uncommitted_with_remote: {
     storeAction: 'commit',
-    renameAction: 'publish_as',
+    renameAction: 'commit_rename',
     deleteAction: 'delete_remote',
   },
   cloud_published: {
     storeAction: null,
-    renameAction: null, // 'rename_remote' - uncomment after implementing
+    renameAction: 'rename_remote',
     deleteAction: 'delete_remote',
   },
 };

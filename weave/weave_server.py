@@ -137,6 +137,14 @@ def log_system_info():
 
 
 def make_app():
+    os.environ["WEAVE_SERVER_DEBUG"]="1"
+    os.environ["WEAVE_SERVER_URL"] = "http://localhost:9994"
+    os.environ["WANDB_BASE_URL"] = "https://api.wandb.test"
+    # test cookie
+    os.environ["WEAVE_WANDB_COOKIE"] = "MTY5NjU0Mzc1MXxEdi1CQkFFQ180SUFBUkFCRUFBQUlfLUNBQUVHYzNSeWFXNW5EQXdBQ25ObGMzTnBiMjVmYVdRRmFXNTBOalFFQWdBT3ybXqX65b_KjDtey6GGRNlRm4cwZTn9iXCFVG8MDf2_sA=="
+    # real cookie
+    # os.environ["WEAVE_WANDB_COOKIE"] = "MTY5ODA4Mzg2OHxEdi1GQkFFQ180WUFBUkFCRUFBQUlfLUdBQUVHYzNSeWFXNW5EQXdBQ25ObGMzTnBiMjVmYVdRRmFXNTBOalFFQWdBT3yJ2IJbjA1AcHgcYuXM7JqRMsfaKyZEg6WaBZMszNt0mw=="
+
     logs.configure_logger()
     import_ecosystem()
 
@@ -395,9 +403,10 @@ def frontend_env():
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
-        "WANDB_BASE_URL": environment.wandb_base_url(),
+        # "WANDB_BASE_URL": environment.wandb_base_url(),
         "DD_ENV": environment.dd_env(),
         "ENV_IS_CI": environment.env_is_ci(),
+        "WANDB_BASE_URL": "https://api.wandb.test", # environment.wandb_base_url(),
     }
 
 

@@ -10,9 +10,10 @@ import {
   isConstNode,
   isOutputNode,
   mapNodes,
-  opProjectArtifact,
   opRootProject,
+  opGet,
   constString,
+  opProjectArtifact,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
@@ -44,6 +45,7 @@ import {
   IconUp as IconUpUnstyled,
   IconWeaveLogo,
 } from '../Panel2/Icons';
+import {UPDATE_ARTIFACT_COLLECTION} from './graphql';
 import {
   useBranchPointFromURIString,
   usePreviousVersionFromURIString,
@@ -314,6 +316,7 @@ const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
   commit: 'Publish changes',
   rename_local: 'Rename',
+  commit_rename: 'Rename & publish',
   publish_as: 'Publish As',
   publish_new: 'Publish board',
   rename_remote: 'Rename',
@@ -392,6 +395,9 @@ const HeaderFileControls: React.FC<{
     DELETE_ARTIFACT_SEQUENCE
   );
   const isLocal = maybeURI != null && isLocalURI(maybeURI);
+  const [updateArtifactCollection] = useApolloMutation(
+    UPDATE_ARTIFACT_COLLECTION
+  );
   const entityProjectName = determineURISource(maybeURI, branchPoint);
   const {name: currName, version: currentVersion} =
     determineURIIdentifier(maybeURI);
@@ -436,6 +442,40 @@ const HeaderFileControls: React.FC<{
     skip: entityName === '' || projectName === '',
   });
 
+  const artifactSequenceID = useMemo(() => {
+    return !artifactNodeValue.loading && artifactNodeValue.result
+      ? (artifactNodeValue.result.id as any)
+      : '';
+  }, [artifactNodeValue.result, artifactNodeValue.loading]);
+
+  const renameRemoteBoard = useCallback(
+    async (newName: string) => {
+      try {
+        await updateArtifactCollection({
+          variables: {
+            artifactSequenceID,
+            name: newName,
+          },
+        });
+        // Refresh the board
+        const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
+        updateNode(opGet({uri: constString(uri)}));
+        setActing(false);
+        setActionRenameOpen(false);
+      } catch (e) {
+        console.error('Failed to rename artifact collection.');
+        toast('Something went wrong while trying to rename this board.');
+      }
+    },
+    [
+      entityName,
+      projectName,
+      updateNode,
+      artifactSequenceID,
+      updateArtifactCollection,
+    ]
+  );
+
   const resetAfterDeletion = useCallback(() => {
     setActing(false);
     setActionDeleteOpen(false);
@@ -447,10 +487,6 @@ const HeaderFileControls: React.FC<{
   }, [entityName, projectName, history, goHome]);
 
   const deleteRemoteBoard = useCallback(async () => {
-    const artifactSequenceID =
-      !artifactNodeValue.loading && artifactNodeValue.result
-        ? artifactNodeValue.result.id
-        : '';
     try {
       await deleteArtifactCollection({
         variables: {
@@ -461,11 +497,7 @@ const HeaderFileControls: React.FC<{
       console.error('Failed to delete artifact collection.');
       toast('Something went wrong while trying to delete this board.');
     }
-  }, [
-    artifactNodeValue.result,
-    artifactNodeValue.loading,
-    deleteArtifactCollection,
-  ]);
+  }, [deleteArtifactCollection, artifactSequenceID]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -516,7 +548,7 @@ const HeaderFileControls: React.FC<{
             onClick={() => {
               setAnchorFileEl(headerEl);
             }}>
-            {entityProjectName.entity}/{entityProjectName.project}/
+            {entityName}/{projectName}/
           </HeaderCenterControlsSecondary>
         )}
         <HeaderCenterControlsPrimary
@@ -665,12 +697,19 @@ const HeaderFileControls: React.FC<{
           actionName={renameAction}
           open={actionRenameOpen}
           onClose={() => setActionRenameOpen(false)}
-          onRename={newName => {
-            setActing(true);
-            takeAction(renameAction, {name: newName}, () => {
-              setActing(false);
-              setActionRenameOpen(false);
-            });
+          onRename={async newName => {
+            if (renameAction === 'rename_remote') {
+              renameRemoteBoard(newName);
+            } else if (renameAction === 'commit_rename') {
+              setActing(true);
+              takeAction('commit', {name: newName}, () => {
+                renameRemoteBoard(newName).then(() => {
+                  // console.log("Board renamed successfully.")
+                });
+              });
+            } else {
+              takeAction(renameAction, {name: newName});
+            }
           }}
         />
       )}
