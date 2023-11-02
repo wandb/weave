@@ -96,7 +96,8 @@ interface NodeEntry {
 declare function btoa(s: string): string;
 
 const createClientCacheKey = (windowSizeMs: number = 15000) => {
-  return Math.floor(Date.now() / windowSizeMs).toString();
+  return undefined;
+  // return Math.floor(Date.now() / windowSizeMs).toString();
 };
 
 // Handles (de)serialization to send to a remote CG server
