@@ -52,6 +52,9 @@ def write_artifact_to_wandb(
     else:
         lite_run = _lite_run
 
+    entity_name = lite_run.run.entity or entity_name
+    project_name = lite_run.run.project or project_name
+
     # Ensure the artifact type exists
     if not merge:
         lite_run.i_api.create_artifact_type(
@@ -91,8 +94,6 @@ def write_artifact_to_wandb(
         art = Artifact._from_id(res["id"], wandb_client_api.wandb_public_api().client)
         if art is not None:
             commit_hash = art.commit_hash
-            entity_name = art.source_entity or entity_name
-            project_name = art.source_project or project_name
 
     # Return the URI of the artifact
     return WeaveWBArtifactURIComponents(
