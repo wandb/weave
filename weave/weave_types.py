@@ -136,6 +136,8 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
+        if is_serialized_object_type(d):
+            return deserialize_object_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -145,8 +147,7 @@ class TypeRegistry:
             # with the one we already have and we need an ObjectType cache
             if is_serialized_object_type(d):
                 return deserialize_object_type(d)
-            # PR: just return Unknown instead of crash
-            return UnknownType()
+            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
 
@@ -1033,7 +1034,16 @@ def is_serialized_object_type(t: dict) -> bool:
     return is_serialized_object_type(t["_base_type"])
 
 
+# We need to ensure we only create new classes for each new unique
+# type seen. Otherwise we get a class explosion, and for one thing, type_of
+# gets really slow.
+DESERIALIZED_OBJECT_TYPE_CLASSES: dict[str, type[ObjectType]] = {}
+
+
 def deserialize_object_type(t: dict) -> ObjectType:
+    key = json.dumps(t)
+    if key in DESERIALIZED_OBJECT_TYPE_CLASSES:
+        return DESERIALIZED_OBJECT_TYPE_CLASSES[key]()
     object_class_name = t["type"]
     type_class_name = object_class_name + "Type"
 
@@ -1071,6 +1081,7 @@ def deserialize_object_type(t: dict) -> ObjectType:
         setattr(new_type_class, k, v)
         new_type_class.__dict__["__annotations__"][k] = Type
     new_type_dataclass = dataclasses.dataclass(frozen=True)(new_type_class)
+    DESERIALIZED_OBJECT_TYPE_CLASSES[key] = new_type_dataclass
     return new_type_dataclass()
 
 
@@ -1402,7 +1413,7 @@ def merge_types(a: Type, b: Type) -> Type:
             next_prop_types[key] = merge_types(self_prop_type, other_prop_type)
         return TypedDict(next_prop_types)
     if isinstance(a, ObjectType) and isinstance(b, ObjectType):
-        if a.name == b.name:
+        if a.name == b.name and not set(a.type_attrs()).difference(b.type_attrs()):
             next_type_attrs = {}
             for key in a.type_attrs():
                 next_type_attrs[key] = merge_types(getattr(a, key), getattr(b, key))
@@ -1410,6 +1421,9 @@ def merge_types(a: Type, b: Type) -> Type:
 
     if isinstance(a, List) and isinstance(b, List):
         return List(merge_types(a.object_type, b.object_type))
+
+    if isinstance(a, RefType) and isinstance(b, RefType) and a.__class__ == b.__class__:
+        return a.__class__(merge_types(a.object_type, b.object_type))
 
     if isinstance(a, UnknownType):
         return b
