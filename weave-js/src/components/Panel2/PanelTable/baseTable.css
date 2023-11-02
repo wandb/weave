@@ -40,7 +40,8 @@
 
 /* Turn off hovering */
 .BaseTable__row:hover, .BaseTable__row--hovered {
-    background-color: rgb(238,242,249);
+    background-color: rgba(21, 24, 31, 0.04) !important;
+    ;
 }
 
 .BaseTable__row:hover .index-cell-checkbox, .BaseTable__row--hovered .index-cell-checkbox{

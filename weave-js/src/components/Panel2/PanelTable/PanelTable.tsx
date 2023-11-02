@@ -98,7 +98,7 @@ const inputType = TableType.GeneralTableLikeType;
 
 const baseColumnWidth = 95;
 const minColumnWidth = 30;
-const rowControlsWidthWide = 60;
+const rowControlsWidthWide = 64;
 const rowControlsWidthSmall = 30;
 const numberOfHeaders = 1;
 const headerHeight = 30;
@@ -611,7 +611,7 @@ const PanelTableInner: React.FC<
     ]
   );
 
-  const [shiftIsPressed, setShiftIsPressed] = useState(false);
+  const shiftIsPressedRef = useRef(false);
 
   const isFiltered = tableState.preFilterFunction.nodeType === 'output';
   const isGrouped = tableState.groupBy.length > 0;
@@ -682,7 +682,7 @@ const PanelTableInner: React.FC<
             rowNode={rowData.rowNode}
             setRowAsPinned={(index: number) => {
               if (!props.config.simpleTable) {
-                if (shiftIsPressed && index > -1) {
+                if (shiftIsPressedRef.current && index > -1) {
                   setRowAsPinned(index, !rowData.isPinned);
                 } else {
                   setRowAsActive(index);
@@ -788,7 +788,6 @@ const PanelTableInner: React.FC<
     runNode,
     activeRowIndex,
     props.config.simpleTable,
-    shiftIsPressed,
     setRowAsPinned,
     setRowAsActive,
     hoveredColId,
@@ -966,18 +965,15 @@ const PanelTableInner: React.FC<
 
   const baseTableRef = useRef<BaseTable<BaseTableDataType>>(null);
 
-  const captureKeyDown = useCallback(
-    e => {
-      if (e.key === 'Shift') {
-        setShiftIsPressed(true);
-      }
-    },
-    [setShiftIsPressed]
-  );
+  const captureKeyDown = useCallback(e => {
+    if (e.key === 'Shift') {
+      shiftIsPressedRef.current = true;
+    }
+  }, []);
 
   const captureKeyUp = useCallback(e => {
     if (e.key === 'Shift') {
-      setShiftIsPressed(false);
+      shiftIsPressedRef.current = false;
     }
   }, []);
 
@@ -997,18 +993,13 @@ const PanelTableInner: React.FC<
           return;
         }
         // TODO: make all these shiftIsPressed features discoverable!!!!
-        if (shiftIsPressed) {
+        if (shiftIsPressedRef.current) {
           setAllColumnWidths(resizeWidth);
         } else {
           setSingleColumnWidth(column.colId, resizeWidth);
         }
       },
-      [
-        props.config.simpleTable,
-        shiftIsPressed,
-        setAllColumnWidths,
-        setSingleColumnWidth,
-      ]
+      [props.config.simpleTable, setAllColumnWidths, setSingleColumnWidth]
     );
 
   const setFilterFunction: React.ComponentProps<
@@ -1195,27 +1186,29 @@ const IndexCell: React.FC<{
           <S.IndexCellCheckboxWrapper
             className="index-cell-checkbox"
             isSelected={isSelected}>
-            <Checkbox onClick={indexOnClick} checked={isSelected} />
+            <Checkbox
+              onClick={indexOnClick}
+              checked={isSelected}
+              size="small"
+            />
           </S.IndexCellCheckboxWrapper>
         )}
-        <div style={{width: '100%'}}>
-          {props.simpleTable || !runName ? (
-            basicIndexContent
-          ) : (
-            <Popup
-              // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
-              popperModifiers={{
-                preventOverflow: {
-                  boundariesElement: 'offsetParent',
-                },
-              }}
-              position="top center"
-              popperDependencies={[index.result, runName]}
-              content={runName}
-              trigger={basicIndexContent}
-            />
-          )}
-        </div>
+        {props.simpleTable || !runName ? (
+          basicIndexContent
+        ) : (
+          <Popup
+            // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
+            popperModifiers={{
+              preventOverflow: {
+                boundariesElement: 'offsetParent',
+              },
+            }}
+            position="top center"
+            popperDependencies={[index.result, runName]}
+            content={runName}
+            trigger={basicIndexContent}
+          />
+        )}
       </S.IndexColumnText>
     </S.IndexColumnVal>
   );

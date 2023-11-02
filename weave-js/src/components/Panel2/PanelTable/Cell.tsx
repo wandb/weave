@@ -23,9 +23,6 @@ import {usePanelTableContext} from './PanelTableContext';
 const CellWrapper = styled.div<{isHovered: boolean}>`
   background-color: ${({isHovered}) =>
     isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
-  :hover {
-    background-color: ${hexToRGB(OBLIVION, 0.08)};
-  }
 `;
 CellWrapper.displayName = 'S.CellWrapper';
 

@@ -23,9 +23,6 @@ export const ColumnHeader = styled.div<{isHovered: boolean}>`
   }
   background-color: ${props =>
     props.isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
-  :hover {
-    background-color: ${hexToRGB(OBLIVION, 0.08)};
-  }
 `;
 ColumnHeader.displayName = 'S.ColumnHeader';
 
@@ -55,9 +52,9 @@ export const IndexColumnVal = styled.div<{isHovered?: boolean}>`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  padding: 0 8px;
   :hover {
     color: ${globals.primary};
-    background-color: ${hexToRGB(OBLIVION, 0.08)};
   }
   background-color: ${props =>
     props.isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
@@ -70,7 +67,7 @@ export const IndexColumnText = styled.div`
   height: 20px;
   display: flex;
   align-content: space-around;
-  justify-content: space-around;
+  justify-content: space-between;
   align-items: center;
   font-weight: 600;
 `;
@@ -112,7 +109,7 @@ export const ColumnAction = styled.div<{isHovered?: boolean}>`
   font-size: 20px;
 
   :hover {
-    background-color: ${hexToRGB(OBLIVION, 0.08)};
+    background-color: ${hexToRGB(OBLIVION, 0.04)};
   }
   background-color: transparent;
 `;
@@ -136,8 +133,7 @@ export const TableAction = styled.div<{
       : 'inherit'};
   :hover {
     color: ${globals.primary};
-    background-color: ${props =>
-      props.highlight ? 'rgb(3, 183, 206)' : hexToRGB(OBLIVION, 0.08)};
+    background-color: ${props => props.highlight && 'rgb(3, 183, 206)'};
   }
   box-shadow: #f8f8f8 -2px 0px 8px 4px;
   display: inline-flex;
@@ -263,6 +259,6 @@ CloseIconButton.displayName = 'S.CloseIconButton';
 
 export const IndexCellCheckboxWrapper = styled.div<{isSelected: boolean}>`
   ${({isSelected}) => (isSelected ? '' : 'visibility: hidden;')}
-  margin-left: 21px;
+  margin-right: 8px;
 `;
 IndexCellCheckboxWrapper.displayName = 'S.IndexCellCheckboxWrapper';
