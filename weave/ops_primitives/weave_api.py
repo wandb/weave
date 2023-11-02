@@ -1,6 +1,7 @@
 import dataclasses
 import typing
 import time
+import logging
 
 from weave.graph import Node
 from ..api import op, weave_class, mutation
@@ -304,6 +305,9 @@ def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
     )
 
 
+logger = logging.getLogger("root")
+
+
 def _merge(name) -> str:
     """Save the object, propagating changes back to the original artifact"""
     merge_spec = _get_merge_spec_unsafe(name)
@@ -340,6 +344,7 @@ def _merge(name) -> str:
             wb_project_name=to_uri.project_name,
             wb_entity_name=to_uri.entity_name,
             branch_name=shared_branch_name,
+            merge=True,
         )
     else:
         if to_uri.version is None:

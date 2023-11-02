@@ -11,6 +11,7 @@ from wandb.sdk.internal.internal_api import Api as InternalApi
 from wandb.sdk.lib import runid
 from weave import wandb_client_api
 from weave import errors
+from weave import engine_trace
 
 logger = logging.getLogger(__name__)
 
@@ -92,36 +93,40 @@ class InMemoryLazyLiteRun:
         if self._run is None:
             try:
                 # Ensure project exists
-                self.i_api.upsert_project(
-                    project=self._project_name, entity=self._entity_name
-                )
+                tracer = engine_trace.tracer()
+                with tracer.trace("Upsert project"):
+                    self.i_api.upsert_project(
+                        project=self._project_name, entity=self._entity_name
+                    )
 
                 # Produce a run
-                run_res, _, _ = self.i_api.upsert_run(
-                    name=self._run_name,
-                    display_name=self._display_name,
-                    job_type=self._job_type,
-                    group=self._group,
-                    project=self._project_name,
-                    entity=self._entity_name,
-                )
+                with tracer.trace("Upsert run"):
+                    run_res, _, _ = self.i_api.upsert_run(
+                        name=self._run_name,
+                        display_name=self._display_name,
+                        job_type=self._job_type,
+                        group=self._group,
+                        project=self._project_name,
+                        entity=self._entity_name,
+                    )
 
-                self._run = Run(
-                    wandb_client_api.wandb_public_api().client,
-                    run_res["project"]["entity"]["name"],
-                    run_res["project"]["name"],
-                    run_res["name"],
-                    {
-                        "id": run_res["id"],
-                        "config": "{}",
-                        "systemMetrics": "{}",
-                        "summaryMetrics": "{}",
-                        "tags": [],
-                        "description": None,
-                        "notes": None,
-                        "state": "running",
-                    },
-                )
+                with tracer.trace("Init run"):
+                    self._run = Run(
+                        wandb_client_api.wandb_public_api().client,
+                        run_res["project"]["entity"]["name"],
+                        run_res["project"]["name"],
+                        run_res["name"],
+                        {
+                            "id": run_res["id"],
+                            "config": "{}",
+                            "systemMetrics": "{}",
+                            "summaryMetrics": "{}",
+                            "tags": [],
+                            "description": None,
+                            "notes": None,
+                            "state": "running",
+                        },
+                    )
             except wandb_errors.CommError as e:
                 raise errors.WeaveWandbAuthenticationException()
 
@@ -174,8 +179,10 @@ class InMemoryLazyLiteRun:
 
         if self._pusher is not None:
             # Wait for the FilePusher and FileStream to finish
-            self.pusher.finish()
-            self.pusher.join()
+            tracer = engine_trace.tracer()
+            with tracer.trace("Closing FilePusher"):
+                self.pusher.finish()
+                self.pusher.join()
 
         # Reset fields
         self._stream = None

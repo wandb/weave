@@ -647,24 +647,29 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         branch: typing.Optional[str] = None,
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
+        merge: typing.Optional[bool] = False,
     ):
         additional_aliases = [] if branch is None else [branch]
-        res = wandb_artifact_pusher.write_artifact_to_wandb(
-            self._writeable_artifact,
-            project,
-            entity_name,
-            additional_aliases,
-            _lite_run=_lite_run,
-        )
-        version = res.version_str if branch is None else branch
-        self._set_read_artifact_uri(
-            WeaveWBArtifactURI(
-                name=res.artifact_name,
-                version=version,
-                entity_name=res.entity_name,
-                project_name=res.project_name,
+        tracer = engine_trace.tracer()
+        with tracer.trace("write_artifact_to_wandb"):
+            res = wandb_artifact_pusher.write_artifact_to_wandb(
+                self._writeable_artifact,
+                project,
+                entity_name,
+                additional_aliases,
+                _lite_run=_lite_run,
+                merge=merge,
             )
-        )
+        version = res.version_str if branch is None else branch
+        with tracer.trace("set_read_artifact_uri"):
+            self._set_read_artifact_uri(
+                WeaveWBArtifactURI(
+                    name=res.artifact_name,
+                    version=version,
+                    entity_name=res.entity_name,
+                    project_name=res.project_name,
+                )
+            )
 
     def _manifest(self) -> typing.Optional[WandbArtifactManifest]:
         if self._read_artifact_uri is None:

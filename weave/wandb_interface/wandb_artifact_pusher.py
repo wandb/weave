@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 import typing
 import wandb
 from wandb import Artifact
@@ -11,6 +12,7 @@ from wandb.sdk.interface.interface import InterfaceBase
 
 from weave import wandb_client_api
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+from weave import engine_trace
 
 
 @dataclasses.dataclass
@@ -21,6 +23,9 @@ class WeaveWBArtifactURIComponents:
     version_str: str
 
 
+logger = logging.getLogger("root")
+
+
 def write_artifact_to_wandb(
     artifact: wandb.Artifact,
     project_name: str,
@@ -28,6 +33,7 @@ def write_artifact_to_wandb(
     additional_aliases: list = [],
     *,
     _lite_run: typing.Optional[InMemoryLazyLiteRun] = None,
+    merge: typing.Optional[bool] = False,
 ) -> WeaveWBArtifactURIComponents:
     # Extract Artifact Attributes
     artifact_name = artifact.name
@@ -49,20 +55,27 @@ def write_artifact_to_wandb(
             entity_name, project_name, group="weave_artifact_pushers", _hide_in_wb=True
         )
     else:
+        logger.info("boom we are given the lite_run")
         lite_run = _lite_run
 
+    logger.info(f"boom entity: {entity_name}")
+    logger.info(f"boom project: {project_name}")
+
     # Ensure the artifact type exists
-    lite_run.i_api.create_artifact_type(
-        artifact_type_name=artifact_type_name,
-        entity_name=lite_run.run.entity,
-        project_name=lite_run.run.project,
-    )
+    if not merge:
+        lite_run.i_api.create_artifact_type(
+            artifact_type_name=artifact_type_name,
+            entity_name=entity_name,
+            project_name=project_name,
+        )
 
     # Finalize the artifact and construct the manifest.
-    artifact.finalize()
-    manifest_dict = _manifest_json_from_proto(
-        InterfaceBase()._make_artifact(artifact).manifest  # type: ignore[abstract, attr-defined]
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("finalize_artifact_and_construct_manifest"):
+        artifact.finalize()
+        manifest_dict = _manifest_json_from_proto(
+            InterfaceBase()._make_artifact(artifact).manifest  # type: ignore[abstract, attr-defined]
+        )
 
     # Save the Artifact and the associated files
     saver = ArtifactSaver(
@@ -72,28 +85,34 @@ def write_artifact_to_wandb(
         file_pusher=lite_run.pusher,
         is_user_created=False,
     )
-    res = saver.save(
-        type=artifact_type_name,
-        name=artifact_name,
-        client_id=artifact._client_id,
-        sequence_client_id=artifact._sequence_client_id,
-        metadata=artifact.metadata,
-        description=artifact.description,
-        aliases=["latest"] + additional_aliases,
-        use_after_commit=False,
-    )
+    with tracer.trace("Saving artifact saver.save"):
+        res = saver.save(
+            type=artifact_type_name,
+            name=artifact_name,
+            client_id=artifact._client_id,
+            sequence_client_id=artifact._sequence_client_id,
+            metadata=artifact.metadata,
+            description=artifact.description,
+            aliases=["latest"] + additional_aliases,
+            use_after_commit=False,
+        )
 
-    lite_run.finish()
+    with tracer.trace("Finishing lite run"):
+        lite_run.finish()
 
     if res is not None:
         art = Artifact._from_id(res["id"], wandb_client_api.wandb_public_api().client)
         if art is not None:
             commit_hash = art.commit_hash
+            logger.info(f"boom artifact entity name: {art.entity}")
+            logger.info(f"boom artifact project name: {art.project}")
 
     # Return the URI of the artifact
-    return WeaveWBArtifactURIComponents(
-        entity_name=lite_run.run.entity,
-        project_name=lite_run.run.project,
-        artifact_name=artifact_name,
-        version_str=commit_hash,
-    )
+    with tracer.trace("constructing WBArtifactURIComponents"):
+        boom = WeaveWBArtifactURIComponents(
+            entity_name=entity_name,
+            project_name=project_name,
+            artifact_name=artifact_name,
+            version_str=commit_hash,
+        )
+    return boom
