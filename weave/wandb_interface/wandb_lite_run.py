@@ -51,6 +51,7 @@ class InMemoryLazyLiteRun:
         group: typing.Optional[str] = None,
         _hide_in_wb: bool = False,
         _use_async_file_stream: bool = False,
+        _optimize_for_artifact_commit: bool = False,
     ):
         wandb_client_api.assert_wandb_authenticated()
 
@@ -75,6 +76,7 @@ class InMemoryLazyLiteRun:
             _use_async_file_stream
             and os.getenv("WEAVE_DISABLE_ASYNC_FILE_STREAM") == None
         )
+        self._optimize_for_artifact_commit = _optimize_for_artifact_commit
 
     def ensure_run(self) -> Run:
         return self.run
@@ -92,9 +94,10 @@ class InMemoryLazyLiteRun:
         if self._run is None:
             try:
                 # Ensure project exists
-                self.i_api.upsert_project(
-                    project=self._project_name, entity=self._entity_name
-                )
+                if not self._optimize_for_artifact_commit:
+                    self.i_api.upsert_project(
+                        project=self._project_name, entity=self._entity_name
+                    )
 
                 # Produce a run
                 run_res, _, _ = self.i_api.upsert_run(
@@ -126,7 +129,9 @@ class InMemoryLazyLiteRun:
                 raise errors.WeaveWandbAuthenticationException()
 
             self.i_api.set_current_run_id(self._run.id)
-            self._step = self._run.lastHistoryStep + 1
+            self._step = 0
+            if not self._optimize_for_artifact_commit:
+                self._step = self._run.lastHistoryStep + 1
 
         return self._run
 

@@ -47,7 +47,11 @@ def write_artifact_to_wandb(
 
     if _lite_run is None:
         lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name, group="weave_artifact_pushers", _hide_in_wb=True
+            entity_name,
+            project_name,
+            group="weave_artifact_pushers",
+            _hide_in_wb=True,
+            _optimize_for_artifact_commit=True,
         )
     else:
         lite_run = _lite_run
