@@ -1,7 +1,6 @@
 import dataclasses
 import typing
 import time
-import logging
 
 from weave.graph import Node
 from ..api import op, weave_class, mutation

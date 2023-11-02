@@ -1,5 +1,4 @@
 import dataclasses
-import logging
 import typing
 import wandb
 from wandb import Artifact
