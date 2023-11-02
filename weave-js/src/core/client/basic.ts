@@ -11,6 +11,7 @@ import {ID} from '../util/id';
 import {Client} from './types';
 import _ from 'lodash';
 import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
+import {defaultCachePolicy} from './cachePolicy';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
@@ -125,7 +126,7 @@ export class BasicClient implements Client {
     });
 
     let lastResult;
-    if (this.isRemoteServer) {
+    if (this.isRemoteServer && defaultCachePolicy(node)) {
       const hasCacheResult = this.localStorageLRU.has(observableId);
       if (hasCacheResult) {
         lastResult = this.localStorageLRU.get(observableId);
