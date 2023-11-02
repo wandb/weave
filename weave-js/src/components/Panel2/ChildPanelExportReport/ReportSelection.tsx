@@ -40,7 +40,7 @@ export const ReportSelection = ({
   setSelectedProject,
   onChange,
 }: ReportSelectionProps) => {
-  const {entityName: entityNameFromUrl, projectName: projectNameFromUrl} =
+  const {entityName: boardEntityName, projectName: boardProjectName} =
     useEntityAndProject(rootConfig);
 
   // Get all of user's entities
@@ -55,7 +55,7 @@ export const ReportSelection = ({
   });
   const entities = useNodeValue(entitiesMetaNode);
   const selectedEntityNode = w.opRootEntity({
-    entityName: w.constString(selectedEntity?.name ?? entityNameFromUrl),
+    entityName: w.constString(selectedEntity?.name ?? boardEntityName),
   });
 
   // Get list of reports across all entities and projects
@@ -107,39 +107,47 @@ export const ReportSelection = ({
   });
 
   useEffect(() => {
-    // Default initial entity value based on url
-    if (!entities.loading && entities.result.length > 0) {
-      const foundEntity = entities.result.find(
-        (item: EntityOption) => item.name === entityNameFromUrl
+    // Default initial entity value based on board location
+    if (!selectedEntity && !entities.loading && entities.result.length > 0) {
+      const boardEntity = entities.result.find(
+        (item: EntityOption) => item.name === boardEntityName
       );
-      setSelectedEntity(foundEntity ?? entities.result[0]);
+      setSelectedEntity(boardEntity ?? null);
     }
-  }, [entityNameFromUrl, entities, setSelectedEntity]);
+  }, [boardEntityName, entities, selectedEntity, setSelectedEntity]);
 
   useEffect(() => {
     // Default report value to `New report` option if no reports are found
     if (
+      selectedEntity != null &&
       !reports.loading &&
       reports.result.length === 0 &&
       selectedReport == null
     ) {
       setSelectedReport(DEFAULT_REPORT_OPTION);
     }
-  }, [reports, setSelectedReport, selectedReport]);
+  }, [reports, setSelectedReport, selectedEntity, selectedReport]);
 
   useEffect(() => {
-    // If `New report` option is selected, set default project based on url
+    // Default initial project value based on board location
     if (
       isNewReportOption(selectedReport) &&
+      !selectedProject &&
       !projects.loading &&
       projects.result.length > 0
     ) {
-      const foundProject = projects.result.find(
-        (item: ProjectOption) => item.name === projectNameFromUrl
+      const boardProject = projects.result.find(
+        (item: ProjectOption) => item.name === boardProjectName
       );
-      setSelectedProject(foundProject ?? null);
+      setSelectedProject(boardProject ?? null);
     }
-  }, [projectNameFromUrl, projects, selectedReport, setSelectedProject]);
+  }, [
+    boardProjectName,
+    projects,
+    selectedProject,
+    selectedReport,
+    setSelectedProject,
+  ]);
 
   return (
     <div className="mt-8 flex-1">
@@ -192,7 +200,7 @@ export const ReportSelection = ({
             className="mb-16"
             id="report-selector"
             isLoading={reports.loading}
-            isDisabled={entities.loading || reports.loading}
+            isDisabled={!selectedEntity || entities.loading || reports.loading}
             options={groupedReportOptions}
             placeholder={!reports.loading && 'Select a report...'}
             getOptionLabel={option => option.name}
@@ -226,7 +234,11 @@ export const ReportSelection = ({
             className="mb-16"
             id="project-selector"
             isLoading={projects.loading}
-            isDisabled={projects.loading || projects.result.length === 0}
+            isDisabled={
+              !selectedReport ||
+              projects.loading ||
+              projects.result.length === 0
+            }
             options={projects.result}
             placeholder={
               !projects.loading && projects.result.length === 0
