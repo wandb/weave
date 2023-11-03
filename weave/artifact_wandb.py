@@ -647,7 +647,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         branch: typing.Optional[str] = None,
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
-        _create_new_artifact: typing.Optional[bool] = True,
+        _create_new_artifact: bool = True,
     ):
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
