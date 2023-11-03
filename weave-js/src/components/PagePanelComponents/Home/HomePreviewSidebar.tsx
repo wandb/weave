@@ -39,6 +39,7 @@ import * as S from './styles';
 import {maybePluralize} from '../../../core/util/string';
 import {Unclickable} from './PreviewNode';
 import {trackNewBoardFromTemplateClicked} from '@wandb/weave/util/events';
+import {ErrorBoundary} from '../../ErrorBoundary';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -369,6 +370,20 @@ export const HomeExpressionPreviewParts: React.FC<{
         </Tabs.Content>
       </Tabs.Root>
     </HomeExpressionPreviewPartsWrapper>
+  );
+};
+
+// It's possible for the artifact fetch to fail, and we don't want that to crash the whole page.
+// For example, if the artifact version is deleted in the app UI but the sequence remains.
+export const SafeHomeExpressionPreviewParts: React.FC<{
+  expr: Node;
+  navigateToExpression: NavigateToExpressionType;
+  generatorAllowList?: string[];
+}> = props => {
+  return (
+    <ErrorBoundary>
+      <HomeExpressionPreviewParts {...props} />
+    </ErrorBoundary>
   );
 };
 
