@@ -137,6 +137,7 @@ export const IconNames = {
   RowHeightLarge: 'row-height-large',
   RowHeightMedium: 'row-height-medium',
   RowHeightSmall: 'row-height-small',
+  RowHeightXLarge: 'row-height-xlarge',
   Run: 'run',
   RunningRepeat: 'running-repeat',
   ScikitLogo: 'scikit-logo',
