@@ -37,7 +37,7 @@ import {useNodeValue} from '@wandb/weave/react';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
   HomePreviewSidebarTemplate,
-  HomeExpressionPreviewParts,
+  SafeHomeExpressionPreviewParts,
   SEED_BOARD_OP_NAME,
 } from './HomePreviewSidebar';
 import {useHistory, useParams} from 'react-router-dom';
@@ -423,7 +423,7 @@ const CenterProjectBoardsBrowser: React.FC<
               navigateToExpression(expr);
             },
           }}>
-          <HomeExpressionPreviewParts
+          <SafeHomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
           />
@@ -614,7 +614,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
             ],
           ]}
           setPreviewNode={setPreviewNode}>
-          <HomeExpressionPreviewParts
+          <SafeHomeExpressionPreviewParts
             expr={convertSimpleLegacyNodeToNewFormat(expr)}
             generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
@@ -886,7 +886,7 @@ const CenterProjectTablesBrowser: React.FC<
           actions={sidebarActions}
           emptyData={row['number of rows'] === 0}
           emptyDataMessage={<EmptyTableMessage />}>
-          <HomeExpressionPreviewParts
+          <SafeHomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
           />
