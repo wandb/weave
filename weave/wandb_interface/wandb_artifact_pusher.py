@@ -28,7 +28,7 @@ def write_artifact_to_wandb(
     additional_aliases: list = [],
     *,
     _lite_run: typing.Optional[InMemoryLazyLiteRun] = None,
-    _always_create_artifact_type: typing.Optional[bool] = True,
+    _create_new_artifact: bool = True,
 ) -> WeaveWBArtifactURIComponents:
     # Extract Artifact Attributes
     artifact_name = artifact.name
@@ -51,8 +51,8 @@ def write_artifact_to_wandb(
             project_name,
             group="weave_artifact_pushers",
             _hide_in_wb=True,
-            _always_create_project=False,
-            _fetch_last_history_step=False,
+            _always_create_project=_create_new_artifact,
+            _fetch_last_history_step=_create_new_artifact,
         )
     else:
         lite_run = _lite_run
@@ -60,7 +60,7 @@ def write_artifact_to_wandb(
     lite_run.upsert_project()
 
     # Ensure artifact type exists
-    if _always_create_artifact_type:
+    if _create_new_artifact:
         lite_run.i_api.create_artifact_type(
             artifact_type_name=artifact_type_name,
             entity_name=entity_name,
