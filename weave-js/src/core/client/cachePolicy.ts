@@ -26,20 +26,20 @@ const nodeIsPure = (node: GraphTypes.Node<any>): boolean => {
   return true;
 };
 
-const graphIsPure = (node: GraphTypes.Node<any>): boolean => {
-  if (isOutputNode(node)) {
-    if (!nodeIsPure(node)) {
-      return false;
-    }
-    for (const input of Object.values(node.fromOp.inputs)) {
-      if (!graphIsPure(input)) {
-        return false;
-      }
-    }
-  }
+// const graphIsPure = (node: GraphTypes.Node<any>): boolean => {
+//   if (isOutputNode(node)) {
+//     if (!nodeIsPure(node)) {
+//       return false;
+//     }
+//     for (const input of Object.values(node.fromOp.inputs)) {
+//       if (!graphIsPure(input)) {
+//         return false;
+//       }
+//     }
+//   }
 
-  return true;
-};
+//   return true;
+// };
 
 export const defaultCachePolicy = (node: GraphTypes.Node<any>): boolean => {
   if (!nodeIsPure(node)) {
