@@ -6,6 +6,7 @@ import {Node} from '../model/graph/types';
 import {Type} from '../model/types';
 import {OpStore} from '../opStore/types';
 import {Client} from './types';
+import {defaultCachePolicy} from './cachePolicy';
 
 type CachedNode = {
   obs: Observable<any>;
@@ -35,14 +36,16 @@ export class CachedClient implements Client {
     // data from the subscription. This means reloading similar content
     // on screen will not cause a re-query, but will instead use the
     // existing subscription for up to 30 seconds!
-
-    if (this.cache.has(node)) {
+    const shouldCache = defaultCachePolicy(node);
+    if (this.cache.has(node) && shouldCache) {
       return this.cache.get(node).obs;
     }
     const obs = this.client.subscribe(node);
-    const sub = obs.subscribe(res => {});
+    if (shouldCache) {
+      const sub = obs.subscribe(res => {});
 
-    this.cache.set(node, {obs, sub}, 30);
+      this.cache.set(node, {obs, sub}, 30);
+    }
 
     return obs;
   }

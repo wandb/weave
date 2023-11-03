@@ -11,6 +11,7 @@ import {ID} from '../util/id';
 import {Client} from './types';
 import _ from 'lodash';
 import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
+import {defaultCachePolicy} from './cachePolicy';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
@@ -92,6 +93,7 @@ export class BasicClient implements Client {
   public subscribe<T extends Model.Type>(
     node: GraphTypes.Node<T>
   ): Observable<any> {
+    const shouldCache = defaultCachePolicy(node);
     GlobalCGEventTracker.basicClientSubscriptions++;
     const observableId = this.hasher.typedNodeId(node);
     if (this.observables.has(observableId)) {
@@ -108,9 +110,14 @@ export class BasicClient implements Client {
         return;
       }
       obs.observers.add(observer);
-      if (obs.hasResult || obs.lastResult !== undefined) {
+      if (shouldCache && (obs.hasResult || obs.lastResult !== undefined)) {
         observer.next(obs.lastResult);
       } else {
+        // If this node is not intended to be cached, then we should
+        // mark it as not having a result, so that we can re-request
+        // the value on the next batch.
+        obs.hasResult = false;
+        this.scheduleRequest();
         this.setIsLoading(true);
       }
       return () => {
@@ -125,7 +132,7 @@ export class BasicClient implements Client {
     });
 
     let lastResult;
-    if (this.isRemoteServer) {
+    if (this.isRemoteServer && shouldCache) {
       const hasCacheResult = this.localStorageLRU.has(observableId);
       if (hasCacheResult) {
         lastResult = this.localStorageLRU.get(observableId);
