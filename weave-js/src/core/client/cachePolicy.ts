@@ -42,5 +42,10 @@ const graphIsPure = (node: GraphTypes.Node<any>): boolean => {
 };
 
 export const defaultCachePolicy = (node: GraphTypes.Node<any>): boolean => {
-  return graphIsPure(node);
+  if (!nodeIsPure(node)) {
+    return false;
+  }
+  return true;
+  // Once we have query time compilation of get ops, we can use a deeper check
+  // return graphIsPure(node);
 };
