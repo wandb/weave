@@ -1,5 +1,4 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
-import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
@@ -53,7 +52,6 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   onOpen,
   isOpen,
 }) => {
-  const isViewerWandbEmployee = useIsViewerWandbEmployee();
   const setInteractingPanel = useSetInteractingPanel();
   const {isNumItemsLocked} = config.config;
 
@@ -187,19 +185,17 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         onClick: () => handleSplit(path),
       });
 
-      if (isViewerWandbEmployee) {
-        items.push({
-          key: 'divider-0',
-          content: <Divider />,
-          disabled: true,
-        });
-        items.push({
-          key: 'export-report',
-          content: 'Add to report...',
-          icon: <IconAddNew />,
-          onClick: () => setInteractingPanel('export-report', path),
-        });
-      }
+      items.push({
+        key: 'divider-0',
+        content: <Divider />,
+        disabled: true,
+      });
+      items.push({
+        key: 'export-report',
+        content: 'Add to report...',
+        icon: <IconAddNew />,
+        onClick: () => setInteractingPanel('export-report', path),
+      });
     }
 
     if (!isNumItemsLocked) {
@@ -224,7 +220,6 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     handleDelete,
     handleUnnest,
     handleDuplicate,
-    isViewerWandbEmployee,
     handleSplit,
     setInteractingPanel,
   ]);
