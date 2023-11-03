@@ -57,6 +57,7 @@ export const Wrapper = styled.div<{showBindings?: boolean}>`
       }
     `}
 `;
+Wrapper.displayName = 'S.Wrapper';
 
 export const ToggleBindingsButton = styled(WBIcon)`
   position: absolute;
@@ -78,3 +79,4 @@ export const ToggleBindingsButton = styled(WBIcon)`
     background: white;
   }
 `;
+ToggleBindingsButton.displayName = 'S.ToggleBindingsButton';
