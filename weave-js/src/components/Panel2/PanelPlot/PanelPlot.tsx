@@ -3803,8 +3803,10 @@ const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
   padding: 3px;
 `;
+ConfigDimMenuButton.displayName = 'S.ConfigDimMenuButton';
 
 const IconBlank = styled.svg`
   width: 18px;
   height: 18px;
 `;
+IconBlank.displayName = 'S.IconBlank';
