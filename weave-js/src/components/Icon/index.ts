@@ -138,6 +138,7 @@ export {
   IconRowHeightLarge,
   IconRowHeightMedium,
   IconRowHeightSmall,
+  IconRowHeightXLarge,
   IconRun,
   IconRunningRepeat,
   IconScikitLogo,

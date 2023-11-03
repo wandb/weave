@@ -41,8 +41,8 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import BaseTable, {BaseTableProps} from 'react-base-table';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import {
-  Button,
-  Icon,
+  Button as SemanticButton,
+  Icon as SemanticIcon,
   Menu,
   MenuItemProps,
   Modal,
@@ -86,6 +86,9 @@ import {
   useUpdateConfigKey,
 } from './util';
 import {Link} from './Link';
+import {IconName} from '../../Icon';
+import {Button} from '../../Button';
+import {Tooltip} from '../../Tooltip';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -95,24 +98,24 @@ const minColumnWidth = 30;
 const rowControlsWidth = 30;
 const numberOfHeaders = 1;
 const headerHeight = 30;
-const footerHeight = 25;
+const footerHeight = 32;
 const rowHeightSettings = {
   [RowSize.Small]: 30,
   [RowSize.Medium]: 60,
   [RowSize.Large]: 120,
   [RowSize.XLarge]: 240,
 };
-const nextRowSize = {
-  [RowSize.Small]: RowSize.Medium,
-  [RowSize.Medium]: RowSize.Large,
-  [RowSize.Large]: RowSize.XLarge,
-  [RowSize.XLarge]: RowSize.Small,
+const rowSizeTooltipContent = {
+  [RowSize.Small]: 'Small row height',
+  [RowSize.Medium]: 'Medium row height',
+  [RowSize.Large]: 'Large row height',
+  [RowSize.XLarge]: 'Extra large row height',
 };
-const rowSizeIconName = {
-  [RowSize.Small]: 'rows',
-  [RowSize.Medium]: 'table',
-  [RowSize.Large]: 'table-collapsed',
-  [RowSize.XLarge]: 'fullscreen',
+const rowSizeIconName: {[key in RowSize]: IconName} = {
+  [RowSize.Small]: 'row-height-small',
+  [RowSize.Medium]: 'row-height-medium',
+  [RowSize.Large]: 'row-height-large',
+  [RowSize.XLarge]: 'row-height-xlarge',
 };
 const useOneBasedIndex = true;
 
@@ -774,7 +777,6 @@ const PanelTableInner: React.FC<
       1,
       numVisibleRows // - pinnedRowsForCurrentGrouping.length
     );
-    const nextSize = nextRowSize[config.rowSize];
 
     return (
       <div
@@ -782,18 +784,30 @@ const PanelTableInner: React.FC<
           height: '100%',
           width: '100%',
           display: 'flex',
-          padding: '2px 9px',
+          padding: '8px 12px 0',
           justifyContent: 'space-between',
         }}>
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name={rowSizeIconName[nextSize]}
-              onClick={() => {
-                setRowSize(nextSize);
-              }}
-            />
+            {(Object.keys(RowSize) as Array<keyof typeof RowSize>)
+              // Remove first 4 sizes, when iterating over the enum, since first 4 are numbers
+              .slice(4)
+              .map(rowSize => (
+                <Tooltip
+                  position="top center"
+                  content={rowSizeTooltipContent[RowSize[rowSize]]}
+                  trigger={
+                    <Button
+                      key={rowSize}
+                      startIcon={rowSizeIconName[RowSize[rowSize]]}
+                      onClick={() => setRowSize(RowSize[rowSize])}
+                      active={config.rowSize === RowSize[rowSize]}
+                      variant="ghost"
+                      size="small"
+                    />
+                  }
+                />
+              ))}
           </div>
         )}
         <div
@@ -898,12 +912,12 @@ const PanelTableInner: React.FC<
                 />
               </Modal.Content>
               <Modal.Actions>
-                <Button
+                <SemanticButton
                   data-test="close-column-select"
                   primary
                   onClick={() => setShowColumnSelect(false)}>
                   Close
-                </Button>
+                </SemanticButton>
               </Modal.Actions>
             </Modal>
             <S.TableActionText
@@ -1204,7 +1218,9 @@ const ActionCell: React.FC<{
           position="bottom left"
           trigger={
             <div>
-              {hover && <Icon name="ellipsis horizontal" size="small" />}
+              {hover && (
+                <SemanticIcon name="ellipsis horizontal" size="small" />
+              )}
             </div>
           }
           content={
