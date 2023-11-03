@@ -11,6 +11,7 @@ from wandb.sdk.interface.interface import InterfaceBase
 
 from weave import wandb_client_api
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+from .. import engine_trace
 
 
 @dataclasses.dataclass
@@ -30,6 +31,7 @@ def write_artifact_to_wandb(
     _lite_run: typing.Optional[InMemoryLazyLiteRun] = None,
     _create_new_artifact: bool = True,
 ) -> WeaveWBArtifactURIComponents:
+    tracer = engine_trace.tracer()  # type: ignore
     # Extract Artifact Attributes
     artifact_name = artifact.name
     artifact_type_name = artifact.type
@@ -74,25 +76,29 @@ def write_artifact_to_wandb(
     )
 
     # Save the Artifact and the associated files
-    saver = ArtifactSaver(
-        api=lite_run.i_api,
-        digest=artifact.digest,
-        manifest_json=manifest_dict,
-        file_pusher=lite_run.pusher,
-        is_user_created=False,
-    )
-    res = saver.save(
-        type=artifact_type_name,
-        name=artifact_name,
-        client_id=artifact._client_id,
-        sequence_client_id=artifact._sequence_client_id,
-        metadata=artifact.metadata,
-        description=artifact.description,
-        aliases=["latest"] + additional_aliases,
-        use_after_commit=False,
-    )
+    with tracer.trace("Instantiate ArtifactSaver"):
+        saver = ArtifactSaver(
+            api=lite_run.i_api,
+            digest=artifact.digest,
+            manifest_json=manifest_dict,
+            file_pusher=lite_run.pusher,
+            is_user_created=False,
+        )
 
-    lite_run.finish()
+    with tracer.trace("ArtifactSaver.save"):
+        res = saver.save(
+            type=artifact_type_name,
+            name=artifact_name,
+            client_id=artifact._client_id,
+            sequence_client_id=artifact._sequence_client_id,
+            metadata=artifact.metadata,
+            description=artifact.description,
+            aliases=["latest"] + additional_aliases,
+            use_after_commit=False,
+        )
+
+    with tracer.trace("Finish lite_run"):
+        lite_run.finish()
 
     if res is not None:
         art = Artifact._from_id(res["id"], wandb_client_api.wandb_public_api().client)
