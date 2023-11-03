@@ -1,18 +1,34 @@
 import * as GraphTypes from '../model/graph/types';
 import {isConstNode, isOutputNode} from '../model';
 
-const nodeIsImpureGetOp = (node: GraphTypes.Node<any>): boolean => {
+const isGetNode = (
+  node: GraphTypes.Node<any>
+): node is GraphTypes.OutputNode<any> => {
   if (isOutputNode(node)) {
     if (node.fromOp.name === 'get') {
-      const uriNode = node.fromOp.inputs.uri;
-      if (isConstNode(uriNode)) {
-        const uriVal = uriNode.val;
-        if (typeof uriVal === 'string') {
-          if (uriVal.includes(':latest')) {
-            return true;
-          }
-        }
-      }
+      return true;
+    }
+  }
+  return false;
+};
+
+const getStringValFromNode = (
+  node: GraphTypes.Node<any>
+): string | undefined => {
+  if (isConstNode(node)) {
+    const uriVal = node.val;
+    if (typeof uriVal === 'string') {
+      return uriVal;
+    }
+  }
+  return undefined;
+};
+
+const nodeIsImpureGetOp = (node: GraphTypes.Node<any>): boolean => {
+  if (isGetNode(node)) {
+    const uriVal = getStringValFromNode(node.fromOp.inputs.uri);
+    if (uriVal?.includes(':latest')) {
+      return true;
     }
   }
   return false;
