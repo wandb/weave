@@ -145,7 +145,7 @@ def _direct_publish(
             entity_name=wb_entity_name,
             branch=branch_name,
             _lite_run=_lite_run,
-            merge=merge,
+            _always_create_artifact_type=not merge,
         )
 
     return ref

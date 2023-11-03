@@ -51,7 +51,8 @@ class InMemoryLazyLiteRun:
         group: typing.Optional[str] = None,
         _hide_in_wb: bool = False,
         _use_async_file_stream: bool = False,
-        _optimize_for_artifact_commit: bool = False,
+        _always_create_project: bool = True,
+        _fetch_last_history_step: bool = True,
     ):
         wandb_client_api.assert_wandb_authenticated()
 
@@ -76,7 +77,10 @@ class InMemoryLazyLiteRun:
             _use_async_file_stream
             and os.getenv("WEAVE_DISABLE_ASYNC_FILE_STREAM") == None
         )
-        self._optimize_for_artifact_commit = _optimize_for_artifact_commit
+        self._fetch_last_history_step = _fetch_last_history_step
+        self._always_create_project = _always_create_project
+
+        self._project_created = False
 
     def ensure_run(self) -> Run:
         return self.run
@@ -94,10 +98,7 @@ class InMemoryLazyLiteRun:
         if self._run is None:
             try:
                 # Ensure project exists
-                if not self._optimize_for_artifact_commit:
-                    self.i_api.upsert_project(
-                        project=self._project_name, entity=self._entity_name
-                    )
+                self.upsert_project()
 
                 # Produce a run
                 run_res, _, _ = self.i_api.upsert_run(
@@ -130,7 +131,7 @@ class InMemoryLazyLiteRun:
 
             self.i_api.set_current_run_id(self._run.id)
             self._step = 0
-            if not self._optimize_for_artifact_commit:
+            if self._fetch_last_history_step:
                 self._step = self._run.lastHistoryStep + 1
 
         return self._run
@@ -171,6 +172,13 @@ class InMemoryLazyLiteRun:
             row_dict["_step"] = self._step
         self._step += 1
         stream.push("wandb-history.jsonl", json.dumps(row_dict))
+
+    def upsert_project(self) -> None:
+        if not self._project_created and self._always_create_project:
+            self.i_api.upsert_project(
+                project=self._project_name, entity=self._entity_name
+            )
+            self._project_created = True
 
     def finish(self) -> None:
         if self._stream is not None:

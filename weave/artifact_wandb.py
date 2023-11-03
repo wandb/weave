@@ -647,7 +647,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         branch: typing.Optional[str] = None,
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
-        merge: typing.Optional[bool] = False,
+        _always_create_artifact_type: typing.Optional[bool] = True,
     ):
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
@@ -656,7 +656,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             entity_name,
             additional_aliases,
             _lite_run=_lite_run,
-            merge=merge,
+            _always_create_artifact_type=_always_create_artifact_type,
         )
         version = res.version_str if branch is None else branch
         self._set_read_artifact_uri(
