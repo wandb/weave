@@ -12,14 +12,21 @@ from weave.uris import WeaveURI
 
 
 def generate_dockerfile(model_ref: str, 
-                        project_name: typing.Optional[str] = None, 
+                        project_name: typing.Optional[str] = None,
+                        auth_entity: typing.Optional[str] = None,
                         base_image: typing.Optional[str] = "python:3.11") -> str:
     """Generates a Dockerfile to run the weave op"""
     if project_name is None:
         project_name = WeaveURI.parse(model_ref).project_name
     src = Path(__file__).parent.parent / "Dockerfile"
     template = string.Template(src.read_text())
-    return template.substitute({"PROJECT_NAME": project_name, "BASE_IMAGE": base_image, "MODEL_REF": model_ref})
+
+    return template.substitute({
+        "PROJECT_NAME": project_name,
+        "BASE_IMAGE": base_image,
+        "MODEL_REF": model_ref,
+        "AUTH_ENTITY": auth_entity or "",
+    })
 
 def generate_requirements_txt(model_ref: str, dir: str, dev = False) -> str:
     """Generate a requirements.txt file."""
@@ -58,7 +65,8 @@ def enforce_login():
     except (subprocess.TimeoutExpired, ValueError):
         raise ValueError("Not logged in to gcloud. Please run `gcloud auth login`.")
 
-def compile(model_ref: str, wandb_project: typing.Optional[str] = None, base_image: typing.Optional[str] = None, dev = False) -> str:
+def compile(model_ref: str, wandb_project: typing.Optional[str] = None, auth_entity: typing.Optional[str] = None,
+            base_image: typing.Optional[str] = None, dev = False) -> str:
     """Compile the weave application."""
     dir = tempfile.mkdtemp()
     reqs = os.path.join(dir, "requirements")
@@ -66,7 +74,7 @@ def compile(model_ref: str, wandb_project: typing.Optional[str] = None, base_ima
     with open(os.path.join(reqs, "requirements.txt"), "w") as f:
         f.write(generate_requirements_txt(model_ref, reqs, dev))
     with open(os.path.join(dir, "Dockerfile"), "w") as f:
-        f.write(generate_dockerfile(model_ref, wandb_project, base_image))
+        f.write(generate_dockerfile(model_ref, wandb_project, auth_entity, base_image))
     return dir
 
 
@@ -109,6 +117,7 @@ def deploy(model_ref: str,
            gcp_project: typing.Optional[str] = None,
            region: typing.Optional[str] = None,
            service_account: typing.Optional[str] = None,
+           auth_entity: typing.Optional[str] = None,
            base_image: typing.Optional[str] = "python:3.11",
            memory: typing.Optional[str] = "500Mi"):
     """Deploy the weave application."""
@@ -122,7 +131,7 @@ def deploy(model_ref: str,
             service_account = ensure_service_account(project=gcp_project)
         except ValueError:
             print("WARNING: No service account specified.  Using the compute engine default service account...")
-    dir = compile(model_ref, wandb_project, base_image)
+    dir = compile(model_ref, wandb_project, auth_entity, base_image)
     ref = WeaveURI.parse(model_ref)
     name = safe_name(f"{ref.project_name}-{ref.name}")
     project = wandb_project or ref.project_name
@@ -161,8 +170,8 @@ def deploy(model_ref: str,
     gcloud(args, capture=False)
     shutil.rmtree(dir)
 
-def develop(model_ref: str, base_image: typing.Optional[str] = "python:3.11"):
-    dir = compile(model_ref, base_image=base_image, dev=True)
+def develop(model_ref: str, base_image: typing.Optional[str] = "python:3.11", auth_entity: typing.Optional[str] = None):
+    dir = compile(model_ref, base_image=base_image, auth_entity=auth_entity, dev=True)
     name = safe_name(WeaveURI.parse(model_ref).name)
     docker = shutil.which("docker")
     if docker is None:

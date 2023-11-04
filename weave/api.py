@@ -195,6 +195,7 @@ def attributes(attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
 def serve(
     model_ref: _artifact_wandb.WandbArtifactRef,
     method_name: typing.Optional[str] = None,
+    auth_entity: typing.Optional[str] = None,
     port: int = 9996,
     thread: bool = False,
 ) -> typing.Optional[str]:
@@ -209,7 +210,7 @@ def serve(
     os.environ["MODEL_REF"] = str(model_ref)
 
     wandb_api_ctx = _wandb_api.get_wandb_api_context()
-    app = object_method_app(model_ref, method_name=method_name)
+    app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
     trace_attrs = _monitor._attributes.get()
 
     def run():

@@ -107,6 +107,10 @@ class WandbApiAsync:
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
                 auth = aiohttp.BasicAuth("api", wandb_context.api_key)
+        # TODO: This is currently used by our FastAPI auth helper, there's probably a better way.
+        api_key_override = kwargs.pop("api_key", None)
+        if api_key_override:
+            auth = aiohttp.BasicAuth("api", api_key_override)
         url_base = weave_env.wandb_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
@@ -126,7 +130,10 @@ class WandbApiAsync:
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = await client.connect_async(reconnecting=False)  # type: ignore
-        return await session.execute(query, kwargs)
+        result = await session.execute(query, kwargs)
+        # Manually reset the connection, bypassing the SSL bug, avoiding ERROR:asyncio:Unclosed client session
+        await transport.session.close()
+        return result
 
     SERVER_INFO_QUERY = gql.gql(
         """
@@ -206,6 +213,22 @@ class WandbApiAsync:
         except gql.transport.exceptions.TransportQueryError as e:
             return None
         return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+
+    ENTITY_ACCESS_QUERY = gql.gql(
+        """
+        query Entity($entityName: String!) {
+            viewer { username }
+            entity(name: $entityName) { readOnly }
+        }
+        """
+    )
+
+    async def can_access_entity(self, entity: str, api_key: typing.Optional[str]) -> bool:
+        try:
+            result = await self.query(self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return False
+        return result.get("viewer") and result.get("entity", {}).get("readOnly", True) == False
 
 
 class WandbApi:

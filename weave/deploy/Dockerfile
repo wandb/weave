@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PROJECT_NAME $PROJECT_NAME
 
 EXPOSE 8080
-CMD ["weave", "serve", "$MODEL_REF", "--port=8080"]
+CMD ["weave", "serve", "$MODEL_REF", "--port=8080", "--auth-entity=$AUTH_ENTITY"]

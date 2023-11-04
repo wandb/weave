@@ -17,9 +17,10 @@ except ImportError:
     raise ImportError("modal must be installed and configured: \n  pip install weave[modal]\n  modal setup")
 
 def compile(model_ref: str,
-               project: str,
-               reqs: list[str],
-               secrets: typing.Optional[dict[str, str]] = None) -> Path:
+            project: str,
+            reqs: list[str],
+            auth_entity: typing.Optional[str] = None,
+            secrets: typing.Optional[dict[str, str]] = None) -> Path:
     """Generates a modal py file and secret env vars to run the weave op"""
     dir = Path(tempfile.mkdtemp())
     with open(Path(__file__).parent / "stub.py", "r") as f:
@@ -27,7 +28,8 @@ def compile(model_ref: str,
         src = template.substitute({
             "REQUIREMENTS": '", "'.join(reqs),
             "MODEL_REF": model_ref,
-            "PROJECT_NAME": project
+            "PROJECT_NAME": project,
+            "AUTH_ENTITY": auth_entity or "",
         })
     
     with open(dir / "weave_model.py", "w") as f:
@@ -42,6 +44,7 @@ def compile(model_ref: str,
 def generate_modal_stub(model_ref: str,
                         project_name: typing.Optional[str] = None,
                         reqs: typing.Optional[list[str]] = None,
+                        auth_entity: typing.Optional[str] = None,
                         secrets: typing.Optional[dict[str, str]] = None) -> str:
     """Generates a modal py file to run the weave op"""
     uri = WeaveURI.parse(model_ref)
@@ -56,7 +59,8 @@ def generate_modal_stub(model_ref: str,
         raise ValueError("project must be specified from command line or via the PROJECT_NAME env var")
     reqs = reqs or []
     reqs.append("weave @ git+https://github.com/wandb/weave@weaveflow")
-    return str(compile(model_ref, project, reqs, secrets=secrets) / "weave_model.py")
+    reqs.append("fastapi>=0.104.0")
+    return str(compile(model_ref, project, reqs, secrets=secrets, auth_entity=auth_entity) / "weave_model.py")
 
 
 def extract_secrets(model_ref: str) -> dict[str, str]:
@@ -71,17 +75,18 @@ def extract_secrets(model_ref: str) -> dict[str, str]:
 
 
 def deploy(model_ref: str,
-           wandb_project: typing.Optional[str] = None):
+           wandb_project: typing.Optional[str] = None,
+           auth_entity: typing.Optional[str] = None):
     """Deploy a model to the modal labs cloud."""
     
-    ref = generate_modal_stub(model_ref, wandb_project, secrets=extract_secrets(model_ref))
+    ref = generate_modal_stub(model_ref, wandb_project, secrets=extract_secrets(model_ref), auth_entity=auth_entity)
     stub = import_stub(ref)
     deploy_stub(stub, name=stub.name, environment_name=config.get("environment"))
 
 
-def develop(model_ref: str):
+def develop(model_ref: str, auth_entity: typing.Optional[str] = None):
     """Run a model for testing."""
-    ref = generate_modal_stub(model_ref, secrets=extract_secrets(model_ref))
+    ref = generate_modal_stub(model_ref, secrets=extract_secrets(model_ref), auth_entity=auth_entity)
     print(f"Serving live code from: {ref}")
     stub = import_stub(ref)
     timeout = 1800

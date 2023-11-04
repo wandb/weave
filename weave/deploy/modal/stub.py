@@ -8,7 +8,8 @@ image = (Image.debian_slim()
     .pip_install(["$REQUIREMENTS"])
     .env({
         "MODEL_REF": "$MODEL_REF",
-        "PROJECT_NAME": "$PROJECT_NAME"
+        "PROJECT_NAME": "$PROJECT_NAME",
+        "AUTH_ENTITY": "$AUTH_ENTITY",
     }))
 stub = Stub("$PROJECT_NAME")
 uri = WeaveURI.parse("$MODEL_REF")
@@ -23,7 +24,7 @@ def fastapi_app():
     from weave import api
     
     uri = WeaveURI.parse(os.environ["MODEL_REF"])
-    app = object_method_app(uri.to_ref())
+    app = object_method_app(uri.to_ref(), auth_entity=os.environ.get("AUTH_ENTITY"))
 
     api.init(os.environ["PROJECT_NAME"])
     # TODO: hookup / provide more control over attributes

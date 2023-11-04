@@ -1,17 +1,64 @@
 import typing
-from fastapi import FastAPI
+import datetime
+from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from typing import Optional
+
+try:
+    from typing import Annotated
+# Support python 3.8
+except ImportError:
+    from typing_extensions import Annotated
 
 from . import weave_types as types
 from . import op_args
 from . import weave_pydantic
 from . import op_def
+from . import cache
 from .monitoring import monitor
+from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
 from .artifact_wandb import WandbArtifactRef
 
+key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+
+api: Optional[WandbApiAsync] = None
+def wandb_auth(entity: str):
+    async def auth_inner(key: Annotated[Optional[str], Depends(api_key)]) -> bool:
+        global api
+        if api is None:
+            api = WandbApiAsync()
+        if key is None:
+            raise HTTPException(status_code=401, detail="Missing API Key")
+        if len(key.split("-")[-1]) != 40:
+            raise HTTPException(status_code=401, detail="Invalid API Key")
+
+        authed = key_cache.get(key)
+        if isinstance(authed, bool):
+            return authed
+        authed = await api.can_access_entity(entity, api_key=key)
+        if not authed:
+            raise HTTPException(status_code=403, detail="Permission Denied")
+        key_cache.set(key, authed)
+        return authed
+    return auth_inner
+
+def api_key(
+    credentials: Annotated[Optional[HTTPBasicCredentials],
+                        Depends(HTTPBasic(auto_error=False,
+                                          description="Set your username to api and password to a W&B API Key"))],
+    x_wandb_api_key: Annotated[Optional[str], Header(description="Optional W&B API Key")] = None,
+) -> Optional[str]:
+    if x_wandb_api_key:
+        return x_wandb_api_key
+    elif credentials and credentials.password:
+        return credentials.password
+    else:
+        return None
 
 def object_method_app(
-    obj_ref: WandbArtifactRef, method_name: typing.Optional[str] = None
+    obj_ref: WandbArtifactRef, method_name: typing.Optional[str] = None, 
+    auth_entity: typing.Optional[str] = None
 ) -> FastAPI:
     obj = obj_ref.get()
     obj_weave_type = types.TypeRegistry.type_of(obj)
@@ -49,10 +96,14 @@ def object_method_app(
 
     Item = weave_pydantic.weave_type_to_pydantic(arg_types, name="Item")
 
-    app = FastAPI()
+    dependencies = []
+    if auth_entity:
+        dependencies.append(Depends(wandb_auth(auth_entity)))
+
+    app = FastAPI(dependencies=dependencies)
 
     @app.post(f"/{method_name}", summary=method_name)
-    def method_route(item: Item) -> dict:  # type: ignore
+    async def method_route(item: Item) -> dict:  # type: ignore
         result = bound_method_op(**item.dict())  # type: ignore
         return {"result": result}
 
