@@ -52,9 +52,8 @@ def write_artifact_to_wandb(
             entity_name,
             project_name,
             group="weave_artifact_pushers",
+            should_create_project=_create_new_artifact,
             _hide_in_wb=True,
-            _always_create_project=_create_new_artifact,
-            _fetch_last_history_step=False,
         )
     else:
         lite_run = _lite_run
