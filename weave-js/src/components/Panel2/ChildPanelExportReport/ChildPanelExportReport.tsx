@@ -8,7 +8,6 @@ import classNames from 'classnames';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import _ from 'lodash';
 
-import {Alert} from '../../Alert.styles';
 import {Button} from '../../Button';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
@@ -233,12 +232,6 @@ export const ChildPanelExportReport = ({
           <Button icon="close" variant="ghost" onClick={closeDrawer} />
         </div>
         <div className="flex-1 gap-8 p-16">
-          <Alert severity="warning">
-            <p>
-              <b>🚧 Work in progress!</b> This feature is under development
-              behind an internal-only feature flag.
-            </p>
-          </Alert>
           <ReportSelection
             rootConfig={rootConfig}
             selectedEntity={selectedEntity}

@@ -150,7 +150,7 @@ export const ReportSelection = ({
   ]);
 
   return (
-    <div className="mt-8 flex-1">
+    <div className="flex-1">
       <label
         htmlFor="entity-selector"
         className="mb-4 block font-semibold text-moon-800">
