@@ -54,7 +54,7 @@ def write_artifact_to_wandb(
             group="weave_artifact_pushers",
             _hide_in_wb=True,
             _always_create_project=_create_new_artifact,
-            _fetch_last_history_step=_create_new_artifact,
+            _fetch_last_history_step=False,
         )
     else:
         lite_run = _lite_run
