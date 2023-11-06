@@ -47,7 +47,9 @@ template_registry.register(
 BOARD_INPUT_WEAVE_TYPE = types.List(
     types.TypedDict(
         {
-            "timestamp": types.optional(types.Timestamp()),
+            "timestamp": types.optional(types.String()),
+            # "server_timestamp": types.Timestamp(),
+            "server_timestamp": types.optional(types.String()),
             "entity_name": types.optional(types.String()),
             "project_name": types.optional(types.String()),
             "queue_uri": types.optional(types.String()),
@@ -64,21 +66,20 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
 
 
 @weave.op(  # type: ignore
-    name="py_board-observability",
-    hidden=True,
-    # input_type={
-    #     "input_node": types.Function(
-    #         {},
-    #         BOARD_INPUT_WEAVE_TYPE,
-    #     )
-    # },
+    name="py_board-observability_board",
+    hidden=False,
+    input_type={
+        "input_node": types.Function(
+            {},
+            BOARD_INPUT_WEAVE_TYPE,
+        )
+    },
 )
-def seed_board(
-    input_node: weave.Node[list[dict]],
-    # config: typing.Optional[PyBoardSeedBoardConfig] = None,
+def observability_board(
+    input_node,  # : weave.Node[list[dict]],
+    config: typing.Optional[PyBoardSeedBoardConfig] = None,
 ) -> weave.panels.Group:
     timestamp_col_name = "timestamp"
-    control_items = []
 
     varbar = panel_board.varbar(editable=False)
     source_data = varbar.add("source_data", input_node)
@@ -105,8 +106,8 @@ def seed_board(
     filtered_range = varbar.add(
         "filtered_range",
         weave.ops.make_list(
-            a=filtered_data[timestamp_col_name][0],
-            b=filtered_data[timestamp_col_name][-1],
+            a=filtered_data[timestamp_col_name].min(),
+            b=filtered_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -124,30 +125,30 @@ def seed_board(
         "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
     )
 
-    # window_data = varbar.add(
-    #     "window_data",
-    #     source_data.filter(
-    #         lambda row: weave.ops.Boolean.bool_and(
-    #             row[timestamp_col_name] >= bin_range[0],
-    #             row[timestamp_col_name] <= bin_range[1],
-    #         )
-    #     ),
-    #     hidden=True,
-    # )
+    window_data = varbar.add(
+        "window_data",
+        source_data.filter(
+            lambda row: weave.ops.Boolean.bool_and(
+                row[timestamp_col_name] >= bin_range[0],
+                row[timestamp_col_name] <= bin_range[1],
+            )
+        ),
+        hidden=True,
+    )
 
-    # filters = varbar.add(
-    #     "filters",
-    #     weave.panels.FilterEditor(filter_fn, node=window_data),
-    # )
+    filters = varbar.add(
+        "filters",
+        weave.panels.FilterEditor(filter_fn, node=window_data),
+    )
 
-    # filtered_window_data = varbar.add(
-    #     "filtered_window_data", window_data.filter(filter_fn), hidden=True
-    # )
+    filtered_window_data = varbar.add(
+        "filtered_window_data", window_data.filter(filter_fn), hidden=True
+    )
 
-    # grouping = varbar.add(
-    #     "grouping",
-    #     weave.panels.GroupingEditor(grouping_fn, node=window_data),
-    # )
+    grouping = varbar.add(
+        "grouping",
+        weave.panels.GroupingEditor(grouping_fn, node=window_data),
+    )
 
     overview_tab = weave.panels.Group(
         layoutMode="grid",
@@ -171,19 +172,20 @@ def seed_board(
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=5),
     )
 
-    overview_tab.add(
-        "table",
-        weave.panels.BoardPanel(
-            weave_internal.make_var_node(input_node.type, "data"),
-            id="table",
-            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
-        ),
-    )
+    # overview_tab.add(
+    #     "table-raw",
+    #     weave.panels.BoardPanel(
+    #         weave_internal.make_var_node(BOARD_INPUT_WEAVE_TYPE, "data"),
+    #         id="table-raw",
+    #         layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+    #     ),
+    # )
+
     return weave.panels.Board(vars=varbar, panels=overview_tab)
 
 
 template_registry.register(
-    "py_board-seed_board_st",
-    "Simple Board st",
+    "py_board-observability_board",
+    "Observability Board from streamtable rows",
     "Seed a board with a simple visualization of this table.",
 )
