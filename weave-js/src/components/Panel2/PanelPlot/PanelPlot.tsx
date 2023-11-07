@@ -3120,6 +3120,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     xScaleAndDomain,
     yScaleAndDomain,
     globalColorScales,
+    vegaCols,
   ]);
 
   useEffect(() => {
