@@ -7,15 +7,28 @@ import {useHistory} from 'react-router-dom';
 import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
 
+import {getCookie} from '../common/util/cookie';
 import getConfig from '../config';
 import {useWeaveContext} from '../context';
+import {
+  useIsAuthenticated,
+  useIsSignupRequired,
+  useWeaveViewer,
+} from '../context/WeaveViewerContext';
+import {
+  datadogSetUserInfo,
+  DDUserInfoType,
+} from '../integrations/analytics/datadog';
 import {useNodeWithServerType} from '../react';
-import {getCookie} from '../common/util/cookie';
 import {consoleLog} from '../util';
 import {trackPage} from '../util/events';
+import {urlWandbFrontend} from '../util/urls';
+import {useWeaveAutomation} from './automation';
+import {BetaIndicator} from './PagePanelComponents/BetaIndicator';
+import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {Home} from './PagePanelComponents/Home/Home';
-import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
+import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {
   inJupyterCell,
   isServedLocally,
@@ -23,6 +36,10 @@ import {
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
+import {
+  PagePanelControlContextProvider,
+  usePagePanelControlRequestedActions,
+} from './PagePanelContext';
 import {
   CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
@@ -46,23 +63,6 @@ import {
 } from './Panel2/PanelInteractContext';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
-import {useWeaveAutomation} from './automation';
-import {
-  PagePanelControlContextProvider,
-  usePagePanelControlRequestedActions,
-} from './PagePanelContext';
-import {
-  useIsAuthenticated,
-  useIsSignupRequired,
-  useWeaveViewer,
-} from '../context/WeaveViewerContext';
-import {HelpCTA} from './PagePanelComponents/HelpCTA';
-import {urlWandbFrontend} from '../util/urls';
-import {
-  DDUserInfoType,
-  datadogSetUserInfo,
-} from '../integrations/analytics/datadog';
-import {BetaIndicator} from './PagePanelComponents/BetaIndicator';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;

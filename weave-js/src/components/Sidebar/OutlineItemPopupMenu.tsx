@@ -7,6 +7,14 @@ import styled from 'styled-components';
 
 import {getFullChildPanel} from '../Panel2/ChildPanel';
 import {
+  IconAddNew,
+  IconCopy,
+  IconDelete,
+  IconRetry,
+  IconSplit,
+} from '../Panel2/Icons';
+import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
+import {
   addChild,
   getPath,
   isGroupNode,
@@ -15,14 +23,6 @@ import {
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
-import {
-  IconAddNew,
-  IconCopy,
-  IconDelete,
-  IconRetry,
-  IconSplit,
-} from '../Panel2/Icons';
-import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
 
 const Divider = styled.div`
   margin: 0 -15px;

@@ -18,11 +18,11 @@ import {
   useNodeValue,
   useRefreshAllNodes,
 } from '@wandb/weave/react';
+import moment from 'moment';
 import {useCallback, useMemo} from 'react';
 
-import {usePanelContext} from './PanelContext';
-import moment from 'moment';
 import {uriFromNode} from '../PagePanelComponents/util';
+import {usePanelContext} from './PanelContext';
 
 export const useBoardGeneratorsForNode = (
   node: Node,

@@ -1,6 +1,7 @@
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
+
 import {IconButton} from '../IconButton';
 
 export const ColumnHeader = styled.div`

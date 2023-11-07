@@ -1,3 +1,4 @@
+import {constNone, isAssignableTo} from '@wandb/weave/core';
 import React, {useMemo} from 'react';
 
 import * as CGReact from '../../react';
@@ -5,7 +6,6 @@ import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import * as S from './PanelString.styles';
 import {TooltipTrigger} from './Tooltip';
-import {constNone, isAssignableTo} from '@wandb/weave/core';
 
 const inputType = 'any' as const;
 

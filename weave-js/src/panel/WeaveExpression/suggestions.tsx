@@ -8,9 +8,9 @@ import {
   useSuggestionVisualState,
 } from './hooks';
 import * as S from './styles';
+import {SuggestionRow} from './SuggestionRow';
 import type {SuggestionProps} from './types';
 import {trace} from './util';
-import {SuggestionRow} from './SuggestionRow';
 
 export const Suggestions = (props: SuggestionProps) => {
   const weave = useWeaveContext();

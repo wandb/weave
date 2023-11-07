@@ -5,8 +5,8 @@ import {Hasher, MemoizedHasher} from '../model/graph/editing/hash';
 import {Node} from '../model/graph/types';
 import {Type} from '../model/types';
 import {OpStore} from '../opStore/types';
-import {Client} from './types';
 import {defaultCachePolicy} from './cachePolicy';
+import {Client} from './types';
 
 type CachedNode = {
   obs: Observable<any>;

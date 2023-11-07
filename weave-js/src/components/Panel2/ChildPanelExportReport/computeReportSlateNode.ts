@@ -1,8 +1,9 @@
 import {ID, isAssignableTo, isConstNode, isVarNode} from '@wandb/weave/core';
+
+import {weaveTypeIsPanel} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {getConfigForPath, makeGroup, makePanel, mapPanels} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
-import {weaveTypeIsPanel} from '../../PagePanelComponents/util';
 
 export type WeavePanelSlateNode = {
   type: 'weave-panel';

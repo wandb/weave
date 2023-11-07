@@ -1,8 +1,7 @@
 // main prismjs needs to be imported first before prism-markdown
-import * as Prism from 'prismjs';
-
 import 'prismjs/components/prism-markdown';
 
+import * as Prism from 'prismjs';
 import React, {
   useCallback,
   useEffect,

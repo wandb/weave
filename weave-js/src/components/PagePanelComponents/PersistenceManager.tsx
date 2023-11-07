@@ -1,23 +1,31 @@
 import {useMutation as useApolloMutation} from '@apollo/client';
-import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {Popover} from '@material-ui/core';
 import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isMac} from '@wandb/weave/common/util/browser';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {
-  NodeOrVoidNode,
-  OutputNode,
+  constString,
   isConstNode,
   isOutputNode,
   mapNodes,
-  opRootProject,
+  NodeOrVoidNode,
   opGet,
-  constString,
   opProjectArtifact,
+  opRootProject,
+  OutputNode,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
+import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 import {useMutation, useNodeWithServerType} from '@wandb/weave/react';
+import {useNodeValue} from '@wandb/weave/react';
+import {urlProjectAssets} from '@wandb/weave/urls';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import _ from 'lodash';
+import moment from 'moment';
 import React, {
   Dispatch,
   SetStateAction,
@@ -27,11 +35,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {Button, Input, Modal} from 'semantic-ui-react';
 import {useHistory} from 'react-router-dom';
-
-import {Popover} from '@material-ui/core';
+import {Button, Input, Modal} from 'semantic-ui-react';
 import styled, {css} from 'styled-components';
+
+import {getFullChildPanel} from '../Panel2/ChildPanel';
 import {
   IconAddNew,
   IconBack,
@@ -45,24 +53,33 @@ import {
   IconUp as IconUpUnstyled,
   IconWeaveLogo,
 } from '../Panel2/Icons';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
+import {
+  useNewDashFromItems,
+  useNewPanelFromRootQueryCallback,
+} from '../Panel2/PanelRootBrowser/util';
+import {mapPanels} from '../Panel2/panelTree';
+import {DeleteActionModal} from './DeleteActionModal';
 import {UPDATE_ARTIFACT_COLLECTION} from './graphql';
+import {DELETE_ARTIFACT_SEQUENCE} from './graphql';
 import {
   useBranchPointFromURIString,
   usePreviousVersionFromURIString,
 } from './hooks';
 import {
+  getAvailableActions,
   PersistenceAction,
   PersistenceDeleteActionType,
   PersistenceRenameActionType,
   PersistenceState,
   PersistenceStoreActionType,
   TakeActionType,
-  getAvailableActions,
   useStateMachine,
 } from './persistenceStateMachine';
+import {PublishModal} from './PublishModal';
 import {
-  BranchPointType,
   branchPointIsRemote,
+  BranchPointType,
   determineURIIdentifier,
   determineURISource,
   isLocalURI,
@@ -70,23 +87,6 @@ import {
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './util';
-import moment from 'moment';
-import {
-  useNewDashFromItems,
-  useNewPanelFromRootQueryCallback,
-} from '../Panel2/PanelRootBrowser/util';
-import {PanelGroupConfig} from '../Panel2/PanelGroup';
-import {getFullChildPanel} from '../Panel2/ChildPanel';
-import {useNodeValue} from '@wandb/weave/react';
-import _ from 'lodash';
-import {mapPanels} from '../Panel2/panelTree';
-import {DeleteActionModal} from './DeleteActionModal';
-import {PublishModal} from './PublishModal';
-import {DELETE_ARTIFACT_SEQUENCE} from './graphql';
-import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
-import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
-import {trackPublishBoardClicked} from '@wandb/weave/util/events';
-import {urlProjectAssets} from '@wandb/weave/urls';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {

@@ -18,10 +18,10 @@ import EmptyPanelBankSectionWatermark from './PanelBankEmptySectionWatermark';
 import {
   getBoxDimensions,
   getPagingParams,
+  getSnappedDimension,
+  getSnappedItemCount,
   isMobile,
   panelOnActivePage,
-  getSnappedItemCount,
-  getSnappedDimension,
 } from './panelbankFlow';
 import {isFirefox} from './panelbankUtil';
 

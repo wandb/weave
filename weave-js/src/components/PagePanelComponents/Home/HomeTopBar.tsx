@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+
 import {IconWeaveLogo} from '../../Panel2/Icons';
 
 export const HomeTopBar: React.FC = () => {

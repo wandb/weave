@@ -1,6 +1,7 @@
 import * as _ from 'lodash';
-import {FlatSpan, SpanType} from '../../../core/model/media/traceTree';
+
 import {Type} from '../../../core';
+import {FlatSpan, SpanType} from '../../../core/model/media/traceTree';
 
 export const SpanWeaveType = {
   type: 'typedDict' as const,

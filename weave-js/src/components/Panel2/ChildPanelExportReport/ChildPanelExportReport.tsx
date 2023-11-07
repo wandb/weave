@@ -1,32 +1,32 @@
 import {useLazyQuery, useMutation} from '@apollo/client';
 import {coreAppUrl} from '@wandb/weave/config';
-import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {opRootViewer} from '@wandb/weave/core';
+import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {UpsertReportMutationVariables} from '@wandb/weave/generated/graphql';
 import {useNodeValue, useNodeValueExecutor} from '@wandb/weave/react';
 import classNames from 'classnames';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import _ from 'lodash';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {Button} from '../../Button';
-import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
+import {ChildPanelFullConfig} from '../ChildPanel';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
 import {isInsideMain} from '../panelTree';
 import {AddPanelErrorAlert} from './AddPanelErrorAlert';
-import {ReportDraftDialog} from './ReportDraftDialog';
-import {ReportSelection} from './ReportSelection';
 import {computeReportSlateNode} from './computeReportSlateNode';
 import {DELETE_REPORT_DRAFT, GET_REPORT, UPSERT_REPORT} from './graphql';
+import {ReportDraftDialog} from './ReportDraftDialog';
+import {ReportSelection} from './ReportSelection';
 import {
-  EntityOption,
-  ProjectOption,
-  ReportOption,
   editDraftVariables,
+  EntityOption,
   getReportDraftByUser,
   isNewReportOption,
   newDraftVariables,
   newReportVariables,
+  ProjectOption,
+  ReportOption,
 } from './utils';
 
 type ChildPanelExportReportProps = {
