@@ -205,27 +205,24 @@ export function useMakePublicBoardFromNode() {
         projectName = parts[1];
       }
 
-      return makeBoardFromNode(
-        boardTemplate,
-        inputNode,
-        draftNode => {
-          makeMutation2(
-            draftNode,
-            'publish_artifact',
-            {
-              artifact_name: constString(boardName!),
-              project_name: constString(projectName!),
-              entity_name: constString(entityName!),
-            },
-            publishedNode => {
-              onCreated(publishedNode as any);
-            }
-          );
-        }
-      );
-    }, [makeBoardFromNode, makeMutation2]);
-  }
-
+      return makeBoardFromNode(boardTemplate, inputNode, draftNode => {
+        makeMutation2(
+          draftNode,
+          'publish_artifact',
+          {
+            artifact_name: constString(boardName!),
+            project_name: constString(projectName!),
+            entity_name: constString(entityName!),
+          },
+          publishedNode => {
+            onCreated(publishedNode as any);
+          }
+        );
+      });
+    },
+    [makeBoardFromNode, makeMutation2]
+  );
+}
 
 export const useMakeLocalBoardFromNode = () => {
   const simpleSetter = useMakeSimpleSetMutation();
