@@ -255,7 +255,7 @@ export function useMakePublicBoardFromNode() {
           );
         }
       );
-    }, []);
+    }, [makeBoardFromNode, makeMutation]);
   }
 
 >>>>>>> 1145e985 (feat(launch): qob)
