@@ -794,11 +794,11 @@ const PanelTableInner: React.FC<
               .slice(4)
               .map(rowSize => (
                 <Tooltip
+                  key={rowSize}
                   position="top center"
                   content={rowSizeTooltipContent[RowSize[rowSize]]}
                   trigger={
                     <Button
-                      key={rowSize}
                       startIcon={rowSizeIconName[RowSize[rowSize]]}
                       onClick={() => setRowSize(RowSize[rowSize])}
                       active={config.rowSize === RowSize[rowSize]}

@@ -85,7 +85,9 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
               const index = cursor.config.gridConfig.panels.findIndex(
                 p => p.id === lastStep
               );
-              cursor.config.gridConfig.panels.splice(index, 1);
+              if (index !== -1) {
+                cursor.config.gridConfig.panels.splice(index, 1);
+              }
             }
           } else if (cursor.id === 'LabeledItem') {
             delete cursor.config[lastStep];
