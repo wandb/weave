@@ -19,7 +19,7 @@ import {
   IconAddNew,
   IconCopy,
   IconDelete,
-  IconRetry,
+  // IconRetry,
   IconSplit,
 } from '../Panel2/Icons';
 import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
@@ -102,25 +102,25 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     [path, config, updateConfig, goBackToOutline]
   );
 
-  const handleUnnest = useCallback(
-    (panelPath: string[]) => {
-      updateConfig2(oldConfig => {
-        oldConfig = getFullChildPanel(oldConfig);
-        const targetPanel = getPath(oldConfig, panelPath);
-        if (!isGroupNode(targetPanel)) {
-          throw new Error('Cannot unnest non-group panel');
-        }
-        const keys = Object.keys(targetPanel.config.items);
-        if (keys.length === 0) {
-          throw new Error('Cannot unnest empty group panel');
-        }
-        return setPath(oldConfig, panelPath, targetPanel.config.items[keys[0]]);
-      });
+  // const handleUnnest = useCallback(
+  //   (panelPath: string[]) => {
+  //     updateConfig2(oldConfig => {
+  //       oldConfig = getFullChildPanel(oldConfig);
+  //       const targetPanel = getPath(oldConfig, panelPath);
+  //       if (!isGroupNode(targetPanel)) {
+  //         throw new Error('Cannot unnest non-group panel');
+  //       }
+  //       const keys = Object.keys(targetPanel.config.items);
+  //       if (keys.length === 0) {
+  //         throw new Error('Cannot unnest empty group panel');
+  //       }
+  //       return setPath(oldConfig, panelPath, targetPanel.config.items[keys[0]]);
+  //     });
 
-      goBackToOutline?.();
-    },
-    [updateConfig2, goBackToOutline]
-  );
+  //     goBackToOutline?.();
+  //   },
+  //   [updateConfig2, goBackToOutline]
+  // );
   const handleSplit = useCallback(
     (panelPath: string[]) => {
       updateConfig2(oldConfig => {
@@ -161,14 +161,15 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   );
   const menuItems = useMemo(() => {
     const items = [];
-    if (localConfig?.id === 'Group') {
-      items.push({
-        key: 'unnest',
-        content: 'Replace with first child',
-        icon: <IconRetry />,
-        onClick: () => handleUnnest(path),
-      });
-    }
+
+    // if (localConfig?.id === 'Group') {
+    //   items.push({
+    //     key: 'unnest',
+    //     content: 'Replace with first child',
+    //     icon: <IconRetry />,
+    //     onClick: () => handleUnnest(path),
+    //   });
+    // }
 
     if (!isNumItemsLocked) {
       items.push({
@@ -218,11 +219,11 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
 
     return items;
   }, [
-    localConfig?.id,
+    // localConfig?.id,
     isNumItemsLocked,
     path,
     handleDelete,
-    handleUnnest,
+    // handleUnnest,
     handleDuplicate,
     isViewerWandbEmployee,
     handleSplit,
