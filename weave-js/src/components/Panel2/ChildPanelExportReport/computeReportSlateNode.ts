@@ -117,6 +117,7 @@ export const computeReportSlateNode = (
   targetPath: string[]
 ): WeavePanelSlateNode => {
   const targetConfig = getConfigForPath(fullConfig, targetPath);
+  const targetPanelName = targetPath[targetPath.length - 1];
   const varItems = getVarItemsForPath(fullConfig, targetConfig);
   const inputNodeVal = makeGroup(
     {
@@ -124,7 +125,7 @@ export const computeReportSlateNode = (
         childNameBase: 'var',
         layoutMode: 'vertical',
       }),
-      panel: targetConfig,
+      [targetPanelName]: targetConfig,
     },
     {
       disableDeletePanel: true,
@@ -136,7 +137,7 @@ export const computeReportSlateNode = (
         vars: {
           hidden: true,
         },
-        panel: {
+        [targetPanelName]: {
           controlBar: 'editable',
         },
       },
