@@ -1,22 +1,41 @@
 import weave
 from weave.panels_py import panel_autoboard
+from weave import types
 from ..panels import panel_board
 from .. import weave_internal
 from .generator_templates import template_registry
 
 
+BOARD_INPUT_WEAVE_TYPE = types.List(
+    types.TypedDict(
+        {
+            "timestamp": types.Timestamp(),
+            "entity": types.String(),
+            "project": types.String(),
+            "queue": types.String(),
+            "run_id": types.optional(types.String()),
+            "job": types.optional(types.String()),
+            "trace_id": types.String(),
+            "state": types.String(),
+            "error": types.optional(types.String()),
+            "metrics": types.optional(types.TypedDict()),
+        }
+    )
+)
+
+
 @weave.op(  # type: ignore
     name="py_board-observability_board",
     hidden=False,
-    # input_type={
-    #     "input_node": types.Function(
-    #         {},
-    #         BOARD_INPUT_WEAVE_TYPE,
-    #     )
-    # },
+    input_type={
+        "input_node": types.Function(
+            {},
+            BOARD_INPUT_WEAVE_TYPE,
+        )
+    },
 )
 def observability_board(
-    input_node: weave.Node[list[dict]],
+    input_node,  # : weave.Node[list[dict]],
 ) -> weave.panels.Group:
     timestamp_col_name = "_timestamp"
 
