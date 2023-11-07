@@ -83,7 +83,7 @@ export const getNamePartFromURI = (uri: string) => {
 };
 
 export const getPartsFromURI = (uri: string) => {
-  let parts = uri.split('://');
+  const parts = uri.split('://');
   if (parts.length !== 2) {
     return null;
   }
@@ -180,7 +180,7 @@ const makeBoardName = (
 
 export function useMakePublicBoardFromNode() {
   const makeBoardFromNode = useMakeLocalBoardFromNode();
-  const makeMutation = useMakeMutation();
+  const makeMutation2 = useMakeMutation();
 
   return useCallback(
     (
@@ -209,7 +209,7 @@ export function useMakePublicBoardFromNode() {
         boardTemplate,
         inputNode,
         draftNode => {
-          makeMutation(
+          makeMutation2(
             draftNode,
             'publish_artifact',
             {
@@ -223,7 +223,7 @@ export function useMakePublicBoardFromNode() {
           );
         }
       );
-    }, [makeBoardFromNode, makeMutation]);
+    }, [makeBoardFromNode, makeMutation2]);
   }
 
 
