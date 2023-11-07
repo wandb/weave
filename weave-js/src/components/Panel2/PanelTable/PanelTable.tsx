@@ -1024,7 +1024,6 @@ const PanelTableInner: React.FC<
     () => TableActions(weave, tableState.preFilterFunction, setFilterFunction),
     [weave, tableState.preFilterFunction, setFilterFunction]
   );
-
   const ConfiguredTable = (
     <BaseTable
       ignoreFunctionInColumnCompare={false}
@@ -1153,7 +1152,6 @@ const IndexCell: React.FC<{
   const index = LLReact.useNodeValue(
     opGetIndexCheckpointTag({obj: props.rowNode})
   );
-
   if (index.loading) {
     return <S.IndexColumnVal />;
   }

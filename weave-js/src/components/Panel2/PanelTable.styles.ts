@@ -21,7 +21,6 @@ export const ColumnHeader = styled.div`
   .column-actions-trigger:hover {
     color: ${globals.primary};
   }
-  background-color: 'inherit';
 `;
 ColumnHeader.displayName = 'S.ColumnHeader';
 
@@ -54,8 +53,8 @@ export const IndexColumnVal = styled.div`
   padding: 0 8px;
   :hover {
     color: ${globals.primary};
+    background-color: ${hexToRGB(OBLIVION, 0.04)};
   }
-  background-color: 'inherit';
 `;
 IndexColumnVal.displayName = 'S.IndexColumnVal';
 
@@ -126,7 +125,8 @@ export const TableAction = styled.div<{
     props.highlight ? 'rgb(3, 183, 206)' : 'inherit'};
   :hover {
     color: ${globals.primary};
-    background-color: ${props => props.highlight && 'rgb(3, 183, 206)'};
+    background-color: ${props =>
+      props.highlight ? 'rgb(3, 183, 206)' : hexToRGB(OBLIVION, 0.04)};
   }
   box-shadow: #f8f8f8 -2px 0px 8px 4px;
   display: inline-flex;
@@ -230,16 +230,11 @@ export const PanelSettings = styled.div`
 PanelSettings.displayName = 'S.PanelSettings';
 
 export const CellWrapper = styled.div`
-  scrollbar-width: thin;
-  overflow: auto;
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background-color: #eee;
-  }
   width: 100%;
   height: 100%;
+  :hover {
+    background-color: ${hexToRGB(OBLIVION, 0.04)};
+  }
 `;
 CellWrapper.displayName = 'S.CellWrapper';
 
