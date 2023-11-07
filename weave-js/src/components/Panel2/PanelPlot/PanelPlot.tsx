@@ -2799,8 +2799,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           newSpec.encoding.color.field = vegaCols[i].label;
           if (colorFieldIsRange) {
             // map the color field to the range of the color scale
-            const labelKey = fixKeyForVega(dims.label);
-            const colorKey = fixKeyForVega(dims.color);
+            const labelKey = vegaCols[i].label;
+            const colorKey = vegaCols[i].color;
 
             const nonNullDims: ExprDimNameType[] =
               PlotState.EXPRESSION_DIM_NAMES.filter(
