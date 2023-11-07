@@ -46,10 +46,11 @@ const nodeIsImpureGetOp = (node: GraphTypes.Node<any>): boolean => {
   if (isGetNode(node)) {
     const uriVal = getStringValFromNode(node.fromOp.inputs.uri);
     if (uriVal) {
-      if (!likelyCommitHash(getAliasFromUri(uriVal))) {
-        return true;
+      if (likelyCommitHash(getAliasFromUri(uriVal))) {
+        return false;
       }
     }
+    return true;
   }
   return false;
 };
