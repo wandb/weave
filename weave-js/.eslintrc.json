@@ -2,10 +2,7 @@
   "extends": [
     "react-app"
   ],
-  "plugins": [
-    "node",
-    "wandb"
-  ],
+  "plugins": ["node", "wandb", "simple-import-sort", "unused-imports"],
   "rules": {
     "node/no-process-env": "error",
     "wandb/no-a-tags": "error",
@@ -26,6 +23,9 @@
         ]
       }
     ],
+    "simple-import-sort/imports": "warn",
+    "simple-import-sort/exports": "warn",
+    "unused-imports/no-unused-imports": "error",
     "react/react-in-jsx-scope": "error"
   }
 }
