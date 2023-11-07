@@ -83,22 +83,14 @@ export const getNamePartFromURI = (uri: string) => {
 };
 
 export const getPartsFromURI = (uri: string) => {
-<<<<<<< HEAD
   const parts = uri.split('://');
-=======
-  let parts = uri.split('://');
->>>>>>> 1145e985 (feat(launch): qob)
   if (parts.length !== 2) {
     return null;
   }
   const artifactName = parts[1].split(':')[0];
   const entityProjectNameList = artifactName.split('/');
   return entityProjectNameList;
-<<<<<<< HEAD
 };
-=======
-}
->>>>>>> 1145e985 (feat(launch): qob)
 
 const getNameFromRootURINode = (node: Node) => {
   const uri = getRootURIFromNode(node);
@@ -188,11 +180,7 @@ const makeBoardName = (
 
 export function useMakePublicBoardFromNode() {
   const makeBoardFromNode = useMakeLocalBoardFromNode();
-<<<<<<< HEAD
   const makeMutation2 = useMakeMutation();
-=======
-  const makeMutation = useMakeMutation();
->>>>>>> 1145e985 (feat(launch): qob)
 
   return useCallback(
     (
@@ -217,31 +205,11 @@ export function useMakePublicBoardFromNode() {
         projectName = parts[1];
       }
 
-<<<<<<< HEAD
-      return makeBoardFromNode(boardTemplate, inputNode, draftNode => {
-        makeMutation2(
-          draftNode,
-          'publish_artifact',
-          {
-            artifact_name: constString(boardName!),
-            project_name: constString(projectName!),
-            entity_name: constString(entityName!),
-          },
-          publishedNode => {
-            onCreated(publishedNode as any);
-          }
-        );
-      });
-    },
-    [makeBoardFromNode, makeMutation2]
-  );
-}
-=======
       return makeBoardFromNode(
         boardTemplate,
         inputNode,
         draftNode => {
-          makeMutation(
+          makeMutation2(
             draftNode,
             'publish_artifact',
             {
@@ -255,10 +223,9 @@ export function useMakePublicBoardFromNode() {
           );
         }
       );
-    }, [makeBoardFromNode, makeMutation]);
+    }, [makeBoardFromNode, makeMutation2]);
   }
 
->>>>>>> 1145e985 (feat(launch): qob)
 
 export const useMakeLocalBoardFromNode = () => {
   const simpleSetter = useMakeSimpleSetMutation();
