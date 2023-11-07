@@ -48,7 +48,6 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
     types.TypedDict(
         {
             "timestamp": types.optional(types.Timestamp()),
-            "_timestamp": types.Number(),
             "entity_name": types.optional(types.String()),
             "project_name": types.optional(types.String()),
             "queue_uri": types.optional(types.String()),
