@@ -65,6 +65,24 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
 )
 
 
+BOARD_INPUT_WEAVE_TYPE = types.List(
+    types.TypedDict(
+        {
+            "timestamp": types.Timestamp(),
+            "entity": types.String(),
+            "project": types.String(),
+            "queue": types.String(),
+            "run_id": types.optional(types.String()),
+            "job": types.optional(types.String()),
+            "trace_id": types.String(),
+            "state": types.String(),
+            "error": types.optional(types.String()),
+            "metrics": types.optional(types.TypedDict()),
+        }
+    )
+)
+
+
 @weave.op(  # type: ignore
     name="py_board-observability",
     hidden=False,
