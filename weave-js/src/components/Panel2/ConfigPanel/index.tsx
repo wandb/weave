@@ -285,6 +285,7 @@ export const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
       color: ${globals.GRAY_800};
     }
   }
+  border: 2px solid transparent;
   &:focus-within {
     border: 2px solid ${globals.TEAL_400};
   }
