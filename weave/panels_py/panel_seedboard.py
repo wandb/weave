@@ -3,6 +3,7 @@ import typing
 import weave
 from .. import weave_internal
 from .generator_templates import template_registry
+from .. import weave_types as types
 
 
 @weave.type()
@@ -39,4 +40,22 @@ template_registry.register(
     "py_board-seed_board",
     "Simple Board",
     "Seed a board with a simple visualization of this table.",
+)
+
+BOARD_INPUT_WEAVE_TYPE = types.List(
+    types.TypedDict(
+        {
+            "timestamp": types.optional(types.Timestamp()),
+            "entity_name": types.optional(types.String()),
+            "project_name": types.optional(types.String()),
+            "queue_uri": types.optional(types.String()),
+            "run_id": types.optional(types.String()),
+            "job": types.optional(types.String()),
+            "error": types.optional(types.String()),
+            "trace_id": types.optional(types.String()),
+            "state": types.optional(types.String()),
+            "metrics": types.optional(types.String()),
+            "_step": types.Number(),
+        }
+    )
 )
