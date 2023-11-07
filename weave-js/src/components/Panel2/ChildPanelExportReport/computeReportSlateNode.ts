@@ -119,12 +119,17 @@ export const computeReportSlateNode = (
   const targetConfig = getConfigForPath(fullConfig, targetPath);
   const targetPanelName = targetPath[targetPath.length - 1];
   const varItems = getVarItemsForPath(fullConfig, targetConfig);
-  const inputNodeVal = makeGroup(
-    {
-      vars: makeGroup(varItems, {
+  const hasVars = Object.keys(varItems).length > 0;
+  const varsConfig = hasVars
+    ? makeGroup(varItems, {
         childNameBase: 'var',
         layoutMode: 'vertical',
-      }),
+      })
+    : undefined;
+
+  const packagedGroup = makeGroup(
+    {
+      vars: varsConfig,
       [targetPanelName]: targetConfig,
     },
     {
@@ -156,8 +161,8 @@ export const computeReportSlateNode = (
         },
         {
           nodeType: 'const',
-          type: toWeaveType(inputNodeVal),
-          val: inputNodeVal,
+          type: toWeaveType(packagedGroup),
+          val: packagedGroup,
         }
       ),
     },
