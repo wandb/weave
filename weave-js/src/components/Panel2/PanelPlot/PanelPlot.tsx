@@ -166,6 +166,7 @@ type DimOption = {
 };
 
 type DimOptionOrSection = DimOption | DimOption[];
+type ExprDimNameType = (typeof PlotState.EXPRESSION_DIM_NAMES)[number];
 
 function useIsOrgDashboard() {
   return Object.keys(useContext(ActivityDashboardContext).frame).length > 0;
@@ -2393,8 +2394,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const tooltipData: {[seriesIndexRowIndexString: string]: ConstNode} =
     useMemo(() => {
-      type ExprDimNameType = (typeof PlotState.EXPRESSION_DIM_NAMES)[number];
-
       return concattedNonLineTable.reduce(
         (acc: {[seriesIndexRowIndexString: string]: ConstNode}, row) => {
           const key = `[${row._seriesIndex},${row._rowIndex}]`;
@@ -2797,28 +2796,31 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         if (
           vegaReadyTable.columnSelectFunctions[dims.label].type !== 'invalid'
         ) {
-          newSpec.encoding.color.field = fixKeyForVega(dims.label);
+          newSpec.encoding.color.field = vegaCols[i].label;
           if (colorFieldIsRange) {
             // map the color field to the range of the color scale
             const labelKey = fixKeyForVega(dims.label);
             const colorKey = fixKeyForVega(dims.color);
 
+            const nonNullDims: ExprDimNameType[] =
+              PlotState.EXPRESSION_DIM_NAMES.filter(
+                dim =>
+                  !isVoidNode(
+                    series.table.columnSelectFunctions[series.dims[dim]]
+                  )
+              );
+
             const mapping = flatPlotTable.reduce((acc, row) => {
-              acc[row[labelKey]] = row[colorKey];
+              if (nonNullDims.every(dim => row[vegaCols[i][dim]] != null)) {
+                acc[row[labelKey]] = row[colorKey];
+              }
               return acc;
             }, {} as {[key: string]: string});
 
-            const scale = Object.keys(mapping).reduce(
-              (acc, key) => {
-                acc.domain.push(key);
-                acc.range.push(mapping[key]);
-                return acc;
-              },
-              {
-                domain: [] as string[],
-                range: [] as string[],
-              }
-            );
+            const scale = {
+              domain: Object.keys(mapping),
+              range: Object.values(mapping),
+            };
 
             newSpec.encoding.color.scale = scale;
           }
