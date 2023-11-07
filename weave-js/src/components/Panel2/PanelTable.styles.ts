@@ -1,11 +1,28 @@
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import styled from 'styled-components';
+import styled, {createGlobalStyle} from 'styled-components';
+import {range} from 'lodash';
 import {IconButton} from '../IconButton';
 import {hexToRGB} from '../../common/css/utils';
 import {OBLIVION} from '../../common/css/color.styles';
 
-export const ColumnHeader = styled.div<{isHovered: boolean}>`
+export const GlobalStyle = createGlobalStyle<{$columnNumber: number}>`
+  .BaseTable.active-col-0 [data-col-idx="0"] {
+    background:${hexToRGB(OBLIVION, 0.04)}
+  }
+  ${({$columnNumber}) =>
+    range($columnNumber)
+      .map(
+        idx =>
+          `.BaseTable.active-col-${idx} [data-col-idx="${idx}"] {background:${hexToRGB(
+            OBLIVION,
+            0.04
+          )};}`
+      )
+      .join('\n')}}
+`;
+
+export const ColumnHeader = styled.div`
   display: flex;
   align-items: stretch;
   white-space: nowrap;
@@ -21,8 +38,7 @@ export const ColumnHeader = styled.div<{isHovered: boolean}>`
   .column-actions-trigger:hover {
     color: ${globals.primary};
   }
-  background-color: ${props =>
-    props.isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
+  background-color: 'inherit';
 `;
 ColumnHeader.displayName = 'S.ColumnHeader';
 
@@ -45,7 +61,7 @@ export const ColumnNameText = styled.span`
 `;
 ColumnNameText.displayName = 'S.ColumnNameText';
 
-export const IndexColumnVal = styled.div<{isHovered?: boolean}>`
+export const IndexColumnVal = styled.div`
   width: 100%;
   height: 100%;
   text-align: center;
@@ -56,8 +72,7 @@ export const IndexColumnVal = styled.div<{isHovered?: boolean}>`
   :hover {
     color: ${globals.primary};
   }
-  background-color: ${props =>
-    props.isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
+  background-color: 'inherit';
 `;
 IndexColumnVal.displayName = 'S.IndexColumnVal';
 
@@ -117,7 +132,6 @@ ColumnAction.displayName = 'S.ColumnAction';
 
 export const TableAction = styled.div<{
   highlight?: boolean;
-  isHovered: boolean;
 }>`
   cursor: pointer;
   padding: 5px 4px 0px 4px;
@@ -126,11 +140,7 @@ export const TableAction = styled.div<{
   width: 100%;
   color: ${props => (props.highlight ? 'white' : 'inherit')};
   background-color: ${props =>
-    props.highlight
-      ? 'rgb(3, 183, 206)'
-      : props.isHovered
-      ? hexToRGB(OBLIVION, 0.04)
-      : 'inherit'};
+    props.highlight ? 'rgb(3, 183, 206)' : 'inherit'};
   :hover {
     color: ${globals.primary};
     background-color: ${props => props.highlight && 'rgb(3, 183, 206)'};

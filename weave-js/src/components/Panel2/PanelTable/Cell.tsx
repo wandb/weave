@@ -5,7 +5,6 @@ import {
   NodeOrVoidNode,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
-import styled from 'styled-components';
 
 import {ActionsTrigger} from '../../../actions';
 import {useWeaveContext, useWeaveFeaturesContext} from '../../../context';
@@ -16,15 +15,6 @@ import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TH from './hooks';
 import * as Table from './tableState';
-import {hexToRGB} from '../../../common/css/utils';
-import {OBLIVION} from '../../../common/css/color.styles';
-import {usePanelTableContext} from './PanelTableContext';
-
-const CellWrapper = styled.div<{isHovered: boolean}>`
-  background-color: ${({isHovered}) =>
-    isHovered ? hexToRGB(OBLIVION, 0.04) : 'inherit'};
-`;
-CellWrapper.displayName = 'S.CellWrapper';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -56,7 +46,6 @@ export const Cell: React.FC<{
   simpleTable,
 }) => {
   const weave = useWeaveContext();
-  const {hoveredColId, setHoveredColId} = usePanelTableContext();
   const {actions: actionsEnabled} = useWeaveFeaturesContext();
 
   const updatePanelConfig = TH.useUpdatePanelConfig(
@@ -130,13 +119,10 @@ export const Cell: React.FC<{
   }, [selectFunction, inputNode, rowNode, weave]);
 
   return (
-    <CellWrapper
+    <div
       ref={domRef}
       data-test-should-render={shouldRender}
       style={{width: '100%', height: '100%'}}
-      onMouseEnter={() => setHoveredColId && setHoveredColId(colId)}
-      onMouseLeave={() => setHoveredColId && setHoveredColId('')}
-      isHovered={hoveredColId === colId}
       // style={{
       //   ...getPanelStackDims(handler, selectedNode.type, config),
       // }}>
@@ -184,7 +170,7 @@ export const Cell: React.FC<{
           </PanelContextProvider>
         )
       )}
-    </CellWrapper>
+    </div>
   );
 };
 

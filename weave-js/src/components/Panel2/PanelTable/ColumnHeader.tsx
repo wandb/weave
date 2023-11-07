@@ -29,7 +29,6 @@ import * as S from '../PanelTable.styles';
 import * as Table from './tableState';
 import {stripTag} from './util';
 import {IconClose} from '../Icons';
-import {usePanelTableContext} from './PanelTableContext';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -144,7 +143,6 @@ export const ColumnHeader: React.FC<{
   simpleTable,
 }) => {
   const weave = useWeaveContext();
-  const {hoveredColId, setHoveredColId} = usePanelTableContext();
   const {stack} = usePanelContext();
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
@@ -448,11 +446,7 @@ export const ColumnHeader: React.FC<{
   }, [cellFrame, weave, propsSelectFunction, inputArrayNode]);
 
   return (
-    <S.ColumnHeader
-      data-test="column-header"
-      onMouseEnter={() => setHoveredColId && setHoveredColId(colId)}
-      onMouseLeave={() => setHoveredColId && setHoveredColId('')}
-      isHovered={hoveredColId === colId}>
+    <S.ColumnHeader data-test="column-header">
       {simpleTable ? (
         workingColumnName !== '' ? (
           <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
@@ -591,9 +585,7 @@ export const ColumnHeader: React.FC<{
       {!simpleTable && (
         <WBPopupMenuTrigger options={columnMenuItems}>
           {({anchorRef, setOpen, open}) => (
-            <S.ColumnAction
-              className="column-controls"
-              isHovered={hoveredColId === colId}>
+            <S.ColumnAction className="column-controls">
               {isPinned && (
                 <PinnedIndicator unpin={() => setColumnPinState(false)} />
               )}

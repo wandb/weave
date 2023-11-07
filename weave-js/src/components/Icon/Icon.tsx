@@ -138,6 +138,7 @@ import {ReactComponent as ImportRocketLaunch} from '../../assets/icons/icon-rock
 import {ReactComponent as ImportRowHeightLarge} from '../../assets/icons/icon-row-height-large.svg';
 import {ReactComponent as ImportRowHeightMedium} from '../../assets/icons/icon-row-height-medium.svg';
 import {ReactComponent as ImportRowHeightSmall} from '../../assets/icons/icon-row-height-small.svg';
+import {ReactComponent as ImportRowHeightXLarge} from '../../assets/icons/icon-row-height-xlarge.svg';
 import {ReactComponent as ImportRun} from '../../assets/icons/icon-run.svg';
 import {ReactComponent as ImportRunningRepeat} from '../../assets/icons/icon-running-repeat.svg';
 import {ReactComponent as ImportScikitLogo} from '../../assets/icons/icon-scikit-logo.svg';
@@ -621,6 +622,9 @@ export const IconRowHeightMedium = (props: SVGIconProps) => (
 export const IconRowHeightSmall = (props: SVGIconProps) => (
   <ImportRowHeightSmall {...updateIconProps(props)} />
 );
+export const IconRowHeightXLarge = (props: SVGIconProps) => (
+  <ImportRowHeightXLarge {...updateIconProps(props)} />
+);
 export const IconRun = (props: SVGIconProps) => (
   <ImportRun {...updateIconProps(props)} />
 );
@@ -926,6 +930,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'row-height-large': IconRowHeightLarge,
   'row-height-medium': IconRowHeightMedium,
   'row-height-small': IconRowHeightSmall,
+  'row-height-xlarge': IconRowHeightXLarge,
   run: IconRun,
   'running-repeat': IconRunningRepeat,
   'scikit-logo': IconScikitLogo,

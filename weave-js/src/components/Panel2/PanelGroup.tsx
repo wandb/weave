@@ -84,6 +84,11 @@ const LAYOUT_MODES = [
 
 interface PanelInfo {
   hidden?: boolean;
+  /**
+   * Sets controlBar value for a specific panel in a group. Useful if you
+   * need to override the default setting chosen based on the group `layout`
+   */
+  controlBar?: ChildPanelProps['controlBar'];
 }
 export interface PanelGroupConfig {
   /**
@@ -709,7 +714,9 @@ export const PanelGroupItem: React.FC<{
   );
 
   let controlBar: ChildPanelProps['controlBar'] = 'off';
-  if (
+  if (config.panelInfo?.[name]?.controlBar) {
+    controlBar = config.panelInfo?.[name]?.controlBar;
+  } else if (
     config.layoutMode === 'layer' ||
     config.layoutMode === 'tab' ||
     // Hardcode off for Board top level items

@@ -33,6 +33,7 @@ const IconWrapper = styled.div<IconWrapperProps>`
   }
   cursor: pointer;
 `;
+IconWrapper.displayName = 'S.IconWrapper';
 
 interface IconProps {
   isDarkMode: boolean;
@@ -51,6 +52,7 @@ const Icon = styled.div<IconProps>`
       ? globals.GRAY_600
       : globals.GRAY_500};
 `;
+Icon.displayName = 'S.Icon';
 
 interface IconComponentProps extends IconWrapperProps {
   onClick: () => void;
@@ -83,6 +85,7 @@ const Group = styled.div<GroupProps>`
     ${props => (props.isDarkMode ? globals.GRAY_800 : globals.GRAY_350)};
   border-radius: 4px;
 `;
+Group.displayName = 'S.Group';
 
 interface GroupComponentProps extends GroupProps {
   children: React.ReactNode;
