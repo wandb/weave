@@ -178,10 +178,7 @@ export const getSectionConfig = (
       }
       draft.panels.push({
         id: name,
-        layout: getNewGridItemLayout(
-          draft.panels.map(p => p.layout),
-          false
-        ),
+        layout: getNewGridItemLayout(draft.panels.map(p => p.layout)),
       });
     });
   });
