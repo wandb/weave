@@ -223,7 +223,7 @@ export function useMakePublicBoardFromNode() {
           );
         }
       );
-    }, []);
+    }, [makeBoardFromNode, makeMutation]);
   }
 
 
