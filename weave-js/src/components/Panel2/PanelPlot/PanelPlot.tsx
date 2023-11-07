@@ -756,21 +756,17 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     setShowAdvancedProperties(prev => !prev);
   }, []);
   const advancedPropertiesDom = useMemo(() => {
-    return (
+    return showAdvancedProperties ? (
       <>
-        {showAdvancedProperties ? (
-          <div onClick={toggleAdvancedProperties}>
-            {scaleConfigDom}
-            <S.AdvancedPropertiesHeader>
-              Hide advanced properties
-            </S.AdvancedPropertiesHeader>
-          </div>
-        ) : (
-          <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
-            Advanced properties
-          </S.AdvancedPropertiesHeader>
-        )}
+        {scaleConfigDom}
+        <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
+          Hide advanced properties
+        </S.AdvancedPropertiesHeader>
       </>
+    ) : (
+      <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
+        Advanced properties
+      </S.AdvancedPropertiesHeader>
     );
   }, [showAdvancedProperties, toggleAdvancedProperties, scaleConfigDom]);
 
