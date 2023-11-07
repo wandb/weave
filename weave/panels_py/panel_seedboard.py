@@ -47,7 +47,20 @@ template_registry.register(
 BOARD_INPUT_WEAVE_TYPE = types.List(
     types.TypedDict(
         {
+<<<<<<< Updated upstream
             "timestamp": types.optional(types.Timestamp()),
+=======
+            # "timestamp": types.optional(types.String()),
+            "timestamp": types.TypedDict(
+                {
+                    "_val": types.TypedDict({"type": types.optional(types.String())}),
+                    "_type": types.optional(types.String()),
+                }
+            ),
+            "_timestamp": types.Number(),
+            # "server_timestamp": types.Timestamp(),
+            "server_timestamp": types.optional(types.String()),
+>>>>>>> Stashed changes
             "entity_name": types.optional(types.String()),
             "project_name": types.optional(types.String()),
             "queue_uri": types.optional(types.String()),
@@ -64,8 +77,13 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
 
 
 @weave.op(  # type: ignore
+<<<<<<< Updated upstream
     name="py_board-observability",
     hidden=True,
+=======
+    name="py_board-observability_board",
+    hidden=False,
+>>>>>>> Stashed changes
     # input_type={
     #     "input_node": types.Function(
     #         {},
@@ -73,12 +91,20 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
     #     )
     # },
 )
+<<<<<<< Updated upstream
 def seed_board(
     input_node: weave.Node[list[dict]],
     # config: typing.Optional[PyBoardSeedBoardConfig] = None,
 ) -> weave.panels.Group:
     timestamp_col_name = "timestamp"
     control_items = []
+=======
+def observability_board(
+    input_node: weave.Node[list[dict]],
+    config: typing.Optional[PyBoardSeedBoardConfig] = None,
+) -> weave.panels.Group:
+    timestamp_col_name = "_timestamp"
+>>>>>>> Stashed changes
 
     varbar = panel_board.varbar(editable=False)
     source_data = varbar.add("source_data", input_node)
@@ -155,20 +181,20 @@ def seed_board(
         enableAddPanel=True,
     )  # , showExpressions="titleBar")
     overview_tab.add(
-        "request_count",
+        "launch_runs",
         panel_autoboard.timeseries(
             filtered_data,
             bin_domain_node=bin_range,
-            x_axis_key="timestamp",
+            x_axis_key=timestamp_col_name,
             y_expr=lambda row: row.count(),
-            y_title="request count",
+            y_title="Launch Runs",
             color_expr=lambda row: grouping_fn(row),
             color_title="group",
             x_domain=user_zoom_range,
             n_bins=100,
             mark="bar",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=5),
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=10),
     )
 
     overview_tab.add(
