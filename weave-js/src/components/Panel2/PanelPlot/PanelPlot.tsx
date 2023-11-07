@@ -2799,9 +2799,28 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         ) {
           newSpec.encoding.color.field = fixKeyForVega(dims.label);
           if (colorFieldIsRange) {
-            newSpec.encoding.color.scale = {
-              range: {field: fixKeyForVega(dims.color)},
-            };
+            // map the color field to the range of the color scale
+            const labelKey = fixKeyForVega(dims.label);
+            const colorKey = fixKeyForVega(dims.color);
+
+            const mapping = flatPlotTable.reduce((acc, row) => {
+              acc[row[labelKey]] = row[colorKey];
+              return acc;
+            }, {} as {[key: string]: string});
+
+            const scale = Object.keys(mapping).reduce(
+              (acc, key) => {
+                acc.domain.push(key);
+                acc.range.push(mapping[key]);
+                return acc;
+              },
+              {
+                domain: [] as string[],
+                range: [] as string[],
+              }
+            );
+
+            newSpec.encoding.color.scale = scale;
           }
         }
       } else if (series.uiState.label === 'dropdown') {
