@@ -1,26 +1,9 @@
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import styled, {createGlobalStyle} from 'styled-components';
-import {range} from 'lodash';
+import styled from 'styled-components';
 import {IconButton} from '../IconButton';
 import {hexToRGB} from '../../common/css/utils';
 import {OBLIVION} from '../../common/css/color.styles';
-
-export const GlobalStyle = createGlobalStyle<{$columnNumber: number}>`
-  .BaseTable.active-col-0 [data-col-idx="0"] {
-    background:${hexToRGB(OBLIVION, 0.04)}
-  }
-  ${({$columnNumber}) =>
-    range($columnNumber)
-      .map(
-        idx =>
-          `.BaseTable.active-col-${idx} [data-col-idx="${idx}"] {background:${hexToRGB(
-            OBLIVION,
-            0.04
-          )};}`
-      )
-      .join('\n')}}
-`;
 
 export const ColumnHeader = styled.div`
   display: flex;

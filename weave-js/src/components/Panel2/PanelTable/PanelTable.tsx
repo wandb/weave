@@ -36,7 +36,7 @@ import {
   voidNode,
   WeaveInterface,
 } from '@wandb/weave/core';
-import _, {String} from 'lodash';
+import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import BaseTable, {BaseTableProps} from 'react-base-table';
 import AutoSizer from 'react-virtualized-auto-sizer';
