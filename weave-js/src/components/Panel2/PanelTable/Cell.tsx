@@ -15,6 +15,7 @@ import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TH from './hooks';
 import * as Table from './tableState';
+import {CellWrapper} from '../PanelTable.styles';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -118,10 +119,9 @@ export const Cell: React.FC<{
     };
   }, [selectFunction, inputNode, rowNode, weave]);
   return (
-    <div
+    <CellWrapper
       ref={domRef}
       data-test-should-render={shouldRender}
-      style={{width: '100%', height: '100%'}}
       // style={{
       //   ...getPanelStackDims(handler, selectedNode.type, config),
       // }}>
@@ -169,7 +169,7 @@ export const Cell: React.FC<{
           </PanelContextProvider>
         )
       )}
-    </div>
+    </CellWrapper>
   );
 };
 
