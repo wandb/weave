@@ -8,16 +8,16 @@ import {
   customEntitySelectComps,
   customReportSelectComps,
 } from './customSelectComponents';
+import {SelectedExistingReport} from './SelectedExistingReport';
 import {
   DEFAULT_REPORT_OPTION,
   EntityOption,
+  GroupedReportOption,
+  isNewReportOption,
+  ProjectOption,
   ReportOption,
   useEntityAndProject,
-  GroupedReportOption,
-  ProjectOption,
-  isNewReportOption,
 } from './utils';
-import {SelectedExistingReport} from './SelectedExistingReport';
 
 type ReportSelectionProps = {
   rootConfig: ChildPanelFullConfig;

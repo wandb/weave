@@ -1,19 +1,20 @@
-import {opGet, constString} from '@wandb/weave/core';
-import React, {useEffect, useMemo, useState} from 'react';
 import {
   IconDelete,
   IconInfo,
   IconOpenNewTab,
 } from '@wandb/weave/components/Icon';
-import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
-import {SetPreviewNodeType, NavigateToExpressionType} from './common';
-import * as query from './query';
-import {HomeBoardPreview} from './HomePreviewSidebar';
-import moment from 'moment';
-import {HomeParams} from './Home';
-import {useHistory, useParams} from 'react-router-dom';
-import {urlLocalAssetPreview} from '../../../urls';
+import {constString,opGet} from '@wandb/weave/core';
 import {setDocumentTitle} from '@wandb/weave/util/document';
+import moment from 'moment';
+import React, {useEffect, useMemo, useState} from 'react';
+import {useHistory, useParams} from 'react-router-dom';
+
+import {urlLocalAssetPreview} from '../../../urls';
+import {NavigateToExpressionType,SetPreviewNodeType} from './common';
+import {HomeParams} from './Home';
+import {CenterBrowser,CenterBrowserActionType} from './HomeCenterBrowser';
+import {HomeBoardPreview} from './HomePreviewSidebar';
+import * as query from './query';
 
 type CenterLocalBrowserPropsType = {
   setPreviewNode: SetPreviewNodeType;

@@ -1,20 +1,20 @@
-import React, {useMemo, useCallback} from 'react';
-import styled from 'styled-components';
-
-import * as Panel from './panel';
-import * as ConfigPanel from './ConfigPanel';
+import {MOON_50, MOON_800} from '@wandb/weave/common/css/color.styles';
 import {
-  NodeOrVoidNode,
   constTimestampList,
+  NodeOrVoidNode,
   opNumbersMax,
   opNumbersMin,
   voidNode,
 } from '@wandb/weave/core';
-import {useUpdateConfig2} from './PanelComp';
 import {useMutation, useNodeValue} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
+import React, {useCallback,useMemo} from 'react';
+import styled from 'styled-components';
+
 import {ValidatingTextInput} from '../ValidatingTextInput';
-import {MOON_50, MOON_800} from '@wandb/weave/common/css/color.styles';
+import * as ConfigPanel from './ConfigPanel';
+import * as Panel from './panel';
+import {useUpdateConfig2} from './PanelComp';
 
 const inputType = {
   type: 'union' as const,

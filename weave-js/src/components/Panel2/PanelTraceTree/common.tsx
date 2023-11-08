@@ -1,20 +1,19 @@
+import {
+  constNumber,
+  constString,
+  Node,
+  opArray,
+  opDict,
+  opMerge,
+  opNoneCoalesce,
+  opNumberMult,
+  opPick,
+} from '@wandb/weave/core';
+import {SpanKindType, SpanType} from '@wandb/weave/core/model/media/traceTree';
 import React, {PropsWithChildren, ReactNode} from 'react';
 
-import {TooltipTrigger} from '../Tooltip';
-
 import {AgentSVG, ChainSVG, LLMSVG, ToolSVG} from '../Icons';
-import {SpanKindType, SpanType} from '@wandb/weave/core/model/media/traceTree';
-import {
-  opDict,
-  opPick,
-  constString,
-  opNumberMult,
-  constNumber,
-  Node,
-  opMerge,
-  opArray,
-  opNoneCoalesce,
-} from '@wandb/weave/core';
+import {TooltipTrigger} from '../Tooltip';
 
 export const chainColor = '#F59B1414';
 export const chainTextColor = '#C77905';

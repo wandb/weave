@@ -1,45 +1,45 @@
-import {Button} from '@wandb/weave/components/Button';
-import {Pill} from '@wandb/weave/components/Tag';
-import * as Tabs from '@wandb/weave/components/Tabs';
-
-import React, {useEffect, useMemo, useState} from 'react';
-import * as LayoutElements from './LayoutElements';
-import styled from 'styled-components';
-import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
-import {
-  NavigateToExpressionType,
-  SetPreviewNodeType,
-  getArtifactVersionNodeFromUri,
-} from './common';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
-import {Node, NodeOrVoidNode} from '@wandb/weave/core';
-import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
-import {useWeaveContext} from '@wandb/weave/context';
-import {
-  useBoardGeneratorsForNode,
-  useMakeLocalBoardFromNode,
-} from '../../Panel2/pyBoardGen';
-import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
-import {useNodeWithServerType} from '@wandb/weave/react';
 import {
   MOON_250,
   MOON_500,
   MOON_800,
   TEAL_400,
 } from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
+import * as Tabs from '@wandb/weave/components/Tabs';
+import {Pill} from '@wandb/weave/components/Tag';
+import {useWeaveContext} from '@wandb/weave/context';
+import {Node, NodeOrVoidNode} from '@wandb/weave/core';
+import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
+import {useNodeWithServerType} from '@wandb/weave/react';
+import {trackNewBoardFromTemplateClicked} from '@wandb/weave/util/events';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
+import styled from 'styled-components';
+
+import {maybePluralize} from '../../../core/util/string';
+import {ErrorBoundary} from '../../ErrorBoundary';
+import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
+import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
+import {
+  useBoardGeneratorsForNode,
+  useMakeLocalBoardFromNode,
+} from '../../Panel2/pyBoardGen';
+import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
+import {BoardsTab} from './BoardsTab';
+import {
+  getArtifactVersionNodeFromUri,
+  NavigateToExpressionType,
+  SetPreviewNodeType,
+} from './common';
 import {
   ActionCell,
   CenterBrowserActionType,
   CenterBrowserDataType,
 } from './HomeCenterBrowser';
-import {BoardsTab} from './BoardsTab';
-import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
-import * as S from './styles';
-import {maybePluralize} from '../../../core/util/string';
+import * as LayoutElements from './LayoutElements';
 import {Unclickable} from './PreviewNode';
-import {trackNewBoardFromTemplateClicked} from '@wandb/weave/util/events';
-import {ErrorBoundary} from '../../ErrorBoundary';
+import * as S from './styles';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};

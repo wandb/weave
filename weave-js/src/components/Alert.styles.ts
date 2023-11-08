@@ -1,3 +1,5 @@
+import styled from 'styled-components';
+
 import {
   GOLD_300,
   GOLD_600,
@@ -12,7 +14,6 @@ import {
   TEAL_600,
 } from '../common/css/globals.styles';
 import {Icon as IconComp} from './Icon';
-import styled from 'styled-components';
 
 type AlertProps = {
   severity: string;

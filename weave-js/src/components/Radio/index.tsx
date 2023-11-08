@@ -1,6 +1,6 @@
 import * as RadioGroup from '@radix-ui/react-radio-group';
-import {twMerge} from 'tailwind-merge';
 import * as React from 'react';
+import {twMerge} from 'tailwind-merge';
 
 export const Root = ({
   className,

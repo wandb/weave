@@ -1,6 +1,6 @@
-import {Tag as TagType} from '../../common/types/graphql';
 import React from 'react';
 
+import {Tag as TagType} from '../../common/types/graphql';
 import {RemoveAction} from './RemoveAction';
 import {RemovableTag, Tag} from './Tag';
 import {getTagContrastColor} from './utils';

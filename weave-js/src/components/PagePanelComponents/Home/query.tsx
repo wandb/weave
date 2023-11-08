@@ -3,6 +3,7 @@
 import * as w from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {useMemo} from 'react';
+
 import {
   getLocalArtifactDataNode,
   opFilterArtifactsToWeaveObjects,

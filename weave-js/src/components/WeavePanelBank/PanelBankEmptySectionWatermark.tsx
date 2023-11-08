@@ -1,4 +1,5 @@
 import React from 'react';
+
 import {Alert} from '../Alert';
 
 // This is a merge of 4 files from app.
