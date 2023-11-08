@@ -4,7 +4,11 @@
   ],
   "plugins": [
     "node",
+    "simple-import-sort",
     "wandb"
+  ],
+  "ignorePatterns": [
+    "**/generated/**"
   ],
   "rules": {
     "node/no-process-env": "error",
