@@ -3,16 +3,16 @@ import {
   IconInfo,
   IconOpenNewTab,
 } from '@wandb/weave/components/Icon';
-import {constString,opGet} from '@wandb/weave/core';
+import {constString, opGet} from '@wandb/weave/core';
 import {setDocumentTitle} from '@wandb/weave/util/document';
 import moment from 'moment';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {urlLocalAssetPreview} from '../../../urls';
-import {NavigateToExpressionType,SetPreviewNodeType} from './common';
+import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {HomeParams} from './Home';
-import {CenterBrowser,CenterBrowserActionType} from './HomeCenterBrowser';
+import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import {HomeBoardPreview} from './HomePreviewSidebar';
 import * as query from './query';
 

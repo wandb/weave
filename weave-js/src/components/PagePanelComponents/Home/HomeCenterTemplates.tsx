@@ -3,7 +3,7 @@ import {
   MOON_350,
   MOON_500,
 } from '@wandb/weave/common/css/color.styles';
-import {opGetFeaturedBoardTemplates,Type} from '@wandb/weave/core';
+import {opGetFeaturedBoardTemplates, Type} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import React from 'react';
 import styled from 'styled-components';

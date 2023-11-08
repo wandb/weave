@@ -8,8 +8,8 @@ import {
   opGet,
   opSaveToUri,
 } from '@wandb/weave/core';
-import {useMakeMutation,useNodeValueExecutor} from '@wandb/weave/react';
-import {useCallback,useState} from 'react';
+import {useMakeMutation, useNodeValueExecutor} from '@wandb/weave/react';
+import {useCallback, useState} from 'react';
 
 import {
   isLocalURI,

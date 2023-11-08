@@ -9,7 +9,7 @@ import {format, getYear} from 'date-fns';
 import {useMemo} from 'react';
 
 import {useBranchPointFromURIString} from '../../PagePanelComponents/hooks';
-import {determineURISource,uriFromNode} from '../../PagePanelComponents/util';
+import {determineURISource, uriFromNode} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {WeavePanelSlateNode} from './computeReportSlateNode';
 

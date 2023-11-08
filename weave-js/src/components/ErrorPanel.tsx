@@ -1,7 +1,7 @@
 import React, {forwardRef, useEffect, useRef, useState} from 'react';
 import styled from 'styled-components';
 
-import {hexToRGB,MOON_300, MOON_600} from '../common/css/globals.styles';
+import {hexToRGB, MOON_300, MOON_600} from '../common/css/globals.styles';
 import {Icon} from './Icon';
 import {Tooltip} from './Tooltip';
 

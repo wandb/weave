@@ -8,7 +8,7 @@ import {
 } from '@wandb/weave/core';
 import {useMutation, useNodeValue} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
-import React, {useCallback,useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import styled from 'styled-components';
 
 import {ValidatingTextInput} from '../ValidatingTextInput';

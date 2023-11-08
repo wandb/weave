@@ -23,7 +23,7 @@ import {useMutation, useNodeValue} from '../../react';
 import {ConfigFieldModifiedDropdown, ConfigFieldWrapper} from './ConfigPanel';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
-import {getSimpleKeyType,VisualEditorMode} from './visualEditors';
+import {getSimpleKeyType, VisualEditorMode} from './visualEditors';
 
 const inputType = {
   type: 'function' as const,

@@ -41,7 +41,7 @@ import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
-import {getSimpleKeyType,VisualEditorMode} from './visualEditors';
+import {getSimpleKeyType, VisualEditorMode} from './visualEditors';
 
 const inputType = {
   type: 'function' as const,

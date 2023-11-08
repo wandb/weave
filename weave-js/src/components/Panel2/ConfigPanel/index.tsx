@@ -11,7 +11,7 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC, ReactNode, useCallback, useState} from 'react';
 import {MenuItemProps} from 'semantic-ui-react';
-import styled, {css,ThemeProvider} from 'styled-components';
+import styled, {css, ThemeProvider} from 'styled-components';
 
 import {useWeaveSidebarConfigStylingEnabled} from '../../../context';
 import {WeaveExpression} from '../../../panel/WeaveExpression';
