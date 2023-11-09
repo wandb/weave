@@ -148,10 +148,11 @@ def timestamp_max(self):
     return pc.max(array).as_py()
 
 
-@op(
-    name="timedelta-totalSeconds",
-    input_type={"td": types.TimeDelta()},
-    output_type=types.Number(),
+@arrow_op(
+    name="ArrowWeaveListTimeDelta-totalSeconds",
+    input_type={"td": ArrowWeaveListType(types.TimeDelta())},
+    output_type=ArrowWeaveListType(types.Number()),
 )
 def timedelta_total_seconds(td):
-    return pc.cast(pc.cast(td, pa.duration("s")), pa.float64())
+    new_arrow_data = pc.divide(pc.cast(td._arrow_data, pa.int64()), 1e6)
+    return ArrowWeaveList(new_arrow_data, types.Number(), td._artifact)
