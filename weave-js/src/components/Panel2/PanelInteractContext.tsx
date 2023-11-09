@@ -2,8 +2,8 @@
 
 import React, {useCallback, useContext, useState} from 'react';
 
-import {usePanelContext} from './PanelContext';
 import {ChildPanelProps} from './ChildPanel';
+import {usePanelContext} from './PanelContext';
 
 interface PanelInteractState {
   hovered?: boolean;

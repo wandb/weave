@@ -4,6 +4,7 @@ import {Ref} from 'semantic-ui-react';
 import {createEditor, Editor, Transforms} from 'slate';
 import {withHistory} from 'slate-history';
 import {ReactEditor, Slate, withReact} from 'slate-react';
+import styled from 'styled-components';
 
 import {usePanelContext} from '../../components/Panel2/PanelContext';
 import {useWeaveContext} from '../../context';
@@ -18,7 +19,6 @@ import * as S from './styles';
 import {Suggestions} from './suggestions';
 import {WeaveExpressionProps} from './types';
 import {trace} from './util';
-import styled from 'styled-components';
 
 // We attach some stuff to the window for test automation (see automation.ts)
 declare global {

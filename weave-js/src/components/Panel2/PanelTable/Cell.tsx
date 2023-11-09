@@ -13,9 +13,9 @@ import {usePanelStacksForType} from '../availablePanels';
 import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
+import {CellWrapper} from '../PanelTable.styles';
 import * as TH from './hooks';
 import * as Table from './tableState';
-import {CellWrapper} from '../PanelTable.styles';
 
 const recordEvent = makeEventRecorder('Table');
 

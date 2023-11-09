@@ -1,8 +1,8 @@
 import _ from 'lodash';
 import React, {memo, useMemo} from 'react';
 import {
-  MenuItemProps,
   Menu as SemanticMenu,
+  MenuItemProps,
   Popup as SemanticPopup,
   StrictMenuItemProps,
   StrictMenuProps,

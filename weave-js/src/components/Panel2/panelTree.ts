@@ -11,6 +11,8 @@ The UI state is a tree of panels. There are three types of non-leaf panels:
 
 */
 
+import {difference} from '@wandb/weave/common/util/data';
+import {ID} from '@wandb/weave/common/util/id';
 import {
   Client,
   Definition,
@@ -23,13 +25,14 @@ import {
   pushFrameDefs,
   refineEditingNode,
   Stack,
-  updateVarTypes,
   updateVarNames,
+  updateVarTypes,
   voidNode,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import * as _ from 'lodash';
 
+import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {
   ChildPanelConfig,
   childPanelFromTableState,
@@ -42,9 +45,6 @@ import {
   PANEL_GROUP2_ID,
   PanelGroupConfig,
 } from './PanelGroup';
-import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
-import {difference} from '@wandb/weave/common/util/data';
-import {ID} from '@wandb/weave/common/util/id';
 
 export type PanelTreeNode = ChildPanelConfig;
 

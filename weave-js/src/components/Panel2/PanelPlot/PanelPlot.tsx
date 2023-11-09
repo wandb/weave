@@ -7,20 +7,23 @@ import CustomPanelRenderer, {
   MultiTableDataType,
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import * as S from './styles';
+import {useIsMounted} from '@wandb/weave/common/util/hooks';
+import {Option} from '@wandb/weave/common/util/uihelpers';
 import {
-  constNode,
   constFunction,
   ConstNode,
+  constNode,
   constNodeUnsafe,
   constNone,
   constNumber,
   constString,
   constStringList,
   escapeDots,
+  filterNodes,
   Frame,
   isAssignableTo,
   isConstNode,
+  isTaggedValue,
   isTypedDict,
   isVoidNode,
   list,
@@ -28,14 +31,14 @@ import {
   maybe,
   Node,
   numberBin,
-  timestampBin,
   oneOrMany,
   opAnd,
   opArray,
-  opDict,
   opContains,
   opDateToNumber,
+  opDict,
   opFilter,
+  opLimit,
   // opMap,
   // opMerge,
   opNumberGreaterEqual,
@@ -48,6 +51,8 @@ import {
   opUnnest,
   OutputNode,
   Stack,
+  taggedValueValueType,
+  timestampBin,
   Type,
   typedDict,
   TypedDictType,
@@ -55,10 +60,6 @@ import {
   varNode,
   voidNode,
   withoutTags,
-  filterNodes,
-  taggedValueValueType,
-  isTaggedValue,
-  opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -76,6 +77,7 @@ import React, {
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
 import {Button, MenuItemProps, Tab} from 'semantic-ui-react';
+import styled from 'styled-components';
 import {calculatePosition} from 'vega-tooltip';
 
 import {
@@ -83,9 +85,23 @@ import {
   useWeaveRedesignedPlotConfigEnabled,
 } from '../../../context';
 import * as LLReact from '../../../react';
+import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
+import {IconButton} from '../../IconButton';
+import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
+import {Tooltip} from '../../Tooltip';
 import {getPanelStackDims, getPanelStacksForType} from '../availablePanels';
 import {VariableView} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
+import {ConfigSection} from '../ConfigPanel';
+import {
+  IconAddNew,
+  IconCheckmark,
+  IconDelete,
+  IconFullScreenModeExpand,
+  IconMinimizeMode,
+  IconOverflowHorizontal,
+  IconWeave,
+} from '../Icons';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
@@ -95,19 +111,21 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TableState from '../PanelTable/tableState';
 import {useTableStatesWithRefinedExpressions} from '../PanelTable/tableStateReact';
 import * as TableType from '../PanelTable/tableType';
+import {toWeaveType} from '../toWeaveType';
 import * as PlotState from './plotState';
 import {
+  DASHBOARD_DIM_NAME_MAP,
+  DIM_NAME_MAP,
   DimensionLike,
   ExpressionDimName,
   isValidConfig,
-  DIM_NAME_MAP,
-  DASHBOARD_DIM_NAME_MAP,
 } from './plotState';
 import {PanelPlotRadioButtons} from './RadioButtons';
+import * as S from './styles';
 import {
   AnyPlotConfig,
-  ConcretePlotConfig,
   AxisSelections,
+  ConcretePlotConfig,
   ContinuousSelection,
   DEFAULT_SCALE_TYPE,
   DiscreteSelection,
@@ -122,24 +140,6 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
-import {toWeaveType} from '../toWeaveType';
-import {ConfigSection} from '../ConfigPanel';
-import {IconButton} from '../../IconButton';
-import {Tooltip} from '../../Tooltip';
-import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
-import {
-  IconAddNew,
-  IconCheckmark,
-  IconDelete,
-  IconFullScreenModeExpand,
-  IconMinimizeMode,
-  IconOverflowHorizontal,
-  IconWeave,
-} from '../Icons';
-import styled from 'styled-components';
-import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
-import {Option} from '@wandb/weave/common/util/uihelpers';
-import {useIsMounted} from '@wandb/weave/common/util/hooks';
 
 const recordEvent = makeEventRecorder('Plot');
 

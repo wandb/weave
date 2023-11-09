@@ -1,10 +1,11 @@
-import React, {useCallback} from 'react';
-import * as LE from './Home/LayoutElements';
-import styled from 'styled-components';
-import queryString from 'query-string';
-import {getCookie} from '../../common/util/cookie';
-import {TargetBlank} from '@wandb/weave/common/util/links';
 import * as globals from '@wandb/weave/common/css/globals.styles';
+import {TargetBlank} from '@wandb/weave/common/util/links';
+import queryString from 'query-string';
+import React, {useCallback} from 'react';
+import styled from 'styled-components';
+
+import {getCookie} from '../../common/util/cookie';
+import * as LE from './Home/LayoutElements';
 
 const BETA_VERSION_COOKIE_KEY = 'betaVersion';
 export const betaVersion = getCookie(BETA_VERSION_COOKIE_KEY);

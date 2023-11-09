@@ -1,5 +1,4 @@
 import {MOON_450} from '@wandb/weave/common/css/globals.styles';
-
 import styled from 'styled-components';
 
 export const PanelSettings = styled.div`

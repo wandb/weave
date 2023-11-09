@@ -10,12 +10,8 @@ import {produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useState} from 'react';
 import Measure from 'react-measure';
-
-import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
-import {PanelBankFlowSection} from './PanelBankFlowSection';
-import {getNewGridItemLayout} from './panelbankGrid';
-import {PanelBankGridSection} from './PanelBankGridSection';
 import styled, {css} from 'styled-components';
+
 import {
   BORDER_COLOR_FOCUSED,
   GRAY_350,
@@ -24,14 +20,18 @@ import {
   SCROLLBAR_STYLES,
   WHITE,
 } from '../../common/css/globals.styles';
-import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
+import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {
   useGetPanelIsHoveredByGroupPath,
   useGetPanelIsHoveredInOutlineByGroupPath,
   useSelectedPath,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
+import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
+import {PanelBankFlowSection} from './PanelBankFlowSection';
+import {getNewGridItemLayout} from './panelbankGrid';
+import {PanelBankGridSection} from './PanelBankGridSection';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';

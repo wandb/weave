@@ -5,8 +5,8 @@ import {
   ConfigSection,
   ModifiedDropdownConfigField,
 } from '../ConfigPanel';
-import {defaultConfig, PanelHistogramProps} from './common';
 import {usePanelContext} from '../PanelContext';
+import {defaultConfig, PanelHistogramProps} from './common';
 
 /* eslint-disable no-template-curly-in-string */
 

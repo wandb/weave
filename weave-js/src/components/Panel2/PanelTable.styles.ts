@@ -1,9 +1,10 @@
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
-import {IconButton} from '../IconButton';
-import {hexToRGB} from '../../common/css/utils';
+
 import {OBLIVION} from '../../common/css/color.styles';
+import {hexToRGB} from '../../common/css/utils';
+import {IconButton} from '../IconButton';
 
 export const ColumnHeader = styled.div`
   display: flex;

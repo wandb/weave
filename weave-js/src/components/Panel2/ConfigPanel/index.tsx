@@ -4,25 +4,24 @@
  * Weave graph editor.
  */
 
-import * as globals from '@wandb/weave/common/css/globals.styles';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
 import {TextInput} from '@wandb/weave/common/components/elements/TextInput';
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC, ReactNode, useCallback, useState} from 'react';
-import styled, {ThemeProvider, css} from 'styled-components';
+import {MenuItemProps} from 'semantic-ui-react';
+import styled, {css, ThemeProvider} from 'styled-components';
 
 import {useWeaveSidebarConfigStylingEnabled} from '../../../context';
 import {WeaveExpression} from '../../../panel/WeaveExpression';
+import {IconButton} from '../../IconButton';
+import {PopupMenu} from '../../Sidebar/PopupMenu';
 import {themes} from '../Editor.styles';
+import {IconOverflowHorizontal} from '../Icons';
+import {IconDown as IconDownUnstyled} from '../Icons';
 import * as S from './styles';
 import * as SN from './stylesNew';
-import {IconOverflowHorizontal} from '../Icons';
-
-import {IconDown as IconDownUnstyled} from '../Icons';
-import {MenuItemProps} from 'semantic-ui-react';
-import {PopupMenu} from '../../Sidebar/PopupMenu';
-import {IconButton} from '../../IconButton';
 
 export const ChildConfigContainer = styled.div`
   position: relative;

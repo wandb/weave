@@ -22,13 +22,13 @@ import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
+import {IconClose} from '../Icons';
 import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import * as Table from './tableState';
 import {stripTag} from './util';
-import {IconClose} from '../Icons';
 
 const recordEvent = makeEventRecorder('Table');
 

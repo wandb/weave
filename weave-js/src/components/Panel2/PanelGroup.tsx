@@ -27,12 +27,21 @@ import {
   Stack,
   voidNode,
 } from '@wandb/weave/core';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {Button} from '../Button';
 import styled, {css} from 'styled-components';
 
+import {
+  GRAY_350,
+  GRAY_500,
+  GRAY_800,
+  MOON_50,
+} from '../../common/css/globals.styles';
+import {Button} from '../Button';
+import {inJupyterCell} from '../PagePanelComponents/util';
+import {usePagePanelControlRequestAction} from '../PagePanelContext';
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {getSectionConfig, PBSection} from '../WeavePanelBank/PBSection';
 import {getPanelStacksForType} from './availablePanels';
@@ -51,6 +60,8 @@ import {IconAddNew as IconAddNewUnstyled} from './Icons';
 // import {LayoutSections} from './LayoutSections';
 import {LayoutTabs} from './LayoutTabs';
 import * as Panel2 from './panel';
+// import {inJupyterCell} from '../PagePanelComponents/util';
+import {useUpdateConfig2} from './PanelComp';
 import {
   ExpressionEvent,
   PanelContextProvider,
@@ -59,17 +70,6 @@ import {
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
-import {
-  GRAY_350,
-  GRAY_500,
-  GRAY_800,
-  MOON_50,
-} from '../../common/css/globals.styles';
-// import {inJupyterCell} from '../PagePanelComponents/util';
-import {useUpdateConfig2} from './PanelComp';
-import {replaceChainRoot} from '@wandb/weave/core/mutate';
-import {inJupyterCell} from '../PagePanelComponents/util';
-import {usePagePanelControlRequestAction} from '../PagePanelContext';
 
 const LAYOUT_MODES = [
   'horizontal' as const,

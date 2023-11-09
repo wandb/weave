@@ -1,7 +1,7 @@
 import 'react-base-table/lib/TableRow';
 
-import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {
   constFunction,
   constNumber,
@@ -53,6 +53,10 @@ import {WeaveActionContextProvider} from '../../../actions';
 import {useWeaveContext} from '../../../context';
 import {WeaveApp} from '../../../index';
 import * as LLReact from '../../../react';
+import {Button} from '../../Button';
+import {Checkbox} from '../../Checkbox';
+import {IconName} from '../../Icon';
+import {Tooltip} from '../../Tooltip';
 import {ControlFilter} from '../ControlFilter';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
@@ -72,6 +76,7 @@ import {
   TABLE_CONFIG_DEFAULTS,
   useUpdateConfigRespectingTableType,
 } from './config';
+import {Link} from './Link';
 import * as Table from './tableState';
 import * as TableType from './tableType';
 import {
@@ -86,11 +91,6 @@ import {
   useRowsNode,
   useUpdateConfigKey,
 } from './util';
-import {Link} from './Link';
-import {Checkbox} from '../../Checkbox';
-import {IconName} from '../../Icon';
-import {Button} from '../../Button';
-import {Tooltip} from '../../Tooltip';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;

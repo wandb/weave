@@ -1,5 +1,5 @@
-import * as GraphTypes from '../model/graph/types';
 import {isConstNode, isOutputNode} from '../model';
+import * as GraphTypes from '../model/graph/types';
 
 const isGetNode = (
   node: GraphTypes.Node<any>

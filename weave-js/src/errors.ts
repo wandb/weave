@@ -1,6 +1,7 @@
-import {WeaveApp} from './weave';
 import {ApolloError} from '@apollo/client';
 import {get} from 'lodash';
+
+import {WeaveApp} from './weave';
 
 export class UseNodeValueServerExecutionError extends Error {}
 

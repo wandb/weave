@@ -1,26 +1,26 @@
+import {IconChevronDown} from '@wandb/weave/components/Icon';
 import {
-  NodeOrVoidNode,
   constNodeUnsafe,
   constNone,
   constString,
   isList,
+  NodeOrVoidNode,
   opUnique,
   voidNode,
 } from '@wandb/weave/core';
-import {IconChevronDown} from '@wandb/weave/components/Icon';
 import React, {useCallback, useMemo} from 'react';
+import styled from 'styled-components';
 
 import {useMutation, useNodeValue} from '../../react';
-import * as Panel2 from './panel';
 import {
-  ConfigFieldWrapper,
   ConfigFieldModifiedDropdown,
+  ConfigFieldWrapper,
   ConfigOption,
   ConfigSection,
   ExpressionConfigField,
 } from './ConfigPanel';
+import * as Panel2 from './panel';
 import {useUpdateConfig2} from './PanelComp';
-import styled from 'styled-components';
 
 const inputType = {
   type: 'union' as const,

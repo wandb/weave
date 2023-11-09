@@ -1,3 +1,17 @@
+import {produce} from 'immer';
+import * as _ from 'lodash';
+
+import {
+  constNode,
+  constNumber,
+  constString,
+  Node,
+  NodeOrVoidNode,
+  opNumberAdd,
+  opPick,
+  varNode,
+  voidNode,
+} from '../../core';
 import {
   addSeriesFromSeries,
   condensePlotConfig,
@@ -13,20 +27,6 @@ import {
 } from './PanelPlot/versions';
 import * as v1 from './PanelPlot/versions/v1';
 import * as TableState from './PanelTable/tableState';
-import {
-  constNode,
-  constNumber,
-  constString,
-  Node,
-  NodeOrVoidNode,
-  opNumberAdd,
-  opPick,
-  varNode,
-  voidNode,
-} from '../../core';
-import {produce} from 'immer';
-import * as _ from 'lodash';
-
 import {
   getTableRowsNode,
   testWeave,
