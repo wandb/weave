@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import dataclasses
 import hashlib
 import os
@@ -22,6 +23,8 @@ from . import filesystem
 from . import environment
 
 WORKING_DIR_PREFIX = "__working__"
+
+logger = logging.getLogger("root")
 
 
 def local_artifact_dir() -> str:
@@ -84,6 +87,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         self._path_handlers: dict[str, typing.Any] = {}
         self._existing_dirs = []
         self._metadata = {}
+        logger.info(f"\nboom - Init - _version = {version}")
         self._setup_dirs()
 
     @classmethod
@@ -93,14 +97,17 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             "WeaveLocalArtifactURI", artifact_wandb.WeaveWBArtifactURI
         ],
     ):
-        art = cls(source_uri.name, source_uri.version)
+        # TODO:
+        # art = cls(source_uri.name, source_uri.version)
+        art = cls(source_uri.name, "user-latest")
         art._original_uri = str(source_uri)
         source_art = source_uri.to_ref().artifact
         if not isinstance(source_art, (LocalArtifact, artifact_wandb.WandbArtifact)):
             raise errors.WeaveInternalError(
                 "Cannot fork from non-local artifact: %s" % source_art
             )
-        art._version = source_art.version
+        # TODO:
+        # art._version = source_art.version
         art._metadata = source_art.metadata.as_dict()
         return art
 
@@ -158,6 +165,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     def undo(self) -> typing.Optional[artifact_fs.FilesystemArtifact]:
         # Fetch the previous uri (could be from a local commit or a branch)
         previous_uri = self.previous_uri()
+        logger.info(f"boom - previous_uri: {previous_uri}")
         if previous_uri is None:
             return None
 
@@ -208,6 +216,9 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 # If it doesn't exist, assume the user has passed in a branch name
                 # for version.
                 self._branch = self._version
+                logger.info(
+                    f"\nboom - setupdir - /version DOES NOT exist - version: {self._version}"
+                )
             else:
                 self._read_dirname = os.path.join(self._root, self._version)
 
@@ -218,6 +229,9 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                         os.path.realpath(self._read_dirname)
                     )
                     self._read_dirname = os.path.join(self._root, self._version)
+                logger.info(
+                    f"\nboom - setupdir - /version EXISTS so setting readdir - version: {self._version}"
+                )
         if self._branch != None:
             self._original_uri = str(
                 WeaveLocalArtifactURI(
@@ -342,6 +356,12 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             json.dump({"created_at": datetime.now().isoformat(), **metadata}, f)
 
     def save(self, branch=None):
+        logger.info(f"\nboom - save - branch={branch} - readdir={self._read_dirname}")
+        logger.info(f"\nboom - save - version={self._version}")
+        if branch:
+            boom_dirname = os.path.join(self._root, branch)
+            logger.info(f"\nboom - /branch exists: {os.path.exists(boom_dirname)}")
+
         for handler in self._path_handlers.values():
             handler.close()
         self._path_handlers = {}
@@ -368,7 +388,9 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             # just rename the write dir
             try:
                 os.rename(self._write_dirname, new_dirname)
+                logger.info(f"\nboom - save rename - /{commit_hash} exists.")
             except OSError:
+                logger.info(f"\nboom - OSError")
                 # Someone already created this version.
                 if os.path.exists(self._write_dirname):
                     shutil.rmtree(self._write_dirname)
@@ -428,16 +450,34 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             if self.branch_point:
                 metadata["branch_point"] = self.branch_point
                 metadata["branch_point"]["n_commits"] += 1
+
+        # logger.info(
+        #     f"\nboom - metadata: {metadata}\nboom - _version: {self._version}\nboom - _read_dirname: {self._read_dirname}\nboom - is_saved: {self.is_saved}"
+        # )
+        # logger.info(f"boom - version: {self.version}")
+        # logger.info(
+        #     f"boom - likely_commit_hash: {artifact_wandb.likely_commit_hash(self.version)}"
+        # )
+        logger.info(f"\nboom - commit_hash: {commit_hash}")
+        logger.info(f"\nboom - _version: {self._version}")
+        # logger.info(f"boom - uri_obj: {self.uri_obj}")
+        # logger.info(f"boom - last_previous_uri: {last_previous_uri}")
         if (
             self.is_saved
             and self.version
             and artifact_wandb.likely_commit_hash(self.version)
             and self.version != commit_hash
         ):
+            logger.info(
+                f"\nboom - save - previous_commit_uri set to new: {str(self.uri_obj)}"
+            )
             metadata["previous_commit_uri"] = str(self.uri_obj)
         elif last_previous_uri != None:
             # TODO: Refactor this to be more sane - we should be explicit about
             # what metadata carries over and protect against duplicate saves
+            logger.info(
+                f"\nboom - save - previous_commit_uri set to last_prev: {last_previous_uri}"
+            )
             metadata["previous_commit_uri"] = last_previous_uri
         self.write_metadata(new_dirname, metadata)
 
