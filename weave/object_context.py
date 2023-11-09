@@ -98,6 +98,10 @@ class ObjectContext:
         if not target_record.mutations:
             return
 
+        target_branch = uris.WeaveURI.parse(target_uri).version
+        if target_branch is None:
+            raise ValueError("No branch to finish mutation on")
+
         if target_record.branched_from_uri is None:
             source_uri = uris.WeaveURI.parse(target_uri)
             art = artifact_local.LocalArtifact(source_uri.name, source_uri.version)
@@ -108,12 +112,7 @@ class ObjectContext:
             # state at the artifact level, we need to ensure the path is empty to conform
             # to the expectations of the branching logic.
             source_uri.path = ""  # type: ignore
-            art = artifact_local.LocalArtifact.fork_from_uri(source_uri)  # type: ignore
-
-        obj = box.box(target_record.val)
-        target_branch = uris.WeaveURI.parse(target_uri).version
-        if target_branch is None:
-            raise ValueError("No branch to finish mutation on")
+            art = artifact_local.LocalArtifact.fork_from_uri(source_uri, target_branch)  # type: ignore
 
         from weave import artifact_wandb
 
@@ -121,6 +120,7 @@ class ObjectContext:
         # don't want to use it as a branch - this is the case that we are
         # mutating an artifact directly without a branch. Seems like we
         # might want to put this logic elsewhere, but for now this works.
+        obj = box.box(target_record.val)
         if artifact_wandb.likely_commit_hash(target_branch):
             target_branch = None
         weave_type = types.TypeRegistry.type_of(obj)

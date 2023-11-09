@@ -96,18 +96,15 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         source_uri: typing.Union[
             "WeaveLocalArtifactURI", artifact_wandb.WeaveWBArtifactURI
         ],
+        target_branch: typing.Optional[str] = None,
     ):
-        # TODO:
-        # art = cls(source_uri.name, source_uri.version)
-        art = cls(source_uri.name, "user-latest")
+        art = cls(source_uri.name, target_branch or source_uri.version)
         art._original_uri = str(source_uri)
         source_art = source_uri.to_ref().artifact
         if not isinstance(source_art, (LocalArtifact, artifact_wandb.WandbArtifact)):
             raise errors.WeaveInternalError(
                 "Cannot fork from non-local artifact: %s" % source_art
             )
-        # TODO:
-        # art._version = source_art.version
         art._metadata = source_art.metadata.as_dict()
         return art
 
