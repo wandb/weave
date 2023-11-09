@@ -41,7 +41,6 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import BaseTable, {BaseTableProps} from 'react-base-table';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import {
-  Button as SemanticButton,
   Icon as SemanticIcon,
   Menu,
   MenuItemProps,
@@ -901,23 +900,27 @@ const PanelTableInner: React.FC<
         </div>
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
-            <S.TableActionText
+            <Button
+              variant="ghost"
+              size="small"
               onClick={() => {
                 downloadDataAsCSV();
               }}>
               Export as CSV
-            </S.TableActionText>
+            </Button>
             <Modal
               className="small"
               trigger={
-                <S.TableActionText
+                <Button
                   data-test="select-columns"
+                  variant="ghost"
+                  size="small"
                   onClick={() => {
                     recordEvent('SELECT_COLUMNS');
                     setShowColumnSelect(true);
                   }}>
                   Columns...
-                </S.TableActionText>
+                </Button>
               }
               open={showColumnSelect}
               onClose={() => setShowColumnSelect(false)}>
@@ -929,22 +932,25 @@ const PanelTableInner: React.FC<
                 />
               </Modal.Content>
               <Modal.Actions>
-                <SemanticButton
+                <Button
                   data-test="close-column-select"
-                  primary
+                  variant="primary"
+                  size="large"
                   onClick={() => setShowColumnSelect(false)}>
                   Close
-                </SemanticButton>
+                </Button>
               </Modal.Actions>
             </Modal>
-            <S.TableActionText
+            <Button
               data-test="auto-columns"
+              variant="ghost"
+              size="small"
               onClick={() => {
                 recordEvent('RESET_TABLE');
                 resetTable();
               }}>
-              Reset Table
-            </S.TableActionText>
+              Reset table
+            </Button>
           </div>
         )}
       </div>

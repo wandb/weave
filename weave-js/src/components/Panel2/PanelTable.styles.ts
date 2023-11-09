@@ -153,18 +153,6 @@ export const TableIcon = styled(WBIcon)<{highlight?: boolean}>`
 `;
 TableIcon.displayName = 'S.TableIcon';
 
-export const TableActionText = styled.span`
-  cursor: pointer;
-  margin-left: 10px;
-  padding: 2px 0px 0px 0px;
-  :hover {
-    color: ${globals.primary};
-    background-color: #eee;
-    border-radius: 2px;
-  }
-`;
-TableActionText.displayName = 'S.TableActionText';
-
 export const ControlIcon = styled(WBIcon)`
   cursor: pointer;
   color: ${globals.primary};

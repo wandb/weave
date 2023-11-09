@@ -1,4 +1,3 @@
-import {LegacyWBIcon} from '@wandb/weave/common/components/elements/LegacyWBIcon';
 import {
   dynamicMatchWithMapping,
   MatchMode,
@@ -6,7 +5,7 @@ import {
 import {Node} from '@wandb/weave/core';
 import {cloneDeep as _cloneDeep} from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
-import {Button, Dropdown, Grid, Icon, List} from 'semantic-ui-react';
+import {Dropdown, Grid, Icon, List} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import * as S from './ColumnSelector.styles';
@@ -14,6 +13,7 @@ import ColumnSelectorField from './ColumnSelectorField';
 import ColumnSelectorListContainer from './ColumnSelectorListContainer';
 import * as Table from './tableState';
 import {ColumnEntry} from './tableState';
+import {Button} from '../../Button';
 
 const MAX_COLUMNS_SHOWN = 100;
 
@@ -291,9 +291,12 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = React.memo(
                 )}
               </div>
               <Button
-                className="right tiny wb-icon-button"
+                variant="secondary"
+                icon="chevron-next"
+                twWrapperStyles={{
+                  float: 'right',
+                }}
                 onClick={() => addAll(searchedColumnsAvailable)}>
-                <LegacyWBIcon name="next" />
                 Add all
               </Button>
             </ColumnSelectorListContainer>
@@ -345,9 +348,9 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = React.memo(
                 )}
               </div>
               <Button
-                className="tiny wb-icon-button"
+                variant="secondary"
+                icon="chevron-back"
                 onClick={() => removeAll(searchedColumnsUsed)}>
-                <LegacyWBIcon name="previous" />
                 Remove all
               </Button>
             </ColumnSelectorListContainer>
