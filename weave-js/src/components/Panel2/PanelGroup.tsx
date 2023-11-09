@@ -172,26 +172,8 @@ const ActionBar = styled.div`
 `;
 ActionBar.displayName = 'S.ActionBar';
 
-const AddPanelBar = styled.div`
-  height: 48px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  border-radius: 6px;
-  background-color: white;
-  font-weight: 600;
-  color: ${GRAY_500};
-`;
-AddPanelBar.displayName = 'S.AddPanelBar';
-
 const AddPanelBarContainer = styled.div`
   padding: 8px 32px 16px;
-
-  transition: opacity 0.3s;
-  &:not(:hover) {
-    opacity: 0;
-  }
 `;
 AddPanelBarContainer.displayName = 'S.AddPanelBarContainer';
 
@@ -971,10 +953,14 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         />
         {!inJupyter && isAddPanelAllowed && (
           <AddPanelBarContainer ref={addPanelBarRef}>
-            <AddPanelBar onClick={handleAddPanel}>
-              <IconAddNew />
+            <Button
+              variant="secondary"
+              size="large"
+              onClick={handleAddPanel}
+              icon="add-new"
+              className="w-full">
               New panel
-            </AddPanelBar>
+            </Button>
           </AddPanelBarContainer>
         )}
       </div>
