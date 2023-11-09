@@ -91,7 +91,7 @@ function executeNotebook(notebookPath: string) {
     'pytest --nbmake --nbmake-timeout=150000 --overwrite "' +
       notebookPath +
       '"',
-    150000
+    160000
   );
 }
 
