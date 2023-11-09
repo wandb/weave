@@ -450,10 +450,13 @@ def get_bytes_read_to_arrow(node: graph.Node, result: typing.Any) -> int:
     if (
         isinstance(node, graph.OutputNode)
         and node.from_op.name in op_policy.ARROW_FS_OPS
-        and isinstance(result, ArrowWeaveList)
     ):
-        return result._arrow_data.nbytes
-
+        if node.from_op.name.startswith("mapped"):
+            return sum(
+                [r._arrow_data.nbytes for r in result if isinstance(r, ArrowWeaveList)]
+            )
+        if isinstance(result, ArrowWeaveList):
+            return result._arrow_data.nbytes
     return 0
 
 
