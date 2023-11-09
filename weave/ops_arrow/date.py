@@ -146,3 +146,12 @@ def timestamp_min(self):
 def timestamp_max(self):
     array = self._arrow_data_asarray_no_tags()
     return pc.max(array).as_py()
+
+
+@op(
+    name="timedelta-totalSeconds",
+    input_type={"td": types.TimeDelta()},
+    output_type=types.Number(),
+)
+def timedelta_total_seconds(td):
+    return pc.cast(pc.cast(td, pa.duration("s")), pa.float64())
