@@ -1,6 +1,6 @@
 import {cloneDeep, findIndex, isNaN, max} from 'lodash';
 
-import {LayoutCoords, LayoutParameters} from './panelbank';
+import {LayoutParameters} from './panelbank';
 
 /* PanelBank grid section utils */
 /* Borrowed heavily from https://github.com/STRML/react-grid-layout! */
@@ -11,7 +11,6 @@ export const GRID_CONTAINER_PADDING = [32, 0]; // padding of grid container
 export const GRID_ITEM_MARGIN = [16, 16]; // margin around each grid item
 export const GRID_ITEM_DEFAULT_WIDTH = 12;
 export const GRID_ITEM_DEFAULT_HEIGHT = 6;
-export const FAT_GRID_ITEM_DEFAULT_WIDTH = 16;
 
 export type GridLayoutItem = LayoutParameters & {
   id: string;
@@ -532,31 +531,9 @@ export function findNextPanelLoc(
   return result;
 }
 
-function findNextFatPanelLoc(layouts: LayoutParameters[]): LayoutCoords {
-  let maxY = 0;
-  for (const layout of layouts) {
-    if (layout.x >= 20 || layout.x + layout.w <= 4) {
-      continue;
-    }
-    const bottomY = layout.y + layout.h;
-    if (bottomY > maxY) {
-      maxY = bottomY;
-    }
-  }
-  return {y: maxY, x: 4};
-}
-
 export function getNewGridItemLayout(
-  gridLayout: GridLayout | LayoutParameters[],
-  fatPanel?: boolean
+  gridLayout: GridLayout | LayoutParameters[]
 ): LayoutParameters {
-  if (fatPanel) {
-    return {
-      ...findNextFatPanelLoc(gridLayout),
-      w: FAT_GRID_ITEM_DEFAULT_WIDTH,
-      h: GRID_ITEM_DEFAULT_HEIGHT,
-    };
-  }
   return {
     ...findNextPanelLoc(gridLayout, GRID_COLUMN_COUNT, GRID_ITEM_DEFAULT_WIDTH),
     w: GRID_ITEM_DEFAULT_WIDTH,
