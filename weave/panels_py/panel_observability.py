@@ -1,31 +1,36 @@
 import weave
-from weave.panels_py import panel_autoboard
-from weave import types
+
+from ..panels_py import panel_autoboard
+from .. import weave_types as types
+from ..panels import panel_group
 from ..panels import panel_board
 from .. import weave_internal
 from .generator_templates import template_registry
+
+panels = weave.panels
 
 
 BOARD_INPUT_WEAVE_TYPE = types.List(
     types.TypedDict(
         {
-            "timestamp": types.Timestamp(),
-            "entity": types.String(),
-            "project": types.String(),
-            "queue": types.String(),
+            "timestamp": types.optional(types.Timestamp()),
+            "_timestamp": types.Number(),
+            "entity_name": types.optional(types.String()),
+            "project_name": types.optional(types.String()),
+            "queue_uri": types.optional(types.String()),
             "run_id": types.optional(types.String()),
             "job": types.optional(types.String()),
-            "trace_id": types.String(),
-            "state": types.String(),
+            "trace_id": types.optional(types.String()),
+            "state": types.optional(types.String()),
             "error": types.optional(types.String()),
-            "metrics": types.optional(types.TypedDict()),
+            "metrics": types.optional(types.String()),
         }
     )
 )
 
 
 @weave.op(  # type: ignore
-    name="py_board-observability_board",
+    name="py_board-observability",
     hidden=False,
     input_type={
         "input_node": types.Function(
@@ -34,17 +39,20 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
         )
     },
 )
-def observability_board(
-    input_node,  # : weave.Node[list[dict]],
-) -> weave.panels.Group:
-    timestamp_col_name = "_timestamp"
+def observability(
+    input_node,
+) -> panels.Group:
+    timestamp_col_name = "timestamp"
 
     varbar = panel_board.varbar(editable=False)
+    # source_data = weave_internal.make_var_for_value(input_node, "source_data")
     source_data = varbar.add("source_data", input_node)
+
     filter_fn = varbar.add(
         "filter_fn",
         weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: weave_internal.const(True)
+            {"row": source_data.type.object_type},
+            lambda row: weave_internal.const(True),
         ),
         hidden=True,
     )
@@ -64,8 +72,8 @@ def observability_board(
     filtered_range = varbar.add(
         "filtered_range",
         weave.ops.make_list(
-            a=filtered_data[timestamp_col_name][0],
-            b=filtered_data[timestamp_col_name][-1],
+            a=filtered_data[timestamp_col_name].min(),
+            b=filtered_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -83,36 +91,37 @@ def observability_board(
         "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
     )
 
-    # window_data = varbar.add(
-    #     "window_data",
-    #     source_data.filter(
-    #         lambda row: weave.ops.Boolean.bool_and(
-    #             row[timestamp_col_name] >= bin_range[0],
-    #             row[timestamp_col_name] <= bin_range[1],
-    #         )
-    #     ),
-    #     hidden=True,
-    # )
+    window_data = varbar.add(
+        "window_data",
+        source_data.filter(
+            lambda row: weave.ops.Boolean.bool_and(
+                row[timestamp_col_name] >= bin_range[0],
+                row[timestamp_col_name] <= bin_range[1],
+            )
+        ),
+        hidden=True,
+    )
 
-    # filters = varbar.add(
-    #     "filters",
-    #     weave.panels.FilterEditor(filter_fn, node=window_data),
-    # )
+    filters = varbar.add(
+        "filters",
+        weave.panels.FilterEditor(filter_fn, node=window_data),
+    )
 
-    # filtered_window_data = varbar.add(
-    #     "filtered_window_data", window_data.filter(filter_fn), hidden=True
-    # )
+    filtered_window_data = varbar.add(
+        "filtered_window_data", window_data.filter(filter_fn), hidden=True
+    )
 
-    # grouping = varbar.add(
-    #     "grouping",
-    #     weave.panels.GroupingEditor(grouping_fn, node=window_data),
-    # )
+    grouping = varbar.add(
+        "grouping",
+        weave.panels.GroupingEditor(grouping_fn, node=window_data),
+    )
 
     overview_tab = weave.panels.Group(
         layoutMode="grid",
         showExpressions=True,
         enableAddPanel=True,
-    )  # , showExpressions="titleBar")
+    )
+
     overview_tab.add(
         "launch_runs",
         panel_autoboard.timeseries(
@@ -130,19 +139,56 @@ def observability_board(
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=10),
     )
 
-    overview_tab.add(
-        "table",
-        weave.panels.BoardPanel(
-            weave_internal.make_var_node(input_node.type, "data"),
-            id="table",
-            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+    grouping_fn_2 = varbar.add(
+        "grouping_fn_2",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: row["trace_id"]
         ),
+        hidden=True,
     )
+
+    # overview_tab.add(
+    #     "runtime_distribution",
+    #     panel_autoboard.timeseries(
+    #         source_complete,
+    #         bin_domain_node=bin_range,
+    #         x_axis_key=timestamp_col_name,
+    #         y_expr=lambda row: (
+    #             row[timestamp_col_name].max() - row[timestamp_col_name].min(),
+    #         ),
+    #         y_title="duration",
+    #         color_expr=lambda row: grouping_fn_2(row),
+    #         color_title="trace_id",
+    #         x_domain=user_zoom_range,
+    #         n_bins=50,
+    #         mark="line",
+    #     ),
+    #     layout=weave.panels.GroupPanelLayout(x=0, y=6, w=6, h=6),
+    # )
+
+    requests_table = weave.panels.Table(filtered_window_data)  # type: ignore
+    requests_table.add_column(
+        lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
+    )
+    requests_table_var = overview_tab.add(
+        "table",
+        requests_table,
+        layout=weave.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
+    )
+
+    # overview_tab.add(
+    #     "table",
+    #     weave.panels.BoardPanel(
+    #         weave_internal.make_var_node(input_node.type, "data"),
+    #         id="table",
+    #         layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+    #     ),
+    # )
     return weave.panels.Board(vars=varbar, panels=overview_tab)
 
 
 template_registry.register(
-    "py_board-seed_board_st",
-    "Simple Board st",
-    "Seed a board with a simple visualization of this table.",
+    "py_board-observability",
+    "observability",
+    "Seed a board with a launch observability viz.",
 )
