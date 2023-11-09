@@ -1,3 +1,4 @@
+import json
 import weave
 
 from ..panels_py import panel_autoboard
@@ -44,9 +45,9 @@ def observability(
 ) -> panels.Group:
     timestamp_col_name = "timestamp"
 
-    varbar = panel_board.varbar_small(editable=False)
-    source_data = varbar.add("source_data", input_node)
-    # source_data = input_node
+    varbar = panel_board.varbar(editable=False)
+    # source_data = varbar.add("source_data", input_node)
+    source_data = input_node
 
     filter_fn = varbar.add(
         "filter_fn",
@@ -135,42 +136,129 @@ def observability(
             n_bins=101,
             mark="bar",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=10),
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
-    # grouping_fn_2 = varbar.add(
-    #     "grouping_fn_2",
-    #     weave_internal.define_fn(
-    #         {"row": input_node.type.object_type}, lambda row: row["trace_id"]
-    #     ),
-    #     hidden=True,
-    # )
+    grouping_fn_2 = varbar.add(
+        "grouping_fn_2",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: row["trace_id"]
+        ),
+        hidden=True,
+    )
+
+    overview_tab.add(
+        "runtime_distribution",
+        panel_autoboard.timeseries(
+            source_data,
+            bin_domain_node=bin_range,
+            x_axis_key=timestamp_col_name,
+            # y_expr=lambda row: weave.ops.timedelta_total_seconds(
+            #     weave.ops.datetime_sub(row["timestamp"].max(), row["timestamp"].min())
+            # ),
+            # y_expr=lambda row: weave.ops.to_number_maybe(
+            #     weave.ops.timestamp_max(row["timestamp"])
+            # )
+            # - weave.ops.to_number_maybe(weave.ops.timestamp_min(row["timestamp"])),
+            y_expr=lambda row: row["_timestamp"].max() - row["_timestamp"].min(),
+            y_title="duration",
+            color_expr=lambda row: grouping_fn_2(row),
+            color_title="trace_id",
+            x_domain=user_zoom_range,
+            n_bins=20,
+            mark="bar",
+        ),
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+    )
+
+    overview_tab.add(
+        "time_in_state",
+        panel_autoboard.timeseries(
+            filtered_data,
+            bin_domain_node=bin_range,
+            x_axis_key=timestamp_col_name,
+            y_expr=lambda row: row["_timestamp"].max() - row["_timestamp"].min(),
+            y_title="Time in state",
+            color_expr=lambda row: grouping_fn(row),
+            color_title="state",
+            x_domain=user_zoom_range,
+            n_bins=20,
+            mark="bar",
+        ),
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+    )
+
+    overview_tab.add(
+        "# runs started",
+        filtered_window_data.filter(
+            weave_internal.define_fn(
+                {"row": source_data.type.object_type},
+                lambda row: row["state"] == "running",
+            )
+        ).count(),
+        layout=weave.panels.GroupPanelLayout(x=0, y=6 * 2, w=4, h=4),
+    )
+
+    overview_tab.add(
+        "# runs finished",
+        filtered_window_data.filter(
+            weave_internal.define_fn(
+                {"row": source_data.type.object_type},
+                lambda row: row["state"] == "finished",
+            )
+        ).count(),
+        layout=weave.panels.GroupPanelLayout(x=4, y=6 * 2, w=4, h=4),
+    )
+
+    overview_tab.add(
+        "# runs failed",
+        filtered_window_data.filter(
+            weave_internal.define_fn(
+                {"row": source_data.type.object_type},
+                lambda row: row["state"] == "rqi_failed",
+            )
+        ).count(),
+        layout=weave.panels.GroupPanelLayout(x=8, y=6 * 2, w=4, h=4),
+    )
+
+    table = panels.Table(
+        filtered_window_data.filter(
+            weave_internal.define_fn(
+                {"row": source_data.type.object_type},
+                lambda row: row["run_id"] != None,
+            )
+        )
+    )
+    table.add_column(lambda row: row["entity_name"], "Entity", groupby=True)
+    table.add_column(lambda row: row.count(), "Count")
+    overview_tab.add(
+        "runs by user",
+        table,
+        layout=weave.panels.GroupPanelLayout(x=12, y=12, w=12, h=4),
+    )
 
     # overview_tab.add(
-    #     "runtime_distribution",
-    #     panel_autoboard.timeseries(
-    #         source_data,
-    #         bin_domain_node=bin_range,
-    #         x_axis_key=timestamp_col_name,
-    #         y_expr=lambda row: weave.ops.datetime_sub(
-    #             row["timestamp"].max(), row["timestamp"].min()
-    #         ),
-    #         y_title="duration",
-    #         color_expr=lambda row: grouping_fn_2(row),
-    #         color_title="trace_id",
-    #         x_domain=user_zoom_range,
-    #         n_bins=50,
-    #         mark="line",
-    #     ),
-    #     layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+    #     "metrics.system.memory",
+    #     filtered_window_data.filter(
+    #         weave_internal.define_fn(
+    #             {"row": source_data.type.object_type},
+    #             lambda row: row["metrics"] != None,
+    #         )
+    #     )["metrics"],
+    #     layout=weave.panels.GroupPanelLayout(x=12, y=6 * 2, w=6, h=6),
     # )
 
-    # table = panels.Table(filtered_window_data)  # type: ignore
-    # overview_tab.add(
-    #     "table",
-    #     table,
-    #     layout=weave.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
-    # )
+    table = panels.Table(filtered_window_data)
+    table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
+    table.add_column(lambda row: row["run_id"], "Run ID", groupby=True)
+    table.add_column(lambda row: row["entity_name"], "Entity")
+    table.add_column(lambda row: row["project_name"], "Project")
+    table.add_column(lambda row: row["state"], "State")
+    overview_tab.add(
+        "table",
+        table,
+        layout=weave.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
+    )
 
     return weave.panels.Board(vars=varbar, panels=overview_tab)
 
