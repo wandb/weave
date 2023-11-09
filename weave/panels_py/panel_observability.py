@@ -166,13 +166,13 @@ def observability(
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
-    grouping_fn_2 = varbar.add(
-        "grouping_fn_2",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["trace_id"]
-        ),
-        hidden=True,
-    )
+    # grouping_fn_2 = varbar.add(
+    #     "grouping_fn_2",
+    #     weave_internal.define_fn(
+    #         {"row": input_node.type.object_type}, lambda row: row["trace_id"]
+    #     ),
+    #     hidden=True,
+    # )
 
     overview_tab.add(
         "runtime_distribution",
