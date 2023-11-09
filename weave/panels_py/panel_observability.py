@@ -180,14 +180,11 @@ def observability(
             source_data,
             bin_domain_node=bin_range,
             x_axis_key=timestamp_col_name,
-            # y_expr=lambda row: weave.ops.timedelta_total_seconds(
-            #     weave.ops.datetime_sub(row["timestamp"].max(), row["timestamp"].min())
-            # ),
-            # y_expr=lambda row: weave.ops.to_number_maybe(
-            #     weave.ops.timestamp_max(row["timestamp"])
-            # )
-            # - weave.ops.to_number_maybe(weave.ops.timestamp_min(row["timestamp"])),
-            y_expr=lambda row: row["_timestamp"].max() - row["_timestamp"].min(),
+            y_expr=lambda row: weave.ops.timedelta_total_seconds(
+                weave.ops.datetime_sub(
+                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                )
+            ),
             y_title="duration",
             color_expr=lambda row: grouping_fn_2(row),
             color_title="trace_id",
@@ -204,7 +201,11 @@ def observability(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key=timestamp_col_name,
-            y_expr=lambda row: row["_timestamp"].max() - row["_timestamp"].min(),
+            y_expr=lambda row: weave.ops.timedelta_total_seconds(
+                weave.ops.datetime_sub(
+                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                )
+            ),
             y_title="Time in state",
             color_expr=lambda row: grouping_fn(row),
             color_title="state",
