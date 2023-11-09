@@ -19,6 +19,7 @@ export const StringContainer = styled.div`
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
 `;
+StringContainer.displayName = 'S.StringContainer';
 
 export const StringItem = styled.div`
   margin: auto;
@@ -27,12 +28,14 @@ export const StringItem = styled.div`
   margin: auto;
   max-height: 100%;
 `;
+StringItem.displayName = 'S.StringItem';
 
 export const ConfigExpressionWrap = styled.div`
   padding: 0.65em;
   background: white;
   max-width: 20em;
 `;
+ConfigExpressionWrap.displayName = 'S.ConfigExpressionWrap';
 
 export const PreformattedProportionalString = styled.pre`
   font-family: ${globals.fontName};
@@ -41,6 +44,7 @@ export const PreformattedProportionalString = styled.pre`
   white-space: pre-wrap;
   line-height: 1.3em;
 `;
+PreformattedProportionalString.displayName = 'S.PreformattedProportionalString';
 
 export const PreformattedMonoString = styled.pre`
   margin-top: 0.25em;
@@ -48,6 +52,7 @@ export const PreformattedMonoString = styled.pre`
   white-space: pre-wrap;
   line-height: 1.3em;
 `;
+PreformattedMonoString.displayName = 'S.PreformattedMonoString';
 
 export const TooltipMarkdownTip = styled.div`
   padding-bottom: 0.5em;
@@ -60,3 +65,4 @@ export const TooltipMarkdownTip = styled.div`
     padding: 2px 4px;
   }
 `;
+TooltipMarkdownTip.displayName = 'S.TooltipMarkdownTip';
