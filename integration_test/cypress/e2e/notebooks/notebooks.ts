@@ -91,7 +91,7 @@ function forEachWeaveOutputCellInNotebook(
 
 function executeNotebook(notebookPath: string) {
   exec(
-    'pytest --nbmake --nbmake-timeout=1500000 --overwrite "' +
+    'pytest --nbmake --nbmake-timeout=150000 --overwrite "' +
       notebookPath +
       '"',
     1500000
