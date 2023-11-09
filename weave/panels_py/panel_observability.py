@@ -44,9 +44,9 @@ def observability(
 ) -> panels.Group:
     timestamp_col_name = "timestamp"
 
-    varbar = panel_board.varbar(editable=False)
-    # source_data = weave_internal.make_var_for_value(input_node, "source_data")
+    varbar = panel_board.varbar_small(editable=False)
     source_data = varbar.add("source_data", input_node)
+    # source_data = input_node
 
     filter_fn = varbar.add(
         "filter_fn",
@@ -102,7 +102,7 @@ def observability(
         hidden=True,
     )
 
-    filters = varbar.add(
+    varbar.add(
         "filters",
         weave.panels.FilterEditor(filter_fn, node=window_data),
     )
@@ -111,7 +111,7 @@ def observability(
         "filtered_window_data", window_data.filter(filter_fn), hidden=True
     )
 
-    grouping = varbar.add(
+    varbar.add(
         "grouping",
         weave.panels.GroupingEditor(grouping_fn, node=window_data),
     )
@@ -121,7 +121,6 @@ def observability(
         showExpressions=True,
         enableAddPanel=True,
     )
-
     overview_tab.add(
         "launch_runs",
         panel_autoboard.timeseries(
@@ -133,28 +132,28 @@ def observability(
             color_expr=lambda row: grouping_fn(row),
             color_title="group",
             x_domain=user_zoom_range,
-            n_bins=100,
+            n_bins=101,
             mark="bar",
         ),
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=10),
     )
 
-    grouping_fn_2 = varbar.add(
-        "grouping_fn_2",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["trace_id"]
-        ),
-        hidden=True,
-    )
+    # grouping_fn_2 = varbar.add(
+    #     "grouping_fn_2",
+    #     weave_internal.define_fn(
+    #         {"row": input_node.type.object_type}, lambda row: row["trace_id"]
+    #     ),
+    #     hidden=True,
+    # )
 
     # overview_tab.add(
     #     "runtime_distribution",
     #     panel_autoboard.timeseries(
-    #         source_complete,
+    #         source_data,
     #         bin_domain_node=bin_range,
     #         x_axis_key=timestamp_col_name,
-    #         y_expr=lambda row: (
-    #             row[timestamp_col_name].max() - row[timestamp_col_name].min(),
+    #         y_expr=lambda row: weave.ops.datetime_sub(
+    #             row["timestamp"].max(), row["timestamp"].min()
     #         ),
     #         y_title="duration",
     #         color_expr=lambda row: grouping_fn_2(row),
@@ -163,27 +162,16 @@ def observability(
     #         n_bins=50,
     #         mark="line",
     #     ),
-    #     layout=weave.panels.GroupPanelLayout(x=0, y=6, w=6, h=6),
+    #     layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     # )
 
-    requests_table = weave.panels.Table(filtered_window_data)  # type: ignore
-    requests_table.add_column(
-        lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
-    )
-    requests_table_var = overview_tab.add(
-        "table",
-        requests_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
-    )
-
+    # table = panels.Table(filtered_window_data)  # type: ignore
     # overview_tab.add(
     #     "table",
-    #     weave.panels.BoardPanel(
-    #         weave_internal.make_var_node(input_node.type, "data"),
-    #         id="table",
-    #         layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
-    #     ),
+    #     table,
+    #     layout=weave.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
     # )
+
     return weave.panels.Board(vars=varbar, panels=overview_tab)
 
 
