@@ -69,6 +69,28 @@ def test_artifact():
     assert len(art_dir.dirs) == 0
 
 
+def test_local_artifact_edits_correcty_set_previous_commit_pointers():
+    target_artifact_name = "test_artifact"
+    branch_name = "user-latest"
+    source_branch_name = "user-latest"
+
+    # Save local artifact
+    edit_1 = storage._direct_save(
+        obj=["initial_data"],
+        name=target_artifact_name,
+        branch_name=branch_name,
+        source_branch_name=source_branch_name,
+    )
+    # Save a second version of the same local artifact
+    edit_2 = storage._direct_save(
+        obj=["test_data"],
+        name=target_artifact_name,
+        branch_name=branch_name,
+        source_branch_name=source_branch_name,
+    )
+    assert edit_2.artifact.read_metadata()["previous_commit_uri"] == edit_1.artifact.uri
+
+
 def test_local_artifact_name():
     with pytest.raises(ValueError):
         artifact_local.LocalArtifact("a/b")
