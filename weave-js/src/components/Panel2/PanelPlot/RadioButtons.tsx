@@ -48,6 +48,7 @@ export const PanelPlotRadioButtons: React.FC<{
     <Group>
       {options.map(({iconName, tooltip}, index) => (
         <Button
+          key={iconName}
           icon={iconName}
           size="small"
           variant={currentValue === options[index].mode ? 'secondary' : 'ghost'}
