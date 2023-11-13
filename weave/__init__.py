@@ -24,6 +24,7 @@ from .panel_util import make_node
 from . import wandb_api as _wandb_api
 
 from .core_types import *
+from .monitoring2 import *
 
 from .panels_py import *
 from . import version
