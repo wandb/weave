@@ -1,5 +1,6 @@
 import {extractStatusCodeFromApolloError} from '@wandb/weave/errors';
 import React from 'react';
+
 import {Alert} from '../../Alert';
 
 export const AddPanelErrorAlert = ({

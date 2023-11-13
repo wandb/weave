@@ -18,10 +18,10 @@ import React, {useCallback, useMemo} from 'react';
 import * as Panel2 from '../panel';
 import {PanelCard} from '../PanelCard';
 import {
-  getLocalArtifactDataTableState,
-  useNewPanelFromRootQueryCallback,
   getLocalArtifactDataNode,
+  getLocalArtifactDataTableState,
   opObjectsToName,
+  useNewPanelFromRootQueryCallback,
 } from './util';
 
 export const useLocalObjectsExist = () => {

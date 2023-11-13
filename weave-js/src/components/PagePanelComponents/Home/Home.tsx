@@ -1,3 +1,9 @@
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {
+  IconCategoryMultimodal,
+  IconDocumentation,
+} from '@wandb/weave/components/Icon';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import React, {
   FC,
   memo,
@@ -6,31 +12,10 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-
-import styled from 'styled-components';
-import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
-import {
-  IconDashboardBlackboard,
-  IconLaptopLocalComputer,
-  IconTable,
-  IconUserProfilePersonal,
-  IconUsersTeam,
-  IconWeaveLogo,
-} from '../../Panel2/Icons';
-import {
-  IconCategoryMultimodal,
-  IconDocumentation,
-} from '@wandb/weave/components/Icon';
-import * as query from './query';
-import * as LayoutElements from './LayoutElements';
-import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
-import {LeftNav} from './HomeLeftNav';
-import {HomeTopBar} from './HomeTopBar';
-import {NavigateToExpressionType} from './common';
-import {isServedLocally} from '../util';
-import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Redirect, useHistory, useParams} from 'react-router-dom';
+import styled from 'styled-components';
+
+import getConfig from '../../../config';
 import {
   URL_BROWSE,
   URL_LOCAL,
@@ -42,11 +27,26 @@ import {
   urlRecentTables,
   urlTemplates,
 } from '../../../urls';
-import getConfig from '../../../config';
-import {ErrorBoundary} from '../../ErrorBoundary';
-import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
-import {HomeCenterTemplates} from './HomeCenterTemplates';
 import {useLocalStorage} from '../../../util/useLocalStorage';
+import {ErrorBoundary} from '../../ErrorBoundary';
+import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
+import {
+  IconDashboardBlackboard,
+  IconLaptopLocalComputer,
+  IconTable,
+  IconUserProfilePersonal,
+  IconUsersTeam,
+  IconWeaveLogo,
+} from '../../Panel2/Icons';
+import {isServedLocally} from '../util';
+import {NavigateToExpressionType} from './common';
+import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
+import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
+import {HomeCenterTemplates} from './HomeCenterTemplates';
+import {LeftNav} from './HomeLeftNav';
+import {HomeTopBar} from './HomeTopBar';
+import * as LayoutElements from './LayoutElements';
+import * as query from './query';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};

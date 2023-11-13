@@ -12,8 +12,8 @@ import {
   useState,
 } from 'react';
 
-import {SetState} from './types';
 import {difference} from './data';
+import {SetState} from './types';
 
 // This hook is used in development for debugging state changes
 // It shouldn't be used in production

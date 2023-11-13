@@ -260,7 +260,10 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                             return None
                         called = orig_op(x, **new_inputs)
                         # Use the use path to get caching.
-                        res = weave_internal.use(called)
+                        try:
+                            res = weave_internal.use(called)
+                        except errors.WeaveArtifactCollectionNotFound:
+                            return None
                         res = storage.deref(res)
                         return res
 

@@ -1,21 +1,21 @@
-import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
-
-import styled from 'styled-components';
-import {IconOverflowHorizontal, IconWeaveLogoGray} from '../../Panel2/Icons';
-import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
-import * as LayoutElements from './LayoutElements';
-import _ from 'lodash';
-import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 import {
   MOON_100,
   MOON_250,
   MOON_350,
 } from '@wandb/weave/common/css/color.styles';
-import {DeleteActionModal} from '../DeleteActionModal';
 import {constString, opGet} from '@wandb/weave/core';
 import {useMakeMutation} from '@wandb/weave/react';
-import {SetPreviewNodeType} from './common';
+import _ from 'lodash';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
+import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
+import styled from 'styled-components';
+
+import {IconOverflowHorizontal, IconWeaveLogoGray} from '../../Panel2/Icons';
+import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
+import {DeleteActionModal} from '../DeleteActionModal';
+import {SetPreviewNodeType} from './common';
+import * as LayoutElements from './LayoutElements';
 
 const TableRow = styled.tr<{$highlighted?: boolean}>`
   background-color: ${props => (props.$highlighted ? '#f8f9fa' : '')};

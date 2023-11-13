@@ -14,8 +14,8 @@ import * as v13 from './v13';
 import * as v14 from './v14';
 import * as v15 from './v15';
 
-export type {Scale, ScaleType} from './v14';
 export type {Signals} from './v12';
+export type {Scale, ScaleType} from './v14';
 
 export const PLOT_DIMS_UI = v2.PLOT_DIMS_UI;
 export const MARK_OPTIONS = v7.MARK_OPTIONS;

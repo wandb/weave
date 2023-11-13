@@ -1,28 +1,24 @@
-import React, {useEffect, useMemo, useState} from 'react';
-
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import {TargetBlank} from '@wandb/weave/common/util/links';
 import {
-  IconCopy,
+  IconAddNew,
   IconChevronDown,
-  IconInfo,
-  IconOpenNewTab,
+  IconCopy,
   IconDelete,
   IconFullScreenModeExpand,
-  IconAddNew,
+  IconInfo,
   IconLightbulbInfo,
+  IconOpenNewTab,
 } from '@wandb/weave/components/Icon';
-import * as query from './query';
-import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
-import * as LayoutElements from './LayoutElements';
-import styled from 'styled-components';
-import moment from 'moment';
+import {useWeaveContext} from '@wandb/weave/context';
 import {
-  Node,
   constString,
   directlyConstructOpCall,
   list,
+  Node,
   opConcat,
-  opFileTable,
   opFilesystemArtifactFile,
+  opFileTable,
   opGet,
   opIsNone,
   opPick,
@@ -32,18 +28,13 @@ import {
   opStreamTableRows,
   opTableRows,
 } from '@wandb/weave/core';
-import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
-import {useWeaveContext} from '@wandb/weave/context';
-import {
-  HomePreviewSidebarTemplate,
-  HomeExpressionPreviewParts,
-  SEED_BOARD_OP_NAME,
-} from './HomePreviewSidebar';
-import {useHistory, useParams} from 'react-router-dom';
-import {HomeParams} from './Home';
 import {setDocumentTitle} from '@wandb/weave/util/document';
-import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import moment from 'moment';
+import React, {useEffect, useMemo, useState} from 'react';
+import {useHistory, useParams} from 'react-router-dom';
+import styled from 'styled-components';
+
 import {
   urlEntity,
   urlProject,
@@ -51,9 +42,18 @@ import {
   urlProjectAssets,
 } from '../../../urls';
 import {urlWandbFrontend} from '../../../util/urls';
-import * as globals from '@wandb/weave/common/css/globals.styles';
-import {TargetBlank} from '@wandb/weave/common/util/links';
 import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
+import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import {NavigateToExpressionType, SetPreviewNodeType} from './common';
+import {HomeParams} from './Home';
+import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
+import {
+  HomePreviewSidebarTemplate,
+  SafeHomeExpressionPreviewParts,
+  SEED_BOARD_OP_NAME,
+} from './HomePreviewSidebar';
+import * as LayoutElements from './LayoutElements';
+import * as query from './query';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -423,7 +423,7 @@ const CenterProjectBoardsBrowser: React.FC<
               navigateToExpression(expr);
             },
           }}>
-          <HomeExpressionPreviewParts
+          <SafeHomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
           />
@@ -614,7 +614,7 @@ const CenterProjectLegacyTracesBrowser: React.FC<
             ],
           ]}
           setPreviewNode={setPreviewNode}>
-          <HomeExpressionPreviewParts
+          <SafeHomeExpressionPreviewParts
             expr={convertSimpleLegacyNodeToNewFormat(expr)}
             generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
@@ -886,7 +886,7 @@ const CenterProjectTablesBrowser: React.FC<
           actions={sidebarActions}
           emptyData={row['number of rows'] === 0}
           emptyDataMessage={<EmptyTableMessage />}>
-          <HomeExpressionPreviewParts
+          <SafeHomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
           />

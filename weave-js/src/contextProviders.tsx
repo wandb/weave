@@ -9,23 +9,23 @@ import {
 } from '@wandb/weave/core';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {Spec as PanelEach} from './components/Panel2/PanelEach';
 import {Spec as PanelEachColumn} from './components/Panel2/PanelEachColumn';
 import {Spec as PanelExpr} from './components/Panel2/PanelExpr';
 import {Spec as PanelFacet} from './components/Panel2/PanelFacet';
 // import {Spec as PanelFacetTabs} from './components/Panel2/PanelFacetTabs';
 import {Spec as PanelGroup} from './components/Panel2/PanelGroup';
-import {Spec as PanelEach} from './components/Panel2/PanelEach';
 import {Spec as PanelRootBrowser} from './components/Panel2/PanelRootBrowser/PanelRootBrowser';
+import {Spec as PanelSelectEditor} from './components/Panel2/PanelSelectEditor';
 // import {Spec as PanelSections} from './components/Panel2/PanelSections';
 import {Spec as PanelSlider} from './components/Panel2/PanelSlider';
-import {Spec as PanelSelectEditor} from './components/Panel2/PanelSelectEditor';
 import {
   RowSize,
   TABLE_CONFIG_DEFAULTS,
 } from './components/Panel2/PanelTable/config';
 import {useLoadWeaveObjects} from './components/Panel2/weaveBackend';
-import {ClientContext, WeaveFeatures, WeaveFeaturesContext} from './context';
 import getConfig from './config';
+import {ClientContext, WeaveFeatures, WeaveFeaturesContext} from './context';
 
 let GLOBAL_CLIENT: Client | null = null;
 

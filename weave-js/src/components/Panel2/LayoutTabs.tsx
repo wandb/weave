@@ -1,9 +1,9 @@
 import {constStringList, Node} from '@wandb/weave/core';
 import React, {useMemo, useState} from 'react';
-
-import * as CGReact from '../../react';
 import styled, {css} from 'styled-components';
+
 import {GRAY_350, GRAY_500, TEAL} from '../../common/css/globals.styles';
+import * as CGReact from '../../react';
 
 export const Tabs: React.FC<{
   input: Node;

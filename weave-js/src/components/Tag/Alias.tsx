@@ -1,7 +1,7 @@
-import {Icon} from '../Icon';
 import classNames from 'classnames';
 import React, {FC, ReactElement} from 'react';
 
+import {Icon} from '../Icon';
 import {Tailwind} from '../Tailwind';
 import {RemoveAction} from './RemoveAction';
 import {getTagColorClass, TagColorName} from './utils';

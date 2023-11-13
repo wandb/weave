@@ -1,26 +1,32 @@
 import './globalStyleImports';
 
 import {ApolloProvider} from '@apollo/client';
-import React from 'react';
+import {
+  getNightMode,
+  updateUserInfo,
+  useViewerUserInfo,
+} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import React, {useEffect} from 'react';
 import ReactDOM from 'react-dom';
-import {BrowserRouter as Router, Switch, Route} from 'react-router-dom';
+import useMousetrap from 'react-hook-mousetrap';
+import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
 
 import {apolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
+import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
+import getConfig from './config';
+import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
   URL_LOCAL,
-  URL_TEMPLATES,
   URL_RECENT,
+  URL_TEMPLATES,
   URL_WANDB,
 } from './urls';
-import getConfig from './config';
-import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
-import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -57,6 +63,46 @@ class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   }
 }
 
+type ThemerProps = {
+  children: React.ReactNode;
+};
+
+const setPageNightMode = (isNightMode: boolean) => {
+  if (isNightMode) {
+    // Note: This adds the 'night-mode' class to the <html> element.
+    // If we add the class to a different element, the night mode css filter breaks position:fixed components, e.g. <ViewBar>.
+    // Google 'css filter position fixed' for more details.
+    // Surprising fix found here: https://developpaper.com/explain-the-reasons-and-solutions-of-the-conflict-between-filter-and-fixed-in-detail/
+    document.documentElement.classList.add('night-mode');
+    // Used for tailwind dark mode
+    document.documentElement.setAttribute('data-mode', 'dark');
+  } else {
+    document.documentElement.classList.remove('night-mode');
+    document.documentElement.removeAttribute('data-mode');
+  }
+};
+
+// Handle light/dark mode theme
+const Themer = ({children}: ThemerProps) => {
+  const {loading, userInfo} = useViewerUserInfo();
+
+  useMousetrap('option+m', () => {
+    const isNightMode = getNightMode(userInfo);
+    setPageNightMode(!isNightMode);
+    userInfo.betaFeatures.night = !isNightMode;
+    updateUserInfo(userInfo);
+  });
+
+  useEffect(() => {
+    if (!loading) {
+      const isNightMode = getNightMode(userInfo);
+      setPageNightMode(isNightMode);
+    }
+  }, [loading, userInfo]);
+
+  return loading ? null : <>{children}</>;
+};
+
 type MainProps = {
   browserType?: string;
 };
@@ -68,7 +114,9 @@ const Main = ({browserType}: MainProps) => (
         <StateInspector name="WeaveApp">
           <PanelRootContextProvider>
             <WeaveViewerContextProvider>
-              <PagePanel browserType={browserType} />
+              <Themer>
+                <PagePanel browserType={browserType} />
+              </Themer>
             </WeaveViewerContextProvider>
           </PanelRootContextProvider>
         </StateInspector>

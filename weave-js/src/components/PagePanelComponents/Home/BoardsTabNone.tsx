@@ -3,13 +3,13 @@
  * nothing has used the table yet.
  */
 
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import {hexToRGB} from '@wandb/weave/common/css/globals.styles';
 import React from 'react';
 import styled from 'styled-components';
-import * as globals from '@wandb/weave/common/css/globals.styles';
 
 import {Button} from '../../Button';
 import {IconDashboardBlackboard} from '../../Icon';
-import {hexToRGB} from '@wandb/weave/common/css/globals.styles';
 
 const Wrapper = styled.div`
   height: 100%;

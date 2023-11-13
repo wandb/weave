@@ -1,12 +1,11 @@
+import {constString, opPick} from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
 import React from 'react';
 
-import * as S from './lct.style';
 import * as Panel2 from '../panel';
-import {SpanWeaveType} from './util';
-import {useNodeValue} from '@wandb/weave/react';
-import {constString, opPick} from '@wandb/weave/core';
-
+import * as S from './lct.style';
 import {GeneralObjectRenderer} from './PanelTraceTreeModel';
+import {SpanWeaveType} from './util';
 
 const inputType = SpanWeaveType;
 

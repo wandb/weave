@@ -1,13 +1,13 @@
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import React, {useCallback} from 'react';
 
+import {formatNumber} from '../../core/util/number';
 import * as CGReact from '../../react';
+import {IconHelpAlt} from '../Icon';
+import {Tooltip} from '../Tooltip';
+import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
-import * as ConfigPanel from './ConfigPanel';
-import {formatNumber} from '../../core/util/number';
-import {Tooltip} from '../Tooltip';
-import {IconHelpAlt} from '../Icon';
-import {MOON_500} from '@wandb/weave/common/css/color.styles';
 
 const CustomFormatHelp = () => {
   return (

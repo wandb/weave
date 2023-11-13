@@ -4283,6 +4283,11 @@
   dependencies:
     "@types/react" "^17"
 
+"@types/react-hook-mousetrap@^2.0.2":
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/@types/react-hook-mousetrap/-/react-hook-mousetrap-2.0.2.tgz#241fc81771d392b3c0683c8f05415e6f133b902d"
+  integrity sha512-XPcC+bweMg8kIH5G3H7W9qDl7KRvBdQij8aCFysHLpDsSZjUSsVqe23tWDsuqdUxbB5muiLXVTitgzDtaiGaiA==
+
 "@types/react-measure@^2.0.5":
   version "2.0.8"
   resolved "https://registry.yarnpkg.com/@types/react-measure/-/react-measure-2.0.8.tgz#3615956c685e6d9fed8380aac53590b333fae34f"
@@ -7759,6 +7764,11 @@ eslint-plugin-react@7.32.2, eslint-plugin-react@^7.27.1:
     resolve "^2.0.0-next.4"
     semver "^6.3.0"
     string.prototype.matchall "^4.0.8"
+
+eslint-plugin-simple-import-sort@10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-simple-import-sort/-/eslint-plugin-simple-import-sort-10.0.0.tgz#cc4ceaa81ba73252427062705b64321946f61351"
+  integrity sha512-AeTvO9UCMSNzIHRkg8S6c3RPy5YEwKWSQPx3DYghLedo2ZQxowPFLGDN1AZ2evfg6r6mjBSZSLxLFsWSu3acsw==
 
 eslint-plugin-testing-library@^5.0.1:
   version "5.11.0"
@@ -11765,6 +11775,11 @@ mouse-wheel@^1.2.0:
     signum "^1.0.0"
     to-px "^1.0.1"
 
+mousetrap@^1.6.2:
+  version "1.6.5"
+  resolved "https://registry.yarnpkg.com/mousetrap/-/mousetrap-1.6.5.tgz#8a766d8c272b08393d5f56074e0b5ec183485bf9"
+  integrity sha512-QNo4kEepaIBwiT8CDhP98umTetp+JNfQYBWvC1pc6/OAibuXtRcxZ58Qz8skvEHYvURne/7R8T5VoOI7rDsEUA==
+
 mri@^1.1.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/mri/-/mri-1.2.0.tgz#6721480fec2a11a4889861115a48b6cbe7cc8f0b"
@@ -12943,6 +12958,13 @@ react-draggable@^4.0.3:
   dependencies:
     clsx "^1.1.1"
     prop-types "^15.8.1"
+
+react-hook-mousetrap@^2.0.4:
+  version "2.0.4"
+  resolved "https://registry.yarnpkg.com/react-hook-mousetrap/-/react-hook-mousetrap-2.0.4.tgz#fd7a61306d852b6b03942deb21a2bce0b1b2af8c"
+  integrity sha512-T/TdV1BgfvCsvlz504CFc1bYHaOgnor61cA1c0OQHfsxNlTbBMtk+NPefeenavP7SGcxVNTRlNmq2T0On+Q+zg==
+  dependencies:
+    mousetrap "^1.6.2"
 
 react-intersection-observer@^8.31.0:
   version "8.34.0"

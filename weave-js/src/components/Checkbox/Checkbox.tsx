@@ -59,14 +59,14 @@ export const Checkbox = ({
             'relative rounded-[1.5px]',
             'radix-state-checked:bg-teal-500 radix-state-indeterminate:bg-transparent radix-state-unchecked:bg-transparent',
             {
-              'h-[7.5px] w-[7.5px]': isSmall,
+              'h-8 w-8': isSmall,
               'h-10 w-10': isMedium,
             },
             // Indeterminate state styles
             {
               "after:absolute after:block after:rounded-[1px] after:border-t-2 after:border-moon-800 after:content-[''] dark:after:border-moon-250":
                 isIndeterminate,
-              'after:top-[2.75px] after:w-[7.5px]': isIndeterminate && isSmall,
+              'after:top-3 after:w-8': isIndeterminate && isSmall,
               'after:top-4 after:w-10': isIndeterminate && isMedium,
             }
           )}

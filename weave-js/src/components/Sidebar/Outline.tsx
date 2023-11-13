@@ -3,6 +3,7 @@ import * as _ from 'lodash';
 import React, {useCallback, useState} from 'react';
 import styled, {css} from 'styled-components';
 
+import {Icon, IconHideHidden, IconLockClosed, IconName} from '../Icon';
 import {IconButton} from '../IconButton';
 import {getPanelStacksForType} from '../Panel2/availablePanels';
 import {ChildPanelConfig, ChildPanelFullConfig} from '../Panel2/ChildPanel';
@@ -10,15 +11,14 @@ import {
   IconCaret as IconCaretUnstyled,
   IconOverflowHorizontal as IconOverflowHorizontalUnstyled,
 } from '../Panel2/Icons';
-import {panelChildren} from '../Panel2/panelTree';
-import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
 import {
   usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
-import {Icon, IconHideHidden, IconLockClosed, IconName} from '../Icon';
+import {panelChildren} from '../Panel2/panelTree';
 import {Tooltip} from '../Tooltip';
-import {PanelGroupConfig} from '../Panel2/PanelGroup';
+import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
 
 const OutlineItem = styled.div``;
 OutlineItem.displayName = 'S.OutlineItem';

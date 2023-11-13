@@ -96,7 +96,11 @@ interface NodeEntry {
 declare function btoa(s: string): string;
 
 const createClientCacheKey = (windowSizeMs: number = 15000) => {
-  return Math.floor(Date.now() / windowSizeMs).toString();
+  // Returning undefined for now since caching is now handled higher
+  // up in the stack - this is quite redundant with the cache key. Keeping
+  // the code here for now in case we want to use it again in the future.
+  return undefined;
+  // return Math.floor(Date.now() / windowSizeMs).toString();
 };
 
 // Handles (de)serialization to send to a remote CG server

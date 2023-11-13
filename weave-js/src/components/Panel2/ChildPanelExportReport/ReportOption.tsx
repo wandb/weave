@@ -1,7 +1,8 @@
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
+
 import {Icon} from '../../Icon';
-import {ReportOption, isNewReportOption} from './utils';
+import {isNewReportOption, ReportOption} from './utils';
 
 type ReportOptionProps = {
   optionData: ReportOption;

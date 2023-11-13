@@ -146,3 +146,13 @@ def timestamp_min(self):
 def timestamp_max(self):
     array = self._arrow_data_asarray_no_tags()
     return pc.max(array).as_py()
+
+
+@arrow_op(
+    name="ArrowWeaveListTimeDelta-totalSeconds",
+    input_type={"td": ArrowWeaveListType(types.TimeDelta())},
+    output_type=ArrowWeaveListType(types.Number()),
+)
+def timedelta_total_seconds(td):
+    new_arrow_data = pc.divide(pc.cast(td._arrow_data, pa.int64()), 1e6)
+    return ArrowWeaveList(new_arrow_data, types.Number(), td._artifact)

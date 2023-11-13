@@ -1,3 +1,12 @@
+import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
+import {RED_550} from '@wandb/weave/common/css/color.styles';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import * as w from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
+import React, {useMemo} from 'react';
+import {useEffect, useState} from 'react';
 import {
   Dropdown,
   DropdownItemProps,
@@ -6,20 +15,12 @@ import {
   Loader,
   Modal,
 } from 'semantic-ui-react';
-import React, {useMemo} from 'react';
 import styled from 'styled-components';
-import {RED_550} from '@wandb/weave/common/css/color.styles';
-import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
-import * as query from './Home/query';
-import {useEffect, useState} from 'react';
-import * as w from '@wandb/weave/core';
-import {useNodeValue} from '@wandb/weave/react';
+
 import {Icon} from '../Icon';
-import {TakeActionType} from './persistenceStateMachine';
+import * as query from './Home/query';
 import * as M from './Modal.styles';
-import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
-import {trackPublishBoardClicked} from '@wandb/weave/util/events';
-import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
+import {TakeActionType} from './persistenceStateMachine';
 
 const Error = styled.div`
   font-size: 14px;
