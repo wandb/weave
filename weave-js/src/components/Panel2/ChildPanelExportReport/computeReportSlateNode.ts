@@ -1,4 +1,5 @@
 import {ID, isAssignableTo, isConstNode, isVarNode} from '@wandb/weave/core';
+import _ from 'lodash';
 
 import {weaveTypeIsPanel} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
@@ -60,7 +61,10 @@ const getVarItemsForPath = (
 
   // First, extract the stack for a given panel.
   mapPanels(fullConfig, [], (config, stack) => {
-    if (config === targetConfig) {
+    // mapPanels does not guarantee reference equality, so we need to use
+    // _.isEqual to compare the configs. This is at least the case for
+    // Group panels, which are cloned in mapPanels.
+    if (_.isEqual(config, targetConfig)) {
       stack.forEach(frame => {
         if (isConstNode(frame.value) && weaveTypeIsPanel(frame.value.type)) {
           if (!isAssignableTo(frame.value.type, {type: 'Group' as any})) {
