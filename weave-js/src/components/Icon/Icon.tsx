@@ -102,6 +102,7 @@ import {ReactComponent as ImportLogOut} from '../../assets/icons/icon-log-out.sv
 import {ReactComponent as ImportLogoColab} from '../../assets/icons/icon-logo-colab.svg';
 import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-magic-wand-star.svg';
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
+import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
 import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-minimize-mode.svg';
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
@@ -515,6 +516,9 @@ export const IconMagicWandStar = (props: SVGIconProps) => (
 export const IconMagicWandStick = (props: SVGIconProps) => (
   <ImportMagicWandStick {...updateIconProps(props)} />
 );
+export const IconMenu = (props: SVGIconProps) => (
+  <ImportMenu {...updateIconProps(props)} />
+);
 export const IconMicrophoneAudio = (props: SVGIconProps) => (
   <ImportMicrophoneAudio {...updateIconProps(props)} />
 );
@@ -898,6 +902,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'logo-colab': IconLogoColab,
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
+  menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
   'minimize-mode': IconMinimizeMode,
   model: IconModel,

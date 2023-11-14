@@ -102,6 +102,7 @@ export {
   IconLogOut,
   IconMagicWandStar,
   IconMagicWandStick,
+  IconMenu,
   IconMicrophoneAudio,
   IconMinimizeMode,
   IconModel,

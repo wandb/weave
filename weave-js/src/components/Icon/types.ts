@@ -101,6 +101,7 @@ export const IconNames = {
   LogoColab: 'logo-colab',
   MagicWandStar: 'magic-wand-star',
   MagicWandStick: 'magic-wand-stick',
+  Menu: 'menu',
   MicrophoneAudio: 'microphone-audio',
   MinimizeMode: 'minimize-mode',
   Model: 'model',
