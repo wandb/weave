@@ -2,12 +2,6 @@ import dataclasses
 import typing
 import wandb
 from wandb import Artifact
-from wandb.sdk.artifacts.artifact_saver import ArtifactSaver
-from wandb.sdk.internal.sender import _manifest_json_from_proto
-
-# from wandb.sdk.internal.artifact_saver import ArtifactSaver # This symbol moved after our pinned version
-# from wandb.sdk.internal.sender import _manifest_json_from_proto # This symbol moved after our pinned version
-from wandb.sdk.interface.interface import InterfaceBase
 
 from weave import wandb_client_api
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun

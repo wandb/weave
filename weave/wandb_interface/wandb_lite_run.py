@@ -11,6 +11,7 @@ from wandb.sdk.internal.file_pusher import FilePusher
 from wandb.sdk.internal import file_stream
 from wandb.sdk.internal.internal_api import Api as InternalApi
 from wandb.sdk.internal.sender import _manifest_json_from_proto
+from wandb.sdk.interface.interface import InterfaceBase
 from wandb.sdk.lib import runid
 from weave import wandb_client_api
 from weave import errors

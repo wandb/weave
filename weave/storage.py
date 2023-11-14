@@ -144,7 +144,7 @@ def _direct_publish(
             project=wb_project_name,
             entity_name=wb_entity_name,
             branch=branch_name,
-            artifact_collection_exists=_merge,
+            artifact_collection_exists=bool(_merge),
             _lite_run=_lite_run,
         )
 
