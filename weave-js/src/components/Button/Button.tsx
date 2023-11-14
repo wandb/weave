@@ -4,11 +4,11 @@
  * https://www.figma.com/file/01KWBdMZg5QM9SRS1pQq0z/Design-System----Robot-Styles?type=design&node-id=5956-31813&mode=design&t=Gm4WWGWwgjdfUUTe-0
  */
 
-import {Icon, IconName} from '../Icon';
 import classNames from 'classnames';
 import React, {ReactElement} from 'react';
 import {twMerge} from 'tailwind-merge';
 
+import {Icon, IconName} from '../Icon';
 import {Tailwind} from '../Tailwind';
 import {Tooltip} from '../Tooltip';
 import {ButtonSize, ButtonVariant} from './types';

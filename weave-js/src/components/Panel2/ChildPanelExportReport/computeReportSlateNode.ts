@@ -1,8 +1,9 @@
 import {ID, isAssignableTo, isConstNode, isVarNode} from '@wandb/weave/core';
+
+import {weaveTypeIsPanel} from '../../PagePanelComponents/util';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {getConfigForPath, makeGroup, makePanel, mapPanels} from '../panelTree';
 import {toWeaveType} from '../toWeaveType';
-import {weaveTypeIsPanel} from '../../PagePanelComponents/util';
 
 export type WeavePanelSlateNode = {
   type: 'weave-panel';
@@ -117,14 +118,20 @@ export const computeReportSlateNode = (
   targetPath: string[]
 ): WeavePanelSlateNode => {
   const targetConfig = getConfigForPath(fullConfig, targetPath);
+  const targetPanelName = targetPath[targetPath.length - 1];
   const varItems = getVarItemsForPath(fullConfig, targetConfig);
-  const inputNodeVal = makeGroup(
-    {
-      vars: makeGroup(varItems, {
+  const hasVars = Object.keys(varItems).length > 0;
+  const varsConfig = hasVars
+    ? makeGroup(varItems, {
         childNameBase: 'var',
         layoutMode: 'vertical',
-      }),
-      panel: targetConfig,
+      })
+    : undefined;
+
+  const packagedGroup = makeGroup(
+    {
+      vars: varsConfig,
+      [targetPanelName]: targetConfig,
     },
     {
       disableDeletePanel: true,
@@ -136,7 +143,7 @@ export const computeReportSlateNode = (
         vars: {
           hidden: true,
         },
-        panel: {
+        [targetPanelName]: {
           controlBar: 'editable',
         },
       },
@@ -155,8 +162,8 @@ export const computeReportSlateNode = (
         },
         {
           nodeType: 'const',
-          type: toWeaveType(inputNodeVal),
-          val: inputNodeVal,
+          type: toWeaveType(packagedGroup),
+          val: packagedGroup,
         }
       ),
     },

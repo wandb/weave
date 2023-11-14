@@ -1,21 +1,22 @@
-import {
-  components as selectComponents,
-  OptionProps,
-  SingleValueProps,
-  MenuListProps,
-  GroupHeadingProps,
-  GroupProps,
-} from 'react-select';
-import {Icon} from '../../Icon';
 import React from 'react';
 import {
+  components as selectComponents,
+  GroupHeadingProps,
+  GroupProps,
+  MenuListProps,
+  OptionProps,
+  SingleValueProps,
+} from 'react-select';
+import TimeAgo from 'react-timeago';
+
+import {Icon} from '../../Icon';
+import {ReportOptionComp} from './ReportOption';
+import {
   EntityOption,
+  formatUpdatedAt,
   GroupedReportOption,
   ReportOption,
-  formatUpdatedAt,
 } from './utils';
-import TimeAgo from 'react-timeago';
-import {ReportOptionComp} from './ReportOption';
 
 export const customEntitySelectComps = {
   SingleValue: ({

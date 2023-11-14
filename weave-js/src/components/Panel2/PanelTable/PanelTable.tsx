@@ -1,7 +1,7 @@
 import 'react-base-table/lib/TableRow';
 
-import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {
   constFunction,
   constNumber,
@@ -41,8 +41,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import BaseTable, {BaseTableProps} from 'react-base-table';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import {
-  Button,
-  Icon,
+  Icon as SemanticIcon,
   Menu,
   MenuItemProps,
   Modal,
@@ -53,6 +52,10 @@ import {WeaveActionContextProvider} from '../../../actions';
 import {useWeaveContext} from '../../../context';
 import {WeaveApp} from '../../../index';
 import * as LLReact from '../../../react';
+import {Button} from '../../Button';
+import {Checkbox} from '../../Checkbox';
+import {IconName} from '../../Icon';
+import {Tooltip} from '../../Tooltip';
 import {ControlFilter} from '../ControlFilter';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
@@ -72,12 +75,14 @@ import {
   TABLE_CONFIG_DEFAULTS,
   useUpdateConfigRespectingTableType,
 } from './config';
+import {Link} from './Link';
 import * as Table from './tableState';
 import * as TableType from './tableType';
 import {
   BaseTableDataType,
   getTableMeasurements,
   nodeIsValidList,
+  tableIsPanelVariable,
   useAutomatedTableState,
   useBaseTableColumnDefinitions,
   useBaseTableData,
@@ -85,34 +90,34 @@ import {
   useRowsNode,
   useUpdateConfigKey,
 } from './util';
-import {Link} from './Link';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
 
 const baseColumnWidth = 95;
 const minColumnWidth = 30;
-const rowControlsWidth = 30;
+const rowControlsWidthWide = 64;
+const rowControlsWidthSmall = 30;
 const numberOfHeaders = 1;
 const headerHeight = 30;
-const footerHeight = 25;
+const footerHeight = 32;
 const rowHeightSettings = {
   [RowSize.Small]: 30,
   [RowSize.Medium]: 60,
   [RowSize.Large]: 120,
   [RowSize.XLarge]: 240,
 };
-const nextRowSize = {
-  [RowSize.Small]: RowSize.Medium,
-  [RowSize.Medium]: RowSize.Large,
-  [RowSize.Large]: RowSize.XLarge,
-  [RowSize.XLarge]: RowSize.Small,
+const rowSizeTooltipContent = {
+  [RowSize.Small]: 'Small row height',
+  [RowSize.Medium]: 'Medium row height',
+  [RowSize.Large]: 'Large row height',
+  [RowSize.XLarge]: 'Extra large row height',
 };
-const rowSizeIconName = {
-  [RowSize.Small]: 'rows',
-  [RowSize.Medium]: 'table',
-  [RowSize.Large]: 'table-collapsed',
-  [RowSize.XLarge]: 'fullscreen',
+const rowSizeIconName: {[key in RowSize]: IconName} = {
+  [RowSize.Small]: 'row-height-small',
+  [RowSize.Medium]: 'row-height-medium',
+  [RowSize.Large]: 'row-height-large',
+  [RowSize.XLarge]: 'row-height-xlarge',
 };
 const useOneBasedIndex = true;
 
@@ -272,6 +277,14 @@ const PanelTableInner: React.FC<
 
   const rowActions = props.rowActions;
 
+  const {stack} = usePanelContext();
+  const tableIsPanelVariableVal = tableIsPanelVariable(stack);
+  const rowControlsWidth = useMemo(
+    () =>
+      tableIsPanelVariableVal ? rowControlsWidthWide : rowControlsWidthSmall,
+    [tableIsPanelVariableVal]
+  );
+
   const updateIndexOffset = useUpdateConfigKey('indexOffset', updateConfig);
   const updateTableState = useUpdateConfigKey('tableState', updateConfig);
   const setRowSize = useUpdateConfigKey('rowSize', updateConfig);
@@ -383,11 +396,17 @@ const PanelTableInner: React.FC<
 
   const setRowAsActive = useCallback(
     (row: number) => {
-      updateConfig({
-        activeRowForGrouping: {
+      const activeRowForGrouping =
+        {
           ...config.activeRowForGrouping,
           [compositeGroupKey]: row,
-        },
+        } ?? {};
+      // if row is less than 0, delete the active row
+      if (row < 0) {
+        delete activeRowForGrouping[compositeGroupKey];
+      }
+      updateConfig({
+        activeRowForGrouping,
       });
     },
     [compositeGroupKey, config.activeRowForGrouping, updateConfig]
@@ -478,7 +497,6 @@ const PanelTableInner: React.FC<
     pinnedRowsForCurrentGrouping,
     pinnableTotalRowCount
   );
-  const {stack} = usePanelContext();
   const downloadDataAsCSV = useCallback(() => {
     downloadCSV(rowsNode, tableState, weave, stack);
   }, [rowsNode, stack, tableState, weave]);
@@ -661,7 +679,7 @@ const PanelTableInner: React.FC<
             rowNode={rowData.rowNode}
             setRowAsPinned={(index: number) => {
               if (!props.config.simpleTable) {
-                if (shiftIsPressedRef.current) {
+                if (shiftIsPressedRef.current && index > -1) {
                   setRowAsPinned(index, !rowData.isPinned);
                 } else {
                   setRowAsActive(index);
@@ -766,6 +784,7 @@ const PanelTableInner: React.FC<
     props.config.simpleTable,
     setRowAsPinned,
     setRowAsActive,
+    rowControlsWidth,
   ]);
 
   const indexInputRef = useRef<HTMLInputElement>(null);
@@ -774,7 +793,6 @@ const PanelTableInner: React.FC<
       1,
       numVisibleRows // - pinnedRowsForCurrentGrouping.length
     );
-    const nextSize = nextRowSize[config.rowSize];
 
     return (
       <div
@@ -782,18 +800,30 @@ const PanelTableInner: React.FC<
           height: '100%',
           width: '100%',
           display: 'flex',
-          padding: '2px 9px',
+          padding: '8px 12px 0',
           justifyContent: 'space-between',
         }}>
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name={rowSizeIconName[nextSize]}
-              onClick={() => {
-                setRowSize(nextSize);
-              }}
-            />
+            {(Object.keys(RowSize) as Array<keyof typeof RowSize>)
+              // Remove first 4 sizes, when iterating over the enum, since first 4 are numbers
+              .slice(4)
+              .map(rowSize => (
+                <Tooltip
+                  key={rowSize}
+                  position="top center"
+                  content={rowSizeTooltipContent[RowSize[rowSize]]}
+                  trigger={
+                    <Button
+                      startIcon={rowSizeIconName[RowSize[rowSize]]}
+                      onClick={() => setRowSize(RowSize[rowSize])}
+                      active={config.rowSize === RowSize[rowSize]}
+                      variant="ghost"
+                      size="small"
+                    />
+                  }
+                />
+              ))}
           </div>
         )}
         <div
@@ -870,23 +900,27 @@ const PanelTableInner: React.FC<
         </div>
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
-            <S.TableActionText
+            <Button
+              variant="ghost"
+              size="small"
               onClick={() => {
                 downloadDataAsCSV();
               }}>
               Export as CSV
-            </S.TableActionText>
+            </Button>
             <Modal
               className="small"
               trigger={
-                <S.TableActionText
+                <Button
                   data-test="select-columns"
+                  variant="ghost"
+                  size="small"
                   onClick={() => {
                     recordEvent('SELECT_COLUMNS');
                     setShowColumnSelect(true);
                   }}>
                   Columns...
-                </S.TableActionText>
+                </Button>
               }
               open={showColumnSelect}
               onClose={() => setShowColumnSelect(false)}>
@@ -900,20 +934,23 @@ const PanelTableInner: React.FC<
               <Modal.Actions>
                 <Button
                   data-test="close-column-select"
-                  primary
+                  variant="primary"
+                  size="large"
                   onClick={() => setShowColumnSelect(false)}>
                   Close
                 </Button>
               </Modal.Actions>
             </Modal>
-            <S.TableActionText
+            <Button
               data-test="auto-columns"
+              variant="ghost"
+              size="small"
               onClick={() => {
                 recordEvent('RESET_TABLE');
                 resetTable();
               }}>
-              Reset Table
-            </S.TableActionText>
+              Reset table
+            </Button>
           </div>
         )}
       </div>
@@ -1084,8 +1121,9 @@ const IndexCell: React.FC<{
   activeRowIndex?: number;
   simpleTable?: boolean;
 }> = props => {
-  const {frame} = usePanelContext();
+  const {frame, stack} = usePanelContext();
   const weave = useWeaveContext();
+  const tableIsPanelVariableVal = tableIsPanelVariable(stack);
 
   if (
     props.runNode != null &&
@@ -1123,26 +1161,40 @@ const IndexCell: React.FC<{
   if (index.loading) {
     return <S.IndexColumnVal />;
   }
+  const isSelected =
+    index.result != null && index.result === props.activeRowIndex;
   const runName = runNameNodeValue.result ?? '';
+  const basicIndexContent = (
+    <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+  );
+  const indexOnClick = () => {
+    if (!props.simpleTable) {
+      if (isSelected) {
+        props.setRowAsPinned(-1);
+      } else {
+        props.setRowAsPinned(index.result);
+      }
+    }
+  };
   return (
-    <S.IndexColumnVal
-      onClick={() => {
-        if (!props.simpleTable) {
-          props.setRowAsPinned(index.result);
-        }
-      }}>
+    <S.IndexColumnVal onClick={indexOnClick}>
       <S.IndexColumnText
         style={{
           color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
-          ...(index.result != null && index.result === props.activeRowIndex
-            ? {
-                fontWeight: 'bold',
-                backgroundColor: '#d4d4d4',
-              }
-            : {}),
         }}>
+        {tableIsPanelVariableVal && (
+          <S.IndexCellCheckboxWrapper
+            className="index-cell-checkbox"
+            isSelected={isSelected}>
+            <Checkbox
+              onClick={indexOnClick}
+              checked={isSelected}
+              size="small"
+            />
+          </S.IndexCellCheckboxWrapper>
+        )}
         {props.simpleTable || !runName ? (
-          <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+          basicIndexContent
         ) : (
           <Popup
             // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
@@ -1154,7 +1206,7 @@ const IndexCell: React.FC<{
             position="top center"
             popperDependencies={[index.result, runName]}
             content={runName}
-            trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
+            trigger={basicIndexContent}
           />
         )}
       </S.IndexColumnText>
@@ -1204,7 +1256,9 @@ const ActionCell: React.FC<{
           position="bottom left"
           trigger={
             <div>
-              {hover && <Icon name="ellipsis horizontal" size="small" />}
+              {hover && (
+                <SemanticIcon name="ellipsis horizontal" size="small" />
+              )}
             </div>
           }
           content={

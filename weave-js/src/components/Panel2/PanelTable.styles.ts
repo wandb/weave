@@ -1,6 +1,9 @@
 import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
+
+import {OBLIVION} from '../../common/css/color.styles';
+import {hexToRGB} from '../../common/css/utils';
 import {IconButton} from '../IconButton';
 
 export const ColumnHeader = styled.div`
@@ -12,10 +15,6 @@ export const ColumnHeader = styled.div`
   height: 100%;
   .column-actions-trigger {
     visibility: hidden;
-  }
-  :hover .column-controls {
-    box-shadow: -4px 0px 4px 4px rgba(255, 255, 255, 0.75);
-    background: rgba(255, 255, 255, 0.75);
   }
   :hover .column-actions-trigger {
     visibility: visible;
@@ -52,9 +51,10 @@ export const IndexColumnVal = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  padding: 0 8px;
   :hover {
     color: ${globals.primary};
-    background-color: #eee;
+    background-color: ${hexToRGB(OBLIVION, 0.04)};
   }
 `;
 IndexColumnVal.displayName = 'S.IndexColumnVal';
@@ -65,7 +65,7 @@ export const IndexColumnText = styled.div`
   height: 20px;
   display: flex;
   align-content: space-around;
-  justify-content: space-around;
+  justify-content: space-between;
   align-items: center;
   font-weight: 600;
 `;
@@ -98,20 +98,26 @@ export const FilterIcon = styled(WBIcon)`
 `;
 FilterIcon.displayName = 'S.FilterIcon';
 
-export const ColumnAction = styled.div`
+export const ColumnAction = styled.div<{isHovered?: boolean}>`
   cursor: pointer;
   padding: 5px 0px 0px 0px;
   flex: 0 0 auto;
   height: 100%;
-  box-shadow: -4px 0px 4px 4px white;
   background: white;
   font-size: 20px;
+
+  :hover {
+    background-color: ${hexToRGB(OBLIVION, 0.04)};
+  }
+  background-color: transparent;
 `;
 ColumnAction.displayName = 'S.ColumnAction';
 
-export const TableAction = styled.div<{highlight?: boolean}>`
+export const TableAction = styled.div<{
+  highlight?: boolean;
+}>`
   cursor: pointer;
-  padding: 5px 4px 0px 9px;
+  padding: 5px 4px 0px 4px;
   flex: 0 0 auto;
   height: 100%;
   width: 100%;
@@ -121,9 +127,11 @@ export const TableAction = styled.div<{highlight?: boolean}>`
   :hover {
     color: ${globals.primary};
     background-color: ${props =>
-      props.highlight ? 'rgb(3, 183, 206)' : '#eee'};
+      props.highlight ? 'rgb(3, 183, 206)' : hexToRGB(OBLIVION, 0.04)};
   }
   box-shadow: #f8f8f8 -2px 0px 8px 4px;
+  display: inline-flex;
+  justify-content: center;
 `;
 TableAction.displayName = 'S.TableAction';
 
@@ -145,18 +153,6 @@ export const TableIcon = styled(WBIcon)<{highlight?: boolean}>`
   }
 `;
 TableIcon.displayName = 'S.TableIcon';
-
-export const TableActionText = styled.span`
-  cursor: pointer;
-  margin-left: 10px;
-  padding: 2px 0px 0px 0px;
-  :hover {
-    color: ${globals.primary};
-    background-color: #eee;
-    border-radius: 2px;
-  }
-`;
-TableActionText.displayName = 'S.TableActionText';
 
 export const ControlIcon = styled(WBIcon)`
   cursor: pointer;
@@ -223,16 +219,11 @@ export const PanelSettings = styled.div`
 PanelSettings.displayName = 'S.PanelSettings';
 
 export const CellWrapper = styled.div`
-  scrollbar-width: thin;
-  overflow: auto;
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background-color: #eee;
-  }
   width: 100%;
   height: 100%;
+  :hover {
+    background-color: ${hexToRGB(OBLIVION, 0.04)};
+  }
 `;
 CellWrapper.displayName = 'S.CellWrapper';
 
@@ -242,3 +233,9 @@ export const CloseIconButton = styled(IconButton)`
   top: 12px;
 `;
 CloseIconButton.displayName = 'S.CloseIconButton';
+
+export const IndexCellCheckboxWrapper = styled.div<{isSelected: boolean}>`
+  ${({isSelected}) => (isSelected ? '' : 'visibility: hidden;')}
+  margin-right: 8px;
+`;
+IndexCellCheckboxWrapper.displayName = 'S.IndexCellCheckboxWrapper';

@@ -1,3 +1,4 @@
+import {usePanelSettings} from '@wandb/weave/context';
 import AU from 'ansi_up';
 import classnames from 'classnames';
 import * as Prism from 'prismjs';
@@ -11,7 +12,6 @@ import BasicNoMatchComponent from './BasicNoMatchComponent';
 import {UseLoadFile} from './FileBrowser';
 import MonacoEditor from './Monaco/Editor';
 import WandbLoader from './WandbLoader';
-import {usePanelSettings} from '@wandb/weave/context';
 
 interface JupyterProps {
   file: File;

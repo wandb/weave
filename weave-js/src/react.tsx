@@ -52,13 +52,11 @@ import {usePanelContext} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
 import {
   ClientContext,
+  useWeaveClientEvalInUseNodeValueEnabled,
   useWeaveContext,
   useWeaveRefinementInReactHooksDisabled,
-  useWeaveClientEvalInUseNodeValueEnabled,
 } from './context';
 import {getUnresolvedVarNodes} from './core/callers';
-import {useDeepMemo} from './hookUtils';
-import {consoleLog} from './util';
 import {
   callResolverSimple,
   clientSet,
@@ -67,6 +65,8 @@ import {
   isConstructor,
 } from './core/mutate';
 import {UseNodeValueServerExecutionError} from './errors';
+import {useDeepMemo} from './hookUtils';
+import {consoleLog} from './util';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**

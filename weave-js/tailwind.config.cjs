@@ -1,5 +1,5 @@
 /**
- * KEEP THIS FILE IN SYNC WITH THE ONE IN WEAVE-JS
+ * KEEP THIS FILE IN SYNC WITH THE ONE IN CORE APP
  */
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -11,6 +11,11 @@ module.exports = {
      * Inherited by padding, margin, width, height, maxHeight, gap,
      * inset, space, translate, scrollMargin, and scrollPadding
      */
+    boxShadow: {
+      none: 'none',
+      md: '0px 12px 24px 0px',
+      lg: '0px 24px 48px 0px',
+    },
     spacing: {
       0: '0rem',
       px: '0.063rem',

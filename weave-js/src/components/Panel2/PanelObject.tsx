@@ -1,38 +1,37 @@
-import React, {useCallback, useMemo} from 'react';
-import _ from 'lodash';
-
 import {
+  constNodeUnsafe,
   constString,
   defaultLanguageBinding,
   escapeDots,
   isAssignableTo,
-  isTypedDictLike,
-  opObjGetAttr,
-  opPick as actualOpPick,
-  typedDictPropertyTypes,
-  varNode,
   isObjectType,
-  Node,
-  unionObjectTypeAttrTypes,
   isObjectTypeLike,
-  Type,
+  isTypedDictLike,
+  Node,
   nonNullable,
   opIsNone,
+  opObjGetAttr,
+  opPick as actualOpPick,
+  Type,
   typedDict,
+  typedDictPropertyTypes,
   TypedDictType,
-  constNodeUnsafe,
+  unionObjectTypeAttrTypes,
+  varNode,
 } from '@wandb/weave/core';
-
+import {useNodeValue} from '@wandb/weave/react';
+import _ from 'lodash';
+import React, {useCallback, useMemo} from 'react';
 import {Icon} from 'semantic-ui-react';
+
 import {useWeaveContext} from '../../context';
-import * as Panel2 from './panel';
+import * as ConfigPanel from './ConfigPanel';
 import * as KeyValTable from './KeyValTable';
-import {PanelString, Spec as PanelStringSpec} from './PanelString';
-import {PanelNumber, Spec as PanelNumberSpec} from './PanelNumber';
+import * as Panel2 from './panel';
 import {Spec as PanelDateSpec} from './PanelDate';
 import PanelDate from './PanelDate/Component';
-import * as ConfigPanel from './ConfigPanel';
-import {useNodeValue} from '@wandb/weave/react';
+import {PanelNumber, Spec as PanelNumberSpec} from './PanelNumber';
+import {PanelString, Spec as PanelStringSpec} from './PanelString';
 
 const inputType = {
   type: 'union' as const,

@@ -1,5 +1,5 @@
-import styled from 'styled-components';
 import * as globals from '@wandb/weave/common/css/globals.styles';
+import styled from 'styled-components';
 
 export const ObjectCount = styled.div`
   color: ${globals.MOON_500};

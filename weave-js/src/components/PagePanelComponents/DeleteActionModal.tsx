@@ -1,7 +1,8 @@
-import {Modal} from 'semantic-ui-react';
 import React from 'react';
-import * as M from './Modal.styles';
+import {Modal} from 'semantic-ui-react';
+
 import {Button} from '../Button';
+import * as M from './Modal.styles';
 
 type DeleteActionModalProps = {
   open: boolean;

@@ -27,12 +27,21 @@ import {
   Stack,
   voidNode,
 } from '@wandb/weave/core';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {Button} from '../Button';
 import styled, {css} from 'styled-components';
 
+import {
+  GRAY_350,
+  GRAY_500,
+  GRAY_800,
+  MOON_50,
+} from '../../common/css/globals.styles';
+import {Button} from '../Button';
+import {inJupyterCell} from '../PagePanelComponents/util';
+import {usePagePanelControlRequestAction} from '../PagePanelContext';
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {getSectionConfig, PBSection} from '../WeavePanelBank/PBSection';
 import {getPanelStacksForType} from './availablePanels';
@@ -51,6 +60,8 @@ import {IconAddNew as IconAddNewUnstyled} from './Icons';
 // import {LayoutSections} from './LayoutSections';
 import {LayoutTabs} from './LayoutTabs';
 import * as Panel2 from './panel';
+// import {inJupyterCell} from '../PagePanelComponents/util';
+import {useUpdateConfig2} from './PanelComp';
 import {
   ExpressionEvent,
   PanelContextProvider,
@@ -59,17 +70,6 @@ import {
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
-import {
-  GRAY_350,
-  GRAY_500,
-  GRAY_800,
-  MOON_50,
-} from '../../common/css/globals.styles';
-// import {inJupyterCell} from '../PagePanelComponents/util';
-import {useUpdateConfig2} from './PanelComp';
-import {replaceChainRoot} from '@wandb/weave/core/mutate';
-import {inJupyterCell} from '../PagePanelComponents/util';
-import {usePagePanelControlRequestAction} from '../PagePanelContext';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -172,26 +172,8 @@ const ActionBar = styled.div`
 `;
 ActionBar.displayName = 'S.ActionBar';
 
-const AddPanelBar = styled.div`
-  height: 48px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  border-radius: 6px;
-  background-color: white;
-  font-weight: 600;
-  color: ${GRAY_500};
-`;
-AddPanelBar.displayName = 'S.AddPanelBar';
-
 const AddPanelBarContainer = styled.div`
   padding: 8px 32px 16px;
-
-  transition: opacity 0.3s;
-  &:not(:hover) {
-    opacity: 0;
-  }
 `;
 AddPanelBarContainer.displayName = 'S.AddPanelBarContainer';
 
@@ -971,10 +953,14 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         />
         {!inJupyter && isAddPanelAllowed && (
           <AddPanelBarContainer ref={addPanelBarRef}>
-            <AddPanelBar onClick={handleAddPanel}>
-              <IconAddNew />
+            <Button
+              variant="secondary"
+              size="large"
+              onClick={handleAddPanel}
+              icon="add-new"
+              className="w-full">
               New panel
-            </AddPanelBar>
+            </Button>
           </AddPanelBarContainer>
         )}
       </div>

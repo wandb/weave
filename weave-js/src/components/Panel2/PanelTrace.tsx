@@ -1,7 +1,7 @@
 import Loader from '@wandb/weave/common/components/WandbLoader';
-import getConfig from '../../config';
 import React from 'react';
 
+import getConfig from '../../config';
 import * as Panel2 from './panel';
 import {useSignedUrlWithExpiration} from './useAssetFromArtifact';
 
