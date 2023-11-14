@@ -1,7 +1,4 @@
 import {ActivityDashboardContext} from '@wandb/weave/common/components/ActivityDashboardContext';
-import {LegacyWBIcon} from '@wandb/weave/common/components/elements/LegacyWBIcon';
-import HighlightedIcon from '@wandb/weave/common/components/HighlightedIcon';
-import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {RepoInsightsDashboardContext} from '@wandb/weave/common/components/RepoInsightsDashboardContext';
 import CustomPanelRenderer, {
   MultiTableDataType,
@@ -40,12 +37,9 @@ import {
   opFilter,
   opIndex,
   opLimit,
-  // opMap,
-  // opMerge,
   opNumberGreaterEqual,
   opNumberLessEqual,
   opPick,
-  // opRandomlyDownsample,
   opRunId,
   opRunName,
   OpStore,
@@ -68,7 +62,6 @@ import _ from 'lodash';
 import React, {
   FC,
   memo,
-  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -78,8 +71,7 @@ import React, {
 } from 'react';
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
-import {Button, MenuItemProps, Tab} from 'semantic-ui-react';
-import styled from 'styled-components';
+import {Button, Tab} from 'semantic-ui-react';
 import {calculatePosition} from 'vega-tooltip';
 
 import {
@@ -87,43 +79,26 @@ import {
   useWeaveRedesignedPlotConfigEnabled,
 } from '../../../context';
 import * as LLReact from '../../../react';
-import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
-import {IconButton} from '../../IconButton';
-import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
-import {Tooltip} from '../../Tooltip';
 import {getPanelStackDims, getPanelStacksForType} from '../availablePanels';
 import {VariableView} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
 import {ConfigSection} from '../ConfigPanel';
-import {
-  IconAddNew,
-  IconCheckmark,
-  IconDelete,
-  IconFullScreenModeExpand,
-  IconMinimizeMode,
-  IconOverflowHorizontal,
-  IconWeave,
-} from '../Icons';
+import {IconAddNew, IconDelete} from '../Icons';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
-import {PanelContextProvider, usePanelContext} from '../PanelContext';
+import {usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
-// import {makePromiseUsable} from '../PanelTable/hooks';
 import * as TableState from '../PanelTable/tableState';
 import {useTableStatesWithRefinedExpressions} from '../PanelTable/tableStateReact';
 import * as TableType from '../PanelTable/tableType';
 import {toWeaveType} from '../toWeaveType';
+import {ConfigDimComponent} from './ConfigDimComponent';
 import * as PlotState from './plotState';
-import {
-  DASHBOARD_DIM_NAME_MAP,
-  DIM_NAME_MAP,
-  DimensionLike,
-  ExpressionDimName,
-  isValidConfig,
-} from './plotState';
+import {isValidConfig} from './plotState';
 import {PanelPlotRadioButtons} from './RadioButtons';
 import * as S from './styles';
+import {inputType, PanelPlotProps} from './types';
 import {
   AnyPlotConfig,
   AxisSelections,
@@ -161,13 +136,6 @@ const defaultFontStyleDict = {
 export const BRUSH_MODES = ['zoom' as const, 'select' as const];
 type BrushMode = (typeof BRUSH_MODES)[number];
 
-type DimOption = {
-  text: string;
-  icon: string;
-  onClick: () => void;
-};
-
-type DimOptionOrSection = DimOption | DimOption[];
 type ExprDimNameType = (typeof PlotState.EXPRESSION_DIM_NAMES)[number];
 
 function useIsOrgDashboard() {
@@ -260,9 +228,6 @@ const useConfig = (
 
   return final;
 };
-
-const inputType = TableType.GeneralTableLikeType;
-export type PanelPlotProps = Panel2.PanelProps<typeof inputType, AnyPlotConfig>;
 
 const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
   const {input} = props;
@@ -1043,563 +1008,6 @@ const stringIsColorLike = (val: string): boolean => {
   );
 };
 
-type DimComponentInputType = {
-  input: PanelPlotProps['input'];
-  config: PlotConfig;
-  updateConfig: (config?: Partial<PlotConfig>) => void;
-  indentation: number;
-  isShared: boolean;
-  dimension: DimensionLike;
-  extraOptions?: DimOptionOrSection[];
-  multiline?: boolean;
-};
-
-const ConfigDimLabel: React.FC<
-  Omit<DimComponentInputType, 'extraOptions'> & {
-    postfixComponent?: React.ReactElement;
-    multiline?: boolean;
-    redesignedPlotConfigEnabled?: boolean;
-  }
-> = props => {
-  const dimName = props.dimension.name;
-  const seriesIndexStr =
-    props.isShared || props.config.series.length === 1
-      ? ''
-      : ` ${props.config.series.indexOf(props.dimension.series) + 1}`;
-  const label = props.redesignedPlotConfigEnabled
-    ? DASHBOARD_DIM_NAME_MAP[dimName]
-    : DIM_NAME_MAP[dimName] + seriesIndexStr;
-
-  return (
-    <div
-      style={{
-        paddingLeft: 10 * props.indentation,
-        borderLeft:
-          props.indentation > 0 && props.redesignedPlotConfigEnabled
-            ? `2px solid ${globals.MOON_200}`
-            : 'none',
-      }}>
-      <ConfigPanel.ConfigOption
-        label={label}
-        data-test={`${props.dimension.name}-dim-config`}
-        postfixComponent={props.postfixComponent}
-        multiline={props.multiline}>
-        {props.children}
-      </ConfigPanel.ConfigOption>
-    </div>
-  );
-};
-
-const WeaveExpressionDimConfig: React.FC<{
-  dimName: ExpressionDimName;
-  input: PanelPlotProps['input'];
-  series: SeriesConfig[];
-  config: PlotConfig;
-  updateConfig: PanelPlotProps['updateConfig'];
-}> = props => {
-  const {config, input, updateConfig, series} = props;
-
-  const seriesIndices = useMemo(
-    () => series.map(s => config.series.indexOf(s)),
-    [series, config.series]
-  );
-  const updateDims = useCallback(
-    (node: Node) => {
-      const newConfig = produce(config, draft => {
-        seriesIndices.forEach(i => {
-          const s = draft.series[i];
-          s.table = TableState.updateColumnSelect(
-            s.table,
-            s.dims[props.dimName],
-            node
-          );
-        });
-      });
-      updateConfig(newConfig);
-    },
-    [config, props.dimName, seriesIndices, updateConfig]
-  );
-  const weave = useWeaveContext();
-
-  const tableConfigs = useMemo(() => series.map(s => s.table), [series]);
-  const rowsNodes = useMemo(() => {
-    return series.map(
-      s => TableState.tableGetResultTableNode(s.table, input, weave).rowsNode
-    );
-  }, [series, input, weave]);
-  const colIds = useMemo(
-    () => series.map(s => s.dims[props.dimName]),
-    [series, props.dimName]
-  );
-
-  const cellFrames = useMemo(
-    () =>
-      rowsNodes.map((rowsNode, i) => {
-        const tableState = tableConfigs[i];
-        const colId = colIds[i];
-        return TableState.getCellFrame(
-          input,
-          rowsNode,
-          tableState.groupBy,
-          tableState.columnSelectFunctions,
-          colId
-        );
-      }),
-    [rowsNodes, input, tableConfigs, colIds]
-  );
-
-  return (
-    <PanelContextProvider newVars={cellFrames[0]}>
-      <ConfigPanel.ExpressionConfigField
-        expr={tableConfigs[0].columnSelectFunctions[colIds[0]]}
-        setExpression={updateDims as any}
-      />
-    </PanelContextProvider>
-  );
-};
-
-const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
-  const {
-    updateConfig,
-    config,
-    dimension,
-    isShared,
-    indentation,
-    input,
-    extraOptions,
-    multiline,
-  } = props;
-  const weave = useWeaveContext();
-  const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
-  const makeUnsharedDimDropdownOptions = useCallback(
-    (series: SeriesConfig, dimName: (typeof PLOT_DIMS_UI)[number]) => {
-      const removeSeriesDropdownOption =
-        config.series.length > 1
-          ? {
-              text: 'Remove series',
-              icon: 'wbic-ic-delete',
-              onClick: () => {
-                updateConfig(PlotState.removeSeries(config, series));
-              },
-            }
-          : null;
-
-      const addSeriesDropdownOption = {
-        text: 'Add series from this series',
-        icon: 'wbic-ic-plus',
-        onClick: () => {
-          const newConfig = PlotState.addSeriesFromSeries(
-            config,
-            series,
-            dimName,
-            weave
-          );
-          updateConfig(newConfig);
-        },
-      };
-
-      const collapseDimDropdownOption =
-        config.series.length > 1
-          ? {
-              text: 'Collapse dimension',
-              icon: 'wbic-ic-collapse',
-              onClick: () => {
-                updateConfig(
-                  PlotState.makeDimensionShared(config, series, dimName, weave)
-                );
-              },
-            }
-          : null;
-
-      return redesignedPlotConfigEnabled
-        ? []
-        : [
-            removeSeriesDropdownOption,
-            addSeriesDropdownOption,
-            collapseDimDropdownOption,
-            redesignedPlotConfigEnabled,
-          ];
-    },
-    [config, updateConfig, weave, redesignedPlotConfigEnabled]
-  );
-
-  const makeSharedDimDropdownOptions = useCallback(
-    (dimName: (typeof PLOT_DIMS_UI)[number]) => {
-      const expandDim =
-        config.series.length > 1
-          ? {
-              text: 'Expand dimension',
-              icon: 'wbic-ic-expand',
-              onClick: () => {
-                const newConfig = produce(config, draft => {
-                  draft.configOptionsExpanded[dimName] = true;
-                });
-                updateConfig(newConfig);
-              },
-            }
-          : null;
-
-      return redesignedPlotConfigEnabled ? [] : [expandDim];
-    },
-    [config, updateConfig, redesignedPlotConfigEnabled]
-  );
-
-  const uiStateOptions = useMemo(() => {
-    if (!PlotState.isDropdownWithExpression(dimension)) {
-      return [null];
-    }
-
-    // return true if an expression can be directly switched to a constant
-    const isDirectlySwitchable = (
-      dim: PlotState.DropdownWithExpressionDimension
-    ): boolean => {
-      const options = dim.dropdownDim.options;
-      const expressionValue = dim.expressionDim.state().value;
-      const expressionIsConst = expressionValue.nodeType === 'const';
-      return options.some(
-        o =>
-          expressionIsConst &&
-          _.isEqual(o.value, (expressionValue as ConstNode).val) &&
-          o.representableAsExpression
-      );
-    };
-
-    const clickHandler = (
-      dim: PlotState.DropdownWithExpressionDimension,
-      kernel: (
-        series: SeriesConfig,
-        dimension: PlotState.DropdownWithExpressionDimension
-      ) => void
-    ): void => {
-      const newConfig = produce(config, draft => {
-        const seriesToIterateOver = isShared
-          ? draft.series
-          : _.compact([
-              draft.series.find(series => _.isEqual(series, dim.series)),
-            ]);
-        seriesToIterateOver.forEach(s => kernel(s, dim));
-      });
-
-      updateConfig(newConfig);
-    };
-
-    return [
-      [
-        {
-          text: 'Input method',
-          icon: null,
-          disabled: true,
-        },
-        {
-          text: 'Select via dropdown',
-          icon: !redesignedPlotConfigEnabled ? (
-            'wbic-ic-list'
-          ) : dimension.mode() === `dropdown` ? (
-            <IconCheckmark />
-          ) : (
-            <IconBlank />
-          ),
-          active: dimension.mode() === 'dropdown',
-          onClick: () => {
-            clickHandler(dimension, (s, dim) => {
-              if (s.uiState[dim.name] === 'expression') {
-                s.uiState[dim.name] = 'dropdown';
-                const expressionValue = dim.expressionDim.state().value;
-
-                // If the current expression has a corresponding dropdown option, use that dropdown value
-                if (isDirectlySwitchable(dim)) {
-                  s.constants[dim.name] = (expressionValue as ConstNode)
-                    .val as any;
-                }
-              }
-            });
-          },
-        },
-        {
-          text: 'Enter a Weave Expression',
-          icon: !redesignedPlotConfigEnabled ? (
-            'wbic-ic-xaxis'
-          ) : dimension.mode() === `expression` ? (
-            <IconCheckmark />
-          ) : (
-            <IconBlank />
-          ),
-
-          active: dimension.mode() === 'expression',
-          onClick: () => {
-            clickHandler(dimension, (s, dim) => {
-              if (s.uiState[dim.name] === 'dropdown') {
-                s.uiState[dim.name] = 'expression';
-
-                // If the current dropdown is representable as an expression, use that expression
-                if (isDirectlySwitchable(dim)) {
-                  const colId = s.dims[dim.name];
-                  s.table = TableState.updateColumnSelect(
-                    s.table,
-                    colId,
-                    constString(s.constants[dim.name])
-                  );
-                }
-              }
-            });
-          },
-        },
-      ],
-    ];
-  }, [config, updateConfig, isShared, dimension, redesignedPlotConfigEnabled]);
-
-  const topLevelDimOptions = useCallback(
-    (dimName: (typeof PLOT_DIMS_UI)[number]) => {
-      return isShared
-        ? makeSharedDimDropdownOptions(dimName)
-        : makeUnsharedDimDropdownOptions(dimension.series, dimName);
-    },
-    [
-      makeSharedDimDropdownOptions,
-      makeUnsharedDimDropdownOptions,
-      dimension.series,
-      isShared,
-    ]
-  );
-
-  const dimOptions = useMemo(
-    () =>
-      _.compact([
-        ...(PlotState.isTopLevelDimension(dimension.name)
-          ? topLevelDimOptions(dimension.name)
-          : []),
-        ...uiStateOptions,
-        ...(extraOptions || []),
-      ]),
-    [dimension, uiStateOptions, topLevelDimOptions, extraOptions]
-  );
-
-  const postFixComponent = useMemo(() => {
-    if (!redesignedPlotConfigEnabled) {
-      return (
-        <PopupDropdown
-          position="left center"
-          trigger={
-            <div>
-              <HighlightedIcon>
-                <LegacyWBIcon name="overflow" />
-              </HighlightedIcon>
-            </div>
-          }
-          options={dimOptions.filter(o => !Array.isArray(o))}
-          sections={dimOptions.filter(o => Array.isArray(o)) as DimOption[][]}
-        />
-      );
-    }
-
-    const nonArrayDimOptions = dimOptions.filter(
-      o => !Array.isArray(o)
-    ) as DimOption[];
-    const arrayDimOptions = dimOptions.filter(o =>
-      Array.isArray(o)
-    ) as DimOption[][];
-
-    const menuItems: MenuItemProps[] =
-      nonArrayDimOptions.map(dimOptionToMenuItem);
-    const menuSections: Section[] = arrayDimOptions.map(opts => ({
-      label: opts[0].text,
-      items: opts.slice(1).map(dimOptionToMenuItem),
-    }));
-
-    const zeroMenuOptions =
-      uiStateOptions.length === 1 &&
-      uiStateOptions[0] === null &&
-      extraOptions == null;
-
-    const dimName = dimension.name as (typeof PLOT_DIMS_UI)[number];
-
-    return (
-      <>
-        {!zeroMenuOptions && (
-          <PopupMenu
-            position="bottom left"
-            trigger={
-              <ConfigDimMenuButton>
-                <IconOverflowHorizontal />
-              </ConfigDimMenuButton>
-            }
-            items={menuItems}
-            sections={menuSections}
-          />
-        )}
-        {config.series.length > 1 &&
-          indentation === 0 &&
-          (isShared ? (
-            <Tooltip
-              position="top right"
-              trigger={
-                <S.ConstrainedIconContainer
-                  onClick={() => {
-                    // "expanding" the dimension means unconstraining it
-                    const newConfig = produce(config, draft => {
-                      draft.configOptionsExpanded[dimName] = true;
-                    });
-                    updateConfig(newConfig);
-                  }}>
-                  <IconLockedConstrained width={18} height={18} />
-                </S.ConstrainedIconContainer>
-              }>
-              Remove constraint across series
-            </Tooltip>
-          ) : (
-            <Tooltip
-              position="top right"
-              trigger={
-                <S.UnconstrainedIconContainer
-                  // "sharing" the dimension means constraining it
-                  onClick={() => {
-                    updateConfig(
-                      PlotState.makeDimensionShared(
-                        config,
-                        dimension.series,
-                        dimName,
-                        weave
-                      )
-                    );
-                  }}>
-                  <IconUnlockedUnconstrained width={18} height={18} />
-                </S.UnconstrainedIconContainer>
-              }>
-              Constrain dimension across series
-            </Tooltip>
-          ))}
-      </>
-    );
-
-    function dimOptionToMenuItem({
-      text,
-      icon,
-      onClick,
-    }: DimOption): MenuItemProps {
-      return {
-        key: text,
-        content: text,
-        icon: convertIcon(icon),
-        onClick,
-      };
-    }
-
-    function convertIcon(iconStr: ReactNode): ReactNode {
-      if (typeof iconStr !== `string`) {
-        return iconStr;
-      }
-      switch (iconStr) {
-        case `wbic-ic-delete`:
-          return <IconDelete />;
-        case `wbic-ic-plus`:
-          return <IconAddNew />;
-        case `wbic-ic-collapse`:
-          // TODO: replace with proper icon
-          return <IconMinimizeMode />;
-        case `wbic-ic-expand`:
-          // TODO: replace with proper icon
-          return <IconFullScreenModeExpand />;
-        case null:
-          return null;
-        default:
-          return <IconWeave />;
-      }
-    }
-  }, [
-    dimOptions,
-    redesignedPlotConfigEnabled,
-    config,
-    dimension.name,
-    dimension.series,
-    extraOptions,
-    indentation,
-    isShared,
-    uiStateOptions,
-    updateConfig,
-    weave,
-  ]);
-
-  if (PlotState.isDropdownWithExpression(dimension)) {
-    return (
-      <ConfigDimComponent
-        {...props}
-        dimension={
-          dimension.mode() === 'expression'
-            ? dimension.expressionDim
-            : dimension.dropdownDim
-        }
-        extraOptions={uiStateOptions as DimOptionOrSection[]}
-      />
-    );
-  } else if (PlotState.isGroup(dimension)) {
-    const primary = dimension.primaryDimension();
-    return (
-      <>
-        {dimension.activeDimensions().map(dim => {
-          const isPrimary = dim.equals(primary);
-          return (
-            <ConfigDimComponent
-              {...props}
-              key={dim.name}
-              indentation={isPrimary ? indentation : indentation + 1}
-              dimension={dim}
-            />
-          );
-        })}
-      </>
-    );
-  } else if (PlotState.isDropdown(dimension)) {
-    const dimName = dimension.name;
-    return (
-      <ConfigDimLabel
-        {...props}
-        postfixComponent={postFixComponent}
-        multiline={redesignedPlotConfigEnabled && multiline}
-        redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
-        <ConfigPanel.ModifiedDropdownConfigField
-          selection
-          data-testid={`dropdown-${dimName}`}
-          placeholder={dimension.defaultState().compareValue}
-          value={dimension.state().value}
-          options={dimension.options}
-          onChange={(e, {value}) => {
-            const newSeries = produce(config.series, draft => {
-              draft.forEach(s => {
-                if (isShared || _.isEqual(s, dimension.series)) {
-                  // @ts-ignore
-                  s.constants[dimName] = value;
-                }
-              });
-            });
-            updateConfig({
-              series: newSeries,
-            });
-          }}
-        />
-      </ConfigDimLabel>
-    );
-  } else if (PlotState.isWeaveExpression(dimension)) {
-    return (
-      <>
-        <ConfigDimLabel
-          {...props}
-          postfixComponent={postFixComponent}
-          multiline={redesignedPlotConfigEnabled && multiline}
-          redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
-          <WeaveExpressionDimConfig
-            dimName={dimension.name}
-            input={input}
-            config={config}
-            updateConfig={updateConfig}
-            series={isShared ? config.series : [dimension.series]}
-          />
-        </ConfigDimLabel>
-      </>
-    );
-  }
-  return <></>;
-};
-
 const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
   // This function assigns smart defaults for the color of a point based on the label.
 
@@ -1928,55 +1336,6 @@ function getColorAxisType(
 function getAxisTimeUnit(isDashboard: boolean): VegaTimeUnit {
   return isDashboard ? 'yearweek' : 'yearmonth';
 }
-/*
-const useMergeTables = makePromiseUsable(
-  (
-    currentData: _.Dictionary<any>[][] | undefined,
-    newFlatPlotTables: _.Dictionary<any>[][],
-    isLoading: boolean
-  ): Promise<_.Dictionary<any>[][]> => {
-    if (!isLoading && currentData) {
-      return Promise.all(
-        newFlatPlotTables.map((table, i) =>
-          mergeRealizedTableData(currentData?.[i] ?? [], table)
-        )
-      );
-    }
-    return Promise.resolve(currentData || []);
-  }
-);
-
-const useLatestData = (
-  newFlatPlotTables: _.Dictionary<any>[][],
-  isLoading: boolean,
-  series: SeriesConfig[]
-) => {
-  const [latestData, setLatestData] = useState<_.Dictionary<any>[][]>([]);
-  const seriesRef = useRef<SeriesConfig[]>(series);
-  const {result: mergedTables, loading} = useMergeTables(
-    latestData,
-    newFlatPlotTables,
-    isLoading
-  );
-
-  if (seriesRef.current !== series) {
-    // invalidate prior data
-    seriesRef.current = series;
-    setLatestData([]);
-    return {latestData: [], loading: true};
-  } else if (mergedTables !== latestData && !loading) {
-    setLatestData(mergedTables);
-  } else if (
-    loading &&
-    latestData.length === 0 &&
-    newFlatPlotTables.length > 0
-  ) {
-    setLatestData(newFlatPlotTables);
-  }
-
-  return {latestData, loading};
-};
-*/
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const isDash = useWeaveRedesignedPlotConfigEnabled();
@@ -3844,15 +3203,3 @@ const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
 };
 
 export default Spec;
-
-const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
-  margin-left: 4px;
-  padding: 3px;
-`;
-ConfigDimMenuButton.displayName = 'S.ConfigDimMenuButton';
-
-const IconBlank = styled.svg`
-  width: 18px;
-  height: 18px;
-`;
-IconBlank.displayName = 'S.IconBlank';
