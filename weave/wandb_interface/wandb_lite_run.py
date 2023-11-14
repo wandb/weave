@@ -15,6 +15,7 @@ from wandb.sdk.interface.interface import InterfaceBase
 from wandb.sdk.lib import runid
 from weave import wandb_client_api
 from weave import errors
+from weave import engine_trace
 
 logger = logging.getLogger(__name__)
 
