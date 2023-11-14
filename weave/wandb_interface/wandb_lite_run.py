@@ -54,7 +54,6 @@ class InMemoryLazyLiteRun:
         *,
         job_type: typing.Optional[str] = None,
         group: typing.Optional[str] = None,
-        should_create_project: bool = True,
         _hide_in_wb: bool = False,
         _use_async_file_stream: bool = False,
     ):
@@ -81,7 +80,6 @@ class InMemoryLazyLiteRun:
             _use_async_file_stream
             and os.getenv("WEAVE_DISABLE_ASYNC_FILE_STREAM") == None
         )
-        self.should_create_project = should_create_project
 
         self._project_created = False
         self._is_log_setup = False
