@@ -29,18 +29,9 @@ def write_artifact_to_wandb(
     additional_aliases: list = [],
     *,
     _lite_run: typing.Optional[InMemoryLazyLiteRun] = None,
-    _create_new_artifact: bool = True,
+    artifact_collection_exists: bool = False,
 ) -> WeaveWBArtifactURIComponents:
     tracer = engine_trace.tracer()  # type: ignore
-    # Extract Artifact Attributes
-    artifact_name = artifact.name
-    artifact_type_name = artifact.type
-
-    assert artifact_name is not None
-    assert artifact_type_name is not None
-
-    wandb_client_api.assert_wandb_authenticated()
-
     # Here we get the default entity if none is provided.
     # When we support saving dashboards to target entities,
     # we may want to rework this code path so that the caller
@@ -52,48 +43,16 @@ def write_artifact_to_wandb(
             entity_name,
             project_name,
             group="weave_artifact_pushers",
-            should_create_project=_create_new_artifact,
             _hide_in_wb=True,
         )
     else:
         lite_run = _lite_run
 
-    lite_run.upsert_project()
-
-    # Ensure artifact type exists
-    if _create_new_artifact:
-        lite_run.i_api.create_artifact_type(
-            artifact_type_name=artifact_type_name,
-            entity_name=entity_name,
-            project_name=project_name,
-        )
-
-    # Finalize the artifact and construct the manifest.
-    artifact.finalize()
-    manifest_dict = _manifest_json_from_proto(
-        InterfaceBase()._make_artifact(artifact).manifest  # type: ignore[abstract, attr-defined]
-    )
-
-    # Save the Artifact and the associated files
-    with tracer.trace("Instantiate ArtifactSaver"):
-        saver = ArtifactSaver(
-            api=lite_run.i_api,
-            digest=artifact.digest,
-            manifest_json=manifest_dict,
-            file_pusher=lite_run.pusher,
-            is_user_created=False,
-        )
-
-    with tracer.trace("ArtifactSaver.save"):
-        res = saver.save(
-            type=artifact_type_name,
-            name=artifact_name,
-            client_id=artifact._client_id,
-            sequence_client_id=artifact._sequence_client_id,
-            metadata=artifact.metadata,
-            description=artifact.description,
-            aliases=["latest"] + additional_aliases,
-            use_after_commit=False,
+    with tracer.trace("Logging artifact"):
+        res = lite_run.log_artifact(
+            artifact,
+            additional_aliases,
+            artifact_collection_exists,
         )
 
     with tracer.trace("Finish lite_run"):
@@ -108,6 +67,6 @@ def write_artifact_to_wandb(
     return WeaveWBArtifactURIComponents(
         entity_name=entity_name,
         project_name=project_name,
-        artifact_name=artifact_name,
+        artifact_name=artifact.name,
         version_str=commit_hash,
     )

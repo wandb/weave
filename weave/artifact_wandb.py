@@ -645,9 +645,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         project: str = DEFAULT_WEAVE_OBJ_PROJECT,
         entity_name: typing.Optional[str] = None,
         branch: typing.Optional[str] = None,
+        artifact_collection_exists: bool = False,
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
-        _create_new_artifact: bool = True,
     ):
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
@@ -655,8 +655,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             project,
             entity_name,
             additional_aliases,
+            artifact_collection_exists=artifact_collection_exists,
             _lite_run=_lite_run,
-            _create_new_artifact=_create_new_artifact,
         )
         version = res.version_str if branch is None else branch
         self._set_read_artifact_uri(
