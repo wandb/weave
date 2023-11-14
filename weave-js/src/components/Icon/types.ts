@@ -41,6 +41,7 @@ export const IconNames = {
   Document: 'document',
   Documentation: 'documentation',
   Download: 'download',
+  Draft: 'draft',
   EducationAcademic: 'education-academic',
   EmailAt: 'email-at',
   EmailEnvelope: 'email-envelope',

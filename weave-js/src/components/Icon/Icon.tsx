@@ -42,6 +42,7 @@ import {ReactComponent as ImportDockerWhale} from '../../assets/icons/icon-docke
 import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document.svg';
 import {ReactComponent as ImportDocumentation} from '../../assets/icons/icon-documentation.svg';
 import {ReactComponent as ImportDownload} from '../../assets/icons/icon-download.svg';
+import {ReactComponent as ImportDraft} from '../../assets/icons/icon-draft.svg';
 import {ReactComponent as ImportEducationAcademic} from '../../assets/icons/icon-education-academic.svg';
 import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.svg';
 import {ReactComponent as ImportEmailEnvelope} from '../../assets/icons/icon-email-envelope.svg';
@@ -333,6 +334,9 @@ export const IconDocumentation = (props: SVGIconProps) => (
 );
 export const IconDownload = (props: SVGIconProps) => (
   <ImportDownload {...updateIconProps(props)} />
+);
+export const IconDraft = (props: SVGIconProps) => (
+  <ImportDraft {...updateIconProps(props)} />
 );
 export const IconEducationAcademic = (props: SVGIconProps) => (
   <ImportEducationAcademic {...updateIconProps(props)} />
@@ -834,6 +838,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   document: IconDocument,
   documentation: IconDocumentation,
   download: IconDownload,
+  draft: IconDraft,
   'education-academic': IconEducationAcademic,
   'email-at': IconEmailAt,
   'email-envelope': IconEmailEnvelope,

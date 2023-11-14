@@ -42,6 +42,7 @@ export {
   IconDocument,
   IconDocumentation,
   IconDownload,
+  IconDraft,
   IconEducationAcademic,
   IconEmailAt,
   IconEmailEnvelope,
