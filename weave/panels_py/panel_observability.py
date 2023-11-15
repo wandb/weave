@@ -1,13 +1,12 @@
-import json
 import weave
-from weave.panels import panel_table
 
 from ..panels_py import panel_autoboard
 from .. import weave_types as types
-from ..panels import panel_group
 from ..panels import panel_board
 from .. import weave_internal
 from .generator_templates import template_registry
+from weave.panels import panel_table
+from ..panels import panel_group
 
 panels = weave.panels
 
@@ -73,7 +72,6 @@ def observability(
     timestamp_col_name = "timestamp"
 
     varbar = panel_board.varbar(editable=False)
-    # source_data = varbar.add("source_data", input_node)
     source_data = input_node
 
     filter_fn = varbar.add(
@@ -112,7 +110,7 @@ def observability(
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "time_range",
-        weave.panels.DateRange(user_zoom_range, domain=source_data[timestamp_col_name]),
+        panels.DateRange(user_zoom_range, domain=source_data[timestamp_col_name]),
     )
 
     bin_range = varbar.add(
@@ -132,7 +130,7 @@ def observability(
 
     varbar.add(
         "filters",
-        weave.panels.FilterEditor(filter_fn, node=window_data),
+        panels.FilterEditor(filter_fn, node=window_data),
     )
 
     filtered_window_data = varbar.add(
@@ -141,7 +139,7 @@ def observability(
 
     varbar.add(
         "grouping",
-        weave.panels.GroupingEditor(grouping_fn, node=window_data),
+        panels.GroupingEditor(grouping_fn, node=window_data),
     )
 
     overview_tab = weave.panels.Group(
@@ -163,7 +161,7 @@ def observability(
             n_bins=101,
             mark="bar",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
     grouping_fn_2 = varbar.add(
@@ -192,7 +190,7 @@ def observability(
             n_bins=20,
             mark="bar",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
     overview_tab.add(
@@ -213,7 +211,7 @@ def observability(
             n_bins=20,
             mark="bar",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
     table = panels.Table(
@@ -229,7 +227,7 @@ def observability(
     overview_tab.add(
         "runs by user",
         table,
-        layout=weave.panels.GroupPanelLayout(x=12, y=12, w=12, h=4),
+        layout=panels.GroupPanelLayout(x=12, y=12, w=12, h=4),
     )
 
     overview_tab.add(
@@ -250,7 +248,7 @@ def observability(
             n_bins=20,
             mark="bar",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
     overview_tab.add(
@@ -271,7 +269,7 @@ def observability(
             n_bins=20,
             mark="bar",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
     table = panels.Table(filtered_window_data)
@@ -280,7 +278,7 @@ def observability(
     overview_tab.add(
         "runs_by_state_table",
         table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=9, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=0, w=9, h=8),
     )
 
     table = panels.Table(
@@ -296,7 +294,7 @@ def observability(
     overview_tab.add(
         "runs_by_user_table",
         table,
-        layout=weave.panels.GroupPanelLayout(x=9, y=0, w=14, h=8),
+        layout=panels.GroupPanelLayout(x=9, y=0, w=14, h=8),
     )
 
     # metrics graph
@@ -320,7 +318,7 @@ def observability(
             n_bins=30,
             mark="point",
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
     )
 
     table = panels.Table(
@@ -358,7 +356,7 @@ def observability(
     overview_tab.add(
         "metrics",
         table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
     )
 
     table = panels.Table(filtered_window_data)
@@ -370,10 +368,10 @@ def observability(
     overview_tab.add(
         "table",
         table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=24, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=8),
     )
 
-    return weave.panels.Board(vars=varbar, panels=overview_tab)
+    return panels.Board(vars=varbar, panels=overview_tab)
 
 
 template_registry.register(
