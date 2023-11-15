@@ -216,39 +216,6 @@ def observability(
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
-    overview_tab.add(
-        "# runs started",
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["state"] == "running",
-            )
-        ).count(),
-        layout=weave.panels.GroupPanelLayout(x=0, y=6 * 2, w=4, h=4),
-    )
-
-    overview_tab.add(
-        "# runs finished",
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["state"] == "finished",
-            )
-        ).count(),
-        layout=weave.panels.GroupPanelLayout(x=4, y=6 * 2, w=4, h=4),
-    )
-
-    overview_tab.add(
-        "# runs failed",
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["state"] == "rqi_failed",
-            )
-        ).count(),
-        layout=weave.panels.GroupPanelLayout(x=8, y=6 * 2, w=4, h=4),
-    )
-
     table = panels.Table(
         filtered_window_data.filter(
             weave_internal.define_fn(
