@@ -65,13 +65,15 @@ first_100_artifacts_alias = _make_alias("first: 100", prefix="artifacts")
             }}
         }}
     }}""",
-        gql_op_output_type=lambda inputs, input_type: types.List(wdt.ArtifactVersionType.with_keys(
-            typing.cast(typing.Any, input_type)
-            .keys[first_100_collections_alias]["edges"]
-            .object_type["node"][first_100_artifacts_alias]["edges"]
-            .object_type["node"]
-            .property_types
-        )),
+        gql_op_output_type=lambda inputs, input_type: types.List(
+            wdt.ArtifactVersionType.with_keys(
+                typing.cast(typing.Any, input_type)
+                .keys[first_100_collections_alias]["edges"]
+                .object_type["node"][first_100_artifacts_alias]["edges"]
+                .object_type["node"]
+                .property_types
+            )
+        ),
     ),
 )
 def artifact_versions(
