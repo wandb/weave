@@ -5,8 +5,6 @@ from .. import weave_types as types
 from ..panels import panel_board
 from .. import weave_internal
 from .generator_templates import template_registry
-from weave.panels import panel_table
-from ..panels import panel_group
 
 panels = weave.panels
 
