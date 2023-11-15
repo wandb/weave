@@ -1,3 +1,4 @@
+import {typedDict} from '../../model';
 import {docType} from '../../util/docs';
 import {makeStandardOp} from '../opKinds';
 import {connectionToNodes} from './util';
@@ -49,9 +50,20 @@ export const opUserEmail = makeUserOp({
   argTypes: userArgType,
   description: `Returns the email of the ${docType('user')}`,
   argDescriptions: {user: userArgDescription},
-  returnValueDescription: `The user of the ${docType('user')}`,
+  returnValueDescription: `The email of the ${docType('user')}`,
   returnType: inputTypes => 'string',
   resolver: ({user}) => user.email,
+});
+
+export const opUserUserInfo = makeUserOp({
+  hidden: true,
+  name: 'user-userInfo',
+  argTypes: userArgType,
+  description: `Returns the userInfo of the ${docType('user')}`,
+  argDescriptions: {user: userArgDescription},
+  returnValueDescription: `The userInfo of the ${docType('user')}`,
+  returnType: inputTypes => typedDict({}),
+  resolver: ({user}) => user.userInfo,
 });
 
 export const opUserLink = makeUserOp({

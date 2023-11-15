@@ -4,7 +4,11 @@
   ],
   "plugins": [
     "node",
+    "simple-import-sort",
     "wandb"
+  ],
+  "ignorePatterns": [
+    "**/generated/*.ts"
   ],
   "rules": {
     "node/no-process-env": "error",
@@ -26,6 +30,8 @@
         ]
       }
     ],
+    "simple-import-sort/imports": "warn",
+    "simple-import-sort/exports": "warn",
     "react/react-in-jsx-scope": "error"
   }
 }

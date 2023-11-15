@@ -7,7 +7,7 @@ from .. import api as weave
 from .. import ops
 from .. import weave_types as types
 from .. import weave_internal
-from ..ops_primitives import dict_, list_
+from ..ops_primitives import dict_, list_, date
 from .. import errors
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
@@ -21,6 +21,8 @@ from ..ops_domain import wb_domain_types as wdt
 
 from ..ops_domain import run_ops
 
+
+import datetime
 
 import pyarrow as pa
 
@@ -1390,3 +1392,19 @@ def test_boxed_null_in_array_equal():
     rhs = box.box(None)
     assert util.equal(lhs, rhs).to_pylist() == [False, True, False]
     assert util.not_equal(lhs, rhs).to_pylist() == [True, False, True]
+
+
+def test_duration():
+    dt1 = datetime.timedelta(seconds=1)
+    dt2 = datetime.timedelta(seconds=2)
+    dt3 = datetime.timedelta(seconds=3)
+
+    awl_node = weave.save(arrow.to_arrow([dt1, dt2, dt3]))
+
+    fn = weave_internal.define_fn(
+        {"row": awl_node.type.object_type},
+        lambda row: date.timedelta_total_seconds(row),
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    assert list(weave.use(called)) == [1, 2, 3]

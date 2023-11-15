@@ -1,6 +1,6 @@
 import {Client} from '@wandb/weave/core';
-import React, {FC, createContext, useContext, useMemo} from 'react';
 import _ from 'lodash';
+import React, {createContext, FC, useContext, useMemo} from 'react';
 
 import {WeaveApp} from './weave';
 

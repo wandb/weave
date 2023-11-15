@@ -1,5 +1,8 @@
+import {SpanType} from '@wandb/weave/core/model/media/traceTree';
+import {useNodeValue} from '@wandb/weave/react';
 import React from 'react';
 
+import * as Panel2 from '../panel';
 import {
   getSpanDuration,
   getSpanIdentifier,
@@ -8,10 +11,7 @@ import {
   opSpanAsDictToLegacySpanShape,
 } from './common';
 import * as S from './lct.style';
-import * as Panel2 from '../panel';
 import {SpanWeaveType} from './util';
-import {useNodeValue} from '@wandb/weave/react';
-import {SpanType} from '@wandb/weave/core/model/media/traceTree';
 
 const inputType = SpanWeaveType;
 

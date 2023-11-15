@@ -1,16 +1,15 @@
-import React from 'react';
-import * as LayoutElements from './LayoutElements';
-import {Type} from '@wandb/weave/core';
-import * as Tabs from '@wandb/weave/components/Tabs';
+import './github-markdown-light.css';
 
+import {TargetBlank} from '@wandb/weave/common/util/links';
+import * as Tabs from '@wandb/weave/components/Tabs';
+import {Type} from '@wandb/weave/core';
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
+import remarkGfm from 'remark-gfm';
 import styled from 'styled-components';
 
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-
-import './github-markdown-light.css';
-import {TargetBlank} from '@wandb/weave/common/util/links';
-import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
+import * as LayoutElements from './LayoutElements';
 
 // This is considered a `hack` because I need to drop down to
 // access .tw-style, to give it a height 100%. When using tailwind

@@ -1,6 +1,8 @@
+import _ from 'lodash';
 import Observable from 'zen-observable';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
+import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
 import {Hasher, MemoizedHasher} from '../model/graph/editing/hash';
 import * as GraphTypes from '../model/graph/types';
 import * as Model from '../model/types';
@@ -8,10 +10,8 @@ import {OpStore} from '../opStore/types';
 import {RemoteHttpServer} from '../server';
 import {Server} from '../server/types';
 import {ID} from '../util/id';
-import {Client} from './types';
-import _ from 'lodash';
-import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
 import {defaultCachePolicy} from './cachePolicy';
+import {Client} from './types';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;

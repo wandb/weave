@@ -1,23 +1,23 @@
 import * as w from '@wandb/weave/core';
 import React, {useEffect, useMemo} from 'react';
 
-import {useNodeValue} from '../../../react';
+import {useNodeValue, useValue} from '../../../react';
 import {Select} from '../../Form/Select';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {
   customEntitySelectComps,
   customReportSelectComps,
 } from './customSelectComponents';
+import {SelectedExistingReport} from './SelectedExistingReport';
 import {
   DEFAULT_REPORT_OPTION,
   EntityOption,
+  GroupedReportOption,
+  isNewReportOption,
+  ProjectOption,
   ReportOption,
   useEntityAndProject,
-  GroupedReportOption,
-  ProjectOption,
-  isNewReportOption,
 } from './utils';
-import {SelectedExistingReport} from './SelectedExistingReport';
 
 type ReportSelectionProps = {
   rootConfig: ChildPanelFullConfig;
@@ -74,9 +74,9 @@ export const ReportSelection = ({
       } as any);
     }),
   });
-  const reports = useNodeValue(reportsMetaNode ?? w.voidNode(), {
-    skip: entities.loading,
-  });
+  const reports = useValue(reportsMetaNode ?? w.voidNode());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => reports.refresh(), []);
   const groupedReportOptions = useMemo(() => {
     return [
       {

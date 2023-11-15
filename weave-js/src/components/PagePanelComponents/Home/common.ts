@@ -1,4 +1,4 @@
-import {Node, constString, opRootArtifactVersion} from '@wandb/weave/core';
+import {constString, Node, opRootArtifactVersion} from '@wandb/weave/core';
 
 export type NavigateToExpressionType = (expression: Node) => void;
 export type SetPreviewNodeType = (

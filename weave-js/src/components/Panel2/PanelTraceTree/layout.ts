@@ -5,8 +5,8 @@
 // spans on different levels, accounting for the height of the parallel spans'
 // children.
 
-import * as _ from 'lodash';
 import {SpanType} from '@wandb/weave/core/model/media/traceTree';
+import * as _ from 'lodash';
 
 export type LayedOutSpanType = SpanType & {
   // x position and width in fraction of total width

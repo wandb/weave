@@ -1,8 +1,8 @@
-import {Icon, IconName} from '../Icon';
 import classNames from 'classnames';
 import React, {FC, ReactElement, useMemo, useRef} from 'react';
 import {twMerge} from 'tailwind-merge';
 
+import {Icon, IconName} from '../Icon';
 import {Tailwind} from '../Tailwind';
 import {RemoveAction} from './RemoveAction';
 import {TagTooltip} from './TagTooltip';

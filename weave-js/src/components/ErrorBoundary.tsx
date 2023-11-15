@@ -1,7 +1,8 @@
-import React, {Component, ErrorInfo, ReactNode} from 'react';
-import {ErrorPanel} from './ErrorPanel';
 import {datadogRum} from '@datadog/browser-rum';
+import React, {Component, ErrorInfo, ReactNode} from 'react';
+
 import {weaveErrorToDDPayload} from '../errors';
+import {ErrorPanel} from './ErrorPanel';
 
 type Props = {
   children?: ReactNode;

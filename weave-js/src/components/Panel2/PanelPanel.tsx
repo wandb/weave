@@ -1,4 +1,6 @@
 import {Client, constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
+import produce from 'immer';
+import _ from 'lodash';
 import React, {
   Dispatch,
   useCallback,
@@ -12,44 +14,42 @@ import React, {
 // but it hooks us up to redux devtools.
 import {useReducer} from 'reinspect';
 
-import _ from 'lodash';
 import {useWeaveContext} from '../../context';
+import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
 import {consoleLog} from '../../util';
+import {Button} from '../Button';
+import * as SidebarConfig from '../Sidebar/Config';
 import {Outline, shouldDisablePanelDelete} from '../Sidebar/Outline';
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {
+  CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
-  CHILD_PANEL_DEFAULT_CONFIG,
 } from './ChildPanel';
 import * as Panel2 from './panel';
 import {Panel2Loader, useUpdateConfig2} from './PanelComp';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {fixChildData} from './PanelGroup';
-import {toWeaveType} from './toWeaveType';
 import {
   useCloseDrawer,
   useSelectedPath,
   useSetInteractingPanel,
 } from './PanelInteractContext';
+import {PanelPanelContextProvider} from './PanelPanelContextProvider';
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
-import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {
-  updateExpressionVarNamesFromConfig,
   getConfigForPath,
   refineAllExpressions,
   refineForUpdate,
+  updateExpressionVarNamesFromConfig,
   updateExpressionVarTypes,
 } from './panelTree';
-import * as SidebarConfig from '../Sidebar/Config';
-import {useScrollbarVisibility} from '../../core/util/scrollbar';
-import {PanelPanelContextProvider} from './PanelPanelContextProvider';
-import {Button} from '../Button';
-import produce from 'immer';
+import {toWeaveType} from './toWeaveType';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<

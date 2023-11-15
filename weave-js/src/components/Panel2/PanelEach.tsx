@@ -11,10 +11,10 @@ import {
   initPanel,
   useChildPanelProps,
 } from './ChildPanel';
-import * as Panel2 from './panel';
-import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {ChildConfigContainer, ConfigSection} from './ConfigPanel';
+import * as Panel2 from './panel';
 import {useUpdateConfig2} from './PanelComp';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
 
 type PanelEachConfig = {
   pbConfig: PanelBankSectionConfig;

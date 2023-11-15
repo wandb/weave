@@ -9,18 +9,17 @@ import {useNodeValue} from '../../../react';
 import * as Panel2 from '../panel';
 import {PanelFullscreenContext} from '../PanelComp';
 import {TooltipTrigger} from '../Tooltip';
-
-import * as S from './lct.style';
-import {useTipOverlay} from './tipOverlay';
-import {useTimelineZoomAndPan} from './zoomAndPan';
+import {getSpanDuration, getSpanIdentifier, getSpanKindStyle} from './common';
 import {
   LayedOutSpanType,
   LayedOutSpanWithParentYLevel,
   layoutTree,
 } from './layout';
-import {treesToFlat} from './util';
+import * as S from './lct.style';
 import {SpanTreeDetail} from './PanelTraceSpan';
-import {getSpanIdentifier, getSpanDuration, getSpanKindStyle} from './common';
+import {useTipOverlay} from './tipOverlay';
+import {treesToFlat} from './util';
+import {useTimelineZoomAndPan} from './zoomAndPan';
 
 const inputType = {
   type: 'wb_trace_tree' as const,
