@@ -27,10 +27,10 @@ const getStringValFromNode = (
 const WANDB_COMMIT_HASH_LENGTH = 20;
 
 const isHexString = (s: string): boolean => {
-  return s.length % 2 === 0 && /^[0-9a-f]+$/i.test(s);
+  return /^[0-9a-f]+$/i.test(s);
 };
 
-const likelyCommitHash = (version: string): boolean => {
+const isLikelyCommitHash = (version: string): boolean => {
   // This is the heuristic we use everywhere to tell if a version is an alias or not
   return isHexString(version) && version.length === WANDB_COMMIT_HASH_LENGTH;
 };
@@ -45,10 +45,8 @@ const getAliasFromUri = (uri: string): string => {
 const nodeIsImpureGetOp = (node: GraphTypes.Node<any>): boolean => {
   if (isGetNode(node)) {
     const uriVal = getStringValFromNode(node.fromOp.inputs.uri);
-    if (uriVal) {
-      if (likelyCommitHash(getAliasFromUri(uriVal))) {
-        return false;
-      }
+    if (uriVal && isLikelyCommitHash(getAliasFromUri(uriVal))) {
+      return false;
     }
     return true;
   }
