@@ -10,47 +10,55 @@ panels = weave.panels
 
 
 BOARD_INPUT_WEAVE_TYPE = types.List(
-    {
-        "timestamp": types.optional(types.Timestamp()),
-        "_timestamp": types.Number(),
-        "entity_name": types.optional(types.String()),
-        "project_name": types.optional(types.String()),
-        "queue_uri": types.optional(types.String()),
-        "run_id": types.optional(types.String()),
-        "job": types.optional(types.String()),
-        "trace_id": types.optional(types.String()),
-        "state": types.optional(types.String()),
-        "error": types.optional(types.String()),
-        "metrics": types.TypedDict(
-            {
-                "system": types.TypedDict(
-                    {
-                        "tpu": types.optional(types.Number()),
-                        "cpu": types.optional(types.Number()),
-                        "cpu_cores_util": types.optional(types.List(types.Number())),
-                        "gpu_cores_util": types.optional(types.List(types.Number())),
-                        "gpu_cores_mem": types.optional(types.List(types.Number())),
-                        "memory": types.optional(types.Number()),
-                        "disk": types.TypedDict(
-                            {
-                                "in": types.optional(types.Number()),
-                                "out": types.optional(types.Number()),
-                            }
-                        ),
-                        "proc": types.TypedDict(
-                            {
-                                "memory": types.TypedDict(
-                                    {
-                                        "availableMB": types.optional(types.Number()),
-                                    }
-                                )
-                            }
-                        ),
-                    }
-                )
-            }
-        ),
-    }
+    types.TypedDict(
+        {
+            "timestamp": types.optional(types.Timestamp()),
+            "_timestamp": types.Number(),
+            "entity_name": types.optional(types.String()),
+            "project_name": types.optional(types.String()),
+            "queue_uri": types.optional(types.String()),
+            "run_id": types.optional(types.String()),
+            "job": types.optional(types.String()),
+            "trace_id": types.optional(types.String()),
+            "state": types.optional(types.String()),
+            "error": types.optional(types.String()),
+            "metrics": types.TypedDict(
+                {
+                    "system": types.TypedDict(
+                        {
+                            "tpu": types.optional(types.Number()),
+                            "cpu": types.optional(types.Number()),
+                            "cpu_cores_util": types.optional(
+                                types.List(types.Number())
+                            ),
+                            "gpu_cores_util": types.optional(
+                                types.List(types.Number())
+                            ),
+                            "gpu_cores_mem": types.optional(types.List(types.Number())),
+                            "memory": types.optional(types.Number()),
+                            "disk": types.TypedDict(
+                                {
+                                    "in": types.optional(types.Number()),
+                                    "out": types.optional(types.Number()),
+                                }
+                            ),
+                            "proc": types.TypedDict(
+                                {
+                                    "memory": types.TypedDict(
+                                        {
+                                            "availableMB": types.optional(
+                                                types.Number()
+                                            ),
+                                        }
+                                    )
+                                }
+                            ),
+                        }
+                    )
+                }
+            ),
+        }
+    )
 )
 
 
