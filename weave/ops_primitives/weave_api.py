@@ -340,6 +340,7 @@ def _merge(name) -> str:
             wb_project_name=to_uri.project_name,
             wb_entity_name=to_uri.entity_name,
             branch_name=shared_branch_name,
+            _merge=True,
         )
     else:
         if to_uri.version is None:

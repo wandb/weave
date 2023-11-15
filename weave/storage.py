@@ -115,6 +115,7 @@ def _direct_publish(
     assume_weave_type: typing.Optional[types.Type] = None,
     *,
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
+    _merge: typing.Optional[bool] = False,
 ):
     weave_type = assume_weave_type or _get_weave_type(obj)
 
@@ -137,12 +138,13 @@ def _direct_publish(
     ref = artifact.set("obj", weave_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
-    #     nothing new was created, so just return the existing ref.
+    # nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
         artifact.save(
             project=wb_project_name,
             entity_name=wb_entity_name,
             branch=branch_name,
+            artifact_collection_exists=bool(_merge),
             _lite_run=_lite_run,
         )
 
