@@ -57,39 +57,12 @@ def varbar(editable=True, items=None) -> panel_group.Group:
     )
 
 
-def varbar_small(editable=False, items=None) -> panel_group.Group:
-    showExpressions = True if editable else "titleBar"
-    if items is None:
-        items = {}
-    return panel_group.Group(
-        config=panel_group.GroupConfig(
-            layoutMode="vertical",
-            equalSize=False,
-            style="width:220px;",
-            showExpressions=showExpressions,  # type: ignore
-            allowedPanels=[
-                "Expression",
-                "Query",
-                "Slider",
-                "StringEditor",
-                "SelectEditor",
-                "Dropdown",
-                "DateRange",
-                "FilterEditor",
-                "GroupingEditor",
-            ],
-            enableAddPanel=editable,
-            childNameBase="var",
-        ),
-        items=items,
-    )
-
-
 def Board(
     vars: typing.Union[panel_group.Group, list, dict],
     panels: typing.Union[panel_group.Group, list[BoardPanel]],
     editable=True,
 ):
+
     showExpressions = True if editable else "titleBar"
     vb = vars
     if not isinstance(vb, weave.panels.Group):
