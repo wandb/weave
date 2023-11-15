@@ -5,6 +5,7 @@ import type {
   BaseNode,
   ConstNode,
   InputTypes,
+  Node,
   NodeOrVoidNode,
   OutputNode,
   OutputTypeAsNode,
