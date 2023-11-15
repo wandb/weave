@@ -1,5 +1,6 @@
 import json
 import weave
+from weave.panels import panel_table
 
 from ..panels_py import panel_autoboard
 from .. import weave_types as types
@@ -24,7 +25,41 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
             "trace_id": types.optional(types.String()),
             "state": types.optional(types.String()),
             "error": types.optional(types.String()),
-            "metrics": types.optional(types.String()),
+            "metrics": types.TypedDict(
+                {
+                    "system": types.TypedDict(
+                        {
+                            "tpu": types.optional(types.Number()),
+                            "cpu": types.optional(types.Number()),
+                            "cpu_cores_util": types.optional(
+                                types.List(types.Number())
+                            ),
+                            "gpu_cores_util": types.optional(
+                                types.List(types.Number())
+                            ),
+                            "gpu_cores_mem": types.optional(types.List(types.Number())),
+                            "memory": types.optional(types.Number()),
+                            "disk": types.TypedDict(
+                                {
+                                    "in": types.optional(types.Number()),
+                                    "out": types.optional(types.Number()),
+                                }
+                            ),
+                            "proc": types.TypedDict(
+                                {
+                                    "memory": types.TypedDict(
+                                        {
+                                            "availableMB": types.optional(
+                                                types.Number()
+                                            ),
+                                        }
+                                    )
+                                }
+                            ),
+                        }
+                    )
+                }
+            ),
         }
     )
 )
@@ -150,7 +185,7 @@ def observability(
     overview_tab.add(
         "runtime_distribution",
         panel_autoboard.timeseries(
-            source_data,
+            filtered_data,
             bin_domain_node=bin_range,
             x_axis_key=timestamp_col_name,
             y_expr=lambda row: weave.ops.timedelta_total_seconds(
@@ -189,37 +224,13 @@ def observability(
         layout=weave.panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
+    table = panels.Table(filtered_window_data)
+    table.add_column(lambda row: row["state"], "State", groupby=True)
+    table.add_column(lambda row: row.count(), "Count")
     overview_tab.add(
-        "# runs started",
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["state"] == "running",
-            )
-        ).count(),
-        layout=weave.panels.GroupPanelLayout(x=0, y=6 * 2, w=4, h=4),
-    )
-
-    overview_tab.add(
-        "# runs finished",
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["state"] == "finished",
-            )
-        ).count(),
-        layout=weave.panels.GroupPanelLayout(x=4, y=6 * 2, w=4, h=4),
-    )
-
-    overview_tab.add(
-        "# runs failed",
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["state"] == "rqi_failed",
-            )
-        ).count(),
-        layout=weave.panels.GroupPanelLayout(x=8, y=6 * 2, w=4, h=4),
+        "runs_by_state_table",
+        table,
+        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=9, h=8),
     )
 
     table = panels.Table(
@@ -233,21 +244,72 @@ def observability(
     table.add_column(lambda row: row["entity_name"], "Entity", groupby=True)
     table.add_column(lambda row: row.count(), "Count")
     overview_tab.add(
-        "runs by user",
+        "runs_by_user_table",
         table,
-        layout=weave.panels.GroupPanelLayout(x=12, y=12, w=12, h=4),
+        layout=weave.panels.GroupPanelLayout(x=9, y=0, w=14, h=8),
     )
 
-    # overview_tab.add(
-    #     "metrics.system.memory",
-    #     filtered_window_data.filter(
-    #         weave_internal.define_fn(
-    #             {"row": source_data.type.object_type},
-    #             lambda row: row["metrics"] != None,
-    #         )
-    #     )["metrics"],
-    #     layout=weave.panels.GroupPanelLayout(x=12, y=6 * 2, w=6, h=6),
-    # )
+    # metrics graph
+    overview_tab.add(
+        "metrics_over_time",
+        panel_autoboard.timeseries(
+            filtered_data.filter(
+                weave_internal.define_fn(
+                    {"row": source_data.type.object_type},
+                    lambda row: row["state"] == "finished",
+                )
+            ),
+            bin_domain_node=bin_range,
+            x_axis_key=timestamp_col_name,
+            y_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
+            y_title="Average run CPU utilization",
+            color_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"].avg(),
+            # color_expr=lambda row: grouping_fn_2(row),
+            color_title="cpu %",
+            x_domain=user_zoom_range,
+            n_bins=30,
+            mark="point",
+        ),
+        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
+    )
+
+    table = panels.Table(
+        filtered_window_data.filter(
+            weave_internal.define_fn(
+                {"row": source_data.type.object_type},
+                lambda row: row["state"] == "finished",
+            )
+        )
+    )
+    table.add_column(lambda row: row["trace_id"], "Id")
+    table.add_column(lambda row: row["metrics"]["system"]["cpu"], "CPU")
+    table.add_column(
+        lambda row: row["metrics"]["system"]["cpu_cores_util"].count(), "CPU count"
+    )
+    table.add_column(
+        lambda row: row["metrics"]["system"]["cpu_cores_util"].avg(), "CPU util avg"
+    )
+    table.add_column(
+        lambda row: row["metrics"]["system"]["gpu_cores_util"].count(), "GPU count"
+    )
+    table.add_column(
+        lambda row: row["metrics"]["system"]["gpu_cores_util"].avg(), "GPU util avg"
+    )
+    table.add_column(
+        lambda row: row["metrics"]["system"]["gpu_cores_mem"].avg(), "GPU mem avg"
+    )
+    table.add_column(lambda row: row["metrics"]["system"]["memory"], "Memory")
+    table.add_column(
+        lambda row: row["metrics"]["system"]["proc"]["memory"]["availableMB"],
+        "Memory available",
+    )
+    table.add_column(lambda row: row["metrics"]["system"]["disk"]["in"], "Disk in")
+    table.add_column(lambda row: row["metrics"]["system"]["disk"]["in"], "Disk out")
+    overview_tab.add(
+        "metrics",
+        table,
+        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
+    )
 
     table = panels.Table(filtered_window_data)
     table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
@@ -258,7 +320,7 @@ def observability(
     overview_tab.add(
         "table",
         table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=13, w=24, h=8),
+        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=24, h=8),
     )
 
     return weave.panels.Board(vars=varbar, panels=overview_tab)
