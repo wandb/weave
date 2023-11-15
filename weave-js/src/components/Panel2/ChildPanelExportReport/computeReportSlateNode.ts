@@ -2,9 +2,8 @@ import {
   ID,
   isAssignableTo,
   isConstNode,
-  isNodeOrVoidNode,
+  isNonVoidNode,
   isVarNode,
-  isVoidNode,
 } from '@wandb/weave/core';
 import _ from 'lodash';
 
@@ -76,8 +75,7 @@ const getVarItemsForPath = (
       // Additionally, the target config might be a direct node itself, so we
       // need to also check for equality with the input_node of the target
       // config.
-      (isNodeOrVoidNode(targetConfig) &&
-        !isVoidNode(targetConfig) &&
+      (isNonVoidNode(targetConfig) &&
         _.isEqual(config.input_node, targetConfig))
     ) {
       stack.forEach(frame => {

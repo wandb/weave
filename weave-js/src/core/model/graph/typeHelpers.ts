@@ -49,6 +49,12 @@ export function isVoidNode(maybeNode: any): maybeNode is VoidNode {
   );
 }
 
+export function isNonVoidNode(maybeNode: any): maybeNode is Node {
+  return (
+    isOutputNode(maybeNode) || isVarNode(maybeNode) || isConstNode(maybeNode)
+  );
+}
+
 export function isNodeOrVoidNode(maybeNode: any): maybeNode is NodeOrVoidNode {
   return (
     isOutputNode(maybeNode) ||
