@@ -196,7 +196,7 @@ def observability(
             n_bins=20,
             mark="bar",
         ),
-        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
     )
 
     overview_tab.add(
@@ -217,65 +217,7 @@ def observability(
             n_bins=20,
             mark="bar",
         ),
-        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
-    )
-
-    table = panels.Table(
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["run_id"] != None,
-            )
-        )
-    )
-    table.add_column(lambda row: row["entity_name"], "Entity", groupby=True)
-    table.add_column(lambda row: row.count(), "Count")
-    overview_tab.add(
-        "runs by user",
-        table,
-        layout=panels.GroupPanelLayout(x=12, y=12, w=12, h=4),
-    )
-
-    overview_tab.add(
-        "runtime_distribution",
-        panel_autoboard.timeseries(
-            filtered_data,
-            bin_domain_node=bin_range,
-            x_axis_key=timestamp_col_name,
-            y_expr=lambda row: weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                )
-            ),
-            y_title="duration",
-            color_expr=lambda row: grouping_fn_2(row),
-            color_title="trace_id",
-            x_domain=user_zoom_range,
-            n_bins=20,
-            mark="bar",
-        ),
-        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
-    )
-
-    overview_tab.add(
-        "time_in_state",
-        panel_autoboard.timeseries(
-            filtered_data,
-            bin_domain_node=bin_range,
-            x_axis_key=timestamp_col_name,
-            y_expr=lambda row: weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                )
-            ),
-            y_title="Time in state",
-            color_expr=lambda row: grouping_fn(row),
-            color_title="state",
-            x_domain=user_zoom_range,
-            n_bins=20,
-            mark="bar",
-        ),
-        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
     )
 
     table = panels.Table(filtered_window_data)
@@ -284,7 +226,7 @@ def observability(
     overview_tab.add(
         "runs_by_state_table",
         table,
-        layout=panels.GroupPanelLayout(x=0, y=0, w=9, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=18, w=9, h=8),
     )
 
     table = panels.Table(
@@ -300,12 +242,12 @@ def observability(
     overview_tab.add(
         "runs_by_user_table",
         table,
-        layout=panels.GroupPanelLayout(x=9, y=0, w=14, h=8),
+        layout=panels.GroupPanelLayout(x=9, y=18, w=15, h=8),
     )
 
     # metrics graph
     overview_tab.add(
-        "metrics_over_time",
+        "cpu_usage_on_run_finish",
         panel_autoboard.timeseries(
             filtered_data.filter(
                 weave_internal.define_fn(
@@ -318,13 +260,12 @@ def observability(
             y_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
             y_title="Average run CPU utilization",
             color_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"].avg(),
-            # color_expr=lambda row: grouping_fn_2(row),
             color_title="cpu %",
             x_domain=user_zoom_range,
             n_bins=30,
-            mark="point",
+            mark="bar",
         ),
-        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=26, w=24, h=6),
     )
 
     table = panels.Table(
@@ -362,7 +303,7 @@ def observability(
     overview_tab.add(
         "metrics",
         table,
-        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=32, w=24, h=6),
     )
 
     table = panels.Table(filtered_window_data)
@@ -372,9 +313,9 @@ def observability(
     table.add_column(lambda row: row["project_name"], "Project")
     table.add_column(lambda row: row["state"], "State")
     overview_tab.add(
-        "table",
+        "data_table",
         table,
-        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=38, w=24, h=8),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)
