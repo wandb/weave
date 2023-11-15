@@ -65,7 +65,12 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     _original_uri: typing.Optional[str]
     _metadata: dict[str, typing.Any]
 
-    def __init__(self, name: str, version: typing.Optional[str] = None):
+    def __init__(
+        self,
+        name: str,
+        version: typing.Optional[str] = None,
+        target_branch: typing.Optional[str] = None,
+    ):
         # LocalArtifacts are created frequently, sometimes in cases where
         # they will neither be read to or written to. The to_python path does
         # this, it creates an Artifact in case any of the objects in the tree
@@ -79,6 +84,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         self.name = name
         self._version = version
         self._branch: typing.Optional[str] = None
+        self._target_branch = target_branch
         self._root = os.path.join(local_artifact_dir(), name)
         self._original_uri = None
         self._path_handlers: dict[str, typing.Any] = {}
@@ -94,13 +100,14 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         ],
         target_branch: typing.Optional[str] = None,
     ):
-        art = cls(source_uri.name, target_branch or source_uri.version)
+        art = cls(source_uri.name, source_uri.version, target_branch)
         art._original_uri = str(source_uri)
         source_art = source_uri.to_ref().artifact
         if not isinstance(source_art, (LocalArtifact, artifact_wandb.WandbArtifact)):
             raise errors.WeaveInternalError(
                 "Cannot fork from non-local artifact: %s" % source_art
             )
+        art._version = source_art.version
         art._metadata = source_art.metadata.as_dict()
         return art
 
@@ -203,7 +210,8 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         )
         self._read_dirname = None
         if self._version:
-            read_dirname = os.path.join(self._root, self._version)
+            dirname = self._target_branch if self._target_branch else self._version
+            read_dirname = os.path.join(self._root, dirname)
             if not os.path.exists(read_dirname):
                 # If it doesn't exist, assume the user has passed in a branch name
                 # for version.
