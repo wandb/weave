@@ -181,7 +181,7 @@ def observability(
     overview_tab.add(
         "runtime_distribution",
         panel_autoboard.timeseries(
-            source_data,
+            filtered_data,
             bin_domain_node=bin_range,
             x_axis_key=timestamp_col_name,
             y_expr=lambda row: weave.ops.timedelta_total_seconds(
