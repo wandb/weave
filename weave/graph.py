@@ -369,6 +369,25 @@ def _map_nodes(
 OnErrorFnType = typing.Optional[typing.Callable[[int, Exception], Node]]
 
 
+def print_node(node: Node, depth=0):
+    prefix = "  " * depth
+    if isinstance(node, VarNode):
+        print(f"{prefix}VarNode({node.name})[{node.type}]")
+    elif isinstance(node, ConstNode):
+        truncated_val = str(node.val)
+        limit = 15
+        if len(truncated_val) > limit:
+            truncated_val = truncated_val[:limit] + "..."
+        print(f"{prefix}ConstNode({node.val})[{node.type}]")
+    elif isinstance(node, OutputNode):
+        print(f"{prefix}OutputNode({node.from_op.name})[{node.type}]")
+        for param_name, param_node in node.from_op.inputs.items():
+            print(f"{prefix}  {param_name}:")
+            print_node(param_node, depth + 1)
+    elif isinstance(node, VoidNode):
+        print(f"{prefix}VoidNode()")
+
+
 def map_nodes_top_level(
     leaf_nodes: list[Node],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
