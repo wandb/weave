@@ -11,6 +11,7 @@ import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
   URL_BROWSE2,
+  URL_BROWSE3,
   URL_LOCAL,
   URL_TEMPLATES,
   URL_RECENT,
@@ -20,6 +21,7 @@ import getConfig from './config';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
 import {Browse2} from './components/PagePanelComponents/Home/Browse2';
+import {Browse3} from './components/PagePanelComponents/Home/Browse3';
 import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
@@ -95,6 +97,24 @@ const Browse2Wrapper = () => (
   </React.Suspense>
 );
 
+const Browse3Wrapper = () => (
+  <React.Suspense fallback="loading">
+    <ErrorBoundary>
+      <NotebookComputeGraphContextProvider>
+        <StateInspector name="WeaveApp">
+          <PanelRootContextProvider>
+            <WeaveViewerContextProvider>
+              <PanelInteractContextProvider>
+                <Browse3 />
+              </PanelInteractContextProvider>
+            </WeaveViewerContextProvider>
+          </PanelRootContextProvider>
+        </StateInspector>
+      </NotebookComputeGraphContextProvider>
+    </ErrorBoundary>
+  </React.Suspense>
+);
+
 const basename = getConfig().PREFIX;
 ReactDOM.render(
   <Router basename={basename}>
@@ -120,6 +140,11 @@ ReactDOM.render(
       <Route
         path={`/${URL_BROWSE2}/:entity?/:project?/:rootType?/:objName?/:objVersion?/:refExtra*`}>
         <Browse2Wrapper />
+      </Route>
+      <Route path={`/${URL_BROWSE3}`}>
+        <Router basename={URL_BROWSE3}>
+          <Browse3Wrapper />
+        </Router>
       </Route>
       <Route path="/">
         <Main />
