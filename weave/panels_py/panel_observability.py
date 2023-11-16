@@ -162,7 +162,7 @@ def observability(
             y_expr=lambda row: row.count(),
             y_title="Launch Runs",
             color_expr=lambda row: grouping_fn(row),
-            color_title="group",
+            color_title="state",
             x_domain=user_zoom_range,
             n_bins=101,
             mark="bar",
@@ -180,21 +180,25 @@ def observability(
 
     overview_tab.add(
         "runtime_distribution",
-        panel_autoboard.timeseries(
+        panels.Plot(
             filtered_data,
-            bin_domain_node=bin_range,
-            x_axis_key=timestamp_col_name,
-            y_expr=lambda row: weave.ops.timedelta_total_seconds(
+            x=lambda row: row[timestamp_col_name].bin(
+                weave.ops.timestamp_bins_nice(bin_range, 30)
+            ),
+            x_title=timestamp_col_name,
+            y=lambda row: weave.ops.timedelta_total_seconds(
                 weave.ops.datetime_sub(
                     row[timestamp_col_name].max(), row[timestamp_col_name].min()
                 )
             ),
-            y_title="duration",
-            color_expr=lambda row: grouping_fn_2(row),
-            color_title="trace_id",
-            x_domain=user_zoom_range,
-            n_bins=20,
+            y_title="Duration (s)",
+            label=lambda row: grouping_fn_2(row),
+            tooltip=lambda row: row,
+            color_title="ID",
+            groupby_dims=["x", "label"],  # "tooltip"
             mark="bar",
+            no_legend=True,
+            domain_x=user_zoom_range,
         ),
         layout=panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
     )
@@ -246,25 +250,73 @@ def observability(
     )
 
     # metrics graph
+    # overview_tab.add(
+    #     "cpu_usage_on_run_finish",
+    #     panel_autoboard.timeseries(
+    #         filtered_data.filter(
+    #             weave_internal.define_fn(
+    #                 {"row": source_data.type.object_type},
+    #                 lambda row: row["state"] == "finished",
+    #             )
+    #         ),
+    #         bin_domain_node=bin_range,
+    #         x_axis_key=timestamp_col_name,
+    #         y_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
+    #         y_title="Average run CPU utilization",
+    #         color_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"].avg(),
+    #         color_title="cpu %",
+    #         x_domain=user_zoom_range,
+    #         n_bins=30,
+    #         mark="line",
+    #     ),
+    #     layout=panels.GroupPanelLayout(x=0, y=26, w=24, h=6),
+    # )
+
+    # metrics graph
+    # plot = weave.panels.Plot(
+    #     filtered_data.filter(
+    #         weave_internal.define_fn(
+    #             {"row": source_data.type.object_type},
+    #             lambda row: row["state"] == "finished",
+    #         )
+    #     ),
+    #     x=lambda row: row[timestamp_col_name].bin(
+    #         weave.ops.timestamp_bins_nice(bin_range, 30)
+    #     )["start"],
+    #     x_title=timestamp_col_name,
+    #     y=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
+    #     y_title="Average run CPU utilization",
+    #     label=lambda row: row["metrics"]["system"]["cpu_cores_util"].avg(),
+    #     tooltip=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
+    #     color_title="cpu %",
+    #     groupby_dims=["x", "label", "tooltip"],
+    #     mark="line",
+    #     no_legend=True,
+    #     domain_x=user_zoom_range,
+    # )
+    plot = weave.panels.Plot(
+        input_node,
+        x=lambda row: row[timestamp_col_name].bin(
+            weave.ops.timestamp_bins_nice(bin_range, 100)
+        )["start"],
+        x_title=timestamp_col_name,
+        y=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
+        y_title="avg cpu_cores_util",
+        label=lambda row: row["trace_id"],
+        # tooltip=lambda row: {
+        #     "run start": row[timestamp_col_name],
+        #     "avg cpu %": row["metrics"]["system"]["cpu_cores_util"][0].avg(),
+        # },
+        tooltip=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
+        groupby_dims=["x", "label"],
+        mark="line",
+        no_legend=True,
+        domain_x=user_zoom_range,
+    )
+
     overview_tab.add(
         "cpu_usage_on_run_finish",
-        panel_autoboard.timeseries(
-            filtered_data.filter(
-                weave_internal.define_fn(
-                    {"row": source_data.type.object_type},
-                    lambda row: row["state"] == "finished",
-                )
-            ),
-            bin_domain_node=bin_range,
-            x_axis_key=timestamp_col_name,
-            y_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"][0].avg(),
-            y_title="Average run CPU utilization",
-            color_expr=lambda row: row["metrics"]["system"]["cpu_cores_util"].avg(),
-            color_title="cpu %",
-            x_domain=user_zoom_range,
-            n_bins=30,
-            mark="bar",
-        ),
+        plot,
         layout=panels.GroupPanelLayout(x=0, y=26, w=24, h=6),
     )
 
