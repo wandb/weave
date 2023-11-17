@@ -38,6 +38,7 @@ import {
   opDateToNumber,
   opDict,
   opFilter,
+  opIndex,
   opLimit,
   // opMap,
   // opMerge,
@@ -59,6 +60,7 @@ import {
   union,
   varNode,
   voidNode,
+  withFileTag,
   withoutTags,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
@@ -2388,10 +2390,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     );
   }, [concattedLineTable, vegaCols]);
 
-  const tooltipData: {[seriesIndexRowIndexString: string]: ConstNode} =
+  const tooltipData: {[seriesIndexRowIndexString: string]: Node} =
     useMemo(() => {
       return concattedNonLineTable.reduce(
-        (acc: {[seriesIndexRowIndexString: string]: ConstNode}, row) => {
+        (acc: {[seriesIndexRowIndexString: string]: Node}, row) => {
           const key = `[${row._seriesIndex},${row._rowIndex}]`;
 
           // check if we have a null select function, and thus are using the default tooltip
@@ -2427,10 +2429,23 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             // use custom tooltip
 
             const type = table.columnSelectFunctions[s.dims.tooltip].type;
-            acc[key] = constNodeUnsafe(
-              isTaggedValue(type) ? taggedValueValueType(type) : type,
-              row[vegaCols[row._seriesIndex].tooltip]
-            );
+            if (isAssignableTo(type, withFileTag('any', {type: 'file'}))) {
+              acc[key] = opPick({
+                obj: opIndex({
+                  arr: opIndex({
+                    arr: flatResultNode,
+                    index: constNumber(row._seriesIndex),
+                  }),
+                  index: constNumber(row._rowIndex),
+                }),
+                key: constString(vegaCols[row._seriesIndex].tooltip),
+              });
+            } else {
+              acc[key] = constNodeUnsafe(
+                isTaggedValue(type) ? taggedValueValueType(type) : type,
+                row[vegaCols[row._seriesIndex].tooltip]
+              );
+            }
           }
 
           return acc;
