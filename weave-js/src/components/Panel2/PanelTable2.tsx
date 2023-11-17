@@ -18,6 +18,7 @@ import {PanelContextProvider, usePanelContext} from './PanelContext';
 
 type PanelTable2Config = {
   columns: ChildPanelFullConfig[];
+  pbConfig?: PanelBankSectionConfig;
 };
 
 export const PANEL_TABLE2_DEFAULT_CONFIG: PanelTable2Config = {

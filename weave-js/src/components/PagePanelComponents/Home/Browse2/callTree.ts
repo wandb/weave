@@ -335,7 +335,7 @@ export const callsTableSelectTraces = (stNode: Node) => {
 
 export const opSignatureFromSpan = (span: Span): OpSignature => {
   const inputs = span.inputs;
-  const inputOrder =
+  const inputOrder: string[] =
     inputs._input_order ?? Object.keys(inputs).filter(k => !k.startsWith('_'));
   const inputTypes = _.fromPairs(
     inputOrder

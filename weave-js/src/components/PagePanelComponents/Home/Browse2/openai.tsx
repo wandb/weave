@@ -108,7 +108,7 @@ export const OpenAIChatMessage: FC<{message: ChatMessage}> = ({message}) => {
           ) : message.role === 'system' ? (
             <Settings />
           ) : (
-            <div>Role: {message.role}</div>
+            <div>Role: {(message as any).role}</div>
           )}
         </div>
         <div>

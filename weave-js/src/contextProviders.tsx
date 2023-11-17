@@ -82,7 +82,8 @@ const useRemoteEcosystemClient = (
       makeEcosystemMixedOpStore(StaticOpStore.getInstance(), remoteOpStore),
       getCookie('anon_api_key'),
       // Always use off of window object, in case of fetch wrappers
-      (input, init) => window.fetch(input, init)
+      // `as any` required as part of node 16 -> 18 upgrade
+      (input, init) => window.fetch(input as any, init)
     );
   }, [isAdmin, remoteOpStore, tokenFunc, loading]);
 };

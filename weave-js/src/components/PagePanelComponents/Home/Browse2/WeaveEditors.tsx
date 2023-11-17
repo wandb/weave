@@ -656,7 +656,7 @@ export const WeaveEditorTable: FC<{
     },
     [path, addEdit, sourceRows]
   );
-  const columnSpec = useMemo(() => {
+  const columnSpec: GridColDef[] = useMemo(() => {
     return [
       {
         field: '_origIndex',

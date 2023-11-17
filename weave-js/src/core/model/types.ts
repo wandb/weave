@@ -421,6 +421,10 @@ export interface RefType {
   type: 'Ref';
 }
 
+export interface WandbArtifactRef {
+  type: 'WandbArtifactRef';
+}
+
 export interface FilesystemArtifact {
   type: 'FilesystemArtifact';
 }
@@ -467,7 +471,8 @@ export type ComplexType =
   | NDArrayType
   | TimestampType
   | OpDefType
-  | RefType;
+  | RefType
+  | WandbArtifactRef;
 export type Type = ComplexType | SimpleType;
 
 export type TypeID = ComplexType['type'] | SimpleType;
