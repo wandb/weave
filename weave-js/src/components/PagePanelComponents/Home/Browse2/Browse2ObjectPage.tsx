@@ -30,8 +30,6 @@ export const Browse2ObjectPage: FC = props => {
     params.objName
   );
 
-  console.log({versionNames});
-
   const rows = useMemo(
     () =>
       (versionNames.result ?? []).map((row, i) => ({
