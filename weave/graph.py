@@ -7,6 +7,10 @@ from . import weave_types
 from . import uris
 from . import storage
 
+if typing.TYPE_CHECKING:
+    from . import node_inspector
+
+
 T = typing.TypeVar("T")
 
 
@@ -33,6 +37,13 @@ class Node(typing.Generic[T]):
 
     def to_json(self) -> dict:
         raise NotImplementedError
+
+    def _inspect(self) -> "node_inspector.Inspector":
+        """Only intended to be used by developers to help debug the graph."""
+        # Circular import, so we do it here.
+        from . import node_inspector
+
+        return node_inspector.Inspector(self)
 
     def __hash__(self) -> int:
         # We store nodes in a memoize cache in execute.py. They need to be
