@@ -54,7 +54,7 @@ const contentClassName = classNames(
   'absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]', // centers modal on screen
   'rounded border py-24 px-32',
   'shadow-lg shadow-oblivion/[0.16] dark:shadow-oblivion/[0.48]',
-  'border-moon-250 bg-white bg-white text-moon-850 ',
+  'border-moon-250 bg-white text-moon-850 ',
   'dark:border-moon-750 dark:bg-moon-900 dark:text-moon-150'
 );
 export const Content = React.forwardRef<
