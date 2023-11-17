@@ -72,6 +72,8 @@ def write_artifact_to_wandb(
     _lite_run: typing.Optional[InMemoryLazyLiteRun] = None,
     artifact_collection_exists: bool = False,
 ) -> WeaveWBArtifactURIComponents:
+    artifact_name = artifact.name
+
     tracer = engine_trace.tracer()  # type: ignore
     # Here we get the default entity if none is provided.
     # When we support saving dashboards to target entities,
