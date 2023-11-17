@@ -34,8 +34,6 @@ export function formatRelativeTime(unixTimestamp: number): string {
   const inFuture = timeDiff < 0;
   timeDiff = Math.abs(timeDiff);
 
-  console.log({timeDiff, unixTimestamp});
-
   const seconds = timeDiff / 1000;
   const minutes = seconds / 60;
   const hours = minutes / 60;
