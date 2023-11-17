@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v1
         with:
-          node-version: "18.x"
+          node-version: "16.x"
       - run: |
           pip install build twine
           ./build_dist.py

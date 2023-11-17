@@ -82,7 +82,7 @@ const useRemoteEcosystemClient = (
       makeEcosystemMixedOpStore(StaticOpStore.getInstance(), remoteOpStore),
       getCookie('anon_api_key'),
       // Always use off of window object, in case of fetch wrappers
-      // `as any` required as part of node 16 -> 18 upgrade
+      // Why is this as any needed all of a sudden?
       (input, init) => window.fetch(input as any, init)
     );
   }, [isAdmin, remoteOpStore, tokenFunc, loading]);
