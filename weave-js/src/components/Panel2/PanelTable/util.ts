@@ -23,7 +23,6 @@ import _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
 import {Stack} from '../../../core';
-import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';

@@ -1,11 +1,4 @@
-import {
-  constNumber,
-  NodeOrVoidNode,
-  opCount,
-  opIndex,
-  varNode,
-  voidNode,
-} from '@wandb/weave/core';
+import {constNumber, opCount, opIndex, varNode} from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
 
 import * as CGReact from '../../react';

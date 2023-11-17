@@ -5,8 +5,6 @@
 import {useWeaveContext} from '@wandb/weave/context';
 import {
   callOpVeryUnsafe,
-  constFunction,
-  constNodeUnsafe,
   constString,
   Node,
   opArtifactName,
@@ -18,10 +16,9 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {isWandbArtifactRef, parseRef, useNodeValue} from '@wandb/weave/react';
-import * as _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo} from 'react';
 
-import {ChildPanelConfig, initPanel} from './ChildPanel';
+import {initPanel} from './ChildPanel';
 import * as Panel2 from './panel';
 import {usePanelContext} from './PanelContext';
 
@@ -68,12 +65,13 @@ export const PanelOpDef: React.FC<PanelLabeledItemProps> = props => {
   }, [entityProject]);
   const streamNamesQuery = useNodeValue(streamTableNamesNode);
   const streamNames: string[] = streamNamesQuery.result ?? [];
-  const [chosenStreamName, setChosenStreamName] = useState<string | undefined>(
-    undefined
-  );
+  // const [chosenStreamName, setChosenStreamName] = useState<string | undefined>(
+  //   undefined
+  // );
+  const chosenStreamName = undefined;
   const streamName = chosenStreamName ?? streamNames[0];
 
-  const [panel, setPanel] = React.useState<ChildPanelConfig | undefined>();
+  // const [panel, setPanel] = React.useState<ChildPanelConfig | undefined>();
   useEffect(() => {
     if (entityProject == null || streamName == null) {
       return;
@@ -106,32 +104,27 @@ export const PanelOpDef: React.FC<PanelLabeledItemProps> = props => {
         },
       },
     };
-    const filtered = callOpVeryUnsafe('filter', {
-      arr: streamTableRowsNode,
-      filterFn: constFunction(
-        {row: 'any'},
-        ({row}) =>
-          callOpVeryUnsafe('Ref-__eq__', {
-            self: callOpVeryUnsafe('pick', {
-              obj: row,
-              key: constString('inputs.self'),
-            }),
-            other: constNodeUnsafe(refType, opDefRefStr),
-          }) as any
-      ),
-    }) as Node;
-    const counted = callOpVeryUnsafe('count', {
-      arr: filtered,
-    }) as Node;
+    // const filtered = callOpVeryUnsafe('filter', {
+    //   arr: streamTableRowsNode,
+    //   filterFn: constFunction(
+    //     {row: 'any'},
+    //     ({row}) =>
+    //       callOpVeryUnsafe('Ref-__eq__', {
+    //         self: callOpVeryUnsafe('pick', {
+    //           obj: row,
+    //           key: constString('inputs.self'),
+    //         }),
+    //         other: constNodeUnsafe(refType, opDefRefStr),
+    //       }) as any
+    //   ),
+    // }) as Node;
+    // const counted = callOpVeryUnsafe('count', {
+    //   arr: filtered,
+    // }) as Node;
     const doInit = async () => {
-      const panel = await initPanel(
-        weave,
-        streamTableRowsNode,
-        undefined,
-        undefined,
-        stack
-      );
-      setPanel(panel);
+      // const panel = await initPanel(
+      await initPanel(weave, streamTableRowsNode, undefined, undefined, stack);
+      // setPanel(panel);
     };
     doInit();
   }, [stack, weave, opDefRefStr, entityProject, streamName]);

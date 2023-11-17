@@ -1,4 +1,4 @@
-import {Box, Button, Chip,Grid, Typography} from '@mui/material';
+import {Box, Button, Grid, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC} from 'react';
@@ -11,7 +11,7 @@ import {
   OpenAIChatInputView,
   OpenAIChatOutputView,
 } from './openai';
-import {parseRefMaybe,SmallRef} from './SmallRef';
+import {parseRefMaybe, SmallRef} from './SmallRef';
 
 const ObjectView: FC<{obj: any}> = ({obj}) => {
   if (_.isPlainObject(obj)) {

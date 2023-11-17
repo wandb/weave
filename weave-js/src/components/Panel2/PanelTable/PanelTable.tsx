@@ -422,17 +422,17 @@ const PanelTableInner: React.FC<
         }
       } else {
         const activeRowForGrouping =
-        {
-          ...config.activeRowForGrouping,
-          [compositeGroupKey]: row,
-        } ?? {};
-      // if row is less than 0, delete the active row
-      if (row < 0) {
-        delete activeRowForGrouping[compositeGroupKey];
-      }
-      updateConfig({
-        activeRowForGrouping,
-      });
+          {
+            ...config.activeRowForGrouping,
+            [compositeGroupKey]: row,
+          } ?? {};
+        // if row is less than 0, delete the active row
+        if (row < 0) {
+          delete activeRowForGrouping[compositeGroupKey];
+        }
+        updateConfig({
+          activeRowForGrouping,
+        });
       }
     },
     [compositeGroupKey, config.activeRowForGrouping, updateConfig, updateInput]
@@ -1187,13 +1187,23 @@ const IndexCell: React.FC<{
   if (index.loading) {
     return <S.IndexColumnVal />;
   } else {
+    const isSelected =
+      index.result != null && index.result === props.activeRowIndex;
+    const runName = runNameNodeValue.result ?? '';
+    const basicIndexContent = (
+      <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+    );
+    const indexOnClick = () => {
+      if (!props.simpleTable) {
+        if (isSelected) {
+          props.setRowAsPinned(-1);
+        } else {
+          props.setRowAsPinned(index.result);
+        }
+      }
+    };
     return (
-      <S.IndexColumnVal
-        onClick={() => {
-          if (!props.simpleTable) {
-            props.setRowAsPinned(index.result);
-          }
-        }}>
+      <S.IndexColumnVal onClick={indexOnClick}>
         <S.IndexColumnText
           style={{
             color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
@@ -1204,8 +1214,19 @@ const IndexCell: React.FC<{
                 }
               : {}),
           }}>
-          {props.simpleTable ? (
-            <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+          {tableIsPanelVariableVal && (
+            <S.IndexCellCheckboxWrapper
+              className="index-cell-checkbox"
+              isSelected={isSelected}>
+              <Checkbox
+                onClick={indexOnClick}
+                checked={isSelected}
+                size="small"
+              />
+            </S.IndexCellCheckboxWrapper>
+          )}
+          {props.simpleTable || !runName ? (
+            basicIndexContent
           ) : window.location.toString().includes('browse2') ? (
             <div style={{cursor: 'pointer'}}>🔗</div>
           ) : (
@@ -1217,66 +1238,15 @@ const IndexCell: React.FC<{
                 },
               }}
               position="top center"
-              popperDependencies={[index.result, runNameNodeValue.result]}
-              content={runNameNodeValue.result ?? ''}
-              trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
+              popperDependencies={[index.result, runName]}
+              content={runName}
+              trigger={basicIndexContent}
             />
           )}
         </S.IndexColumnText>
       </S.IndexColumnVal>
     );
   }
-  const isSelected =
-    index.result != null && index.result === props.activeRowIndex;
-  const runName = runNameNodeValue.result ?? '';
-  const basicIndexContent = (
-    <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
-  );
-  const indexOnClick = () => {
-    if (!props.simpleTable) {
-      if (isSelected) {
-        props.setRowAsPinned(-1);
-      } else {
-        props.setRowAsPinned(index.result);
-      }
-    }
-  };
-  return (
-    <S.IndexColumnVal onClick={indexOnClick}>
-      <S.IndexColumnText
-        style={{
-          color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
-        }}>
-        {tableIsPanelVariableVal && (
-          <S.IndexCellCheckboxWrapper
-            className="index-cell-checkbox"
-            isSelected={isSelected}>
-            <Checkbox
-              onClick={indexOnClick}
-              checked={isSelected}
-              size="small"
-            />
-          </S.IndexCellCheckboxWrapper>
-        )}
-        {props.simpleTable || !runName ? (
-          basicIndexContent
-        ) : (
-          <Popup
-            // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
-            popperModifiers={{
-              preventOverflow: {
-                boundariesElement: 'offsetParent',
-              },
-            }}
-            position="top center"
-            popperDependencies={[index.result, runName]}
-            content={runName}
-            trigger={basicIndexContent}
-          />
-        )}
-      </S.IndexColumnText>
-    </S.IndexColumnVal>
-  );
 };
 
 const ActionCell: React.FC<{
