@@ -90,6 +90,7 @@ import {
   useRowsNode,
   useUpdateConfigKey,
 } from './util';
+import {WeaveAlignmentContext} from './PanelTableContext';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -231,14 +232,16 @@ const PanelTableInnerConfigSetter: React.FC<
   }
 
   return (
-    <PanelTableInner
-      {...props}
-      config={protectedConfig}
-      autoTable={autoTable}
-      updateConfig={protectedUpdateConfig}
-      showColumnSelect={showColumnSelect}
-      setShowColumnSelect={setShowColumnSelect}
-    />
+    <WeaveAlignmentContext.Provider value={{isInTable: true, isInRow: false}}>
+      <PanelTableInner
+        {...props}
+        config={protectedConfig}
+        autoTable={autoTable}
+        updateConfig={protectedUpdateConfig}
+        showColumnSelect={showColumnSelect}
+        setShowColumnSelect={setShowColumnSelect}
+      />
+    </WeaveAlignmentContext.Provider>
   );
 };
 
