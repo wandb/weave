@@ -1,4 +1,4 @@
-# This file contains helper functions to inspect nodes. The main 
+# This file contains helper functions to inspect nodes. The main
 # purpose it to be used in debugging sessions
 
 """
@@ -109,10 +109,12 @@ import tabulate
 from . import weave_types as types
 from . import graph
 
+
 def _trimmed_string(s: str, max_len: int = 20):
     if len(s) > max_len - 3:
-        return s[:max_len // 2] + "..." + s[-max_len // 2:]
+        return s[: max_len // 2] + "..." + s[-max_len // 2 :]
     return s
+
 
 def _node_name(node: graph.Node):
     if isinstance(node, graph.OutputNode):
@@ -120,20 +122,22 @@ def _node_name(node: graph.Node):
     elif isinstance(node, graph.VarNode):
         return node.name
     elif isinstance(node, graph.ConstNode):
-        if (isinstance(node.val, (str, int, float, bool))):
+        if isinstance(node.val, (str, int, float, bool)):
             return _trimmed_string("<<" + str(node.val) + ">>")
-        return 'CONST_VAL'
+        return "CONST_VAL"
     elif isinstance(node, graph.VoidNode):
-        return 'VOID'
+        return "VOID"
     else:
         raise Exception(f"Unknown node type: {type(node)}")
-    
+
+
 def _node_type_name(node: graph.Node):
     return type(node).__name__
-    
+
 
 def _type_name(node_type: types.Type):
     from .language_features.tagging import tagged_value_type
+
     if isinstance(node_type, tagged_value_type.TaggedValueType):
         return f"TV({_type_name(node_type.value)})"
     return type(node_type).__name__
@@ -141,7 +145,7 @@ def _type_name(node_type: types.Type):
 
 def _type_props(node_type: types.Type):
     if isinstance(node_type, types.UnionType):
-        return {str(n):m for n, m in enumerate(node_type.members)}
+        return {str(n): m for n, m in enumerate(node_type.members)}
     elif isinstance(node_type, types.TypedDict):
         return node_type.property_types
     elif isinstance(node_type, types.Function):
@@ -169,7 +173,7 @@ class TypeIter:
     parent_type: typing.Optional[types.Type] = None
 
 
-def _type_iter( node_type: types.Type):
+def _type_iter(node_type: types.Type):
     stack = [TypeIter("", node_type, 0, True)]
     while stack:
         type_iter = stack.pop(0)
@@ -178,7 +182,16 @@ def _type_iter( node_type: types.Type):
         num_props = len(props)
 
         for ndx, (prop_name, prop_type) in reversed(list(enumerate(props.items()))):
-            stack.insert(0, TypeIter(prop_name, prop_type, type_iter.depth + 1, is_last=num_props == ndx + 1, parent_type=type_iter.node_type))
+            stack.insert(
+                0,
+                TypeIter(
+                    prop_name,
+                    prop_type,
+                    type_iter.depth + 1,
+                    is_last=num_props == ndx + 1,
+                    parent_type=type_iter.node_type,
+                ),
+            )
 
 
 @dataclasses.dataclass
@@ -204,16 +217,34 @@ class Inspector:
                 items = enumerate(node_iter.node.from_op.inputs.items())
                 reversed_items = reversed(list(items))
                 for ndx, (param_name, param) in reversed_items:
-                    stack.insert(0, NodeIter(param_name, param, node_iter.depth + 1, is_last=num_params == ndx + 1, parent_node=node_iter.node))
-            elif isinstance(node_iter.node, graph.ConstNode) and isinstance(node_iter.node.val, graph.Node):
-                stack.insert(0, NodeIter(node_iter.param_name, node_iter.node.val, node_iter.depth + 1, is_last=True,  parent_node=node_iter.node))
+                    stack.insert(
+                        0,
+                        NodeIter(
+                            param_name,
+                            param,
+                            node_iter.depth + 1,
+                            is_last=num_params == ndx + 1,
+                            parent_node=node_iter.node,
+                        ),
+                    )
+            elif isinstance(node_iter.node, graph.ConstNode) and isinstance(
+                node_iter.node.val, graph.Node
+            ):
+                stack.insert(
+                    0,
+                    NodeIter(
+                        node_iter.param_name,
+                        node_iter.node.val,
+                        node_iter.depth + 1,
+                        is_last=True,
+                        parent_node=node_iter.node,
+                    ),
+                )
 
     def _pre_order_type_iter(self):
         for node_iter in self._pre_order_node_iter():
             for type_iter in _type_iter(node_iter.node.type):
                 yield type_iter
-    
-  
 
     def _build_maps(self):
         for node_iter in self._pre_order_node_iter():
@@ -229,16 +260,15 @@ class Inspector:
                     self.type_to_id_map[type_iter.node_type] = type_id
 
     def summarize(self, node_id: typing.Optional[int] = None):
-        if (node_id is not None):
+        if node_id is not None:
             target_node = self.id_to_node_map[node_id]
             Inspector(target_node).summarize()
             return target_node
         else:
-            print("\nNode Summary:\n") 
+            print("\nNode Summary:\n")
             print("\nNode as string:", self.base_node)
             self.print_node_table()
             self.print_type_table()
-
 
     def print_node_table(self):
         table = []
@@ -250,11 +280,13 @@ class Inspector:
             if node_iter.depth > last_depth:
                 depth_state.append("OPEN")
             last_depth = node_iter.depth
-            depth_state = depth_state[:node_iter.depth + 1]
+            depth_state = depth_state[: node_iter.depth + 1]
             if node_iter.is_last:
                 depth_state[node_iter.depth] = "CLOSED"
-                depth_state = depth_state[:node_iter.depth + 1]
-            if isinstance(node_iter.node, graph.ConstNode) and isinstance(node_iter.node.val, graph.Node):
+                depth_state = depth_state[: node_iter.depth + 1]
+            if isinstance(node_iter.node, graph.ConstNode) and isinstance(
+                node_iter.node.val, graph.Node
+            ):
                 depth_state[node_iter.depth] = "FUNCTION"
             name_prefix = ""
             for depth, state in enumerate(depth_state):
@@ -283,22 +315,24 @@ class Inspector:
             name_prefix += " "
 
             row = {
-                        'NODE ID': None,
-                        'NAME': None,
-                        'PARAM': node_iter.param_name,
-                        'NODE TYPE': _node_type_name(node_iter.node),
-                        'TYPE NAME': _type_name(node_iter.node.type),
-                        'TYPE ID': self.type_to_id_map[node_iter.node.type],
-                    }
+                "NODE ID": None,
+                "NAME": None,
+                "PARAM": node_iter.param_name,
+                "NODE TYPE": _node_type_name(node_iter.node),
+                "TYPE NAME": _type_name(node_iter.node.type),
+                "TYPE ID": self.type_to_id_map[node_iter.node.type],
+            }
             if node_iter.node in completed_nodes:
                 reference_nodes.add(node_iter.node)
                 if not (node_iter.parent_node in reference_nodes):
-                    row['NODE ID'] = '.'
-                    row['NAME'] = name_prefix + f"NODE_ID({self.node_to_id_map[node_iter.node]})"
+                    row["NODE ID"] = "."
+                    row["NAME"] = (
+                        name_prefix + f"NODE_ID({self.node_to_id_map[node_iter.node]})"
+                    )
                     table.append(row)
             else:
-                row['NODE ID'] = self.node_to_id_map[node_iter.node]
-                row['NAME'] = name_prefix + _node_name(node_iter.node)
+                row["NODE ID"] = self.node_to_id_map[node_iter.node]
+                row["NAME"] = name_prefix + _node_name(node_iter.node)
                 table.append(row)
                 completed_nodes.add(node_iter.node)
 
@@ -317,10 +351,10 @@ class Inspector:
             if type_iter.depth > last_depth:
                 depth_state.append("OPEN")
             last_depth = type_iter.depth
-            depth_state = depth_state[:type_iter.depth + 1]
+            depth_state = depth_state[: type_iter.depth + 1]
             if type_iter.is_last:
                 depth_state[type_iter.depth] = "CLOSED"
-                depth_state = depth_state[:type_iter.depth + 1]
+                depth_state = depth_state[: type_iter.depth + 1]
             name_prefix = ""
             for depth, state in enumerate(depth_state):
                 if state == "OPEN":
@@ -340,25 +374,30 @@ class Inspector:
             if type_iter.param_name:
                 name_prefix += f" [{type_iter.param_name}]: "
             else:
-                name_prefix += f" "
+                name_prefix += " "
 
-            row ={
-                'TYPE ID': self.type_to_id_map[type_iter.node_type],
-                'TYPE NAME': name_prefix + _type_name(type_iter.node_type),
+            row = {
+                "TYPE ID": self.type_to_id_map[type_iter.node_type],
+                "TYPE NAME": name_prefix + _type_name(type_iter.node_type),
             }
 
-            if type_iter.node_type in completed_nodes:                    
+            if type_iter.node_type in completed_nodes:
                 reference_nodes.add(type_iter.node_type)
-                if type_iter.depth > 0 and not (type_iter.parent_type in reference_nodes):
-                    row['TYPE ID'] = '.'
+                if type_iter.depth > 0 and not (
+                    type_iter.parent_type in reference_nodes
+                ):
+                    row["TYPE ID"] = "."
                     if len(_type_props(type_iter.node_type)) == 0:
-                        row['TYPE NAME'] = name_prefix + _type_name(type_iter.node_type)
+                        row["TYPE NAME"] = name_prefix + _type_name(type_iter.node_type)
                     else:
-                        row['TYPE NAME'] = name_prefix + f"TYPE_ID({self.type_to_id_map[type_iter.node_type]})"
+                        row["TYPE NAME"] = (
+                            name_prefix
+                            + f"TYPE_ID({self.type_to_id_map[type_iter.node_type]})"
+                        )
                     table.append(row)
             else:
-                row['TYPE ID'] = self.type_to_id_map[type_iter.node_type]
-                row['TYPE NAME'] = name_prefix + _type_name(type_iter.node_type)
+                row["TYPE ID"] = self.type_to_id_map[type_iter.node_type]
+                row["TYPE NAME"] = name_prefix + _type_name(type_iter.node_type)
                 table.append(row)
                 completed_nodes.add(type_iter.node_type)
 
@@ -366,4 +405,3 @@ class Inspector:
         tabulate.PRESERVE_WHITESPACE = True
         print(tabulate.tabulate(table, headers="keys"))
         print("")
-
