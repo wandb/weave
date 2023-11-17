@@ -864,73 +864,75 @@ def _compile_refine_and_propagate_gql_inner(
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
+# TODO: Move this into the function above to reduce N^2-ness? Included changing to map top level in above
+# TODO: Zip the function args so we are not reliant on names (audit this at both levels)
+
+
 def _propagate_updated_types_through_lambdas(
     op: OpDef, params: dict[str, graph.Node], on_error: graph.OnErrorFnType = None
 ):
+    """
+    This method ensures that the lambda variables for a given op are correctly
+    typed. Since the lambda function's variable typing is dependent on: a) the
+    op; b) the prior params, we can only correctly determine the type after the
+    prior args are correctly typed. Moreover, we need the op itself to determine
+    the expected type of the lambda variables. This function updates the lambda
+    stub (type of the function itself) as well as the internal variable nodes
+    accordingly. It then refines the inner lambda function to ensure that the
+    updated variable types are correctly propagated through the lambda function.
+    """
+    if not isinstance(op.input_type, op_args.OpNamedArgs):
+        return params
+
     updated_params: dict[str, graph.Node] = {**params}
-    if isinstance(op.input_type, op_args.OpNamedArgs):
-        for k, target_node in params.items():
-            input_arg_type = op.input_type.arg_types[k]
-            if callable(input_arg_type):
-                expected_type = input_arg_type(
-                    {k: p.type for k, p in updated_params.items()}
-                )
-                if (
-                    isinstance(expected_type, types.Function)
-                    and isinstance(target_node.type, types.Function)
-                    and isinstance(target_node, graph.ConstNode)
-                ):
-                    param_type_frame = target_node.type.input_types
-                    expected_type_frame = expected_type.input_types
-                    expected_type_frame_needs_update = {}
-                    final_expected_type_frame = {}
-                    for (
-                        expected_type_frame_key,
-                        expected_type_frame_value,
-                    ) in expected_type_frame.items():
-                        if expected_type_frame_key in param_type_frame:
-                            if not expected_type_frame_value.assign_type(
-                                param_type_frame[expected_type_frame_key]
-                            ):
-                                expected_type_frame_needs_update[
-                                    expected_type_frame_key
-                                ] = expected_type_frame[expected_type_frame_key]
-                                final_expected_type_frame[
-                                    expected_type_frame_key
-                                ] = expected_type_frame[expected_type_frame_key]
-                            else:
-                                final_expected_type_frame[
-                                    expected_type_frame_key
-                                ] = param_type_frame[expected_type_frame_key]
-                    if len(expected_type_frame_needs_update) > 0:
 
-                        def _update_fn_vars(
-                            node: graph.Node,
-                        ) -> typing.Optional[graph.Node]:
-                            if (
-                                isinstance(node, graph.VarNode)
-                                and node.name in expected_type_frame_needs_update
-                            ):
-                                return graph.VarNode(
-                                    expected_type_frame_needs_update[node.name],
-                                    node.name,
-                                )
-                            return node
+    for k, target_node in params.items():
+        if not (
+            isinstance(target_node, graph.ConstNode)
+            and isinstance(target_node.type, types.Function)
+        ):
+            continue
 
-                        working_nodes = [target_node.val]
-                        working_nodes = graph.map_nodes_top_level(
-                            [target_node.val], _update_fn_vars, on_error
-                        )
-                        working_nodes = _compile_refine_and_propagate_gql_inner(
-                            working_nodes, True, on_error
-                        )
-                        updated_params[k] = graph.ConstNode(
-                            types.Function(
-                                final_expected_type_frame,
-                                target_node.type.output_type,
-                            ),
-                            working_nodes[0],
-                        )
+        input_arg_type = op.input_type.arg_types[k]
+
+        if not callable(input_arg_type):
+            continue
+
+        expected_type = input_arg_type({k: p.type for k, p in updated_params.items()})
+
+        if not isinstance(expected_type, types.Function):
+            continue
+
+        updated_input_types = {**target_node.type.input_types}
+        expected_input_types = expected_type.input_types
+        dirty_input_keys = set()
+        for (input_key, expected_input_type) in expected_input_types.items():
+            if input_key not in updated_input_types or expected_input_type.assign_type(
+                updated_input_types[input_key]
+            ):
+                continue
+            dirty_input_keys.add(input_key)
+            updated_input_types[input_key] = expected_input_types[input_key]
+
+        if len(dirty_input_keys) == 0:
+            continue
+
+        def _update_fn_vars(node: graph.Node) -> typing.Optional[graph.Node]:
+            if isinstance(node, graph.VarNode) and node.name in dirty_input_keys:
+                return graph.VarNode(updated_input_types[node.name], node.name)
+            return node
+
+        working_nodes = [target_node.val]
+        working_nodes = graph.map_nodes_top_level(
+            [target_node.val], _update_fn_vars, on_error
+        )
+        working_nodes = _compile_refine_and_propagate_gql_inner(
+            working_nodes, True, on_error
+        )
+        updated_params[k] = graph.ConstNode(
+            types.Function(updated_input_types, target_node.type.output_type),
+            working_nodes[0],
+        )
     return updated_params
 
 
