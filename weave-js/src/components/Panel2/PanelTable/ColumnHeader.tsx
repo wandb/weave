@@ -23,9 +23,10 @@ import {Popup} from 'semantic-ui-react';
 import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
+import {Button} from '../../Button';
+import {Tooltip} from '../../Tooltip';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
-import {IconClose} from '../Icons';
 import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
@@ -305,8 +306,8 @@ export const ColumnHeader: React.FC<{
 
   let columnTypeForGroupByChecks = stripTag(workingSelectFunction.type);
   if (!isGroupCol) {
-    /* 
-      Once one column is grouped, the other non-grouped columns are all typed as 
+    /*
+      Once one column is grouped, the other non-grouped columns are all typed as
       lists. So we need to figure out the inner types of the non-grouped columns.
       */
     columnTypeForGroupByChecks = isListLike(columnTypeForGroupByChecks)
@@ -538,12 +539,12 @@ export const ColumnHeader: React.FC<{
                 marginRight: `-${colControlsWidth}px`,
               }}
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
-              {workingColumnName !== '' ? (
-                <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
+              {propsColumnName !== '' ? (
+                <S.ColumnNameText>{propsColumnName}</S.ColumnNameText>
               ) : (
                 <ExpressionView.ExpressionView
                   frame={cellFrame}
-                  node={workingSelectFunction}
+                  node={propsSelectFunction}
                 />
               )}
             </S.ColumnName>
@@ -551,9 +552,19 @@ export const ColumnHeader: React.FC<{
           content={
             columnSettingsOpen && (
               <div>
-                <S.CloseIconButton onClick={() => setColumnSettingsOpen(false)}>
-                  <IconClose width={20} />
-                </S.CloseIconButton>
+                <Tooltip
+                  // Button's built-in tooltip attribute won't position properly with custom wrapper style.
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      icon="close"
+                      size="small"
+                      twWrapperStyles={{position: 'absolute', right: 8}}
+                      onClick={() => setColumnSettingsOpen(false)}
+                    />
+                  }
+                  content="Discard changes"
+                />
                 <S.ColumnEditorSection>
                   <S.ColumnEditorSectionLabel>
                     Cell expression
