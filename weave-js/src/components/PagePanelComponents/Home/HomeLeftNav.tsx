@@ -1,17 +1,17 @@
-import {Button} from '@wandb/weave/components/Button';
 import {MOON_800} from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
 import {voidNode} from '@wandb/weave/core';
-
+import {trackNewBlankBoardClicked} from '@wandb/weave/util/events';
+import moment from 'moment';
 import React, {useCallback, useState} from 'react';
 import styled from 'styled-components';
-import * as LayoutElements from './LayoutElements';
-import moment from 'moment';
 
+import {Link} from '../../../common/util/links';
 import getConfig from '../../../config';
 import {useWeaveContext} from '../../../context';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {NavigateToExpressionType} from './common';
-import {Link} from '../../../common/util/links';
+import * as LayoutElements from './LayoutElements';
 
 const LeftNavItemBlock = styled(LayoutElements.HBlock)`
   margin: 0px 0px 0px 12px;
@@ -66,14 +66,17 @@ export const LeftNav: React.FC<{
   return (
     <LayoutElements.VBlock
       style={{
-        width: '300px',
+        width: '288px', // Makes up for 12px gap
         paddingTop: '0px', // Cecile's design has spacing here, but i kind of like it without
         overflowY: 'auto',
       }}>
       <NewBoardButtonWrapper>
         <Button
           variant="secondary"
-          onClick={newDashboard}
+          onClick={() => {
+            newDashboard();
+            trackNewBlankBoardClicked('home');
+          }}
           icon="add-new"
           size="large">
           New blank board

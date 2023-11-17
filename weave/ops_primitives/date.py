@@ -211,7 +211,7 @@ def from_number(number):
     input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
     output_type=types.Timestamp(),
 )
-def floor(date, multiple_s: int):
+def floor(date, multiple_s: float):
     seconds = (date.replace(tzinfo=None) - date.min).seconds
     rounding = (seconds // multiple_s) * multiple_s
     return date + datetime.timedelta(0, rounding - seconds, -date.microsecond)
@@ -222,7 +222,7 @@ def floor(date, multiple_s: int):
     input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
     output_type=types.Timestamp(),
 )
-def ceil(date, multiple_s: int):
+def ceil(date, multiple_s: float):
     seconds = (date.replace(tzinfo=None) - date.min).seconds
     rounding = (seconds // multiple_s) * multiple_s
     return date + datetime.timedelta(

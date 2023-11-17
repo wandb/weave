@@ -434,12 +434,13 @@ def seed_autoboard(
 instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md"))
 
 
-template_registry.register(
-    "py_board-seed_autoboard",
-    "Timeseries Auto-Board",
-    "Column-level analysis of timeseries data",
-    input_node_predicate=node_qualifies_for_autoboard,
-    # Not featuring because it is pretty buggy
-    # is_featured=True,
-    instructions_md=instructions_md,
-)
+# Removing this from registry for now since it is pretty buggy and not well tested.
+# template_registry.register(
+#     "py_board-seed_autoboard",
+#     "Timeseries Auto-Board",
+#     "Column-level analysis of timeseries data",
+#     input_node_predicate=node_qualifies_for_autoboard,
+#     # Not featuring because it is pretty buggy
+#     # is_featured=True,
+#     instructions_md=instructions_md,
+# )

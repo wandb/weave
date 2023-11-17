@@ -6,26 +6,27 @@
 
 import EditableField from '@wandb/weave/common/components/EditableField';
 import {
-  GRAY_350,
   GRAY_50,
-  MOON_50,
+  GRAY_350,
   linkHoverBlue,
+  MOON_50,
 } from '@wandb/weave/common/css/globals.styles';
 import {ValidatingTextInput} from '@wandb/weave/components/ValidatingTextInput';
 import {
+  defaultLanguageBinding,
+  filterNodes,
   Frame,
   ID,
+  isAssignableTo,
+  isNodeOrVoidNode,
   Node,
   NodeOrVoidNode,
   Stack,
-  Weave,
-  defaultLanguageBinding,
-  filterNodes,
-  isAssignableTo,
-  isNodeOrVoidNode,
   varNode,
   voidNode,
+  Weave,
 } from '@wandb/weave/core';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
 import React, {
@@ -41,9 +42,18 @@ import styled from 'styled-components';
 import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {consoleLog} from '../../util';
+import {Button} from '../Button';
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {Tooltip} from '../Tooltip';
+import {
+  excludePanelPanel,
+  getPanelStacksForType,
+  panelSpecById,
+  usePanelStacksForType,
+} from './availablePanels';
 import * as ConfigPanel from './ConfigPanel';
 import {ConfigSection} from './ConfigPanel';
+import {PanelInput, PanelProps} from './panel';
 import {Panel, PanelConfigEditor, useUpdateConfig2} from './PanelComp';
 import {
   ExpressionEvent,
@@ -54,26 +64,17 @@ import * as Styles from './PanelExpression/styles';
 import {
   useCloseDrawer,
   usePanelInputExprIsHighlightedByPath,
+  useSelectedDocumentId,
   useSelectedPath,
   useSetInteractingChildPanel,
   useSetPanelInputExprIsHighlighted,
   useSetSelectedPanel,
 } from './PanelInteractContext';
-import PanelNameEditor from './PanelNameEditor';
-import {TableState} from './PanelTable/tableState';
-import {
-  getPanelStacksForType,
-  panelSpecById,
-  usePanelStacksForType,
-} from './availablePanels';
-import {PanelInput, PanelProps} from './panel';
 import {getStackIdAndName} from './panellib/libpanel';
-import {replaceChainRoot} from '@wandb/weave/core/mutate';
-
-import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
-import {getConfigForPath} from './panelTree';
+import PanelNameEditor from './PanelNameEditor';
 import {usePanelPanelContext} from './PanelPanelContextProvider';
-import {Button} from '../Button';
+import {TableState} from './PanelTable/tableState';
+import {getConfigForPath, isInsideMain, isMain} from './panelTree';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -146,6 +147,8 @@ export const initPanel = async (
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
     stackIdFilter: allowPanel,
+    // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
+    excludePanelPanel: excludePanelPanel(stack),
   });
   if (id == null) {
     return {vars: {}, input_node: voidNode(), id: '', config: undefined};
@@ -226,6 +229,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     {
       allowedPanels: props.allowedPanels,
       stackIdFilter: allowPanel,
+      // Currently panelpanel cannot be nested within other child panels so we are excluding it here for now if nested
+      excludePanelPanel: excludePanelPanel(stack),
     }
   );
 
@@ -565,6 +570,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     el => el != null && el !== ''
   );
 
+  const selectedDocumentId = useSelectedDocumentId();
   const pathStr = useMemo(() => ['<root>', ...fullPath].join('.'), [fullPath]);
   const selectedPath = useSelectedPath();
   const selectedPathStr = useMemo(() => {
@@ -575,6 +581,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   }, [selectedPath]);
 
   const isPanelSelected =
+    selectedDocumentId === documentId &&
     selectedPathStr !== '<root>' &&
     selectedPathStr !== '<root>.main' &&
     pathStr.startsWith(selectedPathStr);
@@ -583,6 +590,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     useElementWidth<HTMLDivElement>();
 
   const controlBar = props.controlBar ?? 'off';
+
   const isVarNameEditable = props.editable || controlBar === 'editable';
   const setSelectedPanel = useSetSelectedPanel();
   const showEditControls = isPanelSelected || isHoverPanel;
@@ -595,8 +603,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
       onClick={event => {
-        event.stopPropagation();
-        setSelectedPanel(fullPath);
+        if (isMain(fullPath) || isInsideMain(fullPath, 1)) {
+          setSelectedPanel(fullPath);
+          event.stopPropagation();
+        }
       }}
       onMouseEnter={() => setIsHoverPanel(true)}
       onMouseLeave={() => setIsHoverPanel(false)}>
@@ -662,6 +672,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       variant="ghost"
                       size="small"
                       icon="pencil-edit"
+                      data-testid="open-panel-editor"
                       onClick={() =>
                         setInteractingPanel(
                           'config',

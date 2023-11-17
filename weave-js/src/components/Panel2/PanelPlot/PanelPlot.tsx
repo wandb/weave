@@ -7,20 +7,23 @@ import CustomPanelRenderer, {
   MultiTableDataType,
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import * as S from './styles';
+import {useIsMounted} from '@wandb/weave/common/util/hooks';
+import {Option} from '@wandb/weave/common/util/uihelpers';
 import {
-  constNode,
   constFunction,
   ConstNode,
+  constNode,
   constNodeUnsafe,
   constNone,
   constNumber,
   constString,
   constStringList,
   escapeDots,
+  filterNodes,
   Frame,
   isAssignableTo,
   isConstNode,
+  isTaggedValue,
   isTypedDict,
   isVoidNode,
   list,
@@ -28,15 +31,14 @@ import {
   maybe,
   Node,
   numberBin,
-  timestampBin,
   oneOrMany,
   opAnd,
   opArray,
-  opDict,
   opContains,
   opDateToNumber,
+  opDict,
   opFilter,
-  opIndex,
+  opLimit,
   // opMap,
   // opMerge,
   opNumberGreaterEqual,
@@ -49,6 +51,8 @@ import {
   opUnnest,
   OutputNode,
   Stack,
+  taggedValueValueType,
+  timestampBin,
   Type,
   typedDict,
   TypedDictType,
@@ -56,10 +60,6 @@ import {
   varNode,
   voidNode,
   withoutTags,
-  filterNodes,
-  taggedValueValueType,
-  isTaggedValue,
-  opLimit,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -77,13 +77,31 @@ import React, {
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
 import {Button, MenuItemProps, Tab} from 'semantic-ui-react';
+import styled from 'styled-components';
 import {calculatePosition} from 'vega-tooltip';
 
-import {useWeaveContext, useWeaveDashUiEnable} from '../../../context';
+import {
+  useWeaveContext,
+  useWeaveRedesignedPlotConfigEnabled,
+} from '../../../context';
 import * as LLReact from '../../../react';
+import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
+import {IconButton} from '../../IconButton';
+import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
+import {Tooltip} from '../../Tooltip';
 import {getPanelStackDims, getPanelStacksForType} from '../availablePanels';
 import {VariableView} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
+import {ConfigSection} from '../ConfigPanel';
+import {
+  IconAddNew,
+  IconCheckmark,
+  IconDelete,
+  IconFullScreenModeExpand,
+  IconMinimizeMode,
+  IconOverflowHorizontal,
+  IconWeave,
+} from '../Icons';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
@@ -93,19 +111,21 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TableState from '../PanelTable/tableState';
 import {useTableStatesWithRefinedExpressions} from '../PanelTable/tableStateReact';
 import * as TableType from '../PanelTable/tableType';
+import {toWeaveType} from '../toWeaveType';
 import * as PlotState from './plotState';
 import {
+  DASHBOARD_DIM_NAME_MAP,
+  DIM_NAME_MAP,
   DimensionLike,
   ExpressionDimName,
   isValidConfig,
-  DIM_NAME_MAP,
-  DASHBOARD_DIM_NAME_MAP,
 } from './plotState';
 import {PanelPlotRadioButtons} from './RadioButtons';
+import * as S from './styles';
 import {
   AnyPlotConfig,
-  ConcretePlotConfig,
   AxisSelections,
+  ConcretePlotConfig,
   ContinuousSelection,
   DEFAULT_SCALE_TYPE,
   DiscreteSelection,
@@ -120,24 +140,6 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
-import {toWeaveType} from '../toWeaveType';
-import {ConfigSection} from '../ConfigPanel';
-import {IconButton} from '../../IconButton';
-import {Tooltip} from '../../Tooltip';
-import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
-import {
-  IconAddNew,
-  IconCheckmark,
-  IconDelete,
-  IconFullScreenModeExpand,
-  IconMinimizeMode,
-  IconOverflowHorizontal,
-  IconWeave,
-} from '../Icons';
-import styled from 'styled-components';
-import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
-import {Option} from '@wandb/weave/common/util/uihelpers';
-import {useIsMounted} from '@wandb/weave/common/util/hooks';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -164,6 +166,7 @@ type DimOption = {
 };
 
 type DimOptionOrSection = DimOption | DimOption[];
+type ExprDimNameType = (typeof PlotState.EXPRESSION_DIM_NAMES)[number];
 
 function useIsOrgDashboard() {
   return Object.keys(useContext(ActivityDashboardContext).frame).length > 0;
@@ -182,11 +185,11 @@ function useIsDashboard() {
 function defaultPlot(
   inputNode: Node,
   stack: Stack,
-  enableDashUi: boolean
+  redesignedPlotConfigEnabled: boolean
 ): PlotConfig {
   return PlotState.setDefaultSeriesNames(
     PlotState.defaultPlot(inputNode, stack),
-    enableDashUi
+    redesignedPlotConfigEnabled
   );
 }
 
@@ -196,14 +199,14 @@ const useConfig = (
 ): {config: PlotConfig; isRefining: boolean} => {
   const {stack} = usePanelContext();
   const weave = useWeaveContext();
-  const enableDashUi = useWeaveDashUiEnable();
+  const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
 
   const newConfig = useMemo(() => {
     return PlotState.setDefaultSeriesNames(
       PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
-      !!enableDashUi
+      !!redesignedPlotConfigEnabled
     );
-  }, [propsConfig, inputNode, stack, enableDashUi]);
+  }, [propsConfig, inputNode, stack, redesignedPlotConfigEnabled]);
 
   const defaultColNameStrippedConfig = useMemo(
     () =>
@@ -383,7 +386,7 @@ const useConcreteConfig = (
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
-  const enableDashUi = useWeaveDashUiEnable();
+  const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
   const inputNode = input;
 
   const weave = useWeaveContext();
@@ -396,7 +399,9 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     (newConfig?: Partial<PlotConfig>) => {
       if (!newConfig) {
         // if config is undefined, just use the default plot
-        propsUpdateConfig(defaultPlot(input, stack, !!enableDashUi));
+        propsUpdateConfig(
+          defaultPlot(input, stack, !!redesignedPlotConfigEnabled)
+        );
       } else {
         propsUpdateConfig({
           ...config,
@@ -404,7 +409,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         });
       }
     },
-    [config, propsUpdateConfig, input, stack, enableDashUi]
+    [config, propsUpdateConfig, input, stack, redesignedPlotConfigEnabled]
   );
 
   const resetConfig = useCallback(() => {
@@ -752,27 +757,23 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     setShowAdvancedProperties(prev => !prev);
   }, []);
   const advancedPropertiesDom = useMemo(() => {
-    return (
+    return showAdvancedProperties ? (
       <>
-        {showAdvancedProperties ? (
-          <div onClick={toggleAdvancedProperties}>
-            {scaleConfigDom}
-            <S.AdvancedPropertiesHeader>
-              Hide advanced properties
-            </S.AdvancedPropertiesHeader>
-          </div>
-        ) : (
-          <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
-            Advanced properties
-          </S.AdvancedPropertiesHeader>
-        )}
+        {scaleConfigDom}
+        <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
+          Hide advanced properties
+        </S.AdvancedPropertiesHeader>
       </>
+    ) : (
+      <S.AdvancedPropertiesHeader onClick={toggleAdvancedProperties}>
+        Advanced properties
+      </S.AdvancedPropertiesHeader>
     );
   }, [showAdvancedProperties, toggleAdvancedProperties, scaleConfigDom]);
 
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const configTabs = useMemo(() => {
-    if (enableDashUi) {
+    if (redesignedPlotConfigEnabled) {
       return (
         <LayoutTabs
           tabNames={['Data', 'Labels']}
@@ -816,7 +817,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       />
     );
   }, [
-    enableDashUi,
+    redesignedPlotConfigEnabled,
     scaleConfigEnabled,
     activeTabIndex,
     seriesConfigDom,
@@ -884,7 +885,9 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
               updateConfig(newConfig);
             }
           }}>
-          <S.AddNewSeriesText>New series</S.AddNewSeriesText>
+          <S.AddNewSeriesText data-testid="add-new-series-text">
+            New series
+          </S.AddNewSeriesText>
           <S.AddNewSeriesButton>
             <IconAddNew width="18" height="18" />
           </S.AddNewSeriesButton>
@@ -895,7 +898,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
 
   return useMemo(
     () =>
-      enableDashUi ? (
+      redesignedPlotConfigEnabled ? (
         <>
           <ConfigSection label={`Properties`}>
             {dashboardConfigOptions}
@@ -915,7 +918,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         </>
       ),
     [
-      enableDashUi,
+      redesignedPlotConfigEnabled,
       dashboardConfigOptions,
       cellFrame,
       labelConfigDom,
@@ -1053,7 +1056,7 @@ const ConfigDimLabel: React.FC<
   Omit<DimComponentInputType, 'extraOptions'> & {
     postfixComponent?: React.ReactElement;
     multiline?: boolean;
-    enableDashUi?: boolean;
+    redesignedPlotConfigEnabled?: boolean;
   }
 > = props => {
   const dimName = props.dimension.name;
@@ -1061,7 +1064,7 @@ const ConfigDimLabel: React.FC<
     props.isShared || props.config.series.length === 1
       ? ''
       : ` ${props.config.series.indexOf(props.dimension.series) + 1}`;
-  const label = props.enableDashUi
+  const label = props.redesignedPlotConfigEnabled
     ? DASHBOARD_DIM_NAME_MAP[dimName]
     : DIM_NAME_MAP[dimName] + seriesIndexStr;
 
@@ -1070,7 +1073,7 @@ const ConfigDimLabel: React.FC<
       style={{
         paddingLeft: 10 * props.indentation,
         borderLeft:
-          props.indentation > 0 && props.enableDashUi
+          props.indentation > 0 && props.redesignedPlotConfigEnabled
             ? `2px solid ${globals.MOON_200}`
             : 'none',
       }}>
@@ -1165,7 +1168,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     multiline,
   } = props;
   const weave = useWeaveContext();
-  const enableDashUi = useWeaveDashUiEnable();
+  const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
   const makeUnsharedDimDropdownOptions = useCallback(
     (series: SeriesConfig, dimName: (typeof PLOT_DIMS_UI)[number]) => {
       const removeSeriesDropdownOption =
@@ -1206,16 +1209,16 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return enableDashUi
+      return redesignedPlotConfigEnabled
         ? []
         : [
             removeSeriesDropdownOption,
             addSeriesDropdownOption,
             collapseDimDropdownOption,
-            enableDashUi,
+            redesignedPlotConfigEnabled,
           ];
     },
-    [config, updateConfig, weave, enableDashUi]
+    [config, updateConfig, weave, redesignedPlotConfigEnabled]
   );
 
   const makeSharedDimDropdownOptions = useCallback(
@@ -1234,9 +1237,9 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             }
           : null;
 
-      return enableDashUi ? [] : [expandDim];
+      return redesignedPlotConfigEnabled ? [] : [expandDim];
     },
-    [config, updateConfig, enableDashUi]
+    [config, updateConfig, redesignedPlotConfigEnabled]
   );
 
   const uiStateOptions = useMemo(() => {
@@ -1287,7 +1290,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         },
         {
           text: 'Select via dropdown',
-          icon: !enableDashUi ? (
+          icon: !redesignedPlotConfigEnabled ? (
             'wbic-ic-list'
           ) : dimension.mode() === `dropdown` ? (
             <IconCheckmark />
@@ -1312,7 +1315,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         },
         {
           text: 'Enter a Weave Expression',
-          icon: !enableDashUi ? (
+          icon: !redesignedPlotConfigEnabled ? (
             'wbic-ic-xaxis'
           ) : dimension.mode() === `expression` ? (
             <IconCheckmark />
@@ -1341,7 +1344,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         },
       ],
     ];
-  }, [config, updateConfig, isShared, dimension, enableDashUi]);
+  }, [config, updateConfig, isShared, dimension, redesignedPlotConfigEnabled]);
 
   const topLevelDimOptions = useCallback(
     (dimName: (typeof PLOT_DIMS_UI)[number]) => {
@@ -1370,7 +1373,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   );
 
   const postFixComponent = useMemo(() => {
-    if (!enableDashUi) {
+    if (!redesignedPlotConfigEnabled) {
       return (
         <PopupDropdown
           position="left center"
@@ -1502,7 +1505,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     }
   }, [
     dimOptions,
-    enableDashUi,
+    redesignedPlotConfigEnabled,
     config,
     dimension.name,
     dimension.series,
@@ -1549,10 +1552,11 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       <ConfigDimLabel
         {...props}
         postfixComponent={postFixComponent}
-        multiline={enableDashUi && multiline}
-        enableDashUi={enableDashUi}>
+        multiline={redesignedPlotConfigEnabled && multiline}
+        redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
+          data-testid={`dropdown-${dimName}`}
           placeholder={dimension.defaultState().compareValue}
           value={dimension.state().value}
           options={dimension.options}
@@ -1578,8 +1582,8 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         <ConfigDimLabel
           {...props}
           postfixComponent={postFixComponent}
-          multiline={enableDashUi && multiline}
-          enableDashUi={enableDashUi}>
+          multiline={redesignedPlotConfigEnabled && multiline}
+          redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}
@@ -1973,7 +1977,7 @@ const useLatestData = (
 */
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
-  const isDash = useWeaveDashUiEnable();
+  const isDash = useWeaveRedesignedPlotConfigEnabled();
   const weave = useWeaveContext();
   const {
     input,
@@ -2346,22 +2350,31 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const concattedTable = useMemo(() => flatPlotTables.flat(), [flatPlotTables]);
 
-  const concattedLineTable = useMemo(() => {
-    return concattedTable.filter(row => {
+  const getMarkForRow = useCallback(
+    (row: any): MarkOption => {
       const s = concreteConfig.series[row._seriesIndex];
-      const mark = getMark(
+      return getMark(
         s,
         listOfTableNodes[row._seriesIndex],
         vegaReadyTables[row._seriesIndex]
       );
+    },
+    [concreteConfig.series, listOfTableNodes, vegaReadyTables]
+  );
+
+  const concattedLineTable = useMemo(() => {
+    return concattedTable.filter(row => {
+      const mark = getMarkForRow(row);
       return mark === 'line';
     });
-  }, [
-    concattedTable,
-    concreteConfig.series,
-    listOfTableNodes,
-    vegaReadyTables,
-  ]);
+  }, [concattedTable, getMarkForRow]);
+
+  const concattedNonLineTable = useMemo(() => {
+    return concattedTable.filter(row => {
+      const mark = getMarkForRow(row);
+      return mark !== 'line';
+    });
+  }, [concattedTable, getMarkForRow]);
 
   const normalizedTable = useMemo(() => {
     const colNameLookups = vegaCols.map(mapping => _.invert(mapping));
@@ -2373,6 +2386,62 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       )
     );
   }, [concattedLineTable, vegaCols]);
+
+  const tooltipData: {[seriesIndexRowIndexString: string]: ConstNode} =
+    useMemo(() => {
+      return concattedNonLineTable.reduce(
+        (acc: {[seriesIndexRowIndexString: string]: ConstNode}, row) => {
+          const key = `[${row._seriesIndex},${row._rowIndex}]`;
+
+          // check if we have a null select function, and thus are using the default tooltip
+          const s = concreteConfig.series[row._seriesIndex];
+          const colId = s.dims.tooltip;
+          const table = vegaReadyTables[row._seriesIndex];
+          const selectFn = table.columnSelectFunctions[colId];
+          if (isVoidNode(selectFn)) {
+            // use default tooltip
+            const nonNullDims: ExprDimNameType[] = [];
+
+            const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
+              (acc2: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
+                const colid = s.dims[dim];
+
+                if (!isVoidNode(table.columnSelectFunctions[colid])) {
+                  nonNullDims.push(dim);
+                  const colType = table.columnSelectFunctions[colid].type;
+
+                  acc2[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
+                    ? taggedValueValueType(colType)
+                    : colType;
+                }
+
+                return acc2;
+              },
+              {}
+            );
+            const type = typedDict(propertyTypes);
+
+            acc[key] = constNodeUnsafe(type, row);
+          } else {
+            // use custom tooltip
+
+            const type = table.columnSelectFunctions[s.dims.tooltip].type;
+            acc[key] = constNodeUnsafe(
+              isTaggedValue(type) ? taggedValueValueType(type) : type,
+              row[vegaCols[row._seriesIndex].tooltip]
+            );
+          }
+
+          return acc;
+        },
+        {}
+      );
+    }, [
+      concattedNonLineTable,
+      concreteConfig.series,
+      vegaCols,
+      vegaReadyTables,
+    ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
     // concatenate all plot tables into one and group by x value
@@ -2714,15 +2783,41 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         newSpec.encoding.color = {
           field: fixKeyForVega(dims.color),
           type: colorAxisType,
+          scale:
+            colorAxisType === 'quantitative' || colorAxisType === 'temporal'
+              ? {scheme: 'plasma'}
+              : {range: globals.WB_RUN_COLORS},
         };
         if (
           vegaReadyTable.columnSelectFunctions[dims.label].type !== 'invalid'
         ) {
-          newSpec.encoding.color.field = fixKeyForVega(dims.label);
+          newSpec.encoding.color.field = vegaCols[i].label;
           if (colorFieldIsRange) {
-            newSpec.encoding.color.scale = {
-              range: {field: fixKeyForVega(dims.color)},
+            // map the color field to the range of the color scale
+            const labelKey = vegaCols[i].label;
+            const colorKey = vegaCols[i].color;
+
+            const nonNullDims: ExprDimNameType[] =
+              PlotState.EXPRESSION_DIM_NAMES.filter(
+                dim =>
+                  !isVoidNode(
+                    series.table.columnSelectFunctions[series.dims[dim]]
+                  )
+              );
+
+            const mapping = flatPlotTable.reduce((acc, row) => {
+              if (nonNullDims.every(dim => row[vegaCols[i][dim]] != null)) {
+                acc[row[labelKey]] = row[colorKey];
+              }
+              return acc;
+            }, {} as {[key: string]: string});
+
+            const scale = {
+              domain: Object.keys(mapping),
+              range: Object.values(mapping),
             };
+
+            newSpec.encoding.color.scale = scale;
           }
         }
       } else if (series.uiState.label === 'dropdown') {
@@ -2732,6 +2827,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           legend: concreteConfig.legendSettings.color.noLegend
             ? false
             : {...defaultFontStyleDict},
+          scale: {range: globals.WB_RUN_COLORS},
         };
       }
 
@@ -3019,6 +3115,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     xScaleAndDomain,
     yScaleAndDomain,
     globalColorScales,
+    vegaCols,
   ]);
 
   useEffect(() => {
@@ -3442,52 +3539,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   // TODO: this only needs to be one node ... update after getting line tooltip working
   const tooltipNode = useMemo(() => {
+    if (toolTipPos.value == null) {
+      return voidNode();
+    }
+
     if (isLineTooltip) {
       return tooltipLineData[toolTipPos.value] ?? voidNode();
     }
 
-    const tooltipSeriesIndex = toolTipPos.value?._seriesIndex;
-    const valueResultIndex = toolTipPos.value?._rowIndex;
-    const s = config.series[tooltipSeriesIndex];
-
-    if (tooltipSeriesIndex == null || valueResultIndex == null) {
-      return voidNode();
-    }
-
-    const row = opIndex({
-      arr: opIndex({
-        arr: flatResultNode,
-        index: constNumber(tooltipSeriesIndex),
-      }),
-      index: constNumber(valueResultIndex),
-    });
-    const toolTipFn =
-      vegaReadyTables[tooltipSeriesIndex].columnSelectFunctions[s.dims.tooltip];
-    if (toolTipFn.nodeType === 'void' || toolTipFn.type === 'invalid') {
-      return row;
-    }
-    return opPick({
-      obj: row,
-      key: constString(
-        escapeDots(
-          TableState.getTableColumnName(
-            s.table.columnNames,
-            s.table.columnSelectFunctions,
-            s.dims.tooltip,
-            weave.client.opStore
-          )
-        )
-      ),
-    });
-  }, [
-    config.series,
-    toolTipPos.value,
-    flatResultNode,
-    vegaReadyTables,
-    weave.client.opStore,
-    tooltipLineData,
-    isLineTooltip,
-  ]);
+    const key = `[${toolTipPos.value?._seriesIndex},${toolTipPos.value?._rowIndex}]`;
+    return tooltipData[key] ?? voidNode();
+  }, [toolTipPos.value, tooltipLineData, isLineTooltip, tooltipData]);
 
   const handler = useMemo(
     () =>
@@ -3551,15 +3613,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const loaderComp = <Panel2Loader />;
 
-  // Hardcode plot colors for now.
-  if (vegaSpec.encoding.color == null) {
-    vegaSpec.encoding.color = {};
-  }
-  if (vegaSpec.encoding.color.scale == null) {
-    vegaSpec.encoding.color.scale = {};
-  }
-  vegaSpec.encoding.color.scale.range = globals.WB_RUN_COLORS;
-
   return (
     <div
       data-test="panel-plot-2-wrapper"
@@ -3603,7 +3656,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   style={{
                     position: 'fixed',
                     visibility: toolTipPos.x == null ? 'hidden' : 'visible',
-                    borderRadius: 2,
+                    borderRadius: 4,
                     padding: 4,
                     top: toolTipPos.y,
                     left: toolTipPos.x,
@@ -3767,8 +3820,10 @@ const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
   padding: 3px;
 `;
+ConfigDimMenuButton.displayName = 'S.ConfigDimMenuButton';
 
 const IconBlank = styled.svg`
   width: 18px;
   height: 18px;
 `;
+IconBlank.displayName = 'S.IconBlank';

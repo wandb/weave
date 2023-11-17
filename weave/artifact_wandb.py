@@ -27,6 +27,7 @@ from . import memo
 from . import eager
 from . import graph_client_context
 from .wandb_interface import wandb_artifact_pusher
+from . import engine_trace
 
 from urllib import parse
 
@@ -97,12 +98,14 @@ class WandbArtifactManifest:
 # is still used in a couple places.
 @memo.memo  # Per-request memo reduces duplicate calls to the API
 def get_wandb_read_artifact(path: str):
-    try:
-        return wandb_client_api.wandb_public_api().artifact(path)
-    except wandb_client_api.WandbCommError:
-        raise errors.WeaveArtifactVersionNotFound(
-            f"Could not find artifact with path {path} in W&B"
-        )
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_artifact"):
+        try:
+            return wandb_client_api.wandb_public_api().artifact(path)
+        except wandb_client_api.WandbCommError:
+            raise errors.WeaveArtifactVersionNotFound(
+                f"Could not find artifact with path {path} in W&B"
+            )
 
 
 def is_valid_version_index(version_index: str) -> bool:
@@ -110,13 +113,15 @@ def is_valid_version_index(version_index: str) -> bool:
 
 
 def get_wandb_read_artifact_uri(path: str):
-    art = get_wandb_read_artifact(path)
-    return WeaveWBArtifactURI(
-        art.name.split(":", 1)[0],
-        art.commit_hash,
-        art.entity,
-        art.project,
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_artifact_uri"):
+        art = get_wandb_read_artifact(path)
+        return WeaveWBArtifactURI(
+            art.name.split(":", 1)[0],
+            art.commit_hash,
+            art.entity,
+            art.project,
+        )
 
 
 def wandb_artifact_dir():
@@ -150,12 +155,14 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
         }
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
-        query,
-        variable_values={
-            "clientID": art_id,
-        },
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("_convert_client_id_to_server_id.execute"):
+        res = wandb_client_api.wandb_public_api().client.execute(
+            query,
+            variable_values={
+                "clientID": art_id,
+            },
+        )
     return b64_to_hex_id(res["clientIDMapping"]["serverID"])
 
 
@@ -203,16 +210,18 @@ def _collection_and_alias_id_mapping_to_uri(
     """
 
     try:
-        res = wandb_client_api.query_with_retry(
-            query,
-            variables={
-                "id": client_collection_id,
-                "aliasName": alias_name,
-            },
-            num_timeout_retries=1,
-        )
+        tracer = engine_trace.tracer()
+        with tracer.trace("_collection_and_alias_id_mapping_to_uri.execute"):
+            res = wandb_client_api.query_with_retry(
+                query,
+                variables={
+                    "id": client_collection_id,
+                    "aliasName": alias_name,
+                },
+                num_timeout_retries=1,
+            )
     except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 400:
+        if e.response is not None and e.response.status_code == 400:
             # This is a special case: the client id corresponds to an artifact that was
             # never uploaded, so the client id doesn't exist in the W&B server.
 
@@ -313,10 +322,12 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
     }
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
-        query,
-        variable_values={"id": hex_to_b64_id(server_id)},
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("_version_server_id_to_uri.execute"):
+        res = wandb_client_api.wandb_public_api().client.execute(
+            query,
+            variable_values={"id": hex_to_b64_id(server_id)},
+        )
 
     artifact = res["artifact"]
     if artifact is None:
@@ -362,24 +373,30 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
 
 def get_wandb_read_client_artifact_uri(art_id: str) -> ReadClientArtifactURIResult:
     """art_id may be client_id, seq:alias, or server_id"""
-    if _art_id_is_client_version_id_mapping(art_id):
-        server_id = _convert_client_id_to_server_id(art_id)
-        return _version_server_id_to_uri(server_id)
-    elif _art_id_is_client_collection_and_alias_id_mapping(art_id):
-        client_collection_id, alias_name = art_id.split(":")
-        return _collection_and_alias_id_mapping_to_uri(client_collection_id, alias_name)
-    else:
-        return _version_server_id_to_uri(art_id)
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_client_artifact_uri"):
+        if _art_id_is_client_version_id_mapping(art_id):
+            server_id = _convert_client_id_to_server_id(art_id)
+            return _version_server_id_to_uri(server_id)
+        elif _art_id_is_client_collection_and_alias_id_mapping(art_id):
+            client_collection_id, alias_name = art_id.split(":")
+            return _collection_and_alias_id_mapping_to_uri(
+                client_collection_id, alias_name
+            )
+        else:
+            return _version_server_id_to_uri(art_id)
 
 
 def get_wandb_read_client_artifact(art_id: str) -> typing.Optional["WandbArtifact"]:
     """art_id may be client_id, seq:alias, or server_id"""
-    res = get_wandb_read_client_artifact_uri(art_id)
-    if res.is_deleted:
-        return None
-    return WandbArtifact(
-        res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_client_artifact"):
+        res = get_wandb_read_client_artifact_uri(art_id)
+        if res.is_deleted:
+            return None
+        return WandbArtifact(
+            res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
+        )
 
 
 class WandbArtifactType(artifact_fs.FilesystemArtifactType):
@@ -644,6 +661,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         project: str = DEFAULT_WEAVE_OBJ_PROJECT,
         entity_name: typing.Optional[str] = None,
         branch: typing.Optional[str] = None,
+        artifact_collection_exists: bool = False,
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
@@ -653,6 +671,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             project,
             entity_name,
             additional_aliases,
+            artifact_collection_exists=artifact_collection_exists,
             _lite_run=_lite_run,
         )
         version = res.version_str if branch is None else branch

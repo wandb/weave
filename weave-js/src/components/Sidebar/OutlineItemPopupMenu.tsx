@@ -1,27 +1,28 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
+import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
 import styled from 'styled-components';
 
 import {getFullChildPanel} from '../Panel2/ChildPanel';
 import {
+  IconAddNew,
+  IconCopy,
+  IconDelete,
+  // IconRetry,
+  IconSplit,
+} from '../Panel2/Icons';
+import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
+import {
   addChild,
   getPath,
   isGroupNode,
+  isInsideMain,
   makePanel,
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
-import {
-  IconAddNew,
-  IconCopy,
-  IconDelete,
-  IconRetry,
-  IconSplit,
-} from '../Panel2/Icons';
-import {PopupMenu} from './PopupMenu';
-import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
 
 const Divider = styled.div`
   margin: 0 -15px;
@@ -54,6 +55,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
 }) => {
   const isViewerWandbEmployee = useIsViewerWandbEmployee();
   const setInteractingPanel = useSetInteractingPanel();
+  const {isNumItemsLocked} = config.config;
 
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
@@ -83,7 +85,9 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
               const index = cursor.config.gridConfig.panels.findIndex(
                 p => p.id === lastStep
               );
-              cursor.config.gridConfig.panels.splice(index, 1);
+              if (index !== -1) {
+                cursor.config.gridConfig.panels.splice(index, 1);
+              }
             }
           } else if (cursor.id === 'LabeledItem') {
             delete cursor.config[lastStep];
@@ -100,25 +104,25 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     [path, config, updateConfig, goBackToOutline]
   );
 
-  const handleUnnest = useCallback(
-    (panelPath: string[]) => {
-      updateConfig2(oldConfig => {
-        oldConfig = getFullChildPanel(oldConfig);
-        const targetPanel = getPath(oldConfig, panelPath);
-        if (!isGroupNode(targetPanel)) {
-          throw new Error('Cannot unnest non-group panel');
-        }
-        const keys = Object.keys(targetPanel.config.items);
-        if (keys.length === 0) {
-          throw new Error('Cannot unnest empty group panel');
-        }
-        return setPath(oldConfig, panelPath, targetPanel.config.items[keys[0]]);
-      });
+  // const handleUnnest = useCallback(
+  //   (panelPath: string[]) => {
+  //     updateConfig2(oldConfig => {
+  //       oldConfig = getFullChildPanel(oldConfig);
+  //       const targetPanel = getPath(oldConfig, panelPath);
+  //       if (!isGroupNode(targetPanel)) {
+  //         throw new Error('Cannot unnest non-group panel');
+  //       }
+  //       const keys = Object.keys(targetPanel.config.items);
+  //       if (keys.length === 0) {
+  //         throw new Error('Cannot unnest empty group panel');
+  //       }
+  //       return setPath(oldConfig, panelPath, targetPanel.config.items[keys[0]]);
+  //     });
 
-      goBackToOutline?.();
-    },
-    [updateConfig2, goBackToOutline]
-  );
+  //     goBackToOutline?.();
+  //   },
+  //   [updateConfig2, goBackToOutline]
+  // );
   const handleSplit = useCallback(
     (panelPath: string[]) => {
       updateConfig2(oldConfig => {
@@ -159,22 +163,26 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   );
   const menuItems = useMemo(() => {
     const items = [];
-    if (localConfig?.id === 'Group') {
+
+    // if (localConfig?.id === 'Group') {
+    //   items.push({
+    //     key: 'unnest',
+    //     content: 'Replace with first child',
+    //     icon: <IconRetry />,
+    //     onClick: () => handleUnnest(path),
+    //   });
+    // }
+
+    if (!isNumItemsLocked) {
       items.push({
-        key: 'unnest',
-        content: 'Replace with first child',
-        icon: <IconRetry />,
-        onClick: () => handleUnnest(path),
+        key: 'duplicate',
+        content: 'Duplicate',
+        icon: <IconCopy />,
+        onClick: () => handleDuplicate(path),
       });
     }
-    items.push({
-      key: 'duplicate',
-      content: 'Duplicate',
-      icon: <IconCopy />,
-      onClick: () => handleDuplicate(path),
-    });
 
-    if (path.find(p => p === 'main') != null && path.length > 1) {
+    if (isInsideMain(path)) {
       items.push({
         key: 'split',
         content: 'Split',
@@ -197,38 +205,61 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
       }
     }
 
-    items.push({
-      key: 'divider-1',
-      content: <Divider />,
-      disabled: true,
-    });
-    items.push({
-      key: 'delete',
-      content: 'Delete',
-      icon: <IconDelete />,
-      onClick: handleDelete,
-    });
+    if (!isNumItemsLocked) {
+      items.push({
+        key: 'divider-1',
+        content: <Divider />,
+        disabled: true,
+      });
+      items.push({
+        key: 'delete',
+        content: 'Delete',
+        icon: <IconDelete />,
+        onClick: handleDelete,
+      });
+    }
+
     return items;
   }, [
-    localConfig?.id,
+    // localConfig?.id,
+    isNumItemsLocked,
     path,
     handleDelete,
-    handleUnnest,
+    // handleUnnest,
     handleDuplicate,
     isViewerWandbEmployee,
     handleSplit,
     setInteractingPanel,
   ]);
 
+  if (!menuItems.length) {
+    return null;
+  }
+
   return (
-    <PopupMenu
-      trigger={trigger}
-      position={`bottom right`}
-      items={menuItems}
-      onClose={onClose}
-      onOpen={onOpen}
+    <DropdownMenu.Root
       open={isOpen}
-    />
+      onOpenChange={open => (open ? onOpen?.() : onClose?.())}>
+      <DropdownMenu.Trigger>
+        {React.cloneElement(trigger, {active: isOpen})}
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          className="z-[100]"
+          onCloseAutoFocus={e => e.preventDefault()}>
+          {menuItems.map(item => (
+            <DropdownMenu.Item
+              key={item.key}
+              onClick={item.onClick}
+              disabled={item.disabled}>
+              {item.icon}
+              {item.content}
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 };
 

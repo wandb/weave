@@ -460,6 +460,16 @@ def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
     offset_array = pa.nulls(num_rows, type=pa.int32())
     arrays = []
     for col_ndx, column_data in enumerate(columns):
+        if col_ndx == 0:
+            # We always take the entire first column, then replace with mask
+            # each subsequent column. This approach ensures that rows which have
+            # nulls for every single column can be properly represented (ie. by the
+            # first column)
+            new_data = column_data
+            arrays.append(new_data)
+            type_array = pa.array([col_ndx] * len(new_data), type=pa.int8())
+            offset_array = pa.array(list(range(len(new_data))), type=pa.int32())
+            continue
         is_usable = pa.compute.invert(_is_null(column_data))
         new_data = column_data.filter(is_usable)
         arrays.append(new_data)
@@ -474,13 +484,17 @@ def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
             pa.array(list(range(len(new_data))), type=pa.int32()),
         )
 
+
     # TODO: This code tries to add a null we can use, but it makes the
     # union invalid against the weave type. Instead we can just use the first
     # array in the union.
     # TODO: Need to fix this code, it is not correct now, just hacked in the branch
     # arrays.append(pa.nulls(1, type=pa.int8()))
-    type_array = pa.compute.fill_null(type_array, len(arrays) - 1)
-    offset_array = pa.compute.fill_null(offset_array, 0)
+    #
+    # Following lines are from weaveflow merge, but i believe this is already fixed
+    #
+    # type_array = pa.compute.fill_null(type_array, len(arrays) - 1)
+    # offset_array = pa.compute.fill_null(offset_array, 0)
 
     return pa.UnionArray.from_dense(type_array, offset_array, arrays)
 

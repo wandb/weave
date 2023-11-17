@@ -27,13 +27,21 @@ import {
   Stack,
   voidNode,
 } from '@wandb/weave/core';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {Button as OldButton} from 'semantic-ui-react';
-import {Button} from '../Button';
 import styled, {css} from 'styled-components';
 
+import {
+  GRAY_350,
+  GRAY_500,
+  GRAY_800,
+  MOON_50,
+} from '../../common/css/globals.styles';
+import {Button} from '../Button';
+import {inJupyterCell} from '../PagePanelComponents/util';
+import {usePagePanelControlRequestAction} from '../PagePanelContext';
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {getSectionConfig, PBSection} from '../WeavePanelBank/PBSection';
 import {getPanelStacksForType} from './availablePanels';
@@ -52,6 +60,8 @@ import {IconAddNew as IconAddNewUnstyled} from './Icons';
 // import {LayoutSections} from './LayoutSections';
 import {LayoutTabs} from './LayoutTabs';
 import * as Panel2 from './panel';
+// import {inJupyterCell} from '../PagePanelComponents/util';
+import {useUpdateConfig2} from './PanelComp';
 import {
   ExpressionEvent,
   PanelContextProvider,
@@ -60,17 +70,6 @@ import {
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
-import {
-  GRAY_350,
-  GRAY_500,
-  GRAY_800,
-  MOON_50,
-} from '../../common/css/globals.styles';
-// import {inJupyterCell} from '../PagePanelComponents/util';
-import {useUpdateConfig2} from './PanelComp';
-import {replaceChainRoot} from '@wandb/weave/core/mutate';
-import {inJupyterCell} from '../PagePanelComponents/util';
-import {usePagePanelControlRequestAction} from '../PagePanelContext';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -85,37 +84,68 @@ const LAYOUT_MODES = [
 
 interface PanelInfo {
   hidden?: boolean;
+  /**
+   * Sets controlBar value for a specific panel in a group. Useful if you
+   * need to override the default setting chosen based on the group `layout`
+   */
+  controlBar?: ChildPanelProps['controlBar'];
 }
 export interface PanelGroupConfig {
-  // Determines how to lay out children, and also how to render each child's ControlBar
-  // (ie whether ControlBar is off, or shows the title only, or a fully editable var name, panel
-  // id, and expression).
+  /**
+   * Determines how to lay out children, and also how to render each child's ControlBar
+   * (ie whether ControlBar is off, or shows the title only, or a fully editable var name, panel
+   * id, and expression).
+   */
   layoutMode: (typeof LAYOUT_MODES)[number];
-  // Determines if we use equal sizing for horizontal and vertical layouts.
+  /** Determines if we use equal sizing for horizontal and vertical layouts. */
   equalSize?: boolean;
-
-  // This is totally ignored now!
+  /** @deprecated This is totally ignored now! */
   showExpressions?: boolean | 'titleBar';
-  // Applied to some children, a hack that lets us configure width of the VarBar in a horizontal
-  // layout.
-  // TODO: need to make this parameterized instead.
+  /**
+   * Applied to some children, a hack that lets us configure width of the VarBar in a horizontal
+   * layout.
+   * TODO: need to make this parameterized instead.
+   */
   style?: string;
-  // Children
+  /**
+   * Children
+   */
   items: {[key: string]: ChildPanelConfig};
-  // Should stick panel specific information here.
+  /**
+   * Should stick panel specific information here.
+   */
   panelInfo?: {[key: string]: PanelInfo};
-  // Grid and Flow layout information.
-  gridConfig: PanelBankSectionConfig;
-
-  // Specifies which panels are allowed to be chosen by the panel picker for children of this
-  // group. This is only used to restrict the VarBar to controls.
-  // TODO: remove this! It is really annoying that this is part of the board state. We have to
-  // keep it synchronized for new board creation in panelTree.ts and panel_board.py.
-  // We should probably hardcode the allowed panels just for the varbar instead.
+  /**
+   * Grid and Flow layout information.
+   */
+  gridConfig?: PanelBankSectionConfig;
+  /**
+   * Specifies which panels are allowed to be chosen by the panel picker for children of this
+   * group. This is only used to restrict the VarBar to controls.
+   * TODO: remove this! It is really annoying that this is part of the board state. We have to
+   * keep it synchronized for new board creation in panelTree.ts and panel_board.py.
+   * We should probably hardcode the allowed panels just for the varbar instead.
+   */
   allowedPanels?: string[];
-
-  // This actually means "editable"
+  /**
+   * This actually means "is editable". Controls whether users can
+   * add, delete, or edit the expression of any direct child items.
+   */
   enableAddPanel?: boolean;
+  /**
+   * Controls whether the group itself can be deleted.
+   * Does not affect whether each of its items can be deleted.
+   */
+  disableDeletePanel?: boolean;
+  /**
+   * Controls whether items can be added to or deleted from the
+   * group. Unlike `enableAddPanel`, this does not prohibit users
+   * from editing the items that already exist in the group.
+   */
+  isNumItemsLocked?: boolean;
+  /**
+   * Used to name newly created child items. Defaults to "panel".
+   */
   childNameBase?: string;
 }
 
@@ -142,26 +172,8 @@ const ActionBar = styled.div`
 `;
 ActionBar.displayName = 'S.ActionBar';
 
-const AddPanelBar = styled.div`
-  height: 48px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  border-radius: 6px;
-  background-color: white;
-  font-weight: 600;
-  color: ${GRAY_500};
-`;
-AddPanelBar.displayName = 'S.AddPanelBar';
-
 const AddPanelBarContainer = styled.div`
   padding: 8px 32px 16px;
-
-  transition: opacity 0.3s;
-  &:not(:hover) {
-    opacity: 0;
-  }
 `;
 AddPanelBarContainer.displayName = 'S.AddPanelBarContainer';
 
@@ -398,11 +410,15 @@ export const addPanelToGroupConfig = (
     draft.items[
       nextPanelName(Object.keys(currentConfig.items), childNameBase)
     ] = childConfig;
-    if (currentConfig.layoutMode === 'flow') {
+    if (
+      currentConfig.layoutMode === 'flow' &&
+      currentConfig.gridConfig?.flowConfig &&
+      draft.gridConfig?.flowConfig
+    ) {
       // If there is only one panel, and one row and column, add a second
       // column. This is a nice behavior in notebooks.
-      const nRows = currentConfig.gridConfig?.flowConfig.rowsPerPage ?? 1;
-      const nCols = currentConfig.gridConfig?.flowConfig.columnsPerPage ?? 1;
+      const nRows = currentConfig.gridConfig.flowConfig.rowsPerPage ?? 1;
+      const nCols = currentConfig.gridConfig.flowConfig.columnsPerPage ?? 1;
       if (
         Object.keys(currentConfig.items).length === 1 &&
         nRows === 1 &&
@@ -592,9 +608,9 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
         </ConfigPanel.ChildConfigContainer>
       </ConfigPanel.ConfigSection>
       <ConfigPanel.ConfigSection>
-        <OldButton size="mini" onClick={handleAddPanel}>
+        <Button className="w-full" variant="secondary" onClick={handleAddPanel}>
           Add Child
-        </OldButton>
+        </Button>
       </ConfigPanel.ConfigSection>
     </>
   );
@@ -665,7 +681,7 @@ export const PanelGroupItem: React.FC<{
 
           // This updates the grid config with the new name, since we use names as ids
           // if we had unique ids, we wouldnt have to do this
-          if (config.gridConfig != null) {
+          if (config.gridConfig != null && draft.gridConfig != null) {
             const gridConfigIndex = config.gridConfig.panels.findIndex(
               p => p.id === name
             );
@@ -680,7 +696,9 @@ export const PanelGroupItem: React.FC<{
   );
 
   let controlBar: ChildPanelProps['controlBar'] = 'off';
-  if (
+  if (config.panelInfo?.[name]?.controlBar) {
+    controlBar = config.panelInfo?.[name]?.controlBar;
+  } else if (
     config.layoutMode === 'layer' ||
     config.layoutMode === 'tab' ||
     // Hardcode off for Board top level items
@@ -901,12 +919,11 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
-  // const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   const isMain = _.isEqual(groupPath, [`main`]);
-
   const inJupyter = inJupyterCell();
+  const isAddPanelAllowed = !!config.enableAddPanel && !config.isNumItemsLocked;
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
@@ -916,9 +933,13 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           height: !isMain ? '100%' : undefined,
           backgroundColor: isMain ? MOON_50 : undefined,
         }}>
-        {!inJupyter && config.enableAddPanel && (
+        {!inJupyter && isAddPanelAllowed && (
           <ActionBar>
-            <Button variant="ghost" onClick={handleAddPanel} icon="add-new">
+            <Button
+              variant="ghost"
+              onClick={handleAddPanel}
+              icon="add-new"
+              data-test="new-panel-button">
               New panel
             </Button>
           </ActionBar>
@@ -930,12 +951,16 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           updateConfig2={updateGridConfig2}
           renderPanel={renderSectionPanel}
         />
-        {!inJupyter && config.enableAddPanel != null && (
+        {!inJupyter && isAddPanelAllowed && (
           <AddPanelBarContainer ref={addPanelBarRef}>
-            <AddPanelBar onClick={handleAddPanel}>
-              <IconAddNew />
+            <Button
+              variant="secondary"
+              size="large"
+              onClick={handleAddPanel}
+              icon="add-new"
+              className="w-full">
               New panel
-            </AddPanelBar>
+            </Button>
           </AddPanelBarContainer>
         )}
       </div>
@@ -981,6 +1006,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           width = widthItem?.split(':')[1];
         }
         if (config.panelInfo?.[name]?.hidden) {
+          // ISSUE: `name` may not be not unique. Should use path instead?
           return null;
         }
         return (
@@ -994,16 +1020,19 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           </GroupItem>
         );
       })}
-      {config.enableAddPanel &&
+      {isAddPanelAllowed &&
         (isVarBar ? (
           <AddVarButton onClick={handleAddPanel}>
             New variable
             <IconAddNew />
           </AddVarButton>
         ) : (
-          <OldButton onClick={handleAddPanel} size="tiny">
-            Add {props.config?.childNameBase ?? 'panel'}
-          </OldButton>
+          <Button
+            className="w-full"
+            variant="secondary"
+            onClick={handleAddPanel}>
+            {`Add ${props.config?.childNameBase ?? 'panel'}`}
+          </Button>
         ))}
     </Group>
   );

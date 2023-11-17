@@ -1,3 +1,5 @@
+import styled from 'styled-components';
+
 import {
   GOLD_300,
   GOLD_600,
@@ -7,12 +9,11 @@ import {
   MOON_800,
   MOON_950,
   RED_300,
-  RED_500,
+  RED_600,
   TEAL_300,
   TEAL_600,
 } from '../common/css/globals.styles';
 import {Icon as IconComp} from './Icon';
-import styled from 'styled-components';
 
 type AlertProps = {
   severity: string;
@@ -20,7 +21,7 @@ type AlertProps = {
 
 const BG_COLORS: Record<string, string> = {
   default: hexToRGB(MOON_950, 0.04),
-  error: hexToRGB(RED_300, 0.48),
+  error: hexToRGB(RED_300, 0.24),
   warning: hexToRGB(GOLD_300, 0.48),
   info: hexToRGB(TEAL_300, 0.48),
   success: hexToRGB(GREEN_300, 0.48),
@@ -28,7 +29,7 @@ const BG_COLORS: Record<string, string> = {
 
 const TEXT_COLORS: Record<string, string> = {
   default: MOON_800,
-  error: RED_500,
+  error: RED_600,
   warning: GOLD_600,
   info: TEAL_600,
   success: GREEN_600,

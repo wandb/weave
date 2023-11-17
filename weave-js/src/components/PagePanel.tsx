@@ -7,15 +7,28 @@ import {useHistory} from 'react-router-dom';
 import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
 
+import {getCookie} from '../common/util/cookie';
 import getConfig from '../config';
 import {useWeaveContext} from '../context';
+import {
+  useIsAuthenticated,
+  useIsSignupRequired,
+  useWeaveViewer,
+} from '../context/WeaveViewerContext';
+import {
+  datadogSetUserInfo,
+  DDUserInfoType,
+} from '../integrations/analytics/datadog';
 import {useNodeWithServerType} from '../react';
-import {getCookie} from '../common/util/cookie';
 import {consoleLog} from '../util';
 import {trackPage} from '../util/events';
+import {urlWandbFrontend} from '../util/urls';
+import {useWeaveAutomation} from './automation';
+import {BetaIndicator} from './PagePanelComponents/BetaIndicator';
+import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {Home} from './PagePanelComponents/Home/Home';
-import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
+import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {
   inJupyterCell,
   isServedLocally,
@@ -23,6 +36,10 @@ import {
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
+import {
+  PagePanelControlContextProvider,
+  usePagePanelControlRequestedActions,
+} from './PagePanelContext';
 import {
   CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
@@ -46,15 +63,6 @@ import {
 } from './Panel2/PanelInteractContext';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
-import {useWeaveAutomation} from './automation';
-import {
-  PagePanelControlContextProvider,
-  usePagePanelControlRequestedActions,
-} from './PagePanelContext';
-import {
-  useIsAuthenticated,
-  useWeaveViewer,
-} from '../context/WeaveViewerContext';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -127,13 +135,13 @@ function useEnablePageAnalytics() {
       const currentPath = `${location.pathname}${location.search}`;
       const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
       if (pathRef.current !== currentPath) {
-        let pageName = '';
+        let pageCategory = '';
         if (location.search.includes('exp=get')) {
-          pageName = 'WeaveGetExpression';
+          pageCategory = 'WeaveGetExpression';
         } else if (location.pathname.includes('/browse')) {
-          pageName = 'WeaveBrowser';
+          pageCategory = 'WeaveBrowser';
         }
-        trackPage({url: fullURL, pageName}, options);
+        trackPage({url: fullURL, pageCategory}, options);
         pathRef.current = currentPath;
       }
     },
@@ -143,7 +151,23 @@ function useEnablePageAnalytics() {
   // fetch user
   useEffect(() => {
     if (!weaveViewer.loading) {
-      (window.analytics as any)?.identify(weaveViewer.data.user_id ?? '');
+      const injector = (window as any).WBAnalyticsInjector;
+      if (injector) {
+        const authenticated = !!weaveViewer.data.authenticated;
+        // In Weave, we only want to inject analytics if the user is authenticated.
+        // This means we don't have to muck with the consent banner.
+        if (authenticated) {
+          try {
+            injector.initializeTrackingScripts(authenticated).finally(() => {
+              (window.analytics as any)?.identify(
+                weaveViewer.data.user_id ?? ''
+              );
+            });
+          } catch (e) {
+            // console.error('Failed to inject analytics', e);
+          }
+        }
+      }
     }
   }, [urlPrefixed, backendWeaveViewerUrl, weaveViewer]);
 
@@ -185,12 +209,28 @@ const usePoorMansLocation = () => {
   return window.location;
 };
 
+const useInitializeDataDog = () => {
+  const weaveViewer = useWeaveViewer();
+
+  useEffect(() => {
+    if (weaveViewer.loading) {
+      return;
+    }
+    const userInfo: DDUserInfoType = {};
+    if (weaveViewer.data.authenticated && weaveViewer.data.user_id) {
+      userInfo.username = weaveViewer.data.user_id;
+    }
+    datadogSetUserInfo(userInfo);
+  }, [weaveViewer]);
+};
+
 type PagePanelProps = {
   browserType: string | undefined;
 };
 
 const PagePanel = ({browserType}: PagePanelProps) => {
   useEnablePageAnalytics();
+  useInitializeDataDog();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
   const history = useHistory();
@@ -209,6 +249,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
   }
   const inJupyter = inJupyterCell();
   const authed = useIsAuthenticated();
+  const signupRequired = useIsSignupRequired();
   const isLocal = isServedLocally();
   const transparentlyMountExpString = useRef('');
 
@@ -355,6 +396,13 @@ const PagePanel = ({browserType}: PagePanelProps) => {
 
   const needsLogin = authed === false && isLocal === false;
   useEffect(() => {
+    if (signupRequired) {
+      const newOrigin = urlWandbFrontend();
+      const newUrl = `${newOrigin}/signup`;
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      window.location.replace(newUrl);
+      return;
+    }
     if (needsLogin) {
       const newOrigin = window.WEAVE_CONFIG.WANDB_BASE_URL;
       const newUrl = `${newOrigin}/oidc/login?${new URLSearchParams({
@@ -363,7 +411,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
       // eslint-disable-next-line wandb/no-unprefixed-urls
       window.location.replace(newUrl);
     }
-  }, [authed, isLocal, needsLogin]);
+  }, [authed, isLocal, needsLogin, signupRequired]);
 
   if (loading || authed === undefined) {
     return <Loader name="page-panel-loader" />;
@@ -420,6 +468,8 @@ const PagePanel = ({browserType}: PagePanelProps) => {
               </div>
             )}
             {/* <ArtifactManager /> */}
+            {!inJupyter && <HelpCTA />}
+            {!inJupyter && <BetaIndicator />}
           </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>

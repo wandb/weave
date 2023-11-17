@@ -27,6 +27,7 @@ import {ReactComponent as ImportCloud} from '../../assets/icons/icon-cloud.svg';
 import {ReactComponent as ImportCodeAlt} from '../../assets/icons/icon-code-alt.svg';
 import {ReactComponent as ImportCollapse} from '../../assets/icons/icon-collapse.svg';
 import {ReactComponent as ImportColor} from '../../assets/icons/icon-color.svg';
+import {ReactComponent as ImportColumn} from '../../assets/icons/icon-column.svg';
 import {ReactComponent as ImportContentFullWidth} from '../../assets/icons/icon-content-full-width.svg';
 import {ReactComponent as ImportContentNarrow} from '../../assets/icons/icon-content-narrow.svg';
 import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-content-wide.svg';
@@ -42,6 +43,7 @@ import {ReactComponent as ImportDockerWhale} from '../../assets/icons/icon-docke
 import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document.svg';
 import {ReactComponent as ImportDocumentation} from '../../assets/icons/icon-documentation.svg';
 import {ReactComponent as ImportDownload} from '../../assets/icons/icon-download.svg';
+import {ReactComponent as ImportDraft} from '../../assets/icons/icon-draft.svg';
 import {ReactComponent as ImportEducationAcademic} from '../../assets/icons/icon-education-academic.svg';
 import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.svg';
 import {ReactComponent as ImportEmailEnvelope} from '../../assets/icons/icon-email-envelope.svg';
@@ -101,6 +103,7 @@ import {ReactComponent as ImportLogOut} from '../../assets/icons/icon-log-out.sv
 import {ReactComponent as ImportLogoColab} from '../../assets/icons/icon-logo-colab.svg';
 import {ReactComponent as ImportMagicWandStar} from '../../assets/icons/icon-magic-wand-star.svg';
 import {ReactComponent as ImportMagicWandStick} from '../../assets/icons/icon-magic-wand-stick.svg';
+import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
 import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-minimize-mode.svg';
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
@@ -111,7 +114,6 @@ import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
-import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
@@ -128,6 +130,7 @@ import {ReactComponent as ImportPytorchLogo} from '../../assets/icons/icon-pytor
 import {ReactComponent as ImportQueue} from '../../assets/icons/icon-queue.svg';
 import {ReactComponent as ImportQueued} from '../../assets/icons/icon-queued.svg';
 import {ReactComponent as ImportRandomizeAlt} from '../../assets/icons/icon-randomize-alt.svg';
+import {ReactComponent as ImportRandomizeResetReload} from '../../assets/icons/icon-randomize-reset-reload.svg';
 import {ReactComponent as ImportRecentClock} from '../../assets/icons/icon-recent-clock.svg';
 import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-reddit-social.svg';
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
@@ -136,6 +139,10 @@ import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
 import {ReactComponent as ImportRocketLaunch} from '../../assets/icons/icon-rocket-launch.svg';
+import {ReactComponent as ImportRowHeightLarge} from '../../assets/icons/icon-row-height-large.svg';
+import {ReactComponent as ImportRowHeightMedium} from '../../assets/icons/icon-row-height-medium.svg';
+import {ReactComponent as ImportRowHeightSmall} from '../../assets/icons/icon-row-height-small.svg';
+import {ReactComponent as ImportRowHeightXlarge} from '../../assets/icons/icon-row-height-xlarge.svg';
 import {ReactComponent as ImportRun} from '../../assets/icons/icon-run.svg';
 import {ReactComponent as ImportRunningRepeat} from '../../assets/icons/icon-running-repeat.svg';
 import {ReactComponent as ImportScikitLogo} from '../../assets/icons/icon-scikit-logo.svg';
@@ -286,6 +293,9 @@ export const IconCollapse = (props: SVGIconProps) => (
 export const IconColor = (props: SVGIconProps) => (
   <ImportColor {...updateIconProps(props)} />
 );
+export const IconColumn = (props: SVGIconProps) => (
+  <ImportColumn {...updateIconProps(props)} />
+);
 export const IconContentFullWidth = (props: SVGIconProps) => (
   <ImportContentFullWidth {...updateIconProps(props)} />
 );
@@ -330,6 +340,9 @@ export const IconDocumentation = (props: SVGIconProps) => (
 );
 export const IconDownload = (props: SVGIconProps) => (
   <ImportDownload {...updateIconProps(props)} />
+);
+export const IconDraft = (props: SVGIconProps) => (
+  <ImportDraft {...updateIconProps(props)} />
 );
 export const IconEducationAcademic = (props: SVGIconProps) => (
   <ImportEducationAcademic {...updateIconProps(props)} />
@@ -508,6 +521,9 @@ export const IconMagicWandStar = (props: SVGIconProps) => (
 export const IconMagicWandStick = (props: SVGIconProps) => (
   <ImportMagicWandStick {...updateIconProps(props)} />
 );
+export const IconMenu = (props: SVGIconProps) => (
+  <ImportMenu {...updateIconProps(props)} />
+);
 export const IconMicrophoneAudio = (props: SVGIconProps) => (
   <ImportMicrophoneAudio {...updateIconProps(props)} />
 );
@@ -537,9 +553,6 @@ export const IconOrganizationCorporate = (props: SVGIconProps) => (
 );
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportOverflowHorizontal {...updateIconProps(props)} />
-);
-export const IconOverflowVertical = (props: SVGIconProps) => (
-  <ImportOverflowVertical {...updateIconProps(props)} />
 );
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
@@ -589,6 +602,9 @@ export const IconQueued = (props: SVGIconProps) => (
 export const IconRandomizeAlt = (props: SVGIconProps) => (
   <ImportRandomizeAlt {...updateIconProps(props)} />
 );
+export const IconRandomizeResetReload = (props: SVGIconProps) => (
+  <ImportRandomizeResetReload {...updateIconProps(props)} />
+);
 export const IconRecentClock = (props: SVGIconProps) => (
   <ImportRecentClock {...updateIconProps(props)} />
 );
@@ -612,6 +628,18 @@ export const IconRobotServiceMember = (props: SVGIconProps) => (
 );
 export const IconRocketLaunch = (props: SVGIconProps) => (
   <ImportRocketLaunch {...updateIconProps(props)} />
+);
+export const IconRowHeightLarge = (props: SVGIconProps) => (
+  <ImportRowHeightLarge {...updateIconProps(props)} />
+);
+export const IconRowHeightMedium = (props: SVGIconProps) => (
+  <ImportRowHeightMedium {...updateIconProps(props)} />
+);
+export const IconRowHeightSmall = (props: SVGIconProps) => (
+  <ImportRowHeightSmall {...updateIconProps(props)} />
+);
+export const IconRowHeightXlarge = (props: SVGIconProps) => (
+  <ImportRowHeightXlarge {...updateIconProps(props)} />
 );
 export const IconRun = (props: SVGIconProps) => (
   <ImportRun {...updateIconProps(props)} />
@@ -807,6 +835,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'code-alt': IconCodeAlt,
   collapse: IconCollapse,
   color: IconColor,
+  column: IconColumn,
   'content-full-width': IconContentFullWidth,
   'content-narrow': IconContentNarrow,
   'content-wide': IconContentWide,
@@ -822,6 +851,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   document: IconDocument,
   documentation: IconDocumentation,
   download: IconDownload,
+  draft: IconDraft,
   'education-academic': IconEducationAcademic,
   'email-at': IconEmailAt,
   'email-envelope': IconEmailEnvelope,
@@ -881,6 +911,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'logo-colab': IconLogoColab,
   'magic-wand-star': IconMagicWandStar,
   'magic-wand-stick': IconMagicWandStick,
+  menu: IconMenu,
   'microphone-audio': IconMicrophoneAudio,
   'minimize-mode': IconMinimizeMode,
   model: IconModel,
@@ -891,7 +922,6 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
-  'overflow-vertical': IconOverflowVertical,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
@@ -908,6 +938,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   queue: IconQueue,
   queued: IconQueued,
   'randomize-alt': IconRandomizeAlt,
+  'randomize-reset-reload': IconRandomizeResetReload,
   'recent-clock': IconRecentClock,
   'reddit-social': IconRedditSocial,
   redo: IconRedo,
@@ -916,6 +947,10 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
   'rocket-launch': IconRocketLaunch,
+  'row-height-large': IconRowHeightLarge,
+  'row-height-medium': IconRowHeightMedium,
+  'row-height-small': IconRowHeightSmall,
+  'row-height-xlarge': IconRowHeightXlarge,
   run: IconRun,
   'running-repeat': IconRunningRepeat,
   'scikit-logo': IconScikitLogo,

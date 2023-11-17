@@ -18,6 +18,7 @@ FROM node:16 as js_builder
 RUN apt update && apt install -y gcc g++ make libcairo2-dev libjpeg-dev libgif-dev libpango1.0-dev
 
 COPY weave-js /root/weave-js
+COPY wb_schema.gql /root/wb_schema.gql
 WORKDIR /root/weave-js
 RUN --mount=type=cache,target=/usr/local/share/.cache \
     SHA1=$(find $JS_DIR -not -path "*/.vite-cache/*" -not -path "*/node_modules/*" -not -path "*/build/*" -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d " " -f1) && \

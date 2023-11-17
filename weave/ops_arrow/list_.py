@@ -1047,6 +1047,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     types.ObjectType,
                     types.UnionType,
                     types.Function,
+                    types.TimeDelta,
                 ),
             ):
                 return None

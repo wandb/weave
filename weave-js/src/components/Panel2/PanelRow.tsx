@@ -23,9 +23,9 @@ import * as ConfigPanel from './ConfigPanel';
 import PageControls from './ControlPage';
 import * as Panel2 from './panel';
 import {PanelComp2} from './PanelComp';
+import {usePanelContext} from './PanelContext';
 import * as PanelLib from './panellib/libpanel';
 import * as Table from './PanelTable/tableState';
-import {usePanelContext} from './PanelContext';
 
 export interface PanelRowConfig {
   pageSize: number;

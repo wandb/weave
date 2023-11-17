@@ -15,3 +15,4 @@ hypothesis>=6.68.3
 numpy<1.24  # shap uses np.bool which is removed in 1.24
 Faker>=16.0  # used for synthetic data generation
 pytest-dotenv
+supervisor>=4.2.5

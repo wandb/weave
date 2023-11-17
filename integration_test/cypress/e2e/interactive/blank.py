@@ -1,6 +1,11 @@
 import weave
 
 weave.use_fixed_server_port()
-blank = weave.save(weave.panels.Board({}, []))
+obj = [
+    1,
+    2,
+    3,
+]  # weave.panels.Board({}, [weave.panels.BoardPanel(weave.panels.Table([1, 2, 3]))])
+blank = weave.save(obj)
 
-print(weave.show_url(blank))
+print(weave.show_url(obj))

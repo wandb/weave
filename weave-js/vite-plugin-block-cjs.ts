@@ -14,13 +14,17 @@ const ALLOWED_CJS_MODULES = [
   '@babel/runtime',
   '@wandb/ui',
   '@wandb/weave',
+  '@wry/equality',
   '@apollo',
   'apollo-client',
   'classnames',
   'graphql-tag',
   'monaco-editor',
   'monaco-yaml',
+  'mousetrap',
   'query-string',
+  'decode-uri-component',
+  'split-on-first',
   'querystring',
   'react-timeago',
   'styled-components',
@@ -66,6 +70,12 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/icons/KeyboardArrowDown',
   '@material-ui/icons/KeyboardArrowRight',
   '@monaco-editor/loader',
+  '@radix-ui/react-checkbox',
+  '@radix-ui/react-dialog',
+  '@radix-ui/react-dropdown-menu',
+  '@radix-ui/react-radio-group',
+  '@radix-ui/react-slider',
+  '@radix-ui/react-switch',
   '@radix-ui/react-tabs',
   '@redux-saga/core',
   '@redux-saga/deferred',
@@ -145,6 +155,7 @@ const ALLOWED_CJS_MODULES = [
   'react-cytoscapejs',
   'react-dropzone',
   'react-helmet',
+  'react-hook-mousetrap',
   'react-is',
   'react-measure',
   'react-string-replace',
@@ -366,7 +377,7 @@ Here are the new dependencies, along with the modules importing them: ${JSON.str
   2
 )}
 
-Please run invoker_prod_preview.ini and check that each dependency works as expected, then add them to ALLOWED_CJS_MODULES in vite-plugin-block-cjs.ts.
+Please run invoker_fe_prod_preview.ini and check that each dependency works as expected, then add them to ALLOWED_CJS_MODULES in vite-plugin-block-cjs.ts.
 
 The error that motivated this check is https://github.com/vitejs/vite/issues/4209 (so if it's fixed, consider tearing this out)
 `;

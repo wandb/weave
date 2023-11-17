@@ -1,5 +1,6 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import React, {useMemo} from 'react';
+
 import {urlPrefixed} from '../../../config';
 
 export const Scaler: React.FC<{

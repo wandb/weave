@@ -1,5 +1,5 @@
 include requirements.*
-include weave/wb_schema.gql
+include wb_schema.gql
 graft weave/frontend
 graft weave/language_features
 graft weave/ops_primitives

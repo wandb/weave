@@ -1,19 +1,19 @@
-import {SetPreviewNodeType} from './common';
-import React from 'react';
-import * as LayoutElements from './LayoutElements';
-import {Node, Type, callOpVeryUnsafe} from '@wandb/weave/core';
-import {useNodeValue} from '@wandb/weave/react';
-import {Panel2Loader} from '../../Panel2/PanelComp';
-
-import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
-import {HomeFeaturedTemplateDrawer} from './HomeFeaturedTemplates';
 import {
   MOON_250,
   MOON_350,
   MOON_500,
 } from '@wandb/weave/common/css/color.styles';
-import {Button} from '../../Button';
+import {opGetFeaturedBoardTemplates, Type} from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
+import React from 'react';
 import styled from 'styled-components';
+
+import {Button} from '../../Button';
+import {Panel2Loader} from '../../Panel2/PanelComp';
+import {SetPreviewNodeType} from './common';
+import {HomeFeaturedTemplateDrawer} from './HomeFeaturedTemplates';
+import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
+import * as LayoutElements from './LayoutElements';
 
 const Template = styled(LayoutElements.VStack)`
   width: 332px;
@@ -54,10 +54,7 @@ type TemplateType = {
 export const HomeCenterTemplates: React.FC<{
   setPreviewNode: SetPreviewNodeType;
 }> = ({setPreviewNode}) => {
-  const featuredTemplatesNode = callOpVeryUnsafe(
-    'py_board-get_featured_board_templates',
-    {}
-  ) as Node;
+  const featuredTemplatesNode = opGetFeaturedBoardTemplates({});
   const featuredTemplates = useNodeValue(featuredTemplatesNode);
   if (featuredTemplates.result?.length === 0) {
     // not expecting this to happen, but just in case
@@ -105,6 +102,7 @@ const TemplateCard: React.FC<{
   const [isHover, setIsHover] = React.useState(false);
   return (
     <Template
+      data-testid="template-card"
       onMouseEnter={() => {
         setIsHover(true);
       }}

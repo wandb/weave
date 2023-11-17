@@ -1,24 +1,23 @@
-import React, {useEffect, useMemo, useState} from 'react';
-
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import {TargetBlank} from '@wandb/weave/common/util/links';
 import {
-  IconCopy,
+  IconAddNew,
   IconChevronDown,
-  IconInfo,
-  IconOpenNewTab,
+  IconCopy,
   IconDelete,
   IconFullScreenModeExpand,
-  IconAddNew,
+  IconInfo,
+  IconLightbulbInfo,
+  IconOpenNewTab,
 } from '@wandb/weave/components/Icon';
-import * as query from './query';
-import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
-import moment from 'moment';
+import {useWeaveContext} from '@wandb/weave/context';
 import {
-  Node,
-  callOpVeryUnsafe,
   constString,
+  directlyConstructOpCall,
   list,
-  opArtifactVersionFile,
+  Node,
   opConcat,
+  opFilesystemArtifactFile,
   opFileTable,
   opGet,
   opIsNone,
@@ -26,27 +25,35 @@ import {
   opProjectRuns,
   opRootProject,
   opRunHistory3,
+  opStreamTableRows,
   opTableRows,
-  typedDict,
 } from '@wandb/weave/core';
-import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
-import {useWeaveContext} from '@wandb/weave/context';
-import {
-  HomePreviewSidebarTemplate,
-  HomeExpressionPreviewParts,
-  SEED_BOARD_OP_NAME,
-} from './HomePreviewSidebar';
-import {useHistory, useParams} from 'react-router-dom';
-import {HomeParams} from './Home';
 import {setDocumentTitle} from '@wandb/weave/util/document';
-import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import moment from 'moment';
+import React, {useEffect, useMemo, useState} from 'react';
+import {useHistory, useParams} from 'react-router-dom';
+import styled from 'styled-components';
+
 import {
   urlEntity,
   urlProject,
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
+import {urlWandbFrontend} from '../../../util/urls';
+import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
+import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import {NavigateToExpressionType, SetPreviewNodeType} from './common';
+import {HomeParams} from './Home';
+import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
+import {
+  HomePreviewSidebarTemplate,
+  SafeHomeExpressionPreviewParts,
+  SEED_BOARD_OP_NAME,
+} from './HomePreviewSidebar';
+import * as LayoutElements from './LayoutElements';
+import * as query from './query';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -93,6 +100,8 @@ export const CenterEntityBrowserInner: React.FC<
         (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
           ? meta.num_stream_tables + meta.num_logged_tables
           : null,
+      'run logged traces':
+        meta.num_logged_traces > 0 ? meta.num_logged_traces : null,
       'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
   }, [projectsMeta.result, entityName]);
@@ -116,8 +125,8 @@ export const CenterEntityBrowserInner: React.FC<
           label: 'View in Weights and Biases',
           onClick: row => {
             // Open a new tab with the W&B project URL
-            // TODO: make this work for local. Probably need to bring over `urlPrefixed`
-            const url = `https://wandb.ai/${props.entityName}/${row.project}/overview`;
+            const prefix = urlWandbFrontend();
+            const url = `${prefix}/${props.entityName}/${row.project}/overview`;
             // eslint-disable-next-line wandb/no-unprefixed-urls
             window.open(url, '_blank');
           },
@@ -132,7 +141,13 @@ export const CenterEntityBrowserInner: React.FC<
     <CenterBrowser
       allowSearch
       noDataCTA={`No projects with Weave assets found for entity: ${props.entityName}`}
-      columns={['project', 'boards', 'tables', 'updated at']}
+      columns={[
+        'project',
+        'boards',
+        'tables',
+        // 'run logged traces', // keeping this hidden for now to not draw attention
+        'updated at',
+      ]}
       loading={loading}
       title={browserTitle}
       data={browserData}
@@ -408,7 +423,7 @@ const CenterProjectBoardsBrowser: React.FC<
               navigateToExpression(expr);
             },
           }}>
-          <HomeExpressionPreviewParts
+          <SafeHomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
           />
@@ -482,6 +497,26 @@ const legacyTraceRowToSimpleNode = (
       }),
     }),
     key: constString(legacyTraceKey),
+  }) as Node<{type: 'wb_trace_tree'}>;
+};
+
+const opWBTraceTreeConvertToSpans = (inputs: {
+  tree: Node<{type: 'wb_trace_tree'}>;
+}) => {
+  return directlyConstructOpCall(
+    'wb_trace_tree-convertToSpans',
+    inputs,
+    list(list(SpanWeaveWithTimestampType))
+  );
+};
+
+const convertSimpleLegacyNodeToNewFormat = (
+  node: Node<{type: 'wb_trace_tree'}>
+) => {
+  return opConcat({
+    arr: opWBTraceTreeConvertToSpans({
+      tree: node,
+    }),
   });
 };
 
@@ -567,9 +602,21 @@ const CenterProjectLegacyTracesBrowser: React.FC<
         <HomePreviewSidebarTemplate
           title={row.name}
           row={row}
+          actions={[
+            [
+              {
+                icon: IconFullScreenModeExpand,
+                label: 'Preview Traces',
+                onClick: _ => {
+                  navigateToExpression(expr);
+                },
+              },
+            ],
+          ]}
           setPreviewNode={setPreviewNode}>
-          <HomeExpressionPreviewParts
-            expr={expr}
+          <SafeHomeExpressionPreviewParts
+            expr={convertSimpleLegacyNodeToNewFormat(expr)}
+            generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
           />
         </HomePreviewSidebarTemplate>
@@ -634,13 +681,9 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     const node = opGet({uri: constString(uri)});
     node.type = {type: 'stream_table'} as any;
-    newExpr = callOpVeryUnsafe(
-      'stream_table-rows',
-      {
-        self: node,
-      },
-      list(typedDict({}))
-    ) as any;
+    newExpr = opStreamTableRows({
+      self: node as any,
+    });
   } else {
     // This is a hack. Would be nice to have better mapping
     // Note that this will not work for tables with spaces in their name
@@ -651,8 +694,10 @@ const tableRowToNode = (
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest`;
     newExpr = opTableRows({
       table: opFileTable({
-        file: opArtifactVersionFile({
-          artifactVersion: opGet({uri: constString(uri)}),
+        file: opFilesystemArtifactFile({
+          artifactVersion: opGet({
+            uri: constString(uri),
+          }) as any,
           path: constString(tableName),
         }),
       }),
@@ -740,6 +785,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconFullScreenModeExpand,
           label: 'Preview table',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             navigateToExpression(
               tableRowToNode(row.kind, entityName, projectName, row._id)
@@ -749,6 +795,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconCopy,
           label: 'Copy Weave expression',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
@@ -767,6 +814,7 @@ const CenterProjectTablesBrowser: React.FC<
         {
           icon: IconAddNew,
           label: 'New board',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
@@ -835,8 +883,10 @@ const CenterProjectTablesBrowser: React.FC<
           title={row.name}
           row={row}
           setPreviewNode={setPreviewNode}
-          actions={sidebarActions}>
-          <HomeExpressionPreviewParts
+          actions={sidebarActions}
+          emptyData={row['number of rows'] === 0}
+          emptyDataMessage={<EmptyTableMessage />}>
+          <SafeHomeExpressionPreviewParts
             expr={expr}
             navigateToExpression={navigateToExpression}
           />
@@ -900,5 +950,54 @@ const CenterProjectTablesBrowser: React.FC<
         actions={browserActions}
       />
     </>
+  );
+};
+
+const EmptyTableMessageBlockContainer = styled(LayoutElements.HBlock)`
+  background-color: ${globals.MOON_100};
+  border-radius: 8px;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+`;
+EmptyTableMessageBlockContainer.displayName =
+  'S.EmptyTableMessageBlockContainer';
+
+const EmptyTableMessageIcon = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+`;
+EmptyTableMessageIcon.displayName = 'S.EmptyTableMessageIcon';
+
+const EmptyTableMessageText = styled.div`
+  padding: 15px 20px 15px 0px;
+  color: ${globals.MOON_600};
+`;
+EmptyTableMessageText.displayName = 'S.EmptyTableMessageText';
+
+const EmptyTableMessage = () => {
+  return (
+    <div>
+      <EmptyTableMessageBlockContainer>
+        <EmptyTableMessageIcon>
+          <IconLightbulbInfo style={{color: globals.MOON_600}} />
+        </EmptyTableMessageIcon>
+        <EmptyTableMessageText>
+          <div style={{fontWeight: 600, marginBottom: '2px'}}>
+            This table has no data
+          </div>
+          <div>
+            Table preview and board creation are not available until data has
+            been logged. Learn more about logging data to StreamTables{' '}
+            <TargetBlank href="https://docs.wandb.ai/guides/weave/streamtable">
+              here
+            </TargetBlank>
+            .
+          </div>
+        </EmptyTableMessageText>
+      </EmptyTableMessageBlockContainer>
+    </div>
   );
 };

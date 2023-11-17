@@ -222,6 +222,8 @@ class Monitor:
 
     def trace(
         self,
+        *,
+        static_attributes: typing.Optional[typing.Dict[str, typing.Any]] = None,
         preprocess: typing.Optional[typing.Callable] = None,
         postprocess: typing.Optional[typing.Callable] = None,
     ) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
@@ -231,7 +233,9 @@ class Monitor:
                 async def async_wrapper(
                     *args: typing.Any, **kwargs: typing.Any
                 ) -> typing.Any:
-                    attributes = kwargs.pop("monitor_attributes", {})
+                    attributes = {}
+                    attributes.update(static_attributes or {})
+                    attributes.update(kwargs.pop("monitor_attributes", {}))
                     with self.attributes(attributes):
                         with self.span(get_function_name(fn)) as span:
                             span.inputs = _arguments_to_dict(fn, args, kwargs)
@@ -248,7 +252,9 @@ class Monitor:
             else:
 
                 def sync_wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-                    attributes = kwargs.pop("monitor_attributes", {})
+                    attributes = {}
+                    attributes.update(static_attributes or {})
+                    attributes.update(kwargs.pop("monitor_attributes", {}))
                     with self.attributes(attributes):
                         with self.span(get_function_name(fn)) as span:
                             span.inputs = _arguments_to_dict(fn, args, kwargs)
@@ -256,10 +262,9 @@ class Monitor:
                                 preprocess(span)
                             try:
                                 span.output = fn(*args, **kwargs)
+                                output = span.output
                                 if postprocess:
                                     output = postprocess(span)
-                                else:
-                                    output = span.output
                             except Exception as e:
                                 span.status_code = StatusCode.ERROR
                                 span.exception = e
@@ -280,10 +285,16 @@ class Monitor:
 
 
 def _init_monitor_streamtable(stream_key: str) -> typing.Optional[StreamTable]:
-    try:
-        entity_name, project_name, stream_name = stream_key.split("/", 3)
-    except ValueError:
-        raise ValueError("stream_key must be of the form 'entity/project/stream_name'")
+    tokens = stream_key.split("/")
+    if len(tokens) == 2:
+        project_name, stream_name = tokens
+        entity_name = None
+    elif len(tokens) == 3:
+        entity_name, project_name, stream_name = tokens
+    else:
+        raise ValueError(
+            "stream_key must be of the form 'entity/project/stream_name' or 'project/stream_name'"
+        )
 
     stream_table = None
     try:

@@ -9,23 +9,23 @@ import {
 } from '@wandb/weave/core';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {Spec as PanelEach} from './components/Panel2/PanelEach';
 import {Spec as PanelEachColumn} from './components/Panel2/PanelEachColumn';
 import {Spec as PanelExpr} from './components/Panel2/PanelExpr';
 import {Spec as PanelFacet} from './components/Panel2/PanelFacet';
 // import {Spec as PanelFacetTabs} from './components/Panel2/PanelFacetTabs';
 import {Spec as PanelGroup} from './components/Panel2/PanelGroup';
-import {Spec as PanelEach} from './components/Panel2/PanelEach';
 import {Spec as PanelRootBrowser} from './components/Panel2/PanelRootBrowser/PanelRootBrowser';
+import {Spec as PanelSelectEditor} from './components/Panel2/PanelSelectEditor';
 // import {Spec as PanelSections} from './components/Panel2/PanelSections';
 import {Spec as PanelSlider} from './components/Panel2/PanelSlider';
-import {Spec as PanelSelectEditor} from './components/Panel2/PanelSelectEditor';
 import {
   RowSize,
   TABLE_CONFIG_DEFAULTS,
 } from './components/Panel2/PanelTable/config';
 import {useLoadWeaveObjects} from './components/Panel2/weaveBackend';
-import {ClientContext, WeaveFeatures, WeaveFeaturesContext} from './context';
 import getConfig from './config';
+import {ClientContext, WeaveFeatures, WeaveFeaturesContext} from './context';
 
 let GLOBAL_CLIENT: Client | null = null;
 
@@ -55,7 +55,8 @@ export const ComputeGraphContextProviderFromClient: React.FC<{client: Client}> =
         data-test-num-shadow-server-requests-counter={
           GlobalCGEventTracker.shadowServerRequests
         }
-        className={isLoading ? 'loading cg-executing' : ''}>
+        className={isLoading ? 'loading cg-executing' : ''}
+        style={{height: '100%'}}>
         <ClientContext.Provider value={context}>
           {children}
         </ClientContext.Provider>
@@ -128,7 +129,10 @@ export const NotebookComputeGraphContextProvider: React.FC = React.memo(
       () => ({
         actions: true,
         fullscreenMode: true,
-        dashUi: true,
+        clientEvalInUseNodeValueEnabled: true,
+        sidebarConfigStylingEnabled: true,
+        errorBoundaryInPanelComp2Enabled: true,
+        redesignedPlotConfigEnabled: true,
         betaFeatures: {
           'weave-python-ecosystem': true,
           'weave-devpopup': false,

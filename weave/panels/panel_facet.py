@@ -5,6 +5,7 @@ from .. import panel
 from .. import panel_util
 from . import table_state
 
+from .. import weave_types as types
 from .. import graph
 from .. import weave_internal
 
@@ -117,7 +118,9 @@ class Facet(panel.Panel):
         if self.config.selectedCell == None:
             from ..ops_arrow import list_
 
-            return list_.make_vec_none(0)
+            return weave_internal.make_const_node(
+                list_.ArrowWeaveListType(types.NoneType()), list_.make_vec_none(0)
+            )
         x_fn = self.config.table.columnSelectFunctions[self.config.dims.x]
         y_fn = self.config.table.columnSelectFunctions[self.config.dims.y]
         filtered = weave.ops.List.filter(
@@ -133,4 +136,5 @@ class Facet(panel.Panel):
                 ),
             ),
         )
+
         return filtered

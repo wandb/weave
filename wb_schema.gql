@@ -1,0 +1,708 @@
+# This file is a hand-selected subset of the W&B GQL spec that is used by weave python.
+# On the backend, it's used by gql_to_weave.py to convert GQL queries to weave types.
+# On the frontend, it's used for autogenerating TypeScript definitions for GQL queries.
+# If you need to support a new GQL op in weave, you must add the relevant type definitions here.
+
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+directive @audit on FIELD_DEFINITION
+directive @constraints(
+  min: Int
+  max: Int
+  pattern: String
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+type Query {
+  user(id: ID, userName: String): User
+  entity(name: String, login: Boolean): Entity
+  viewer(entityName: String): User
+  users(
+    query: String
+    before: String
+    after: String
+    first: Int
+    last: Int
+    usernames: [String!]
+    ids: [ID!]
+  ): UserConnection
+  project(name: String, entityName: String): Project
+  projects(
+    entityName: String
+    order: String
+    anonymous: Boolean
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): ProjectConnection
+  entities(
+    order: String
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): EntityConnection
+  view(id: ID!, type: String): View
+  views(ids: [ID!]!): ViewConnection
+  organizations(
+    ids: [ID!]
+    emailDomain: String
+    query: String
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): OrganizationConnection!
+  organization(id: ID, name: String): Organization
+  artifact(id: ID!): Artifact
+  artifactCollection(id: ID!): ArtifactCollection
+  artifactSequence(id: ID!): ArtifactSequence
+  instance: WBInstance
+  repoInsightsPlotData(
+    plotName: String!
+    repoName: String!
+    filters: JSONString
+    order: String
+    groupKeys: [String!]
+    columns: [String!]
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): RepoInsightsRowConnection
+  repo(id: ID!): Repo
+}
+
+input UpdateUserInput {
+  id: ID # null implies "self" -- only admins can edit others
+  primaryEmail: String
+  defaultEntity: String
+  defaultFramework: String # deprecated
+  photoUrl: String
+  code: String
+  name: String @constraints(max: 64)
+  userInfo: JSONString
+  hideTeamsFromPublic: Boolean
+  settingsVisited: Boolean
+  galleryVisited: Boolean
+  onboardingHidden: Boolean
+  private: Boolean
+  admin: Boolean
+  password: String
+  clientMutationId: String
+}
+
+type UpdateUserPayload {
+  user: User
+  clientMutationId: String
+}
+
+type Mutation {
+  updateUser(input: UpdateUserInput!): UpdateUserPayload @audit
+  deleteView(input: DeleteViewInput!): DeleteViewPayload
+  upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
+  updateArtifactSequence(
+    input: UpdateArtifactSequenceInput!
+  ): UpdateArtifactCollectionPayload
+  deleteArtifactSequence(
+    input: DeleteArtifactSequenceInput!
+  ): DeleteArtifactCollectionPayload
+}
+
+scalar DateTime
+scalar JSONString
+scalar JSON
+scalar Duration
+scalar Int64
+
+type WBInstance {
+  entities: [Entity!]!
+  views(first: Int): ViewConnection!
+  artifactSequences(first: Int): ArtifactSequenceConnection
+  projects(first: Int): ProjectConnection
+}
+
+interface Node {
+  id: ID!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input TimeWindow {
+  start: DateTime!
+  end: DateTime!
+}
+
+type PublicImageUploadInfo {
+  uploadUrl: String!
+  imageUrl: String!
+  uploadHeaders: [String!]!
+}
+
+enum ArtifactCollectionType {
+  SEQUENCE
+  PORTFOLIO
+}
+
+input ProjectIdentifierInput {
+  Name: String
+  EntityName: String
+}
+
+type User implements Node {
+  id: ID!
+  name: String!
+  username: String
+  teams(before: String, after: String, first: Int, last: Int): EntityConnection
+}
+
+type UserConnection {
+  pageInfo: PageInfo!
+  edges: [UserEdge!]!
+}
+
+type UserEdge {
+  node: User
+  cursor: String!
+}
+
+union Initiator = Run | User
+
+type Project implements Node {
+  createdAt: DateTime!
+  updatedAt: DateTime
+  id: ID!
+  name: String!
+  runs(filters: JSONString, order: String, first: Int): RunConnection
+  entity: Entity!
+  # groups(fields: [String], level: String, filters: JSONString, order: String, historyFields: [String], before: String, after: String, first: Int, last: Int): GroupConnection
+  user: User
+  run(name: String!): Run
+  artifactType(name: String!): ArtifactType
+  artifactTypes(first: Int): ArtifactTypeConnection!
+  artifact(name: String!): Artifact
+  artifactCollection(name: String!): ArtifactCollection
+  artifactCollections(first: Int): ArtifactCollectionConnection
+  runQueues: [RunQueue!]!
+}
+
+type RunQueue {
+  id: ID!
+}
+
+type ProjectConnection {
+  pageInfo: PageInfo!
+  edges: [ProjectEdge!]!
+}
+
+type ProjectEdge {
+  node: Project
+  cursor: String!
+}
+
+type ParquetHistory {
+  liveData: [JSON!]!
+  parquetUrls: [String!]!
+}
+
+type Run implements Node {
+  createdAt: DateTime!
+  name: String!
+  jobType: String
+  config(keys: [String!]): JSONString
+  summaryMetrics(keys: [String!]): JSONString
+  displayName: String
+  heartbeatAt: DateTime
+  user: User
+  project: Project
+  id: ID!
+  outputArtifacts(first: Int): ArtifactConnection
+  inputArtifacts(first: Int): InputArtifactConnection
+  history(minStep: Int64, maxStep: Int64): [String!]!
+  historyLineCount: Int
+  historyKeys: JSON
+  computeSeconds: Duration!
+  parquetHistory(liveKeys: [String!]!): ParquetHistory!
+}
+
+type RunConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [RunEdge!]!
+}
+
+type RunEdge {
+  node: Run!
+  cursor: String!
+}
+
+type RepoInsightsRowConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  schema: JSON!
+  edges: [RowEdge!]!
+  isNormalizedUserCount: Boolean!
+}
+
+type RowConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  schema: JSON!
+  edges: [RowEdge!]!
+}
+
+type RowEdge {
+  node: RowType
+}
+
+type RowType {
+  row: JSON!
+}
+
+type Entity implements Node {
+  id: ID!
+  name: String!
+  isTeam: Boolean!
+  projects(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    order: String
+  ): ProjectConnection
+  organization: Organization
+  artifactCollections(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    order: String
+    filters: JSONString
+    collectionTypes: [ArtifactCollectionType!]
+  ): ArtifactCollectionConnection
+}
+
+type EntityConnection {
+  edges: [EntityEdge!]!
+}
+
+type EntityEdge {
+  node: Entity
+  cursor: String!
+}
+
+type RepoConnection {
+  edges: [RepoEdge!]!
+}
+
+type RepoEdge {
+  node: Repo
+  cursor: String!
+}
+
+type Repo implements Node {
+  id: ID!
+  entity: Entity!
+  displayName: String!
+}
+
+enum OrgType {
+  ORGANIZATION
+  PERSONAL
+}
+
+type OrganizationConnection {
+  pageInfo: PageInfo!
+  edges: [OrganizationEdge!]!
+}
+
+type OrganizationEdge {
+  node: Organization!
+  cursor: String!
+}
+
+type Organization implements Node {
+  id: ID!
+  name: String!
+  views(first: Int): ViewConnection!
+  artifactCollections(first: Int): ArtifactCollectionConnection
+  projects(first: Int): ProjectConnection
+}
+
+type ArtifactTypeConnection {
+  pageInfo: PageInfo!
+  edges: [ArtifactTypeEdge!]!
+}
+
+type ArtifactTypeEdge {
+  node: ArtifactType
+  cursor: String!
+}
+
+type ArtifactType {
+  id: ID!
+  name: String!
+  project: Project!
+  artifactCollections(first: Int): ArtifactCollectionConnection
+  artifact(name: String!): Artifact
+}
+
+type ArtifactCollectionConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [ArtifactCollectionEdge!]!
+}
+
+type ArtifactCollectionEdge {
+  node: ArtifactCollection
+  cursor: String!
+}
+
+interface ArtifactCollection {
+  id: ID!
+  name: String!
+  description: String
+  createdAt: DateTime!
+  project: Project!
+  defaultArtifactType: ArtifactType!
+
+  artifacts(first: Int): VersionedArtifactConnection
+  aliases(first: Int): ArtifactAliasConnection!
+  artifactMemberships(first: Int): ArtifactCollectionMembershipConnection!
+  artifactMembership(aliasName: String!): ArtifactCollectionMembership
+
+  tags: TagConnection!
+}
+
+type TagConnection {
+  pageInfo: PageInfo!
+  edges: [TagEdge!]!
+}
+
+type TagEdge {
+  node: Tag!
+  cursor: String!
+}
+
+type Tag {
+  id: ID!
+  name: String!
+  attributes: JSONString!
+  tagCategoryName: String!
+}
+
+type ArtifactSequenceConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [ArtifactSequenceEdge!]!
+}
+
+type ArtifactSequenceEdge {
+  node: ArtifactSequence
+  cursor: String!
+}
+
+type ArtifactSequence implements ArtifactCollection {
+  id: ID!
+  name: String!
+  description: String
+  createdAt: DateTime!
+  project: Project!
+  defaultArtifactType: ArtifactType!
+  artifacts(first: Int): VersionedArtifactConnection!
+  aliases(first: Int): ArtifactAliasConnection!
+  artifactMemberships(first: Int): ArtifactCollectionMembershipConnection!
+  # aliasName can be an alias (latest, v0, custom_alias), commitHash, or digest
+  artifactMembership(aliasName: String!): ArtifactCollectionMembership
+}
+
+type ArtifactPortfolio implements ArtifactCollection {
+  id: ID!
+  name: String!
+  description: String
+  createdAt: DateTime!
+  project: Project!
+  defaultArtifactType: ArtifactType!
+  artifacts(first: Int): VersionedArtifactConnection!
+  aliases(first: Int): ArtifactAliasConnection!
+  artifactMemberships(first: Int): ArtifactCollectionMembershipConnection!
+  artifactMembership(aliasName: String!): ArtifactCollectionMembership
+}
+
+type ArtifactCollectionMembershipConnection {
+  pageInfo: PageInfo!
+  edges: [ArtifactCollectionMembershipEdge!]!
+}
+
+type ArtifactCollectionMembershipEdge {
+  node: ArtifactCollectionMembership
+  cursor: String!
+}
+
+type ArtifactCollectionMembership {
+  id: ID!
+  artifactCollection: ArtifactCollection
+  artifact: Artifact
+  createdAt: DateTime!
+  commitHash: String
+  versionIndex: Int
+  aliases: [ArtifactAlias!]!
+}
+
+interface ArtifactConnectionType {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [ArtifactEdgeType!]!
+}
+
+type ArtifactConnection implements ArtifactConnectionType {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [ArtifactEdge!]!
+}
+
+type VersionedArtifactConnection implements ArtifactConnectionType {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [VersionedArtifactEdge!]!
+}
+
+type InputArtifactConnection implements ArtifactConnectionType {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [InputArtifactEdge!]!
+}
+
+interface ArtifactEdgeType {
+  node: Artifact
+  cursor: String!
+}
+
+type ArtifactEdge implements ArtifactEdgeType {
+  node: Artifact
+  cursor: String!
+}
+
+type VersionedArtifactEdge implements ArtifactEdgeType {
+  node: Artifact!
+  version: String!
+  cursor: String!
+}
+
+type InputArtifactEdge implements ArtifactEdgeType {
+  node: Artifact
+  cursor: String!
+  usedAs: [String!]!
+}
+
+enum ArtifactState {
+  PENDING
+  COMMITTED
+  DELETED
+}
+
+type ArtifactAliasConnection {
+  pageInfo: PageInfo!
+  edges: [ArtifactAliasEdge!]!
+}
+
+type ArtifactAliasEdge {
+  node: ArtifactAlias
+  cursor: String!
+}
+
+type ArtifactAlias {
+  id: ID!
+  artifact: Artifact
+  alias: String!
+  artifactCollection: ArtifactCollection
+  artifactCollectionName: String!
+}
+
+type Artifact {
+  id: ID!
+  digest: String!
+  description: String
+  commitHash(artifactCollectionName: String): String
+  versionIndex(artifactCollectionName: String): Int
+  aliases(artifactCollectionName: String): [ArtifactAlias!]!
+  labels: JSONString
+  metadata: JSONString
+  state: ArtifactState!
+  size: Int64!
+  storageBytes: Int64!
+  fileCount: Int64!
+  artifactType: ArtifactType!
+  artifactCollections: ArtifactCollectionConnection!
+  artifactMemberships: ArtifactCollectionMembershipConnection!
+  artifactSequence: ArtifactSequence!
+  createdAt: DateTime!
+  updatedAt: DateTime
+  createdBy: Initiator
+  usedCount: Int!
+  usedBy(
+    filters: JSONString
+    order: String
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): RunConnection!
+  currentManifest: ArtifactManifest
+  historyStep: Int64
+  ttlDurationSeconds: Int64!
+}
+
+type ArtifactManifestConnection {
+  pageInfo: PageInfo!
+  edges: [ArtifactManifestEdge!]!
+}
+
+type ArtifactManifestEdge {
+  node: ArtifactManifest
+  cursor: String!
+}
+
+enum ArtifactManifestType {
+  FULL
+  PATCH
+  INCREMENTAL
+}
+
+type ArtifactManifest {
+  id: ID!
+  type: ArtifactManifestType!
+  createdAt: DateTime!
+  digest: String!
+  artifact: Artifact!
+}
+
+type ImageUrl {
+  url: String
+  publicUrl: String
+  path: String
+}
+
+enum ViewSource {
+  WANDB_UI
+  WANDB_UI_SHARE_PANEL
+  WANDB_SDK
+  WEAVE_UI
+}
+
+type View implements Node {
+  createdAt: DateTime!
+  updatedAt: DateTime
+  updatedBy: User
+  id: ID!
+  name: String
+  displayName: String
+  type: String
+  userId: Int
+  projectId: Int
+  description: String
+  imageUploadUrl(name: String!): ImageUrl!
+  uploadHeaders: [String!]!
+  previewUrl: String
+  coverUrl: String
+  spec: JSONString
+  user: User
+  project: Project
+  entity: Entity
+  entityName: String!
+  projectName: String!
+  starCount(from: DateTime, to: DateTime): Int!
+  starred: Boolean
+  children: ViewConnection
+  parentId: ID
+  locked: Boolean!
+  viewCount: Int!
+  showcasedAt: DateTime
+  createdUsing: ViewSource!
+}
+
+type ViewConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [ViewEdge!]!
+}
+
+type ViewEdge {
+  node: View
+  cursor: String!
+}
+
+input DeleteViewInput {
+  id: ID
+  deleteDrafts: Boolean = false
+  clientMutationId: String
+}
+
+type DeleteViewPayload {
+  success: Boolean
+  pendingDrafts: Boolean
+  clientMutationId: String
+}
+
+input UpsertViewInput {
+  id: ID
+  entityName: String
+  projectName: String
+  name: String @constraints(max: 128)
+  displayName: String @constraints(max: 128)
+  description: String
+  type: String
+  spec: String
+  parentId: ID
+  locked: Boolean
+  previewUrl: String @constraints(max: 256)
+  coverUrl: String @constraints(max: 256)
+  clientMutationId: String
+  showcasedAt: DateTime
+  createdUsing: ViewSource
+}
+
+type UpsertViewPayload {
+  view: View
+  inserted: Boolean
+  clientMutationId: String
+}
+
+input UpdateArtifactSequenceInput {
+  artifactSequenceID: ID!
+  name: String @constraints(max: 128)
+  description: String
+  clientMutationId: String
+}
+
+type UpdateArtifactCollectionPayload {
+  artifactCollection: ArtifactCollection!
+  clientMutationId: String
+}
+
+input DeleteArtifactSequenceInput {
+  artifactSequenceID: ID!
+  clientMutationId: String
+}
+
+type DeleteArtifactCollectionPayload {
+  artifactCollection: ArtifactCollection!
+  clientMutationId: String
+}
+
+interface Error {
+  message: String!
+}
+
+enum ErrorSeverity {
+  WARN
+  ERROR
+}

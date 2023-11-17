@@ -1,9 +1,9 @@
 // Shared compoennts and helpers for building visual editors,
 // like PanelFilterEditor and PanelGroupEditor
 
-import React from 'react';
+import {isAssignableTo, maybe, Type} from '@wandb/weave/cg';
 import {Button} from '@wandb/weave/components/Button';
-import {Type, isAssignableTo, maybe} from '@wandb/weave/cg';
+import React from 'react';
 
 export const getSimpleKeyType = (keyType: Type) => {
   return isAssignableTo(keyType, maybe('string'))

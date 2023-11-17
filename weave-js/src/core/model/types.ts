@@ -413,6 +413,7 @@ export interface NewRun {
   _prints: string[];
 }
 
+
 export interface OpDefType {
   type: 'OpDef';
 }
@@ -420,6 +421,20 @@ export interface OpDefType {
 export interface RefType {
   type: 'Ref';
 }
+
+export interface FilesystemArtifact {
+  type: 'FilesystemArtifact';
+}
+
+export interface FilesystemArtifactRef {
+  type: 'FilesystemArtifactRef';
+}
+
+export interface StreamTable {
+  type: 'stream_table';
+}
+
+
 // End Weave Python additions
 
 export type ComplexType =
@@ -431,6 +446,9 @@ export type ComplexType =
   | PanelType
   | PanelSubType
   | NewImage
+  | FilesystemArtifact
+  | FilesystemArtifactRef
+  | StreamTable
   // End Weave Python additions
   | HistogramType
   | TypedDictType

@@ -1,30 +1,29 @@
+import {MOON_50} from '@wandb/weave/common/css/color.styles';
+import {IconChevronDown} from '@wandb/weave/components/Icon';
 import {
   constFunction,
   constNodeUnsafe,
-  isFunctionLiteral,
-  varNode,
-  voidNode,
-  Node,
   constString,
+  isFunctionLiteral,
+  Node,
+  NodeOrVoidNode,
   opIndex,
   opPick,
   pickSuggestions,
-  NodeOrVoidNode,
   Type,
+  varNode,
+  voidNode,
   // opLimit,
 } from '@wandb/weave/core';
-import {IconChevronDown} from '@wandb/weave/components/Icon';
-import {MOON_50} from '@wandb/weave/common/css/color.styles';
-
 import * as _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useMutation, useNodeValue} from '../../react';
+import {ConfigFieldModifiedDropdown, ConfigFieldWrapper} from './ConfigPanel';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
-import {ConfigFieldModifiedDropdown, ConfigFieldWrapper} from './ConfigPanel';
-import {VisualEditorMode, getSimpleKeyType} from './visualEditors';
+import {getSimpleKeyType, VisualEditorMode} from './visualEditors';
 
 const inputType = {
   type: 'function' as const,

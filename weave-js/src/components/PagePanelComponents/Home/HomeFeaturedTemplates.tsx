@@ -1,16 +1,15 @@
-import React from 'react';
-import * as LayoutElements from './LayoutElements';
-import {Type} from '@wandb/weave/core';
-import * as Tabs from '@wandb/weave/components/Tabs';
+import './github-markdown-light.css';
 
+import {TargetBlank} from '@wandb/weave/common/util/links';
+import * as Tabs from '@wandb/weave/components/Tabs';
+import {Type} from '@wandb/weave/core';
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
+import remarkGfm from 'remark-gfm';
 import styled from 'styled-components';
 
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-
-import './github-markdown-light.css';
-import {TargetBlank} from '@wandb/weave/common/util/links';
-import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
+import * as LayoutElements from './LayoutElements';
 
 // This is considered a `hack` because I need to drop down to
 // access .tw-style, to give it a height 100%. When using tailwind
@@ -64,7 +63,10 @@ export const HomeFeaturedTemplateDrawer: React.FC<{
           onValueChange={(val: string) => setTabValue(val)}>
           <Tabs.List className="px-16">
             <Tabs.Trigger value="Instructions">1. Instructions</Tabs.Trigger>
-            <Tabs.Trigger value="Select Data">2. Select Data</Tabs.Trigger>
+            {/* 
+              <Tabs.Trigger value="Select Data">2. Select Data</Tabs.Trigger> 
+              NOTE: Once we have the interactive data flow we can re-enable this tab.
+            */}
           </Tabs.List>
           <Tabs.Content value="Instructions" style={{height: '100%'}}>
             <TabContentWrapper>

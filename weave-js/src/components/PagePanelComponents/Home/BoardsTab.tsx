@@ -1,18 +1,20 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import React from 'react';
-import * as LayoutElements from './LayoutElements';
-import {NodeOrVoidNode, constString, opGet} from '@wandb/weave/core';
-import {NavigateToExpressionType, WANDB_ARTIFACT_SCHEME} from './common';
-import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
-import {maybePluralize} from '../../../core/util/string';
-import styled from 'styled-components';
-import {IconChevronNext, IconDashboardBlackboard} from '../../Icon';
-import * as S from './styles';
+import {constString, NodeOrVoidNode, opGet} from '@wandb/weave/core';
+import {trackNewBoardFromTemplateClicked} from '@wandb/weave/util/events';
 import moment from 'moment';
-import {BoardsTabNone} from './BoardsTabNone';
+import React from 'react';
+import styled from 'styled-components';
+
+import {maybePluralize} from '../../../core/util/string';
 import {Button} from '../../Button';
+import {IconChevronNext, IconDashboardBlackboard} from '../../Icon';
+import {useArtifactDependencyOfForNode} from '../../Panel2/pyArtifactDep';
 import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import {BoardsTabNone} from './BoardsTabNone';
+import {NavigateToExpressionType, WANDB_ARTIFACT_SCHEME} from './common';
 import {SEED_BOARD_OP_NAME} from './HomePreviewSidebar';
+import * as LayoutElements from './LayoutElements';
+import * as S from './styles';
 
 const BoardList = styled.div`
   flex: 1 1 auto;
@@ -120,6 +122,10 @@ export const BoardsTab = ({
         setIsGenerating(false);
         navigateToExpression(newDashExpr);
       }
+    );
+    trackNewBoardFromTemplateClicked(
+      'table-board-tab',
+      'simple-table-visualization'
     );
   };
 

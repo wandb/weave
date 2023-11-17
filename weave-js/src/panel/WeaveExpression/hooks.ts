@@ -1,5 +1,5 @@
 import {computePosition, flip, offset, shift} from '@floating-ui/react';
-
+import {useIsMounted} from '@wandb/weave/common/util/hooks';
 import {
   AutosuggestResult,
   Parser,
@@ -25,7 +25,6 @@ import {usePanelContext} from '../../components/Panel2/PanelContext';
 import {WeaveExpressionState} from './state';
 import type {SuggestionProps, WeaveExpressionProps} from './types';
 import {getIndexForPoint, moveToNextMissingArg, trace} from './util';
-import {useIsMounted} from '@wandb/weave/common/util/hooks';
 
 // Provides the decorate callback to pass to Slate's Editable
 // component and implements syntax highlighting and styling
@@ -233,15 +232,6 @@ export const useWeaveExpressionState = (
     internalState.dispatch({type: 'flushPendingExpr'});
   }, [internalState]);
 
-  const [suppressSuggestions, setSuppressSuggestions] = React.useState(false);
-  const hideSuggestions = React.useCallback(
-    (nMillis: number) => {
-      setSuppressSuggestions(true);
-      setTimeout(() => setSuppressSuggestions(false), nMillis);
-    },
-    [setSuppressSuggestions]
-  );
-
   trace(`${internalState.id}: useWeaveExpressionState render`, externalState);
 
   return {
@@ -268,12 +258,6 @@ export const useWeaveExpressionState = (
 
     // Flush pending expression in non-live-update mode
     applyPendingExpr,
-
-    // To hide suggestions momentarily
-    suppressSuggestions,
-
-    // Callback to hide suggestions for n milliseconds
-    hideSuggestions,
 
     // EE focus state
     isFocused,

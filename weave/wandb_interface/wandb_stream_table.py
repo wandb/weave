@@ -299,7 +299,12 @@ class StreamTable(_StreamTableSync):
 def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_types.Type]:
     if tc_type.startswith(TYPE_ENCODE_PREFIX):
         w_type = json.loads(tc_type[len(TYPE_ENCODE_PREFIX) :])
-        return weave_types.TypeRegistry.type_from_dict(w_type)
+        try:
+            return weave_types.TypeRegistry.type_from_dict(w_type)
+        except Exception as e:
+            logging.warning(
+                f"StreamTable Type Error: Found type for {tc_type}, but blind construction failed: {e}",
+            )
     else:
         possible_type = weave_types.type_name_to_type(tc_type)
         if possible_type is not None:

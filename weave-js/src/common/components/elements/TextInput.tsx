@@ -1,9 +1,9 @@
 import React, {FC} from 'react';
 import {InputOnChangeData} from 'semantic-ui-react';
-import {TextInput as TextInputNew} from './TextInputNew';
 
+import {useWeaveSidebarConfigStylingEnabled} from '../../../context';
 import * as S from './TextInput.styles';
-import {useWeaveDashUiEnable} from '../../../context';
+import {TextInput as TextInputNew} from './TextInputNew';
 
 interface TextInputProps {
   dataTest: string;
@@ -17,8 +17,8 @@ interface TextInputProps {
 export const TextInput: FC<TextInputProps> = React.memo(props => {
   const {dataTest, label, onChange, placeholder, sublabel, value} = props;
 
-  const dashUIEnabled = useWeaveDashUiEnable();
-  if (dashUIEnabled) {
+  const useSidebarConfigStylingEnabled = useWeaveSidebarConfigStylingEnabled();
+  if (useSidebarConfigStylingEnabled) {
     return <TextInputNew {...props} />;
   }
 

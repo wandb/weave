@@ -22,6 +22,7 @@ import {
 import _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
+import {Stack} from '../../../core';
 import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
 import * as Table from './tableState';
@@ -369,4 +370,11 @@ export const useBaseTableData = (
   }, [unfilteredRowsNode, adjustedPinnedRows]);
 
   return {unpinnedData, pinnedData};
+};
+
+// This is used to determine if a PanelTable is a ChildPanel
+// We do not want to render row selection styles if the activeData of the PanelTable cannot be used
+// If PanelTable is a ChildPanel, there will exist a variable in the stack that is an input
+export const tableIsPanelVariable = (stack: Stack) => {
+  return stack && stack.find(node => node.name === 'input') !== undefined;
 };

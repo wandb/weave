@@ -5,6 +5,7 @@ import {Hasher, MemoizedHasher} from '../model/graph/editing/hash';
 import {Node} from '../model/graph/types';
 import {Type} from '../model/types';
 import {OpStore} from '../opStore/types';
+import {defaultCachePolicy} from './cachePolicy';
 import {Client} from './types';
 
 type CachedNode = {
@@ -35,14 +36,16 @@ export class CachedClient implements Client {
     // data from the subscription. This means reloading similar content
     // on screen will not cause a re-query, but will instead use the
     // existing subscription for up to 30 seconds!
-
-    if (this.cache.has(node)) {
+    const shouldCache = defaultCachePolicy(node);
+    if (this.cache.has(node) && shouldCache) {
       return this.cache.get(node).obs;
     }
     const obs = this.client.subscribe(node);
-    const sub = obs.subscribe(res => {});
+    if (shouldCache) {
+      const sub = obs.subscribe(res => {});
 
-    this.cache.set(node, {obs, sub}, 5);
+      this.cache.set(node, {obs, sub}, 30);
+    }
 
     return obs;
   }
@@ -91,7 +94,9 @@ export class CachedClient implements Client {
     return this.client.loadingObservable();
   }
   public refreshAll(): Promise<void> {
-    return this.client.refreshAll();
+    return this.cache.reset().finally(() => {
+      return this.client.refreshAll();
+    });
   }
   public debugMeta(): {id: string} & {[prop: string]: any} {
     return {
@@ -99,6 +104,12 @@ export class CachedClient implements Client {
       opStore: this.opStore.debugMeta(),
       client: this.client.debugMeta(),
     };
+  }
+
+  public clearCacheForNode(node: Node<any>): Promise<void> {
+    return this.client.clearCacheForNode(node).then(() => {
+      return this.cache.invalidate(node);
+    });
   }
 
   private onDispose(key: string, value: CachedNode): void {

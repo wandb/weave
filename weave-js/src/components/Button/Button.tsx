@@ -4,11 +4,11 @@
  * https://www.figma.com/file/01KWBdMZg5QM9SRS1pQq0z/Design-System----Robot-Styles?type=design&node-id=5956-31813&mode=design&t=Gm4WWGWwgjdfUUTe-0
  */
 
-import {Icon, IconName} from '../Icon';
 import classNames from 'classnames';
 import React, {ReactElement} from 'react';
 import {twMerge} from 'tailwind-merge';
 
+import {Icon, IconName} from '../Icon';
 import {Tailwind} from '../Tailwind';
 import {Tooltip} from '../Tooltip';
 import {ButtonSize, ButtonVariant} from './types';
@@ -32,6 +32,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactElement | string;
   active?: boolean;
   tooltip?: string;
+  twWrapperStyles?: React.CSSProperties;
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -46,6 +47,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       children,
       className = '',
       tooltip,
+      twWrapperStyles = {},
       ...htmlAttributes
     },
     ref
@@ -75,6 +77,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const wrapperStyles = {
       display: 'inline-flex',
       width: className.includes('w-full') ? '100%' : undefined,
+      ...twWrapperStyles,
     };
 
     const button = (
@@ -87,6 +90,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'night-aware',
               "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
               'disabled:pointer-events-none disabled:opacity-40',
+              'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
               {
                 // small
                 'gap-6 px-6 py-3 text-sm leading-[18px]': isSmall,
