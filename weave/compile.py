@@ -901,7 +901,7 @@ def _propagate_updated_types_through_lambdas(
                             else:
                                 final_expected_type_frame[
                                     expected_type_frame_key
-                                ] = param_type_frame[k]
+                                ] = param_type_frame[expected_type_frame_key]
                     if len(expected_type_frame_needs_update) > 0:
 
                         def _update_fn_vars(
