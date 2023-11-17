@@ -2469,6 +2469,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       concreteConfig.series,
       vegaCols,
       vegaReadyTables,
+      flatResultNode,
     ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
