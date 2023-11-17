@@ -150,10 +150,6 @@ jobs:
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
 
-    strategy:
-      fail-fast: false
-      matrix:
-        containers: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v3
       - name: Setup W&B API key
@@ -174,16 +170,8 @@ jobs:
         # wants to write to is closed.
         run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
         shell: bash
-      - name: Cypress run
-        # Use the following to run just a single test
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
-        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx ds run --record --parallel --browser chrome
-        # uses: cypress-io/github-action@v4
-        # with:
-        #   working-directory: ./integration_testG
-        #   record: true
-        #   parallel: true
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
         env:
           CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
           # pass the Dashboard record key as an environment variable
