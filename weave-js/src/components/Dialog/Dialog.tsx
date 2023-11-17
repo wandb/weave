@@ -30,7 +30,7 @@ export const Portal = RadixDialog.Portal;
  */
 const overlayClassName = classNames(
   'night-aware',
-  'bg-oblivion/[0.20] dark:bg-oblivion/[0.48]',
+  'bg-oblivion/[0.24] dark:bg-oblivion/[0.48]',
   'fixed bottom-0 left-0 right-0 top-0',
   'grid place-items-center overflow-y-auto'
 );
