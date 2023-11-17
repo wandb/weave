@@ -2430,6 +2430,20 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
             const type = table.columnSelectFunctions[s.dims.tooltip].type;
             if (isAssignableTo(type, withFileTag('any', {type: 'file'}))) {
+              // This is a hack to get images to work with cached tooltips in weave0.
+              // When we retire weave0, we can remove this and just use the else branch
+              // instead.
+
+              // The reason this is needed is because when we construct a constNode from
+              // a row, we do not cache the tags, so the file tag is lost. When we render
+              // the actual image in the tooltip, we have to get a signed URL for the file
+              // which requires calling opAssetFile. The resolver of this function expects
+              // the file tag to be present, but it is not, so it fails. To get around this,
+              // we circumvent caching and execute the entire graph for the tooltip if
+              // the tooltip is an image.
+
+              // This is only a problem in weave0 because
+
               acc[key] = opPick({
                 obj: opIndex({
                   arr: opIndex({
