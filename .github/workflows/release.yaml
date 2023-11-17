@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       is_test:
-        description: 'Use Test Pypi'
+        description: "Use Test Pypi"
         required: true
         type: boolean
         default: true
@@ -14,7 +14,7 @@ jobs:
     name: Build and publish to pypi
     runs-on: ubuntu-8core
     timeout-minutes: 10
-    environment: 
+    environment:
       name: release
     permissions:
       id-token: write
@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v1
         with:
-          node-version: "16.x"
+          node-version: "18.x"
       - run: |
           pip install build twine
           ./build_dist.py
