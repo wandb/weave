@@ -5,11 +5,13 @@ import React, {useMemo} from 'react';
 export const LinkTable = <RowType extends {[key: string]: any}>({
   rows,
   handleRowClick,
+  columns,
 }: {
   rows: RowType[];
   handleRowClick: (row: RowType) => void;
+  columns?: any[];
 }) => {
-  const columns = useMemo(() => {
+  const autoColumns = useMemo(() => {
     const row0 = rows[0];
     if (row0 == null) {
       return [];
@@ -40,7 +42,14 @@ export const LinkTable = <RowType extends {[key: string]: any}>({
       <DataGrid
         density="compact"
         rows={rows}
-        columns={columns}
+        columns={[
+          ...autoColumns.filter(
+            row =>
+              !columns ||
+              !columns.map(column => column.field).includes(row.field)
+          ),
+          ...(columns || []),
+        ]}
         autoPageSize
         disableRowSelectionOnClick
         onRowClick={params => handleRowClick(params.row as RowType)}
