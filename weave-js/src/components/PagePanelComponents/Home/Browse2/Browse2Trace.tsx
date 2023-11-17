@@ -1,4 +1,4 @@
-import {Box, Button, Grid, Tab,Tabs, Typography} from '@mui/material';
+import {Box, Button, Grid, Tab, Tabs, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {useWeaveContext} from '@wandb/weave/context';
 import * as _ from 'lodash';
@@ -7,13 +7,13 @@ import {v4 as uuidv4} from 'uuid';
 
 import {flatToTrees} from '../../../Panel2/PanelTraceTree/util';
 import {AddRowToTable} from './AddRow';
-import {feedbackTableObjNode,Span, StreamId} from './callTree';
+import {feedbackTableObjNode, Span, StreamId} from './callTree';
 import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
 import {Paper} from './CommonLib';
 import {mutationStreamTableLog} from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {SpanDetails} from './SpanDetails';
-import {SpanTreeNode,SpanWithChildren} from './SpanWithChildren';
+import {SpanTreeNode, SpanWithChildren} from './SpanWithChildren';
 
 const VerticalTraceView: FC<{
   traceSpans: Span[];

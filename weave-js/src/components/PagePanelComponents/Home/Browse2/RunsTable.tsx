@@ -9,7 +9,7 @@ import {parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
-import {Link,useParams} from 'react-router-dom';
+import {Link, useParams} from 'react-router-dom';
 
 import {URL_BROWSE2} from '../../../../urls';
 import {flattenObject} from './browse2Util';
@@ -27,7 +27,9 @@ function addToTree(
   fields: string[],
   fullPath: string
 ): void {
-  if (!fields.length) { return; }
+  if (!fields.length) {
+    return;
+  }
 
   if (fields.length === 1) {
     node.children.push({
@@ -193,16 +195,18 @@ export const RunsTable: FC<{
       cols.push({
         field: 'attributes.' + key,
         headerName: key.split('.').slice(-1)[0],
-        renderCell: params => {
+        renderCell: cellParams => {
           if (
-            typeof params.row['attributes.' + key] === 'string' &&
-            params.row['attributes.' + key].startsWith('wandb-artifact:///')
+            typeof cellParams.row['attributes.' + key] === 'string' &&
+            cellParams.row['attributes.' + key].startsWith('wandb-artifact:///')
           ) {
             return (
-              <SmallRef objRef={parseRef(params.row['attributes.' + key])} />
+              <SmallRef
+                objRef={parseRef(cellParams.row['attributes.' + key])}
+              />
             );
           }
-          return params.row['attributes.' + key];
+          return cellParams.row['attributes.' + key];
         },
       });
     }
@@ -223,14 +227,16 @@ export const RunsTable: FC<{
       cols.push({
         field: 'input_' + key,
         headerName: key,
-        renderCell: params => {
+        renderCell: cellParams => {
           if (
-            typeof params.row['input_' + key] === 'string' &&
-            params.row['input_' + key].startsWith('wandb-artifact:///')
+            typeof cellParams.row['input_' + key] === 'string' &&
+            cellParams.row['input_' + key].startsWith('wandb-artifact:///')
           ) {
-            return <SmallRef objRef={parseRef(params.row['input_' + key])} />;
+            return (
+              <SmallRef objRef={parseRef(cellParams.row['input_' + key])} />
+            );
           }
-          return params.row['input_' + key];
+          return cellParams.row['input_' + key];
         },
       });
       inputGroup.children.push({field: 'input_' + key});
@@ -262,14 +268,16 @@ export const RunsTable: FC<{
       cols.push({
         field: 'output.' + key,
         headerName: key.split('.').slice(-1)[0],
-        renderCell: params => {
+        renderCell: cellParams => {
           if (
-            typeof params.row['output.' + key] === 'string' &&
-            params.row['output.' + key].startsWith('wandb-artifact:///')
+            typeof cellParams.row['output.' + key] === 'string' &&
+            cellParams.row['output.' + key].startsWith('wandb-artifact:///')
           ) {
-            return <SmallRef objRef={parseRef(params.row['output.' + key])} />;
+            return (
+              <SmallRef objRef={parseRef(cellParams.row['output.' + key])} />
+            );
           }
-          return params.row['output.' + key];
+          return cellParams.row['output.' + key];
         },
       });
     }
@@ -298,16 +306,16 @@ export const RunsTable: FC<{
       cols.push({
         field: 'feedback.' + key,
         headerName: key.split('.').slice(-1)[0],
-        renderCell: params => {
+        renderCell: cellParams => {
           if (
-            typeof params.row['feedback.' + key] === 'string' &&
-            params.row['feedback.' + key].startsWith('wandb-artifact:///')
+            typeof cellParams.row['feedback.' + key] === 'string' &&
+            cellParams.row['feedback.' + key].startsWith('wandb-artifact:///')
           ) {
             return (
-              <SmallRef objRef={parseRef(params.row['feedback.' + key])} />
+              <SmallRef objRef={parseRef(cellParams.row['feedback.' + key])} />
             );
           }
-          return params.row['feedback.' + key];
+          return cellParams.row['feedback.' + key];
         },
       });
     }

@@ -61,7 +61,7 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {parseRefMaybe,SmallRef} from './SmallRef';
+import {parseRefMaybe, SmallRef} from './SmallRef';
 import {refPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {

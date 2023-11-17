@@ -48,12 +48,14 @@ export const ObjectNamePicker: FC<{
         }
       }}
       options={options}
-      filterOptions={(options, params) => {
-        const filtered = filterOptions(options, params);
+      filterOptions={(innerOptions, params) => {
+        const filtered = filterOptions(innerOptions, params);
 
         const {inputValue} = params;
         // Suggest the creation of a new value
-        const isExisting = options.some(option => inputValue === option.name);
+        const isExisting = innerOptions.some(
+          option => inputValue === option.name
+        );
         if (inputValue !== '' && !isExisting) {
           filtered.push({
             name: inputValue,

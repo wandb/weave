@@ -500,14 +500,14 @@ export const parseRef = (ref: string): ArtifactRef => {
   }
 
   if (isWandbArtifact) {
-    const [entityName, projectName, artifactId, artifactPath] = splitUri;
-    const [artifactName, artifactVersion] = artifactId.split(':', 2);
+    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
+    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
     return {
       entityName,
       projectName,
-      artifactName,
+      artifactName: artifactNamePart,
       artifactVersion,
-      artifactPath,
+      artifactPath: artifactPathPart,
     };
   }
 

@@ -75,6 +75,7 @@ export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
 export const parseRefMaybe = (s: string): ArtifactRef | null => {
   try {
     return parseRef(s);
-  } catch (e) {}
-  return null;
+  } catch (e) {
+    return null;
+  }
 };

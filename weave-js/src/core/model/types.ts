@@ -413,7 +413,6 @@ export interface NewRun {
   _prints: string[];
 }
 
-
 export interface OpDefType {
   type: 'OpDef';
 }
@@ -433,7 +432,6 @@ export interface FilesystemArtifactRef {
 export interface StreamTable {
   type: 'stream_table';
 }
-
 
 // End Weave Python additions
 

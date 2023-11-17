@@ -1,7 +1,7 @@
-import {Box,Button} from '@mui/material';
+import {Box, Button} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import React, {FC, useCallback} from 'react';
-import {useHistory,useParams} from 'react-router-dom';
+import {useHistory, useParams} from 'react-router-dom';
 
 import {URL_BROWSE2} from '../../../../urls';
 import {Browse2Trace} from './Browse2Trace';

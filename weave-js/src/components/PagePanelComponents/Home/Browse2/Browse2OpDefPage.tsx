@@ -1,4 +1,4 @@
-import {Box, Button, TextField,Typography} from '@mui/material';
+import {Box, Button, TextField, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import React, {FC, useMemo} from 'react';
 import {useParams} from 'react-router-dom';

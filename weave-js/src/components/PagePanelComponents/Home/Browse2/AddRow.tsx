@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import {useWeaveContext} from '@wandb/weave/context';
 import {constString, opGet} from '@wandb/weave/core';
-import React, {FC, useCallback,useState} from 'react';
+import React, {FC, useCallback, useState} from 'react';
 
 import {Link} from './CommonLib';
 import {

@@ -1,13 +1,13 @@
-import {Box, Grid,Typography} from '@mui/material';
+import {Box, Grid, Typography} from '@mui/material';
 import {useWeaveContext} from '@wandb/weave/context';
-import {constString,opGet} from '@wandb/weave/core';
+import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useMemo} from 'react';
-import {useHistory,useParams} from 'react-router-dom';
+import {useHistory, useParams} from 'react-router-dom';
 
 import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
 import {Browse2RootObjectType} from './Browse2RootObjectType';
-import {Link, makeObjRefUri,Paper} from './CommonLib';
+import {Link, makeObjRefUri, Paper} from './CommonLib';
 import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
 import {LinkTable} from './LinkTable';

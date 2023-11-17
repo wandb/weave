@@ -36,11 +36,11 @@ export const opDisplayName = (opName: string) => {
   if (opName.startsWith('wandb-artifact:')) {
     const ref = parseRef(opName);
     if (isWandbArtifactRef(ref)) {
-      let opName = ref.artifactName;
-      if (opName.startsWith('op-')) {
-        opName = opName.slice(3);
+      let refOpName = ref.artifactName;
+      if (refOpName.startsWith('op-')) {
+        refOpName = refOpName.slice(3);
       }
-      return opName + ':' + ref.artifactVersion;
+      return refOpName + ':' + ref.artifactVersion;
     }
   }
   return opName;

@@ -5,7 +5,7 @@ import {useParams} from 'react-router-dom';
 
 import {callsTableFilter, callsTableNode, callsTableOpCounts} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {parseRefMaybe,SmallRef} from './SmallRef';
+import {parseRefMaybe, SmallRef} from './SmallRef';
 
 export const Browse2RootObjectVersionOutputOf: FC<{uri: string}> = ({uri}) => {
   const params = useParams<Browse2RootObjectVersionItemParams>();

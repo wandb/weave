@@ -29,7 +29,7 @@ import {
 } from '../../model';
 import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
-import {makeBasicOp, makeEqualOp,makeStandardOp} from '../opKinds';
+import {makeBasicOp, makeEqualOp, makeStandardOp} from '../opKinds';
 import {opIndex} from '../primitives';
 import {splitEscapedString} from '../primitives/splitEscapedString';
 

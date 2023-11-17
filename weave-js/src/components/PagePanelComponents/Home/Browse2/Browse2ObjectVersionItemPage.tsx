@@ -1,5 +1,5 @@
 import {LoadingButton} from '@mui/lab';
-import {Box, Button, Grid,Typography} from '@mui/material';
+import {Box, Button, Grid, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useWeaveContext} from '@wandb/weave/context';
@@ -35,7 +35,7 @@ const nodeFromExtra = (node: Node, extra: string[]): Node => {
     return nodeFromExtra(
       callOpVeryUnsafe('index', {
         arr: node,
-        index: constNumber(parseInt(extra[1])),
+        index: constNumber(parseInt(extra[1], 10)),
       }) as Node,
       extra.slice(2)
     );

@@ -1,6 +1,6 @@
 import {useNodeValue} from '@wandb/weave/react';
 import React, {FC, useCallback, useMemo} from 'react';
-import {useHistory,useParams} from 'react-router-dom';
+import {useHistory, useParams} from 'react-router-dom';
 
 import {callsTableFilter, callsTableNode, callsTableOpCounts} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';

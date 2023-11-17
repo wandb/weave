@@ -1,4 +1,4 @@
-import {Box, Chip,Typography} from '@mui/material';
+import {Box, Chip, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';

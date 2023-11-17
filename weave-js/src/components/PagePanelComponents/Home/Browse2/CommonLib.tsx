@@ -1,5 +1,5 @@
-import {Link as MaterialLink,Paper as MaterialPaper} from '@mui/material';
-import {Box,Typography} from '@mui/material';
+import {Link as MaterialLink, Paper as MaterialPaper} from '@mui/material';
+import {Box, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import React, {FC} from 'react';
 import {Link as RouterLink, useLocation} from 'react-router-dom';

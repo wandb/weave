@@ -4,6 +4,9 @@ export const flattenObject = (
   result: {[key: string]: any} = {}
 ) => {
   for (const key in obj) {
+    if (!obj.hasOwnProperty(key)) {
+      continue;
+    }
     const newKey = parentKey ? `${parentKey}.${key}` : key;
     if (Array.isArray(obj[key])) {
       result[newKey] = obj[key];
@@ -18,6 +21,9 @@ export const flattenObject = (
 export const unflattenObject = (obj: {[key: string]: any}) => {
   const result: {[key: string]: any} = {};
   for (const key in obj) {
+    if (!obj.hasOwnProperty(key)) {
+      continue;
+    }
     const keys = key.split('.');
     let current = result;
     for (let i = 0; i < keys.length; i++) {

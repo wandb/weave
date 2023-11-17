@@ -381,7 +381,6 @@ const PanelObjectChild: React.FC<
                 });
               }}
             />
-
           </div>
         )}
       </KeyValTable.Val>
