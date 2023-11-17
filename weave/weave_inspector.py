@@ -193,9 +193,10 @@ def _type_iter(node_type: types.Type) -> typing.Iterator[TypeIter]:
                 ),
             )
 
+
 def _print_type_table(
-        type_iterator: typing.Iterator[TypeIter],
-        type_to_id_map: dict[types.Type, int],
+    type_iterator: typing.Iterator[TypeIter],
+    type_to_id_map: dict[types.Type, int],
 ) -> None:
     table = []
     completed_nodes = set()
@@ -238,16 +239,13 @@ def _print_type_table(
 
         if type_iter.node_type in completed_nodes:
             reference_nodes.add(type_iter.node_type)
-            if type_iter.depth > 0 and not (
-                type_iter.parent_type in reference_nodes
-            ):
+            if type_iter.depth > 0 and not (type_iter.parent_type in reference_nodes):
                 row["TYPE ID"] = "."
                 if len(_type_props(type_iter.node_type)) == 0:
                     row["TYPE NAME"] = name_prefix + _type_name(type_iter.node_type)
                 else:
                     row["TYPE NAME"] = (
-                        name_prefix
-                        + f"TYPE_ID({type_to_id_map[type_iter.node_type]})"
+                        name_prefix + f"TYPE_ID({type_to_id_map[type_iter.node_type]})"
                     )
                 table.append(row)
         else:
@@ -269,7 +267,6 @@ class TypeInspector:
     id_to_type_map: dict[int, types.Type] = dataclasses.field(default_factory=dict)
     type_to_id_map: dict[types.Type, int] = dataclasses.field(default_factory=dict)
 
-
     def __post_init__(self) -> None:
         self._build_maps()
 
@@ -279,7 +276,6 @@ class TypeInspector:
                 type_id = len(self.id_to_type_map)
                 self.id_to_type_map[type_id] = type_iter.node_type
                 self.type_to_id_map[type_iter.node_type] = type_id
-            
 
     def _pre_order_type_iter(self) -> typing.Iterator[TypeIter]:
         for type_iter in _type_iter(self.base_type):
@@ -293,6 +289,7 @@ class TypeInspector:
         print("\Type Summary:")
         print("\nType as string:", str(self.base_type))
         _print_type_table(self._pre_order_type_iter(), self.type_to_id_map)
+
 
 @dataclasses.dataclass
 class NodeInspector:
