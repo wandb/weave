@@ -110,13 +110,13 @@ from . import weave_types as types
 from . import graph
 
 
-def _trimmed_string(s: str, max_len: int = 20):
+def _trimmed_string(s: str, max_len: int = 20) -> str:
     if len(s) > max_len - 3:
         return s[: max_len // 2] + "..." + s[-max_len // 2 :]
     return s
 
 
-def _node_name(node: graph.Node):
+def _node_name(node: graph.Node) -> str:
     if isinstance(node, graph.OutputNode):
         return node.from_op.name
     elif isinstance(node, graph.VarNode):
@@ -131,19 +131,19 @@ def _node_name(node: graph.Node):
         raise Exception(f"Unknown node type: {type(node)}")
 
 
-def _node_type_name(node: graph.Node):
+def _node_type_name(node: graph.Node) -> str:
     return type(node).__name__
 
 
-def _type_name(node_type: types.Type):
+def _type_name(node_type: types.Type) -> str:
     from .language_features.tagging import tagged_value_type
 
     if isinstance(node_type, tagged_value_type.TaggedValueType):
         return f"TV({_type_name(node_type.value)})"
-    return type(node_type).__name__
+    return str(type(node_type).__name__)
 
 
-def _type_props(node_type: types.Type):
+def _type_props(node_type: types.Type) -> typing.Dict[str, types.Type]:
     if isinstance(node_type, types.UnionType):
         return {str(n): m for n, m in enumerate(node_type.members)}
     elif isinstance(node_type, types.TypedDict):
@@ -173,7 +173,7 @@ class TypeIter:
     parent_type: typing.Optional[types.Type] = None
 
 
-def _type_iter(node_type: types.Type):
+def _type_iter(node_type: types.Type) -> typing.Iterator[TypeIter]:
     stack = [TypeIter("", node_type, 0, True)]
     while stack:
         type_iter = stack.pop(0)
@@ -204,10 +204,10 @@ class Inspector:
     id_to_type_map: dict[int, types.Type] = dataclasses.field(default_factory=dict)
     type_to_id_map: dict[types.Type, int] = dataclasses.field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self._build_maps()
 
-    def _pre_order_node_iter(self):
+    def _pre_order_node_iter(self) -> typing.Iterator[NodeIter]:
         stack = [NodeIter("", self.base_node, 0, True)]
         while stack:
             node_iter = stack.pop(0)
@@ -241,12 +241,12 @@ class Inspector:
                     ),
                 )
 
-    def _pre_order_type_iter(self):
+    def _pre_order_type_iter(self) -> typing.Iterator[TypeIter]:
         for node_iter in self._pre_order_node_iter():
             for type_iter in _type_iter(node_iter.node.type):
                 yield type_iter
 
-    def _build_maps(self):
+    def _build_maps(self) -> None:
         for node_iter in self._pre_order_node_iter():
             if node_iter.node not in self.node_to_id_map:
                 node_id = len(self.id_to_node_map)
@@ -259,18 +259,17 @@ class Inspector:
                     self.id_to_type_map[type_id] = type_iter.node_type
                     self.type_to_id_map[type_iter.node_type] = type_id
 
-    def summarize(self, node_id: typing.Optional[int] = None):
-        if node_id is not None:
-            target_node = self.id_to_node_map[node_id]
-            Inspector(target_node).summarize()
-            return target_node
-        else:
-            print("\nNode Summary:\n")
-            print("\nNode as string:", self.base_node)
-            self.print_node_table()
-            self.print_type_table()
+    def lookup(self, node_id: int) -> "Inspector":
+        target_node = self.id_to_node_map[node_id]
+        return Inspector(target_node)
 
-    def print_node_table(self):
+    def summarize(self) -> None:
+        print("\nNode Summary:\n")
+        print("\nNode as string:", self.base_node)
+        self.print_node_table()
+        self.print_type_table()
+
+    def print_node_table(self) -> None:
         table = []
         completed_nodes = set()
         reference_nodes = set()
@@ -341,7 +340,7 @@ class Inspector:
         print(tabulate.tabulate(table, headers="keys"))
         print("")
 
-    def print_type_table(self):
+    def print_type_table(self) -> None:
         table = []
         completed_nodes = set()
         reference_nodes = set()

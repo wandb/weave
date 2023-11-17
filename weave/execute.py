@@ -180,9 +180,6 @@ def get_top_level_stats() -> typing.Optional[ExecuteStats]:
 
 
 def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.Any]:
-    from . import node_inspector
-
-    node_inspector.Inspector(nodes[0]).summarize()
     tracer = engine_trace.tracer()
     with tracer.trace("execute-log-graph"):
         logging.info(
