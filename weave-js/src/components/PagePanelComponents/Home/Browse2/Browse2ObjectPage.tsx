@@ -22,11 +22,21 @@ export const Browse2ObjectPage: FC = props => {
   //   params.project,
   //   params.objName
   // );
-  const versionNames = query.useObjectVersions(
+  const versions = query.useObjectVersions(
     params.entity,
     params.project,
     params.objName
   );
+
+  console.log(versions);
+
+  const versionNames = [
+    {
+      result: 'abcd',
+      loading: false,
+    },
+  ];
+
   const rows = useMemo(
     () =>
       (versionNames.result ?? []).map((row, i) => ({

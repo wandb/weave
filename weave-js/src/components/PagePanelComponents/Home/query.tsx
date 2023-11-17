@@ -522,11 +522,8 @@ export const useObjectVersions = (
   });
   const artifactVersionsNode = w.opArtifactVersions({
     artifact: artifactNode,
-  });
-  const digestsNode = w.opArtifactVersionHash({
-    artifactVersion: artifactVersionsNode,
-  });
-  const resultQuery = useNodeValue(digestsNode);
+  });  
+  const resultQuery = useNodeValue(artifactVersionsNode);
   return useMemo(() => {
     return {
       result: resultQuery.result ?? [],
