@@ -1,9 +1,3 @@
-import * as _ from 'lodash';
-import React, {FC, useEffect, useMemo, useRef} from 'react';
-import {useParams, Link} from 'react-router-dom';
-import {URL_BROWSE2} from '../../../../urls';
-import {monthRoundedTime} from '@wandb/weave/time';
-import {SpanWithFeedback} from './callTree';
 import {Box} from '@mui/material';
 import {
   DataGridPro as DataGrid,
@@ -11,10 +5,17 @@ import {
   GridColumnGroup,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {parseRef} from '@wandb/weave/react';
+import {monthRoundedTime} from '@wandb/weave/time';
+import * as _ from 'lodash';
+import React, {FC, useEffect, useMemo, useRef} from 'react';
+import {Link,useParams} from 'react-router-dom';
+
+import {URL_BROWSE2} from '../../../../urls';
+import {flattenObject} from './browse2Util';
+import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {SmallRef} from './SmallRef';
-import {parseRef} from '@wandb/weave/react';
-import {flattenObject} from './browse2Util';
 
 type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
@@ -26,7 +27,7 @@ function addToTree(
   fields: string[],
   fullPath: string
 ): void {
-  if (!fields.length) return;
+  if (!fields.length) { return; }
 
   if (fields.length === 1) {
     node.children.push({

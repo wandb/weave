@@ -25,12 +25,12 @@ import React, {useCallback, useMemo} from 'react';
 import {Icon} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../context';
+import {ChildPanel} from './ChildPanel';
 import * as ConfigPanel from './ConfigPanel';
 import * as KeyValTable from './KeyValTable';
 import * as Panel2 from './panel';
 import {Spec as PanelDateSpec} from './PanelDate';
 import PanelDate from './PanelDate/Component';
-import {ChildPanel} from './ChildPanel';
 import {PanelNumber, Spec as PanelNumberSpec} from './PanelNumber';
 import {PanelString, Spec as PanelStringSpec} from './PanelString';
 

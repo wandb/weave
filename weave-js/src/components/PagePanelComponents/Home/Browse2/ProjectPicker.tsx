@@ -1,7 +1,7 @@
-import React, {FC, useMemo} from 'react';
-import * as Queries from '../query';
-
 import {Autocomplete, CircularProgress, TextField} from '@mui/material';
+import React, {FC, useMemo} from 'react';
+
+import * as Queries from '../query';
 
 export const ProjectNamePicker: FC<{
   entityName: string;

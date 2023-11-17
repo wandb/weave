@@ -1,9 +1,10 @@
+import {Typography} from '@mui/material';
 import React, {FC, useCallback, useMemo} from 'react';
-import {useParams, useHistory} from 'react-router-dom';
+import {useHistory,useParams} from 'react-router-dom';
+
 import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
 import {Paper} from './CommonLib';
-import {Typography} from '@mui/material';
 import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
 import {LinkTable} from './LinkTable';

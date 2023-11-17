@@ -6,7 +6,7 @@ export const refPageUrl = (objectType: string, refS: string) => {
   if (!isWandbArtifactRef(ref)) {
     throw new Error('Not a wandb artifact ref: ' + refS);
   }
-  let res = `/${URL_BROWSE2}/${ref.entityName}/${ref.projectName}/${objectType}/${ref.artifactName}/${ref.artifactVersion}`;
+  const res = `/${URL_BROWSE2}/${ref.entityName}/${ref.projectName}/${objectType}/${ref.artifactName}/${ref.artifactVersion}`;
   return res;
 };
 export const opPageUrl = (opUri: string) => {

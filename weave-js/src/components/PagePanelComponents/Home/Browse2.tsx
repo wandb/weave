@@ -1,26 +1,25 @@
-import React, {FC} from 'react';
-import {Switch, Route, Link as RouterLink, useParams} from 'react-router-dom';
-
-import {URL_BROWSE2} from '../../../urls';
-
+import {Home} from '@mui/icons-material';
 import {
   AppBar,
+  Box,
+  Breadcrumbs,
+  Container,
   IconButton,
   Link as MaterialLink,
   Toolbar,
   Typography,
-  Breadcrumbs,
-  Box,
-  Container,
 } from '@mui/material';
-import {Home} from '@mui/icons-material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import React, {FC} from 'react';
+import {Link as RouterLink, Route, Switch, useParams} from 'react-router-dom';
+
+import {URL_BROWSE2} from '../../../urls';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
-import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
+import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
 import {Browse2ObjectTypePage} from './Browse2/Browse2ObjectTypePage';
 import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPage';
-import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
+import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
 

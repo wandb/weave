@@ -15,6 +15,8 @@ import {StateInspector} from 'reinspect';
 import {apolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
+import {Browse2} from './components/PagePanelComponents/Home/Browse2';
+import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import getConfig from './config';
@@ -28,8 +30,6 @@ import {
   URL_TEMPLATES,
   URL_WANDB,
 } from './urls';
-import {Browse2} from './components/PagePanelComponents/Home/Browse2';
-import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {

@@ -73,7 +73,7 @@ export const useAutomatedTableState = (
   currentTableState: Table.TableState | undefined,
   weave: WeaveInterface
 ) => {
-  let {stack} = usePanelContext();
+  const {stack} = usePanelContext();
   // TODO: This was reversing stack and breaking stuff!
   // TODO TODO TODO
   // ({node: input as any, stack} = useRefEqualExpr(input, stack));

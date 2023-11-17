@@ -1,6 +1,7 @@
-import React, {FC, useMemo} from 'react';
 import Editor from '@monaco-editor/react';
 import {useNodeValue} from '@wandb/weave/react';
+import React, {FC, useMemo} from 'react';
+
 import {opDefCodeNode} from './dataModel';
 
 export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {

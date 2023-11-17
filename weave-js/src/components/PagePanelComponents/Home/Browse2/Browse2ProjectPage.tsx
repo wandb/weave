@@ -1,15 +1,16 @@
+import {Box, Grid,Typography} from '@mui/material';
+import {useWeaveContext} from '@wandb/weave/context';
+import {constString,opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useMemo} from 'react';
-import {useParams, useHistory} from 'react-router-dom';
+import {useHistory,useParams} from 'react-router-dom';
+
 import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
-import {Link, Paper, makeObjRefUri} from './CommonLib';
-import {Typography, Box, Grid} from '@mui/material';
+import {Browse2RootObjectType} from './Browse2RootObjectType';
+import {Link, makeObjRefUri,Paper} from './CommonLib';
 import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
 import {LinkTable} from './LinkTable';
-import {Browse2RootObjectType} from './Browse2RootObjectType';
-import {useWeaveContext} from '@wandb/weave/context';
-import {opGet, constString} from '@wandb/weave/core';
 
 const Browse2Boards: FC<{entity: string; project: string}> = ({
   entity,

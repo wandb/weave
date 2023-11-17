@@ -1,9 +1,10 @@
 import React, {FC} from 'react';
 import {useParams} from 'react-router-dom';
+
 import {URL_BROWSE2} from '../../../../urls';
 import {CallFilter, StreamId, TraceSpan} from './callTree';
-import {Link} from './CommonLib';
 import {useTraceSummaries} from './callTreeHooks';
+import {Link} from './CommonLib';
 import {PageEl} from './CommonLib';
 import {useQuery} from './CommonLib';
 
@@ -34,7 +35,7 @@ export const Browse2TracesPage: FC = () => {
   const params = useParams<Browse2TracesPageParams>();
   const filters: CallFilter = {};
   const query = useQuery();
-  let selectedSpan: TraceSpan | undefined = undefined;
+  let selectedSpan: TraceSpan | undefined;
   query.forEach((val, key) => {
     if (key === 'op') {
       filters.opUri = val;

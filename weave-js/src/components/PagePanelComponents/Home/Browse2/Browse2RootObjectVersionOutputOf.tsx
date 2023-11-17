@@ -1,10 +1,11 @@
+import {Typography} from '@material-ui/core';
+import {useNodeValue} from '@wandb/weave/react';
 import React, {FC, useMemo} from 'react';
 import {useParams} from 'react-router-dom';
-import {useNodeValue} from '@wandb/weave/react';
+
 import {callsTableFilter, callsTableNode, callsTableOpCounts} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {SmallRef, parseRefMaybe} from './SmallRef';
-import {Typography} from '@material-ui/core';
+import {parseRefMaybe,SmallRef} from './SmallRef';
 
 export const Browse2RootObjectVersionOutputOf: FC<{uri: string}> = ({uri}) => {
   const params = useParams<Browse2RootObjectVersionItemParams>();

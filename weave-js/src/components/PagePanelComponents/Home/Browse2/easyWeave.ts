@@ -1,17 +1,17 @@
+import {toWeaveType} from '@wandb/weave/components/Panel2/toWeaveType';
 import {
   callOpVeryUnsafe,
-  constString,
-  opGet,
-  Node,
+  ConstNode,
   constNodeUnsafe,
+  constString,
+  isAssignableTo,
+  Node,
+  Op,
+  opGet,
+  OutputNode,
   Type,
   Weave,
-  isAssignableTo,
-  ConstNode,
-  OutputNode,
-  Op,
 } from '@wandb/weave/core';
-import {toWeaveType} from '@wandb/weave/components/Panel2/toWeaveType';
 
 const weaveConst = (val: any): ConstNode => {
   return constNodeUnsafe(toWeaveType(val), val);

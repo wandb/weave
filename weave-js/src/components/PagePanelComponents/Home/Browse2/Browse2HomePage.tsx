@@ -1,11 +1,12 @@
+import {Typography} from '@mui/material';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
+
 import {URL_BROWSE2} from '../../../../urls';
-import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import * as query from '../query';
-import {Typography} from '@mui/material';
+import {PageEl,PageHeader, Paper} from './CommonLib';
 import {LinkTable} from './LinkTable';
-import {Paper, PageHeader, PageEl} from './CommonLib';
 
 export const Browse2HomePage: FC = props => {
   const isAuthenticated = useIsAuthenticated();

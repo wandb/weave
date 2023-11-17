@@ -1,6 +1,3 @@
-import React, {FC} from 'react';
-import styled from 'styled-components';
-import {Popup} from 'semantic-ui-react';
 import {
   CallMade,
   CallReceived,
@@ -9,6 +6,10 @@ import {
   SmartToy,
 } from '@mui/icons-material';
 import {Box, Chip, Typography} from '@mui/material';
+import React, {FC} from 'react';
+import {Popup} from 'semantic-ui-react';
+import styled from 'styled-components';
+
 import {DisplayControlChars} from './CommonLib';
 
 interface ChatMessageSystem {

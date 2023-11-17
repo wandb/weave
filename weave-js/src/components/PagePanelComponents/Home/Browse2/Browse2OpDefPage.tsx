@@ -1,14 +1,15 @@
+import {Box, Button, TextField,Typography} from '@mui/material';
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import React, {FC, useMemo} from 'react';
 import {useParams} from 'react-router-dom';
-import * as globals from '@wandb/weave/common/css/globals.styles';
-import {Paper} from './CommonLib';
+
+import {Browse2Calls} from './Browse2Calls';
+import {Browse2OpDefCode} from './Browse2OpDefCode';
 import {useFirstCall, useOpSignature} from './callTreeHooks';
-import {Button, Typography, Box, TextField} from '@mui/material';
+import {Paper} from './CommonLib';
 import {makeObjRefUri} from './CommonLib';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {useQuery} from './CommonLib';
-import {Browse2Calls} from './Browse2Calls';
-import {Browse2OpDefCode} from './Browse2OpDefCode';
 
 export const Browse2OpDefPage: FC = () => {
   const params = useParams<Browse2RootObjectVersionItemParams>();

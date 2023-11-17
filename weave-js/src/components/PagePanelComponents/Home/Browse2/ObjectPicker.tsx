@@ -1,8 +1,8 @@
-import React, {FC, useMemo} from 'react';
-import * as Queries from '../query';
-
 import {CircularProgress, TextField} from '@mui/material';
 import Autocomplete, {createFilterOptions} from '@mui/material/Autocomplete';
+import React, {FC, useMemo} from 'react';
+
+import * as Queries from '../query';
 
 export interface ChosenObjectNameOption {
   name: string;

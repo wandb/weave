@@ -1,11 +1,12 @@
-import React, {FC, useCallback, useMemo} from 'react';
-import {useParams, useHistory} from 'react-router-dom';
 import {useNodeValue} from '@wandb/weave/react';
+import React, {FC, useCallback, useMemo} from 'react';
+import {useHistory,useParams} from 'react-router-dom';
+
 import {callsTableFilter, callsTableNode, callsTableOpCounts} from './callTree';
-import {LinkTable} from './LinkTable';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {opPageUrl} from './url';
 import {opDisplayName} from './dataModel';
+import {LinkTable} from './LinkTable';
+import {opPageUrl} from './url';
 
 export const Browse2RootObjectVersionUsers: FC<{uri: string}> = ({uri}) => {
   const params = useParams<Browse2RootObjectVersionItemParams>();

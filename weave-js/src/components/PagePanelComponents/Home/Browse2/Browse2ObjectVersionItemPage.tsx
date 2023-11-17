@@ -1,30 +1,31 @@
-import React, {FC, useCallback, useMemo, useState} from 'react';
-import {useParams} from 'react-router-dom';
+import {LoadingButton} from '@mui/lab';
+import {Box, Button, Grid,Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
+import {urlPrefixed} from '@wandb/weave/config';
+import {useWeaveContext} from '@wandb/weave/context';
 import {
   callOpVeryUnsafe,
   constNumber,
   constString,
-  opGet,
   Node,
+  opGet,
 } from '@wandb/weave/core';
+import React, {FC, useCallback, useMemo, useState} from 'react';
+import {useParams} from 'react-router-dom';
+
 import {usePanelContext} from '../../../Panel2/PanelContext';
-import {useWeaveContext} from '@wandb/weave/context';
 import {useMakeLocalBoardFromNode} from '../../../Panel2/pyBoardGen';
 import {SEED_BOARD_OP_NAME} from '../HomePreviewSidebar';
+import {Browse2CallsPage} from './Browse2CallsPage';
+import {Browse2OpDefPage} from './Browse2OpDefPage';
+import {Browse2RootObjectVersionOutputOf} from './Browse2RootObjectVersionOutputOf';
+import {Browse2RootObjectVersionUsers} from './Browse2RootObjectVersionUsers';
 import {Paper} from './CommonLib';
-import {Button, Typography, Box, Grid} from '@mui/material';
-import {LoadingButton} from '@mui/lab';
-import {urlPrefixed} from '@wandb/weave/config';
-import {WeaveEditor} from './WeaveEditors';
 import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
 import {makeObjRefUri} from './CommonLib';
-import {Browse2RootObjectVersionUsers} from './Browse2RootObjectVersionUsers';
-import {Browse2OpDefPage} from './Browse2OpDefPage';
-import {Browse2CallsPage} from './Browse2CallsPage';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {Browse2RootObjectVersionOutputOf} from './Browse2RootObjectVersionOutputOf';
+import {WeaveEditor} from './WeaveEditors';
 
 const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {

@@ -1,5 +1,3 @@
-import React, {useState, FC, useCallback} from 'react';
-
 import {
   Box,
   Button,
@@ -10,19 +8,21 @@ import {
   Grid,
   Typography,
 } from '@mui/material';
-import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
-import {ProjectNamePicker} from './ProjectPicker';
-import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
-import {constString, opGet} from '@wandb/weave/core';
 import {useWeaveContext} from '@wandb/weave/context';
+import {constString, opGet} from '@wandb/weave/core';
+import React, {FC, useCallback,useState} from 'react';
+
+import {Link} from './CommonLib';
 import {
   mutationAppend,
   mutationPublishArtifact,
   weaveGet,
   weaveObject,
 } from './easyWeave';
+import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
+import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
+import {ProjectNamePicker} from './ProjectPicker';
 import {refPageUrl} from './url';
-import {Link} from './CommonLib';
 
 interface AddRowToPaneFormState {
   projectName?: string;

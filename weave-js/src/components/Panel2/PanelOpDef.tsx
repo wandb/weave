@@ -2,27 +2,27 @@
 //   filter stream to only show self matches
 //   sort stream
 
+import {useWeaveContext} from '@wandb/weave/context';
 import {
-  Node,
-  Type,
   callOpVeryUnsafe,
   constFunction,
   constNodeUnsafe,
   constString,
+  Node,
   opArtifactName,
   opArtifactTypeArtifacts,
   opGet,
   opProjectArtifactType,
   opRootProject,
+  Type,
   voidNode,
 } from '@wandb/weave/core';
+import {isWandbArtifactRef, parseRef, useNodeValue} from '@wandb/weave/react';
 import * as _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import * as Panel2 from './panel';
-import {isWandbArtifactRef, parseRef, useNodeValue} from '@wandb/weave/react';
 import {ChildPanelConfig, initPanel} from './ChildPanel';
-import {useWeaveContext} from '@wandb/weave/context';
+import * as Panel2 from './panel';
 import {usePanelContext} from './PanelContext';
 
 // Don't show up in any suggestions for now.

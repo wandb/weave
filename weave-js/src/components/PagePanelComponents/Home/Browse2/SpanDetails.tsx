@@ -1,16 +1,17 @@
+import {Box, Button, Chip,Grid, Typography} from '@mui/material';
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC} from 'react';
-import * as globals from '@wandb/weave/common/css/globals.styles';
+
 import {Call} from './callTree';
+import {DisplayControlChars} from './CommonLib';
 import {
-  OpenAIChatInputView,
-  OpenAIChatOutputView,
   isOpenAIChatInput,
   isOpenAIChatOutput,
+  OpenAIChatInputView,
+  OpenAIChatOutputView,
 } from './openai';
-import {Button, Grid, Typography, Box, Chip} from '@mui/material';
-import {DisplayControlChars} from './CommonLib';
-import {SmallRef, parseRefMaybe} from './SmallRef';
+import {parseRefMaybe,SmallRef} from './SmallRef';
 
 const ObjectView: FC<{obj: any}> = ({obj}) => {
   if (_.isPlainObject(obj)) {

@@ -1,9 +1,9 @@
 import {
-  opRootProject,
   constString,
-  opProjectArtifactVersion,
   opArtifactVersionFile,
   opFileContents,
+  opProjectArtifactVersion,
+  opRootProject,
 } from '@wandb/weave/core';
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 

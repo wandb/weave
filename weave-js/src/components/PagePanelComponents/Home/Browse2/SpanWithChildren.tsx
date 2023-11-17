@@ -1,7 +1,8 @@
-import React, {FC} from 'react';
-import * as globals from '@wandb/weave/common/css/globals.styles';
-import {Span} from './callTree';
 import {Box} from '@mui/material';
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import React, {FC} from 'react';
+
+import {Span} from './callTree';
 import {CallViewSmall} from './CallViewSmall';
 
 export type SpanWithChildren = Span & {child_spans: SpanWithChildren[]};

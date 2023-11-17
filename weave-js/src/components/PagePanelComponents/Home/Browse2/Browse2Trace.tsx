@@ -1,18 +1,19 @@
+import {Box, Button, Grid, Tab,Tabs, Typography} from '@mui/material';
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import {useWeaveContext} from '@wandb/weave/context';
 import * as _ from 'lodash';
 import React, {FC, useMemo, useState} from 'react';
-import * as globals from '@wandb/weave/common/css/globals.styles';
-import {flatToTrees} from '../../../Panel2/PanelTraceTree/util';
-import {Span, StreamId, feedbackTableObjNode} from './callTree';
 import {v4 as uuidv4} from 'uuid';
-import {Paper} from './CommonLib';
-import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
-import {Button, Typography, Box, Grid, Tabs, Tab} from '@mui/material';
+
+import {flatToTrees} from '../../../Panel2/PanelTraceTree/util';
 import {AddRowToTable} from './AddRow';
-import {SpanDetails} from './SpanDetails';
-import {SpanWithChildren, SpanTreeNode} from './SpanWithChildren';
-import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
+import {feedbackTableObjNode,Span, StreamId} from './callTree';
+import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
+import {Paper} from './CommonLib';
 import {mutationStreamTableLog} from './easyWeave';
-import {useWeaveContext} from '@wandb/weave/context';
+import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
+import {SpanDetails} from './SpanDetails';
+import {SpanTreeNode,SpanWithChildren} from './SpanWithChildren';
 
 const VerticalTraceView: FC<{
   traceSpans: Span[];
@@ -135,10 +136,10 @@ export const Browse2Trace: FC<{
         Object.keys(output).filter(
           k => !k.startsWith('_') && output[k] != null
         );
-      res['output'] = _.fromPairs(outputOrder.map(k => [k, output[k]]));
+      res.output = _.fromPairs(outputOrder.map(k => [k, output[k]]));
     }
     if (lastFeedbackQuery.result != null) {
-      res['feedback'] = lastFeedbackQuery.result;
+      res.feedback = lastFeedbackQuery.result;
     }
     return res;
   }, [lastFeedbackQuery.result, selectedSpan]);

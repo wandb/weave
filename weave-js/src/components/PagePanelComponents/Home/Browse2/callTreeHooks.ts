@@ -1,21 +1,22 @@
+import {constNumber, opIndex} from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
 import {useMemo} from 'react';
+
 import {
-  StreamId,
-  Span,
+  CallFilter,
   callsTableFilter,
   callsTableNode,
   callsTableSelect,
+  callsTableSelectTraces,
+  feedbackTableNode,
+  listSelectAll,
   OpSignature,
   opSignatureFromSpan,
-  callsTableSelectTraces,
-  listSelectAll,
   runFeedbackNode,
-  CallFilter,
+  Span,
   SpanWithFeedback,
-  feedbackTableNode,
+  StreamId,
 } from './callTree';
-import {useNodeValue} from '@wandb/weave/react';
-import {constNumber, opIndex} from '@wandb/weave/core';
 
 export const useRuns = (
   streamId: StreamId,

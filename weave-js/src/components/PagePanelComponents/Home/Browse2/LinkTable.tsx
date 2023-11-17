@@ -1,6 +1,6 @@
-import React, {useMemo} from 'react';
 import {Box} from '@mui/material';
 import {DataGridPro as DataGrid} from '@mui/x-data-grid-pro';
+import React, {useMemo} from 'react';
 
 export const LinkTable = <RowType extends {[key: string]: any}>({
   rows,

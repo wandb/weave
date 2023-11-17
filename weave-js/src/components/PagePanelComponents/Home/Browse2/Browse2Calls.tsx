@@ -1,10 +1,11 @@
-import React, {FC} from 'react';
-import {CallFilter, StreamId} from './callTree';
-import {Paper} from './CommonLib';
-import {Typography} from '@mui/material';
 import {FilterList} from '@mui/icons-material';
-import {RunsTable} from './RunsTable';
+import {Typography} from '@mui/material';
+import React, {FC} from 'react';
+
+import {CallFilter, StreamId} from './callTree';
 import {useRunsWithFeedback} from './callTreeHooks';
+import {Paper} from './CommonLib';
+import {RunsTable} from './RunsTable';
 
 export const Browse2Calls: FC<{
   streamId: StreamId;

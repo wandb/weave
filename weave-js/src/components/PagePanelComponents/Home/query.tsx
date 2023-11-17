@@ -243,7 +243,7 @@ export const useProjectAssetCountGeneral = (
         artifactType: row,
       });
       return w.opDict({
-        artifactTypeName: artifactTypeName,
+        artifactTypeName,
         artifactCount: artifactCountNode,
       } as any);
     }),
@@ -480,7 +480,7 @@ export const useObjectAliases = (
   projectName: string,
   objectName: string
 ): {
-  result: Array<string>;
+  result: string[];
   loading: boolean;
 } => {
   const projectNode = w.opRootProject({
@@ -509,7 +509,7 @@ export const useObjectVersions = (
   projectName: string,
   objectName: string
 ): {
-  result: Array<string>;
+  result: string[];
   loading: boolean;
 } => {
   const projectNode = w.opRootProject({

@@ -1,5 +1,6 @@
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
+
 import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
 import {LinkTable} from './LinkTable';

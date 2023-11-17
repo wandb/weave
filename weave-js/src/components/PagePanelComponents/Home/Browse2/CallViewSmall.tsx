@@ -1,10 +1,11 @@
-import React, {FC} from 'react';
-import styled from 'styled-components';
+import {Box, Chip,Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
+import React, {FC} from 'react';
+import styled from 'styled-components';
+
 import {Call} from './callTree';
-import {Typography, Box, Chip} from '@mui/material';
 
 const callOpName = (call: Call) => {
   if (!call.name.startsWith('wandb-artifact:')) {

@@ -1,35 +1,4 @@
-import * as _ from 'lodash';
-import React, {
-  FC,
-  useMemo,
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-} from 'react';
-
-import {
-  Node,
-  NodeOrVoidNode,
-  OutputNode,
-  Type,
-  constFunction,
-  constNumber,
-  constString,
-  isAssignableTo,
-  isConstNode,
-  isTypedDict,
-  linearize,
-  listObjectType,
-  maybe,
-  opDict,
-  opLimit,
-  opMap,
-  opObjGetAttr,
-  opPick,
-  typedDictPropertyTypes,
-  voidNode,
-} from '@wandb/weave/core';
+import LinkIcon from '@mui/icons-material/Link';
 import {
   Box,
   Button,
@@ -42,27 +11,58 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
+import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
+import {useWeaveContext} from '@wandb/weave/context';
 import {
-  WandbArtifactRef,
+  constFunction,
+  constNumber,
+  constString,
+  isAssignableTo,
+  isConstNode,
+  isTypedDict,
+  linearize,
+  listObjectType,
+  maybe,
+  Node,
+  NodeOrVoidNode,
+  opDict,
+  opLimit,
+  opMap,
+  opObjGetAttr,
+  opPick,
+  OutputNode,
+  Type,
+  typedDictPropertyTypes,
+  voidNode,
+} from '@wandb/weave/core';
+import {
   isWandbArtifactRef,
   parseRef,
   useNodeValue,
+  WandbArtifactRef,
 } from '@wandb/weave/react';
-import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
-import {useWeaveContext} from '@wandb/weave/context';
+import * as _ from 'lodash';
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {useHistory, useLocation} from 'react-router-dom';
+
+import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
-import {refPageUrl} from './url';
 import {
   mutationPublishArtifact,
   mutationSet,
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {useHistory, useLocation} from 'react-router-dom';
-import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
-import LinkIcon from '@mui/icons-material/Link';
-import {flattenObject, unflattenObject} from './browse2Util';
-import {SmallRef, parseRefMaybe} from './SmallRef';
+import {parseRefMaybe,SmallRef} from './SmallRef';
+import {refPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {
   if (isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))) {

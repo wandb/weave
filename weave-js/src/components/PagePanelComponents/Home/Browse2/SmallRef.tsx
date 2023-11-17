@@ -1,11 +1,9 @@
-import React, {FC, useMemo} from 'react';
-import {
-  ArtifactRef,
-  isWandbArtifactRef,
-  parseRef,
-  refUri,
-  useNodeValue,
-} from '@wandb/weave/react';
+import {Dataset as DatasetIcon} from '@mui/icons-material';
+import {SmartToy as SmartToyIcon} from '@mui/icons-material';
+import {TableRows as TableRowsIcon} from '@mui/icons-material';
+import {DataObject as DataObjectIcon} from '@mui/icons-material';
+import {Spoke as SpokeIcon} from '@mui/icons-material';
+import {Box, Typography} from '@mui/material';
 import {
   callOpVeryUnsafe,
   constString,
@@ -13,14 +11,17 @@ import {
   Node,
   Type,
 } from '@wandb/weave/core';
-import {Dataset as DatasetIcon} from '@mui/icons-material';
-import {SmartToy as SmartToyIcon} from '@mui/icons-material';
-import {TableRows as TableRowsIcon} from '@mui/icons-material';
-import {DataObject as DataObjectIcon} from '@mui/icons-material';
-import {Spoke as SpokeIcon} from '@mui/icons-material';
-import {Link} from './CommonLib';
+import {
+  ArtifactRef,
+  isWandbArtifactRef,
+  parseRef,
+  refUri,
+  useNodeValue,
+} from '@wandb/weave/react';
 import {URL_BROWSE2} from '@wandb/weave/urls';
-import {Box, Typography} from '@mui/material';
+import React, {FC, useMemo} from 'react';
+
+import {Link} from './CommonLib';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -59,7 +60,7 @@ export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
   } else if (rootTypeName === 'OpDef') {
     icon = <DataObjectIcon />;
   }
-  let Item = (
+  const Item = (
     <Box display="flex" alignItems="center">
       <Box mr={1}>{icon}</Box>
       <Typography variant="body1">{label}</Typography>

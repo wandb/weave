@@ -29,8 +29,8 @@ import {
 } from '../../model';
 import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
+import {makeBasicOp, makeEqualOp,makeStandardOp} from '../opKinds';
 import {opIndex} from '../primitives';
-import {makeStandardOp, makeBasicOp, makeEqualOp} from '../opKinds';
 import {splitEscapedString} from '../primitives/splitEscapedString';
 
 // import * as TypeHelpers from '../model/typeHelpers';
