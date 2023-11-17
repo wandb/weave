@@ -231,12 +231,19 @@ class WandbApiAsync:
         """
     )
 
-    async def can_access_entity(self, entity: str, api_key: typing.Optional[str]) -> bool:
+    async def can_access_entity(
+        self, entity: str, api_key: typing.Optional[str]
+    ) -> bool:
         try:
-            result = await self.query(self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key)
+            result = await self.query(
+                self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key
+            )
         except gql.transport.exceptions.TransportQueryError as e:
             return False
-        return result.get("viewer") and result.get("entity", {}).get("readOnly", True) == False
+        return (
+            result.get("viewer")
+            and result.get("entity", {}).get("readOnly", True) == False
+        )
 
 
 class WandbApi:

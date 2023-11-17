@@ -263,7 +263,9 @@ def board(
     return panels.Board(vars=varbar, panels=overview_tab)
 
 
-instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_trace_monitor.md"))
+instructions_md = util.read_or_default(
+    os.path.join(os.path.dirname(__file__), "instructions", "panel_trace_monitor.md")
+)
 
 template_registry.register(
     board_name,

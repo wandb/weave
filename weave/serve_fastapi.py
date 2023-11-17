@@ -20,9 +20,13 @@ from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
 from .artifact_wandb import WandbArtifactRef
 
-key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+key_cache: cache.LruTimeWindowCache[
+    str, typing.Optional[bool]
+] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
 api: Optional[WandbApiAsync] = None
+
+
 def wandb_auth(entity: str):
     async def auth_inner(key: Annotated[Optional[str], Depends(api_key)]) -> bool:
         global api
@@ -41,13 +45,23 @@ def wandb_auth(entity: str):
             raise HTTPException(status_code=403, detail="Permission Denied")
         key_cache.set(key, authed)
         return authed
+
     return auth_inner
 
+
 def api_key(
-    credentials: Annotated[Optional[HTTPBasicCredentials],
-                        Depends(HTTPBasic(auto_error=False,
-                                          description="Set your username to api and password to a W&B API Key"))],
-    x_wandb_api_key: Annotated[Optional[str], Header(description="Optional W&B API Key")] = None,
+    credentials: Annotated[
+        Optional[HTTPBasicCredentials],
+        Depends(
+            HTTPBasic(
+                auto_error=False,
+                description="Set your username to api and password to a W&B API Key",
+            )
+        ),
+    ],
+    x_wandb_api_key: Annotated[
+        Optional[str], Header(description="Optional W&B API Key")
+    ] = None,
 ) -> Optional[str]:
     if x_wandb_api_key:
         return x_wandb_api_key
@@ -56,9 +70,11 @@ def api_key(
     else:
         return None
 
+
 def object_method_app(
-    obj_ref: WandbArtifactRef, method_name: typing.Optional[str] = None, 
-    auth_entity: typing.Optional[str] = None
+    obj_ref: WandbArtifactRef,
+    method_name: typing.Optional[str] = None,
+    auth_entity: typing.Optional[str] = None,
 ) -> FastAPI:
     obj = obj_ref.get()
     obj_weave_type = types.TypeRegistry.type_of(obj)

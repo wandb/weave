@@ -431,7 +431,9 @@ def seed_autoboard(
     return auto_panels(input_node, config)  # type: ignore
 
 
-instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md"))
+instructions_md = util.read_or_default(
+    os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md")
+)
 
 
 # Removing this from registry for now since it is pretty buggy and not well tested.
