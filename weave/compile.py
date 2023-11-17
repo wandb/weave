@@ -29,6 +29,7 @@ from . import input_provider
 from . import partial_object
 from . import gql_to_weave
 from . import gql_op_plugin
+from .op_def import OpDef
 
 from .language_features.tagging import tagged_value_type_helpers
 
@@ -713,11 +714,19 @@ def compile_refine_and_propagate_gql(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
+    return _compile_refine_and_propagate_gql_inner(nodes, False, on_error)
+
+
+def _compile_refine_and_propagate_gql_inner(
+    nodes: typing.List[graph.Node],
+    skip_stitch: bool = False,
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
     # Stitch is needed for gql key propagation only. If we try to stitch
     # a graph that does not have gqlroot-wbgqlquery, it may fail completely.
     # So we only stitch if we have a gqlroot-wbgqlquery node.
 
-    use_stitch = (
+    use_stitch = not skip_stitch and (
         len(
             graph.filter_nodes_full(
                 nodes,
@@ -773,7 +782,10 @@ def compile_refine_and_propagate_gql(
                         )
                     }
 
-                res = op.lazy_call(**params)
+                fixed_params = _propagate_updated_types_through_lambdas(
+                    op, params, on_error
+                )
+                res = op.lazy_call(**fixed_params)
 
                 # The GQL key propagation logic needs to happen in the refine pass rather than the GQL
                 # compile pass. This is because the gql_op_output_types need refined input types or else
@@ -850,6 +862,76 @@ def compile_refine_and_propagate_gql(
         return None
 
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
+
+
+def _propagate_updated_types_through_lambdas(
+    op: OpDef, params: dict[str, graph.Node], on_error: graph.OnErrorFnType = None
+):
+    updated_params: dict[str, graph.Node] = {**params}
+    if isinstance(op.input_type, op_args.OpNamedArgs):
+        for k, target_node in params.items():
+            input_arg_type = op.input_type.arg_types[k]
+            if callable(input_arg_type):
+                expected_type = input_arg_type(
+                    {k: p.type for k, p in updated_params.items()}
+                )
+                if (
+                    isinstance(expected_type, types.Function)
+                    and isinstance(target_node.type, types.Function)
+                    and isinstance(target_node, graph.ConstNode)
+                ):
+                    param_type_frame = target_node.type.input_types
+                    expected_type_frame = expected_type.input_types
+                    expected_type_frame_needs_update = {}
+                    final_expected_type_frame = {}
+                    for (
+                        expected_type_frame_key,
+                        expected_type_frame_value,
+                    ) in expected_type_frame.items():
+                        if expected_type_frame_key in param_type_frame:
+                            if not expected_type_frame_value.assign_type(
+                                param_type_frame[expected_type_frame_key]
+                            ):
+                                expected_type_frame_needs_update[
+                                    expected_type_frame_key
+                                ] = expected_type_frame[expected_type_frame_key]
+                                final_expected_type_frame[
+                                    expected_type_frame_key
+                                ] = expected_type_frame[expected_type_frame_key]
+                            else:
+                                final_expected_type_frame[
+                                    expected_type_frame_key
+                                ] = param_type_frame[k]
+                    if len(expected_type_frame_needs_update) > 0:
+
+                        def _update_fn_vars(
+                            node: graph.Node,
+                        ) -> typing.Optional[graph.Node]:
+                            if (
+                                isinstance(node, graph.VarNode)
+                                and node.name in expected_type_frame_needs_update
+                            ):
+                                return graph.VarNode(
+                                    expected_type_frame_needs_update[node.name],
+                                    node.name,
+                                )
+                            return node
+
+                        working_nodes = [target_node.val]
+                        working_nodes = graph.map_nodes_top_level(
+                            [target_node.val], _update_fn_vars, on_error
+                        )
+                        working_nodes = _compile_refine_and_propagate_gql_inner(
+                            working_nodes, True, on_error
+                        )
+                        updated_params[k] = graph.ConstNode(
+                            types.Function(
+                                final_expected_type_frame,
+                                target_node.type.output_type,
+                            ),
+                            working_nodes[0],
+                        )
+    return updated_params
 
 
 def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
