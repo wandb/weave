@@ -16,6 +16,7 @@ from . import timestamp as weave_timestamp
 if typing.TYPE_CHECKING:
     from .artifact_fs import FilesystemArtifact
     from . import artifact_base
+    from . import weave_inspector
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -392,6 +393,13 @@ class Type(metaclass=_TypeSubclassWatcher):
     @staticmethod
     def _make(cls, kwargs={}):
         raise Exception("Please import `weave` to use `Type.make`.")
+
+    def _inspect(self) -> "weave_inspector.TypeInspector":
+        """Only intended to be used by developers to help debug the graph."""
+        # Circular import, so we do it here.
+        from . import weave_inspector
+
+        return weave_inspector.TypeInspector(self)
 
 
 # _PlainStringNamedType should only be used for backward compatibility with
