@@ -106,8 +106,11 @@ import typing
 
 import tabulate
 
+
 from . import weave_types as types
 from . import graph
+
+from .partial_object import PartialObjectType
 
 
 def _trimmed_string(s: str, max_len: int = 20) -> str:
@@ -152,6 +155,8 @@ def _type_props(node_type: types.Type) -> typing.Dict[str, types.Type]:
         props = {f"input.{k}": v for k, v in node_type.input_types.items()}
         props["output_type"] = node_type.output_type
         return props
+    elif isinstance(node_type, PartialObjectType):
+        return node_type.keys
     return node_type.type_vars
 
 
