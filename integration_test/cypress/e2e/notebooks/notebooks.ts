@@ -94,7 +94,7 @@ function executeNotebook(notebookPath: string) {
     exec(
       'pytest --nbmake --nbmake-timeout=150000 --overwrite "' +
         notebookPath +
-        '"',
+        '" > output.log 2>&1',
       160000
     ).then(() => {
       // This block is executed if cy.exec() succeeds
