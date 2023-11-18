@@ -491,8 +491,11 @@ def execute_sync_op(
                 span.exception = e
                 raise
 
+            # Note this unboxes, but doesn't move tags.
+            # We should not allow tagging in the standard user / eager path anyway
             if isinstance(res, box.BoxedNone):
                 res = None
+
             log_res = res
             if not isinstance(log_res, dict):
                 log_res = {"_result": log_res}
@@ -502,8 +505,6 @@ def execute_sync_op(
             span.output["_keys"] = list(log_res.keys())
     else:
         res = op_def.resolve_fn(**inputs)
-        if isinstance(res, box.BoxedNone):
-            res = None
 
     # TODO: not simple name
     # TODO: capture publish time here?
