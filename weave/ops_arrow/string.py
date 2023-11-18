@@ -181,14 +181,13 @@ def string_right_add(
     )
 
 
-# todo: remove this explicit name, it shouldn't be needed
-# @arrow_op(
-#     name="ArrowWeaveListString-append",
-#     input_type=binary_input_type,
-#     output_type=self_type_output_type_fn,
-# )
-# def append(self, other):
-#     return _concatenate_strings(self, other)
+@arrow_op(
+    name="ArrowWeaveListString-append",
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
+)
+def append(self, other):
+    return _concatenate_strings(self, other)
 
 
 @arrow_op(

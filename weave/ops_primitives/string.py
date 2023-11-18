@@ -59,10 +59,10 @@ class String:
 
     # This should be string __add__, which is implemented above, so as not
     # to list append which is a mutation
-    # @op(name="string-append")
-    # def append(str: str, suffix: typing.Optional[str]) -> str:  # type: ignore[misc]
-    #     suffix = suffix or ""
-    #     return str + suffix
+    @op(name="string-append")
+    def append(str: str, suffix: typing.Optional[str]) -> str:  # type: ignore[misc]
+        suffix = suffix or ""
+        return str + suffix
 
     @op(name="string-prepend")
     def prepend(str: str, prefix: typing.Optional[str]) -> str:  # type: ignore[misc]

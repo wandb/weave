@@ -495,7 +495,6 @@ def execute_sync_op(
             # We should not allow tagging in the standard user / eager path anyway
             if isinstance(res, box.BoxedNone):
                 res = None
-
             log_res = res
             if not isinstance(log_res, dict):
                 log_res = {"_result": log_res}
