@@ -81,15 +81,18 @@ def type(
                 else:
                     static_property_types[field.name] = weave_type
 
+        relocatable = not context_state.get_loading_built_ins()
+
         # Iterate through methods, finding ops that have versions (not builtins)
         # and sticking them on the type. This way we'll serialize
         # and deserialize them along with the data attached to the object
-        for name, member in inspect.getmembers(target):
-            from . import op_def
-            from . import op_def_type
+        if relocatable:
+            for name, member in inspect.getmembers(target):
+                from . import op_def
+                from . import op_def_type
 
-            if isinstance(member, op_def.BoundOpDef):
-                static_property_types[name] = op_def_type.OpDefType()
+                if isinstance(member, op_def.BoundOpDef):
+                    static_property_types[name] = op_def_type.OpDefType()
 
         if type_vars:
             setattr(TargetType, "__annotations__", {})
@@ -115,7 +118,7 @@ def type(
 
         TargetType = dataclasses.dataclass(frozen=True)(TargetType)
 
-        TargetType._relocatable = not context_state.get_loading_built_ins()
+        TargetType._relocatable = relocatable
 
         dc.WeaveType = TargetType
         decorator_class.weave_class(weave_type=TargetType)(dc)

@@ -95,13 +95,16 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             # Construct a new class, inheriting from the original instance_class
             # with overridden op methods. The op_methods are unbound on the class,
             # and will bind self upon construction as usual.
-            new_class = type(
-                instance_class.__name__ + "WithLoadedMethods",
-                (instance_class,),
-                op_methods,
-            )
+            if self.type._relocatable:
+                new_class = type(
+                    instance_class.__name__ + "WithLoadedMethods",
+                    (instance_class,),
+                    op_methods,
+                )
 
-            return new_class(**result)
+                return new_class(**result)
+            else:
+                return instance_class(**result)
         except:
             err = errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)
