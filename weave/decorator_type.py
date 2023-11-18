@@ -7,6 +7,7 @@ from . import infer_types
 from . import decorator_class
 from . import errors
 from . import decorator_op
+from . import context_state
 
 _py_type = type
 
@@ -113,6 +114,8 @@ def type(
             TargetType.__repr__ = lambda self: f"{self.__class__.__name__}()"
 
         TargetType = dataclasses.dataclass(frozen=True)(TargetType)
+
+        TargetType._relocatable = not context_state.get_loading_built_ins()
 
         dc.WeaveType = TargetType
         decorator_class.weave_class(weave_type=TargetType)(dc)

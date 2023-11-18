@@ -33,3 +33,19 @@ def test_object_noneunion_attr_is_variable():
         a: weave.Node[typing.Union[str, int]]
 
     assert "a" in ObjWithUnion.WeaveType().type_vars
+
+
+def test_type_is_reloctable():
+    @weave.type()
+    class CoolObjBase:
+        pass
+
+    @weave.type()
+    class CoolObj(CoolObjBase):
+        a: int
+        b: str
+
+    obj = CoolObj(1, "hi")
+    ref = weave.storage.save(obj)
+    obj2 = weave.storage.get(str(ref))
+    assert obj2.a == 1

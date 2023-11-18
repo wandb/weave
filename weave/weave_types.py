@@ -137,8 +137,8 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
-        if is_serialized_object_type(d):
-            return deserialize_object_type(d)
+        if is_relocatable_object_type(d):
+            return deserialize_relocatable_object_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -146,8 +146,8 @@ class TypeRegistry:
         if type_ is None:
             # TODO: this needs to happen earlier in case it's in incompatible object type
             # with the one we already have and we need an ObjectType cache
-            if is_serialized_object_type(d):
-                return deserialize_object_type(d)
+            if is_relocatable_object_type(d):
+                return deserialize_relocatable_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
@@ -976,6 +976,11 @@ class Dict(Type):
 
 @dataclasses.dataclass(frozen=True)
 class ObjectType(Type):
+    # If True, object is relocatable, meaning it can be saved in one python runtime
+    # and loaded in another. (reloctable false means that we need the original
+    # object definition to load the object, ie it's a built-in)
+    _relocatable = False
+
     def __init__(self, **attr_types: Type):
         self.__dict__["attr_types"] = attr_types
         for k, v in attr_types.items():
@@ -1010,8 +1015,9 @@ class ObjectType(Type):
         return cls(**variable_prop_types)
 
     def _to_dict(self) -> dict:
-        d: dict = {"_is_object": True}
         d = self.class_to_dict()
+        if self._relocatable:
+            d["_relocatable"] = True
         # TODO: we don't need _is_object, now that we have base_type everywhere.
         # Remove the check for self._base_type.__class__ != ObjectType, and get
         # rid of _is_object (need to update frontend as well).
@@ -1042,13 +1048,21 @@ def is_serialized_object_type(t: dict) -> bool:
     return is_serialized_object_type(t["_base_type"])
 
 
+def is_relocatable_object_type(t: typing.Union[str, dict]) -> bool:
+    if not isinstance(t, dict):
+        return False
+    if not t.get("_relocatable"):
+        return False
+    return is_serialized_object_type(t)
+
+
 # We need to ensure we only create new classes for each new unique
 # type seen. Otherwise we get a class explosion, and for one thing, type_of
 # gets really slow.
 DESERIALIZED_OBJECT_TYPE_CLASSES: dict[str, type[ObjectType]] = {}
 
 
-def deserialize_object_type(t: dict) -> ObjectType:
+def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     key = json.dumps(t)
     if key in DESERIALIZED_OBJECT_TYPE_CLASSES:
         return DESERIALIZED_OBJECT_TYPE_CLASSES[key]()
@@ -1082,7 +1096,9 @@ def deserialize_object_type(t: dict) -> ObjectType:
 
     all_attr_types = {**type_attr_types, "instance_classes": new_object_class}
     if "_base_type" in t:
-        all_attr_types["_base_type"] = deserialize_object_type(t["_base_type"])
+        all_attr_types["_base_type"] = deserialize_relocatable_object_type(
+            t["_base_type"]
+        )
     new_type_class = type(type_class_name, (ObjectType,), all_attr_types)
     setattr(new_type_class, "__annotations__", {})
     for k, v in type_attr_types.items():
