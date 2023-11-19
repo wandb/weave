@@ -126,8 +126,10 @@ def type(
         # constructor op for this type. due to a circular dependency with ArrowWeave* types, we
         # define the vectorized constructor ops in vectorize.py instead of here
 
-        # TODO: this is commented out because the new op serialization stuff
-        # causes us to serialize this in every object for some reason
+        # Generating this constructor is currently disabled, now that we have reloctable object
+        # types and we serialize methods as well, we don't want to serialize the constructor.
+        # Instead we could have a generic constructor for all objects, but it's unclear how this
+        # constructor will need to be used so for now we go with nothing.
 
         # @decorator_op.op(
         #     name=f"objectConstructor-_new_{target_name.replace('-', '_')}",
