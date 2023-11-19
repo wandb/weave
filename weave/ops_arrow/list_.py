@@ -13,6 +13,8 @@ from .. import ref_base
 from .. import weave_types as types
 from .. import box
 from .. import weave_internal
+from .. import op_def_type
+from .. import op_def
 from ..ops_primitives import _dict_utils
 from .. import errors
 from .. import graph
@@ -1124,12 +1126,32 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
 
         for path, obj_type in obj_type_paths.items():
-            # print("OBJ TYPE PATH", path)
+            non_op_def_keys = [
+                k
+                for k, t in obj_type.property_types().items()
+                if not t == op_def_type.OpDefType()
+            ]
+
+            def val_to_obj(v, y):
+                # We init the object with non-op-def (non-method) keys.
+                # This is not quite right, this code needs to do what we do
+                # in mappers_python, and also attach the methods to the object
+                # after construction.
+
+                # So we don't yet correctly deserialize lists of relocatable objects
+                # with different methods correctly.
+                # TODO: fix
+                return (
+                    None
+                    if v is None
+                    else obj_type.instance_class(**{k: v[k] for k in non_op_def_keys})
+                )
+
             set_path(
                 value_py,
                 value_awl._arrow_data,
                 (PathItemOuterList(),) + path,
-                lambda v, j: None if v is None else obj_type.instance_class(**v),
+                val_to_obj,
             )
         # Dictionary decode the value, and add the tags to the tag store,
         # in a single pass.
@@ -1148,6 +1170,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     return None
                 if isinstance(v, dict):
                     return type_.instance_from_dict(v)
+                if isinstance(v, op_def.OpDef):
+                    # I'm not sure how this is already an OpDef, but it is
+                    # so we can just return...
+                    return v
                 # else its a ref string
                 # TODO: this does not use self.artifact, can we just drop it?
                 # Do we need the type so we can load here? No...

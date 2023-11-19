@@ -297,6 +297,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             or self.type.name == "file"
             or self.type.name == "WandbArtifactRef"
             or self.type.name == "LocalArtifactRef"
+            or self.type.name == "OpDef"
         ):
             # Ref type
             return pa.string()
