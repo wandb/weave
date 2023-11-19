@@ -602,6 +602,14 @@ class WeaveLocalArtifactURI(uris.WeaveURI):
             uri += f"#{'/'.join(self.extra)}"
         return uri
 
+    def with_path(self, path: str) -> "WeaveLocalArtifactURI":
+        return WeaveLocalArtifactURI(
+            self.name,
+            self.version,
+            path,
+            self.extra,
+        )
+
     def to_ref(self) -> LocalArtifactRef:
         return LocalArtifactRef.from_uri(self)
 
