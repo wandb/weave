@@ -6,7 +6,7 @@ from ..panels import panel_board
 # formulation of a text extraction problem
 
 
-def eval_board(dataset, eval_result0, eval_result1):
+def eval_board(dataset, eval_result0, eval_result1):  # type: ignore
     varbar = panel_board.varbar()
     dataset_var = varbar.add("dataset", dataset)
     baseline_eval_result = varbar.add("baseline_eval_result", eval_result0)
