@@ -17,8 +17,8 @@ from weave.uris import WeaveURI
 
 def test_publish_values(user_by_api_key_in_env):
     data = ["a", "b", "c"]
-    res = weave.publish(data, "weave/list")
-    assert weave.use(res) == data
+    ref = weave.publish(data, "weave/list")
+    assert ref.get() == data
 
 
 def test_publish_panel(user_by_api_key_in_env):
@@ -36,8 +36,8 @@ def test_publish_panel(user_by_api_key_in_env):
             lambda row: row["c"],
         ],
     )
-    res = weave.publish(table_obj, "weave/table")
-    assert isinstance(res, weave.graph.Node)
+    ref = weave.publish(table_obj, "weave/table")
+    assert isinstance(ref, WandbArtifactRef)
 
 
 def test_publish_table(user_by_api_key_in_env):
@@ -55,8 +55,10 @@ def test_publish_table(user_by_api_key_in_env):
             lambda row: row["c"],
         ],
     )
-    res = weave.publish(table_obj, "weave/table")
-    assert res.val.input_node.from_op.inputs["uri"].val.startswith("wandb-artifact://")
+    ref = weave.publish(table_obj, "weave/table")
+    assert (
+        ref.get().input_node.from_op.inputs["uri"].val.startswith("wandb-artifact://")
+    )
 
 
 def test_publish_group(user_by_api_key_in_env):
