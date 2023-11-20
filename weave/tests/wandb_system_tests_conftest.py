@@ -397,3 +397,26 @@ def fixture_fn(base_url, wandb_server_tag, wandb_server_pull):
         pytest.fail("wandb server is not running")
 
     yield fixture_util
+
+
+@pytest.fixture(scope=determine_scope)
+def dev_only_admin_env_override() -> Generator[None, None, None]:
+    new_env = {}
+    admin_path = "../config/.admin.env"
+    if not os.path.exists(admin_path):
+        raise ValueError(
+            f"Could not find admin env file at {admin_path}. Please follow instructions in README.md to create one."
+        )
+    with open(admin_path) as file:
+        for line in file:
+            # skip comments and blank lines
+            if line.startswith("#") or line.strip().__len__() == 0:
+                continue
+            # otherwise treat lines as environment variables in a KEY=VALUE combo
+            key, value = line.split("=", 1)
+            new_env[key.strip()] = value.strip()
+    with unittest.mock.patch.dict(
+        os.environ,
+        new_env,
+    ):
+        yield
