@@ -404,9 +404,11 @@ def dev_only_admin_env_override() -> Generator[None, None, None]:
     new_env = {}
     admin_path = "../config/.admin.env"
     if not os.path.exists(admin_path):
-        raise ValueError(
-            f"Could not find admin env file at {admin_path}. Please follow instructions in README.md to create one."
+        print(
+            f"WARNING: Could not find admin env file at {admin_path}. Please follow instructions in README.md to create one."
         )
+        yield
+        return
     with open(admin_path) as file:
         for line in file:
             # skip comments and blank lines
