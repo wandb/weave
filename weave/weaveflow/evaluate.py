@@ -116,8 +116,8 @@ class EvaluateNamedSteps(Evaluate):
             if i != 0:
                 prior_columns = columns[self.step_keys[i - 1]]
                 cur_columns = columns[step_key]
-                delta_columns = {}
-                delta_summary = {}
+                delta_columns: dict = {}
+                delta_summary: dict = {}
                 compute_delta(cur_columns, prior_columns, delta_columns, delta_summary)
                 columns[f"{step_key}_delta"] = delta_columns
                 summary[f"{step_key}_delta_avg"] = delta_summary
