@@ -998,14 +998,16 @@ class ObjectType(Type):
     def property_types(self) -> dict[str, Type]:
         return self.type_vars
 
-    def attr_types(self) -> dict[str, Type]:
-        from . import op_def_type
+    # TIM: Commenting this out from Weaveflow - it does not seem to align with
+    # all the uses of `attr_types` being dictionaries, not methods.
+    # def attr_types(self) -> dict[str, Type]:
+    #     from . import op_def_type
 
-        return {
-            k: t
-            for k, t in self.property_types().items()
-            if not isinstance(t, op_def_type.OpDefType)
-        }
+    #     return {
+    #         k: t
+    #         for k, t in self.property_types().items()
+    #         if not isinstance(t, op_def_type.OpDefType)
+    #     }
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -1109,7 +1111,9 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     for k, v in type_attr_types.items():
         setattr(new_type_class, k, v)
         new_type_class.__dict__["__annotations__"][k] = Type
-    new_type_dataclass = dataclasses.dataclass(frozen=True)(new_type_class)
+    new_type_dataclass: type[ObjectType] = dataclasses.dataclass(frozen=True)(
+        new_type_class
+    )
     DESERIALIZED_OBJECT_TYPE_CLASSES[key] = new_type_dataclass
     return new_type_dataclass()
 
