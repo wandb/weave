@@ -55,7 +55,7 @@ def test_publish_table(user_by_api_key_in_env):
             lambda row: row["c"],
         ],
     )
-    res = weave.publish(table_obj)
+    res = weave.publish(table_obj, "weave/table")
     assert res.val.input_node.from_op.inputs["uri"].val.startswith("wandb-artifact://")
 
 
@@ -85,7 +85,7 @@ def test_publish_group(user_by_api_key_in_env):
         }
     )
 
-    res = weave.publish(group)
+    res = weave.publish(group, "weave/group")
 
 
 """
