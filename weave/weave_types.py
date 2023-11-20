@@ -1703,7 +1703,8 @@ def type_is_variable(t: Type) -> bool:
     elif isinstance(t, ObjectType):
         return True
     elif isinstance(t, Dict):
-        return True
+        # Tim: This was `true` before weaveflow.
+        return type_is_variable(t.object_type)
     elif isinstance(t, TypedDict):
         # Should we just make type_vars for TypedDict be its property types?
         # That would simplify a lot.
