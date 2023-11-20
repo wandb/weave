@@ -138,6 +138,7 @@ class TypeRegistry:
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
         if is_relocatable_object_type(d):
+            d = typing.cast(dict, d)
             return deserialize_relocatable_object_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
@@ -147,6 +148,7 @@ class TypeRegistry:
             # TODO: this needs to happen earlier in case it's in incompatible object type
             # with the one we already have and we need an ObjectType cache
             if is_relocatable_object_type(d):
+                d = typing.cast(dict, d)
                 return deserialize_relocatable_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
@@ -1094,7 +1096,10 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
         object_class_name, (), {"__init__": locals()["loaded_object_init"]}
     )
 
-    all_attr_types = {**type_attr_types, "instance_classes": new_object_class}
+    all_attr_types: dict[str, typing.Union[Type, type[Type]]] = {
+        **type_attr_types,
+        "instance_classes": new_object_class,
+    }
     if "_base_type" in t:
         all_attr_types["_base_type"] = deserialize_relocatable_object_type(
             t["_base_type"]

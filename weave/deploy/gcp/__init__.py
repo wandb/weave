@@ -6,6 +6,8 @@ import string
 import subprocess
 import typing
 import tempfile
+
+from weave.artifact_wandb import WeaveWBArtifactURI
 from ..util import execute, safe_name
 from weave import environment, __version__
 from weave.uris import WeaveURI
@@ -233,6 +235,8 @@ def deploy(
             )
     dir = compile(model_ref, wandb_project, auth_entity, base_image)
     ref = WeaveURI.parse(model_ref)
+    if not isinstance(ref, WeaveWBArtifactURI):
+        raise ValueError(f"Expected a wandb artifact ref, got {ref}")
     name = safe_name(f"{ref.project_name}-{ref.name}")
     project = wandb_project or ref.project_name
     key = environment.weave_wandb_api_key()
@@ -256,8 +260,9 @@ def deploy(
         args.append(f"--service-account={service_account}")
         sec_or_env = "--set-secrets="
         for k, v in secrets.items():
-            ensure_secret(k, v, service_account, gcp_project)
-            sec_or_env += f"{k}={k}:latest,"
+            if v is not None:
+                ensure_secret(k, v, service_account, gcp_project)
+                sec_or_env += f"{k}={k}:latest,"
     else:
         sec_or_env = "--set-env-vars="
         for k, v in secrets.items():
@@ -275,7 +280,7 @@ def develop(
     model_ref: str,
     base_image: typing.Optional[str] = "python:3.11",
     auth_entity: typing.Optional[str] = None,
-):
+) -> None:
     dir = compile(model_ref, base_image=base_image, auth_entity=auth_entity, dev=True)
     name = safe_name(WeaveURI.parse(model_ref).name)
     docker = shutil.which("docker")
@@ -285,7 +290,10 @@ def develop(
     execute(
         [docker, "buildx", "build", "-t", name, "--load", "."], cwd=dir, capture=False
     )
-    env = {"WANDB_API_KEY": environment.weave_wandb_api_key()}
+    env_api_key = environment.weave_wandb_api_key()
+    if env_api_key is None:
+        raise ValueError("WANDB_API_KEY environment variable required")
+    env = {"WANDB_API_KEY": env_api_key}
     env.update(os.environ.copy())
     print("Running container at http://localhost:8080")
     execute(
