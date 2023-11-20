@@ -26,7 +26,7 @@ import {PanelComp2} from './PanelComp';
 import {usePanelContext} from './PanelContext';
 import * as PanelLib from './panellib/libpanel';
 import * as Table from './PanelTable/tableState';
-import {WeaveAlignmentContext} from './PanelTable/PanelTableContext';
+import {WeaveAlignmentContext} from './WeaveAlignmentContext';
 
 export interface PanelRowConfig {
   pageSize: number;

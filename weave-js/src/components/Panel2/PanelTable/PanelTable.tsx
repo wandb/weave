@@ -63,6 +63,7 @@ import {GrowToParent} from '../PanelComp.styles';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
+import {WeaveAlignmentContext} from '../WeaveAlignmentContext';
 import {TableActions} from './actions';
 import {Cell, Value} from './Cell';
 import {ColumnHeader} from './ColumnHeader';
@@ -90,7 +91,6 @@ import {
   useRowsNode,
   useUpdateConfigKey,
 } from './util';
-import {WeaveAlignmentContext} from './PanelTableContext';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
@@ -232,7 +232,7 @@ const PanelTableInnerConfigSetter: React.FC<
   }
 
   return (
-    <WeaveAlignmentContext.Provider value={{isInTable: true, isInRow: false}}>
+    <WeaveAlignmentContext.Provider value={{isInTable: true}}>
       <PanelTableInner
         {...props}
         config={protectedConfig}

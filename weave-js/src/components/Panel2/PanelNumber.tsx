@@ -1,5 +1,5 @@
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
-import React, {useCallback} from 'react';
+import React, {useCallback, useContext} from 'react';
 
 import {formatNumber} from '../../core/util/number';
 import * as CGReact from '../../react';
@@ -8,6 +8,7 @@ import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
+import {WeaveAlignmentContext} from './WeaveAlignmentContext';
 
 const CustomFormatHelp = () => {
   return (
@@ -131,11 +132,13 @@ type PanelNumberExtraProps = {
 export const PanelNumber: React.FC<
   PanelNumberProps & PanelNumberExtraProps
 > = props => {
+  const {isInTable, isInRow} = useContext(WeaveAlignmentContext);
   const nodeValueQuery = CGReact.useNodeValue(props.input);
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
-  const textAlign = props.textAlign ?? 'center';
+  const tableFormat = isInTable && !isInRow;
+  const textAlign = tableFormat ? 'right' : props.textAlign ?? 'center';
 
   return (
     <div
@@ -149,9 +152,11 @@ export const PanelNumber: React.FC<
         textAlign,
         wordBreak: 'normal',
         display: 'flex',
+        paddingRight: '12px',
+        paddingTop: '4px',
         flexDirection: 'column',
-        alignContent: 'space-around',
-        justifyContent: 'space-around',
+        alignContent: tableFormat ? 'normal' : 'space-around',
+        justifyContent: tableFormat ? 'normal' : 'space-around',
         alignItems: textAlign === 'center' ? 'center' : 'normal',
       }}>
       {nodeValueQuery.result == null

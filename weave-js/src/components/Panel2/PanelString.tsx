@@ -12,7 +12,7 @@ import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import * as S from './PanelString.styles';
 import {TooltipTrigger} from './Tooltip';
-import {WeaveAlignmentContext} from './PanelTable/PanelTableContext';
+import {WeaveAlignmentContext} from './WeaveAlignmentContext';
 
 const inputType = {
   type: 'union' as const,
@@ -144,10 +144,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
   const inputValue = CGReact.useNodeValue(props.input);
   const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
   const loading = inputValue.loading || compValue.loading;
-  let {isInTable, isInRow} = useContext(WeaveAlignmentContext);
-  isInTable = !!isInTable;
-  isInRow = !!isInRow;
-  const isDirectlyRenderedByTableCell = isInTable && !isInRow;
+  const {isInTable, isInRow} = useContext(WeaveAlignmentContext);
+  const isDirectlyRenderedByTableCell = (isInTable && !isInRow)!!;
   console.log({isDirectlyRenderedByTableCell});
 
   const fullStr = String(inputValue?.result ?? '-');
@@ -239,7 +237,14 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         </S.StringItem>
       </S.StringContainer>
     );
-  }, [comparandStr, config.diffMode, config.mode, contentHeight, fullStr]);
+  }, [
+    comparandStr,
+    config.diffMode,
+    config.mode,
+    contentHeight,
+    fullStr,
+    isDirectlyRenderedByTableCell,
+  ]);
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);
 
