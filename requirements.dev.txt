@@ -14,6 +14,7 @@ mypy==1.0.0
 ruff==0.0.275
 types-pytz
 types-Pillow
-types-Flask-Cors
+# Testing adding 4.0.0 to see if it fixes the issue with the build
+types-Flask-Cors==4.0.0
 build
 twine
