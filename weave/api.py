@@ -132,6 +132,8 @@ def init(project_name: str) -> _graph_client.GraphClient:
         raise ValueError(
             'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
         )
+    if not entity_name:
+        raise ValueError("entity_name must be non-empty")
     client = _graph_client.GraphClient(entity_name, project_name)
     _graph_client_context._graph_client.set(client)
     print("Ensure you have the prototype UI running with `weave ui`")
@@ -231,3 +233,4 @@ def serve(
         return "http://localhost:%d" % port
     else:
         run()
+    return None
