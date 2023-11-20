@@ -352,4 +352,4 @@ def trace(
     preprocess: typing.Optional[typing.Callable] = None,
     postprocess: typing.Optional[typing.Callable] = None,
 ) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
-    return default_monitor().trace(preprocess, postprocess)
+    return default_monitor().trace(preprocess=preprocess, postprocess=postprocess)
