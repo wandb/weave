@@ -6,7 +6,11 @@ from .chat_model import ChatModel
 
 @weave.type()
 class StructuredOutputChatModel:
-    pass
+    @weave.op()
+    def complete(
+        self, messages: list[typing.Any], output_type: weave.types.Type
+    ) -> typing.Any:
+        ...
 
 
 @weave.type()
