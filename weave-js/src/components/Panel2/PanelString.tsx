@@ -146,7 +146,6 @@ export const PanelString: React.FC<PanelStringProps> = props => {
   const loading = inputValue.loading || compValue.loading;
   const {isInTable, isInRow} = useContext(WeaveAlignmentContext);
   const isDirectlyRenderedByTableCell = (isInTable && !isInRow)!!;
-  console.log({isDirectlyRenderedByTableCell});
 
   const fullStr = String(inputValue?.result ?? '-');
   const comparandStr = String(compValue?.result ?? ''); // Default comparand is empty string

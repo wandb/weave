@@ -10,8 +10,6 @@ export const StringContainer = styled.div<{
   height: 100%;
   display: flex;
   flex-direction: column;
-  // justify-content: center;
-  // align-items: center;
   overflow-x: auto;
   overflow-y: auto;
   text-align: left;
