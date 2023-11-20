@@ -224,7 +224,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         return str(self)
 
     @classmethod
-    def _instance_classes(cls):
+    def _instance_classes(cls) -> typing.Sequence[type]:
         """Helper to get instance_classes as iterable."""
         if cls.instance_classes is None:
             return ()
