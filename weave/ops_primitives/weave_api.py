@@ -25,15 +25,21 @@ from .. import object_context
 class RefNodeMethods:
     @op()
     def type(self) -> types.Type:
-        return storage._get_ref(self).type
+        self_ref = storage._get_ref(self)
+        if self_ref is None:
+            raise errors.WeaveInternalError("Cannot get type of ref resolving to None")
+        return self_ref.type
 
     @op(output_type=lambda input_type: input_type["self"].object_type)
     def get(self):
         return storage.deref(self)
 
-    @op()
-    def __eq__(self, other: str) -> bool:
-        return str(self) == uris.WeaveURI.parse(other).to_ref().uri
+    # Tim: I commented this out as part of Weaveflow merge. There is a duplicate
+    # definition below and i believe that will take precedence. Keeping here for
+    # now in case we need to revert.
+    # @op()
+    # def __eq__(self, other: str) -> bool:
+    #     return str(self) == uris.WeaveURI.parse(other).to_ref().uri
 
     @op()
     def __eq__(self, other: ref_base.Ref) -> bool:
