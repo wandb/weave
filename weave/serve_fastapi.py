@@ -8,7 +8,7 @@ try:
     from typing import Annotated
 # Support python 3.8
 except ImportError:
-    from typing_extensions import Annotated
+    from typing_extensions import Annotated  # type: ignore
 
 from . import weave_types as types
 from . import op_args
@@ -27,7 +27,11 @@ key_cache: cache.LruTimeWindowCache[
 api: Optional[WandbApiAsync] = None
 
 
-def wandb_auth(entity: str):
+def wandb_auth(
+    entity: str,
+) -> typing.Callable[
+    [typing.Optional[str]], typing.Coroutine[typing.Any, typing.Any, bool]
+]:
     async def auth_inner(key: Annotated[Optional[str], Depends(api_key)]) -> bool:
         global api
         if api is None:
