@@ -614,10 +614,17 @@ def stream_table_log(self: graph.Node, val: typing.Any) -> typing.Any:
     st_obj = weave_internal.use(self)
     from weave.monitoring import StreamTable
 
+    if not isinstance(st_obj, StreamTable):
+        raise errors.WeaveInternalError(
+            "stream_table-log op must be called on a stream table"
+        )
+
+    # Tim: as part of weaveflow merge, i added underscores here. Not sure
+    # how this ever worked before
     st = StreamTable(
-        table_name=st_obj.table_name,
-        project_name=st_obj.project_name,
-        entity_name=st_obj.entity_name,
+        table_name=st_obj._table_name,
+        project_name=st_obj._project_name,
+        entity_name=st_obj._entity_name,
     )
     st.log(val)
 
