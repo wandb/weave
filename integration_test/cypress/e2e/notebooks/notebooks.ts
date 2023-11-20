@@ -90,25 +90,18 @@ function forEachWeaveOutputCellInNotebook(
 }
 
 function executeNotebook(notebookPath: string) {
-  try {
-    exec(
-      'pytest --nbmake --nbmake-timeout=3000 --overwrite "' +
-        notebookPath +
-        '" > output.log 2>&1',
-      150000
-    ).then(() => {
-      // This block is executed if cy.exec() succeeds
-      cy.readFile('output.log').then(logContent => {
-        console.log('Command completed successfully:', logContent);
-      });
-    });
-  } catch (error) {
-    // This block is executed if cy.exec() fails, including on timeout
-    cy.readFile('output.log').then(logContent => {
-      console.error('Command failed or timed out:', logContent);
-      throw error; // Re-throw the error to ensure the test fails appropriately
-    });
-  }
+  exec(
+    'pytest --nbmake --nbmake-timeout=3000 --overwrite "' + notebookPath + '"',
+    160000
+  ).then(result => {
+    if (result.code !== 0) {
+      console.log(result.stdout);
+      console.error(result.stderr);
+      throw new Error(
+        `Notebook ${notebookPath} failed to execute. See console output for more details.`
+      );
+    }
+  });
 }
 
 export function checkWeaveNotebookOutputs(notebookPath: string) {
