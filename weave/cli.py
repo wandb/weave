@@ -52,11 +52,12 @@ def serve(
     parsed_ref = uris.WeaveURI.parse(model_ref).to_ref()
     if not isinstance(parsed_ref, artifact_wandb.WandbArtifactRef):
         raise ValueError(f"Expected a wandb artifact ref, got {parsed_ref}")
-    project = project or os.getenv("PROJECT_NAME")
-    if project is None:
+    maybe_project = project or os.getenv("PROJECT_NAME")
+    if maybe_project is None:
         raise ValueError(
             "project must be specified from command line or via the PROJECT_NAME env var"
         )
+    project = maybe_project
     api.init(project)
     # TODO: provide more control over attributes
     with api.attributes({"env": env}):
@@ -83,7 +84,7 @@ def gcp(
     gcp_project: str,
     auth_entity: str,
     service_account: str,
-    dev=False,
+    dev: bool = False,
 ) -> None:
     if dev:
         print(f"Developing model {model_ref}...")
@@ -119,7 +120,7 @@ def gcp(
     "--auth-entity", help="Enforce authorization for this entity using W&B API keys."
 )
 @click.option("--dev", is_flag=True, help="Run the function locally.")
-def modal(model_ref: str, project: str, auth_entity: str, dev=False) -> None:
+def modal(model_ref: str, project: str, auth_entity: str, dev: bool = False) -> None:
     from .deploy import modal as mdp
 
     if dev:

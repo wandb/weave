@@ -19,7 +19,7 @@ def evaluate(eval: Evaluate, dataset: Dataset, model: Model) -> typing.Any:
         outputs.append(output)
     eval_result = eval.compute(dataset, outputs)
     summary = eval_result["summary"]
-    eval_table_columns = {
+    eval_table_columns: dict[str, weave.WeaveList] = {
         "dataset_id": weave.WeaveList([r["id"] for r in ds_rows]),
         "output": weave.WeaveList(outputs),
         **eval_result["columns"],

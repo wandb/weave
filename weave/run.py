@@ -39,9 +39,7 @@ class Run:
 
     @property
     def attributes(self) -> dict[str, typing.Any]:
-        if self._attrs.get("attributes") == None:
-            return {}
-        return {k: v for k, v in self._attrs["attributes"].items() if v != None}
+        return {k: v for k, v in self._attrs.get("attributes", {}).items() if v != None}
 
     @property
     def inputs(self) -> dict[str, typing.Any]:

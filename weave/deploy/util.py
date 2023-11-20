@@ -12,7 +12,7 @@ def execute(
     cwd: typing.Optional[str] = None,
     env: typing.Optional[dict[str, str]] = None,
     input: typing.Optional[str] = None,
-    capture=True,
+    capture: bool = True,
 ) -> typing.Any:
     process = subprocess.Popen(
         args,
