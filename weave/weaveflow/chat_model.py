@@ -17,6 +17,16 @@ class ChatModel:
         valid_dataset: Dataset,
         hyperparameters: typing.Any,
     ) -> typing.Any:
+        from .openai import OpenaiChatModel
+        from .anyscale import AnyscaleChatModel
+
+        if not isinstance(self, (OpenaiChatModel, AnyscaleChatModel)):
+            # This is because the following code assumes instance properties
+            # that are not defined on the base class. Hack for weaveflow merge
+            raise ValueError(
+                "finetuning implementation only supported for OpenAI and Anyscale models"
+            )
+
         import os
         import openai
         import time
@@ -80,4 +90,4 @@ class ChatModel:
                 break
             time.sleep(5)
 
-        return self.__class__(fine_tune_result["fine_tuned_model"])
+        return self.__class__(fine_tune_result["fine_tuned_model"])  # type: ignore
