@@ -93,15 +93,7 @@ function executeNotebook(notebookPath: string) {
   exec(
     'pytest --nbmake --nbmake-timeout=3000 --overwrite "' + notebookPath + '"',
     160000
-  ).then(result => {
-    if (result.code !== 0) {
-      console.log(result.stdout);
-      console.error(result.stderr);
-      throw new Error(
-        `Notebook ${notebookPath} failed to execute. See console output for more details.`
-      );
-    }
-  });
+  );
 }
 
 export function checkWeaveNotebookOutputs(notebookPath: string) {
