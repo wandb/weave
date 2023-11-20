@@ -165,9 +165,7 @@ def get_signature(pyfunc: typing.Callable) -> inspect.Signature:
     return inspect.signature(pyfunc)
 
 
-def _create_args_from_op_input_type(
-    input_type: typing.Union[op_args.OpArgs, typing.Dict[str, types.Type]]
-) -> op_args.OpArgs:
+def _create_args_from_op_input_type(input_type: InputTypeType) -> op_args.OpArgs:
     if isinstance(input_type, op_args.OpArgs):
         return input_type
     if not isinstance(input_type, dict):
