@@ -167,6 +167,10 @@ def _direct_publish(
         obj = _ensure_object_components_are_published(obj, weave_type, artifact)
     artifact_fs.update_weave_meta(weave_type, artifact)
     ref = artifact.set("obj", weave_type, obj)
+    if not isinstance(ref, artifact_wandb.WandbArtifactRef):
+        raise errors.WeaveSerializeError(
+            "Expected a WandbArtifactRef, got %s" % type(ref)
+        )
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     # nothing new was created, so just return the existing ref.
