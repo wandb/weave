@@ -21,7 +21,10 @@ def generate_dockerfile(
 ) -> str:
     """Generates a Dockerfile to run the weave op"""
     if project_name is None:
-        project_name = WeaveURI.parse(model_ref).project_name
+        ref_uri = WeaveURI.parse(model_ref)
+        if not isinstance(ref_uri, WeaveWBArtifactURI):
+            raise ValueError(f"Expected a wandb artifact ref, got {type(ref_uri)}")
+        project_name = ref_uri.project_name
     src = Path(__file__).parent.parent / "Dockerfile"
     template = string.Template(src.read_text())
 
@@ -35,7 +38,7 @@ def generate_dockerfile(
     )
 
 
-def generate_requirements_txt(model_ref: str, dir: str, dev=False) -> str:
+def generate_requirements_txt(model_ref: str, dir: str, dev: bool = False) -> str:
     """Generate a requirements.txt file."""
     cwd = Path(os.getcwd())
     if dev and (cwd / "build_dist.py").exists():
@@ -60,7 +63,7 @@ def gcloud(
     args: list[str],
     timeout: typing.Optional[float] = None,
     input: typing.Optional[str] = None,
-    capture=True,
+    capture: bool = True,
 ) -> typing.Any:
     gcloud_absolute_path = shutil.which("gcloud")
     if gcloud_absolute_path is None:
@@ -74,7 +77,7 @@ def gcloud(
     )
 
 
-def enforce_login():
+def enforce_login() -> None:
     """Ensure the user is logged in to gcloud."""
     try:
         auth = gcloud(["auth", "print-access-token", "--format=json"], timeout=3)
@@ -89,7 +92,7 @@ def compile(
     wandb_project: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
     base_image: typing.Optional[str] = None,
-    dev=False,
+    dev: bool = False,
 ) -> str:
     """Compile the weave application."""
     dir = tempfile.mkdtemp()
@@ -157,7 +160,7 @@ def ensure_service_account(
 
 def ensure_secret(
     name: str, value: str, service_account: str, project: typing.Optional[str] = None
-):
+) -> None:
     """Ensure a secret exists and is accessbile by the service account."""
     project = project or gcloud(["config", "get", "project", "--format=json"])
     exists = gcloud(
@@ -217,7 +220,7 @@ def deploy(
     auth_entity: typing.Optional[str] = None,
     base_image: typing.Optional[str] = "python:3.11",
     memory: typing.Optional[str] = "500Mi",
-):
+) -> None:
     """Deploy the weave application."""
     enforce_login()
     if region is None:
@@ -236,7 +239,7 @@ def deploy(
     dir = compile(model_ref, wandb_project, auth_entity, base_image)
     ref = WeaveURI.parse(model_ref)
     if not isinstance(ref, WeaveWBArtifactURI):
-        raise ValueError(f"Expected a wandb artifact ref, got {ref}")
+        raise ValueError(f"Expected a wandb artifact ref, got {type(ref)}")
     name = safe_name(f"{ref.project_name}-{ref.name}")
     project = wandb_project or ref.project_name
     key = environment.weave_wandb_api_key()
