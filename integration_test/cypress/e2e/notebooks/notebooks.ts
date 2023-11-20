@@ -92,10 +92,10 @@ function forEachWeaveOutputCellInNotebook(
 function executeNotebook(notebookPath: string) {
   try {
     exec(
-      'pytest --nbmake --nbmake-timeout=150000 --overwrite "' +
+      'pytest --nbmake --nbmake-timeout=3000 --overwrite "' +
         notebookPath +
         '" > output.log 2>&1',
-      3000
+      150000
     ).then(() => {
       // This block is executed if cy.exec() succeeds
       cy.readFile('output.log').then(logContent => {
