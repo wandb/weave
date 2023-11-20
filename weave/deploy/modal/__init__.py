@@ -58,6 +58,8 @@ def generate_modal_stub(
     """Generates a modal py file to run the weave op"""
     uri = WeaveURI.parse(model_ref)
     if project_name is None:
+        if not isinstance(uri, artifact_wandb.WeaveWBArtifactURI):
+            raise ValueError(f"Expected a wandb artifact ref, got {type(uri)}")
         project_name = uri.project_name
 
     parsed_ref = uri.to_ref()
@@ -80,11 +82,15 @@ def generate_modal_stub(
 def extract_secrets(model_ref: str) -> dict[str, str]:
     # TODO: get secrets from the weave op
     key = environment.weave_wandb_api_key()
-    secrets = {
-        "WANDB_API_KEY": key,
-    }
-    if os.getenv("OPENAI_API_KEY"):
-        secrets["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+    if key is None:
+        secrets = {}
+    else:
+        secrets = {
+            "WANDB_API_KEY": key,
+        }
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if openai_api_key:
+        secrets["OPENAI_API_KEY"] = openai_api_key
     return secrets
 
 
@@ -92,7 +98,7 @@ def deploy(
     model_ref: str,
     wandb_project: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
-):
+) -> None:
     """Deploy a model to the modal labs cloud."""
 
     ref = generate_modal_stub(
@@ -105,7 +111,7 @@ def deploy(
     deploy_stub(stub, name=stub.name, environment_name=config.get("environment"))
 
 
-def develop(model_ref: str, auth_entity: typing.Optional[str] = None):
+def develop(model_ref: str, auth_entity: typing.Optional[str] = None) -> None:
     """Run a model for testing."""
     ref = generate_modal_stub(
         model_ref, secrets=extract_secrets(model_ref), auth_entity=auth_entity
