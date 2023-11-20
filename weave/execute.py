@@ -427,7 +427,9 @@ def execute_async_op(
     job.start()
 
 
-def _auto_publish(project_name: str, obj: typing.Any, output_refs: list):
+def _auto_publish(
+    project_name: str, obj: typing.Any, output_refs: typing.List[ref_base.Ref]
+):
     import numpy as np
 
     if isinstance(obj, dict):
@@ -455,8 +457,8 @@ def _auto_publish(project_name: str, obj: typing.Any, output_refs: list):
     return ref
 
 
-def auto_publish(project_name: str, obj: typing.Any):
-    refs = []
+def auto_publish(project_name: str, obj: typing.Any) -> typing.Tuple[typing.Any, list]:
+    refs: typing.List[ref_base.Ref] = []
     return _auto_publish(project_name, obj, refs), refs
 
 
@@ -471,7 +473,7 @@ def execute_sync_op(
         op_def_ref = storage._get_ref(op_def)
         project_name = st._project_name
         if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
-            op_def._ref = None
+            op_def._ref = None  # type: ignore
             from .api import publish
 
             op_def_ref = publish(
