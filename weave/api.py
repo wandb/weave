@@ -124,7 +124,12 @@ def init(project_name: str) -> _graph_client.GraphClient:
     fields = project_name.split("/")
     if len(fields) == 1:
         api = wandb_api.get_wandb_api_sync()
-        entity_name = api.default_entity_name()
+        try:
+            entity_name = api.default_entity_name()
+        except AttributeError:
+            raise errors.WeaveWandbAuthenticationException(
+                'weave init requires wandb. Run "wandb login"'
+            )
         project_name = fields[0]
     elif len(fields) == 2:
         entity_name, project_name = fields
