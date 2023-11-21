@@ -84,6 +84,7 @@ const JupyterControlsHelpText = styled.div<{active: boolean}>`
   opacity: ${props => (props.active ? 0.8 : 0)};
   transition: visibility 0s, opacity 0.3s ease-in-out;
 `;
+JupyterControlsHelpText.displayName = 'S.JupyterControlsHelpText';
 
 const JupyterControlsMain = styled.div<{reveal?: boolean}>`
   position: absolute;
@@ -105,6 +106,7 @@ const JupyterControlsMain = styled.div<{reveal?: boolean}>`
   padding: 8px 0px;
   z-index: 100;
 `;
+JupyterControlsMain.displayName = 'S.JupyterControlsMain';
 
 const JupyterControlsIcon = styled.div`
   width: 25px;
@@ -121,6 +123,7 @@ const JupyterControlsIcon = styled.div`
     color: #0096ad;
   }
 `;
+JupyterControlsIcon.displayName = 'S.JupyterControlsIcon';
 
 const HOST_SESSION_ID_COOKIE = `host_session_id`;
 
@@ -726,9 +729,11 @@ const WeaveRoot = styled.div<{fullScreen: boolean}>`
   background-color: ${globals.WHITE};
   color: ${globals.TEXT_PRIMARY_COLOR};
 `;
+WeaveRoot.displayName = 'S.WeaveRoot';
 
 const PageContentContainer = styled.div`
   flex: 1 1 300px;
   overflow: hidden;
   display: flex;
 `;
+PageContentContainer.displayName = 'S.PageContentContainer';
