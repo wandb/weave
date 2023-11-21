@@ -132,12 +132,15 @@ type PanelNumberExtraProps = {
 export const PanelNumber: React.FC<
   PanelNumberProps & PanelNumberExtraProps
 > = props => {
-  const {numberAlign, numberJustifyContent} = useContext(WeaveFormatContext);
+  const {numberTextAlign, numberJustifyContent, numberAlignContent} =
+    useContext(WeaveFormatContext);
   const nodeValueQuery = CGReact.useNodeValue(props.input);
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
-  const textAlign = numberAlign ?? props.textAlign ?? 'center';
+  const textAlign = numberTextAlign ?? props.textAlign ?? 'center';
+  const justifyContent = numberJustifyContent ?? 'space-around';
+  const alignContent = numberAlignContent ?? 'space-around';
 
   return (
     <div
@@ -151,11 +154,11 @@ export const PanelNumber: React.FC<
         textAlign,
         wordBreak: 'normal',
         display: 'flex',
-        paddingRight: '24px',
+        paddingRight: '8px',
         paddingTop: '4px',
         flexDirection: 'column',
-        alignContent: numberJustifyContent,
-        justifyContent: numberJustifyContent,
+        alignContent,
+        justifyContent,
         alignItems: textAlign === 'center' ? 'center' : 'normal',
       }}>
       {nodeValueQuery.result == null
