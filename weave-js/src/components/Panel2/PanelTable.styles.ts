@@ -25,7 +25,7 @@ export const ColumnHeader = styled.div`
 `;
 ColumnHeader.displayName = 'S.ColumnHeader';
 
-export const ColumnName = styled.div<{textAlign?: 'left' | 'right'}>`
+export const ColumnName = styled.div`
   cursor: pointer;
   padding: 4px 4px 4px 1em;
   flex: 1 1 auto;
@@ -33,7 +33,7 @@ export const ColumnName = styled.div<{textAlign?: 'left' | 'right'}>`
     color: ${globals.primary};
   }
   overflow: hidden;
-  text-align: ${p => p.textAlign ?? 'left'};
+  text-align: left;
 `;
 ColumnName.displayName = 'S.ColumnName';
 

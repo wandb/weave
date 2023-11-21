@@ -12,7 +12,6 @@ import {
   listObjectType,
   Node,
   NodeOrVoidNode,
-  nullableTaggableStrip,
   voidNode,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo, useState} from 'react';
@@ -157,11 +156,6 @@ export const ColumnHeader: React.FC<{
     useState<any>(propsPanelConfig);
   const enableGroup = Table.enableGroupByCol;
   const disableGroup = Table.disableGroupByCol;
-
-  const colAlign = useMemo(() => {
-    const colType = nullableTaggableStrip(workingSelectFunction.type);
-    return colType === 'number' ? 'right' : 'left';
-  }, [workingSelectFunction]);
 
   const applyWorkingState = useCallback(() => {
     let newState = tableState;
@@ -436,6 +430,9 @@ export const ColumnHeader: React.FC<{
   const colIsSorted =
     tableState.sort.find(sort => sort.columnId === colId)?.dir != null;
 
+  const colControlsWidth =
+    20 * (1 + (colIsSorted ? 1 : 0) + (isPinned ? 1 : 0));
+
   const newContextVars = useMemo(() => {
     // TODO mixing up propsSelectFunction and
     // selectFunction
@@ -489,7 +486,9 @@ export const ColumnHeader: React.FC<{
           }}
           trigger={
             <S.ColumnName
-              textAlign={colAlign}
+              style={{
+                marginRight: `-${colControlsWidth}px`,
+              }}
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
               {workingColumnName !== '' ? (
                 <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
