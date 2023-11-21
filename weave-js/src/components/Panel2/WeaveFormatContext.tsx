@@ -27,11 +27,3 @@ export const WeaveFormatContext = React.createContext<WeaveFormatContextType>({
     spacing: false,
   },
 });
-
-// export type WeaveFormatContextType = {
-//   numberTextAlign?: React.CSSProperties['textAlign'];
-//   numberPadding?: React.CSSProperties['padding'];
-//   numberJustifyContent?: string;
-//   numberAlignContent?: string;
-//   stringSpacing?: boolean;
-// };
