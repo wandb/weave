@@ -26,6 +26,7 @@ import {
   opIndex,
   opLimit,
   opPick,
+  // opRandomlyDownsample,
   OpStore,
   opUnnest,
   taggedValueValueType,
@@ -86,6 +87,8 @@ import {
 } from './versions';
 
 const recordEvent = makeEventRecorder('Plot');
+
+// const PANELPLOT_MAX_DATAPOINTS = 2000;
 
 /* eslint-disable no-template-curly-in-string */
 const PLOT_TEMPLATE: VisualizationSpec = {
@@ -184,6 +187,65 @@ function getColorAxisType(
   }
   return colorAxisType;
 }
+
+/*
+async function mergeRealizedTableData(
+  oldTable: _.Dictionary<any>[],
+  newTable: _.Dictionary<any>[]
+): Promise<_.Dictionary<any>[]> {
+  const flatArray = _.flatten([oldTable, newTable]);
+  const uniqueArray = _.uniqBy(flatArray, '_rowIndex');
+  return _.sortBy(uniqueArray, '_rowIndex');
+}
+
+const useMergeTables = makePromiseUsable(
+  (
+    currentData: _.Dictionary<any>[][] | undefined,
+    newFlatPlotTables: _.Dictionary<any>[][],
+    isLoading: boolean
+  ): Promise<_.Dictionary<any>[][]> => {
+    if (!isLoading && currentData) {
+      return Promise.all(
+        newFlatPlotTables.map((table, i) =>
+          mergeRealizedTableData(currentData?.[i] ?? [], table)
+        )
+      );
+    }
+    return Promise.resolve(currentData || []);
+  }
+);
+
+const useLatestData = (
+  newFlatPlotTables: _.Dictionary<any>[][],
+  isLoading: boolean,
+  series: SeriesConfig[]
+) => {
+  const [latestData, setLatestData] = useState<_.Dictionary<any>[][]>([]);
+  const seriesRef = useRef<SeriesConfig[]>(series);
+  const {result: mergedTables, loading} = useMergeTables(
+    latestData,
+    newFlatPlotTables,
+    isLoading
+  );
+
+  if (seriesRef.current !== series) {
+    // invalidate prior data
+    seriesRef.current = series;
+    setLatestData([]);
+    return {latestData: [], loading: true};
+  } else if (mergedTables !== latestData && !loading) {
+    setLatestData(mergedTables);
+  } else if (
+    loading &&
+    latestData.length === 0 &&
+    newFlatPlotTables.length > 0
+  ) {
+    setLatestData(newFlatPlotTables);
+  }
+
+  return {latestData, loading};
+};
+*/
 
 export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const isDash = useWeaveRedesignedPlotConfigEnabled();
@@ -321,6 +383,13 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           });
         }
       }
+
+      // if (isDash) {
+      //   node = opRandomlyDownsample({
+      //     arr: node,
+      //     n: constNumber(PANELPLOT_MAX_DATAPOINTS),
+      //   });
+      // }
 
       acc[i] = node;
       return acc;
