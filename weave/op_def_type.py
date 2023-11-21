@@ -105,13 +105,25 @@ class OpDefType(types.Type):
         else:
             code = "import typing\nimport weave\n"
 
-            # Try to figure out module imports from the function body
-            # (in a real hacky way as a POC)
-            code += get_code_deps(obj.raw_resolve_fn, obj._decl_locals)
+            # Get import statements for any annotations
             code += (
                 "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
                 + "\n\n"
             )
+
+            # Try to figure out module imports from the function body
+            # (in a real hacky way as a POC)
+            code += get_code_deps(obj.raw_resolve_fn, obj._decl_locals)
+
+            # Note the above two stanzas are in the order they are to ensure
+            # this case works.
+            # from PIL import Image
+            # def sin_image(f: int) -> Image.Image:
+            #     pass
+            # The first stanza will create "from PIL.Image import Image"
+            # and the second will create "from PIL import Image". In this case
+            # we want the latter.
+            # This is a major hack to get a notebook working.
 
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.raw_resolve_fn.__annotations__
