@@ -26,7 +26,6 @@ import {PanelComp2} from './PanelComp';
 import {usePanelContext} from './PanelContext';
 import * as PanelLib from './panellib/libpanel';
 import * as Table from './PanelTable/tableState';
-import {WeaveAlignmentContext} from './WeaveAlignmentContext';
 
 export interface PanelRowConfig {
   pageSize: number;
@@ -181,66 +180,64 @@ const PanelRow: React.FC<PanelRowProps> = props => {
   const rowNodes = rowNodesUse.result;
 
   return useGatedValue(
-    <WeaveAlignmentContext.Provider value={{isInRow: true}}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
+        padding: '2px',
+      }}>
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
+          height: '0px',
           width: '100%',
-          height: '100%',
-          padding: '2px',
+          display: 'flex',
+          justifyContent: 'space-evenly',
+          flexDirection: vertical ? 'column' : 'row',
+          gap: '4px',
+          flex: '1 1 auto',
         }}>
-        <div
-          style={{
-            height: '0px',
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'space-evenly',
-            flexDirection: vertical ? 'column' : 'row',
-            gap: '4px',
-            flex: '1 1 auto',
-          }}>
-          {_.range(pageSize).map(offset => {
-            const node = rowNodes[offset];
-            if (node == null) {
-              return <div key={offset} style={{flex: '1 1 auto'}} />;
-            }
-            return (
-              <div
-                key={offset}
-                style={{
-                  overflowX: 'auto',
-                  flex: '1 1 50px',
-                  height: '100%',
-                }}>
-                <PanelComp2
-                  input={node}
-                  inputType={node.type}
-                  loading={props.loading}
-                  panelSpec={props.child}
-                  configMode={false}
-                  config={childConfig}
-                  context={props.context}
-                  updateConfig={updateChildConfig}
-                  updateContext={props.updateContext}
-                  updateInput={props.updateInput}
-                />
-              </div>
-            );
-          })}
-        </div>
-        {(rowsNode.type.length == null || rowsNode.type.length > pageSize) && (
-          <div style={{flex: '0 0 auto', maxHeight: '27px'}}>
-            <PageControls
-              rowsNode={rowsNode}
-              page={pageNum}
-              pageSize={pageSize}
-              setPage={setPageNum}
-            />
-          </div>
-        )}
+        {_.range(pageSize).map(offset => {
+          const node = rowNodes[offset];
+          if (node == null) {
+            return <div key={offset} style={{flex: '1 1 auto'}} />;
+          }
+          return (
+            <div
+              key={offset}
+              style={{
+                overflowX: 'auto',
+                flex: '1 1 50px',
+                height: '100%',
+              }}>
+              <PanelComp2
+                input={node}
+                inputType={node.type}
+                loading={props.loading}
+                panelSpec={props.child}
+                configMode={false}
+                config={childConfig}
+                context={props.context}
+                updateConfig={updateChildConfig}
+                updateContext={props.updateContext}
+                updateInput={props.updateInput}
+              />
+            </div>
+          );
+        })}
       </div>
-    </WeaveAlignmentContext.Provider>,
+      {(rowsNode.type.length == null || rowsNode.type.length > pageSize) && (
+        <div style={{flex: '0 0 auto', maxHeight: '27px'}}>
+          <PageControls
+            rowsNode={rowsNode}
+            page={pageNum}
+            pageSize={pageSize}
+            setPage={setPageNum}
+          />
+        </div>
+      )}
+    </div>,
     o => !rowNodesUse.loading
   );
 };

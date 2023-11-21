@@ -9,6 +9,7 @@ import {
   ListType,
   MemoizedHasher,
   Node,
+  nullableTaggableStrip,
   NodeOrVoidNode,
   nonNullableDeep,
   opIndex,
@@ -27,6 +28,20 @@ import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';
+import {WeaveFormatContextType} from '../WeaveFormatContext';
+
+// Formatting for PanelNumbers and PanelStrings inside Tables
+export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
+  const t = nullableTaggableStrip(colType);
+  const numberAlign = t === 'number' ? 'right' : 'center';
+  const numberJustifyContent = t === 'number' ? 'normal' : 'space-around';
+  const stringSpacing = t === 'string';
+  return {
+    numberAlign,
+    numberJustifyContent,
+    stringSpacing,
+  };
+};
 
 export const stripTag = (type: Type): Type => {
   return isTaggedValue(type) ? taggedValueValueType(type) : type;

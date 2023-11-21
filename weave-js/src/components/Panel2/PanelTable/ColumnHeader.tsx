@@ -9,6 +9,7 @@ import {
   EditingNode,
   isListLike,
   isVoidNode,
+  nullableTaggableStrip,
   listObjectType,
   Node,
   NodeOrVoidNode,
@@ -156,6 +157,11 @@ export const ColumnHeader: React.FC<{
     useState<any>(propsPanelConfig);
   const enableGroup = Table.enableGroupByCol;
   const disableGroup = Table.disableGroupByCol;
+
+  const colAlign = useMemo(() => {
+    const colType = nullableTaggableStrip(workingSelectFunction.type);
+    return colType === 'number' ? 'right' : 'left';
+  }, [workingSelectFunction]);
 
   const applyWorkingState = useCallback(() => {
     let newState = tableState;
@@ -486,9 +492,12 @@ export const ColumnHeader: React.FC<{
           }}
           trigger={
             <S.ColumnName
-              style={{
-                marginRight: `-${colControlsWidth}px`,
-              }}
+              textAlign={colAlign}
+              style={
+                {
+                  // marginRight: `-${colControlsWidth}px`,
+                }
+              }
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
               {workingColumnName !== '' ? (
                 <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>

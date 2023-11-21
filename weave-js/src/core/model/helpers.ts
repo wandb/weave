@@ -862,6 +862,14 @@ export function isObjectType(t: any): t is ObjectType {
   return !isSimpleTypeShape(t) && (t as any)?._is_object;
 }
 
+export function isNumberLike(t: Type): boolean {
+  return t === 'number' || (isUnion(t) && t.members.some(v => v === 'number'));
+}
+
+export function isStringLike(t: Type): boolean {
+  return t === 'string' || (isUnion(t) && t.members.some(v => v === 'string'));
+}
+
 export function isFunctionType(
   maybeFunctionType: Type
 ): maybeFunctionType is FunctionType {

@@ -8,7 +8,7 @@ import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
-import {WeaveAlignmentContext} from './WeaveAlignmentContext';
+import {WeaveFormatContext} from './WeaveFormatContext';
 
 const CustomFormatHelp = () => {
   return (
@@ -132,13 +132,12 @@ type PanelNumberExtraProps = {
 export const PanelNumber: React.FC<
   PanelNumberProps & PanelNumberExtraProps
 > = props => {
-  const {isInTable, isInRow} = useContext(WeaveAlignmentContext);
+  const {numberAlign, numberJustifyContent} = useContext(WeaveFormatContext);
   const nodeValueQuery = CGReact.useNodeValue(props.input);
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
-  const tableFormat = isInTable && !isInRow;
-  const textAlign = tableFormat ? 'right' : props.textAlign ?? 'center';
+  const textAlign = numberAlign ? numberAlign : props.textAlign ?? 'center';
 
   return (
     <div
@@ -152,11 +151,11 @@ export const PanelNumber: React.FC<
         textAlign,
         wordBreak: 'normal',
         display: 'flex',
-        paddingRight: '12px',
+        paddingRight: '24px',
         paddingTop: '4px',
         flexDirection: 'column',
-        alignContent: tableFormat ? 'normal' : 'space-around',
-        justifyContent: tableFormat ? 'normal' : 'space-around',
+        alignContent: numberJustifyContent,
+        justifyContent: numberJustifyContent,
         alignItems: textAlign === 'center' ? 'center' : 'normal',
       }}>
       {nodeValueQuery.result == null

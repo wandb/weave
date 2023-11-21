@@ -12,7 +12,7 @@ import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import * as S from './PanelString.styles';
 import {TooltipTrigger} from './Tooltip';
-import {WeaveAlignmentContext} from './WeaveAlignmentContext';
+import {WeaveFormatContext} from './WeaveFormatContext';
 
 const inputType = {
   type: 'union' as const,
@@ -144,8 +144,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
   const inputValue = CGReact.useNodeValue(props.input);
   const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
   const loading = inputValue.loading || compValue.loading;
-  const {isInTable, isInRow} = useContext(WeaveAlignmentContext);
-  const isDirectlyRenderedByTableCell = (isInTable && !isInRow)!!;
+  const {stringSpacing} = useContext(WeaveFormatContext);
 
   const fullStr = String(inputValue?.result ?? '-');
   const comparandStr = String(compValue?.result ?? ''); // Default comparand is empty string
@@ -162,10 +161,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         />
       );
       return (
-        <S.StringContainer
-          isDirectlyRenderedByTableCell={isDirectlyRenderedByTableCell}>
-          <S.StringItem
-            isDirectlyRenderedByTableCell={isDirectlyRenderedByTableCell}>
+        <S.StringContainer stringSpacing={stringSpacing}>
+          <S.StringItem stringSpacing={stringSpacing}>
             <TooltipTrigger
               copyableContent={fullStr}
               content={contentMarkdown}
@@ -205,10 +202,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
 
       return (
-        <S.StringContainer
-          isDirectlyRenderedByTableCell={isDirectlyRenderedByTableCell}>
-          <S.StringItem
-            isDirectlyRenderedByTableCell={isDirectlyRenderedByTableCell}>
+        <S.StringContainer stringSpacing={stringSpacing}>
+          <S.StringItem stringSpacing={stringSpacing}>
             <TooltipTrigger copyableContent={fullStr} content={contentDiff}>
               {contentDiff}
             </TooltipTrigger>
@@ -227,23 +222,15 @@ export const PanelString: React.FC<PanelStringProps> = props => {
     return (
       <S.StringContainer
         data-test-weave-id="string"
-        isDirectlyRenderedByTableCell={isDirectlyRenderedByTableCell}>
-        <S.StringItem
-          isDirectlyRenderedByTableCell={isDirectlyRenderedByTableCell}>
+        stringSpacing={stringSpacing}>
+        <S.StringItem stringSpacing={stringSpacing}>
           <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
             {contentPlaintext}
           </TooltipTrigger>
         </S.StringItem>
       </S.StringContainer>
     );
-  }, [
-    comparandStr,
-    config.diffMode,
-    config.mode,
-    contentHeight,
-    fullStr,
-    isDirectlyRenderedByTableCell,
-  ]);
+  }, [comparandStr, config.diffMode, config.mode, contentHeight, fullStr]);
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);
 
