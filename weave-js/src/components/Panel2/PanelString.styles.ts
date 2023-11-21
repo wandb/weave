@@ -24,7 +24,7 @@ StringContainer.displayName = 'S.StringContainer';
 export const StringItem = styled.div<{
   spacing?: boolean;
 }>`
-  margin: ${p => (p.spacing ? '0px' : 'auto')};
+  margin: ${p => (p.spacing ? '0' : 'auto')};
   width: 100%;
   /* padding: 4px; */
   max-height: 100%;

@@ -145,6 +145,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
   const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
   const loading = inputValue.loading || compValue.loading;
   const {stringFormat} = useContext(WeaveFormatContext);
+  const {spacing} = stringFormat;
 
   const fullStr = String(inputValue?.result ?? '-');
   const comparandStr = String(compValue?.result ?? ''); // Default comparand is empty string
@@ -161,8 +162,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         />
       );
       return (
-        <S.StringContainer spacing={stringFormat.spacing}>
-          <S.StringItem spacing={stringFormat.spacing}>
+        <S.StringContainer spacing={spacing}>
+          <S.StringItem spacing={spacing}>
             <TooltipTrigger
               copyableContent={fullStr}
               content={contentMarkdown}
@@ -202,8 +203,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
 
       return (
-        <S.StringContainer spacing={stringFormat.spacing}>
-          <S.StringItem spacing={stringFormat.spacing}>
+        <S.StringContainer spacing={spacing}>
+          <S.StringItem spacing={spacing}>
             <TooltipTrigger copyableContent={fullStr} content={contentDiff}>
               {contentDiff}
             </TooltipTrigger>
@@ -220,10 +221,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
 
     // plaintext
     return (
-      <S.StringContainer
-        data-test-weave-id="string"
-        spacing={stringFormat.spacing}>
-        <S.StringItem spacing={stringFormat.spacing}>
+      <S.StringContainer data-test-weave-id="string" spacing={spacing}>
+        <S.StringItem spacing={spacing}>
           <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
             {contentPlaintext}
           </TooltipTrigger>
@@ -236,7 +235,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
     config.mode,
     contentHeight,
     fullStr,
-    stringFormat,
+    spacing,
   ]);
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);

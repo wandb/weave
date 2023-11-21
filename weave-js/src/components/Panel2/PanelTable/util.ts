@@ -36,7 +36,7 @@ export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
   const numberFormat =
     t === 'number'
       ? {
-          textAlign: 'right' as React.CSSProperties['textAlign'],
+          textAlign: 'right' as const,
           justifyContent: 'normal',
           alignContent: 'normal',
           padding: '4px 8px 0 0',

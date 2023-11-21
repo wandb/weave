@@ -3,8 +3,8 @@ import React from 'react';
 type PanelNumberFormat = {
   textAlign?: React.CSSProperties['textAlign'];
   padding?: React.CSSProperties['padding'];
-  justifyContent?: string;
-  alignContent?: string;
+  justifyContent?: React.CSSProperties['justifyContent'];
+  alignContent?: React.CSSProperties['alignContent'];
 };
 
 type PanelStringFormat = {
