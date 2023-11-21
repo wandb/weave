@@ -66,18 +66,23 @@ function forEachWeaveOutputCellInNotebook(
         // TODO: This switches depending on if in devmode
         cy.visit('/__frontend/weave_frontend' + url.search);
 
-        // Cypress is erroring on ResizeObserver loop limit exceeded, but 
+        // Cypress is erroring on ResizeObserver loop limit exceeded, but
         // we are not seeing anything like this locally. I think it might
         // have to do with cypress itself. Similar issues have been noted
         // here: https://github.com/cypress-io/cypress/issues/8418, with similar
         // patches resolving the issue. I'm not sure if this is the best way
         // to handle this, but it seems to work.
         cy.on('uncaught:exception', err => {
-          if (err.name?.includes('ResizeObserver') || err.message?.includes('ResizeObserver')) {
-            return false
+
+          if (
+            err.name?.includes('ResizeObserver') ||
+            err.message?.includes('ResizeObserver')
+          ) {
+            return false;
+
           }
-        })
-        
+        });
+
         // cy.visit('http://localhost:3000/' + url.search);
 
         cellTest(cell.id);
@@ -88,9 +93,7 @@ function forEachWeaveOutputCellInNotebook(
 
 function executeNotebook(notebookPath: string) {
   exec(
-    'pytest --nbmake --nbmake-timeout=150000 --overwrite "' +
-      notebookPath +
-      '"',
+    'pytest --nbmake --nbmake-timeout=3000 --overwrite "' + notebookPath + '"',
     160000
   );
 }
