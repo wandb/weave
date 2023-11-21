@@ -144,7 +144,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
   const inputValue = CGReact.useNodeValue(props.input);
   const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
   const loading = inputValue.loading || compValue.loading;
-  const {stringSpacing} = useContext(WeaveFormatContext);
+  const {stringFormat} = useContext(WeaveFormatContext);
 
   const fullStr = String(inputValue?.result ?? '-');
   const comparandStr = String(compValue?.result ?? ''); // Default comparand is empty string
@@ -161,8 +161,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         />
       );
       return (
-        <S.StringContainer stringSpacing={stringSpacing}>
-          <S.StringItem stringSpacing={stringSpacing}>
+        <S.StringContainer spacing={stringFormat.spacing}>
+          <S.StringItem spacing={stringFormat.spacing}>
             <TooltipTrigger
               copyableContent={fullStr}
               content={contentMarkdown}
@@ -202,8 +202,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
 
       return (
-        <S.StringContainer stringSpacing={stringSpacing}>
-          <S.StringItem stringSpacing={stringSpacing}>
+        <S.StringContainer spacing={stringFormat.spacing}>
+          <S.StringItem spacing={stringFormat.spacing}>
             <TooltipTrigger copyableContent={fullStr} content={contentDiff}>
               {contentDiff}
             </TooltipTrigger>
@@ -222,8 +222,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
     return (
       <S.StringContainer
         data-test-weave-id="string"
-        stringSpacing={stringSpacing}>
-        <S.StringItem stringSpacing={stringSpacing}>
+        spacing={stringFormat.spacing}>
+        <S.StringItem spacing={stringFormat.spacing}>
           <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
             {contentPlaintext}
           </TooltipTrigger>
@@ -236,7 +236,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
     config.mode,
     contentHeight,
     fullStr,
-    stringSpacing,
+    stringFormat,
   ]);
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);

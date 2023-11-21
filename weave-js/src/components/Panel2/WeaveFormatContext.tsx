@@ -1,15 +1,37 @@
 import React from 'react';
 
+type PanelNumberFormat = {
+  textAlign?: React.CSSProperties['textAlign'];
+  padding?: React.CSSProperties['padding'];
+  justifyContent?: string;
+  alignContent?: string;
+};
+
+type PanelStringFormat = {
+  spacing?: boolean;
+};
+
 export type WeaveFormatContextType = {
-  numberTextAlign?: React.CSSProperties['textAlign'];
-  numberJustifyContent?: string;
-  numberAlignContent?: string;
-  stringSpacing?: boolean;
+  numberFormat: PanelNumberFormat;
+  stringFormat: PanelStringFormat;
 };
 
 export const WeaveFormatContext = React.createContext<WeaveFormatContextType>({
-  numberTextAlign: 'center',
-  numberJustifyContent: 'space-around',
-  numberAlignContent: 'space-around',
-  stringSpacing: false,
+  numberFormat: {
+    textAlign: 'center',
+    justifyContent: 'space-around',
+    alignContent: 'space-around',
+    padding: '0',
+  },
+  stringFormat: {
+    spacing: false,
+  },
 });
+
+// export type WeaveFormatContextType = {
+//   numberTextAlign?: React.CSSProperties['textAlign'];
+//   numberPadding?: React.CSSProperties['padding'];
+//   numberJustifyContent?: string;
+//   numberAlignContent?: string;
+//   stringSpacing?: boolean;
+// };

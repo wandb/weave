@@ -33,15 +33,19 @@ import {useTableStateWithRefinedExpressions} from './tableStateReact';
 // Formatting for PanelNumbers and PanelStrings inside Tables
 export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
   const t = nullableTaggableStrip(colType);
-  const numberTextAlign = t === 'number' ? 'right' : undefined;
-  const numberJustifyContent = t === 'number' ? 'normal' : undefined;
-  const numberAlignContent = t === 'number' ? 'normal' : undefined;
-  const stringSpacing = t === 'string';
+  const numberFormat =
+    t === 'number'
+      ? {
+          textAlign: 'right' as React.CSSProperties['textAlign'],
+          justifyContent: 'normal',
+          alignContent: 'normal',
+          padding: '4px 8px 0 0',
+        }
+      : {};
+  const stringFormat = {spacing: t === 'string'};
   return {
-    numberTextAlign,
-    numberJustifyContent,
-    numberAlignContent,
-    stringSpacing,
+    numberFormat,
+    stringFormat,
   };
 };
 
