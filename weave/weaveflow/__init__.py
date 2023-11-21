@@ -1,3 +1,7 @@
+from .. import context_state as _context_state
+
+_context_state._eager_mode.set(True)
+
 from .dataset import *
 from .model import *
 from .chat_model import *

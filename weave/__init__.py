@@ -40,7 +40,7 @@ from . import context as _context
 
 _context.get_client()
 # Eager by default
-_context_state._eager_mode.set(True)
+# _context_state._eager_mode.set(True)
 
 _context_state.clear_loading_built_ins(_loading_builtins_token)
 
