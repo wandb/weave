@@ -134,6 +134,7 @@ export {
   IconRecentClock,
   IconRedditSocial,
   IconRedo,
+  IconRegex,
   IconRemove,
   IconReport,
   IconRetry,
