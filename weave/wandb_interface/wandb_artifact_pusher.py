@@ -2,15 +2,10 @@ import dataclasses
 import typing
 import wandb
 from wandb import Artifact
-from wandb.sdk.artifacts.artifact_saver import ArtifactSaver
-from wandb.sdk.internal.sender import _manifest_json_from_proto
-
-# from wandb.sdk.internal.artifact_saver import ArtifactSaver # This symbol moved after our pinned version
-# from wandb.sdk.internal.sender import _manifest_json_from_proto # This symbol moved after our pinned version
-from wandb.sdk.interface.interface import InterfaceBase
 
 from weave import wandb_client_api
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+from .. import engine_trace
 
 
 @dataclasses.dataclass
@@ -28,16 +23,9 @@ def write_artifact_to_wandb(
     additional_aliases: list = [],
     *,
     _lite_run: typing.Optional[InMemoryLazyLiteRun] = None,
+    artifact_collection_exists: bool = False,
 ) -> WeaveWBArtifactURIComponents:
-    # Extract Artifact Attributes
-    artifact_name = artifact.name
-    artifact_type_name = artifact.type
-
-    assert artifact_name is not None
-    assert artifact_type_name is not None
-
-    wandb_client_api.assert_wandb_authenticated()
-
+    tracer = engine_trace.tracer()  # type: ignore
     # Here we get the default entity if none is provided.
     # When we support saving dashboards to target entities,
     # we may want to rework this code path so that the caller
@@ -46,44 +34,23 @@ def write_artifact_to_wandb(
 
     if _lite_run is None:
         lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name, group="weave_artifact_pushers", _hide_in_wb=True
+            entity_name,
+            project_name,
+            group="weave_artifact_pushers",
+            _hide_in_wb=True,
         )
     else:
         lite_run = _lite_run
 
-    # Ensure the artifact type exists
-    lite_run.i_api.create_artifact_type(
-        artifact_type_name=artifact_type_name,
-        entity_name=lite_run.run.entity,
-        project_name=lite_run.run.project,
-    )
+    with tracer.trace("Logging artifact"):
+        res = lite_run.log_artifact(
+            artifact,
+            additional_aliases,
+            artifact_collection_exists,
+        )
 
-    # Finalize the artifact and construct the manifest.
-    artifact.finalize()
-    manifest_dict = _manifest_json_from_proto(
-        InterfaceBase()._make_artifact(artifact).manifest  # type: ignore[abstract, attr-defined]
-    )
-
-    # Save the Artifact and the associated files
-    saver = ArtifactSaver(
-        api=lite_run.i_api,
-        digest=artifact.digest,
-        manifest_json=manifest_dict,
-        file_pusher=lite_run.pusher,
-        is_user_created=False,
-    )
-    res = saver.save(
-        type=artifact_type_name,
-        name=artifact_name,
-        client_id=artifact._client_id,
-        sequence_client_id=artifact._sequence_client_id,
-        metadata=artifact.metadata,
-        description=artifact.description,
-        aliases=["latest"] + additional_aliases,
-        use_after_commit=False,
-    )
-
-    lite_run.finish()
+    with tracer.trace("Finish lite_run"):
+        lite_run.finish()
 
     if res is not None:
         art = Artifact._from_id(res["id"], wandb_client_api.wandb_public_api().client)
@@ -92,8 +59,8 @@ def write_artifact_to_wandb(
 
     # Return the URI of the artifact
     return WeaveWBArtifactURIComponents(
-        entity_name=lite_run.run.entity,
-        project_name=lite_run.run.project,
-        artifact_name=artifact_name,
+        entity_name=entity_name,
+        project_name=project_name,
+        artifact_name=artifact.name,
         version_str=commit_hash,
     )

@@ -1,9 +1,8 @@
 import {
   GRAY_350,
-  GRAY_500,
   SCROLLBAR_STYLES,
 } from '@wandb/weave/common/css/globals.styles';
-import styled, {css} from 'styled-components';
+import styled from 'styled-components';
 
 export const Container = styled.div`
   display: flex;
@@ -27,15 +26,9 @@ export const HeaderTop = styled.div<{lessLeftPad?: boolean}>`
 `;
 HeaderTop.displayName = 'S.HeaderTop';
 
-export const HeaderTopLeft = styled.div<{canGoBack?: boolean}>`
+export const HeaderTopLeft = styled.div`
   display: flex;
   align-items: center;
-  ${p =>
-    p.canGoBack &&
-    css`
-      color: ${GRAY_500};
-      cursor: pointer;
-    `}
 `;
 HeaderTopLeft.displayName = 'S.HeaderTopLeft';
 
