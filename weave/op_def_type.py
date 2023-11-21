@@ -139,7 +139,8 @@ class OpDefType(types.Type):
         if isinstance(artifact, artifact_wandb.WandbArtifact):
             is_wandb_artifact = True
 
-        module_path = artifact.path(f"{name}.py")
+        file_name = f"{name}.py"
+        module_path = artifact.path(file_name)
 
         if is_wandb_artifact:
             module_dir = os.path.dirname(module_path)
@@ -149,10 +150,16 @@ class OpDefType(types.Type):
             # because serialized ops would be cached at the "obj" key. We include
             # the version in the module name to avoid this. Since version names
             # are content hashes, this is correct.
-            art_dir, version_subdir, fname = module_path.rsplit("/", 2)
+            #
+            # module_path = {WEAVE_CACHE_DIR}/{USER}/local-artifacts/{ARTIFACT_NAME}/{ARTIFACT_VERSION}/{NAME_INCLUDING_SUB_PATHS}.py
+            art_and_version_dir = module_path[: -(1 + len(file_name))]
+            art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
             module_dir = art_dir
-            model_filename = fname
-            import_name = version_subdir + "." + os.path.splitext(model_filename)[0]
+            import_name = (
+                version_subdir
+                + "."
+                + ".".join(os.path.splitext(file_name)[0].split("/"))
+            )
 
         # path_with_ext = os.path.relpath(
         #     artifact.path(f"{name}.py"), start=artifact_local.local_artifact_dir()
@@ -168,7 +175,8 @@ class OpDefType(types.Type):
             # This has a side effect of registering the op
             # PR: Return None if we can't load the op?
             try:
-                mod = __import__(import_name)
+                # Weaveflow Merge: fromlist correctly imports submodules
+                mod = __import__(import_name, fromlist=[module_dir])
             except Exception as e:
                 print("Op loading exception. This might be fine!")
                 import traceback
@@ -177,8 +185,14 @@ class OpDefType(types.Type):
                 return None
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
-        if not is_wandb_artifact:
-            mod = getattr(mod, "obj")
+        # Weaveflow Merge: Commenting out, this does not look correct to me (tim), but
+        # leaving it here in case I'm wrong.
+        # if not is_wandb_artifact:
+        #     try:
+        #         mod = getattr(mod, "obj")
+        #     except:
+        #         raise errors.WeaveInternalError(f"{import_name=} {name=} {module_dir=}")
+
         # mod down to _obj.
         # for part in parts[1:]:
         #     mod = getattr(mod, part)
@@ -186,7 +200,7 @@ class OpDefType(types.Type):
         op_defs = inspect.getmembers(mod, op_def.is_op_def)
         if len(op_defs) != 1:
             raise errors.WeaveInternalError(
-                "Unexpected Weave module saved in: %s" % module_path
+                f"Unexpected Weave module saved in: {module_path}. Found {len(op_defs)} op defs, expected 1. All members: {dir(mod)}. {module_dir=} {import_name=} t={type(mod.call)}"
             )
         _, od = op_defs[0]
         return od
