@@ -3,13 +3,14 @@ import {isAssignableTo, maybe} from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
-import {Button, Tab} from 'semantic-ui-react';
+import {Tab} from 'semantic-ui-react';
 
 import {
   useWeaveContext,
   useWeaveRedesignedPlotConfigEnabled,
 } from '../../../context';
 import * as LLReact from '../../../react';
+import {Button} from '../../Button';
 import {VariableView} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
 import {ConfigSection} from '../ConfigPanel';
@@ -499,10 +500,14 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const seriesButtons = useMemo(
     () => (
       <>
-        <Button size="mini" onClick={resetConfig}>
+        <Button
+          size="small"
+          variant="secondary"
+          className="mr-12"
+          onClick={resetConfig}>
           Reset & Automate Plot
         </Button>
-        <Button size="mini" onClick={condense}>
+        <Button size="small" variant="secondary" onClick={condense}>
           Condense
         </Button>
         {/* {weavePythonEcosystemEnabled && (
