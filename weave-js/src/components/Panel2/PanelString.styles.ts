@@ -4,7 +4,7 @@ import styled from 'styled-components';
 export const StringContainer = styled.div<{
   stringSpacing?: boolean;
 }>`
-  padding: ${p => (p.stringSpacing ? '4px 1em' : '0px 1em')};
+  padding: ${p => (p.stringSpacing ? '4px 1em' : '0 1em')};
   width: 100%;
   height: 100%;
   display: flex;

@@ -137,7 +137,7 @@ export const PanelNumber: React.FC<
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
-  const textAlign = numberAlign ? numberAlign : props.textAlign ?? 'center';
+  const textAlign = numberAlign ?? props.textAlign ?? 'center';
 
   return (
     <div

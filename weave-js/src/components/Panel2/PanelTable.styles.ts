@@ -33,7 +33,7 @@ export const ColumnName = styled.div<{textAlign?: 'left' | 'right'}>`
     color: ${globals.primary};
   }
   overflow: hidden;
-  text-align: ${p => p.textAlign || 'left'};
+  text-align: ${p => p.textAlign ?? 'left'};
 `;
 ColumnName.displayName = 'S.ColumnName';
 
