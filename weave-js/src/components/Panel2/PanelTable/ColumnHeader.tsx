@@ -436,9 +436,6 @@ export const ColumnHeader: React.FC<{
   const colIsSorted =
     tableState.sort.find(sort => sort.columnId === colId)?.dir != null;
 
-  // const colControlsWidth =
-  //   20 * (1 + (colIsSorted ? 1 : 0) + (isPinned ? 1 : 0));
-
   const newContextVars = useMemo(() => {
     // TODO mixing up propsSelectFunction and
     // selectFunction
@@ -493,11 +490,6 @@ export const ColumnHeader: React.FC<{
           trigger={
             <S.ColumnName
               textAlign={colAlign}
-              style={
-                {
-                  // marginRight: `-${colControlsWidth}px`,
-                }
-              }
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
               {workingColumnName !== '' ? (
                 <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
