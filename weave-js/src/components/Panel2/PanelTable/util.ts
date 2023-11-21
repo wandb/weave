@@ -9,9 +9,9 @@ import {
   ListType,
   MemoizedHasher,
   Node,
-  nullableTaggableStrip,
   NodeOrVoidNode,
   nonNullableDeep,
+  nullableTaggableStrip,
   opIndex,
   opIndexCheckpoint,
   OpStore,
@@ -26,9 +26,9 @@ import React, {useCallback, useMemo} from 'react';
 import {Stack} from '../../../core';
 import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
+import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';
-import {WeaveFormatContextType} from '../WeaveFormatContext';
 
 // Formatting for PanelNumbers and PanelStrings inside Tables
 export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {

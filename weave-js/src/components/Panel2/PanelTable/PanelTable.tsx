@@ -35,7 +35,6 @@ import {
   varNode,
   voidNode,
   WeaveInterface,
-  nullableTaggableStrip,
 } from '@wandb/weave/core';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -64,10 +63,7 @@ import {GrowToParent} from '../PanelComp.styles';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
-import {
-  WeaveFormatContext,
-  WeaveFormatContextType,
-} from '../WeaveFormatContext';
+import {WeaveFormatContext} from '../WeaveFormatContext';
 import {TableActions} from './actions';
 import {Cell, Value} from './Cell';
 import {ColumnHeader} from './ColumnHeader';
@@ -85,6 +81,7 @@ import * as Table from './tableState';
 import * as TableType from './tableType';
 import {
   BaseTableDataType,
+  getColumnCellFormats,
   getTableMeasurements,
   nodeIsValidList,
   tableIsPanelVariable,
@@ -94,7 +91,6 @@ import {
   useOrderedColumns,
   useRowsNode,
   useUpdateConfigKey,
-  getColumnCellFormats,
 } from './util';
 
 const recordEvent = makeEventRecorder('Table');

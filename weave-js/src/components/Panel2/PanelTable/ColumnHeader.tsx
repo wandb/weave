@@ -9,10 +9,10 @@ import {
   EditingNode,
   isListLike,
   isVoidNode,
-  nullableTaggableStrip,
   listObjectType,
   Node,
   NodeOrVoidNode,
+  nullableTaggableStrip,
   voidNode,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo, useState} from 'react';
@@ -436,8 +436,8 @@ export const ColumnHeader: React.FC<{
   const colIsSorted =
     tableState.sort.find(sort => sort.columnId === colId)?.dir != null;
 
-  const colControlsWidth =
-    20 * (1 + (colIsSorted ? 1 : 0) + (isPinned ? 1 : 0));
+  // const colControlsWidth =
+  //   20 * (1 + (colIsSorted ? 1 : 0) + (isPinned ? 1 : 0));
 
   const newContextVars = useMemo(() => {
     // TODO mixing up propsSelectFunction and

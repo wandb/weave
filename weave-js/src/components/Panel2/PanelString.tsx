@@ -230,7 +230,14 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         </S.StringItem>
       </S.StringContainer>
     );
-  }, [comparandStr, config.diffMode, config.mode, contentHeight, fullStr]);
+  }, [
+    comparandStr,
+    config.diffMode,
+    config.mode,
+    contentHeight,
+    fullStr,
+    stringSpacing,
+  ]);
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);
 
