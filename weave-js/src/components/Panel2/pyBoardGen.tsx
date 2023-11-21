@@ -83,7 +83,7 @@ export const getNamePartFromURI = (uri: string) => {
 };
 
 export const getPartsFromURI = (uri: string) => {
-  let parts = uri.split('://');
+  const parts = uri.split('://');
   if (parts.length !== 2) {
     return null;
   }
