@@ -153,8 +153,13 @@ export function toWeaveType(o: any): any {
     };
   } else if (_.isObject(o)) {
     if ('_type' in o) {
+      // Conditioned as as part of weaveflow merge
+      let oType = (o as {_type: any})._type;
+      if (_.isString(oType)) {
+        oType = {type: oType};
+      }
       return {
-        ...(o as {_type: any})._type,
+        ...oType,
         ..._.mapValues(_.omit(o, ['_type']), toWeaveType),
       };
     }
