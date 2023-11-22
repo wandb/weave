@@ -20,7 +20,10 @@ import {PanelInteractContextProvider} from './components/Panel2/PanelInteractCon
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import getConfig from './config';
-import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
+import {
+  useIsAuthenticated,
+  WeaveViewerContextProvider,
+} from './context/WeaveViewerContext';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
@@ -110,23 +113,28 @@ type MainProps = {
   browserType?: string;
 };
 
-const Main = ({browserType}: MainProps) => (
-  <React.Suspense fallback="loading">
-    <ErrorBoundary>
-      <NotebookComputeGraphContextProvider>
-        <StateInspector name="WeaveApp">
-          <PanelRootContextProvider>
-            <WeaveViewerContextProvider>
-              <Themer>
-                <PagePanel browserType={browserType} />
-              </Themer>
-            </WeaveViewerContextProvider>
-          </PanelRootContextProvider>
-        </StateInspector>
-      </NotebookComputeGraphContextProvider>
-    </ErrorBoundary>
-  </React.Suspense>
-);
+const Main = ({browserType}: MainProps) => {
+  // If we aren't authenticated, we don't have the ability to see/set the
+  // user's night mode preference, so we just omit the theme support entirely.
+  const isAuthed = useIsAuthenticated();
+  let page = <PagePanel browserType={browserType} />;
+  if (isAuthed) {
+    page = <Themer>{page}</Themer>;
+  }
+  return (
+    <React.Suspense fallback="loading">
+      <ErrorBoundary>
+        <NotebookComputeGraphContextProvider>
+          <StateInspector name="WeaveApp">
+            <PanelRootContextProvider>
+              <WeaveViewerContextProvider>{page}</WeaveViewerContextProvider>
+            </PanelRootContextProvider>
+          </StateInspector>
+        </NotebookComputeGraphContextProvider>
+      </ErrorBoundary>
+    </React.Suspense>
+  );
+};
 
 const Browse2Wrapper = () => (
   <React.Suspense fallback="loading">
