@@ -17,9 +17,11 @@ old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 
 Callbacks = List[Callable]
 
+api = wandb.Api()
 
 DEFAULT_STREAM_NAME = "monitoring"
 DEFAULT_PROJECT_NAME = "openai"
+DEFAULT_ENTITY_NAME = api.default_entity
 
 
 class Callback:
@@ -100,7 +102,7 @@ class LogToStreamTable(Callback):
             d["outputs"] = outputs.model_dump()
 
         self._streamtable.log(d)
-        self._streamtable.finish()
+        self._streamtable._flush()
 
 
 class AsyncChatCompletions:
@@ -233,7 +235,9 @@ def unpatch():
 
 default_callbacks = [
     ReassembleStream(),
-    Error(),
-    InfoMsg(),
-    LogToStreamTable.from_stream_name(DEFAULT_STREAM_NAME, DEFAULT_PROJECT_NAME),
+    LogToStreamTable.from_stream_name(
+        DEFAULT_STREAM_NAME,
+        DEFAULT_PROJECT_NAME,
+        DEFAULT_ENTITY_NAME,
+    ),
 ]
