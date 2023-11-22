@@ -1128,7 +1128,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
         "instance_classes": new_object_class,
     }
     if "_base_type" in t:
-        all_attr_types["_base_type"] = TypeRegistry.type_from_dict(
+        all_attr_types["_base_type"] = deserialize_relocatable_object_type(
             t["_base_type"]
         )
     new_type_class = type(type_class_name, (ObjectType,), all_attr_types)
