@@ -55,5 +55,14 @@ gql_connection_op(
     lambda inputs: "first: 100",
 )
 
+gql_connection_op(
+    "org-teams",
+    wdt.OrgType,
+    "teams",
+    wdt.EntityType,
+    {},
+    lambda inputs: "first: 100",
+)
+
 # Section 6/6: Non Standard Business Logic Ops
 #
