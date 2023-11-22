@@ -3,6 +3,7 @@ import datetime
 import typing
 import inspect
 import functools
+import keyword
 import json
 from collections.abc import Iterable
 
@@ -1066,6 +1067,19 @@ def is_relocatable_object_type(t: typing.Union[str, dict]) -> bool:
 DESERIALIZED_OBJECT_TYPE_CLASSES: dict[str, type[ObjectType]] = {}
 
 
+def validate_kwarg_name(name: str) -> bool:
+    """Return True if name is a valid python kwarg name"""
+    if name in keyword.kwlist:
+        raise ValueError(
+            f"{name} is a Python keyword and cannot be used as a kwarg name"
+        )
+    if not name.isidentifier():
+        raise ValueError(
+            f"{name} is not a valid Python identifier and cannot be used as a kwarg name"
+        )
+    return True
+
+
 def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     key = json.dumps(t)
     if key in DESERIALIZED_OBJECT_TYPE_CLASSES:
@@ -1083,6 +1097,10 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     object_constructor_arg_names = [
         k for k, t in type_attr_types.items() if t.name != "OpDef"
     ]
+    # Sanitize
+    for k in object_constructor_arg_names:
+        if not validate_kwarg_name(k):
+            raise ValueError(f"Invalid kwarg name: {k}")
 
     object_init_code = textwrap.dedent(
         f"""
