@@ -744,6 +744,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaCols,
       vegaReadyTables,
       flatResultNode,
+      weave.client.opStore,
     ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
