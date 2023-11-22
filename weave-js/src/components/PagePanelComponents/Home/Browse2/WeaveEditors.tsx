@@ -558,7 +558,11 @@ const typeToDataGridColumnSpec = (type: Type): GridColDef[] => {
               headerName: key,
               renderCell: params => {
                 return (
-                  <Typography>{`[${params.row[key].length} item list]`}</Typography>
+                  <Typography>
+                    {params.row[key] == null
+                      ? '-'
+                      : `[${params.row[key].length} item list]`}
+                  </Typography>
                 );
               },
             },

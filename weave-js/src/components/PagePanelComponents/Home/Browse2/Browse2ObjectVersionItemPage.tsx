@@ -212,12 +212,13 @@ export const Browse2ObjectVersionItemPage: FC = props => {
         <>
           <Grid container spacing={3}>
             <Grid item xs={8}>
-              <Paper>
-                {/* <Typography variant="h6" gutterBottom>
+              <Box mb={4}>
+                <Paper>
+                  {/* <Typography variant="h6" gutterBottom>
                       Value
                     </Typography> */}
-                <WeaveEditor objType={params.rootType} node={itemNode} />
-                {/* <Box p={2} sx={{height: 1000}}>
+                  <WeaveEditor objType={params.rootType} node={itemNode} />
+                  {/* <Box p={2} sx={{height: 1000}}>
                       {panel != null && (
                         <ChildPanel
                           config={panel}
@@ -227,7 +228,16 @@ export const Browse2ObjectVersionItemPage: FC = props => {
                         />
                       )}
                     </Box> */}
-              </Paper>
+                </Paper>
+              </Box>
+              <Box>
+                <Paper>
+                  <Typography variant="h6" gutterBottom>
+                    Ref
+                  </Typography>
+                  {uri}
+                </Paper>
+              </Box>
             </Grid>
             <Grid item xs={4}>
               <Paper>

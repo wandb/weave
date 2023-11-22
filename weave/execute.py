@@ -468,7 +468,7 @@ def execute_sync_op(
 ):
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
-    st = mon._streamtable
+    st = mon.streamtable
     if op_def.location and st:
         op_def_ref = storage._get_ref(op_def)
         project_name = st._project_name
