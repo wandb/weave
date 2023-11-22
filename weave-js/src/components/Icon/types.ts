@@ -133,6 +133,7 @@ export const IconNames = {
   RecentClock: 'recent-clock',
   RedditSocial: 'reddit-social',
   Redo: 'redo',
+  Regex: 'regex',
   Remove: 'remove',
   Report: 'report',
   Retry: 'retry',

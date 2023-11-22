@@ -64,6 +64,7 @@ import {GrowToParent} from '../PanelComp.styles';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
+import {WeaveFormatContext} from '../WeaveFormatContext';
 import {TableActions} from './actions';
 import {Cell, Value} from './Cell';
 import {ColumnHeader} from './ColumnHeader';
@@ -81,6 +82,7 @@ import * as Table from './tableState';
 import * as TableType from './tableType';
 import {
   BaseTableDataType,
+  getColumnCellFormats,
   getTableMeasurements,
   nodeIsValidList,
   tableIsPanelVariable,
@@ -576,6 +578,7 @@ const PanelTableInner: React.FC<
     ) => {
       const rowNode = rowData.rowNode;
       const columnDef = columnDefinitions[colId];
+      const colType = columnDef.selectFn.type;
       // MaybeWrappers are needed because the table will eagerly ask for enough
       // rows to fill the screen, before we know if that many rows exist. This
       // means that the true value of every cell is possibly nullable, even if
@@ -583,42 +586,46 @@ const PanelTableInner: React.FC<
       // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
         return (
-          <GrowToParent>
-            <Value
-              table={tableState}
-              colId={colId}
-              // Warning: not memoized
-              valueNode={opPick({
-                obj: opGroupGroupKey({
-                  obj: rowNode as any,
-                }),
-                key: constString(escapeDots(columnDef.name)),
-              })}
-              config={{}}
-              updateTableState={updateTableState}
-              panelContext={props.context}
-              updatePanelContext={updateContext}
-            />
-          </GrowToParent>
+          <WeaveFormatContext.Provider value={getColumnCellFormats(colType)}>
+            <GrowToParent>
+              <Value
+                table={tableState}
+                colId={colId}
+                // Warning: not memoized
+                valueNode={opPick({
+                  obj: opGroupGroupKey({
+                    obj: rowNode as any,
+                  }),
+                  key: constString(escapeDots(columnDef.name)),
+                })}
+                config={{}}
+                updateTableState={updateTableState}
+                panelContext={props.context}
+                updatePanelContext={updateContext}
+              />
+            </GrowToParent>
+          </WeaveFormatContext.Provider>
         );
       } else {
         return (
-          <GrowToParent>
-            <Cell
-              table={tableState}
-              colId={colId}
-              inputNode={input}
-              rowNode={rowNode}
-              selectFunction={columnDef.selectFn}
-              panelId={columnDef.panelId}
-              config={columnDef.panelConfig}
-              panelContext={props.context}
-              updateTableState={updateTableState}
-              updatePanelContext={updateContext}
-              updateInput={props.updateInput}
-              simpleTable={props.config.simpleTable}
-            />
-          </GrowToParent>
+          <WeaveFormatContext.Provider value={getColumnCellFormats(colType)}>
+            <GrowToParent>
+              <Cell
+                table={tableState}
+                colId={colId}
+                inputNode={input}
+                rowNode={rowNode}
+                selectFunction={columnDef.selectFn}
+                panelId={columnDef.panelId}
+                config={columnDef.panelConfig}
+                panelContext={props.context}
+                updateTableState={updateTableState}
+                updatePanelContext={updateContext}
+                updateInput={props.updateInput}
+                simpleTable={props.config.simpleTable}
+              />
+            </GrowToParent>
+          </WeaveFormatContext.Provider>
         );
       }
     },
