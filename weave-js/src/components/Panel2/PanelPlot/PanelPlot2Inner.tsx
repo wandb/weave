@@ -11,6 +11,7 @@ import {
   constNodeUnsafe,
   constNumber,
   constString,
+  escapeDots,
   filterNodes,
   isAssignableTo,
   isConstNode,
@@ -714,7 +715,16 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   }),
                   index: constNumber(row._rowIndex),
                 }),
-                key: constString(vegaCols[row._seriesIndex].tooltip),
+                key: constString(
+                  escapeDots(
+                    TableState.getTableColumnName(
+                      s.table.columnNames,
+                      s.table.columnSelectFunctions,
+                      s.dims.tooltip,
+                      weave.client.opStore
+                    )
+                  )
+                ),
               });
             } else {
               acc[key] = constNodeUnsafe(
@@ -734,6 +744,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaCols,
       vegaReadyTables,
       flatResultNode,
+      weave.client.opStore,
     ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
