@@ -67,8 +67,6 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/core/colors',
   '@material-ui/core/styles/createSpacing',
   '@material-ui/core/useMediaQuery',
-  '@material-ui/icons/KeyboardArrowDown',
-  '@material-ui/icons/KeyboardArrowRight',
   '@monaco-editor/loader',
   '@radix-ui/react-checkbox',
   '@radix-ui/react-dialog',
