@@ -12,6 +12,7 @@ import {
   OpenAIChatOutputView,
 } from './openai';
 import {parseRefMaybe, SmallRef} from './SmallRef';
+import {Paper} from '@material-ui/core';
 
 const ObjectView: FC<{obj: any}> = ({obj}) => {
   if (_.isPlainObject(obj)) {
@@ -39,6 +40,19 @@ const ObjectView: FC<{obj: any}> = ({obj}) => {
       return <SmallRef objRef={ref} />;
     }
     return <DisplayControlChars text={obj} />;
+  }
+  if (_.isArray(obj)) {
+    return (
+      <Grid container spacing={1}>
+        {obj.map((value, i) => (
+          <Grid item key={i} xs={12}>
+            <Paper style={{margin: 10, wordWrap: 'break-word', padding: 10}}>
+              <ObjectView obj={value} />
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+    );
   }
   return <Typography>{JSON.stringify(obj)}</Typography>;
 };
