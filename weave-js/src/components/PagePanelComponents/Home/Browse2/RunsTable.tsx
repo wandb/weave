@@ -137,7 +137,7 @@ export const RunsTable: FC<{
       };
     });
   }, [spans]);
-  console.log('TABLE DATA', tableData);
+
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {

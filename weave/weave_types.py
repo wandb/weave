@@ -156,8 +156,8 @@ class TypeRegistry:
             # of `is_relocatable_object_type` since it explicitly does not
             # require the `_relocatable` flag.  This can be removed if we are ok
             # breaking these early versions
-            if isinstance(d, dict) and is_serialized_object_type(d):
-                return deserialize_relocatable_object_type(d)
+            # if isinstance(d, dict) and is_serialized_object_type(d):
+            #     return deserialize_relocatable_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
