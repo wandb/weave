@@ -69,7 +69,9 @@ class LogToStreamTable(Callback):
         self._streamtable = streamtable
 
     @classmethod
-    def from_stream_name(cls, stream: str, project: Optional[str] = None, entity: Optional[str] = None):
+    def from_stream_name(
+        cls, stream: str, project: Optional[str] = None, entity: Optional[str] = None
+    ):
         streamtable = StreamTable(stream, project_name=project, entity_name=entity)
         return cls(streamtable)
 
@@ -82,9 +84,13 @@ class LogToStreamTable(Callback):
         elif len(tokens) == 3:
             entity_name, project_name, stream_name = tokens
         else:
-            raise ValueError("stream_key must be of the form 'entity/project/stream_name' or 'project/stream_name'")
+            raise ValueError(
+                "stream_key must be of the form 'entity/project/stream_name' or 'project/stream_name'"
+            )
 
-        streamtable = StreamTable(stream_name, project_name=project_name, entity_name=entity_name)
+        streamtable = StreamTable(
+            stream_name, project_name=project_name, entity_name=entity_name
+        )
         return cls(streamtable)
 
     def before_send_request(self, context: Context, *args, **kwargs):
@@ -129,7 +135,9 @@ class AsyncChatCompletions:
     async def _streaming_create(self, *args, **kwargs):
         await self._use_callbacks("before_send_request", *args, **kwargs)
         for callback in self.callbacks:
-            await self._use_callback(callback.before_send_request, self.context, *args, **kwargs)
+            await self._use_callback(
+                callback.before_send_request, self.context, *args, **kwargs
+            )
 
         stream = await self._base_create(*args, **kwargs)
         self.context.chunks = []
@@ -213,11 +221,17 @@ def patch(callbacks: List[Callback] = None):
 
         hooks = ChatCompletions(old_create, callbacks=callbacks)
         async_hooks = AsyncChatCompletions(old_async_create, callbacks=callbacks)
-        openai.resources.chat.completions.Completions.create = functools.partialmethod(hooks.create)
-        openai.resources.chat.completions.AsyncCompletions.create = functools.partialmethod(async_hooks.create)
+        openai.resources.chat.completions.Completions.create = functools.partialmethod(
+            hooks.create
+        )
+        openai.resources.chat.completions.AsyncCompletions.create = (
+            functools.partialmethod(async_hooks.create)
+        )
 
     if version.parse(openai.__version__) < version.parse("1.0.0"):
-        error(f"this integration requires openai>=1.0.0 (got {openai.__version__}).  Please upgrade and try again")
+        error(
+            f"this integration requires openai>=1.0.0 (got {openai.__version__}).  Please upgrade and try again"
+        )
         return
 
     try:
