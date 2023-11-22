@@ -1,4 +1,5 @@
 import {Typography} from '@mui/material';
+import {formatRelativeTime} from '@wandb/weave/util';
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
@@ -28,14 +29,16 @@ export const Browse2ObjectPage: FC = props => {
     params.project,
     params.objName
   );
+
   const rows = useMemo(
     () =>
       (versionNames.result ?? []).map((row, i) => ({
         id: i,
-        name: row,
+        ...row,
       })),
     [versionNames.result]
   );
+
   const history = useHistory();
   const handleRowClick = useCallback(
     (row: any) => {
@@ -64,7 +67,24 @@ export const Browse2ObjectPage: FC = props => {
           <Typography variant="h6" gutterBottom>
             Versions
           </Typography>
-          <LinkTable rows={rows} handleRowClick={handleRowClick} />
+          <LinkTable
+            rows={rows}
+            handleRowClick={handleRowClick}
+            columns={[
+              {
+                field: 'digest',
+                width: 200,
+              },
+
+              {
+                field: 'createdAt',
+                headerName: 'Created At',
+                width: 200,
+                valueFormatter: (params: any) =>
+                  formatRelativeTime(params?.value),
+              },
+            ]}
+          />
         </Paper>
         {/* {versionNames.result.map(version => (
               <div key={version}>

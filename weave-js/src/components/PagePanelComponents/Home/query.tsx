@@ -509,7 +509,11 @@ export const useObjectVersions = (
   projectName: string,
   objectName: string
 ): {
-  result: string[];
+  result: Array<{
+    name: string;
+    createdAt: number;
+    digest: string;
+  }>;
   loading: boolean;
 } => {
   const projectNode = w.opRootProject({
@@ -523,13 +527,27 @@ export const useObjectVersions = (
   const artifactVersionsNode = w.opArtifactVersions({
     artifact: artifactNode,
   });
-  const digestsNode = w.opArtifactVersionHash({
-    artifactVersion: artifactVersionsNode,
+
+  const queryNode = w.opMap({
+    arr: artifactVersionsNode,
+    mapFn: w.constFunction({row: 'artifactVersion'}, ({row}) => {
+      return w.opDict({
+        name: w.opArtifactVersionName({
+          artifactVersion: row,
+        }),
+        createdAt: w.opArtifactVersionCreatedAt({
+          artifactVersion: row,
+        }),
+        digest: w.opArtifactVersionHash({
+          artifactVersion: row,
+        }),
+      } as any);
+    }),
   });
-  const resultQuery = useNodeValue(digestsNode);
+  const resultQuery = useNodeValue(queryNode);
   return useMemo(() => {
     return {
-      result: resultQuery.result ?? [],
+      result: (resultQuery.result as any) ?? [],
       loading: resultQuery.loading,
     };
   }, [resultQuery]);
