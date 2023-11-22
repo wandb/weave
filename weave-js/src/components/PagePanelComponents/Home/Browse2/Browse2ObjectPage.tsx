@@ -43,7 +43,7 @@ export const Browse2ObjectPage: FC = props => {
   const handleRowClick = useCallback(
     (row: any) => {
       history.push(
-        `/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${row.name}`
+        `/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${row.digest}`
       );
     },
     [history, params.entity, params.objName, params.project, params.rootType]

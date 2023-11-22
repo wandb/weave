@@ -532,9 +532,6 @@ export const useObjectVersions = (
     arr: artifactVersionsNode,
     mapFn: w.constFunction({row: 'artifactVersion'}, ({row}) => {
       return w.opDict({
-        name: w.opArtifactVersionName({
-          artifactVersion: row,
-        }),
         createdAt: w.opArtifactVersionCreatedAt({
           artifactVersion: row,
         }),
