@@ -146,11 +146,16 @@ class TypeRegistry:
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            # Here, we use `is_serialized_object_type` instead of
-            # `is_relocatable_object_type` for legacy reasons (basically
-            # anything written before dc48fa16263d49d5accaca37515ab4c80efef1b6
-            # does not include `relocatable` flag and therefore fails. I think
-            # this can be removed if we are ok breaking these early versions
+            # Normally, we should just raise the error. However, the core team
+            # used earlier versions of Weaveflow ( before
+            # dc48fa16263d49d5accaca37515ab4c80efef1b6) which serialized
+            # "relocatable" objects without the "_relocatable" flag was added.
+            # As a result, we will hit this branch in such cases. In order to
+            # maintain backwards compat for these situations, we perform a less
+            # constrained check here. We use `is_serialized_object_type` instead
+            # of `is_relocatable_object_type` since it explicitly does not
+            # require the `_relocatable` flag.  This can be removed if we are ok
+            # breaking these early versions
             if isinstance(d, dict) and is_serialized_object_type(d):
                 return deserialize_relocatable_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
