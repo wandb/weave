@@ -27,8 +27,6 @@ from .. import file_util
 from .. import graph
 from .. import errors
 from ..core_types.stream_table_type import StreamTableType
-from ..ops_domain import stream_table_ops
-from ..ops_primitives import weave_api
 
 if typing.TYPE_CHECKING:
     from wandb.sdk.internal.file_pusher import FilePusher
@@ -190,7 +188,7 @@ class _StreamTableSync:
             base_url = environment.weave_server_url()
             url = f"{base_url}/browse/wandb/{self._entity_name}/{self._project_name}/table/{self._table_name}"
             printer = get_printer(_get_python_type() != "python")
-            printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
+            # printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
 
     def log(self, row_or_rows: ROW_TYPE) -> None:
@@ -201,6 +199,9 @@ class _StreamTableSync:
             self._log_row(row)
 
     def rows(self) -> graph.Node:
+        from ..ops_domain import stream_table_ops
+        from ..ops_primitives import weave_api
+
         if self._weave_stream_table_ref is None:
             raise errors.WeaveInternalError("ref is None after ensure")
         return stream_table_ops.rows(

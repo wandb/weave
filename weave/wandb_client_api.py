@@ -6,6 +6,8 @@ from wandb.sdk.internal.internal_api import _thread_local_api_settings
 import logging
 import typing
 
+from wandb.errors import CommError as WandbCommError
+
 from . import errors
 
 import graphql

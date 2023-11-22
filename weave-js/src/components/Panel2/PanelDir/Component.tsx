@@ -241,7 +241,7 @@ const PanelPreviewDir: React.FC<PanelPreviewDirProps> = props => {
   return (
     <DirView
       dir={dir}
-      path={props.context.path!}
+      path={props.context?.path!}
       setFilePath={path => {
         if (props.updateInput != null) {
           props.updateInput(

@@ -413,6 +413,18 @@ export interface NewRun {
   _prints: string[];
 }
 
+export interface OpDefType {
+  type: 'OpDef';
+}
+
+export interface RefType {
+  type: 'Ref';
+}
+
+export interface WandbArtifactRef {
+  type: 'WandbArtifactRef';
+}
+
 export interface FilesystemArtifact {
   type: 'FilesystemArtifact';
 }
@@ -457,7 +469,10 @@ export type ComplexType =
   | FunctionType
   | Union
   | NDArrayType
-  | TimestampType;
+  | TimestampType
+  | OpDefType
+  | RefType
+  | WandbArtifactRef;
 export type Type = ComplexType | SimpleType;
 
 export type TypeID = ComplexType['type'] | SimpleType;

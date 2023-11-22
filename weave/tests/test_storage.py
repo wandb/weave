@@ -164,7 +164,10 @@ def test_ref_type(test_artifact_dir):
     assert python_ref == {
         "_type": {
             "type": "LocalArtifactRef",
-            "_base_type": {"type": "FilesystemArtifactRef"},
+            "_base_type": {
+                "type": "FilesystemArtifactRef",
+                "_base_type": {"type": "Ref"},
+            },
             "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
         },
         "_val": "local-artifact:///my-dict:10e1804d2dd19195ac2d/obj",

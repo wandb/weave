@@ -5,6 +5,7 @@ export const Table = styled.div`
   font-size: 13px;
   display: table;
   padding: 2px;
+  width: 100%;
 `;
 Table.displayName = 'S.Table';
 

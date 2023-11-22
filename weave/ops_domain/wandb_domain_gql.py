@@ -188,7 +188,7 @@ def gql_direct_edge_op(
     is_many: bool = False,
 ):
     is_root = input_type is None
-    first_arg_name = "gql_obj" if input_type is None else input_type.name
+    first_arg_name: str = "gql_obj" if input_type is None else input_type.name
     if not output_type.instance_class or isinstance(
         output_type.instance_class, wb_domain_types.PartialObject
     ):
@@ -286,7 +286,11 @@ def gql_direct_edge_op(
     gql_relationship_getter_op.__signature__ = sig  # type: ignore
     gql_relationship_getter_op.sig = sig  # type: ignore
 
-    base_input_type = {first_arg_name: input_type} if not is_root else {}
+    base_input_type: dict[str, weave_types.Type] = (
+        {first_arg_name: typing.cast(weave_types.Type, input_type)}
+        if not is_root
+        else {}
+    )
     _output_type = output_type
     if is_many:
         _output_type = weave_types.List(output_type)

@@ -24,7 +24,6 @@ import _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
 import {Stack} from '../../../core';
-import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
 import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
@@ -94,8 +93,10 @@ export const useAutomatedTableState = (
   currentTableState: Table.TableState | undefined,
   weave: WeaveInterface
 ) => {
-  let {stack} = usePanelContext();
-  ({node: input as any, stack} = useRefEqualExpr(input, stack));
+  const {stack} = usePanelContext();
+  // TODO: This was reversing stack and breaking stuff!
+  // TODO TODO TODO
+  // ({node: input as any, stack} = useRefEqualExpr(input, stack));
   const {table: autoTable} = useMemo(() => {
     const dereffedInput = dereferenceAllVars(input, stack).node as Node;
     return Table.initTableFromTableType(dereffedInput, weave);

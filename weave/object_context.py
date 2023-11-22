@@ -69,7 +69,10 @@ class ObjectContext:
 
         source_record = self.objects.get(source_uri)
         if branched_from_uri is not None and source_record is None:
-            raise ValueError("Can't branch object that doesn't exist")
+            # Set to None, the original artifact doesn't exist yet.
+            # we're just creating a new object.
+            branched_from_uri = None
+            # raise ValueError("Can't branch object that doesn't exist")
 
         target_record = self.objects.get(target_uri)
         if target_record is None:

@@ -65,6 +65,7 @@ def test_mapped_pick():
     assert weave.use(ops_arrow.dict.pick(arrow_arr, "b")).to_pylist_raw() == [9, 10]
 
 
+@pytest.mark.skip("disabled decorator_type() constructor")
 def test_constructor():
     expected = geom.Point2d(0.5, 0.6)
     point2d_node = geom.Point2d.constructor(x=0.5, y=0.6)

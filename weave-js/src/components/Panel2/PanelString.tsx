@@ -22,6 +22,7 @@ const inputType = {
     'number' as const,
     'boolean' as const,
     'id' as const,
+    {type: 'WandbArtifactRef' as const},
   ],
 };
 
@@ -141,7 +142,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
 
 export const PanelString: React.FC<PanelStringProps> = props => {
   const config = props.config ?? defaultConfig();
-  const inputValue = CGReact.useNodeValue(props.input);
+  const inputValue = CGReact.useNodeValue(props.input as Node<'string'>);
   const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
   const loading = inputValue.loading || compValue.loading;
   const {stringFormat} = useContext(WeaveFormatContext);

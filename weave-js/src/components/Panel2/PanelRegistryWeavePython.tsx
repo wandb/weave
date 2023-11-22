@@ -20,6 +20,7 @@ import {Spec as PanelHexColor} from './PanelHexColor';
 import {Spec as PanelLabeledItem} from './PanelLabeledItem';
 import {Spec as PanelNewImage} from './PanelNewImage';
 import {Spec as PanelObjectPicker} from './PanelObjectPicker';
+import {Spec as PanelOpDef} from './PanelOpDef';
 import {Spec as PanelPanel} from './PanelPanel';
 import {Spec as PanelPlotly} from './PanelPlotly';
 import {Spec as PanelQuery} from './PanelQuery';
@@ -66,5 +67,6 @@ export const weavePythonPanelSpecs = () => {
     PanelLayoutFlow,
     PanelFacetTabs,
     PanelSections,
+    PanelOpDef,
   ];
 };

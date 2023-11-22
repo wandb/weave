@@ -11,11 +11,11 @@ jobs:
     name: Build frontend assets
     runs-on: ubuntu-8core
     timeout-minutes: 10
-    environment: 
+    environment:
       name: release
     permissions:
-      contents: 'write'
-      id-token: 'write'
+      contents: "write"
+      id-token: "write"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: "16.x"
-      - id: 'build'
+      - id: "build"
         run: |
           ./weave/frontend/build.sh
           if [[ -z "$(git status weave/frontend/sha1.txt --porcelain)" ]]
@@ -36,16 +36,16 @@ jobs:
             git diff
             echo "UPLOAD_ASSETS=true" >> "$GITHUB_OUTPUT"
           fi
-      - id: 'auth'
-        name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v1'
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
         if: ${{ steps.build.outputs.UPLOAD_ASSETS == 'true' }}
         with:
           workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
           # the service account secret format is wrong, hard coding it until it is fixed in core
           #service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
           service_account: tf-github-ci-weave@wandb-production.iam.gserviceaccount.com
-      - id: 'upload-and-push'
+      - id: "upload-and-push"
         if: ${{ steps.build.outputs.UPLOAD_ASSETS == 'true' }}
         run: |
           ./weave/frontend/bundle.sh

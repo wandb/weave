@@ -34,6 +34,7 @@ import type {
   TypedDictType,
   Union,
   VideoType,
+  WandbArtifactRef,
   WBTraceTreeType,
 } from '../types';
 
@@ -239,6 +240,8 @@ export interface Closure {
 // Convert a Type.Type to an actual Typescript type that matches it!
 export type TypeToTSTypeInner<T> = T extends 'any'
   ? any
+  : T extends WandbArtifactRef
+  ? any // TODO
   : T extends 'user'
   ? any // TODO
   : T extends 'project'

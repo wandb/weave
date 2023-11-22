@@ -7,6 +7,7 @@ from . import infer_types
 from . import decorator_class
 from . import errors
 from . import decorator_op
+from . import context_state
 
 _py_type = type
 
@@ -69,12 +70,29 @@ def type(
                     raise errors.WeaveDefinitionError(
                         f"{target}.{field.name} is not a valid python type (a class or type)"
                     )
+                # if weave_type == types.UnknownType():
+                #     raise errors.WeaveDefinitionError(
+                #         f"Weave doesn't yet handle the type '{field.type}' at {target}.{field.name}"
+                #     )
 
                 if types.type_is_variable(weave_type):
                     # this is a Weave type with a type variable in it
                     type_vars[field.name] = weave_type
                 else:
                     static_property_types[field.name] = weave_type
+
+        relocatable = not context_state.get_loading_built_ins()
+
+        # Iterate through methods, finding ops that have versions (not builtins)
+        # and sticking them on the type. This way we'll serialize
+        # and deserialize them along with the data attached to the object
+        if relocatable:
+            for name, member in inspect.getmembers(target):
+                from . import op_def
+                from . import op_def_type
+
+                if isinstance(member, op_def.BoundOpDef):
+                    static_property_types[name] = op_def_type.OpDefType()
 
         if type_vars:
             setattr(TargetType, "__annotations__", {})
@@ -100,27 +118,35 @@ def type(
 
         TargetType = dataclasses.dataclass(frozen=True)(TargetType)
 
+        TargetType._relocatable = relocatable
+
         dc.WeaveType = TargetType
         decorator_class.weave_class(weave_type=TargetType)(dc)
 
         # constructor op for this type. due to a circular dependency with ArrowWeave* types, we
         # define the vectorized constructor ops in vectorize.py instead of here
-        @decorator_op.op(
-            name=f"objectConstructor-_new_{target_name.replace('-', '_')}",
-            input_type={
-                field.name: static_property_types.get(field.name, None)
-                or type_vars[field.name]
-                for field in fields
-            },
-            output_type=TargetType(),
-            render_info={"type": "function"},
-        )
-        def constructor(**attributes):
-            return dc(
-                **{field.name: attributes[field.name] for field in fields if field.init}
-            )
 
-        dc.constructor = constructor
+        # Generating this constructor is currently disabled, now that we have reloctable object
+        # types and we serialize methods as well, we don't want to serialize the constructor.
+        # Instead we could have a generic constructor for all objects, but it's unclear how this
+        # constructor will need to be used so for now we go with nothing.
+
+        # @decorator_op.op(
+        #     name=f"objectConstructor-_new_{target_name.replace('-', '_')}",
+        #     input_type={
+        #         field.name: static_property_types.get(field.name, None)
+        #         or type_vars[field.name]
+        #         for field in fields
+        #     },
+        #     output_type=TargetType(),
+        #     render_info={"type": "function"},
+        # )
+        # def constructor(**attributes):
+        #     return dc(
+        #         **{field.name: attributes[field.name] for field in fields if field.init}
+        #     )
+
+        # dc.constructor = constructor
 
         return dc
 

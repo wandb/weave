@@ -181,7 +181,6 @@ def string_right_add(
     )
 
 
-# todo: remove this explicit name, it shouldn't be needed
 @arrow_op(
     name="ArrowWeaveListString-append",
     input_type=binary_input_type,

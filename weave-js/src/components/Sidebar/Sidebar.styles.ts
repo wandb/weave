@@ -3,9 +3,9 @@ import {GLOBAL_COLORS} from '@wandb/weave/common/util/colors';
 import {Button} from 'semantic-ui-react';
 import styled from 'styled-components';
 
-export const Wrapper = styled.div<{collapsed: boolean}>`
+export const Wrapper = styled.div<{collapsed: boolean; width: number}>`
   height: 100vh;
-  width: ${props => (props.collapsed ? 0 : 300)}px;
+  width: ${props => (props.collapsed ? 0 : props.width)}px;
   background: white;
   position: sticky;
   top: 0;

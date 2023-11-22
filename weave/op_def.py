@@ -18,6 +18,9 @@ from . import pyfunc_type_util
 from . import engine_trace
 from . import memo
 from . import weavify
+from . import eager
+from . import run
+from . import graph_client_context
 
 from .language_features.tagging import (
     opdef_util,
@@ -375,11 +378,14 @@ class OpDef:
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
     def eager_call(_self, *args, **kwargs):
-        if _self.is_async:
-            output_node = _self.lazy_call(*args, **kwargs)
-            return weave_internal.use(output_node)
-        else:
-            return _self.resolve_fn(*args, **kwargs)
+        output_node = _self.lazy_call(*args, **kwargs)
+        if (
+            _self.name == "get"
+            or _self.name == "root-project"
+            or any(isinstance(n, graph.Node) for n in args)
+        ) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
+            return output_node
+        return weave_internal.use(output_node)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
@@ -597,6 +603,10 @@ class OpDef:
 
     def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
         return isinstance(self, AutoTagHandlingArrowOpDef)
+
+    def runs(self) -> eager.WeaveIter[run.Run]:
+        client = graph_client_context.require_graph_client()
+        return client.op_runs(self)
 
 
 class AutoTagHandlingArrowOpDef(OpDef):

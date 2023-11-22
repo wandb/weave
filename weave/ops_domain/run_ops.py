@@ -119,6 +119,13 @@ gql_prop_op(
     "createdAt",
     types.Timestamp(),
 )
+# TODO: this should be an enum
+gql_prop_op(
+    "run-state",
+    wdt.RunType,
+    "state",
+    types.String(),
+)
 gql_prop_op(
     "run-updatedAt",
     wdt.RunType,

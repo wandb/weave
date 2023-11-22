@@ -7,8 +7,6 @@ import time
 
 import weave
 
-openai.api_key_path = os.path.expanduser("~/.openai-apikey")
-
 
 class StoredFileType(weave.types.ObjectType):
     name = "openai_stored_file"

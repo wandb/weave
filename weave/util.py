@@ -64,6 +64,14 @@ def get_pid():
     return os.getpid()
 
 
+def read_or_default(path: str, default: str = "") -> str:
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return default
+
+
 def rand_string_n(n: int) -> str:
     return "".join(
         random.choice(string.ascii_uppercase + string.digits) for _ in range(n)

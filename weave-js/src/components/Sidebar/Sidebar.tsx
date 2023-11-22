@@ -14,6 +14,7 @@ export function getConfigWithDefaults(configSpec: any, config: any) {
 
 interface SidebarProps {
   className?: string;
+  width?: number;
   collapsed: boolean;
   close: () => void;
 }
@@ -25,7 +26,8 @@ export const Sidebar: React.FC<SidebarProps> = props => {
       <S.Wrapper
         data-test="weave-sidebar"
         className={props.className}
-        collapsed={collapsed}>
+        collapsed={collapsed}
+        width={props.width ?? 300}>
         <S.Title>
           <S.BarButton data-test="panel-config" onClick={() => close()}>
             <Icon name="x" />

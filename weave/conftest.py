@@ -30,6 +30,11 @@ from typing import Tuple, Optional
 
 logs.configure_logger()
 
+# Lazy mode was the default for a long time. Eager is now the default for the user API.
+# A lot of tests are written to expect lazy mode, so just make lazy mode the default for
+# tests.
+context_state._eager_mode.set(False)
+
 
 def pytest_report_teststatus(
     report: TestReport, config: Config
