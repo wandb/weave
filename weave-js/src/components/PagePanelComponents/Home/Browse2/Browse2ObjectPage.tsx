@@ -80,8 +80,8 @@ export const Browse2ObjectPage: FC = props => {
                 field: 'createdAt',
                 headerName: 'Created At',
                 width: 200,
-                valueFormatter: (params: any) =>
-                  formatRelativeTime(params?.value),
+                valueFormatter: (linkParams: any) =>
+                  formatRelativeTime(linkParams?.value),
               },
             ]}
           />
