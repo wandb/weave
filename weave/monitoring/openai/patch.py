@@ -17,11 +17,9 @@ old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 
 Callbacks = List[Callable]
 
-api = wandb.Api()
-
 DEFAULT_STREAM_NAME = "monitoring"
 DEFAULT_PROJECT_NAME = "openai"
-DEFAULT_ENTITY_NAME = api.default_entity
+DEFAULT_ENTITY_NAME = None  # defer to StreamTable
 
 
 class Callback:
