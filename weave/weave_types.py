@@ -146,10 +146,12 @@ class TypeRegistry:
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            # TODO: this needs to happen earlier in case it's in incompatible object type
-            # with the one we already have and we need an ObjectType cache
-            if is_relocatable_object_type(d):
-                d = typing.cast(dict, d)
+            # Here, we use `is_serialized_object_type` instead of
+            # `is_relocatable_object_type` for legacy reasons (basically
+            # anything written before dc48fa16263d49d5accaca37515ab4c80efef1b6
+            # does not include `relocatable` flag and therefore fails. I think
+            # this can be removed if we are ok breaking these early versions
+            if isinstance(d, dict) and is_serialized_object_type(d):
                 return deserialize_relocatable_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
