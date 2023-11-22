@@ -1132,6 +1132,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
             t["_base_type"]
         )
     new_type_class = type(type_class_name, (ObjectType,), all_attr_types)
+    setattr(new_type_class, "_relocatable", True)
     setattr(new_type_class, "__annotations__", {})
     for k, v in type_attr_types.items():
         setattr(new_type_class, k, v)
