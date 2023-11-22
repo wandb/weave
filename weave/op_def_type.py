@@ -15,6 +15,7 @@ from . import context_state
 from . import weave_types as types
 from . import registry_mem
 from . import errors
+from . import environment
 
 from . import infer_types
 
@@ -137,6 +138,10 @@ class OpDefType(types.Type):
                 f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
+        if environment.wandb_production():
+            raise errors.WeaveInternalError(
+                "Loading ops from artifacts is not supported in production mode."
+            )
         try:
             with artifact.open(f"{name}.json") as f:
                 op_spec = json.load(f)
