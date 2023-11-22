@@ -73,6 +73,8 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
                 if obj_val is not None:
                     v = serializer.apply(obj_val)
                     result[k] = v
+                else:
+                    result[k] = None
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
