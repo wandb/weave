@@ -92,7 +92,7 @@ const escapeAndRenderControlChars = (str: string) => {
     if (controlCharMap[char]) {
       return (
         <span key={index}>
-          <span style={{color: globals.darkRed}}>{controlCharMap[char]}</span>
+          <span style={{color: globals.MOON_400}}>{controlCharMap[char]}</span>
           {char === '\n' ? (
             <br />
           ) : (
