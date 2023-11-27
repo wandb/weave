@@ -147,9 +147,6 @@ def observability(
     varbar.add(
         "Grouping",
         panels.GroupingEditor(grouping_fn, node=window_data),
-        layoutMode="grid",
-        showExpressions=True,
-        enableAddPanel=True,
     )
 
     grouping_fn_2 = varbar.add(
