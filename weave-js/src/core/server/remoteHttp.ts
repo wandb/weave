@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import crypto from 'crypto';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
