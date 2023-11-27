@@ -69,12 +69,9 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
                 # None haxxx
                 # TODO: remove
                 obj_val = obj.get(k)
-                # PR, this causes an issue with UnknownType, which returns None
-                if obj_val is not None:
+                if obj_val is not None or serializer.type == types.UnknownType():
                     v = serializer.apply(obj_val)
                     result[k] = v
-                else:
-                    result[k] = None
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
