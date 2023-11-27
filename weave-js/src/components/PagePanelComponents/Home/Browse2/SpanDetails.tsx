@@ -1,3 +1,4 @@
+import {Paper} from '@material-ui/core';
 import {Box, Button, Grid, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
@@ -12,7 +13,6 @@ import {
   OpenAIChatOutputView,
 } from './openai';
 import {parseRefMaybe, SmallRef} from './SmallRef';
-import {Paper} from '@material-ui/core';
 
 const ObjectView: FC<{obj: any}> = ({obj}) => {
   if (_.isPlainObject(obj)) {
