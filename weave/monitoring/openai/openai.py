@@ -1,3 +1,5 @@
+__all__ = ["ReassembleStream", "LogToStreamTable", "patch", "unpatch"]
+
 import asyncio
 import functools
 from typing import Callable, List
@@ -6,10 +8,11 @@ import openai
 from openai.types.chat import ChatCompletion
 from packaging import version
 
-import wandb
+from weave.monitoring.openai.models import Context
+from weave.monitoring.openai.util import Context
 from weave.wandb_interface.wandb_stream_table import StreamTable
 
-from .interface import *
+from .models import *
 from .util import *
 
 old_create = openai.resources.chat.completions.Completions.create
@@ -19,7 +22,6 @@ Callbacks = List[Callable]
 
 DEFAULT_STREAM_NAME = "monitoring"
 DEFAULT_PROJECT_NAME = "openai"
-DEFAULT_ENTITY_NAME = None  # defer to StreamTable
 
 
 class Callback:
@@ -36,30 +38,15 @@ class Callback:
         ...
 
 
-class InfoMsg(Callback):
-    def before_send_request(self, context: Context, *args, **kwargs):
-        info(f"before send request, {context=}")
-
-    def before_end(self, context: Context, *args, **kwargs):
-        info(f"before end, {context=}")
-
-    def before_yield_chunk(self, context: Context, *args, **kwargs):
-        info(f"before yield chunk, {context=}")
-
-    def after_yield_chunk(self, context: Context, *args, **kwargs):
-        info(f"after yield chunk, {context=}")
-
-
 class ReassembleStream(Callback):
+    def before_send_request(self, context: Context, *args, **kwargs):
+        sig = match_signature(old_create, *args, **kwargs)
+        context.inputs = ChatCompletionRequest.model_validate(sig)
+
     def before_end(self, context: Context, *args, **kwargs):
         if hasattr(context, "chunks"):
             input_messages = context.inputs.messages
             context.outputs = reconstruct_completion(input_messages, context.chunks)
-
-
-class Error(Callback):
-    def before_end(self, context: Context, *args, **kwargs):
-        raise Exception("problem")
 
 
 class LogToStreamTable(Callback):
@@ -233,9 +220,5 @@ def unpatch():
 
 default_callbacks = [
     ReassembleStream(),
-    LogToStreamTable.from_stream_name(
-        DEFAULT_STREAM_NAME,
-        DEFAULT_PROJECT_NAME,
-        DEFAULT_ENTITY_NAME,
-    ),
+    LogToStreamTable.from_stream_name(DEFAULT_STREAM_NAME, DEFAULT_PROJECT_NAME),
 ]

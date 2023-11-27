@@ -9,7 +9,7 @@ from openai.types.completion_usage import CompletionUsage
 
 import wandb
 
-from .interface import *
+from .models import *
 
 T = TypeVar("T")
 
