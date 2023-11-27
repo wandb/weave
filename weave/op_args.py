@@ -95,7 +95,7 @@ class OpNamedArgs(OpArgs):
     ):
         self.arg_types = arg_types
 
-    def weave_type(self) -> types.Type:
+    def weave_type(self) -> types.TypedDict:
         return types.TypedDict(self.initial_arg_types)
 
     @property

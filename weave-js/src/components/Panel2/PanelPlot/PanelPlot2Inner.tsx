@@ -380,7 +380,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         if (xAxisType === 'nominal' || yAxisType === 'nominal') {
           node = opLimit({
             arr: node,
-            limit: constNumber(50),
+            limit: constNumber(500),
           });
         }
       }

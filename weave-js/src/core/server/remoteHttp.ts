@@ -107,7 +107,7 @@ const createClientCacheKey = (windowSizeMs: number = 15000) => {
 export class RemoteHttpServer implements Server {
   public clientCacheKey: string | undefined = createClientCacheKey();
   private readonly opts: RemoteWeaveOptions;
-  private readonly flushInterval: NodeJS.Timer;
+  private readonly flushInterval: NodeJS.Timeout;
   private pendingNodes: Map<Node, NodeEntry> = new Map();
   private pendingRequests: Set<Promise<any>> = new Set();
   private nextFlushTime = 0;

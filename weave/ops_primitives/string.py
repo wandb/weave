@@ -57,6 +57,8 @@ class String:
     def len(str: str) -> int:  # type: ignore[misc]
         return len(str)
 
+    # This should be string __add__, which is implemented above, so as not
+    # to list append which is a mutation
     @op(name="string-append")
     def append(str: str, suffix: typing.Optional[str]) -> str:  # type: ignore[misc]
         suffix = suffix or ""
