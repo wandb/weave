@@ -1,7 +1,7 @@
-import crypto from 'crypto';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
+import * as uuid from 'uuid';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
 import {Node, serialize, serializeMulti} from '../model';
@@ -353,7 +353,7 @@ export class RemoteHttpServer implements Server {
           additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
         }
 
-        additionalHeaders['x-weave-request-id'] = crypto.randomUUID();
+        additionalHeaders['x-request-id'] = uuid.v4();
 
         let respJson: any = {
           data: new Array(nodes.length).fill(null),
