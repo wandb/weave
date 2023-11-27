@@ -437,10 +437,13 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     <SidebarConfig.Container>
       <SidebarConfig.Header>
         <SidebarConfig.HeaderTop lessLeftPad>
-          <SidebarConfig.HeaderTopLeft canGoBack onClick={goBackToOutline}>
-            <Button icon="back" variant="ghost" size="small" />
-            <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
-          </SidebarConfig.HeaderTopLeft>
+          <Button
+            variant="ghost"
+            size="small"
+            icon="back"
+            onClick={goBackToOutline}>
+            Outline
+          </Button>
           <SidebarConfig.HeaderTopRight>
             {!selectedIsRoot && !shouldShowOutline && (
               <OutlineItemPopupMenu

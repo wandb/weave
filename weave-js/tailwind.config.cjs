@@ -13,8 +13,8 @@ module.exports = {
      */
     boxShadow: {
       none: 'none',
-      md: '0px 12px 24px 0px',
-      lg: '0px 24px 48px 0px',
+      md: '0px 12px 24px 0px #15181F29',
+      lg: '0px 24px 48px 0px #15181F29',
     },
     spacing: {
       0: '0rem',

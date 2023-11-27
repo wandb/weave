@@ -67,7 +67,10 @@ import {
   PanelContextProvider,
   usePanelContext,
 } from './PanelContext';
-import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
+import {
+  useSetInteractingChildPanel,
+  useSetPanelInputExprIsHighlighted,
+} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 
@@ -390,8 +393,8 @@ export function getItemVarPaths(
 
 export const addPanelToGroupConfig = (
   currentConfig: PanelGroupConfig,
+  panelName: string,
   allowedPanels?: string[],
-  childNameBase?: string,
   childConfig?: ChildPanelConfig
 ) => {
   let panelId = '';
@@ -407,9 +410,7 @@ export const addPanelToGroupConfig = (
         config: undefined,
       };
     }
-    draft.items[
-      nextPanelName(Object.keys(currentConfig.items), childNameBase)
-    ] = childConfig;
+    draft.items[panelName] = childConfig;
     if (
       currentConfig.layoutMode === 'flow' &&
       currentConfig.gridConfig?.flowConfig &&
@@ -432,25 +433,43 @@ export const addPanelToGroupConfig = (
 
 const usePanelGroupCommon = (props: PanelGroupProps) => {
   const updateConfig2 = useUpdateConfig2(props);
+  const setInteractingChildPanel = useSetInteractingChildPanel();
 
   const addPanelBarRef = React.useRef<HTMLDivElement>(null);
 
-  const handleAddPanel = useCallback(() => {
-    updateConfig2(currentConfig => {
-      return addPanelToGroupConfig(
-        currentConfig,
-        props.config?.allowedPanels,
-        props.config?.childNameBase
-      );
-    });
-    setTimeout(() => {
-      if (addPanelBarRef.current != null) {
-        addPanelBarRef.current.scrollIntoView({
-          behavior: 'smooth',
-        });
-      }
-    }, 1);
-  }, [props.config?.allowedPanels, props.config?.childNameBase, updateConfig2]);
+  const childNameBase = props.config?.childNameBase;
+  const handleAddPanel = useCallback(
+    event => {
+      // We don't want a click on a New panel button to act as a
+      // click on the main panel background.
+      event.stopPropagation();
+      updateConfig2(currentConfig => {
+        const panelName = nextPanelName(
+          Object.keys(currentConfig.items),
+          childNameBase
+        );
+        setInteractingChildPanel('config', panelName, 'input');
+        return addPanelToGroupConfig(
+          currentConfig,
+          panelName,
+          props.config?.allowedPanels
+        );
+      });
+      setTimeout(() => {
+        if (addPanelBarRef.current != null) {
+          addPanelBarRef.current.scrollIntoView({
+            behavior: 'smooth',
+          });
+        }
+      }, 1);
+    },
+    [
+      props.config?.allowedPanels,
+      childNameBase,
+      updateConfig2,
+      setInteractingChildPanel,
+    ]
+  );
 
   return useMemo(
     () => ({handleAddPanel, addPanelBarRef}),
