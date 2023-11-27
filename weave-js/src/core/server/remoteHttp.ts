@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
@@ -351,6 +352,8 @@ export class RemoteHttpServer implements Server {
         if (this.clientCacheKey != null) {
           additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
         }
+
+        additionalHeaders['x-weave-request-id'] = crypto.randomUUID();
 
         let respJson: any = {
           data: new Array(nodes.length).fill(null),
