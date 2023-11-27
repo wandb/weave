@@ -562,9 +562,12 @@ def test_gql_connection_op():
             },
         },
         "value": {
-            "type": "PartialObject",
-            "keys": {"id": "string"},
-            "keyless_weave_type_class": "artifactVersion",
+            "type": "list",
+            "objectType": {
+                "type": "PartialObject",
+                "keys": {"id": "string"},
+                "keyless_weave_type_class": "artifactVersion",
+            },
         },
     }
 

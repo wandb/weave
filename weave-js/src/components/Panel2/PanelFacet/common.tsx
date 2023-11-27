@@ -7,7 +7,7 @@ import {ChildPanelConfigComp} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
-import {PanelPlotProps} from '../PanelPlot/PanelPlot';
+import {PanelPlotProps} from '../PanelPlot/types';
 import * as TableState from '../PanelTable/tableState';
 
 export const inputType = {type: 'list' as const, objectType: 'any' as const};

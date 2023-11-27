@@ -11,6 +11,7 @@ import {
   Node,
   NodeOrVoidNode,
   nonNullableDeep,
+  nullableTaggableStrip,
   opIndex,
   opIndexCheckpoint,
   OpStore,
@@ -25,8 +26,28 @@ import React, {useCallback, useMemo} from 'react';
 import {Stack} from '../../../core';
 import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
+import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';
+
+// Formatting for PanelNumbers and PanelStrings inside Tables
+export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
+  const t = nullableTaggableStrip(colType);
+  const numberFormat =
+    t === 'number'
+      ? {
+          textAlign: 'right' as const,
+          justifyContent: 'normal',
+          alignContent: 'normal',
+          padding: '4px 8px 0 0',
+        }
+      : {};
+  const stringFormat = {spacing: t === 'string'};
+  return {
+    numberFormat,
+    stringFormat,
+  };
+};
 
 export const stripTag = (type: Type): Type => {
   return isTaggedValue(type) ? taggedValueValueType(type) : type;

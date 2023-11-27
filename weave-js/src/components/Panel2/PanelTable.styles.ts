@@ -27,13 +27,13 @@ ColumnHeader.displayName = 'S.ColumnHeader';
 
 export const ColumnName = styled.div`
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 4px 4px 1em;
   flex: 1 1 auto;
   :hover {
     color: ${globals.primary};
   }
   overflow: hidden;
-  text-align: center;
+  text-align: left;
 `;
 ColumnName.displayName = 'S.ColumnName';
 

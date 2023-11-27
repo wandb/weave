@@ -1,8 +1,8 @@
-import {WBIcon} from '@wandb/ui';
 import classNames from 'classnames';
 import React from 'react';
 
-import * as S from './PanelError.styles';
+import {IconInfo} from '../../../components/Icon';
+import {Tailwind} from '../../../components/Tailwind';
 
 type PanelErrorProps = {
   message: React.ReactChild;
@@ -13,12 +13,10 @@ const PanelError: React.FC<PanelErrorProps> = React.memo(
   ({message, className}) => {
     return (
       <div className={classNames('panel-error', className)}>
-        <div>
-          <S.IconWrapper>
-            <WBIcon name="info" />
-          </S.IconWrapper>
+        <Tailwind>
+          <IconInfo width={24} height={24} className="m-auto mb-4" />
           <div>{message}</div>
-        </div>
+        </Tailwind>
       </div>
     );
   }

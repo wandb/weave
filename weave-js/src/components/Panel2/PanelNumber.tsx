@@ -1,5 +1,5 @@
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
-import React, {useCallback} from 'react';
+import React, {useCallback, useContext} from 'react';
 
 import {formatNumber} from '../../core/util/number';
 import * as CGReact from '../../react';
@@ -8,6 +8,7 @@ import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
+import {WeaveFormatContext} from './WeaveFormatContext';
 
 const CustomFormatHelp = () => {
   return (
@@ -131,27 +132,32 @@ type PanelNumberExtraProps = {
 export const PanelNumber: React.FC<
   PanelNumberProps & PanelNumberExtraProps
 > = props => {
+  const {numberFormat} = useContext(WeaveFormatContext);
   const nodeValueQuery = CGReact.useNodeValue(props.input);
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
-  const textAlign = props.textAlign ?? 'center';
+  const textAlign = numberFormat.textAlign ?? props.textAlign ?? 'center';
+  const justifyContent = numberFormat.justifyContent ?? 'space-around';
+  const alignContent = numberFormat.alignContent ?? 'space-around';
+  const padding = numberFormat.padding ?? '0';
 
   return (
     <div
       data-test-weave-id="number"
       style={{
+        textAlign,
+        alignContent,
+        justifyContent,
+        padding,
         width: '100%',
         height: '100%',
         overflowX: 'hidden',
         overflowY: 'auto',
         margin: 'auto',
-        textAlign,
         wordBreak: 'normal',
         display: 'flex',
         flexDirection: 'column',
-        alignContent: 'space-around',
-        justifyContent: 'space-around',
         alignItems: textAlign === 'center' ? 'center' : 'normal',
       }}>
       {nodeValueQuery.result == null

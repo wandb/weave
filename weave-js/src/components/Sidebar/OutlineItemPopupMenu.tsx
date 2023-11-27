@@ -1,7 +1,7 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
-import {useIsViewerWandbEmployee} from '@wandb/weave/common/hooks/useViewerIsWandbEmployee';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {produce} from 'immer';
+import * as _ from 'lodash';
 import React, {memo, useCallback, useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -13,7 +13,10 @@ import {
   // IconRetry,
   IconSplit,
 } from '../Panel2/Icons';
-import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
+import {
+  useSelectedPath,
+  useSetInteractingPanel,
+} from '../Panel2/PanelInteractContext';
 import {
   addChild,
   getPath,
@@ -53,9 +56,11 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   onOpen,
   isOpen,
 }) => {
-  const isViewerWandbEmployee = useIsViewerWandbEmployee();
   const setInteractingPanel = useSetInteractingPanel();
   const {isNumItemsLocked} = config.config;
+
+  const selectedPath = useSelectedPath();
+  const isDeletingSelected = _.isEqual(path, selectedPath);
 
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
@@ -99,9 +104,11 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         })
       );
 
-      goBackToOutline?.();
+      if (isDeletingSelected) {
+        goBackToOutline?.();
+      }
     },
-    [path, config, updateConfig, goBackToOutline]
+    [path, config, updateConfig, goBackToOutline, isDeletingSelected]
   );
 
   // const handleUnnest = useCallback(
@@ -190,19 +197,17 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         onClick: () => handleSplit(path),
       });
 
-      if (isViewerWandbEmployee) {
-        items.push({
-          key: 'divider-0',
-          content: <Divider />,
-          disabled: true,
-        });
-        items.push({
-          key: 'export-report',
-          content: 'Add to report...',
-          icon: <IconAddNew />,
-          onClick: () => setInteractingPanel('export-report', path),
-        });
-      }
+      items.push({
+        key: 'divider-0',
+        content: <Divider />,
+        disabled: true,
+      });
+      items.push({
+        key: 'export-report',
+        content: 'Add to report...',
+        icon: <IconAddNew />,
+        onClick: () => setInteractingPanel('export-report', path),
+      });
     }
 
     if (!isNumItemsLocked) {
@@ -227,7 +232,6 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     handleDelete,
     // handleUnnest,
     handleDuplicate,
-    isViewerWandbEmployee,
     handleSplit,
     setInteractingPanel,
   ]);
