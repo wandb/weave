@@ -147,28 +147,9 @@ def observability(
     varbar.add(
         "Grouping",
         panels.GroupingEditor(grouping_fn, node=window_data),
-    )
-
-    overview_tab = weave.panels.Group(
         layoutMode="grid",
         showExpressions=True,
         enableAddPanel=True,
-    )
-    overview_tab.add(
-        "launch_runs",
-        panel_autoboard.timeseries(
-            filtered_data,
-            bin_domain_node=bin_range,
-            x_axis_key=timestamp_col_name,
-            y_expr=lambda row: row.count(),
-            y_title="Launch Runs",
-            color_expr=lambda row: grouping_fn(row),
-            color_title="state",
-            x_domain=user_zoom_range,
-            n_bins=101,
-            mark="bar",
-        ),
-        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
 
     grouping_fn_2 = varbar.add(
@@ -195,6 +176,12 @@ def observability(
                 row["state"] == "rqi_pending",
             ),
         )
+    )
+
+    overview_tab = weave.panels.Group(
+        layoutMode="grid",
+        showExpressions=True,
+        enableAddPanel=True,
     )
 
     # f = weave.ops.arrow.arrow_as_array(pending)
