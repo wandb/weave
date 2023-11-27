@@ -93,7 +93,9 @@ class LogToStreamTable(Callback):
 class AsyncChatCompletions:
     def __init__(self, base_create, callbacks: List[Callback] = None):
         self._base_create = base_create
-        self.callbacks = coalesce(callbacks, default_callbacks)
+        self.callbacks = callbacks
+        if self.callbacks is None:
+            self.callbacks = make_default_callbacks()
 
     async def create(self, *args, **kwargs):
         self.context = Context()
@@ -146,7 +148,9 @@ class AsyncChatCompletions:
 class ChatCompletions:
     def __init__(self, base_create, callbacks: List[Callback] = None):
         self._base_create = base_create
-        self.callbacks = coalesce(callbacks, default_callbacks)
+        self.callbacks = callbacks
+        if self.callbacks is None:
+            self.callbacks = make_default_callbacks()
 
     def create(self, *args, **kwargs):
         self.context = Context()
@@ -218,7 +222,11 @@ def unpatch():
     openai.resources.chat.completions.AsyncCompletions.create = old_async_create
 
 
-default_callbacks = [
-    ReassembleStream(),
-    LogToStreamTable.from_stream_name(DEFAULT_STREAM_NAME, DEFAULT_PROJECT_NAME),
-]
+def make_default_callbacks():
+    try:
+        return [
+            ReassembleStream(),
+            LogToStreamTable.from_stream_name(DEFAULT_STREAM_NAME, DEFAULT_PROJECT_NAME),
+        ]
+    except AttributeError as e:
+        raise Exception("not logged in to W&B, try `wandb login --relogin`") from e

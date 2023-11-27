@@ -297,7 +297,7 @@ def test_patching():
     og_create = openai.resources.chat.completions.Completions.create
     og_acreate = openai.resources.chat.completions.AsyncCompletions.create
 
-    patch()
+    patch(callbacks=[])
     assert openai.resources.chat.completions.Completions.create is not og_create
     assert openai.resources.chat.completions.AsyncCompletions.create is not og_acreate
 
