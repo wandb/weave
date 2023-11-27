@@ -1,7 +1,7 @@
 from typing import List, Optional
 
-from openai.types.chat import ChatCompletionMessage
-from pydantic import BaseModel, ConfigDict
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelTokensConfig(BaseModel):
@@ -34,5 +34,5 @@ class ChatCompletionRequest(BaseModel):
 class Context(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    inputs: Optional[BaseModel] = None
-    outputs: Optional[BaseModel] = None
+    inputs: ChatCompletionRequest = Field(default_factory=ChatCompletionRequest)
+    outputs: ChatCompletion = Field(default_factory=ChatCompletion)
