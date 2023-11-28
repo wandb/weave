@@ -80,6 +80,10 @@ def object_method_app(
     method_name: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
 ) -> FastAPI:
+    # Import weaveflow to trigger eager mode and ensure we have weaveflow weave
+    # types loaded.
+    from weave import weaveflow
+
     obj = obj_ref.get()
     obj_weave_type = types.TypeRegistry.type_of(obj)
     if not isinstance(obj_weave_type, types.ObjectType):

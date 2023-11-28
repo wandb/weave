@@ -71,6 +71,7 @@ def deploy() -> None:
 
 @deploy.command(help="Deploy to GCP.")
 @click.argument("model_ref")
+@click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
 @click.option("--gcp-project", help="GCP project name.")
 @click.option(
@@ -80,6 +81,7 @@ def deploy() -> None:
 @click.option("--dev", is_flag=True, help="Run the function locally.")
 def gcp(
     model_ref: str,
+    method: str,
     project: str,
     gcp_project: str,
     auth_entity: str,
@@ -98,6 +100,7 @@ def gcp(
     try:
         google.deploy(
             model_ref,
+            model_method=method,
             wandb_project=project,
             auth_entity=auth_entity,
             gcp_project=gcp_project,
