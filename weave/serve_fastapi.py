@@ -99,6 +99,9 @@ def object_method_app(
     if not op_attrs:
         raise ValueError("No ops found on object")
 
+    import json
+
+    print("METHOD_NAME", json.dumps(method_name))
     if method_name is None:
         if len(op_attrs) > 1:
             raise ValueError(
