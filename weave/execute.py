@@ -38,12 +38,15 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
+from . import storage
+from . import artifact_wandb
 from . import op_policy
 from . import trace_local
 from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
+from .monitoring import monitor
 
 # Language Features
 from . import language_nullability
@@ -424,11 +427,93 @@ def execute_async_op(
     job.start()
 
 
+def _auto_publish(
+    project_name: str, obj: typing.Any, output_refs: typing.List[ref_base.Ref]
+):
+    import numpy as np
+
+    if isinstance(obj, dict):
+        return {k: _auto_publish(project_name, v, output_refs) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_auto_publish(project_name, v, output_refs) for v in obj]
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    weave_type = types.TypeRegistry.type_of(obj)
+    if not (
+        types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
+    ):
+        return obj
+    from .api import publish
+
+    ref = storage.get_ref(obj)
+    if not ref:
+        ref = publish(
+            obj,
+            f"{obj.__class__.__name__}",
+        )
+    output_refs.append(ref)
+    return ref
+
+
+def auto_publish(project_name: str, obj: typing.Any) -> typing.Tuple[typing.Any, list]:
+    refs: typing.List[ref_base.Ref] = []
+    return _auto_publish(project_name, obj, refs), refs
+
+
 def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
 ):
-    return op_def.resolve_fn(**inputs)
+    mon = monitor.default_monitor()
+    mon_span_inputs = {**inputs}
+    st = mon.streamtable
+    if op_def.location and st:
+        op_def_ref = storage._get_ref(op_def)
+        project_name = st._project_name
+        if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
+            op_def._ref = None  # type: ignore
+            from .api import publish
+
+            op_def_ref = publish(
+                op_def,
+                f"{op_def.name}",
+            )
+        mon_span_inputs, refs = auto_publish(project_name, inputs)
+        with mon.span(str(op_def_ref)) as span:
+            span.inputs = mon_span_inputs
+            span.inputs["_keys"] = list(inputs.keys())
+            for i, ref in enumerate(refs[:3]):
+                span.inputs["_ref%s" % i] = ref
+            try:
+                res = op_def.resolve_fn(**inputs)
+            except Exception as e:
+                span.status_code = monitor.StatusCode.ERROR
+                span.exception = e
+                raise
+
+            # Note this unboxes, but doesn't move tags.
+            # We should not allow tagging in the standard user / eager path anyway
+            if isinstance(res, box.BoxedNone):
+                res = None
+            log_res = res
+            if not isinstance(log_res, dict):
+                log_res = {"_result": log_res}
+            span.output, refs = auto_publish(project_name, log_res)
+            for i, ref in enumerate(refs[:3]):
+                span.output["_ref%s" % i] = ref
+            span.output["_keys"] = list(log_res.keys())
+    else:
+        res = op_def.resolve_fn(**inputs)
+
+    # TODO: not simple name
+    # TODO: capture publish time here?
+    # TODO: yeah we need to capture all engine overhead so prob want this
+    #    at a higher level... in the engine (execute_forward_node or higher)
+    # TODO: this needs to work with local object saving as well
+    # TODO: generalize "self" publishing above
+    return res
 
 
 def is_run_op(op_call: graph.Op):

@@ -4,6 +4,8 @@ import typing
 import datetime
 import pathlib
 import functools
+import contextvars
+import contextlib
 
 from . import errors
 from . import ref_base
@@ -104,6 +106,28 @@ def _assert_valid_artifact_name(part: typing.Optional[str] = None):
         )
 
 
+class PublishTargetProject(typing.TypedDict):
+    # TODO: should include entity_name as well, but we defalt that right now...
+    # entity_name: str
+    project_name: str
+
+
+_pubish_target_project: contextvars.ContextVar[
+    typing.Optional[typing.Optional[PublishTargetProject]]
+] = contextvars.ContextVar("publish_target_project", default=None)
+
+
+@contextlib.contextmanager
+def publish_target_project(project: PublishTargetProject):
+    token = _pubish_target_project.set(project)
+    yield
+    _pubish_target_project.reset(token)
+
+
+def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
+    return _pubish_target_project.get()
+
+
 def _direct_publish(
     obj: typing.Any,
     name: typing.Optional[str] = None,
@@ -116,12 +140,16 @@ def _direct_publish(
     *,
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     _merge: typing.Optional[bool] = False,
-):
+) -> artifact_wandb.WandbArtifactRef:
     weave_type = assume_weave_type or _get_weave_type(obj)
 
-    wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
+    target_project_from_context = get_publish_target_project()
+    if target_project_from_context is not None:
+        wb_project_name = target_project_from_context["project_name"]
+    else:
+        wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
     name = name or _get_name(weave_type, obj)
-    wb_artifact_type_name = wb_artifact_type_name or weave_type.name
+    wb_artifact_type_name = wb_artifact_type_name or weave_type.root_type_class().name
 
     _assert_valid_artifact_name(name)
     _assert_valid_project_name(wb_project_name)
@@ -133,9 +161,16 @@ def _direct_publish(
     obj = box.box(obj)
     artifact = artifact_wandb.WandbArtifact(name, type=wb_artifact_type_name)
     artifact.metadata.update(metadata or {})
-    obj = _ensure_object_components_are_published(obj, weave_type, artifact)
+
+    # Use context to ensure any recursively published objects go to the same project
+    with publish_target_project({"project_name": wb_project_name}):
+        obj = _ensure_object_components_are_published(obj, weave_type, artifact)
     artifact_fs.update_weave_meta(weave_type, artifact)
     ref = artifact.set("obj", weave_type, obj)
+    if not isinstance(ref, artifact_wandb.WandbArtifactRef):
+        raise errors.WeaveSerializeError(
+            "Expected a WandbArtifactRef, got %s" % type(ref)
+        )
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     # nothing new was created, so just return the existing ref.

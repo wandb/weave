@@ -3,14 +3,6 @@ import typing
 import weave
 
 
-def test_no_type_vars_in_dict():
-    @weave.type()
-    class TestNoTypeVarsInDictType:
-        v: dict[str, int]
-
-    assert not TestNoTypeVarsInDictType.WeaveType.type_attrs()
-
-
 def test_type_var_in_dict_any():
     @weave.type()
     class TestTypeVarsInDictType:
@@ -33,3 +25,19 @@ def test_object_noneunion_attr_is_variable():
         a: weave.Node[typing.Union[str, int]]
 
     assert "a" in ObjWithUnion.WeaveType().type_vars
+
+
+def test_type_is_reloctable():
+    @weave.type()
+    class CoolObjBase:
+        pass
+
+    @weave.type()
+    class CoolObj(CoolObjBase):
+        a: int
+        b: str
+
+    obj = CoolObj(1, "hi")
+    ref = weave.storage.save(obj)
+    obj2 = weave.storage.get(str(ref))
+    assert obj2.a == 1

@@ -35,6 +35,13 @@ export function isSimpleTypeShape(t: Type): t is SimpleType {
   return typeof t === 'string';
 }
 
+export function getTypeName(t: Type): string {
+  if (isSimpleTypeShape(t)) {
+    return t;
+  }
+  return t.type;
+}
+
 // Returns a list of all paths for the object.
 // Traversing lists are converted to "*",
 // nulls and tags are stripped, and dictionary

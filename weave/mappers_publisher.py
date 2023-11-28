@@ -13,6 +13,7 @@ from .language_features.tagging import tagged_value_type
 import dataclasses
 from weave import weave_internal, context, storage
 from .ops_primitives import weave_api
+from . import artifact_local
 
 
 class RefToPyRef(mappers.Mapper):
@@ -47,16 +48,12 @@ class FunctionToPyFunction(mappers.Mapper):
 
 class ObjectToPyDict(mappers_python_def.ObjectToPyDict):
     def apply(self, obj):
-        try:
-            res = super().apply(obj)
-            copy_obj = dataclasses.copy.copy(obj)
-            for prop_name, prop_serializer in self._property_serializers.items():
-                if prop_serializer is not None:
-                    setattr(copy_obj, prop_name, res[prop_name])
-            obj = copy_obj
-        except Exception as e:
-            print(e)
-            pass
+        res = super().apply(obj)
+        copy_obj = dataclasses.copy.copy(obj)
+        for prop_name, prop_serializer in self._property_serializers.items():
+            if prop_serializer is not None:
+                setattr(copy_obj, prop_name, res[prop_name])
+        obj = copy_obj
         return obj
 
 
@@ -81,8 +78,38 @@ class TaggedValueToPy(tagged_value_type.TaggedValueToPy):
         return value
 
 
+class DefaultToPy(mappers.Mapper):
+    def apply(self, obj: typing.Any) -> dict:
+        existing_ref = storage._get_ref(obj)
+        if not existing_ref:
+            return obj
+
+        if not isinstance(existing_ref, artifact_local.LocalArtifactRef):
+            return obj
+
+        # This is the case where we have a default object that we already have
+        # a ref to a local artifact for. Non builtin ops satisify this condition.
+        # During startup we save any non builtin ops to local artifacts, which
+        # attaches a ref to them. We want to publish those ops so that for example
+        # ops attached to Weave Objects are published as well.
+
+        # Just clear the ref... we don't need to recursively publish, it will
+        # happen later.
+        if hasattr(obj, "_ref"):
+            obj._ref = None
+
+        return obj
+
+
+class Identity(mappers.Mapper):
+    def apply(self, obj: typing.Any) -> typing.Any:
+        return obj
+
+
 def map_to_python_remote_(type, mapper, artifact, path=[], mapper_options=None):
-    if isinstance(type, types.Function):
+    if isinstance(type, types.TypeType):
+        return Identity(type, mapper, artifact, path)
+    elif isinstance(type, types.Function):
         return FunctionToPyFunction(type, mapper, artifact, path)
     elif isinstance(type, types.RefType):
         return RefToPyRef(type, mapper, artifact, path)
@@ -101,8 +128,7 @@ def map_to_python_remote_(type, mapper, artifact, path=[], mapper_options=None):
         return TaggedValueToPy(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return mappers_python_def.ConstToPyConst(type, mapper, artifact, path)
-
-    return mappers.Mapper(type, mapper, artifact, path)
+    return DefaultToPy(type, mapper, artifact, path)
 
 
 map_to_python_remote = mappers.make_mapper(map_to_python_remote_)
