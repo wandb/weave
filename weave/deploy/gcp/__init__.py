@@ -52,7 +52,7 @@ def generate_requirements_txt(model_ref: str, dir: str, dev: bool = False) -> st
         execute(["cp", str(cwd / "dist" / wheel), dir], capture=False)
         weave = f"/app/{wheel}"
     else:
-        weave = "weave @ git+https://github.com/wandb/weave@wf-serve_fix"
+        weave = "weave @ git+https://github.com/wandb/weave@wf-serve-fix"
     # TODO: add any additional reqs the op needs
     return f"""
 uvicorn[standard]
