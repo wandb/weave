@@ -27,19 +27,16 @@ describe('RemoteHttpServer', () => {
 
     const result = server.query([constNumber(42)]);
     return result.then(r => {
-      expect(fetch).toHaveBeenCalledWith(
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
+      expect(fetch).toHaveBeenCalledWith('https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
       expect(r).toEqual([42]);
     });
   });
@@ -59,19 +56,16 @@ describe('RemoteHttpServer', () => {
 
     const result = server.query([constNumber(42), constString('foo')]);
     return result.then(r => {
-      expect(fetch).toHaveBeenCalledWith(
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42},{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0,1]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
+      expect(fetch).toHaveBeenCalledWith('https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42},{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0,1]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
       expect(r).toEqual([42, 'foo']);
     });
   });
@@ -95,19 +89,16 @@ describe('RemoteHttpServer', () => {
       server.query([constBoolean(true)]),
     ]);
     return result.then(r => {
-      expect(fetch).toHaveBeenCalledWith(
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42},{"nodeType":"const","type":"string","val":"foo"},{"nodeType":"const","type":"boolean","val":true}],"targetNodes":[0,1,2]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
+      expect(fetch).toHaveBeenCalledWith('https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42},{"nodeType":"const","type":"string","val":"foo"},{"nodeType":"const","type":"boolean","val":true}],"targetNodes":[0,1,2]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
       expect(r).toEqual([[42], ['foo'], [true]]);
     });
   });
@@ -143,48 +134,36 @@ describe('RemoteHttpServer', () => {
     ]);
 
     return result.then(r => {
-      expect(fetch).toHaveBeenNthCalledWith(
-        1,
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
-      expect(fetch).toHaveBeenNthCalledWith(
-        2,
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
-      expect(fetch).toHaveBeenNthCalledWith(
-        3,
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"const","type":"boolean","val":true}],"targetNodes":[0]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
+      expect(fetch).toHaveBeenNthCalledWith(1, 'https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"number","val":42}],"targetNodes":[0]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
+      expect(fetch).toHaveBeenNthCalledWith(2, 'https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
+      expect(fetch).toHaveBeenNthCalledWith(3, 'https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"boolean","val":true}],"targetNodes":[0]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
       expect(r).toEqual([[42], ['foo'], [true]]);
     });
   });
@@ -217,34 +196,26 @@ describe('RemoteHttpServer', () => {
     ]);
 
     return result.then(r => {
-      expect(fetch).toHaveBeenNthCalledWith(
-        1,
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"output","fromOp":1,"type":"number","id":"3831373993168090"},{"name":"number-add","inputs":{"lhs":2,"rhs":2}},{"nodeType":"const","type":"number","val":10},{"nodeType":"output","fromOp":4,"type":"number","id":"2790509981729619"},{"name":"number-mult","inputs":{"lhs":2,"rhs":5}},{"nodeType":"const","type":"number","val":5}],"targetNodes":[0,3]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
-      expect(fetch).toHaveBeenNthCalledWith(
-        2,
-        'https://weave-host/execute',
-        expect.objectContaining({
-          body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]}}',
-          credentials: 'include',
-          headers: {
-            'weave-shadow': 'false',
-            'Content-Type': 'application/json',
-            'x-weave-client-cache-key': server.clientCacheKey,
-          },
-          method: 'POST',
-        })
-      );
+      expect(fetch).toHaveBeenNthCalledWith(1, 'https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"output","fromOp":1,"type":"number","id":"3831373993168090"},{"name":"number-add","inputs":{"lhs":2,"rhs":2}},{"nodeType":"const","type":"number","val":10},{"nodeType":"output","fromOp":4,"type":"number","id":"2790509981729619"},{"name":"number-mult","inputs":{"lhs":2,"rhs":5}},{"nodeType":"const","type":"number","val":5}],"targetNodes":[0,3]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
+      expect(fetch).toHaveBeenNthCalledWith(2, 'https://weave-host/execute', {
+        body: '{"graphs":{"nodes":[{"nodeType":"const","type":"string","val":"foo"}],"targetNodes":[0]}}',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'weave-shadow': 'false',
+          'Content-Type': 'application/json',
+          'x-weave-client-cache-key': server.clientCacheKey,
+        }),
+        method: 'POST',
+      });
       expect(r).toEqual([20, 50, 'foo']);
     });
   });
