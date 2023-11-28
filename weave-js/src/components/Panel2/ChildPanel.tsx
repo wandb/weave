@@ -758,10 +758,10 @@ const NEW_INSPECTOR_IMPLEMENTED_FOR = new Set([
   `Sections`,
 ]);
 
-// Return true if maybeAncestor is an ancestor of path.
-// Returns false for self and other non-ancestors.
-const isAncestor = (path: string, maybeAncestor: string): boolean => {
-  return path.startsWith(maybeAncestor + '.');
+// Return true if the panel with path maybeAncestorPath is an ancestor of the
+// given panel's path. Returns false for self and other non-ancestors.
+const isAncestor = (panelPath: string, maybeAncestorPath: string): boolean => {
+  return panelPath.startsWith(maybeAncestorPath + '.');
 };
 
 export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
