@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelTokensConfig(BaseModel):
-    per_message: int
-    per_name: int
+    per_message: int = 0
+    per_name: int = 0
 
 
 class CombinedChoice(BaseModel):
@@ -18,14 +18,14 @@ class CombinedChoice(BaseModel):
 
 
 class ChatCompletionRequestMessage(ChatCompletionMessage):
-    role: str
+    role: str = ""
 
 
 class ChatCompletionRequest(BaseModel):
     model_config = ConfigDict(use_enum_values=True, exclude_none=True)
 
-    model: str
-    messages: List[ChatCompletionRequestMessage]
+    model: str = ""
+    messages: List[ChatCompletionRequestMessage] = Field(default_factory=list)
     max_tokens: Optional[int] = None
     temperature: Optional[float] = None
     stream: Optional[bool] = None
@@ -34,5 +34,5 @@ class ChatCompletionRequest(BaseModel):
 class Context(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    inputs: ChatCompletionRequest = Field(default_factory=ChatCompletionRequest)
-    outputs: ChatCompletion = Field(default_factory=ChatCompletion)
+    inputs: Optional[ChatCompletionRequest] = None
+    outputs: Optional[ChatCompletion] = None

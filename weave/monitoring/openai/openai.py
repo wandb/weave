@@ -45,7 +45,7 @@ class ReassembleStream(Callback):
         context.inputs = ChatCompletionRequest.model_validate(sig)
 
     def before_end(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        if hasattr(context, "chunks"):
+        if hasattr(context, "chunks") and context.inputs is not None:
             input_messages = context.inputs.messages
             context.outputs = reconstruct_completion(input_messages, context.chunks)
 
