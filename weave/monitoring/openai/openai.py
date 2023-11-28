@@ -2,7 +2,7 @@ __all__ = ["ReassembleStream", "LogToStreamTable", "patch", "unpatch"]
 
 import asyncio
 import functools
-from typing import Callable, List
+from typing import Callable, List, Union
 
 import openai
 from openai import AsyncStream, Stream
@@ -108,7 +108,7 @@ class AsyncChatCompletions:
 
     async def create(
         self, *args: Any, **kwargs: Any
-    ) -> ChatCompletion | AsyncStream[ChatCompletionChunk]:
+    ) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
         self.context = Context()
         if kwargs.get("stream", False):
             return self._streaming_create(*args, **kwargs)
@@ -173,7 +173,7 @@ class ChatCompletions:
 
     def create(
         self, *args: Any, **kwargs: Any
-    ) -> ChatCompletion | Stream[ChatCompletionChunk]:
+    ) -> Union[ChatCompletion, Stream[ChatCompletionChunk]]:
         self.context = Context()
         if kwargs.get("stream", False):
             return self._streaming_create(*args, **kwargs)
