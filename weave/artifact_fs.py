@@ -109,6 +109,10 @@ class FilesystemArtifact(artifact_base.Artifact):
     ) -> typing.Generator[typing.IO, None, None]:
         raise NotImplementedError
 
+    @contextlib.contextmanager
+    def writeable_file_path(self, path: str) -> typing.Generator[str, None, None]:
+        raise NotImplementedError
+
     def ref_from_local_str(self, s: str, type: "types.Type") -> "FilesystemArtifactRef":
         path, extra = ref_util.parse_local_ref_str(s)
         return self.RefClass(self, path=path, extra=extra, type=type)

@@ -13,3 +13,5 @@ from .model_eval import *
 from .openai import *
 from .anyscale import *
 from .huggingface import *
+
+from .faiss import *
