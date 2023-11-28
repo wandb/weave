@@ -31,3 +31,4 @@ tabulate
 # Weaveflow Additions
 openai>=0.27.0
 tiktoken>=0.4.0
+faiss-cpu
