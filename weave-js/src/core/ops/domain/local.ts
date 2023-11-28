@@ -29,7 +29,7 @@ import {
 } from '../../model';
 import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
-import {makeBasicOp, makeStandardOp} from '../opKinds';
+import {makeBasicOp, makeEqualOp, makeStandardOp} from '../opKinds';
 import {opIndex} from '../primitives';
 import {splitEscapedString} from '../primitives/splitEscapedString';
 
@@ -373,7 +373,7 @@ export const opArtifactVersionFileType = makeOp({
   },
 });
 
-export const opRefGet = makeOp({
+export const opRefGet = makeBasicOp({
   hidden: false,
   name: 'Ref-get',
   description: 'hello',
@@ -392,13 +392,13 @@ export const opRefGet = makeOp({
     },
   },
   returnType: inputTypes => {
-    const selfType = inputTypes.self.type;
+    const selfType = inputTypes.self;
     if (isUnion(selfType)) {
       return union(selfType.members.map(m => m.objectType as Type));
     }
-    return (inputTypes.self.type as any).objectType;
+    return (selfType as any).objectType;
   },
-  resolver: ({path}) => {
+  resolver: ({self}) => {
     throw new Error('not implemented');
   },
 });
@@ -821,4 +821,10 @@ export const opChainRun = makeStandardOp({
   resolver: inputs => {
     throw new Error('cant resolve op-chain-run in js');
   },
+});
+
+export const opRefEqual = makeEqualOp({
+  hidden: true,
+  name: 'Ref-__eq__',
+  argType: {type: 'Ref'},
 });

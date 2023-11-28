@@ -12,7 +12,7 @@ def test_graph_playback():
         res.results.unwrap()
 
 
-def test_zlib_playback(use_server_gql_schema):
+def test_zlib_playback(dev_only_admin_env_override, use_server_gql_schema):
     if zlib_str == "":
         return
     req_bytes = zlib.decompress(base64.b64decode(zlib_str.encode("ascii")))

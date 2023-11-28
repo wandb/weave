@@ -97,13 +97,14 @@ def weavify_object(obj: typing.Any) -> graph.Node:
     elif isinstance(obj, dict):
         return dict_(**{i: weavify_object(o) for i, o in obj.items()})
 
-    try:
-        return obj.__class__.constructor(
-            **{
-                field.name: weavify_object(getattr(obj, field.name))
-                for field in dataclasses.fields(obj)
-            }
-        )
-    except AttributeError:
-        pass
+    # ObjectType constructor is disabled.
+    # try:
+    #     return obj.__class__.constructor(
+    #         **{
+    #             field.name: weavify_object(getattr(obj, field.name))
+    #             for field in dataclasses.fields(obj)
+    #         }
+    #     )
+    # except AttributeError:
+    #     pass
     return weave_internal.make_const_node(types.TypeRegistry.type_of(obj), obj)

@@ -4,6 +4,6 @@
 
 from ..wandb_interface.wandb_stream_table import StreamTable
 from . import openai
-from .monitor import init_monitor
+from .monitor import default_monitor, deinit_monitor, init_monitor
 
 __all__ = ["StreamTable", "monitor", "openai"]

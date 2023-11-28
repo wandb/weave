@@ -25,6 +25,7 @@ import React, {useCallback, useMemo} from 'react';
 import {Icon} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../context';
+import {ChildPanel} from './ChildPanel';
 import * as ConfigPanel from './ConfigPanel';
 import * as KeyValTable from './KeyValTable';
 import * as Panel2 from './panel';
@@ -365,8 +366,21 @@ const PanelObjectChild: React.FC<
             />
           </div>
         ) : (
-          <div style={{paddingLeft: '1em'}}>
+          <div style={{paddingLeft: '1em', height: 400, width: '100%'}}>
             {defaultLanguageBinding.printType(childType, true)}
+            {/* TODO: This is not probably what we always want! - came from weaveflow */}
+            <ChildPanel
+              config={config?.children?.[k] ?? childNode}
+              updateConfig={newConfig => {
+                updateConfig({
+                  ...config,
+                  children: {
+                    ...config?.children,
+                    [k]: newConfig,
+                  },
+                });
+              }}
+            />
           </div>
         )}
       </KeyValTable.Val>

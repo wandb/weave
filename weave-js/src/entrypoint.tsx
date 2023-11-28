@@ -15,13 +15,19 @@ import {StateInspector} from 'reinspect';
 import {apolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
+import {Browse2} from './components/PagePanelComponents/Home/Browse2';
+import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
 import getConfig from './config';
-import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
+import {
+  useIsAuthenticated,
+  WeaveViewerContextProvider,
+} from './context/WeaveViewerContext';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
+  URL_BROWSE2,
   URL_LOCAL,
   URL_RECENT,
   URL_TEMPLATES,
@@ -107,16 +113,39 @@ type MainProps = {
   browserType?: string;
 };
 
-const Main = ({browserType}: MainProps) => (
+const Main = ({browserType}: MainProps) => {
+  // If we aren't authenticated, we don't have the ability to see/set the
+  // user's night mode preference, so we just omit the theme support entirely.
+  const isAuthed = useIsAuthenticated();
+  let page = <PagePanel browserType={browserType} />;
+  if (isAuthed) {
+    page = <Themer>{page}</Themer>;
+  }
+  return (
+    <React.Suspense fallback="loading">
+      <ErrorBoundary>
+        <NotebookComputeGraphContextProvider>
+          <StateInspector name="WeaveApp">
+            <PanelRootContextProvider>
+              <WeaveViewerContextProvider>{page}</WeaveViewerContextProvider>
+            </PanelRootContextProvider>
+          </StateInspector>
+        </NotebookComputeGraphContextProvider>
+      </ErrorBoundary>
+    </React.Suspense>
+  );
+};
+
+const Browse2Wrapper = () => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
         <StateInspector name="WeaveApp">
           <PanelRootContextProvider>
             <WeaveViewerContextProvider>
-              <Themer>
-                <PagePanel browserType={browserType} />
-              </Themer>
+              <PanelInteractContextProvider>
+                <Browse2 />
+              </PanelInteractContextProvider>
             </WeaveViewerContextProvider>
           </PanelRootContextProvider>
         </StateInspector>
@@ -147,6 +176,10 @@ ReactDOM.render(
         </Route>
         <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
           <Main browserType={URL_LOCAL} />
+        </Route>
+        <Route
+          path={`/${URL_BROWSE2}/:entity?/:project?/:rootType?/:objName?/:objVersion?/:refExtra*`}>
+          <Browse2Wrapper />
         </Route>
         <Route path="/">
           <Main />
