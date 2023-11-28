@@ -758,6 +758,12 @@ const NEW_INSPECTOR_IMPLEMENTED_FOR = new Set([
   `Sections`,
 ]);
 
+// Return true if maybeAncestor is an ancestor of path.
+// Returns false for self and other non-ancestors.
+const isAncestor = (path: string, maybeAncestor: string): boolean => {
+  return path.startsWith(maybeAncestor + '.');
+};
+
 export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
   const {
     newVars,
@@ -796,12 +802,12 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
   // Render everything along this path, and its descendants, but only show
   // the controls for this and its descendants.
 
-  if (
-    !selectedPathStr.startsWith(pathStr) &&
-    !pathStr.startsWith(selectedPathStr)
-  ) {
-    // Off the path
-    return <></>;
+  const nothingToShow =
+    pathStr !== selectedPathStr &&
+    !isAncestor(pathStr, selectedPathStr) && // E.g. If Group is selected, descendants would show
+    !isAncestor(selectedPathStr, pathStr); // Need to be able to recurse down to selection
+  if (nothingToShow) {
+    return null;
   }
 
   // If we are selected, expose controls for input expression, panel selection,
