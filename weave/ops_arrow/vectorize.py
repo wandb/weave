@@ -1,3 +1,5 @@
+import contextlib
+import contextvars
 import logging
 import typing
 import pyarrow as pa
@@ -622,6 +624,23 @@ def vectorize(
     return graph.map_nodes_top_level([weave_fn], vectorize_along_wrt_paths)[0]
 
 
+_raise_on_python_bailout: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_raise_on_python_bailout", default=False
+)
+
+
+def _should_raise_on_python_bailout() -> bool:
+    return _raise_on_python_bailout.get()
+
+
+@contextlib.contextmanager
+def raise_on_python_bailout():
+    token = _raise_on_python_bailout.set(True)
+    try:
+        yield
+    finally:
+        _raise_on_python_bailout.reset(token)
+
 def _call_and_ensure_awl(
     awl: ArrowWeaveList, called: graph.OutputNode
 ) -> ArrowWeaveList:
@@ -648,6 +667,8 @@ def _call_and_ensure_awl(
         if isinstance(res, list):
             res = convert.to_arrow(res)
             logging.warning(err_msg)
+            if _should_raise_on_python_bailout():
+                raise errors.WeaveVectorizationError(err_msg)
         else:
             raise errors.WeaveVectorizationError(err_msg)
 
