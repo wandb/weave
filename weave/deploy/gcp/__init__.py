@@ -34,7 +34,7 @@ def generate_dockerfile(
             "PROJECT_NAME": project_name,
             "BASE_IMAGE": base_image,
             "MODEL_REF": model_ref,
-            "MODEL_METHOD": model_method or "",
+            "MODEL_METHOD": model_method,
             "AUTH_ENTITY": auth_entity or "",
         }
     )
@@ -289,11 +289,18 @@ def deploy(
 
 def develop(
     model_ref: str,
+    model_method: typing.Optional[str] = None,
     base_image: typing.Optional[str] = "python:3.11",
     auth_entity: typing.Optional[str] = None,
 ) -> None:
 
-    dir = compile(model_ref, base_image=base_image, auth_entity=auth_entity, dev=True)
+    dir = compile(
+        model_ref,
+        model_method=model_method,
+        base_image=base_image,
+        auth_entity=auth_entity,
+        dev=True,
+    )
     name = safe_name(WeaveURI.parse(model_ref).name)
     docker = shutil.which("docker")
     if docker is None:

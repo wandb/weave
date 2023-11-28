@@ -61,7 +61,9 @@ def serve(
     api.init(project)
     # TODO: provide more control over attributes
     with api.attributes({"env": env}):
-        api.serve(parsed_ref, method_name=method, auth_entity=auth_entity, port=port)
+        api.serve(
+            parsed_ref, method_name=method or None, auth_entity=auth_entity, port=port
+        )
 
 
 @cli.group(help="Deploy weave models.")
@@ -90,7 +92,7 @@ def gcp(
 ) -> None:
     if dev:
         print(f"Developing model {model_ref}...")
-        google.develop(model_ref, auth_entity=auth_entity)
+        google.develop(model_ref, model_method=method, auth_entity=auth_entity)
         return
     print(f"Deploying model {model_ref}...")
     if auth_entity is None:
