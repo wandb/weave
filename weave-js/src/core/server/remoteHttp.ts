@@ -1,12 +1,12 @@
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
-import * as uuid from 'uuid';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
 import {Node, serialize, serializeMulti} from '../model';
 import type {OpStore} from '../opStore';
 import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
+import {uuidv4} from '../util/id';
 import type {Server} from './types';
 
 const BATCH_INTERVAL_MS = () => batchIntervalOverride() ?? 50;
@@ -353,7 +353,7 @@ export class RemoteHttpServer implements Server {
           additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
         }
 
-        additionalHeaders['x-request-id'] = uuid.v4();
+        additionalHeaders['x-request-id'] = uuidv4();
 
         let respJson: any = {
           data: new Array(nodes.length).fill(null),
