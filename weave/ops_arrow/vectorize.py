@@ -641,6 +641,7 @@ def raise_on_python_bailout():
     finally:
         _raise_on_python_bailout.reset(token)
 
+
 def _call_and_ensure_awl(
     awl: ArrowWeaveList, called: graph.OutputNode
 ) -> ArrowWeaveList:

@@ -291,12 +291,13 @@ def test_compile_list_flatten_to_awl_concat():
     for result in results[2:]:
         assert result.to_pylist_notags() == [1, 2]
 
+
 def test_compile_lambda_on_refineable(user_by_api_key_in_env):
     st = StreamTable(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
-         _disable_async_file_stream=True
+        _disable_async_file_stream=True,
     )
 
     for i in range(10):
@@ -305,8 +306,12 @@ def test_compile_lambda_on_refineable(user_by_api_key_in_env):
     st.finish()
 
     rows_node = st.rows()
-    rows_node_copy = RuntimeOutputNode(types.List(types.TypedDict({})), rows_node.from_op.name, rows_node.from_op.inputs)
-    mapped_node = rows_node_copy.map(lambda row: row['num'] + 1)
+    rows_node_copy = RuntimeOutputNode(
+        types.List(types.TypedDict({})),
+        rows_node.from_op.name,
+        rows_node.from_op.inputs,
+    )
+    mapped_node = rows_node_copy.map(lambda row: row["num"] + 1)
     with raise_on_python_bailout():
         val = use(mapped_node)
     assert val.to_pylist_raw() == list(range(1, 11))
