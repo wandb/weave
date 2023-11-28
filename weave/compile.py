@@ -865,10 +865,6 @@ def _compile_refine_and_propagate_gql_inner(
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
-# TODO: Move this into the function above to reduce N^2-ness? Included changing to map top level in above
-# TODO: Zip the function args so we are not reliant on names (audit this at both levels)
-
-
 def _propagate_updated_types_through_lambdas(
     op: OpDef, params: dict[str, graph.Node], on_error: graph.OnErrorFnType = None
 ):
@@ -882,6 +878,12 @@ def _propagate_updated_types_through_lambdas(
     accordingly. It then refines the inner lambda function to ensure that the
     updated variable types are correctly propagated through the lambda function.
     """
+    #
+    # Optimizations: 1) We call `_compile_refine_and_propagate_gql_inner` inside
+    # of this function, which means we "compile" the inner part of the lambda twice.
+    # If instead, we somehow propagated the updated var types before traversing into
+    # them, we could do this in a single pass.
+    #
     if not isinstance(op.input_type, op_args.OpNamedArgs):
         return params
 
