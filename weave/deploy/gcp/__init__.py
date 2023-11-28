@@ -34,7 +34,7 @@ def generate_dockerfile(
             "PROJECT_NAME": project_name,
             "BASE_IMAGE": base_image,
             "MODEL_REF": model_ref,
-            "MODEL_METHOD": model_method,
+            "MODEL_METHOD": model_method or "",
             "AUTH_ENTITY": auth_entity or "",
         }
     )
