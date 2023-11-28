@@ -33,7 +33,9 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
         method: 'POST',
       });
@@ -62,8 +64,11 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
+
         method: 'POST',
       });
       expect(r).toEqual([42, 'foo']);
@@ -95,7 +100,9 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
         method: 'POST',
       });
@@ -140,7 +147,9 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
         method: 'POST',
       });
@@ -150,7 +159,9 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
         method: 'POST',
       });
@@ -160,7 +171,9 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
         method: 'POST',
       });
@@ -202,7 +215,9 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
         method: 'POST',
       });
@@ -212,7 +227,9 @@ describe('RemoteHttpServer', () => {
         headers: expect.objectContaining({
           'weave-shadow': 'false',
           'Content-Type': 'application/json',
-          'x-weave-client-cache-key': server.clientCacheKey,
+          ...(server.clientCacheKey == null
+            ? {}
+            : {'x-weave-client-cache-key': server.clientCacheKey}),
         }),
         method: 'POST',
       });
