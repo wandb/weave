@@ -80,7 +80,7 @@ class Registry:
     def get_op(self, uri: str) -> op_def.OpDef:
         object_uri = uris.WeaveURI.parse(uri)
         if object_uri.version is not None:
-            object_key = (object_uri.name, object_uri.version)
+            object_key = (object_uri.name, object_uri.version, object_uri.path)
             if object_key in self._op_versions:
                 res = self._op_versions[object_key]
             else:
@@ -164,10 +164,8 @@ class Registry:
         # see comment here: https://github.com/wandb/weave-internal/pull/554#discussion_r1103875156
         if op.location is not None:
             ref = storage.save(op, name=new_name)
-            location = ref.artifact.uri_obj
-            version = ref.version
-            op.version = version
-            op.location = location
+            op.version = ref.version
+            op.location = uris.WeaveURI.parse(ref.uri)
 
         if op.version is not None:
             self._op_versions.pop((name, old_version))
