@@ -9,7 +9,7 @@ import TableRow from '@mui/material/TableRow';
 import _ from 'lodash';
 import * as React from 'react';
 
-import * as query from '../query';
+import * as query from '../../query';
 
 function createData(
   name: string,
@@ -29,7 +29,7 @@ const rows = [
   createData('Gingerbread', 356, 16.0, 49, 3.9),
 ];
 
-export const AllBoardsPage: React.FC<{
+export const BoardsPage: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {

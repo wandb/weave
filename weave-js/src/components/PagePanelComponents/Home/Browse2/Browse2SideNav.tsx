@@ -28,8 +28,9 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import React, {FC, Fragment, useMemo} from 'react';
+import {useHistory, useParams} from 'react-router-dom';
 
-import {useProjectsForEntity} from './query';
+import {useProjectsForEntity} from '../query';
 
 const drawerWidth = 240;
 
@@ -54,6 +55,84 @@ type Browse2ProjectSideNavProps = {
     | 'boards'
     | 'tables';
 } & NavigationCallbacks;
+
+export const RouteAwareBrowse2ProjectSideNav: FC = props => {
+  const params = useParams<Browse2DataModelRouteParams>();
+  const history = useHistory();
+  const currentProject = params.project;
+  const currentEntity = params.entity;
+  const selectedCategory = useMemo(() => {
+    if (params.tab === 'types' || params.tab === 'type-versions') {
+      return 'types';
+    } else if (params.tab === 'objects' || params.tab === 'object-versions') {
+      return 'objects';
+    } else if (params.tab === 'ops' || params.tab === 'op-versions') {
+      return 'ops';
+    } else if (params.tab === 'calls') {
+      return 'calls';
+    } else if (params.tab === 'boards') {
+      return 'boards';
+    } else if (params.tab === 'tables') {
+      return 'tables';
+    }
+    return undefined;
+  }, [params.tab]);
+  if (!currentProject || !currentEntity) {
+    return null;
+  }
+  return (
+    <Browse2ProjectSideNav
+      entity={currentEntity}
+      project={currentProject}
+      selectedCategory={selectedCategory}
+      navigateToProject={project => {
+        history.push(`/${params.entity}/${project}`);
+      }}
+      navigateToObjectVersions={(filter?: string) => {
+        history.push(
+          `/${params.entity}/${params.project}/object-versions${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToCalls={(filter?: string) => {
+        history.push(
+          `/${params.entity}/${params.project}/calls${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToTypeVersions={(filter?: string) => {
+        history.push(
+          `/${params.entity}/${params.project}/type-versions${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToOpVersions={(filter?: string) => {
+        history.push(
+          `/${params.entity}/${params.project}/op-versions${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToBoards={(filter?: string) => {
+        history.push(
+          `/${params.entity}/${params.project}/boards${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToTables={(filter?: string) => {
+        history.push(
+          `/${params.entity}/${params.project}/tables${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+    />
+  );
+};
 
 export const Browse2ProjectSideNav: FC<Browse2ProjectSideNavProps> = props => {
   const sections = useSectionsForProject(props);

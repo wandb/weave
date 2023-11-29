@@ -10,15 +10,12 @@ import {
 } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import {LicenseInfo} from '@mui/x-license-pro';
-import _ from 'lodash';
-import React, {FC, useMemo} from 'react';
+import React, {FC} from 'react';
 import {
   BrowserRouter as Router,
   Link as RouterLink,
   Route,
   Switch,
-  useHistory,
-  useLocation,
   useParams,
 } from 'react-router-dom';
 
@@ -28,11 +25,14 @@ import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
 import {Browse2ObjectTypePage} from './Browse2/Browse2ObjectTypePage';
 import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPage';
 import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
+import {RouteAwareBrowse2ProjectSideNav} from './Browse2/Browse2SideNav';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
-import {Browse2Boards} from './Browse2Boards';
-import {Browse2ProjectSideNav} from './Browse2SideNav';
-import {AllBoardsPage} from './pages/AllBoardsPage';
+import {BoardsPage} from './Browse2/pages/BoardsPage';
+import {Browse2Boards} from './Browse2/pages/Browse2Boards';
+import {CallsPage} from './Browse2/pages/CallsPage';
+import {ObjectVersionsPage} from './Browse2/pages/ObjectVersionsPage';
+import {dummyImageURL, useQuery} from './Browse2/pages/util';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -63,7 +63,6 @@ const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
 
 const Browse2Breadcrumbs: FC = props => {
   const params = useParams<Browse2Params>();
-  console.log(params);
   const refFields = params.refExtra?.split('/') ?? [];
   return (
     <Breadcrumbs>
@@ -123,84 +122,6 @@ const Browse2Breadcrumbs: FC = props => {
   );
 };
 
-const RouteAwareBrowse2ProjectSideNav: FC = props => {
-  const params = useParams<Browse2DataModelRouteParams>();
-  const history = useHistory();
-  const currentProject = params.project;
-  const currentEntity = params.entity;
-  const selectedCategory = useMemo(() => {
-    if (params.tab === 'types' || params.tab === 'type-versions') {
-      return 'types';
-    } else if (params.tab === 'objects' || params.tab === 'object-versions') {
-      return 'objects';
-    } else if (params.tab === 'ops' || params.tab === 'op-versions') {
-      return 'ops';
-    } else if (params.tab === 'calls') {
-      return 'calls';
-    } else if (params.tab === 'boards') {
-      return 'boards';
-    } else if (params.tab === 'tables') {
-      return 'tables';
-    }
-    return undefined;
-  }, [params.tab]);
-  if (!currentProject || !currentEntity) {
-    return null;
-  }
-  return (
-    <Browse2ProjectSideNav
-      entity={currentEntity}
-      project={currentProject}
-      selectedCategory={selectedCategory}
-      navigateToProject={project => {
-        history.push(`/${params.entity}/${project}`);
-      }}
-      navigateToObjectVersions={(filter?: string) => {
-        history.push(
-          `/${params.entity}/${params.project}/object-versions${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
-      }}
-      navigateToCalls={(filter?: string) => {
-        history.push(
-          `/${params.entity}/${params.project}/calls${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
-      }}
-      navigateToTypeVersions={(filter?: string) => {
-        history.push(
-          `/${params.entity}/${params.project}/type-versions${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
-      }}
-      navigateToOpVersions={(filter?: string) => {
-        history.push(
-          `/${params.entity}/${params.project}/op-versions${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
-      }}
-      navigateToBoards={(filter?: string) => {
-        history.push(
-          `/${params.entity}/${params.project}/boards${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
-      }}
-      navigateToTables={(filter?: string) => {
-        history.push(
-          `/${params.entity}/${params.project}/tables${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
-      }}
-    />
-  );
-};
-
 export const Browse2: FC<{basename: string}> = props => {
   return (
     <Router basename={props.basename}>
@@ -210,6 +131,8 @@ export const Browse2: FC<{basename: string}> = props => {
 };
 
 const Browse2Mounted: FC = props => {
+  const projectRootPagesPath =
+    '/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)';
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
       <CssBaseline />
@@ -235,15 +158,13 @@ const Browse2Mounted: FC = props => {
           </Route>
         </Toolbar>
       </AppBar>
-      <Route
-        path={`/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)?`}>
+      <Route path={`${projectRootPagesPath}?`}>
         <RouteAwareBrowse2ProjectSideNav />
       </Route>
       <Box component="main" sx={{flexGrow: 1, p: 3}}>
         <Toolbar />
         <Switch>
-          <Route
-            path={`/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)`}>
+          <Route path={projectRootPagesPath}>
             <Browse2ProjectRoot />
           </Route>
           <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
@@ -335,7 +256,7 @@ const Browse2ProjectRoot: FC = () => {
         <Browse2DataModelRoute />
       </Route>
       <Route path={`/${projectRoot}/boards`}>
-        <AllBoardsPage entity={entity} project={project} />
+        <BoardsPage entity={entity} project={project} />
       </Route>
       {/* TABLES */}
       <Route path={`/${projectRoot}/tables/:tableId`}>
@@ -354,20 +275,6 @@ interface Browse2DataModelRouteParams {
   tab?: string;
 }
 
-function useQuery() {
-  const {search} = useLocation();
-
-  return React.useMemo(() => {
-    const params = new URLSearchParams(search);
-    const entries = Array.from(params.entries());
-    const searchDict = _.fromPairs(entries);
-    return searchDict;
-  }, [search]);
-}
-
-const dummyImageURL =
-  'https://github.com/wandb/weave/blob/7cbb458e83a7121042af6ab6894f999210fafa4d/weave-js/src/components/PagePanelComponents/Home/dd_placeholder.png?raw=true';
-
 const Browse2DataModelRoute: FC = props => {
   const params = useParams<Browse2DataModelRouteParams>();
   const search = useQuery();
@@ -384,49 +291,5 @@ const Browse2DataModelRoute: FC = props => {
         height: '100%',
       }}
     />
-  );
-};
-
-const ObjectVersionsPage: FC = props => {
-  const search = useQuery();
-  const filter = search.filter;
-  return (
-    <>
-      <Typography variant="h3" component="h3" gutterBottom>
-        Objects {filter}
-      </Typography>
-      <div
-        style={{
-          backgroundImage: `url(${dummyImageURL})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          width: '100%',
-          height: '100%',
-        }}
-      />
-    </>
-  );
-};
-
-const CallsPage: FC = props => {
-  const search = useQuery();
-  const filter = search.filter;
-  return (
-    <>
-      <Typography variant="h3" component="h3" gutterBottom>
-        Calls {filter}
-      </Typography>
-      <div
-        style={{
-          backgroundImage: `url(${dummyImageURL})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          width: '100%',
-          height: '100%',
-        }}
-      />
-    </>
   );
 };
