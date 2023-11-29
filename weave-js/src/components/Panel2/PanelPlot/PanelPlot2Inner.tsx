@@ -980,12 +980,10 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     return brushTypesResult;
   }, [listOfTableNodes, config.series, weave]);
 
+  const signalDomainX = concreteConfig.signals.domain.x;
   const xScaleAndDomain = useMemo(
-    () =>
-      concreteConfig.signals.domain.x
-        ? {scale: {domain: concreteConfig.signals.domain.x}}
-        : {},
-    [concreteConfig.signals.domain.x]
+    () => (signalDomainX ? {scale: {domain: signalDomainX}} : {}),
+    [signalDomainX]
   );
   const yScaleAndDomain = useMemo(
     () =>
@@ -1076,10 +1074,16 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             };
           }
         } else {
+          // If we haven't zoomed in, use the extent of the x values
+          const domain = signalDomainX ?? {
+            data: newSpec.data.name,
+            field: fixedXKey,
+          };
+          const scale = {domain};
           newSpec.encoding.x = {
             field: fixedXKey,
             type: xAxisType,
-            ...xScaleAndDomain,
+            scale,
           };
         }
         if (xAxisType === 'temporal' && xTimeUnit && isDashboard) {
@@ -1463,6 +1467,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     isDashboard,
     hasLine,
     brushableAxes,
+    signalDomainX,
     xScaleAndDomain,
     yScaleAndDomain,
     globalColorScales,
