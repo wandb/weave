@@ -39,13 +39,13 @@ function useQuery() {
   }, [search]);
 }
 
-export const Browse2Boards: React.FC<{title: string}> = props => {
+export const ObjectsPage: React.FC = props => {
   const search = useQuery();
   const filter = search.filter;
   return (
     <>
       <Typography variant="h3" component="h3" gutterBottom>
-        {props.title} {filter}
+        Objects {filter}
       </Typography>
       <TableContainer component={Paper}>
         <Table sx={{minWidth: 650}} size="small" aria-label="a dense table">

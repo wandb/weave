@@ -174,14 +174,14 @@ export const Browse2ProjectSideNav: FC<Browse2ProjectSideNavProps> = props => {
 
 type SectionType = {
   title: string;
-  items: Array<ItemType>;
+  items: ItemType[];
 };
 type ItemType = {
   title: string;
   icon: React.ReactNode;
   selected?: boolean;
   onClick: () => void;
-  children?: Array<ItemType>;
+  children?: ItemType[];
 };
 const SideBarNavItem: FC<{item: ItemType; depth?: number}> = props => {
   const depth = props.depth ?? 0;
@@ -207,7 +207,7 @@ const SideBarNavItem: FC<{item: ItemType; depth?: number}> = props => {
   );
 };
 const SideNav: FC<{
-  sections: Array<SectionType>;
+  sections: SectionType[];
 }> = props => {
   return (
     <Box sx={{overflow: 'auto'}}>
@@ -234,13 +234,13 @@ const SideNav: FC<{
 
 const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
   // TODO: Lookup pinned sidebar items from entity/project + user
-  const sections: Array<SectionType> = useMemo(() => {
+  const sections: SectionType[] = useMemo(() => {
     return [
       {
         title: 'Records',
         items: [
           {
-            title: 'Objects', //, 'Instances (ObjectVersions)',
+            title: 'Objects', // , 'Instances (ObjectVersions)',
             selected: props.selectedCategory === 'objects',
             icon: <Category />,
             onClick: () => {

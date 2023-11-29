@@ -28,11 +28,24 @@ import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {RouteAwareBrowse2ProjectSideNav} from './Browse2/Browse2SideNav';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
+import {BoardPage} from './Browse2/pages/BoardPage';
 import {BoardsPage} from './Browse2/pages/BoardsPage';
-import {Browse2Boards} from './Browse2/pages/Browse2Boards';
+import {CallPage} from './Browse2/pages/CallPage';
 import {CallsPage} from './Browse2/pages/CallsPage';
+import {ObjectPage} from './Browse2/pages/ObjectPage';
+import {ObjectsPage} from './Browse2/pages/ObjectsPage';
+import {ObjectVersionPage} from './Browse2/pages/ObjectVersionPage';
 import {ObjectVersionsPage} from './Browse2/pages/ObjectVersionsPage';
-import {dummyImageURL, useQuery} from './Browse2/pages/util';
+import {OpPage} from './Browse2/pages/OpPage';
+import {OpsPage} from './Browse2/pages/OpsPage';
+import {OpVersionPage} from './Browse2/pages/OpVersionPage';
+import {OpVersionsPage} from './Browse2/pages/OpVersionsPage';
+import {TablePage} from './Browse2/pages/TablePage';
+import {TablesPage} from './Browse2/pages/TablesPage';
+import {TypePage} from './Browse2/pages/TypePage';
+import {TypesPage} from './Browse2/pages/TypesPage';
+import {TypeVersionPage} from './Browse2/pages/TypeVersionPage';
+import {TypeVersionsPage} from './Browse2/pages/TypeVersionsPage';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -207,89 +220,64 @@ const Browse2ProjectRoot: FC = () => {
     <Switch>
       {/* TYPES */}
       <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
-        <Browse2DataModelRoute />
+        <TypeVersionPage />
       </Route>
       <Route path={`/${projectRoot}/types/:typeName`}>
-        <Browse2DataModelRoute />
+        <TypePage />
       </Route>
       <Route path={`/${projectRoot}/types`}>
-        <Browse2Boards title={'Types'} />
+        <TypesPage />
       </Route>
       <Route path={`/${projectRoot}/type-versions`}>
-        <Browse2Boards title={'Type Versions'} />
+        <TypeVersionsPage />
       </Route>
       {/* OBJECTS */}
       <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
-        <Browse2DataModelRoute />
+        <ObjectVersionPage />
       </Route>
       <Route path={`/${projectRoot}/objects/:objectName`}>
-        <Browse2DataModelRoute />
+        <ObjectPage />
       </Route>
       <Route path={`/${projectRoot}/objects`}>
-        <Browse2Boards title={'Objects'} />
+        <ObjectsPage />
       </Route>
       <Route path={`/${projectRoot}/object-versions`}>
         <ObjectVersionsPage />
       </Route>
       {/* OPS */}
       <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
-        <Browse2DataModelRoute />
+        <OpVersionPage />
       </Route>
       <Route path={`/${projectRoot}/ops/:opName`}>
-        <Browse2DataModelRoute />
+        <OpPage />
       </Route>
       <Route path={`/${projectRoot}/ops`}>
-        <Browse2Boards title={'Ops'} />
+        <OpsPage />
       </Route>
       <Route path={`/${projectRoot}/op-versions`}>
-        <Browse2Boards title={'Op Versions'} />
+        <OpVersionsPage />
       </Route>
       {/* CALLS */}
       <Route path={`/${projectRoot}/calls/:callId`}>
-        <Browse2DataModelRoute />
+        <CallPage />
       </Route>
       <Route path={`/${projectRoot}/calls`}>
         <CallsPage />
       </Route>
       {/* BOARDS */}
       <Route path={`/${projectRoot}/boards/:boardId`}>
-        <Browse2DataModelRoute />
+        <BoardPage />
       </Route>
       <Route path={`/${projectRoot}/boards`}>
         <BoardsPage entity={entity} project={project} />
       </Route>
       {/* TABLES */}
       <Route path={`/${projectRoot}/tables/:tableId`}>
-        <Browse2DataModelRoute />
+        <TablePage />
       </Route>
       <Route path={`/${projectRoot}/tables`}>
-        <Browse2Boards title={'Tables'} />
+        <TablesPage />
       </Route>
     </Switch>
-  );
-};
-
-interface Browse2DataModelRouteParams {
-  entity?: string;
-  project?: string;
-  tab?: string;
-}
-
-const Browse2DataModelRoute: FC = props => {
-  const params = useParams<Browse2DataModelRouteParams>();
-  const search = useQuery();
-  console.log('BROWSE2 DATA MODEL ROUTE', {params, search});
-
-  return (
-    <div
-      style={{
-        backgroundImage: `url(${dummyImageURL})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        width: '100%',
-        height: '100%',
-      }}
-    />
   );
 };
