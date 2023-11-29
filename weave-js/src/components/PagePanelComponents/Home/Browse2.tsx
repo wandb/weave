@@ -265,7 +265,12 @@ const Browse2ProjectRoot: FC = () => {
         <CallsPage />
       </Route>
       {/* BOARDS */}
-      <Route path={`/${projectRoot}/boards/:boardId`}>
+      <Route
+        path={[
+          `/${projectRoot}/boards/_new_board_`,
+          `/${projectRoot}/boards/:boardId`,
+          `/${projectRoot}/boards/:boardId/version/:versionId`,
+        ]}>
         <BoardPage />
       </Route>
       <Route path={`/${projectRoot}/boards`}>
