@@ -9,6 +9,7 @@ from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion
 from packaging import version
 
+from weave.monitoring.monitor import Monitor, default_monitor
 from weave.monitoring.openai.models import Context
 from weave.monitoring.openai.util import Context
 from weave.wandb_interface.wandb_stream_table import StreamTable
@@ -52,7 +53,7 @@ class ReassembleStream(Callback):
 
 class LogToStreamTable(Callback):
     def __init__(self, streamtable: StreamTable) -> None:
-        self._streamtable = streamtable
+        self.monitor = Monitor(streamtable)
 
     @classmethod
     def from_stream_name(
@@ -80,21 +81,18 @@ class LogToStreamTable(Callback):
         return cls(streamtable)
 
     def before_send_request(self, context: Context, *args: Any, **kwargs: Any) -> None:
+        context.span_cm = self.monitor.span("request")
+        context.span = context.span_cm.__enter__()
+
         sig = match_signature(old_create, *args, **kwargs)
         context.inputs = ChatCompletionRequest.model_validate(sig)
+        if context.inputs is not None:
+            context.span.inputs = context.inputs.model_dump()
 
     def before_end(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        inputs = context.inputs
-        outputs = context.outputs
-
-        d = {}
-        if inputs:
-            d["inputs"] = inputs.model_dump()
-        if outputs:
-            d["outputs"] = outputs.model_dump()
-
-        self._streamtable.log(d)
-        self._streamtable._flush()
+        if context.outputs is not None:
+            context.span.output = context.outputs.model_dump()
+        context.span_cm.__exit__()
 
 
 class AsyncChatCompletions:
@@ -243,6 +241,7 @@ def patch(callbacks: Optional[List[Callback]] = None) -> None:
     except Exception as e:
         error(f"problem patching: {e}, auto-unpatching")
         unpatch()
+        raise Exception from e
 
 
 def unpatch() -> None:
