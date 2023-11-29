@@ -45,7 +45,14 @@ export const BoardPage: React.FC = () => {
       <a href="https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2Ftimssweeney%2Fcustomer_demo%2Fc_exmaple%3A8b2b4705f6776948b84d%2Fobj%22%29">
         Link
       </a>
-      <image src="" />
+      <br />
+      <img
+        src="https://github.com/wandb/weave/blob/562a679a24ede63dcf4295476a52d7dc38d4bd04/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/board_example.png?raw=true"
+        style={{
+          width: '100%',
+          maxWidth: '800px',
+        }}
+      />
     </div>
   );
 };
