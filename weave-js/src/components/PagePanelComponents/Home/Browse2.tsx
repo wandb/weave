@@ -21,7 +21,6 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../urls';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
@@ -30,8 +29,9 @@ import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPa
 import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
-import {Browse2ProjectSideNav} from './Browse2SideNav';
 import {Browse2Boards} from './Browse2Boards';
+import {Browse2ProjectSideNav} from './Browse2SideNav';
+import {AllBoardsPage} from './pages/AllBoardsPage';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -62,34 +62,33 @@ const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
 
 const Browse2Breadcrumbs: FC = props => {
   const params = useParams<Browse2Params>();
+  console.log(params);
   const refFields = params.refExtra?.split('/') ?? [];
   return (
     <Breadcrumbs>
       {params.entity && (
-        <AppBarLink to={`/${URL_BROWSE2}/${params.entity}`}>
-          {params.entity}
-        </AppBarLink>
+        <AppBarLink to={`/${params.entity}`}>{params.entity}</AppBarLink>
       )}
       {params.project && (
-        <AppBarLink to={`/${URL_BROWSE2}/${params.entity}/${params.project}`}>
+        <AppBarLink to={`/${params.entity}/${params.project}`}>
           {params.project}
         </AppBarLink>
       )}
       {params.rootType && (
         <AppBarLink
-          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}`}>
+          to={`/${params.entity}/${params.project}/${params.rootType}`}>
           {params.rootType}
         </AppBarLink>
       )}
       {params.objName && (
         <AppBarLink
-          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}`}>
+          to={`/${params.entity}/${params.project}/${params.rootType}/${params.objName}`}>
           {params.objName}
         </AppBarLink>
       )}
       {params.objVersion && (
         <AppBarLink
-          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`}>
+          to={`/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`}>
           {params.objVersion}
         </AppBarLink>
       )}
@@ -112,11 +111,9 @@ const Browse2Breadcrumbs: FC = props => {
           </Typography>
         ) : (
           <AppBarLink
-            to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${
-              params.rootType
-            }/${params.objName}/${params.objVersion}/${refFields
-              .slice(0, idx + 1)
-              .join('/')}`}>
+            to={`/${params.entity}/${params.project}/${params.rootType}/${
+              params.objName
+            }/${params.objVersion}/${refFields.slice(0, idx + 1).join('/')}`}>
             {field}
           </AppBarLink>
         )
@@ -155,46 +152,46 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
       project={currentProject}
       selectedCategory={selectedCategory}
       navigateToProject={project => {
-        history.push(`/${URL_BROWSE2}/${params.entity}/${project}`);
+        history.push(`/${params.entity}/${project}`);
       }}
       navigateToObjectVersions={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/object-versions${
+          `/${params.entity}/${params.project}/object-versions${
             filter ? `?filter=${filter}` : ''
           }`
         );
       }}
       navigateToCalls={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/calls${
+          `/${params.entity}/${params.project}/calls${
             filter ? `?filter=${filter}` : ''
           }`
         );
       }}
       navigateToTypeVersions={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/type-versions${
+          `/${params.entity}/${params.project}/type-versions${
             filter ? `?filter=${filter}` : ''
           }`
         );
       }}
       navigateToOpVersions={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/op-versions${
+          `/${params.entity}/${params.project}/op-versions${
             filter ? `?filter=${filter}` : ''
           }`
         );
       }}
       navigateToBoards={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/boards${
+          `/${params.entity}/${params.project}/boards${
             filter ? `?filter=${filter}` : ''
           }`
         );
       }}
       navigateToTables={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/tables${
+          `/${params.entity}/${params.project}/tables${
             filter ? `?filter=${filter}` : ''
           }`
         );
@@ -204,7 +201,10 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
 };
 
 export const Browse2: FC = props => {
-  const projectRoot = `${URL_BROWSE2}/:entity/:project`;
+  const projectRoot = `:entity/:project`;
+  const params = useParams<Browse2Params>();
+  const entity = params.entity ?? '';
+  const project = params.project ?? '';
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
       <CssBaseline />
@@ -212,7 +212,7 @@ export const Browse2: FC = props => {
         <Toolbar>
           <IconButton
             component={RouterLink}
-            to={`/${URL_BROWSE2}`}
+            to={`/`}
             sx={{
               color: theme =>
                 theme.palette.getContrastText(theme.palette.primary.main),
@@ -224,11 +224,14 @@ export const Browse2: FC = props => {
             }}>
             <Home />
           </IconButton>
-          <Browse2Breadcrumbs />
+          <Route
+            path={`/:entity?/:project?/:rootType?/:objName?/:objVersion?/:refExtra*`}>
+            <Browse2Breadcrumbs />
+          </Route>
         </Toolbar>
       </AppBar>
       <Route
-        path={`/${URL_BROWSE2}/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)?`}>
+        path={`/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)?`}>
         <RouteAwareBrowse2ProjectSideNav />
       </Route>
       <Box component="main" sx={{flexGrow: 1, p: 3}}>
@@ -286,7 +289,7 @@ export const Browse2: FC = props => {
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/boards`}>
-            <Browse2Boards title={'Boards'} />
+            <AllBoardsPage entity={entity} project={project} />
           </Route>
           {/* TABLES */}
           <Route path={`/${projectRoot}/tables/:tableId`}>
@@ -296,30 +299,29 @@ export const Browse2: FC = props => {
             <Browse2Boards title={'Tables'} />
           </Route>
           {/* END TIM's ADDITIONS */}
-          <Route
-            path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId/:spanId?`}>
+          <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
             <Browse2TracePage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project/trace`}>
+          <Route path={`/:entity/:project/trace`}>
             <Browse2TracesPage />
           </Route>
           <Route
-            path={`/${URL_BROWSE2}/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
+            path={`/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
             <Browse2ObjectVersionItemPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project/:rootType/:objName`}>
+          <Route path={`/:entity/:project/:rootType/:objName`}>
             <Browse2ObjectPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project/:rootType`}>
+          <Route path={`/:entity/:project/:rootType`}>
             <Browse2ObjectTypePage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project`}>
+          <Route path={`/:entity/:project`}>
             <Browse2ProjectPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity`}>
+          <Route path={`/:entity`}>
             <Browse2EntityPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}`}>
+          <Route path={``}>
             <Browse2HomePage />
           </Route>
         </Switch>

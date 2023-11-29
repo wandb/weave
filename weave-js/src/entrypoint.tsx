@@ -177,9 +177,10 @@ ReactDOM.render(
         <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
           <Main browserType={URL_LOCAL} />
         </Route>
-        <Route
-          path={`/${URL_BROWSE2}/:entity?/:project?/:rootType?/:objName?/:objVersion?/:refExtra*`}>
-          <Browse2Wrapper />
+        <Route path={`/${URL_BROWSE2}`}>
+          <Router basename={`/${URL_BROWSE2}`}>
+            <Browse2Wrapper />
+          </Router>
         </Route>
         <Route path="/">
           <Main />

@@ -11,7 +11,6 @@ import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {Link, useParams} from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../../urls';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
@@ -146,7 +145,7 @@ export const RunsTable: FC<{
         renderCell: rowParams => {
           return (
             <Link
-              to={`/${URL_BROWSE2}/${params.entity}/${params.project}/trace/${rowParams.row.trace_id}/${rowParams.row.id}`}>
+              to={`/${params.entity}/${params.project}/trace/${rowParams.row.trace_id}/${rowParams.row.id}`}>
               {rowParams.row.id}
             </Link>
           );

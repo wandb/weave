@@ -3,7 +3,6 @@ import {formatRelativeTime} from '@wandb/weave/util';
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
 import {Paper} from './CommonLib';
 import {PageEl} from './CommonLib';
@@ -43,7 +42,7 @@ export const Browse2ObjectPage: FC = props => {
   const handleRowClick = useCallback(
     (row: any) => {
       history.push(
-        `/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${row.digest}`
+        `/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${row.digest}`
       );
     },
     [history, params.entity, params.objName, params.project, params.rootType]
