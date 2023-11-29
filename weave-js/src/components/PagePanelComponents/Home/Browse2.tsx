@@ -31,6 +31,7 @@ import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
 import {Browse2ProjectSideNav} from './Browse2SideNav';
+import Browse2Boards from './Browse2Boards';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -285,7 +286,7 @@ export const Browse2: FC = props => {
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/boards`}>
-            <Browse2DataModelRoute />
+            <Browse2Boards />
           </Route>
           {/* TABLES */}
           <Route path={`/${projectRoot}/tables/:tableId`}>
