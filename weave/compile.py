@@ -877,13 +877,13 @@ def _propagate_updated_types_through_lambdas(
     stub (type of the function itself) as well as the internal variable nodes
     accordingly. It then refines the inner lambda function to ensure that the
     updated variable types are correctly propagated through the lambda function.
+
+    Optimizations: 1) We call `_compile_refine_and_propagate_gql_inner` inside
+    of this function, which means we "compile" the inner part of the lambda twice.
+    If instead, we somehow propagated the updated var types before traversing into
+    them, we could do this in a single pass.
     """
-    #
-    # Optimizations: 1) We call `_compile_refine_and_propagate_gql_inner` inside
-    # of this function, which means we "compile" the inner part of the lambda twice.
-    # If instead, we somehow propagated the updated var types before traversing into
-    # them, we could do this in a single pass.
-    #
+
     if not isinstance(op.input_type, op_args.OpNamedArgs):
         return params
 
