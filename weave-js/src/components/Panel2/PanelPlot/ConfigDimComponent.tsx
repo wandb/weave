@@ -1,7 +1,12 @@
 import {LegacyWBIcon} from '@wandb/weave/common/components/elements/LegacyWBIcon';
 import HighlightedIcon from '@wandb/weave/common/components/HighlightedIcon';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
-import {ConstNode, constString} from '@wandb/weave/core';
+import {
+  ConstNode,
+  // constString,
+  isOutputNode,
+  isVoidNode,
+} from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
 import React, {ReactNode, useCallback, useMemo} from 'react';
@@ -24,10 +29,13 @@ import {
   IconMinimizeMode,
   IconWeave,
 } from '../Icons';
-import * as TableState from '../PanelTable/tableState';
+// import * as TableState from '../PanelTable/tableState';
+import {getColumnsFromInput} from './columnHelpers';
+import {ColumnWithExpressionDimension} from './ColumnWithExpressionDimension';
 import {ConfigDimLabel} from './ConfigDimLabel';
 import {ConfigSelect} from './ConfigSelect';
 import * as PlotState from './plotState';
+import {SelectColumn} from './SelectColumn';
 import * as S from './styles';
 import {DimComponentInputType, DimOption, DimOptionOrSection} from './types';
 import {PLOT_DIMS_UI, SeriesConfig} from './versions';
@@ -38,6 +46,21 @@ const IconBlank = styled.svg`
   height: 18px;
 `;
 IconBlank.displayName = 'S.IconBlank';
+
+// Return true if the given node is picking a constant string
+// from a row.
+const isColumnPickValue = (node: any, k: string): boolean => {
+  const {name, inputs} = node.fromOp;
+  // console.log('isColumnPickValue');
+  const x =
+    name === 'pick' &&
+    inputs.key.nodeType === 'const' &&
+    inputs.key.val === k &&
+    inputs.obj.nodeType === 'var' &&
+    inputs.obj.varName === 'row';
+  // console.log({name, inputs, x, node});
+  return x;
+};
 
 export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   const {
@@ -52,6 +75,9 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } = props;
   const weave = useWeaveContext();
   const redesignedPlotConfigEnabled = useWeaveRedesignedPlotConfigEnabled();
+
+  const availableColumns = getColumnsFromInput(input);
+
   const makeUnsharedDimDropdownOptions = useCallback(
     (series: SeriesConfig, dimName: (typeof PLOT_DIMS_UI)[number]) => {
       const removeSeriesDropdownOption =
@@ -126,13 +152,18 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   );
 
   const uiStateOptions = useMemo(() => {
-    if (!PlotState.isDropdownWithExpression(dimension)) {
+    if (
+      !PlotState.isDropdownWithExpression(dimension) &&
+      !PlotState.isColumnSelWithExpression(dimension)
+    ) {
       return [null];
     }
 
     // return true if an expression can be directly switched to a constant
-    const isDirectlySwitchable = (
-      dim: PlotState.DropdownWithExpressionDimension
+    const isSwitchableWithConst = (
+      dim:
+        | PlotState.DropdownWithExpressionDimension
+        | ColumnWithExpressionDimension
     ): boolean => {
       const options = dim.dropdownDim.options;
       const expressionValue = dim.expressionDim.state().value;
@@ -145,11 +176,41 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       );
     };
 
+    // return true if an expression can be switched with multi-select options
+    const isSwitchableWithDict = (
+      dim:
+        | PlotState.DropdownWithExpressionDimension
+        | ColumnWithExpressionDimension
+    ): boolean => {
+      const expressionValue = dim.expressionDim.state().value;
+      if (isVoidNode(expressionValue)) {
+        return true;
+      }
+      if (!isOutputNode(expressionValue)) {
+        return false;
+      }
+      const expressionIsDict = expressionValue.fromOp.name === 'dict';
+      if (expressionIsDict) {
+        const inputs = expressionValue.fromOp.inputs;
+        const keys = Object.keys(inputs);
+        const availableKeys = availableColumns.map(c => c.path.join('.'));
+        return keys.every(
+          k => availableKeys.includes(k) && isColumnPickValue(inputs[k], k)
+        );
+      }
+
+      return false;
+    };
+
     const clickHandler = (
-      dim: PlotState.DropdownWithExpressionDimension,
+      dim:
+        | PlotState.DropdownWithExpressionDimension
+        | ColumnWithExpressionDimension,
       kernel: (
         series: SeriesConfig,
-        dimension: PlotState.DropdownWithExpressionDimension
+        dimension:
+          | PlotState.DropdownWithExpressionDimension
+          | ColumnWithExpressionDimension
       ) => void
     ): void => {
       const newConfig = produce(config, draft => {
@@ -183,14 +244,24 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           active: dimension.mode() === 'dropdown',
           onClick: () => {
             clickHandler(dimension, (s, dim) => {
-              if (s.uiState[dim.name] === 'expression') {
+              console.log(Object.keys(s.uiState));
+              if (s.uiState[dim.name] !== 'dropdown') {
                 s.uiState[dim.name] = 'dropdown';
-                const expressionValue = dim.expressionDim.state().value;
+                // const expressionValue = dim.expressionDim.state().value;
+                // console.log('switching to dropdown');
+                // console.log({expressionValue});
 
                 // If the current expression has a corresponding dropdown option, use that dropdown value
-                if (isDirectlySwitchable(dim)) {
-                  s.constants[dim.name] = (expressionValue as ConstNode)
-                    .val as any;
+                if (isSwitchableWithConst(dim)) {
+                  console.log('switchable with const!!!');
+                  // s.constants[dim.name] = (expressionValue as ConstNode)
+                  //   .val as any;
+                } else if (isSwitchableWithDict(dim)) {
+                  console.log('switchable with dict!!!');
+                  // s.constants[dim.name] = (expressionValue as ConstNode)
+                  //   .val as any;
+                } else {
+                  console.log('Not switchable');
                 }
               }
             });
@@ -209,17 +280,18 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           active: dimension.mode() === 'expression',
           onClick: () => {
             clickHandler(dimension, (s, dim) => {
-              if (s.uiState[dim.name] === 'dropdown') {
+              if (s.uiState[dim.name] !== 'expression') {
                 s.uiState[dim.name] = 'expression';
 
                 // If the current dropdown is representable as an expression, use that expression
-                if (isDirectlySwitchable(dim)) {
-                  const colId = s.dims[dim.name];
-                  s.table = TableState.updateColumnSelect(
-                    s.table,
-                    colId,
-                    constString(s.constants[dim.name])
-                  );
+                if (isSwitchableWithConst(dim)) {
+                  console.log('isSwitchableWIthConst');
+                  // const colId = s.dims[dim.name];
+                  // s.table = TableState.updateColumnSelect(
+                  //   s.table,
+                  //   colId,
+                  //   constString(s.constants[dim.name])
+                  // );
                 }
               }
             });
@@ -227,7 +299,14 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         },
       ],
     ];
-  }, [config, updateConfig, isShared, dimension, redesignedPlotConfigEnabled]);
+  }, [
+    config,
+    updateConfig,
+    isShared,
+    dimension,
+    redesignedPlotConfigEnabled,
+    availableColumns,
+  ]);
 
   const topLevelDimOptions = useCallback(
     (dimName: (typeof PLOT_DIMS_UI)[number]) => {
@@ -254,6 +333,7 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       ]),
     [dimension, uiStateOptions, topLevelDimOptions, extraOptions]
   );
+  // console.log({dimOptions});
 
   const postFixComponent = useMemo(() => {
     if (!redesignedPlotConfigEnabled) {
@@ -398,6 +478,15 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     weave,
   ]);
 
+  // console.log({
+  //   name: dimension.name,
+  //   dimension,
+  //   isDropdownWithExpression: PlotState.isDropdownWithExpression(dimension),
+  //   isGroup: PlotState.isGroup(dimension),
+  //   isDropdown: PlotState.isDropdown(dimension),
+  //   isWeaveExpression: PlotState.isWeaveExpression(dimension),
+  //   isColumnSelWithExpression: PlotState.isColumnSelWithExpression(dimension),
+  // });
   if (PlotState.isDropdownWithExpression(dimension)) {
     return (
       <ConfigDimComponent
@@ -470,6 +559,70 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           updateConfig={updateConfig}
           series={isShared ? config.series : [dimension.series]}
         />
+      </ConfigDimLabel>
+    );
+  } else if (PlotState.isColumnSelWithExpression(dimension)) {
+    // console.log('col sel render');
+    // console.log({props});
+    // console.log({dimension});
+    // const postfix = <div>foo</div>;
+
+    // This worked for logged CIA table
+    // const availableColumns = Object.keys(
+    //   props.input.type.objectType.propertyTypes
+    // );
+    // type = tagged
+    // produce.input.type.
+    // console.log({props});
+    // getColumnsFromInput(props.input);
+    // const availableColumns: string[] = [];
+
+    // const value = nullableTaggableValue(props.input.type);
+    // const availableColumns = Object.keys(value.objectType.propertyTypes);
+    // const columnTypes = availableColumns.map(c => {
+    //   const unionMembers = value.objectType.propertyTypes[c].members;
+    //   console.log({c, unionMembers});
+    //   // return unionMembers[1]; // TODO: this ok
+    // });
+    // console.log({value, availableColumns, columnTypes});
+
+    // taggableValue
+
+    // dimension.series;
+    // const colId = this.series.dims[this.name];
+    // const selectFunction = this.series.table.columnSelectFunctions[colId];
+
+    // console.log({
+    //   availableColumns,
+    //   config,
+    //   updateConfig,
+    //   isShared,
+    //   mode: dimension.mode(),
+    // });
+    return (
+      <ConfigDimLabel
+        {...props}
+        postfixComponent={postFixComponent}
+        multiline={redesignedPlotConfigEnabled && multiline}
+        redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
+        {dimension.mode() === 'dropdown' ? (
+          <SelectColumn
+            dimension={dimension}
+            columns={availableColumns}
+            input={input}
+            config={config}
+            updateConfig={updateConfig}
+            series={isShared ? config.series : [dimension.series]}
+          />
+        ) : (
+          <WeaveExpressionDimConfig
+            dimName={dimension.name}
+            input={input}
+            config={config}
+            updateConfig={updateConfig}
+            series={isShared ? config.series : [dimension.series]}
+          />
+        )}
       </ConfigDimLabel>
     );
   }

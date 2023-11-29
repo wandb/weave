@@ -46,7 +46,6 @@ export const DIM_NAME_MAP: {
   y2: 'Y2 Dim',
   lineStyle: 'Style',
 };
-
 export type DimName = keyof typeof DIM_NAME_MAP;
 
 export type DimState = {
@@ -59,4 +58,5 @@ export type DimType =
   | 'optionSelect'
   | 'weaveExpression'
   | 'group'
-  | 'dropdownWithExpression';
+  | 'dropdownWithExpression'
+  | 'columnSelWithExpression';
