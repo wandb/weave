@@ -388,7 +388,7 @@ def send_local_file(path):
     return send_from_directory("/", path)
 
 
-@blueprint.before_app_first_request
+@blueprint.before_request
 def _disable_eager_mode():
     context_state._eager_mode.set(False)
 
