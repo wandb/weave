@@ -3,12 +3,12 @@ import {
   AppBar,
   Box,
   Breadcrumbs,
-  Container,
   IconButton,
   Link as MaterialLink,
   Toolbar,
   Typography,
 } from '@mui/material';
+import CssBaseline from '@mui/material/CssBaseline';
 import {LicenseInfo} from '@mui/x-license-pro';
 import React, {FC} from 'react';
 import {Link as RouterLink, Route, Switch, useParams} from 'react-router-dom';
@@ -22,6 +22,7 @@ import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPa
 import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
+import {Browse2ProjectSideNav} from './Browse2SideNav';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -117,13 +118,9 @@ const Browse2Breadcrumbs: FC = props => {
 
 export const Browse2: FC = props => {
   return (
-    <div
-      style={{
-        height: '100vh',
-        overflow: 'auto',
-        backgroundColor: '#fafafa',
-      }}>
-      <AppBar position="static">
+    <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
+      <CssBaseline />
+      <AppBar position="fixed" sx={{zIndex: theme => theme.zIndex.drawer + 1}}>
         <Toolbar>
           <IconButton
             component={RouterLink}
@@ -142,8 +139,11 @@ export const Browse2: FC = props => {
           <Browse2Breadcrumbs />
         </Toolbar>
       </AppBar>
-      <Container maxWidth="xl">
-        <Box sx={{height: 40}} />
+      <Route path={`/${URL_BROWSE2}/:entity/:project`}>
+        <Browse2ProjectSideNav />
+      </Route>
+      <Box component="main" sx={{flexGrow: 1, p: 3}}>
+        <Toolbar />
         <Switch>
           <Route
             path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId/:spanId?`}>
@@ -172,7 +172,7 @@ export const Browse2: FC = props => {
             <Browse2HomePage />
           </Route>
         </Switch>
-      </Container>
-    </div>
+      </Box>
+    </Box>
   );
 };
