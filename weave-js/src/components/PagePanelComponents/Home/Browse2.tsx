@@ -5,12 +5,13 @@ import {
   Breadcrumbs,
   Container,
   IconButton,
+  LinearProgress,
   Link as MaterialLink,
   Toolbar,
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC} from 'react';
+import React, {FC, useEffect} from 'react';
 import {
   BrowserRouter as Router,
   Link as RouterLink,
@@ -19,6 +20,7 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {useWeaveContext} from '../../../context';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
@@ -125,6 +127,15 @@ export const Browse2: FC<{basename: string}> = props => {
 };
 
 const Browse2Mounted: FC = props => {
+  const {client: weaveClient} = useWeaveContext();
+  const loadingObservable = weaveClient.loadingObservable();
+  const [loading, setLoading] = React.useState(false);
+  useEffect(() => {
+    const sub = loadingObservable.subscribe(weaveIsLoading => {
+      setLoading(weaveIsLoading);
+    });
+    return () => sub.unsubscribe();
+  }, [loadingObservable]);
   return (
     <div
       style={{
@@ -154,6 +165,7 @@ const Browse2Mounted: FC = props => {
           </Route>
         </Toolbar>
       </AppBar>
+      {loading ? <LinearProgress /> : <div style={{height: 4}} />}
       <Container maxWidth="xl">
         <Box sx={{height: 40}} />
         <Switch>
