@@ -171,6 +171,10 @@ export const Browse2: FC = props => {
         <Toolbar />
         <Switch>
           <Route
+            path={`/${URL_BROWSE2}/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|streams)`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route
             path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId/:spanId?`}>
             <Browse2TracePage />
           </Route>
@@ -200,4 +204,15 @@ export const Browse2: FC = props => {
       </Box>
     </Box>
   );
+};
+
+interface Browse2DataModelRouteParams {
+  entity?: string;
+  project?: string;
+  tab?: string;
+}
+
+const Browse2DataModelRoute: FC = props => {
+  const params = useParams<Browse2DataModelRouteParams>();
+  return <>{JSON.stringify(params)}</>;
 };
