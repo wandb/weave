@@ -388,6 +388,11 @@ def send_local_file(path):
     return send_from_directory("/", path)
 
 
+@blueprint.before_app_first_request
+def _disable_eager_mode():
+    context_state._eager_mode.set(False)
+
+
 def frontend_env():
     """If you add vars here, make sure to define their types in weave-js/src/config.ts"""
     return {
