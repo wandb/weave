@@ -6,7 +6,7 @@ import {
   updateUserInfo,
   useViewerUserInfo,
 } from '@wandb/weave/common/hooks/useViewerUserInfo';
-import React, {useEffect} from 'react';
+import React, {FC, useEffect} from 'react';
 import ReactDOM from 'react-dom';
 import useMousetrap from 'react-hook-mousetrap';
 import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
@@ -136,7 +136,7 @@ const Main = ({browserType}: MainProps) => {
   );
 };
 
-const Browse2Wrapper = () => (
+const Browse2Wrapper: FC<{basename: string}> = props => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
@@ -144,7 +144,7 @@ const Browse2Wrapper = () => (
           <PanelRootContextProvider>
             <WeaveViewerContextProvider>
               <PanelInteractContextProvider>
-                <Browse2 />
+                <Browse2 basename={props.basename} />
               </PanelInteractContextProvider>
             </WeaveViewerContextProvider>
           </PanelRootContextProvider>
@@ -178,9 +178,7 @@ ReactDOM.render(
           <Main browserType={URL_LOCAL} />
         </Route>
         <Route path={`/${URL_BROWSE2}`}>
-          <Router basename={`/${URL_BROWSE2}`}>
-            <Browse2Wrapper />
-          </Router>
+          <Browse2Wrapper basename={`/${URL_BROWSE2}`} />
         </Route>
         <Route path="/">
           <Main />

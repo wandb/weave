@@ -290,12 +290,23 @@ const projectBoardsNode = (entityName: string, projectName: string) => {
 const opProjectBoardArtifacts = ({project}: {project: w.Node}) => {
   let artifactsNode;
   if (ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE) {
-    const artifactTypesNode = w.opProjectArtifactType({
-      project,
-      artifactType: w.constString('Panel'),
+    const preWeaveflowArtifactTypesNode = w.opArtifactTypeArtifacts({
+      artifactType: w.opProjectArtifactType({
+        project,
+        artifactType: w.constString('Group'),
+      }),
     });
-    artifactsNode = w.opArtifactTypeArtifacts({
-      artifactType: artifactTypesNode,
+    const postWeaveflowArtifactTypesNode = w.opArtifactTypeArtifacts({
+      artifactType: w.opProjectArtifactType({
+        project,
+        artifactType: w.constString('Panel'),
+      }),
+    });
+    artifactsNode = w.opConcat({
+      arr: w.opArray({
+        a: preWeaveflowArtifactTypesNode,
+        b: postWeaveflowArtifactTypesNode,
+      } as any),
     });
   } else {
     const artifactTypesNode = w.opProjectArtifactTypes({

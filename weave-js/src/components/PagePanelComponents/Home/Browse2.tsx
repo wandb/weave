@@ -13,6 +13,7 @@ import {LicenseInfo} from '@mui/x-license-pro';
 import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
 import {
+  BrowserRouter as Router,
   Link as RouterLink,
   Route,
   Switch,
@@ -200,7 +201,15 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
   );
 };
 
-export const Browse2: FC = props => {
+export const Browse2: FC<{basename: string}> = props => {
+  return (
+    <Router basename={props.basename}>
+      <Browse2Mounted />
+    </Router>
+  );
+};
+
+const Browse2Mounted: FC = props => {
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
       <CssBaseline />
@@ -233,12 +242,10 @@ export const Browse2: FC = props => {
       <Box component="main" sx={{flexGrow: 1, p: 3}}>
         <Toolbar />
         <Switch>
-          {/* TIM's ADDITIONS */}
           <Route
             path={`/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)`}>
             <Browse2ProjectRoot />
           </Route>
-          {/* END TIM's ADDITIONS */}
           <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
             <Browse2TracePage />
           </Route>
