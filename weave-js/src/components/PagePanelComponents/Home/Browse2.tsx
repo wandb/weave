@@ -10,14 +10,15 @@ import {
 } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC} from 'react';
+import _ from 'lodash';
+import React, {FC, useMemo} from 'react';
 import {
   Link as RouterLink,
   Route,
   Switch,
   useHistory,
-  useParams,
   useLocation,
+  useParams,
 } from 'react-router-dom';
 
 import {URL_BROWSE2} from '../../../urls';
@@ -30,7 +31,6 @@ import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
 import {Browse2ProjectSideNav} from './Browse2SideNav';
-import _ from 'lodash';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -125,10 +125,26 @@ const Browse2Breadcrumbs: FC = props => {
 };
 
 const RouteAwareBrowse2ProjectSideNav: FC = props => {
-  const params = useParams<Browse2Params>();
+  const params = useParams<Browse2DataModelRouteParams>();
   const history = useHistory();
   const currentProject = params.project;
   const currentEntity = params.entity;
+  const selectedCategory = useMemo(() => {
+    if (params.tab === 'types' || params.tab === 'type-versions') {
+      return 'types';
+    } else if (params.tab === 'objects' || params.tab === 'object-versions') {
+      return 'objects';
+    } else if (params.tab === 'ops' || params.tab === 'op-versions') {
+      return 'ops';
+    } else if (params.tab === 'calls') {
+      return 'calls';
+    } else if (params.tab === 'boards') {
+      return 'boards';
+    } else if (params.tab === 'tables') {
+      return 'tables';
+    }
+    return undefined;
+  }, [params.tab]);
   if (!currentProject || !currentEntity) {
     return null;
   }
@@ -136,6 +152,7 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
     <Browse2ProjectSideNav
       entity={currentEntity}
       project={currentProject}
+      selectedCategory={selectedCategory}
       navigateToProject={project => {
         history.push(`/${URL_BROWSE2}/${params.entity}/${project}`);
       }}
@@ -209,7 +226,8 @@ export const Browse2: FC = props => {
           <Browse2Breadcrumbs />
         </Toolbar>
       </AppBar>
-      <Route path={`/${URL_BROWSE2}/:entity/:project`}>
+      <Route
+        path={`/${URL_BROWSE2}/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)?`}>
         <RouteAwareBrowse2ProjectSideNav />
       </Route>
       <Box component="main" sx={{flexGrow: 1, p: 3}}>

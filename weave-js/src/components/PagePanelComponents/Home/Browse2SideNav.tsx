@@ -46,14 +46,16 @@ type NavigationCallbacks = {
 type Browse2ProjectSideNavProps = {
   entity: string;
   project: string;
+  selectedCategory?:
+    | 'objects'
+    | 'calls'
+    | 'types'
+    | 'ops'
+    | 'boards'
+    | 'tables';
 } & NavigationCallbacks;
 
-export const Browse2ProjectSideNav: FC<
-  {
-    entity: string;
-    project: string;
-  } & NavigationCallbacks
-> = props => {
+export const Browse2ProjectSideNav: FC<Browse2ProjectSideNavProps> = props => {
   const sections = useSectionsForProject(props);
   const entityProjectsValue = useProjectsForEntity(props.entity);
   const projects = useMemo(() => {
@@ -98,6 +100,7 @@ type SectionType = {
 type ItemType = {
   title: string;
   icon: React.ReactNode;
+  selected?: boolean;
   onClick: () => void;
   children?: Array<ItemType>;
 };
@@ -105,7 +108,10 @@ const SideBarNavItem: FC<{item: ItemType; depth?: number}> = props => {
   const depth = props.depth ?? 0;
   return (
     <Fragment>
-      <ListItemButton sx={{pl: 2 + depth}} onClick={props.item.onClick}>
+      <ListItemButton
+        sx={{pl: 2 + depth}}
+        onClick={props.item.onClick}
+        selected={props.item.selected}>
         <ListItemIcon>{props.item.icon}</ListItemIcon>
         <ListItemText primary={props.item.title} />
       </ListItemButton>
@@ -156,6 +162,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
         items: [
           {
             title: 'Objects', //, 'Instances (ObjectVersions)',
+            selected: props.selectedCategory === 'objects',
             icon: <Category />,
             onClick: () => {
               props.navigateToObjects();
@@ -179,6 +186,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
           },
           {
             title: 'Traces', // 'Traces (Calls)',
+            selected: props.selectedCategory === 'calls',
             icon: <Segment />,
             onClick: () => {
               props.navigateToCalls();
@@ -228,6 +236,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
         items: [
           {
             title: 'Types', // 'Classes (TypeVersions)',
+            selected: props.selectedCategory === 'types',
             icon: <TypeSpecimen />,
             onClick: () => {
               props.navigateToTypes();
@@ -235,6 +244,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
           },
           {
             title: 'Operations', // 'Methods (OpDefVersions)',
+            selected: props.selectedCategory === 'ops',
             icon: <ManageHistory />,
             onClick: () => {
               props.navigateToOps();
@@ -247,6 +257,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
         items: [
           {
             title: 'Boards',
+            selected: props.selectedCategory === 'boards',
             icon: <DashboardCustomize />,
             onClick: () => {
               props.navigateToBoards();
@@ -254,6 +265,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
           },
           {
             title: 'Tables',
+            selected: props.selectedCategory === 'tables',
             icon: <TableChart />,
             onClick: () => {
               props.navigateToTables();
