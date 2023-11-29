@@ -4,7 +4,6 @@ import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
 import {Browse2RootObjectType} from './Browse2RootObjectType';
 import {Link, makeObjRefUri, Paper} from './CommonLib';
@@ -86,9 +85,7 @@ export const Browse2ProjectPage: FC = props => {
   const history = useHistory();
   const handleRowClick = useCallback(
     (row: any) => {
-      history.push(
-        `/${URL_BROWSE2}/${params.entity}/${params.project}/${row.name}`
-      );
+      history.push(`/${params.entity}/${params.project}/${row.name}`);
     },
     [history, params.entity, params.project]
   );
@@ -121,8 +118,7 @@ export const Browse2ProjectPage: FC = props => {
               justifyContent="space-between">
               Functions
               <Typography variant="h6" component="span">
-                <Link
-                  to={`/${URL_BROWSE2}/${params.entity}/${params.project}/trace`}>
+                <Link to={`/${params.entity}/${params.project}/trace`}>
                   [See all runs]
                 </Link>
               </Typography>

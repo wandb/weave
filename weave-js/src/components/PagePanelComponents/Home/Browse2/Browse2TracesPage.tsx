@@ -1,7 +1,6 @@
 import React, {FC} from 'react';
 import {useParams} from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../../urls';
 import {CallFilter, StreamId, TraceSpan} from './callTree';
 import {useTraceSummaries} from './callTreeHooks';
 import {Link} from './CommonLib';
@@ -18,7 +17,7 @@ const Browse2Traces: FC<{
       {traces.map(trace => (
         <div>
           <Link
-            to={`/${URL_BROWSE2}/${streamId.entityName}/${streamId.projectName}/trace/${trace.trace_id}`}>
+            to={`/${streamId.entityName}/${streamId.projectName}/trace/${trace.trace_id}`}>
             {trace.trace_id}
           </Link>
           : {trace.span_count}

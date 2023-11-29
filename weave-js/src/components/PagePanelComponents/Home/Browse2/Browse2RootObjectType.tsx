@@ -1,7 +1,6 @@
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
 import {LinkTable} from './LinkTable';
 
@@ -28,9 +27,7 @@ export const Browse2RootObjectType: FC<Browse2RootObjectTypeParams> = ({
   const history = useHistory();
   const handleRowClick = useCallback(
     (row: any) => {
-      history.push(
-        `/${URL_BROWSE2}/${entity}/${project}/${rootType}/${row.name}`
-      );
+      history.push(`/${entity}/${project}/${rootType}/${row.name}`);
     },
     [history, entity, project, rootType]
   );

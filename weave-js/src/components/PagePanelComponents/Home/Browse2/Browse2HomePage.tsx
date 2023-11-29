@@ -3,7 +3,6 @@ import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../../urls';
 import * as query from '../query';
 import {PageEl, PageHeader, Paper} from './CommonLib';
 import {LinkTable} from './LinkTable';
@@ -23,7 +22,7 @@ export const Browse2HomePage: FC = props => {
   const handleRowClick = useCallback(
     (row: any) => {
       const entityName = row.name;
-      history.push(`/${URL_BROWSE2}/${entityName}`);
+      history.push(`/${entityName}`);
     },
     [history]
   );

@@ -18,7 +18,6 @@ import {
   refUri,
   useNodeValue,
 } from '@wandb/weave/react';
-import {URL_BROWSE2} from '@wandb/weave/urls';
 import React, {FC, useMemo} from 'react';
 
 import {Link} from './CommonLib';
@@ -37,7 +36,7 @@ const refUIUrl = (rootTypeName: string, objRef: ArtifactRef) => {
   if (!isWandbArtifactRef(objRef)) {
     throw new Error('Not a wandb artifact ref');
   }
-  return `/${URL_BROWSE2}/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
+  return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
 };
 
 export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
