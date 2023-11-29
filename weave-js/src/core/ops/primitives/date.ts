@@ -285,3 +285,18 @@ export const opDateRoundWeek = dateRounder('week');
 export const opDateRoundDay = dateRounder('day');
 export const opDateRoundHour = dateRounder('hour');
 export const opDateRoundMinute = dateRounder('minute');
+
+
+export const opDatetimeNow = makeDateOp({
+  hidden: true,
+  name: 'datetime-now',
+  argTypes: {},
+  description: `Returns the difference between two ${docType('date', {
+    plural: true,
+  })} in milliseconds`,
+  returnValueDescription: `datetime.now()`,
+  returnType: inputTypes => 'number',
+  resolver: inputs => {
+    return moment.now()
+  },
+});

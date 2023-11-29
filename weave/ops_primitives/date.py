@@ -318,3 +318,8 @@ def timestamp(timestampISO: str) -> typing.Optional[datetime.datetime]:
             return dateutil.parser.parse(timestampISO)
         except dateutil.parser.ParserError:
             return None
+
+
+@op(name="datetime-now", output_type=types.Number())
+def datetime_now():
+    return int(datetime.datetime.now().timestamp())
