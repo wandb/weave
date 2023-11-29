@@ -5,11 +5,11 @@ import {
   Dataset,
   Layers,
   ManageHistory,
+  ModelTraining,
   Rule,
   Scoreboard,
   Segment,
   TableChart,
-  Train,
   Tune,
   TypeSpecimen,
 } from '@mui/icons-material';
@@ -170,7 +170,7 @@ const useSectionsForProject = (entity: string, project: string) => {
             children: [
               {
                 title: 'Train',
-                icon: <Train />,
+                icon: <ModelTraining />,
               },
               {
                 title: 'Predict',
