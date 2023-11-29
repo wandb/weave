@@ -32,7 +32,6 @@ export const TablesPage: React.FC = () => {
         src="https://github.com/wandb/weave/blob/562a679a24ede63dcf4295476a52d7dc38d4bd04/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/tables_example.png?raw=true"
         style={{
           width: '100%',
-          maxWidth: '800px',
         }}
       />
     </div>
