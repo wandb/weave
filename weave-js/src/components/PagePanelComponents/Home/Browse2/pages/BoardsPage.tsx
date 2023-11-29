@@ -24,7 +24,9 @@ export const BoardsPage: React.FC = () => {
         </li>
       </ul>
       <div>Inspiration</div>
-      <a href="">Link</a>
+      <a href="https://weave.wandb.test/browse/wandb/timssweeney/weave/board">
+        Link
+      </a>
       <image src="" />
     </div>
   );
