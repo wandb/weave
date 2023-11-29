@@ -41,6 +41,11 @@ export const BoardPage: React.FC = () => {
           Back to all boards. <Link to={prefix('/boards')}>/boards</Link>
         </li>
       </ul>
+      <div>Inspiration</div>
+      <a href="https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2Ftimssweeney%2Fcustomer_demo%2Fc_exmaple%3A8b2b4705f6776948b84d%2Fobj%22%29">
+        Link
+      </a>
+      <image src="" />
     </div>
   );
 };
