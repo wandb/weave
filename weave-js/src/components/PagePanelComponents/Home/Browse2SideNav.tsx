@@ -35,10 +35,10 @@ const drawerWidth = 240;
 
 type NavigationCallbacks = {
   navigateToProject: (project: string) => void;
-  navigateToObjects: (filter?: string) => void;
+  navigateToObjectVersions: (filter?: string) => void;
   navigateToCalls: (filter?: string) => void;
-  navigateToTypes: (filter?: string) => void;
-  navigateToOps: (filter?: string) => void;
+  navigateToTypeVersions: (filter?: string) => void;
+  navigateToOpVersions: (filter?: string) => void;
   navigateToBoards: (filter?: string) => void;
   navigateToTables: (filter?: string) => void;
 };
@@ -135,11 +135,11 @@ const SideNav: FC<{
       {props.sections.map((section, sectionIndex) => {
         return (
           <Fragment key={sectionIndex}>
-            <Divider />
             <ListSubheader component="div" id="nested-list-subheader">
+              <Divider />
               {section.title}
+              <Divider />
             </ListSubheader>
-            <Divider />
             <List>
               {section.items.map((item, itemIndex) => {
                 return <SideBarNavItem item={item} key={itemIndex} />;
@@ -165,21 +165,21 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'objects',
             icon: <Category />,
             onClick: () => {
-              props.navigateToObjects();
+              props.navigateToObjectVersions();
             },
             children: [
               {
                 title: 'Models',
                 icon: <Layers />,
                 onClick: () => {
-                  props.navigateToObjects('kind="model"');
+                  props.navigateToObjectVersions('kind="model"');
                 },
               },
               {
                 title: 'Datasets',
                 icon: <Dataset />,
                 onClick: () => {
-                  props.navigateToObjects('kind="dataset"');
+                  props.navigateToObjectVersions('kind="dataset"');
                 },
               },
             ],
@@ -239,7 +239,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'types',
             icon: <TypeSpecimen />,
             onClick: () => {
-              props.navigateToTypes();
+              props.navigateToTypeVersions('alias="latest"');
             },
           },
           {
@@ -247,7 +247,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'ops',
             icon: <ManageHistory />,
             onClick: () => {
-              props.navigateToOps();
+              props.navigateToOpVersions('alias="latest"');
             },
           },
         ],

@@ -6,7 +6,9 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import _ from 'lodash';
 import * as React from 'react';
+import {useLocation} from 'react-router-dom';
 
 function createData(
   name: string,
@@ -26,11 +28,24 @@ const rows = [
   createData('Gingerbread', 356, 16.0, 49, 3.9),
 ];
 
-export default function Browse2Boards() {
+function useQuery() {
+  const {search} = useLocation();
+
+  return React.useMemo(() => {
+    const params = new URLSearchParams(search);
+    const entries = Array.from(params.entries());
+    const searchDict = _.fromPairs(entries);
+    return searchDict;
+  }, [search]);
+}
+
+export const Browse2Boards: React.FC<{title: string}> = props => {
+  const search = useQuery();
+  const filter = search.filter;
   return (
     <>
       <Typography variant="h3" component="h3" gutterBottom>
-        All Boards
+        {props.title} {filter}
       </Typography>
       <TableContainer component={Paper}>
         <Table sx={{minWidth: 650}} size="small" aria-label="a dense table">
@@ -62,4 +77,4 @@ export default function Browse2Boards() {
       </TableContainer>
     </>
   );
-}
+};

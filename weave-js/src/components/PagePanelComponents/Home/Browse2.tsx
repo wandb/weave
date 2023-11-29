@@ -31,7 +31,7 @@ import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
 import {Browse2ProjectSideNav} from './Browse2SideNav';
-import Browse2Boards from './Browse2Boards';
+import {Browse2Boards} from './Browse2Boards';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -157,9 +157,9 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
       navigateToProject={project => {
         history.push(`/${URL_BROWSE2}/${params.entity}/${project}`);
       }}
-      navigateToObjects={(filter?: string) => {
+      navigateToObjectVersions={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/objects${
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/object-versions${
             filter ? `?filter=${filter}` : ''
           }`
         );
@@ -171,16 +171,16 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
           }`
         );
       }}
-      navigateToTypes={(filter?: string) => {
+      navigateToTypeVersions={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/types${
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/type-versions${
             filter ? `?filter=${filter}` : ''
           }`
         );
       }}
-      navigateToOps={(filter?: string) => {
+      navigateToOpVersions={(filter?: string) => {
         history.push(
-          `/${URL_BROWSE2}/${params.entity}/${params.project}/ops${
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/op-versions${
             filter ? `?filter=${filter}` : ''
           }`
         );
@@ -243,10 +243,10 @@ export const Browse2: FC = props => {
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/types`}>
-            <Browse2DataModelRoute />
+            <Browse2Boards title={'Types'} />
           </Route>
           <Route path={`/${projectRoot}/type-versions`}>
-            <Browse2DataModelRoute />
+            <Browse2Boards title={'Type Versions'} />
           </Route>
           {/* OBJECTS */}
           <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
@@ -256,10 +256,10 @@ export const Browse2: FC = props => {
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/objects`}>
-            <Browse2DataModelRoute />
+            <Browse2Boards title={'Objects'} />
           </Route>
           <Route path={`/${projectRoot}/object-versions`}>
-            <Browse2DataModelRoute />
+            <ObjectVersionsPage />
           </Route>
           {/* OPS */}
           <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
@@ -269,31 +269,31 @@ export const Browse2: FC = props => {
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/ops`}>
-            <Browse2DataModelRoute />
+            <Browse2Boards title={'Ops'} />
           </Route>
           <Route path={`/${projectRoot}/op-versions`}>
-            <Browse2DataModelRoute />
+            <Browse2Boards title={'Op Versions'} />
           </Route>
           {/* CALLS */}
           <Route path={`/${projectRoot}/calls/:callId`}>
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/calls`}>
-            <Browse2DataModelRoute />
+            <CallsPage />
           </Route>
           {/* BOARDS */}
           <Route path={`/${projectRoot}/boards/:boardId`}>
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/boards`}>
-            <Browse2Boards />
+            <Browse2Boards title={'Boards'} />
           </Route>
           {/* TABLES */}
           <Route path={`/${projectRoot}/tables/:tableId`}>
             <Browse2DataModelRoute />
           </Route>
           <Route path={`/${projectRoot}/tables`}>
-            <Browse2DataModelRoute />
+            <Browse2Boards title={'Tables'} />
           </Route>
           {/* END TIM's ADDITIONS */}
           <Route
@@ -345,8 +345,68 @@ function useQuery() {
   }, [search]);
 }
 
+const dummyImageURL =
+  'https://github.com/wandb/weave/blob/7cbb458e83a7121042af6ab6894f999210fafa4d/weave-js/src/components/PagePanelComponents/Home/dd_placeholder.png?raw=true';
+
 const Browse2DataModelRoute: FC = props => {
   const params = useParams<Browse2DataModelRouteParams>();
   const search = useQuery();
-  return <pre>{JSON.stringify({params, search}, null, 2)}</pre>;
+  console.log('BROWSE2 DATA MODEL ROUTE', {params, search});
+
+  return (
+    <div
+      style={{
+        backgroundImage: `url(${dummyImageURL})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        width: '100%',
+        height: '100%',
+      }}
+    />
+  );
+};
+
+const ObjectVersionsPage: FC = props => {
+  const search = useQuery();
+  const filter = search.filter;
+  return (
+    <>
+      <Typography variant="h3" component="h3" gutterBottom>
+        Objects {filter}
+      </Typography>
+      <div
+        style={{
+          backgroundImage: `url(${dummyImageURL})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          width: '100%',
+          height: '100%',
+        }}
+      />
+    </>
+  );
+};
+
+const CallsPage: FC = props => {
+  const search = useQuery();
+  const filter = search.filter;
+  return (
+    <>
+      <Typography variant="h3" component="h3" gutterBottom>
+        Calls {filter}
+      </Typography>
+      <div
+        style={{
+          backgroundImage: `url(${dummyImageURL})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          width: '100%',
+          height: '100%',
+        }}
+      />
+    </>
+  );
 };
