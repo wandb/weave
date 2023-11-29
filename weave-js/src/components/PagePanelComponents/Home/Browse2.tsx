@@ -201,10 +201,6 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
 };
 
 export const Browse2: FC = props => {
-  const projectRoot = `:entity/:project`;
-  const params = useParams<Browse2Params>();
-  const entity = params.entity ?? '';
-  const project = params.project ?? '';
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
       <CssBaseline />
@@ -238,65 +234,9 @@ export const Browse2: FC = props => {
         <Toolbar />
         <Switch>
           {/* TIM's ADDITIONS */}
-          {/* TYPES */}
-          <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/types/:typeName`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/types`}>
-            <Browse2Boards title={'Types'} />
-          </Route>
-          <Route path={`/${projectRoot}/type-versions`}>
-            <Browse2Boards title={'Type Versions'} />
-          </Route>
-          {/* OBJECTS */}
-          <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/objects/:objectName`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/objects`}>
-            <Browse2Boards title={'Objects'} />
-          </Route>
-          <Route path={`/${projectRoot}/object-versions`}>
-            <ObjectVersionsPage />
-          </Route>
-          {/* OPS */}
-          <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/ops/:opName`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/ops`}>
-            <Browse2Boards title={'Ops'} />
-          </Route>
-          <Route path={`/${projectRoot}/op-versions`}>
-            <Browse2Boards title={'Op Versions'} />
-          </Route>
-          {/* CALLS */}
-          <Route path={`/${projectRoot}/calls/:callId`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/calls`}>
-            <CallsPage />
-          </Route>
-          {/* BOARDS */}
-          <Route path={`/${projectRoot}/boards/:boardId`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/boards`}>
-            <AllBoardsPage entity={entity} project={project} />
-          </Route>
-          {/* TABLES */}
-          <Route path={`/${projectRoot}/tables/:tableId`}>
-            <Browse2DataModelRoute />
-          </Route>
-          <Route path={`/${projectRoot}/tables`}>
-            <Browse2Boards title={'Tables'} />
+          <Route
+            path={`/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)`}>
+            <Browse2ProjectRoot />
           </Route>
           {/* END TIM's ADDITIONS */}
           <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
@@ -327,6 +267,77 @@ export const Browse2: FC = props => {
         </Switch>
       </Box>
     </Box>
+  );
+};
+
+const Browse2ProjectRoot: FC = () => {
+  const params = useParams<Browse2Params>();
+  const entity = params.entity ?? '';
+  const project = params.project ?? '';
+  const projectRoot = `:entity/:project`;
+  return (
+    <Switch>
+      {/* TYPES */}
+      <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/types/:typeName`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/types`}>
+        <Browse2Boards title={'Types'} />
+      </Route>
+      <Route path={`/${projectRoot}/type-versions`}>
+        <Browse2Boards title={'Type Versions'} />
+      </Route>
+      {/* OBJECTS */}
+      <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/objects/:objectName`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/objects`}>
+        <Browse2Boards title={'Objects'} />
+      </Route>
+      <Route path={`/${projectRoot}/object-versions`}>
+        <ObjectVersionsPage />
+      </Route>
+      {/* OPS */}
+      <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/ops/:opName`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/ops`}>
+        <Browse2Boards title={'Ops'} />
+      </Route>
+      <Route path={`/${projectRoot}/op-versions`}>
+        <Browse2Boards title={'Op Versions'} />
+      </Route>
+      {/* CALLS */}
+      <Route path={`/${projectRoot}/calls/:callId`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/calls`}>
+        <CallsPage />
+      </Route>
+      {/* BOARDS */}
+      <Route path={`/${projectRoot}/boards/:boardId`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/boards`}>
+        <AllBoardsPage entity={entity} project={project} />
+      </Route>
+      {/* TABLES */}
+      <Route path={`/${projectRoot}/tables/:tableId`}>
+        <Browse2DataModelRoute />
+      </Route>
+      <Route path={`/${projectRoot}/tables`}>
+        <Browse2Boards title={'Tables'} />
+      </Route>
+    </Switch>
   );
 };
 

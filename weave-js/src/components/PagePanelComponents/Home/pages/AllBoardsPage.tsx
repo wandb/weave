@@ -34,7 +34,7 @@ export const AllBoardsPage: React.FC<{
   project: string;
 }> = ({entity, project}) => {
   const boards = query.useProjectBoards(entity, project);
-  console.log(boards);
+  console.log({boards, entity, project});
   return (
     <>
       <Typography variant="h3" component="h3" gutterBottom>
