@@ -11,7 +11,13 @@ import {
 import CssBaseline from '@mui/material/CssBaseline';
 import {LicenseInfo} from '@mui/x-license-pro';
 import React, {FC} from 'react';
-import {Link as RouterLink, Route, Switch, useParams} from 'react-router-dom';
+import {
+  Link as RouterLink,
+  Route,
+  Switch,
+  useHistory,
+  useParams,
+} from 'react-router-dom';
 
 import {URL_BROWSE2} from '../../../urls';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
@@ -116,6 +122,25 @@ const Browse2Breadcrumbs: FC = props => {
   );
 };
 
+const RouteAwareBrowse2ProjectSideNav: FC = props => {
+  const params = useParams<Browse2Params>();
+  const history = useHistory();
+  const currentProject = params.project;
+  const currentEntity = params.entity;
+  if (!currentProject || !currentEntity) {
+    return null;
+  }
+  return (
+    <Browse2ProjectSideNav
+      currentEntity={currentEntity}
+      currentProject={currentProject}
+      onProjectChange={project => {
+        history.push(`/${URL_BROWSE2}/${params.entity}/${project}`);
+      }}
+    />
+  );
+};
+
 export const Browse2: FC = props => {
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
@@ -140,7 +165,7 @@ export const Browse2: FC = props => {
         </Toolbar>
       </AppBar>
       <Route path={`/${URL_BROWSE2}/:entity/:project`}>
-        <Browse2ProjectSideNav />
+        <RouteAwareBrowse2ProjectSideNav />
       </Route>
       <Box component="main" sx={{flexGrow: 1, p: 3}}>
         <Toolbar />
