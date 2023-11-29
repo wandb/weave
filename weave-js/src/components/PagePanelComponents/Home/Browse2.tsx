@@ -17,6 +17,7 @@ import {
   Switch,
   useHistory,
   useParams,
+  useLocation,
 } from 'react-router-dom';
 
 import {URL_BROWSE2} from '../../../urls';
@@ -29,6 +30,7 @@ import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
 import {Browse2ProjectSideNav} from './Browse2SideNav';
+import _ from 'lodash';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -132,16 +134,59 @@ const RouteAwareBrowse2ProjectSideNav: FC = props => {
   }
   return (
     <Browse2ProjectSideNav
-      currentEntity={currentEntity}
-      currentProject={currentProject}
-      onProjectChange={project => {
+      entity={currentEntity}
+      project={currentProject}
+      navigateToProject={project => {
         history.push(`/${URL_BROWSE2}/${params.entity}/${project}`);
+      }}
+      navigateToObjects={(filter?: string) => {
+        history.push(
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/objects${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToCalls={(filter?: string) => {
+        history.push(
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/calls${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToTypes={(filter?: string) => {
+        history.push(
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/types${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToOps={(filter?: string) => {
+        history.push(
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/ops${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToBoards={(filter?: string) => {
+        history.push(
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/boards${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
+      }}
+      navigateToTables={(filter?: string) => {
+        history.push(
+          `/${URL_BROWSE2}/${params.entity}/${params.project}/tables${
+            filter ? `?filter=${filter}` : ''
+          }`
+        );
       }}
     />
   );
 };
 
 export const Browse2: FC = props => {
+  const projectRoot = `${URL_BROWSE2}/:entity/:project`;
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
       <CssBaseline />
@@ -170,10 +215,68 @@ export const Browse2: FC = props => {
       <Box component="main" sx={{flexGrow: 1, p: 3}}>
         <Toolbar />
         <Switch>
-          <Route
-            path={`/${URL_BROWSE2}/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|streams)`}>
+          {/* TIM's ADDITIONS */}
+          {/* TYPES */}
+          <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
             <Browse2DataModelRoute />
           </Route>
+          <Route path={`/${projectRoot}/types/:typeName`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/types`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/type-versions`}>
+            <Browse2DataModelRoute />
+          </Route>
+          {/* OBJECTS */}
+          <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/objects/:objectName`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/objects`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/object-versions`}>
+            <Browse2DataModelRoute />
+          </Route>
+          {/* OPS */}
+          <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/ops/:opName`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/ops`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/op-versions`}>
+            <Browse2DataModelRoute />
+          </Route>
+          {/* CALLS */}
+          <Route path={`/${projectRoot}/calls/:callId`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/calls`}>
+            <Browse2DataModelRoute />
+          </Route>
+          {/* BOARDS */}
+          <Route path={`/${projectRoot}/boards/:boardId`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/boards`}>
+            <Browse2DataModelRoute />
+          </Route>
+          {/* TABLES */}
+          <Route path={`/${projectRoot}/tables/:tableId`}>
+            <Browse2DataModelRoute />
+          </Route>
+          <Route path={`/${projectRoot}/tables`}>
+            <Browse2DataModelRoute />
+          </Route>
+          {/* END TIM's ADDITIONS */}
           <Route
             path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId/:spanId?`}>
             <Browse2TracePage />
@@ -212,7 +315,19 @@ interface Browse2DataModelRouteParams {
   tab?: string;
 }
 
+function useQuery() {
+  const {search} = useLocation();
+
+  return React.useMemo(() => {
+    const params = new URLSearchParams(search);
+    const entries = Array.from(params.entries());
+    const searchDict = _.fromPairs(entries);
+    return searchDict;
+  }, [search]);
+}
+
 const Browse2DataModelRoute: FC = props => {
   const params = useParams<Browse2DataModelRouteParams>();
-  return <>{JSON.stringify(params)}</>;
+  const search = useQuery();
+  return <pre>{JSON.stringify({params, search}, null, 2)}</pre>;
 };

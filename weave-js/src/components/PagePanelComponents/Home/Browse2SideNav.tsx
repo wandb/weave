@@ -33,27 +33,33 @@ import {useProjectsForEntity} from './query';
 
 const drawerWidth = 240;
 
-export const Browse2ProjectSideNav: FC<{
-  currentEntity: string;
-  currentProject: string;
-  onProjectChange: (project: string) => void;
-}> = props => {
-  const sections = useSectionsForProject(
-    props.currentEntity,
-    props.currentProject
-  );
-  const entityProjectsValue = useProjectsForEntity(props.currentEntity);
+type NavigationCallbacks = {
+  navigateToProject: (project: string) => void;
+  navigateToObjects: (filter?: string) => void;
+  navigateToCalls: (filter?: string) => void;
+  navigateToTypes: (filter?: string) => void;
+  navigateToOps: (filter?: string) => void;
+  navigateToBoards: (filter?: string) => void;
+  navigateToTables: (filter?: string) => void;
+};
+
+type Browse2ProjectSideNavProps = {
+  entity: string;
+  project: string;
+} & NavigationCallbacks;
+
+export const Browse2ProjectSideNav: FC<
+  {
+    entity: string;
+    project: string;
+  } & NavigationCallbacks
+> = props => {
+  const sections = useSectionsForProject(props);
+  const entityProjectsValue = useProjectsForEntity(props.entity);
   const projects = useMemo(() => {
-    return [props.currentProject, ...(entityProjectsValue.result ?? [])];
-  }, [entityProjectsValue.result, props.currentProject]);
-  // const projectOptions = useMemo(() => {
-  //   return projects.map(project => {
-  //     return {
-  //       label: project,
-  //       id: project,
-  //     };
-  //   });
-  // }, [projects]);
+    return [props.project, ...(entityProjectsValue.result ?? [])];
+  }, [entityProjectsValue.result, props.project]);
+
   return (
     <Drawer
       variant="permanent"
@@ -72,9 +78,9 @@ export const Browse2ProjectSideNav: FC<{
             disablePortal
             disableClearable
             options={projects}
-            value={props.currentProject}
+            value={props.project}
             onChange={(event, newValue) => {
-              props.onProjectChange(newValue);
+              props.navigateToProject(newValue);
             }}
             renderInput={params => <TextField {...params} label="Project" />}
           />
@@ -92,13 +98,14 @@ type SectionType = {
 type ItemType = {
   title: string;
   icon: React.ReactNode;
+  onClick: () => void;
   children?: Array<ItemType>;
 };
 const SideBarNavItem: FC<{item: ItemType; depth?: number}> = props => {
   const depth = props.depth ?? 0;
   return (
     <Fragment>
-      <ListItemButton sx={{pl: 2 + depth}}>
+      <ListItemButton sx={{pl: 2 + depth}} onClick={props.item.onClick}>
         <ListItemIcon>{props.item.icon}</ListItemIcon>
         <ListItemText primary={props.item.title} />
       </ListItemButton>
@@ -140,7 +147,8 @@ const SideNav: FC<{
   );
 };
 
-const useSectionsForProject = (entity: string, project: string) => {
+const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
+  // TODO: Lookup pinned sidebar items from entity/project + user
   const sections: Array<SectionType> = useMemo(() => {
     return [
       {
@@ -148,42 +156,68 @@ const useSectionsForProject = (entity: string, project: string) => {
         items: [
           {
             title: 'Objects', //, 'Instances (ObjectVersions)',
-            // An appropriate icon for "objects" from the MUI icon set is:
             icon: <Category />,
+            onClick: () => {
+              props.navigateToObjects();
+            },
             children: [
               {
                 title: 'Models',
                 icon: <Layers />,
+                onClick: () => {
+                  props.navigateToObjects('kind="model"');
+                },
               },
               {
                 title: 'Datasets',
                 icon: <Dataset />,
+                onClick: () => {
+                  props.navigateToObjects('kind="dataset"');
+                },
               },
             ],
           },
           {
             title: 'Traces', // 'Traces (Calls)',
             icon: <Segment />,
+            onClick: () => {
+              props.navigateToCalls();
+            },
             children: [
               {
                 title: 'Train',
                 icon: <ModelTraining />,
+                onClick: () => {
+                  props.navigateToCalls('kind="train"');
+                },
               },
               {
                 title: 'Predict',
                 icon: <AutoFixHigh />,
+                onClick: () => {
+                  props.navigateToCalls('kind="predict"');
+                },
               },
               {
                 title: 'Score',
                 icon: <Scoreboard />,
+                onClick: () => {
+                  props.navigateToCalls('kind="score"');
+                },
               },
               {
                 title: 'Evaluate',
                 icon: <Rule />,
+                onClick: () => {
+                  props.navigateToCalls('kind="evaluate"');
+                },
               },
               {
                 title: 'Tune',
                 icon: <Tune />,
+                onClick: () => {
+                  props.navigateToCalls('kind="tune"');
+                },
               },
             ],
           },
@@ -195,10 +229,16 @@ const useSectionsForProject = (entity: string, project: string) => {
           {
             title: 'Types', // 'Classes (TypeVersions)',
             icon: <TypeSpecimen />,
+            onClick: () => {
+              props.navigateToTypes();
+            },
           },
           {
             title: 'Operations', // 'Methods (OpDefVersions)',
             icon: <ManageHistory />,
+            onClick: () => {
+              props.navigateToOps();
+            },
           },
         ],
       },
@@ -208,14 +248,20 @@ const useSectionsForProject = (entity: string, project: string) => {
           {
             title: 'Boards',
             icon: <DashboardCustomize />,
+            onClick: () => {
+              props.navigateToBoards();
+            },
           },
           {
             title: 'Tables',
             icon: <TableChart />,
+            onClick: () => {
+              props.navigateToTables();
+            },
           },
         ],
       },
     ];
-  }, []);
+  }, [props]);
   return sections;
 };
