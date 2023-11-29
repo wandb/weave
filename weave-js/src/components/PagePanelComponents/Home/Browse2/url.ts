@@ -1,6 +1,5 @@
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 
-
 export const refPageUrl = (objectType: string, refS: string) => {
   const ref = parseRef(refS);
   if (!isWandbArtifactRef(ref)) {
