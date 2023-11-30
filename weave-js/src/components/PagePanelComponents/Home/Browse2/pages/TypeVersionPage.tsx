@@ -15,38 +15,64 @@ export const TypeVersionPage: React.FC = () => {
       </div>
       <div>Migration Notes:</div>
       <ul>
-        <li>
-          Weaveflow pretty much already has this page (
-          <a href="https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/Dataset/eval_dataset/696d98783ec24548e08b">
-            https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/Dataset/eval_dataset/696d98783ec24548e08b
-          </a>
-          ) that includes most of what we will want here. However, this is one
-          of the most important pages, so it is is worth enumerating the primary
-          features
-        </li>
+        <li>THIS IS COMPLETELY MISSING IN WEAVEFLOW</li>
       </ul>
       <div>Primary Features:</div>
       <ul>
-        <li></li>
+        <li>
+          Property Types - with links to child type pages if they are other
+          objects
+        </li>
+        <li>A type Hierarchy (with links to each parent type)</li>
+        <li>(future) Type/OpDef DAG Visual</li>
       </ul>
       <div>Links:</div>
       <ul>
         <li>
-          Each row should link to the associated type version:{' '}
-          <Link to={prefix('/types/type_name/versions/version_id')}>
-            /types/[type_name]/versions/[version_id]
+          Link to parent Type ({' '}
+          <Link to={prefix('/types/type_name')}>/types/[type_name]</Link>)
+        </li>
+        <li>
+          Connection to all child ObjectVersions instances ({' '}
+          <Link
+            to={prefix(
+              '/object-versions?filter=instance_of=type_name:version'
+            )}>
+            /object-versions?filter=instance_of=type_name:version
           </Link>
+          )
+        </li>
+        <li>
+          Connection to all child TypeVersions ({' '}
+          <Link
+            to={prefix(
+              '/type-versions?filter=descendant_of=type_name:version,alias=latest'
+            )}>
+            /type-versions?filter=descendant_of=type_name:version,alias=latest
+          </Link>
+          )
+        </li>
+        <li>
+          Connection to all consuming OpVersions ({' '}
+          <Link
+            to={prefix(
+              '/op-versions?filter=consumes=type_name:version,alias=latest'
+            )}>
+            /op-versions?filter=consumes=type_name:version,alias=latest
+          </Link>
+          )
+        </li>
+        <li>
+          Connection to all producing OpVersions ({' '}
+          <Link
+            to={prefix(
+              '/op-versions?filter=produces=type_name:version,alias=latest'
+            )}>
+            /op-versions?filter=produces=type_name:version,alias=latest
+          </Link>
+          )
         </li>
       </ul>
-      <div>Inspiration</div>
-      Existing Weaveflow Page
-      <br />
-      <img
-        src="https://github.com/wandb/weave/blob/db555a82512c2bac881ee0c65cf6d33264f4d34c/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/simple_table.png?raw=true"
-        style={{
-          width: '100%',
-        }}
-      />
     </div>
   );
 };

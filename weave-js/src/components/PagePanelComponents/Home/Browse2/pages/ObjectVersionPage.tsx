@@ -40,6 +40,13 @@ export const ObjectVersionPage: React.FC = () => {
           )
         </li>
         <li>
+          Link to parent Object ({' '}
+          <Link to={prefix('/objects/object_name')}>
+            /objects/[object_name]
+          </Link>
+          )
+        </li>
+        <li>
           Link to Producing Call ({' '}
           <Link to={prefix('/calls/call_id')}>/calls/call_id</Link>)
         </li>
