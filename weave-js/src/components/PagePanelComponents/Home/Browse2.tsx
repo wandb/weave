@@ -176,39 +176,57 @@ const Browse2Mounted: FC = props => {
       <Route path={`${projectRootPagesPath}?`}>
         <RouteAwareBrowse2ProjectSideNav />
       </Route>
-      <Box component="main" sx={{flexGrow: 1, p: 3}}>
-        <Toolbar />
-        <Switch>
-          <Route path={projectRootPagesPath}>
+      <Switch>
+        <Route path={projectRootPagesPath}>
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              pt: 3,
+              pr: 3,
+              pb: 0,
+              pl: 3,
+            }}>
+            <Toolbar />
             <Browse2ProjectRoot />
-          </Route>
-          <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
-            <Browse2TracePage />
-          </Route>
-          <Route path={`/:entity/:project/trace`}>
-            <Browse2TracesPage />
-          </Route>
-          <Route
-            path={`/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
-            <Browse2ObjectVersionItemPage />
-          </Route>
-          <Route path={`/:entity/:project/:rootType/:objName`}>
-            <Browse2ObjectPage />
-          </Route>
-          <Route path={`/:entity/:project/:rootType`}>
-            <Browse2ObjectTypePage />
-          </Route>
-          <Route path={`/:entity/:project`}>
-            <Browse2ProjectPage />
-          </Route>
-          <Route path={`/:entity`}>
-            <Browse2EntityPage />
-          </Route>
-          <Route path={``}>
-            <Browse2HomePage />
-          </Route>
-        </Switch>
-      </Box>
+          </Box>
+        </Route>
+        <Route>
+          <Box component="main" sx={{flexGrow: 1, p: 3}}>
+            <Toolbar />
+            <Switch>
+              <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
+                <Browse2TracePage />
+              </Route>
+              <Route path={`/:entity/:project/trace`}>
+                <Browse2TracesPage />
+              </Route>
+              <Route
+                path={`/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
+                <Browse2ObjectVersionItemPage />
+              </Route>
+              <Route path={`/:entity/:project/:rootType/:objName`}>
+                <Browse2ObjectPage />
+              </Route>
+              <Route path={`/:entity/:project/:rootType`}>
+                <Browse2ObjectTypePage />
+              </Route>
+              <Route path={`/:entity/:project`}>
+                <Browse2ProjectPage />
+              </Route>
+              <Route path={`/:entity`}>
+                <Browse2EntityPage />
+              </Route>
+              <Route path={``}>
+                <Browse2HomePage />
+              </Route>
+            </Switch>
+          </Box>
+        </Route>
+      </Switch>
     </Box>
   );
 };
@@ -216,72 +234,79 @@ const Browse2Mounted: FC = props => {
 const Browse2ProjectRoot: FC = () => {
   const projectRoot = `:entity/:project`;
   return (
-    <Switch>
-      {/* TYPES */}
-      <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
-        <TypeVersionPage />
-      </Route>
-      <Route path={`/${projectRoot}/types/:typeName`}>
-        <TypePage />
-      </Route>
-      <Route path={`/${projectRoot}/types`}>
-        <TypesPage />
-      </Route>
-      <Route path={`/${projectRoot}/type-versions`}>
-        <TypeVersionsPage />
-      </Route>
-      {/* OBJECTS */}
-      <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
-        <ObjectVersionPage />
-      </Route>
-      <Route path={`/${projectRoot}/objects/:objectName`}>
-        <ObjectPage />
-      </Route>
-      <Route path={`/${projectRoot}/objects`}>
-        <ObjectsPage />
-      </Route>
-      <Route path={`/${projectRoot}/object-versions`}>
-        <ObjectVersionsPage />
-      </Route>
-      {/* OPS */}
-      <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
-        <OpVersionPage />
-      </Route>
-      <Route path={`/${projectRoot}/ops/:opName`}>
-        <OpPage />
-      </Route>
-      <Route path={`/${projectRoot}/ops`}>
-        <OpsPage />
-      </Route>
-      <Route path={`/${projectRoot}/op-versions`}>
-        <OpVersionsPage />
-      </Route>
-      {/* CALLS */}
-      <Route path={`/${projectRoot}/calls/:callId`}>
-        <CallPage />
-      </Route>
-      <Route path={`/${projectRoot}/calls`}>
-        <CallsPage />
-      </Route>
-      {/* BOARDS */}
-      <Route
-        path={[
-          `/${projectRoot}/boards/_new_board_`,
-          `/${projectRoot}/boards/:boardId`,
-          `/${projectRoot}/boards/:boardId/version/:versionId`,
-        ]}>
-        <BoardPage />
-      </Route>
-      <Route path={`/${projectRoot}/boards`}>
-        <BoardsPage />
-      </Route>
-      {/* TABLES */}
-      <Route path={`/${projectRoot}/tables/:tableId`}>
-        <TablePage />
-      </Route>
-      <Route path={`/${projectRoot}/tables`}>
-        <TablesPage />
-      </Route>
-    </Switch>
+    <Box
+      sx={{
+        flex: '1 1 auto',
+        width: '100%',
+        overflow: 'auto',
+      }}>
+      <Switch>
+        {/* TYPES */}
+        <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
+          <TypeVersionPage />
+        </Route>
+        <Route path={`/${projectRoot}/types/:typeName`}>
+          <TypePage />
+        </Route>
+        <Route path={`/${projectRoot}/types`}>
+          <TypesPage />
+        </Route>
+        <Route path={`/${projectRoot}/type-versions`}>
+          <TypeVersionsPage />
+        </Route>
+        {/* OBJECTS */}
+        <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
+          <ObjectVersionPage />
+        </Route>
+        <Route path={`/${projectRoot}/objects/:objectName`}>
+          <ObjectPage />
+        </Route>
+        <Route path={`/${projectRoot}/objects`}>
+          <ObjectsPage />
+        </Route>
+        <Route path={`/${projectRoot}/object-versions`}>
+          <ObjectVersionsPage />
+        </Route>
+        {/* OPS */}
+        <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
+          <OpVersionPage />
+        </Route>
+        <Route path={`/${projectRoot}/ops/:opName`}>
+          <OpPage />
+        </Route>
+        <Route path={`/${projectRoot}/ops`}>
+          <OpsPage />
+        </Route>
+        <Route path={`/${projectRoot}/op-versions`}>
+          <OpVersionsPage />
+        </Route>
+        {/* CALLS */}
+        <Route path={`/${projectRoot}/calls/:callId`}>
+          <CallPage />
+        </Route>
+        <Route path={`/${projectRoot}/calls`}>
+          <CallsPage />
+        </Route>
+        {/* BOARDS */}
+        <Route
+          path={[
+            `/${projectRoot}/boards/_new_board_`,
+            `/${projectRoot}/boards/:boardId`,
+            `/${projectRoot}/boards/:boardId/version/:versionId`,
+          ]}>
+          <BoardPage />
+        </Route>
+        <Route path={`/${projectRoot}/boards`}>
+          <BoardsPage />
+        </Route>
+        {/* TABLES */}
+        <Route path={`/${projectRoot}/tables/:tableId`}>
+          <TablePage />
+        </Route>
+        <Route path={`/${projectRoot}/tables`}>
+          <TablesPage />
+        </Route>
+      </Switch>
+    </Box>
   );
 };
