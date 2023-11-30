@@ -4,10 +4,13 @@ import {Link} from 'react-router-dom';
 import {useEPPrefix, useQuery} from './util';
 
 export const ObjectVersionsPage: React.FC = () => {
+  const search = useQuery();
+  const filter = search.filter;
   const prefix = useEPPrefix();
   return (
     <div>
       <h1>ObjectVersionsPage Placeholder</h1>
+      <h2>Filter: {filter}</h2>
       <div>
         This is <strong>A VERY IMPORTANT PAGE</strong>. This is a rich, realtime
         datagrid of all ObjectVersions. It is critical that linkers and users
