@@ -36,6 +36,10 @@ export const ObjectVersionsPage: React.FC = () => {
           . Note: This might prefer to be a slideout like Notion rather than a
           full link to allow for "peeking".
         </li>
+        <li>
+          Each row might also special link to the producing call:{' '}
+          <Link to={prefix('/calls/call_id')}>/calls/call_id</Link>
+        </li>
       </ul>
       <div>Inspiration</div>
       The Datadog Traces page is a great point of inspiration for this page.

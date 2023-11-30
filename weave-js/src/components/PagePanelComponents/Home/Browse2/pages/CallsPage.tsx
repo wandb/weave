@@ -55,6 +55,12 @@ export const CallsPage: React.FC = () => {
           This might prefer to be a slideout like Notion rather than a full link
           to allow for "peeking".
         </li>
+        <li>
+          Each row might also contains links to objects (inputs and ouputs):{' '}
+          <Link to={prefix('/objects/object_name/versions/version_id')}>
+            /objects/object_name/versions/version_id
+          </Link>
+        </li>
       </ul>
       <div>Inspiration</div>
       <img
