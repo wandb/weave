@@ -214,9 +214,6 @@ const Browse2Mounted: FC = props => {
 };
 
 const Browse2ProjectRoot: FC = () => {
-  const params = useParams<Browse2Params>();
-  const entity = params.entity ?? '';
-  const project = params.project ?? '';
   const projectRoot = `:entity/:project`;
   return (
     <Switch>
@@ -276,7 +273,7 @@ const Browse2ProjectRoot: FC = () => {
         <BoardPage />
       </Route>
       <Route path={`/${projectRoot}/boards`}>
-        <BoardsPage entity={entity} project={project} />
+        <BoardsPage />
       </Route>
       {/* TABLES */}
       <Route path={`/${projectRoot}/tables/:tableId`}>

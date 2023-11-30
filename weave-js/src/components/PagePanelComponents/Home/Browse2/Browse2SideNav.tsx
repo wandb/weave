@@ -57,7 +57,20 @@ type Browse2ProjectSideNavProps = {
 } & NavigationCallbacks;
 
 export const RouteAwareBrowse2ProjectSideNav: FC = props => {
-  const params = useParams<Browse2DataModelRouteParams>();
+  const params = useParams<{
+    entity: string;
+    project: string;
+    tab:
+      | 'types'
+      | 'type-versions'
+      | 'objects'
+      | 'object-versions'
+      | 'ops'
+      | 'op-versions'
+      | 'calls'
+      | 'boards'
+      | 'tables';
+  }>();
   const history = useHistory();
   const currentProject = params.project;
   const currentEntity = params.entity;
