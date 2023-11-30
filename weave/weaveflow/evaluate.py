@@ -4,6 +4,7 @@ import weave
 
 from .dataset import Dataset
 from .structured_output import StructuredOutputChatModel
+from ..parallelism import do_in_parallel
 
 
 @weave.type()
@@ -35,23 +36,32 @@ class EvaluateLLM(Evaluate):
     def compute(self, dataset: Dataset, predictions: list[typing.Any]) -> typing.Any:
         scores = []
         rationales = []
-        for example, prediction in zip(dataset.rows, predictions):
-            # example_fields = self.format_example(example)
+
+        result_type = weave.types.TypedDict(
+            {
+                "score": weave.types.Float(),
+                "rationale": weave.types.String(),
+            }
+        )
+
+        def do_one(row: typing.Any) -> typing.Any:
+            example, prediction = row
             messages = self.messages_template(example, prediction)
             try:
                 result = self.chat_llm.complete(
                     messages,
-                    weave.types.TypedDict(
-                        {
-                            "score": weave.types.Float(),
-                            "rationale": weave.types.String(),
-                        }
-                    ),
+                    result_type,
                 )
             except:
                 result = {"score": None, "rationale": None}
-            scores.append(result["score"])
-            rationales.append(result["rationale"])
+            return result
+
+        results = list(do_in_parallel(do_one, list(zip(dataset.rows, predictions))))
+
+        for row in results:
+            scores.append(row["score"])
+            rationales.append(row["rationale"])
+
         return {
             "columns": {"score": scores, "rationale": rationales},
             "summary": {"score_avg": sum(scores) / len(scores)},

@@ -39,9 +39,14 @@ ResultType = TypeVar("ResultType")
 
 
 def do_in_parallel(
-    do_one: Callable[[ItemType], ResultType], items: list[ItemType]
+    do_one: Callable[[ItemType], ResultType],
+    items: list[ItemType],
+    max_parallelism: Optional[int] = None,
 ) -> Iterator[ResultType]:
-    parallel_budget = get_parallel_budget()
+    if max_parallelism is None:
+        parallel_budget = get_parallel_budget()
+    else:
+        parallel_budget = max_parallelism
 
     if parallel_budget <= 1:
         return map(do_one, items)

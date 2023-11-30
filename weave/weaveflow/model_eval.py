@@ -4,19 +4,23 @@ import weave
 from .dataset import Dataset
 from .model import Model
 from .evaluate import Evaluate
+from ..parallelism import do_in_parallel
 
 
 @weave.op()
 def evaluate(eval: Evaluate, dataset: Dataset, model: Model) -> typing.Any:
     outputs = []
     ds_rows = list(dataset.rows)
-    for i, row in enumerate(ds_rows):
-        print("evaluating row", i)
+
+    def do_one(row: typing.Any) -> typing.Any:
+        print("evaluating row", row)
         try:
-            output = model.predict(row)
+            return model.predict(row)
         except:
-            output = None
-        outputs.append(output)
+            return None
+
+    outputs = list(do_in_parallel(do_one, ds_rows))
+
     eval_result = eval.compute(dataset, outputs)
     summary = eval_result["summary"]
     eval_table_columns: dict[str, weave.WeaveList] = {
