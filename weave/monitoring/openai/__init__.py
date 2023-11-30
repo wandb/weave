@@ -6,6 +6,6 @@ We provide simple patch and unpatch functions to enable or disable these feature
 By default, the patch method will provide goodies like auto-collecting streaming completions and logging results to StreamTable
 """
 
-__all__ = ["ReassembleStream", "LogToStreamTable", "patch", "unpatch"]
+__all__ = ["ReassembleStream", "patch", "unpatch"]
 
-from .openai import LogToStreamTable, ReassembleStream, patch, unpatch
+from .openai import ReassembleStream, patch, unpatch
