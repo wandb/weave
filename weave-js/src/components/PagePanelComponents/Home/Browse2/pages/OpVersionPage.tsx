@@ -1,7 +1,7 @@
 import React from 'react';
 import {Link} from 'react-router-dom';
 
-import {useEPPrefix, useQuery} from './util';
+import {useEPPrefix} from './util';
 
 export const OpVersionPage: React.FC = () => {
   const prefix = useEPPrefix();
@@ -50,6 +50,7 @@ export const OpVersionPage: React.FC = () => {
         style={{
           width: '100%',
         }}
+        alt=""
       />
     </div>
   );

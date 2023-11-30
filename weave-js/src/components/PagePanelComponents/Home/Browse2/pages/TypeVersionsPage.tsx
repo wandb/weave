@@ -53,6 +53,7 @@ export const TypeVersionsPage: React.FC = () => {
         style={{
           width: '100%',
         }}
+        alt=""
       />
     </div>
   );

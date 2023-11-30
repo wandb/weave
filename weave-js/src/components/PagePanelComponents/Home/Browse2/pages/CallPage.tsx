@@ -1,7 +1,7 @@
 import React from 'react';
 import {Link} from 'react-router-dom';
 
-import {useEPPrefix, useQuery} from './util';
+import {useEPPrefix} from './util';
 
 export const CallPage: React.FC = () => {
   const prefix = useEPPrefix();
@@ -64,6 +64,7 @@ export const CallPage: React.FC = () => {
         style={{
           width: '100%',
         }}
+        alt=""
       />
     </div>
   );

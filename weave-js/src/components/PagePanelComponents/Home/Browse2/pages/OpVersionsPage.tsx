@@ -47,6 +47,7 @@ export const OpVersionsPage: React.FC = () => {
         style={{
           width: '100%',
         }}
+        alt=""
       />
     </div>
   );

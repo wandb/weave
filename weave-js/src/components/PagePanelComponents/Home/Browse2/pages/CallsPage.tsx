@@ -34,6 +34,7 @@ export const CallsPage: React.FC = () => {
             style={{
               width: '75%',
             }}
+            alt=""
             src="https://github.com/wandb/weave/blob/4bd192e7a8936d7bd16a5ecd70675804674215e0/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/wf_filtered_calls_example.png?raw=true"
           />
         </li>
@@ -68,6 +69,7 @@ export const CallsPage: React.FC = () => {
         style={{
           width: '100%',
         }}
+        alt=""
       />
     </div>
   );

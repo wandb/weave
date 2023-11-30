@@ -1,7 +1,7 @@
 import React from 'react';
 import {Link} from 'react-router-dom';
 
-import {useEPPrefix, useQuery} from './util';
+import {useEPPrefix} from './util';
 
 export const TypeVersionPage: React.FC = () => {
   const prefix = useEPPrefix();

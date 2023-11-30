@@ -32,6 +32,7 @@ export const TablePage: React.FC = () => {
         style={{
           width: '100%',
         }}
+        alt=""
       />
     </div>
   );
