@@ -51,13 +51,12 @@ export const CallsPage: React.FC = () => {
       <ul>
         <li>
           Each row should link to the associated call:{' '}
-          <Link to={prefix('/calls/call_id')}>/calls/[call_id]</Link>
+          <Link to={prefix('/calls/call_id')}>/calls/[call_id]</Link>. Note:
+          This might prefer to be a slideout like Notion rather than a full link
+          to allow for "peeking".
         </li>
       </ul>
       <div>Inspiration</div>
-      This page will basically be a simple table of Op Versions, with some
-      lightweight filtering on top.
-      <br />
       <img
         src="https://github.com/wandb/weave/blob/7cbb458e83a7121042af6ab6894f999210fafa4d/weave-js/src/components/PagePanelComponents/Home/dd_placeholder.png?raw=true"
         style={{
