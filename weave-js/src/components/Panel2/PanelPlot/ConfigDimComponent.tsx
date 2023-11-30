@@ -459,22 +459,20 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     );
   } else if (PlotState.isWeaveExpression(dimension)) {
     return (
-      <>
-        <ConfigDimLabel
-          {...props}
-          postfixComponent={postFixComponent}
-          multiline={redesignedPlotConfigEnabled && multiline}
-          redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
-          <WeaveExpressionDimConfig
-            dimName={dimension.name}
-            input={input}
-            config={config}
-            updateConfig={updateConfig}
-            series={isShared ? config.series : [dimension.series]}
-          />
-        </ConfigDimLabel>
-      </>
+      <ConfigDimLabel
+        {...props}
+        postfixComponent={postFixComponent}
+        multiline={redesignedPlotConfigEnabled && multiline}
+        redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
+        <WeaveExpressionDimConfig
+          dimName={dimension.name}
+          input={input}
+          config={config}
+          updateConfig={updateConfig}
+          series={isShared ? config.series : [dimension.series]}
+        />
+      </ConfigDimLabel>
     );
   }
-  return <></>;
+  return null;
 };
