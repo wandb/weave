@@ -26,6 +26,7 @@ export const OpVersionPage: React.FC = () => {
       <div>Primary Features:</div>
       <ul>
         <li>Code</li>
+        <li>(future) Type/OpDef DAG Visual</li>
       </ul>
       <div>Links:</div>
       <ul>
@@ -45,7 +46,7 @@ export const OpVersionPage: React.FC = () => {
       Existing Weaveflow page:
       <br />
       <img
-        src="asdf"
+        src="https://github.com/wandb/weave/blob/96665d8a25dd9d7d0aaa9cde2bd5e80c1520e491/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/opversion_example.png?raw=true"
         style={{
           width: '100%',
         }}
