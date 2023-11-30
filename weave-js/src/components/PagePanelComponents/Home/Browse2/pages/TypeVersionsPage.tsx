@@ -1,80 +1,59 @@
-import {Typography} from '@material-ui/core';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import _ from 'lodash';
-import * as React from 'react';
-import {useLocation} from 'react-router-dom';
+import React from 'react';
+import {Link} from 'react-router-dom';
 
-function createData(
-  name: string,
-  calories: number,
-  fat: number,
-  carbs: number,
-  protein: number
-) {
-  return {name, calories, fat, carbs, protein};
-}
+import {useEPPrefix, useQuery} from './util';
 
-const rows = [
-  createData('Frozen yoghurt', 159, 6.0, 24, 4.0),
-  createData('Ice cream sandwich', 237, 9.0, 37, 4.3),
-  createData('Eclair', 262, 16.0, 24, 6.0),
-  createData('Cupcake', 305, 3.7, 67, 4.3),
-  createData('Gingerbread', 356, 16.0, 49, 3.9),
-];
-
-function useQuery() {
-  const {search} = useLocation();
-
-  return React.useMemo(() => {
-    const params = new URLSearchParams(search);
-    const entries = Array.from(params.entries());
-    const searchDict = _.fromPairs(entries);
-    return searchDict;
-  }, [search]);
-}
-
-export const TypeVersionsPage: React.FC = props => {
+export const TypeVersionsPage: React.FC = () => {
   const search = useQuery();
   const filter = search.filter;
+  const prefix = useEPPrefix();
   return (
-    <>
-      <Typography variant="h3" component="h3" gutterBottom>
-        TypeVersions {filter}
-      </Typography>
-      <TableContainer component={Paper}>
-        <Table sx={{minWidth: 650}} size="small" aria-label="a dense table">
-          <TableHead>
-            <TableRow>
-              <TableCell>Dessert (100g serving)</TableCell>
-              <TableCell align="right">Calories</TableCell>
-              <TableCell align="right">Fat&nbsp;(g)</TableCell>
-              <TableCell align="right">Carbs&nbsp;(g)</TableCell>
-              <TableCell align="right">Protein&nbsp;(g)</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map(row => (
-              <TableRow
-                key={row.name}
-                sx={{'&:last-child td, &:last-child th': {border: 0}}}>
-                <TableCell component="th" scope="row">
-                  {row.name}
-                </TableCell>
-                <TableCell align="right">{row.calories}</TableCell>
-                <TableCell align="right">{row.fat}</TableCell>
-                <TableCell align="right">{row.carbs}</TableCell>
-                <TableCell align="right">{row.protein}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </>
+    <div>
+      <h1>TypeVersionsPage Placeholder</h1>
+      <h2>Filter: {filter}</h2>
+      <div>
+        This is the listing page for TypeVersions. A TypeVersion is a "version"
+        of a weave "type". In the user's mind it is analogous to a specific
+        implementation of a python class.
+      </div>
+      <div>Migration Notes:</div>
+      <ul>
+        <li>
+          From a content perspective, this is similar to the `versions` table
+          available in weaveflow (
+          <a href="https://weave.wandb.ai/browse2/dannygoldstein/hooman-eval-notion2/Dataset/eval_dataset">
+            example
+          </a>
+          ) except that rather than just showing the versions of a single type,
+          we show all versions of all types, filtered to whatever the user (or
+          link source) specified.
+        </li>
+        <li>
+          Notice that the sidebar `Types` links here. This might seem like a
+          mistake, but it is not. What the user most likely _wants_ to see is a
+          listing of all the _latest_ versions of each type (which is why the
+          link filters to latest).
+        </li>
+      </ul>
+      <div>Links:</div>
+      <ul>
+        <li>
+          Each row should link to the associated type version:{' '}
+          <Link to={prefix('/types/type_name/versions/version_id')}>
+            /types/[type_name]/versions/[version_id]
+          </Link>
+        </li>
+      </ul>
+      <div>Inspiration</div>
+      This page will basically be a simple table of Type Versions, with some
+      lightweight filtering on top.
+      <br />
+      <img
+        src=""
+        style={{
+          width: '100%',
+        }}
+      />
+    </div>
   );
 };
