@@ -65,7 +65,7 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
     )
 )
 
-num_buckets = 80
+num_buckets = 120
 
 
 @weave.op(  # type: ignore
@@ -101,14 +101,6 @@ def observability(
         hidden=True,
     )
 
-    # grouping_fn = varbar.add(
-    #     "grouping_fn",
-    #     weave_internal.define_fn(
-    #         {"row": input_node.type.object_type}, lambda row: row["state"]
-    #     ),
-    #     hidden=True,
-    # )
-
     filtered_data = varbar.add(
         "filtered_data", source_data.filter(filter_fn), hidden=True
     )
@@ -120,10 +112,8 @@ def observability(
     filtered_range = varbar.add(
         "filtered_range",
         weave.ops.make_list(
-            # a=window_start,
-            # b=window_end,
-            a=filtered_data[timestamp_col_name].min(),
-            b=filtered_data[timestamp_col_name].max(),
+            a=window_start,
+            b=window_end,
         ),
         hidden=True,
     )
@@ -136,11 +126,10 @@ def observability(
         "Time_range",
         panels.DateRange(
             user_zoom_range,
-            # domain=weave.ops.make_list(
-            #     a=window_start,
-            #     b=window_end,
-            # ),
-            domain=source_data[timestamp_col_name],
+            domain=weave.ops.make_list(
+                a=window_start,
+                b=window_end,
+            ),
         ),
     )
 
@@ -167,11 +156,6 @@ def observability(
     filtered_window_data = varbar.add(
         "filtered_window_data", window_data.filter(filter_fn), hidden=True
     )
-
-    # varbar.add(
-    #     "Grouping",
-    #     panels.GroupingEditor(grouping_fn, node=window_data),
-    # )
 
     grouping_by_trace = varbar.add(
         "grouping_fn_2",
@@ -203,32 +187,6 @@ def observability(
         hidden=True,
     )
 
-    grouped = list_.List.groupby(filtered_window_data, lambda row: row["trace_id"])
-
-    grouped_mapped = list_.List.map(
-        grouped,
-        lambda run: weave.ops.dict_(
-            queued_time=weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    run[timestamp_col_name][2], run[timestamp_col_name][0]
-                )
-            ),
-            job=run["job"][0],
-            run_id=run["run_id"][-1],
-            trace_id=run["trace_id"][0],
-            project_name=run["project_name"][0],
-            entity_name=run["entity_name"][0],
-            enqueued=run[timestamp_col_name].min(),
-            start=run[timestamp_col_name][2],
-            end=run[timestamp_col_name].max(),
-            duration=weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    run[timestamp_col_name].max(), run[timestamp_col_name][2]
-                )
-            ),
-        ),
-    )
-
     overview_tab.add(
         "State_transitions",
         panels.Plot(
@@ -239,7 +197,8 @@ def observability(
             x_title="Time",
             y=lambda row: row.count(),
             y_title="Count of transitions by state",
-            label=lambda row: state_color_func(row),
+            # label=lambda row: state_color_func(row),
+            label=lambda row: row["state"],
             tooltip=lambda row: weave.ops.dict_(
                 **{
                     "state": row["state"][0],
@@ -250,8 +209,8 @@ def observability(
             color=lambda row: state_color_func(row),
             groupby_dims=["x", "label"],
             mark="bar",
-            no_legend=True,
-            domain_x=user_zoom_range,
+            # no_legend=True,
+            domain_x=bin_range,
         ),
         layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
@@ -259,62 +218,85 @@ def observability(
     overview_tab.add(
         "Queued_time",
         panels.Plot(
-            grouped_mapped.filter(lambda row: row["queued_time"] > 0),
-            x=lambda row: row["enqueued"].bin(
+            filtered_data,
+            x=lambda row: row[timestamp_col_name].bin(
                 weave.ops.timestamp_bins_nice(bin_range, num_buckets / 2)
             ),
             x_title="Time",
-            y=lambda row: row["queued_time"],
+            y=lambda row: weave.ops.timedelta_total_seconds(
+                weave.ops.datetime_sub(
+                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                )
+            ),
             y_title="Time spent queued",
-            label=lambda row: row["trace_id"],
+            label=lambda row: grouping_by_trace(row),
             tooltip=lambda row: weave.ops.dict_(
                 **{
                     "job": row["job"][0],
                     "user": row["entity_name"][0],
                     "project": row["project_name"][0],
-                    "duration (s)": row["queued_time"][0],
+                    "duration (s)": weave.ops.timedelta_total_seconds(
+                        weave.ops.datetime_sub(
+                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                        )
+                    ),
                 }
             ),
             color_title="id",
-            color=lambda row: row["queued_time"],
+            color=lambda row: row["trace_id"],
             groupby_dims=["x", "label"],
             mark="bar",
             no_legend=True,
-            domain_x=user_zoom_range,
+            domain_x=bin_range,
         ),
         layout=panels.GroupPanelLayout(x=0, y=6, w=12, h=8),
     )
 
     overview_tab.add(
-        "Last_20_runs",
+        "Lastest_runs",
         panels.Plot(
             weave.ops.List.limit(
-                grouped_mapped.filter(lambda row: row["duration"] > 0),
-                20,
+                # list_.List.sort(
+                filtered_data.filter(
+                    lambda row: weave.ops.Boolean.bool_or(
+                        row["state"] == "running",
+                        weave.ops.Boolean.bool_or(
+                            row["state"] == "finished",
+                            weave.ops.Boolean.bool_or(
+                                row["state"] == "crashed",
+                                row["state"] == "failed",
+                            ),
+                        ),
+                    )
+                ),
+                # compFn=lambda row: row[timestamp_col_name],
+                # columnDirs=["desc"],
+                # ),
+                40000,
             ),
             x=lambda row: row["run_id"],
             x_title="Run ID",
             y_title="Runtime",
-            y=lambda row: row["duration"],
+            y=lambda row: weave.ops.timedelta_total_seconds(
+                weave.ops.datetime_sub(
+                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                )
+            ),
             tooltip=lambda row: weave.ops.dict_(
                 **{
                     "job": row["job"],
                     "run id": row["run_id"],
                     "entity": row["entity_name"],
                     "project": row["project_name"],
-                    "enqueued": row["enqueued"],
-                    "launched": row["start"],
-                    "finished": row["end"],
-                    "queued time (s)": row["queued_time"],
-                    "runtime (s)": row["duration"],
+                    "timestamp": row["timestamp"],
                 }
             ),
-            color=lambda row: row["run_id"],
+            color=lambda row: row["trace_id"],
             color_title="runtime",
-            groupby_dims=[],
+            groupby_dims=["x"],
             mark="bar",
             no_legend=True,
-            domain_x=user_zoom_range,
+            domain_x=bin_range,
         ),
         layout=panels.GroupPanelLayout(x=12, y=6, w=12, h=8),
     )
@@ -382,9 +364,9 @@ def observability(
         y_title="min, max, avg cpu %",
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "user": row["entity_name"],
+                "user": row["entity_name"][0],
                 "run id": row["run_id"][-1],
-                "project": row["project_name"],
+                "project": row["project_name"][0],
                 "min": row["metrics"]["system"]["cpu_cores_util"][0].min(),
                 "max": row["metrics"]["system"]["cpu_cores_util"][0].max(),
                 "avg": row["metrics"]["system"]["cpu_cores_util"][0].avg(),
@@ -422,9 +404,9 @@ def observability(
         y_title="min, max, avg cpu %",
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "user": row["entity_name"],
+                "user": row["entity_name"][0],
                 "run id": row["run_id"][-1],
-                "project": row["project_name"],
+                "project": row["project_name"][0],
                 "min": row["metrics"]["system"]["gpu_cores_util"][0].min(),
                 "max": row["metrics"]["system"]["gpu_cores_util"][0].max(),
                 "avg": row["metrics"]["system"]["gpu_cores_util"][0].avg(),
