@@ -56,7 +56,12 @@ class EvaluateLLM(Evaluate):
                 result = {"score": None, "rationale": None}
             return result
 
-        results = list(do_in_parallel(do_one, list(zip(dataset.rows, predictions))))
+        # do one serially to publish everything
+        results = [do_one((dataset.rows[0], predictions[0]))]
+
+        results.extend(
+            list(do_in_parallel(do_one, list(zip(dataset.rows, predictions))[1:]))
+        )
 
         for row in results:
             scores.append(row["score"])

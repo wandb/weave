@@ -14,12 +14,12 @@ def evaluate(eval: Evaluate, dataset: Dataset, model: Model) -> typing.Any:
 
     def do_one(row: typing.Any) -> typing.Any:
         print("evaluating row", row)
-        try:
-            return model.predict(row)
-        except:
-            return None
+        return model.predict(row)
 
-    outputs = list(do_in_parallel(do_one, ds_rows))
+    # do one row serially to publish everything
+    outputs = [do_one(ds_rows[0])]
+
+    outputs.extend(list(do_in_parallel(do_one, ds_rows[1:])))
 
     eval_result = eval.compute(dataset, outputs)
     summary = eval_result["summary"]
