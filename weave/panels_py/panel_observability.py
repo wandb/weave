@@ -101,27 +101,21 @@ def observability(
         hidden=True,
     )
 
-    # grouping_fn = varbar.add(
-    #     "grouping_fn",
-    #     weave_internal.define_fn(
-    #         {"row": input_node.type.object_type}, lambda row: row["state"]
-    #     ),
-    #     hidden=True,
-    # )
+    grouping_fn = varbar.add(
+        "grouping_fn",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type}, lambda row: row["state"]
+        ),
+        hidden=True,
+    )
 
     filtered_data = varbar.add(
         "filtered_data", source_data.filter(filter_fn), hidden=True
     )
 
-    one_week_in_seconds = 60 * 60 * 24 * 7
-    window_start = weave.ops.from_number(weave.ops.datetime_now() - one_week_in_seconds)
-    window_end = weave.ops.from_number(weave.ops.datetime_now())
-
     filtered_range = varbar.add(
         "filtered_range",
         weave.ops.make_list(
-            # a=window_start,
-            # b=window_end,
             a=filtered_data[timestamp_col_name].min(),
             b=filtered_data[timestamp_col_name].max(),
         ),
@@ -134,14 +128,7 @@ def observability(
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "Time_range",
-        panels.DateRange(
-            user_zoom_range,
-            # domain=weave.ops.make_list(
-            #     a=window_start,
-            #     b=window_end,
-            # ),
-            domain=source_data[timestamp_col_name],
-        ),
+        panels.DateRange(user_zoom_range, domain=source_data[timestamp_col_name]),
     )
 
     bin_range = varbar.add(
@@ -168,10 +155,10 @@ def observability(
         "filtered_window_data", window_data.filter(filter_fn), hidden=True
     )
 
-    # varbar.add(
-    #     "Grouping",
-    #     panels.GroupingEditor(grouping_fn, node=window_data),
-    # )
+    varbar.add(
+        "Grouping",
+        panels.GroupingEditor(grouping_fn, node=window_data),
+    )
 
     grouping_by_trace = varbar.add(
         "grouping_fn_2",
@@ -184,13 +171,13 @@ def observability(
     colors_node = weave.ops.dict_(
         **{
             "running": "rgb(83, 135, 221)",
-            "failed": "rgb(255, 80, 80)",
+            "failed": "rgb(218, 76, 76)",
             "crashed": "rgb(218, 200, 76)",
-            "finished": "rgb(0, 200, 100)",
-            "starting": "rgb(218, 200, 0)",
-            "failed_rqi": "rgb(255, 0, 0)",
-            "queued": "rgb(218, 200, 200)",
-            "popped": "rgb(150, 150, 150)",
+            "finished": "rgb(218, 200, 200)",
+            "rqi_pending": "rgb(218, 0, 76)",
+            "rqi_failed": "rgb(255, 0, 0)",
+            "rqi_launched": "rgb(0, 200, 76)",
+            "rqi_popped": "rgb(218, 200, 0)",
         }
     )
 
@@ -238,7 +225,7 @@ def observability(
             ),
             x_title="Time",
             y=lambda row: row.count(),
-            y_title="Count of transitions by state",
+            y_title="State Transitions",
             label=lambda row: state_color_func(row),
             tooltip=lambda row: weave.ops.dict_(
                 **{
@@ -269,10 +256,9 @@ def observability(
             label=lambda row: row["trace_id"],
             tooltip=lambda row: weave.ops.dict_(
                 **{
-                    "job": row["job"][0],
-                    "user": row["entity_name"][0],
                     "project": row["project_name"][0],
-                    "duration (s)": row["queued_time"][0],
+                    "user": row["entity_name"][0],
+                    "duration": row["queued_time"][0],
                 }
             ),
             color_title="id",
