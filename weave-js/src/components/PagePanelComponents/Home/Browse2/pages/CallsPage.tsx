@@ -30,7 +30,12 @@ export const CallsPage: React.FC = () => {
           <a href="https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/OpDef/EvaluateLLM-compute/40de89370d4563806d5c?inputUri=wandb-artifact%3A%2F%2F%2Fdannygoldstein%2Fhooman-eval-notion2%2Feval_dataset%3A696d98783ec24548e08b%2Fobj">
             https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/OpDef/EvaluateLLM-compute/40de89370d4563806d5c?inputUri=wandb-artifact%3A%2F%2F%2Fdannygoldstein%2Fhooman-eval-notion2%2Feval_dataset%3A696d98783ec24548e08b%2Fobj
           </a>
-          .
+          <img
+            style={{
+              width: '75%',
+            }}
+            src="https://github.com/wandb/weave/blob/4bd192e7a8936d7bd16a5ecd70675804674215e0/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/wf_filtered_calls_example.png?raw=true"
+          />
         </li>
         <li>
           Notice that the sidebar links (Traces and the user-terms like

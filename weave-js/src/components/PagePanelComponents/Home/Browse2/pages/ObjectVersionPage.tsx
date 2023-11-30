@@ -69,7 +69,7 @@ export const ObjectVersionPage: React.FC = () => {
       Existing Weaveflow Page
       <br />
       <img
-        src="https://github.com/wandb/weave/blob/db555a82512c2bac881ee0c65cf6d33264f4d34c/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/simple_table.png?raw=true"
+        src="https://github.com/wandb/weave/blob/a0d44639b972421890ed6149f9cbc01211749291/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/objectversion_example.png?raw=true"
         style={{
           width: '100%',
         }}
