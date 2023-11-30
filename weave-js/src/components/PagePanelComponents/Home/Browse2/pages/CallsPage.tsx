@@ -15,7 +15,11 @@ export const CallsPage: React.FC = () => {
         This is <strong>A VERY IMPORTANT PAGE</strong>. This is a rich, realtime
         datagrid of calls. The best product analogy here is datadog's traces
         page (see below). It is critical that linkers and users can filter this
-        page to see exactly what they want.
+        page to see exactly what they want. Moreover, it is critical that the
+        user can view in a board. The user should also be able to do more
+        advanced things like pivot, unnest, etc... in order to create comparison
+        or analysis views inline. Plots should be automatically generated above
+        the tables.
       </div>
       <div>Migration Notes:</div>
       <ul>
