@@ -75,9 +75,23 @@ export interface AutosuggestResult<
 > {
   newNodeOrOp: Replacement;
   suggestionString: string;
+  category: string;
 }
 
 const MAX_SUGGESTIONS = 500;
+
+type SuggestedNode = {
+  node: EditingNode;
+  category: string;
+};
+
+// Attach a category string (like "Ops") to a suggestion.
+const addCategory = (node: EditingNode, category: string): SuggestedNode => {
+  return {
+    node,
+    category,
+  };
+};
 
 // For a given node, return a list of suggested new
 // nodes to swap it with.
@@ -88,9 +102,9 @@ async function autosuggestNodes(
   stack: Stack
 ): Promise<{
   refinedNode: EditingNode;
-  suggestions: EditingNode[];
+  suggestions: SuggestedNode[];
 }> {
-  let result: EditingNode[] = [];
+  let result: SuggestedNode[] = [];
   const consumer = findConsumingOp(node, graph);
   const consumingOp = consumer?.outputNode.fromOp;
   const supportedEngines =
@@ -106,16 +120,19 @@ async function autosuggestNodes(
         isFunctionType(consumingOpDef.inputTypes[consumer.argName])
       ) {
         result = [
-          {
-            nodeType: 'const',
-            type: consumingOpDef.inputTypes[consumer.argName],
-            val: voidNode(),
-          },
+          addCategory(
+            {
+              nodeType: 'const',
+              type: consumingOpDef.inputTypes[consumer.argName],
+              val: voidNode(),
+            },
+            'Other'
+          ),
         ];
       } else if (consumingOp.name === 'pick') {
         const pickObj = consumingOp.inputs.obj;
         const pickKeys = pickSuggestions(pickObj.type);
-        result = pickKeys.map(key => constString(key));
+        result = pickKeys.map(key => addCategory(constString(key), 'Other'));
         // TODO: the following branches have `supportedEngines.has('ts')`. This
         // means that suggestions will only work for these ops so long as we
         // have a typescript engine. For now this is fine, but we can remove
@@ -125,7 +142,9 @@ async function autosuggestNodes(
         supportedEngines.has('ts')
       ) {
         let keys: string[] = [];
+        let category = '';
         if (consumer?.argName === 'entityName') {
+          category = 'Entities';
           const entityNamesNode = opEntityName({
             entity: opUserEntities({
               user: opRootViewer({}),
@@ -133,6 +152,7 @@ async function autosuggestNodes(
           });
           keys = await client.query(entityNamesNode as any);
         } else if (consumer?.argName === 'projectName') {
+          category = 'Projects';
           const entityNamesNode = opProjectName({
             project: opEntityProjects({
               entity: opRootEntity({
@@ -143,7 +163,7 @@ async function autosuggestNodes(
           keys = await client.query(entityNamesNode as any);
         }
         result = keys.map(key => {
-          return constString(key);
+          return addCategory(constString(key), category);
         });
       } else if (
         consumingOp.name === 'root-user' &&
@@ -154,7 +174,7 @@ async function autosuggestNodes(
           keys = ['shawn', 'stacey', 'l2k2'];
         }
         result = keys.map(key => {
-          return constString(key);
+          return addCategory(constString(key), 'Users');
         });
       } else if (
         consumingOp.name === 'project-artifact' &&
@@ -181,7 +201,7 @@ async function autosuggestNodes(
         );
         keys = _.uniq(_.flatten(possibleValues));
         result = keys.map(key => {
-          return constString(key);
+          return addCategory(constString(key), 'Artifacts');
         });
       } else if (
         consumingOp.name === 'project-artifactType' &&
@@ -212,7 +232,7 @@ async function autosuggestNodes(
           keys = _.uniq(_.flatten(possibleValues));
         }
         result = keys.map(key => {
-          return constString(key);
+          return addCategory(constString(key), 'Artifact types');
         });
       } else if (
         consumingOp.name === 'project-artifactVersion' &&
@@ -261,7 +281,10 @@ async function autosuggestNodes(
           keys = _.uniq(_.flatten(possibleValues));
         }
         result = keys.map(key => {
-          return constString(Number.isInteger(key) ? `v${key}` : `${key}`);
+          return addCategory(
+            constString(Number.isInteger(key) ? `v${key}` : `${key}`),
+            'Aliases'
+          );
         });
       } else if (
         consumingOp.name === 'run-loggedArtifactVersion' &&
@@ -313,7 +336,7 @@ async function autosuggestNodes(
           keys = _.uniq(_.flatten(possibleValues));
         }
         result = keys.map(key => {
-          return constString(key);
+          return addCategory(constString(key), 'Artifact versions');
         });
       } else if (
         consumingOp.name === 'artifactVersion-file' &&
@@ -347,7 +370,7 @@ async function autosuggestNodes(
           keys = _.uniq(_.flatten(possibleValues));
         }
         result = keys.map(key => {
-          return constString(key);
+          return addCategory(constString(key), 'Artifact files');
         });
       } else if (
         consumingOp.name === 'string-equal' ||
@@ -426,7 +449,7 @@ async function autosuggestNodes(
             possibleValues == null
               ? []
               : _.uniq(possibleValues).filter(notEmpty).sort(matchesFirst);
-          result = keys.map(key => constString(key));
+          result = keys.map(key => addCategory(constString(key), 'Other'));
         }
         // do stuff
       } else if (consumingOp.name === 'contains') {
@@ -479,13 +502,13 @@ async function autosuggestNodes(
             possibleValues == null
               ? []
               : _.uniq(possibleValues).filter(notEmpty);
-          result = keys.map(key => constString(key));
+          result = keys.map(key => addCategory(constString(key), 'Other'));
         }
       } else if (
         isBinaryOp(consumingOp, client.opStore) &&
         isAssignableTo('number', consumingOpInputTypes[1])
       ) {
-        result.push(constNumber(3.14159));
+        result.push(addCategory(constNumber(3.14159), 'Numeric constants'));
       }
 
       // Suggest none for equality comparison ops (which are all nullable),
@@ -498,7 +521,7 @@ async function autosuggestNodes(
           (isListLike(consumingOp.inputs.lhs.type) &&
             isNullable(listObjectType(consumingOp.inputs.lhs.type))))
       ) {
-        result.push(constNone());
+        result.push(addCategory(constNone(), 'Other'));
       }
     }
 
@@ -517,7 +540,7 @@ async function autosuggestNodes(
           //   stack
           // );
           // vNode = results.refinedNode as any;
-          result.push(vNode);
+          result.push(addCategory(vNode, 'Variables'));
           // result = result.concat(results.suggestions);
         }
       }
@@ -529,7 +552,10 @@ async function autosuggestNodes(
               opDef.inputTypes,
               (v, key) => getPlaceholderArg(opDef, key) ?? voidNode()
             );
-            return callOpVeryUnsafe(opDef.name, rootOpInputs);
+            return addCategory(
+              callOpVeryUnsafe(opDef.name, rootOpInputs),
+              'Root Ops'
+            );
           })
         );
       }
@@ -539,10 +565,13 @@ async function autosuggestNodes(
       );
       result = result.concat(
         availOps.flatMap(opDef => {
-          return callOpVeryUnsafe(opDef.name, {
-            lhs: node,
-            rhs: getPlaceholderArg(opDef, 'rhs') ?? voidNode(),
-          });
+          return addCategory(
+            callOpVeryUnsafe(opDef.name, {
+              lhs: node,
+              rhs: getPlaceholderArg(opDef, 'rhs') ?? voidNode(),
+            }),
+            'Ops'
+          );
         })
       );
     }
@@ -556,12 +585,18 @@ async function autosuggestNodes(
         const pickKeys = pickSuggestions(node.type);
         return [
           ...pickKeys.map(key =>
-            callOpVeryUnsafe('pick', {
-              obj: node,
-              key: constString(key),
-            })
+            addCategory(
+              callOpVeryUnsafe('pick', {
+                obj: node,
+                key: constString(key),
+              }),
+              'Pick'
+            )
           ),
-          callOpVeryUnsafe('pick', {obj: node, key: voidNode()}),
+          addCategory(
+            callOpVeryUnsafe('pick', {obj: node, key: voidNode()}),
+            'Pick'
+          ),
         ];
       } else {
         const argNames = Object.keys(opDef.inputTypes);
@@ -587,7 +622,7 @@ async function autosuggestNodes(
             opInputs[argName] = getPlaceholderArg(opDef, argName) ?? voidNode();
           }
         }
-        return callOpVeryUnsafe(opDef.name, opInputs);
+        return addCategory(callOpVeryUnsafe(opDef.name, opInputs), 'Ops');
       }
     });
 
@@ -596,10 +631,13 @@ async function autosuggestNodes(
       const getAttrCalls = Object.keys(node.type as any)
         .filter(attrName => !attrName.startsWith('_'))
         .map(attrName => {
-          return callOpVeryUnsafe('Object-__getattr__', {
-            self: node,
-            name: constString(attrName),
-          });
+          return addCategory(
+            callOpVeryUnsafe('Object-__getattr__', {
+              self: node,
+              name: constString(attrName),
+            }),
+            'Other'
+          );
         });
 
       result = [...result, ...getAttrCalls];
@@ -681,6 +719,7 @@ export async function autosuggest(
     result = ops.map(newOp => ({
       newNodeOrOp: newOp,
       suggestionString: opDisplayName(newOp, client.opStore),
+      category: 'Other',
     }));
   } else {
     const results = await autosuggestNodes(
@@ -690,13 +729,18 @@ export async function autosuggest(
       stackAtNodeOrOp
     );
 
-    result = results.suggestions.map(newNode => ({
-      newNodeOrOp: newNode,
+    result = results.suggestions.map(suggestion => ({
+      newNodeOrOp: suggestion.node,
       suggestionString: nodeToString(
-        maybeReplaceNode(newNode, results.refinedNode, varNode('any', '')),
+        maybeReplaceNode(
+          suggestion.node,
+          results.refinedNode,
+          varNode('any', '')
+        ),
         client.opStore,
         null
       ),
+      category: suggestion.category,
     }));
   }
 
@@ -786,6 +830,7 @@ export async function autosuggest(
           {
             newNodeOrOp: constString(query),
             suggestionString: `"${query}"`,
+            category: 'Replace with',
           },
           ...result,
         ],
