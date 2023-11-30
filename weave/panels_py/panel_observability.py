@@ -189,8 +189,22 @@ def observability(
         hidden=True,
     )
 
-    # TODO: add back in legend, when color != label
+    is_terminal_state = varbar.add(
+        "is_terminal_state",
+        weave_internal.define_fn(
+            {"row": input_node.type.object_type},
+            lambda row: weave.ops.Boolean.bool_or(
+                row["state"] == "finished",
+                weave.ops.Boolean.bool_or(
+                    row["state"] == "crashed",
+                    row["state"] == "failed",
+                ),
+            ),
+        ),
+        hidden=True,
+    )
 
+    # TODO: fix colors to special function
     state_transitions_plot = panels.Plot(
         filtered_data,
         x=lambda row: row[timestamp_col_name].bin(
@@ -270,7 +284,7 @@ def observability(
                 ),
                 columnDirs=["desc"],
             ),
-            10,
+            20,
         ),
         x=lambda row: row["run_id"],
         x_title="Run ID",
@@ -284,11 +298,12 @@ def observability(
             **{
                 "job": row[0]["job"],
                 "run id": row[0]["run_id"],
-                "entity": row[0]["entity_name"],
+                "user": row[0]["entity_name"],
                 "project": row[0]["project_name"],
                 "timestamp": row[0]["timestamp"],
             }
         ),
+        label=lambda row: row["run_id"],
         color_title="runtime",
         groupby_dims=["x"],
         mark="bar",
@@ -296,7 +311,7 @@ def observability(
         domain_x=user_zoom_range,
     )
 
-    jobs_table = panels.Table(filtered_window_data)
+    jobs_table = panels.Table(filtered_window_data.filter(is_terminal_state))
     jobs_table.add_column(lambda row: row["job"], "Job", groupby=True)
     jobs_table.add_column(lambda row: row.count(), "# Runs", sort_dir="desc")
     jobs_table.add_column(
@@ -308,18 +323,18 @@ def observability(
         / row.count(),
         "avg runtime (s)",
     )
-    jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["cpu_cores_util"]
-        .map(lambda r: r.avg())
-        .avg(),
-        "cpu util",
-    )
-    jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["gpu_cores_util"]
-        .map(lambda r: r.avg())
-        .avg(),
-        "gpu util",
-    )
+    # jobs_table.add_column(
+    #     lambda row: row["metrics"]["system"]["cpu_cores_util"]
+    #     .map(lambda r: r.avg())
+    #     .avg(),
+    #     "cpu util",
+    # )
+    # jobs_table.add_column(
+    #     lambda row: row["metrics"]["system"]["gpu_cores_util"]
+    #     .map(lambda r: r.avg())
+    #     .avg(),
+    #     "gpu util",
+    # )
 
     runs_table = panels.Table(
         filtered_window_data.filter(
@@ -329,37 +344,41 @@ def observability(
             )
         )
     )
-    runs_table.add_column(lambda row: row["entity_name"], "Entity", groupby=True)
+    runs_table.add_column(lambda row: row["entity_name"], "User", groupby=True)
     runs_table.add_column(lambda row: row.count(), "Count", sort_dir="desc")
 
-    cpu_plot = weave.panels.Plot(
-        filtered_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["state"] == "finished",
-            )
-        ),
-        x=lambda row: row[timestamp_col_name],
-        x_title=timestamp_col_name,
-        y=lambda row: row["metrics"]["system"]["cpu_cores_util"].avg(),
-        y_title="avg cpu %",
-        tooltip=lambda row: weave.ops.dict_(
-            **{
-                "user": row["entity_name"][0],
-                "run id": row["run_id"][-1],
-                "project": row["project_name"][0],
-                "min": row["metrics"]["system"]["cpu_cores_util"][0].min(),
-                "max": row["metrics"]["system"]["cpu_cores_util"][0].max(),
-                "avg": row["metrics"]["system"]["cpu_cores_util"][0].avg(),
-            }
-        ),
-        groupby_dims=["y"],
-        mark="line",
-        no_legend=True,
-        domain_x=user_zoom_range,
-    )
+    def make_metric_plot(metric_name, y_title):
+        return weave.panels.Plot(
+            filtered_data.filter(
+                weave_internal.define_fn(
+                    {"row": source_data.type.object_type},
+                    lambda row: row["state"] == "finished",
+                )
+            ),
+            x=lambda row: row[timestamp_col_name],
+            x_title=timestamp_col_name,
+            y=lambda row: row["metrics"]["system"][metric_name].avg(),
+            y_title=y_title,
+            tooltip=lambda row: weave.ops.dict_(
+                **{
+                    "user": row["entity_name"][0],
+                    "run id": row["run_id"][-1],
+                    "project": row["project_name"][0],
+                    "min": row["metrics"]["system"][metric_name][0].min(),
+                    "max": row["metrics"]["system"][metric_name][0].max(),
+                    "avg": row["metrics"]["system"][metric_name][0].avg(),
+                }
+            ),
+            groupby_dims=["y"],
+            mark="line",
+            no_legend=True,
+            domain_x=user_zoom_range,
+        )
 
-    gpu_plot = weave.panels.Plot(
+    cpu_plot = make_metric_plot("cpu_cores_util", "avg cpu %")
+    gpu_plot = make_metric_plot("gpu_cores_util", "avg gpu %")
+    gpu_memory_plot = make_metric_plot("gpu_cores_mem", "avg gpu memory util %")
+    memory_plot = weave.panels.Plot(
         filtered_data.filter(
             weave_internal.define_fn(
                 {"row": source_data.type.object_type},
@@ -368,16 +387,14 @@ def observability(
         ),
         x=lambda row: row[timestamp_col_name],
         x_title=timestamp_col_name,
-        y=lambda row: row["metrics"]["system"]["gpu_cores_util"].avg(),
-        y_title="avg gpu %",
+        y=lambda row: row["metrics"]["system"]["memory"],
+        y_title="system memory used (MB)",
         tooltip=lambda row: weave.ops.dict_(
             **{
                 "user": row["entity_name"][0],
                 "run id": row["run_id"][-1],
                 "project": row["project_name"][0],
-                "min": row["metrics"]["system"]["gpu_cores_util"][0].min(),
-                "max": row["metrics"]["system"]["gpu_cores_util"][0].max(),
-                "avg": row["metrics"]["system"]["gpu_cores_util"][0].avg(),
+                "memory": row["metrics"]["system"]["memory"][0],
             }
         ),
         groupby_dims=["y"],
@@ -419,27 +436,37 @@ def observability(
     overview_tab.add(
         "Jobs",
         jobs_table,
-        layout=panels.GroupPanelLayout(x=0, y=14, w=14, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=14, w=12, h=8),
     )
     overview_tab.add(
         "Runs_by_users",
         runs_table,
-        layout=panels.GroupPanelLayout(x=14, y=14, w=10, h=8),
+        layout=panels.GroupPanelLayout(x=12, y=14, w=12, h=8),
     )
     overview_tab.add(
         "Cpu_usage_on_run_finish",
         cpu_plot,
-        layout=panels.GroupPanelLayout(x=0, y=24, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=22, w=12, h=6),
+    )
+    overview_tab.add(
+        "System_memory_on_run_finish",
+        memory_plot,
+        layout=panels.GroupPanelLayout(x=12, y=22, w=12, h=6),
     )
     overview_tab.add(
         "Gpu_usage_on_run_finish",
         gpu_plot,
-        layout=panels.GroupPanelLayout(x=0, y=30, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=28, w=12, h=6),
+    )
+    overview_tab.add(
+        "Gpu_memory_on_run_finish",
+        gpu_memory_plot,
+        layout=panels.GroupPanelLayout(x=12, y=28, w=12, h=6),
     )
     overview_tab.add(
         "Errors",
         errors_table,
-        layout=panels.GroupPanelLayout(x=0, y=36, w=24, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=34, w=24, h=8),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)
