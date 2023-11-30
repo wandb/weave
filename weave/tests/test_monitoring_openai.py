@@ -1,3 +1,5 @@
+import contextlib
+import os
 from unittest.mock import Mock
 
 import openai
@@ -13,7 +15,7 @@ from weave.monitoring.openai.models import *
 from weave.monitoring.openai.models import Context
 from weave.monitoring.openai.openai import (
     Callback,
-    LogToStreamTable,
+    # LogToStreamTable,
     ReassembleStream,
     patch,
     unpatch,
@@ -387,23 +389,58 @@ def test_callback_reassemble_stream(
     assert chat_completions.context.outputs == reassembled_chat_completion_message
 
 
-def test_callback_log_to_streamtable_streaming(
+def test_log_to_span(
+    user_by_api_key_in_env, mocked_create, teardown, reassembled_chat_completion_message
+):
+    stream_name = "monitoring"
+    project = "openai"
+    entity = user_by_api_key_in_env.username
+
+    streamtable = make_stream_table(
+        stream_name, project_name=project, entity_name=entity
+    )
+    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+        mocked_create, streamtable=streamtable
+    )
+    create_input = dict(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": "Tell me a joke"}],
+    )
+    result = chat_completions.create(**create_input)
+    streamtable.finish()
+
+    hist_node = (
+        weave.ops.project(user_by_api_key_in_env.username, project)
+        .run(stream_name)
+        .history3()
+    )
+
+    inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
+    inputs_expected = ChatCompletionRequest.model_validate(create_input).model_dump()
+    assert inputs_st == inputs_expected
+
+    outputs_st = weave.use(hist_node["output"]).to_pylist_tagged()[0]
+    outputs_expected = reassembled_chat_completion_message.model_dump()
+    assert outputs_st == outputs_expected
+
+
+def test_log_to_span_streaming(
     user_by_api_key_in_env,
     mocked_streaming_create,
     teardown,
     reassembled_chat_completion_message,
 ):
-    table_name = "test_table"
-    project_name = "stream-tables"
+    stream_name = "monitoring"
+    project = "openai"
+    entity = user_by_api_key_in_env.username
 
-    st = make_stream_table(
-        table_name,
-        project_name=project_name,
-        entity_name=user_by_api_key_in_env.username,
+    streamtable = make_stream_table(
+        stream_name, project_name=project, entity_name=entity
     )
-    cb = LogToStreamTable(st)
     chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_streaming_create, callbacks=[ReassembleStream(), cb]
+        mocked_streaming_create,
+        callbacks=[ReassembleStream()],
+        streamtable=streamtable,
     )
     create_input = dict(
         model="gpt-3.5-turbo",
@@ -414,11 +451,11 @@ def test_callback_log_to_streamtable_streaming(
     for x in stream:
         ...
 
-    st.finish()  # only required for testing
+    streamtable.finish()
 
     hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, project_name)
-        .run(table_name)
+        weave.ops.project(user_by_api_key_in_env.username, project)
+        .run(stream_name)
         .history3()
     )
 
@@ -426,45 +463,7 @@ def test_callback_log_to_streamtable_streaming(
     inputs_expected = ChatCompletionRequest.model_validate(create_input).model_dump()
     assert inputs_st == inputs_expected
 
-    outputs_st = weave.use(hist_node["outputs"]).to_pylist_tagged()[0]
-    outputs_expected = reassembled_chat_completion_message.model_dump()
-    assert outputs_st == outputs_expected
-
-
-def test_callback_log_to_streamtable(
-    user_by_api_key_in_env, mocked_create, teardown, reassembled_chat_completion_message
-):
-    table_name = "test_table"
-    project_name = "stream-tables"
-
-    st = make_stream_table(
-        table_name,
-        project_name=project_name,
-        entity_name=user_by_api_key_in_env.username,
-    )
-    cb = LogToStreamTable(st)
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_create, callbacks=[cb]
-    )
-    create_input = dict(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Tell me a joke"}],
-    )
-    result = chat_completions.create(**create_input)
-
-    st.finish()  # only required for testing
-
-    hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, project_name)
-        .run(table_name)
-        .history3()
-    )
-
-    inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
-    inputs_expected = ChatCompletionRequest.model_validate(create_input).model_dump()
-    assert inputs_st == inputs_expected
-
-    outputs_st = weave.use(hist_node["outputs"]).to_pylist_tagged()[0]
+    outputs_st = weave.use(hist_node["output"]).to_pylist_tagged()[0]
     outputs_expected = reassembled_chat_completion_message.model_dump()
     assert outputs_st == outputs_expected
 
@@ -472,7 +471,7 @@ def test_callback_log_to_streamtable(
 def test_callback_ordering(mocked_streaming_create):
     cb = TestingCallback()
     chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_streaming_create, callbacks=[cb]
+        mocked_streaming_create, callbacks=[ReassembleStream(), cb]
     )
     stream = chat_completions.create(
         model="gpt-3.5-turbo",
@@ -492,7 +491,7 @@ def test_callback_ordering(mocked_streaming_create):
     assert expected == chat_completions.context.testing
 
 
-def test_patching():
+def test_patching(user_by_api_key_in_env):
     og_create = openai.resources.chat.completions.Completions.create
     og_acreate = openai.resources.chat.completions.AsyncCompletions.create
 
@@ -503,3 +502,16 @@ def test_patching():
     unpatch()
     assert openai.resources.chat.completions.Completions.create is og_create
     assert openai.resources.chat.completions.AsyncCompletions.create is og_acreate
+
+
+@contextlib.contextmanager
+def async_disabled():
+    current = os.environ.get("WEAVE_DISABLE_ASYNC_FILE_STREAM")
+    os.environ["WEAVE_DISABLE_ASYNC_FILE_STREAM"] = "true"
+    try:
+        yield
+    finally:
+        if current is None:
+            del os.environ["WEAVE_DISABLE_ASYNC_FILE_STREAM"]
+        else:
+            os.environ["WEAVE_DISABLE_ASYNC_FILE_STREAM"] = current
