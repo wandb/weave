@@ -149,7 +149,9 @@ const Browse2Mounted: FC = props => {
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
       <CssBaseline />
-      <AppBar position="fixed" sx={{zIndex: theme => theme.zIndex.drawer + 1}}>
+      <AppBar
+        position="fixed"
+        sx={{zIndex: theme => theme.zIndex.drawer + 1, height: '60px'}}>
         <Toolbar>
           <IconButton
             component={RouterLink}
