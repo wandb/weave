@@ -2,7 +2,6 @@ import _ from 'lodash';
 import React from 'react';
 import {useLocation, useParams} from 'react-router-dom';
 
-
 export const useQuery = () => {
   const {search} = useLocation();
 
@@ -21,4 +20,4 @@ export const useEPPrefix = () => {
     throw new Error('useEPPrefix must be called within a project route');
   }
   return (path: string) => `/${entity}/${project}${path}`;
-}
+};

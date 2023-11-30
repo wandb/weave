@@ -51,15 +51,8 @@ export const ObjectVersionPage: React.FC = () => {
           <Link to={prefix('/calls/call_id')}>/calls/call_id</Link>)
         </li>
         <li>
-          Link to * Consuming Calls ({' '}
+          Link to all Consuming Calls ({' '}
           <Link to={prefix('/calls?filter=uses=object_version_id')}>
-            /types/[type_name]/versions/[version_id]
-          </Link>
-          )
-        </li>
-        <li>
-          Link to * Consuming Boards ({' '}
-          <Link to={prefix('/boards?filter=uses=object_version_id')}>
             /types/[type_name]/versions/[version_id]
           </Link>
           )
