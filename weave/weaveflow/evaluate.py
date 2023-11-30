@@ -35,18 +35,20 @@ class EvaluateLLM(Evaluate):
     def compute(self, dataset: Dataset, predictions: list[typing.Any]) -> typing.Any:
         scores = []
         rationales = []
+        result_type = weave.types.TypedDict(
+            {
+                "score": weave.types.Float(),
+                "rationale": weave.types.String(),
+            }
+        )
+
         for example, prediction in zip(dataset.rows, predictions):
             # example_fields = self.format_example(example)
             messages = self.messages_template(example, prediction)
             try:
                 result = self.chat_llm.complete(
                     messages,
-                    weave.types.TypedDict(
-                        {
-                            "score": weave.types.Float(),
-                            "rationale": weave.types.String(),
-                        }
-                    ),
+                    result_type,
                 )
             except:
                 result = {"score": None, "rationale": None}
