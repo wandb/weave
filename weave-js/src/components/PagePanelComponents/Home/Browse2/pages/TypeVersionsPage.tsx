@@ -49,7 +49,7 @@ export const TypeVersionsPage: React.FC = () => {
       lightweight filtering on top.
       <br />
       <img
-        src=""
+        src="https://github.com/wandb/weave/blob/db555a82512c2bac881ee0c65cf6d33264f4d34c/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/simple_table.png?raw=true"
         style={{
           width: '100%',
         }}

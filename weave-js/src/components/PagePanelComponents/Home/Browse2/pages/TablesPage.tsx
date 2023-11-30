@@ -29,7 +29,7 @@ export const TablesPage: React.FC = () => {
       </a>
       <br />
       <img
-        src="https://github.com/wandb/weave/blob/562a679a24ede63dcf4295476a52d7dc38d4bd04/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/tables_example.png?raw=true"
+        src="https://github.com/wandb/weave/blob/db555a82512c2bac881ee0c65cf6d33264f4d34c/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/tables_example.png?raw=true"
         style={{
           width: '100%',
         }}
