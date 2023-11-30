@@ -268,7 +268,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'calls',
             icon: <Segment />,
             onClick: () => {
-              props.navigateToCalls();
+              props.navigateToCalls('parent_id=null');
             },
             children: [
               {
