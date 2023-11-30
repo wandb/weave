@@ -1,27 +1,60 @@
-import {Typography} from '@mui/material';
-import _ from 'lodash';
-import React, {FC} from 'react';
+import React from 'react';
+import {Link} from 'react-router-dom';
 
-import {dummyImageURL, useQuery} from './util';
+import {useEPPrefix, useQuery} from './util';
 
-export const CallsPage: FC = props => {
+export const CallsPage: React.FC = () => {
   const search = useQuery();
   const filter = search.filter;
+  const prefix = useEPPrefix();
   return (
-    <>
-      <Typography variant="h3" component="h3" gutterBottom>
-        Calls {filter}
-      </Typography>
-      <div
+    <div>
+      <h1>CallsPage Placeholder</h1>
+      <h2>Filter: {filter}</h2>
+      <div>
+        This is <strong>A VERY IMPORTANT PAGE</strong>. This is a rich, realtime
+        datagrid of calls. The best product analogy here is datadog's traces
+        page (see below). It is critical that linkers and users can filter this
+        page to see exactly what they want.
+      </div>
+      <div>Migration Notes:</div>
+      <ul>
+        <li>
+          Weaveflow has an existing concept of a run table that shows up on the
+          opversion page. This can have builtin filters from the linker. For
+          example, see here:{' '}
+          <a href="https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/OpDef/EvaluateLLM-compute/40de89370d4563806d5c?inputUri=wandb-artifact%3A%2F%2F%2Fdannygoldstein%2Fhooman-eval-notion2%2Feval_dataset%3A696d98783ec24548e08b%2Fobj">
+            https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/OpDef/EvaluateLLM-compute/40de89370d4563806d5c?inputUri=wandb-artifact%3A%2F%2F%2Fdannygoldstein%2Fhooman-eval-notion2%2Feval_dataset%3A696d98783ec24548e08b%2Fobj
+          </a>
+          .
+        </li>
+        <li>
+          Notice that the sidebar links (Traces and the user-terms like
+          'evaluate') link here, each with predefined filters. Trace links here
+          with `parent_id=null` in order to only show trace roots. While The
+          others link with `kind=evaluate` for example. We still need to
+          implement a grouping of ops so that we can properly do this "kind"
+          lookup. In the beginning, it will be fairly heuristic based until this
+          is implemented
+        </li>
+      </ul>
+      <div>Links:</div>
+      <ul>
+        <li>
+          Each row should link to the associated call:{' '}
+          <Link to={prefix('/calls/call_id')}>/calls/[call_id]</Link>
+        </li>
+      </ul>
+      <div>Inspiration</div>
+      This page will basically be a simple table of Op Versions, with some
+      lightweight filtering on top.
+      <br />
+      <img
+        src="https://github.com/wandb/weave/blob/7cbb458e83a7121042af6ab6894f999210fafa4d/weave-js/src/components/PagePanelComponents/Home/dd_placeholder.png?raw=true"
         style={{
-          backgroundImage: `url(${dummyImageURL})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
           width: '100%',
-          height: '100%',
         }}
       />
-    </>
+    </div>
   );
 };
