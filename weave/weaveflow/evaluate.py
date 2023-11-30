@@ -35,13 +35,11 @@ class EvaluateLLM(Evaluate):
     def compute(self, dataset: Dataset, predictions: list[typing.Any]) -> typing.Any:
         scores = []
         rationales = []
-        result_type = (
-            weave.types.TypedDict(
-                {
-                    "score": weave.types.Float(),
-                    "rationale": weave.types.String(),
-                }
-            ),
+        result_type = weave.types.TypedDict(
+            {
+                "score": weave.types.Float(),
+                "rationale": weave.types.String(),
+            }
         )
 
         for example, prediction in zip(dataset.rows, predictions):
