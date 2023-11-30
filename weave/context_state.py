@@ -172,7 +172,7 @@ def lazy_execution():
         _eager_mode.reset(eager_token)
 
 
-def eager_mode():
+def eager_mode() -> bool:
     return _eager_mode.get()
 
 
