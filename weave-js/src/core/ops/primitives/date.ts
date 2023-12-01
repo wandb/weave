@@ -291,9 +291,7 @@ export const opDatetimeNow = makeDateOp({
   hidden: true,
   name: 'datetime-now',
   argTypes: {},
-  description: `Returns the difference between two ${docType('date', {
-    plural: true,
-  })} in milliseconds`,
+  description: `Returns the current time in milliseconds`,
   returnValueDescription: `datetime.now()`,
   returnType: inputTypes => 'number',
   resolver: inputs => {
