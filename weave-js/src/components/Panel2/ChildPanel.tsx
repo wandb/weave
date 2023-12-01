@@ -802,10 +802,37 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
   // Render everything along this path, and its descendants, but only show
   // the controls for this and its descendants.
 
+  // Panels are organized into a tree as seen in the Outline. A board with a
+  // variable and two panels in the main section might look like this:
+  //
+  // <root>
+  //   sidebar
+  //     data
+  //   main
+  //     panel
+  //     panel0
+  //
+  // pathStr is a period-delimited string that identifies a panel.
+  // E.g. <root>.main.panel0
+  // The full delimited path is important for identification as e.g. "panel0" could
+  // have a child that is also named "panel0".
+  // We need to proceed with config display in three cases:
+  // 1. This component is the selected component.
+  // 2. This component is a descendent of the selected component. (E.g. parent is a Group)
+  // 3. This component is an ancestor of the selected component, we need to recurse down.
+  // For other cases display nothing.
+  const isThisPanelSelected = pathStr === selectedPathStr;
+
+  // Handle this panel is <root>.main.panel.child and <root>.main.panel is selected
+  const isThisPanelDescendantOfSelected = isAncestor(pathStr, selectedPathStr);
+
+  // Handle <root>.main.panel is selected and this is <root>.main
+  const isThisPanelAncestorOfSelected = isAncestor(selectedPathStr, pathStr);
+
   const nothingToShow =
-    pathStr !== selectedPathStr &&
-    !isAncestor(pathStr, selectedPathStr) && // E.g. If Group is selected, descendants would show
-    !isAncestor(selectedPathStr, pathStr); // Need to be able to recurse down to selection
+    !isThisPanelSelected &&
+    !isThisPanelDescendantOfSelected &&
+    !isThisPanelAncestorOfSelected;
   if (nothingToShow) {
     return null;
   }
