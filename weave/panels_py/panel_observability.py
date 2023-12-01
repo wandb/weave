@@ -112,10 +112,10 @@ def observability(
     filtered_range = varbar.add(
         "filtered_range",
         weave.ops.make_list(
-            # a=window_start,
-            # b=window_end,
-            a=filtered_data[timestamp_col_name].min(),
-            b=filtered_data[timestamp_col_name].max(),
+            a=window_start,
+            b=window_end,
+            # a=filtered_data[timestamp_col_name].min(),
+            # b=filtered_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -128,11 +128,11 @@ def observability(
         "Time_range",
         panels.DateRange(
             user_zoom_range,
-            # domain=weave.ops.make_list(
-            #     a=window_start,
-            #     b=window_end,
-            # ),
-            domain=filtered_data[timestamp_col_name],
+            domain=weave.ops.make_list(
+                a=window_start,
+                b=window_end,
+            ),
+            # domain=filtered_data[timestamp_col_name],
         ),
     )
 

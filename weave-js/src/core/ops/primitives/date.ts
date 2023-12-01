@@ -2,7 +2,8 @@ import moment from 'moment';
 
 import {list, listObjectType, maybe, nonNullable} from '../../model';
 import {docType} from '../../util/docs';
-import {makeBasicDimDownOp, makeStandardOp} from '../opKinds';
+import {makeBasicDimDownOp, makeBasicOp, makeStandardOp} from '../opKinds';
+import {makeOp} from '../../opStore';
 
 // Not yet ready, needs to handle tags and nulls (see number.ts).
 // Also we'll want to figure out what kind of unit/type to return.
@@ -286,14 +287,14 @@ export const opDateRoundDay = dateRounder('day');
 export const opDateRoundHour = dateRounder('hour');
 export const opDateRoundMinute = dateRounder('minute');
 
-export const opDatetimeNow = makeDateOp({
+export const opDatetimeNow = makeOp({
   hidden: true,
   name: 'datetime-now',
   argTypes: {},
   description: `Returns the current time in milliseconds`,
   returnValueDescription: `datetime.now()`,
-  returnType: inputTypes => 'number',
-  resolver: inputs => {
+  returnType: 'number',
+  resolver: () => {
     return moment.now();
   },
 });

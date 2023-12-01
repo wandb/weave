@@ -45,7 +45,7 @@ def test_zlib_playback(dev_only_admin_env_override, use_server_gql_schema):
 # paste the stringified error node here and we will only execute that node.
 filter_node = ""
 
-zlib_str = ""
+zlib_str = "eJyt1M1ugzAMAOB38TkHHOeH8AzTdult6oGWtM1UAoIwdar67ksZnbpS0SLtRIKN88kJOcK2yetdC9kRfFXYOHj/GS2+agsZVF2ouwAMNk1VvtWQIYPQh47DE4IrbRvysoYTA1fENwqJa6VRcSLDUcVALJqX52znC3uI9ZyPdft186aBjLMhkplTnz1BoBFh79pzQrX6sOuwmOCVzr9Yvw07yJI4yw+XGf3ahSIjiKRBKVNF1/a9K10Y2wUbIhkmD/Hyf/AXLpcmkSZFI5XhHM01t9psWnvHq9gl9ESz9f96KTVCapGQMILrP90tmqr2+Zib3hrXle8FM1ydd5WPwdKWK9ucT3ks6C2we/JlXBA+833cT52gEJw0pqmYVIDvzpVh+DCZk0yP9gD5Uz9dKo3mKUlJiIme9dMhTTf5RowPxeNjPhZzqbgQ0sQrAik2eJ5YzRLz0zJG8mZrw+twzyUMkaGIu/0NvhSZZA=="
 # Paste zlib into zlib.txt (from DD)
 zlib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zlib.txt")
 if os.path.exists(zlib_path):
