@@ -100,8 +100,10 @@ def observability(
         hidden=True,
     )
 
-    one_week_in_seconds = 60 * 60 * 24 * 7
-    window_start = weave.ops.from_number(weave.ops.datetime_now() - one_week_in_seconds)
+    three_days_in_seconds = 60 * 60 * 24 * 3
+    window_start = weave.ops.from_number(
+        weave.ops.datetime_now() - three_days_in_seconds
+    )
     window_end = weave.ops.from_number(weave.ops.datetime_now())
 
     filtered_range = weave.ops.make_list(
@@ -131,10 +133,6 @@ def observability(
     varbar.add(
         "Filters",
         panels.FilterEditor(filter_fn, node=window_data),
-    )
-
-    grouping_by_trace = weave_internal.define_fn(
-        {"row": input_node.type.object_type}, lambda row: row["trace_id"]
     )
 
     colors_node = weave.ops.dict_(
@@ -212,7 +210,7 @@ def observability(
             )
         ),
         y_title="Time spent queued",
-        label=lambda row: grouping_by_trace(row),
+        label=lambda row: row["trace_id"],
         tooltip=lambda row: weave.ops.dict_(
             **{
                 "job": row["job"][0],
@@ -240,7 +238,7 @@ def observability(
                 # make_list required for sorting (?)
                 compFn=lambda row: weave.ops.make_list(
                     timestamp=row[timestamp_col_name],
-                    state=row["state"],
+                    # state=row["state"],
                 ),
                 columnDirs=["desc"],
             ),
@@ -271,7 +269,7 @@ def observability(
         domain_x=bin_range,
     )
 
-    jobs_table = panels.Table(filtered_window_data.filter(is_start_stop_state))
+    jobs_table = panels.Table(filtered_window_data.filter(is_start_stop_state))  # type: ignore
     jobs_table.add_column(lambda row: row["run_id"], "Run ID", groupby=True)
     jobs_table.add_column(
         lambda row: weave.ops.timedelta_total_seconds(
@@ -289,7 +287,7 @@ def observability(
         "avg cpu util %",
     )
 
-    runs_table = panels.Table(
+    runs_table = panels.Table(  # type: ignore
         filtered_window_data.filter(
             weave_internal.define_fn(
                 {"row": source_data.type.object_type},
@@ -300,8 +298,8 @@ def observability(
     runs_table.add_column(lambda row: row["entity_name"], "User", groupby=True)
     runs_table.add_column(lambda row: row.count(), "Count", sort_dir="desc")
 
-    def make_metric_plot(metric_name, y_title):
-        return weave.panels.Plot(
+    def make_metric_plot(metric_name: str, y_title: str) -> panels.Plot:
+        return panels.Plot(
             filtered_window_data.filter(
                 weave_internal.define_fn(
                     {"row": source_data.type.object_type},
@@ -356,7 +354,7 @@ def observability(
         domain_x=bin_range,
     )
 
-    errors_table = panels.Table(
+    errors_table = panels.Table(  # type: ignore
         filtered_window_data.filter(
             weave_internal.define_fn(
                 {"row": source_data.type.object_type},
