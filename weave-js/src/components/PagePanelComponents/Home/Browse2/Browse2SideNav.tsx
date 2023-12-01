@@ -208,7 +208,7 @@ const SideBarNavItem: FC<{item: ItemType; depth?: number}> = props => {
         <ListItemText primary={props.item.title} />
       </ListItemButton>
       {props.item.children && (
-        <List component="div" disablePadding>
+        <List disablePadding>
           {props.item.children.map((item, itemIndex) => {
             return (
               <SideBarNavItem item={item} depth={depth + 2} key={itemIndex} />
@@ -227,7 +227,7 @@ const SideNav: FC<{
       {props.sections.map((section, sectionIndex) => {
         return (
           <Fragment key={sectionIndex}>
-            <ListSubheader component="div" id="nested-list-subheader">
+            <ListSubheader id="nested-list-subheader">
               <Divider />
               {section.title}
               <Divider />

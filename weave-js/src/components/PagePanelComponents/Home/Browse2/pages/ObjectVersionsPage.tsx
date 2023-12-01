@@ -33,7 +33,7 @@ export const ObjectVersionsPage: React.FC<{
           hash: ov.hash,
           is_latest_in_collection: ov.aliases.includes('latest'),
           version_index: ov.version_index,
-          type_version: ov.type_name,
+          type_version: ov.type_version.type_name,
           // produced_by: ov.produced_by,
           created_at_ms: ov.created_at_ms,
           date_created: ov.created_at_ms,

@@ -7,11 +7,11 @@ Convention:
 import { useMutation} from '@apollo/client';
 import { useMemo } from "react"
 
-import { constFunction, constString, Node, opArtifactAliasAlias, opArtifactName, opArtifactTypeArtifacts, opArtifactTypeName, opArtifactVersionAliases, opArtifactVersionArtifactSequence, opArtifactVersionArtifactType, opArtifactVersionCreatedAt, opArtifactVersionDescription, opArtifactVersionDigest, opArtifactVersionHash, opArtifactVersionId, opArtifactVersionIsWeaveObject, opArtifactVersions, opArtifactVersionVersionId, opDict, opFilesystemArtifactWeaveType, opFilter, opFlatten, opMap, opProjectArtifactTypes, opRootProject, opTypeName } from "../../../../../../core"
+import { constFunction, constNone, constString, Node, opArray, opArtifactAliasAlias, opArtifactName, opArtifactTypeArtifacts, opArtifactTypeName, opArtifactVersionAliases, opArtifactVersionArtifactSequence, opArtifactVersionArtifactType, opArtifactVersionCreatedAt, opArtifactVersionDescription, opArtifactVersionDigest, opArtifactVersionHash, opArtifactVersionId, opArtifactVersionIsWeaveObject, opArtifactVersions, opArtifactVersionVersionId, opDict, opFilesystemArtifactWeaveType, opFilter, opFlatten, opMap, opProjectArtifactTypes, opProjectArtifactVersion, opRootProject, opTypeName } from "../../../../../../core"
 import { useNodeValue } from "../../../../../../react"
 import { UPDATE_ARTIFACT_DESCRIPTION } from './gql';
 
-export const useAllObjectVersions = (entity: string, project: string): Loadable<Array<ObjectVersionDictType>> => {
+export const useAllObjectVersions = (entity: string, project: string): Loadable<ObjectVersionDictType[]> => {
     const allObjectVersions = useMemo(() => allObjectVersionsNode(entity, project), [entity, project])
     const asDictNode = opMap({arr: allObjectVersions, mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
         return opObjectVersionToDict(row as any)
@@ -39,15 +39,34 @@ export const useUpdateObjectVersionDescription = () => {
     })
 }
 
+export const useObjectVersionTypeInfo = (entity: string, project: string, object_name: string, object_version_hash: string): Loadable<ObjectVersionDictType> => {
+    const objectVersionNode = opProjectArtifactVersion({
+        project: opRootProject({
+            entityName: constString(entity),
+            projectName: constString(project),
+        }),
+        artifactName: constString(object_name),
+        artifactVersionAlias: constString(object_version_hash),
+    })
+    const value = useNodeValue(opObjectVersionToDict(objectVersionNode as any))
+    return value as any
+}
+
 ///
 
-type Loadable<T> = {loading: true} | {loading: false, result: T}
+type Loadable<T> = {loading: true, result: undefined | null} | {loading: false, result: T}
+
+type TypeVersionTypeDictType = {
+    type_name: string,
+    type_version: string,
+    parent_type?: TypeVersionTypeDictType,
+}
 
 type ObjectVersionDictType = {
     artifact_id: string,
     collection_name: string,
-    type_name: string,
-    aliases: Array<string>,
+    type_version: TypeVersionTypeDictType
+    aliases: string[],
     created_at_ms: number,
     description: string,
     hash: string,
@@ -55,11 +74,11 @@ type ObjectVersionDictType = {
 }
 
 const nonUserTypes = [
-    'OpDef', 'list', 'dict', 'type', 'stream_table'
+    'OpDef',  'type', 'stream_table'
 ]
-const removeNonUserObjects = (objectVersions: Array<ObjectVersionDictType>) => {
+const removeNonUserObjects = (objectVersions: ObjectVersionDictType[]) => {
     return objectVersions.filter(objectVersion => {
-        return !nonUserTypes.includes(objectVersion.type_name)
+        return !nonUserTypes.includes(objectVersion.type_version.type_name)
     })
 }
 
@@ -69,7 +88,7 @@ const opObjectVersionToDict = (objectVersionNode: Node<'artifactVersion'>) => {
     return opDict({
         artifact_id: opArtifactVersionId({artifactVersion: objectVersionNode}),
         collection_name: opArtifactName({artifact: sequenceNode}),
-        type_name: fnObjectVersionTypeVersion(artifactTypeNode),
+        type_version: fnObjectVersionTypeVersion(artifactTypeNode),
         // type_name: opTypeName({type: opFilesystemArtifactWeaveType({artifact: objectVersionNode} as any)})
         aliases: opArtifactAliasAlias({artifactAlias:  opArtifactVersionAliases({artifactVersion: objectVersionNode})}),
         created_at_ms: opArtifactVersionCreatedAt({artifactVersion: objectVersionNode}),
@@ -85,7 +104,12 @@ const fnObjectVersionTypeVersion = (objectVersionNode: Node<'artifactVersion'>) 
     // that:
     // 1. The name of the artifactType is the same name as the weave type
     // 2. There is only 1 version of each type (totally wrong)
-    return  opArtifactTypeName({artifactType: objectVersionNode})
+    return  opDict({
+        type_name: opArtifactTypeName({artifactType: objectVersionNode}),
+        type_version: constString('UNKNOWN'),
+        // TODO(tim/weaveflow_improved_nav): This is incorrect for now. We don't have the notion
+        parent_type: constNone()
+    } as any)
 }
 
 const fnObjectVersionHash = (objectVersionNode: Node<'artifactVersion'>) => {

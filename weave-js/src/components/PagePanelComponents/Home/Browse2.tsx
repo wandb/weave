@@ -28,6 +28,7 @@ import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {RouteAwareBrowse2ProjectSideNav} from './Browse2/Browse2SideNav';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
+import {NewWeaveflowRouteContextProvider} from './Browse2/context';
 import {BoardPage} from './Browse2/pages/BoardPage';
 import {BoardsPage} from './Browse2/pages/BoardsPage';
 import {CallPage} from './Browse2/pages/CallPage';
@@ -194,7 +195,9 @@ const Browse2Mounted: FC = props => {
               pl: 3,
             }}>
             <Toolbar />
-            <Browse2ProjectRoot />
+            <NewWeaveflowRouteContextProvider>
+              <Browse2ProjectRoot />
+            </NewWeaveflowRouteContextProvider>
           </Box>
         </Route>
         <Route>

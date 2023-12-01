@@ -11,16 +11,11 @@ import {
   Node,
   Type,
 } from '@wandb/weave/core';
-import {
-  ArtifactRef,
-  isWandbArtifactRef,
-  parseRef,
-  refUri,
-  useNodeValue,
-} from '@wandb/weave/react';
+import {ArtifactRef, parseRef, refUri, useNodeValue} from '@wandb/weave/react';
 import React, {FC, useMemo} from 'react';
 
 import {Link} from './CommonLib';
+import {useWeaveflowRouteContext} from './context';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -32,18 +27,13 @@ const getRootType = (t: Type): Type => {
   return t;
 };
 
-const refUIUrl = (rootTypeName: string, objRef: ArtifactRef) => {
-  if (!isWandbArtifactRef(objRef)) {
-    throw new Error('Not a wandb artifact ref');
-  }
-  return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
-};
-
 export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
+  const {refUIUrl} = useWeaveflowRouteContext();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
     return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
   }, [objRef]);
+  console.log({objRef});
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
