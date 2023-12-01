@@ -85,10 +85,11 @@ def observability(
     overview_tab = weave.panels.Group(
         layoutMode="grid",
         showExpressions=False,
-        enableAddPanel=True,
+        enableAddPanel=False,
+        disableDeletePanel=True,
     )
 
-    varbar = panel_board.varbar(editable=False)
+    varbar = panel_board.varbar(editable=False, width=280)
     source_data = input_node
 
     filter_fn = varbar.add(
@@ -348,8 +349,8 @@ def observability(
     jobs_table.add_column(lambda row: row["job"][0], "Job")  # groupby=True
     # jobs_table.add_column(lambda row: row.count(), "# Runs", sort_dir="desc")
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["cpu_cores_util"][-1],
-        "cpu util",
+        lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
+        "avg cpu util %",
     )
     # jobs_table.add_column(
     #     lambda row: row["metrics"]["system"]["gpu_cores_util"]
@@ -439,7 +440,6 @@ def observability(
     errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
 
     # layout
-
     overview_tab.add(
         "State_transitions",
         state_transitions_plot,
@@ -491,7 +491,7 @@ def observability(
         layout=panels.GroupPanelLayout(x=0, y=34, w=24, h=8),
     )
 
-    return panels.Board(vars=varbar, panels=overview_tab)
+    return panels.Board(vars=varbar, panels=overview_tab, editable=False)
 
 
 template_registry.register(
