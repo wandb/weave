@@ -266,7 +266,7 @@ def observability(
         groupby_dims=["x"],
         mark="bar",
         no_legend=True,
-        domain_x=bin_range,
+        domain_x=user_zoom_range,
     )
 
     jobs_table = panels.Table(filtered_window_data.filter(is_start_stop_state))  # type: ignore
