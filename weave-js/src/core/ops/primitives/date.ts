@@ -286,7 +286,6 @@ export const opDateRoundDay = dateRounder('day');
 export const opDateRoundHour = dateRounder('hour');
 export const opDateRoundMinute = dateRounder('minute');
 
-
 export const opDatetimeNow = makeDateOp({
   hidden: true,
   name: 'datetime-now',
@@ -295,6 +294,6 @@ export const opDatetimeNow = makeDateOp({
   returnValueDescription: `datetime.now()`,
   returnType: inputTypes => 'number',
   resolver: inputs => {
-    return moment.now()
+    return moment.now();
   },
 });
