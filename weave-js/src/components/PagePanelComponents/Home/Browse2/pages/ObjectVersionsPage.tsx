@@ -1,3 +1,4 @@
+import {Check} from '@mui/icons-material';
 import Box from '@mui/material/Box';
 // import {useDemoData} from '@mui/x-data-grid-generator';
 import {
@@ -6,37 +7,60 @@ import {
   GridColumnGroupingModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
-import React from 'react';
-import {Link} from 'react-router-dom';
+import React, {useMemo} from 'react';
 
-import {useEPPrefix, useQuery} from './util';
-import {Check} from '@mui/icons-material';
+import {useAllObjectVersions} from './interface/dataModel';
+import moment from 'moment';
 
-export const ObjectVersionsPage: React.FC = () => {
-  // const search = useQuery();
-  // const filter = search.filter;
-  // const prefix = useEPPrefix();
-  // const {data} = useDemoData({
-  //   dataSet: 'Commodity',
-  //   rowLength: 100000,
-  //   editable: false,
-  // });
-  const rows: GridRowsProp = [
-    {
-      id: 0,
-      collection_name: 'Model',
-      version_id: '1234',
-      is_latest_in_collection: true,
-      version_index: 4,
-      type_version: 'GPT:1234 -> Model:5432',
-      produced_by: 'Call xyz',
-      date_created: '2021-10-01',
-      description: 'This is a model',
-      // metadata: {},
-      // tags: [],
-      // properties: {a: 'b', c: 'd'},
-    },
-  ];
+export const ObjectVersionsPage: React.FC<{
+  entity: string;
+  project: string;
+}> = props => {
+  const allObjectVersions = useAllObjectVersions(props.entity, props.project);
+  console.log(allObjectVersions);
+  const rows: GridRowsProp = useMemo(() => {
+    if (allObjectVersions.loading) {
+      return [];
+    } else {
+      return allObjectVersions.result.map((ov, i) => {
+        return {
+          id: i,
+          collection_name: ov.collection_name,
+          version_id: ov.digest,
+          is_latest_in_collection: ov.aliases.includes('latest'),
+          version_index: ov.version_index,
+          type_version: ov.type_name,
+          // produced_by: ov.produced_by,
+          created_at_ms: ov.created_at_ms,
+          date_created: ov.created_at_ms,
+          // date_created: moment
+          //   .unix(ov.created_at_ms / 1000)
+          //   .format('YYYY-MM-DD HH:mm:ss'),
+          description: ov.description,
+          // metadata: {},
+          // tags: [],
+          // properties: {a: 'b', c: 'd'},
+        };
+      });
+    }
+  }, [allObjectVersions]);
+  // const rows: GridRowsProp = [
+  //   {
+  //     // id: 0,
+  //     collection_name: 'Model',
+  //     version_id: '1234',
+  //     is_latest_in_collection: true,
+  //     version_index: 4,
+  //     type_version: 'GPT:1234 -> Model:5432',
+  //     // TODO: Tim: We need an efficient way to look up the producing call.
+  //     produced_by: 'Call xyz',
+  //     date_created: '2021-10-01',
+  //     description: 'This is a model',
+  //     // metadata: {},
+  //     // tags: [],
+  //     // properties: {a: 'b', c: 'd'},
+  //   },
+  // ];
   const columns: GridColDef[] = [
     {
       field: 'collection_name',
@@ -51,7 +75,7 @@ export const ObjectVersionsPage: React.FC = () => {
       flex: 1,
       minWidth: 100,
       renderCell: params => {
-        return params.value ? <Check /> : <Check />;
+        return params.value ? <Check /> : null;
       },
     },
     {
@@ -61,8 +85,16 @@ export const ObjectVersionsPage: React.FC = () => {
       minWidth: 100,
     },
     {field: 'type_version', headerName: 'Data Type', flex: 1, minWidth: 100},
-    {field: 'produced_by', headerName: 'Produced By', flex: 1, minWidth: 100},
-    {field: 'date_created', headerName: 'Date Created', flex: 1, minWidth: 100},
+    // {field: 'produced_by', headerName: 'Produced By', flex: 1, minWidth: 100},
+    {
+      field: 'date_created',
+      headerName: 'Date Created',
+      flex: 1,
+      minWidth: 100,
+      renderCell: params => {
+        return moment.unix(params.value / 1000).format('YYYY-MM-DD HH:mm:ss');
+      },
+    },
     {field: 'description', headerName: 'Description', flex: 1, minWidth: 100},
     // Metadata might not be necessary right now
     // {field: 'metadata', headerName: 'Metadata', flex: 1, minWidth: 100},
@@ -81,10 +113,17 @@ export const ObjectVersionsPage: React.FC = () => {
         width: '100%',
         overflow: 'hidden',
         display: 'flex',
+        flexDirection: 'column',
       }}>
+      <h1>All Object (Version)s</h1>
       <Box sx={{flex: '1 1 auto', overflow: 'hidden'}}>
         <DataGridPro
           rows={rows}
+          initialState={{
+            sorting: {
+              sortModel: [{field: 'date_created', sort: 'desc'}],
+            },
+          }}
           // {...data}
           // loading={data.rows.length === 0}
           rowHeight={38}

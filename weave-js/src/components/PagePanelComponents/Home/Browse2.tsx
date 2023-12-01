@@ -233,6 +233,8 @@ const Browse2Mounted: FC = props => {
 
 const Browse2ProjectRoot: FC = () => {
   const projectRoot = `:entity/:project`;
+  const params = useParams<{entity: string; project: string}>();
+
   return (
     <Box
       sx={{
@@ -265,7 +267,7 @@ const Browse2ProjectRoot: FC = () => {
           <ObjectsPage />
         </Route>
         <Route path={`/${projectRoot}/object-versions`}>
-          <ObjectVersionsPage />
+          <ObjectVersionsPage entity={params.entity} project={params.project} />
         </Route>
         {/* OPS */}
         <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
