@@ -1,6 +1,5 @@
 import weave
 
-from ..panels_py import panel_autoboard
 from .. import weave_types as types
 from ..panels import panel_board
 from .. import weave_internal
@@ -250,24 +249,6 @@ def observability(
         x=lambda row: row["run_id"],
         x_title="Run ID",
         y_title="Runtime",
-        # y=lambda row: weave.ops.timedelta_total_seconds(
-        #     weave.ops.cond(
-        #         weave.ops.dict_(
-        #             terminal=row[timestamp_col_name].count() > 1,
-        #             running=row[timestamp_col_name].count() <= 1,
-        #         ),
-        #         weave.ops.dict_(
-        #             terminal=weave.ops.datetime_sub(
-        #                 row[timestamp_col_name].max(),
-        #                 row[timestamp_col_name].min(),
-        #             ),
-        #             running=weave.ops.datetime_sub(
-        #                 weave.ops.from_number(weave.ops.datetime_now()),
-        #                 row[timestamp_col_name].min(),
-        #             ),
-        #         ),
-        #     )
-        # ),
         y=lambda row: weave.ops.timedelta_total_seconds(
             weave.ops.datetime_sub(
                 row[timestamp_col_name].max(), row[timestamp_col_name].min()
@@ -303,17 +284,10 @@ def observability(
         sort_dir="desc",
     )
     jobs_table.add_column(lambda row: row["job"][0], "Job")  # groupby=True
-    # jobs_table.add_column(lambda row: row.count(), "# Runs", sort_dir="desc")
     jobs_table.add_column(
         lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
         "avg cpu util %",
     )
-    # jobs_table.add_column(
-    #     lambda row: row["metrics"]["system"]["gpu_cores_util"]
-    #     .map(lambda r: r.avg())
-    #     .avg(),
-    #     "gpu util",
-    # )
 
     runs_table = panels.Table(
         filtered_window_data.filter(
