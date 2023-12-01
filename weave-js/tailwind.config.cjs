@@ -186,7 +186,11 @@ module.exports = {
         700: '#193C80',
       },
     },
-    extend: {},
+    extend: {
+      opacity: {
+        35: '.35',
+      },
+    },
   },
   plugins: [require('tailwindcss-radix')],
   corePlugins: {

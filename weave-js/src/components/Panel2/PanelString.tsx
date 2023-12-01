@@ -163,8 +163,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         />
       );
       return (
-        <S.StringContainer spacing={spacing}>
-          <S.StringItem spacing={spacing}>
+        <S.StringContainer $spacing={spacing}>
+          <S.StringItem $spacing={spacing}>
             <TooltipTrigger
               copyableContent={fullStr}
               content={contentMarkdown}
@@ -204,8 +204,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
 
       return (
-        <S.StringContainer spacing={spacing}>
-          <S.StringItem spacing={spacing}>
+        <S.StringContainer $spacing={spacing}>
+          <S.StringItem $spacing={spacing}>
             <TooltipTrigger copyableContent={fullStr} content={contentDiff}>
               {contentDiff}
             </TooltipTrigger>
@@ -222,8 +222,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
 
     // plaintext
     return (
-      <S.StringContainer data-test-weave-id="string" spacing={spacing}>
-        <S.StringItem spacing={spacing}>
+      <S.StringContainer data-test-weave-id="string" $spacing={spacing}>
+        <S.StringItem $spacing={spacing}>
           <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
             {contentPlaintext}
           </TooltipTrigger>
