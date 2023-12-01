@@ -15,8 +15,11 @@ import datetime
     output_type=types.optional(types.TimeDelta()),
 )
 def datetime_sub(lhs, rhs):
+    """
     if rhs == None:
         return None
+    """
+
     return lhs - rhs
 
 
@@ -318,3 +321,8 @@ def timestamp(timestampISO: str) -> typing.Optional[datetime.datetime]:
             return dateutil.parser.parse(timestampISO)
         except dateutil.parser.ParserError:
             return None
+
+
+@op(name="datetime-now", output_type=types.Number())
+def datetime_now():
+    return int(datetime.datetime.now().timestamp())
