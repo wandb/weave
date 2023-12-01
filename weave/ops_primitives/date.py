@@ -15,8 +15,8 @@ import datetime
     output_type=types.optional(types.TimeDelta()),
 )
 def datetime_sub(lhs, rhs):
-    if rhs == None:
-        return None
+    # if rhs == None:
+    #     return None
     return lhs - rhs
 
 

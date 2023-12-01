@@ -101,53 +101,31 @@ def observability(
         hidden=True,
     )
 
-    filtered_data = varbar.add(
-        "filtered_data", source_data.filter(filter_fn), hidden=True
-    )
-
     one_week_in_seconds = 60 * 60 * 24 * 7
     window_start = weave.ops.from_number(weave.ops.datetime_now() - one_week_in_seconds)
     window_end = weave.ops.from_number(weave.ops.datetime_now())
 
-    filtered_range = varbar.add(
-        "filtered_range",
-        weave.ops.make_list(
-            # a=window_start,
-            # b=window_end,
-            a=filtered_data[timestamp_col_name].min(),
-            b=filtered_data[timestamp_col_name].max(),
-        ),
-        hidden=True,
+    filtered_range = weave.ops.make_list(
+        a=window_start,
+        b=window_end,
     )
 
-    ## 2. user_zoom_range is used to store the user's zoom range
     user_zoom_range = varbar.add("user_zoom_range", None, hidden=True)
-
-    ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "Time_range",
-        panels.DateRange(
-            user_zoom_range,
-            # domain=weave.ops.make_list(
-            #     a=window_start,
-            #     b=window_end,
-            # ),
-            domain=filtered_data[timestamp_col_name],
-        ),
+        panels.DateRange(user_zoom_range, domain=filtered_range),
     )
 
-    bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
+    bin_range = user_zoom_range.coalesce(filtered_range)
+    window_data = source_data.filter(
+        lambda row: weave.ops.Boolean.bool_and(
+            row[timestamp_col_name] >= bin_range[0],
+            row[timestamp_col_name] <= bin_range[1],
+        )
     )
-
-    window_data = varbar.add(
-        "window_data",
-        source_data.filter(
-            lambda row: weave.ops.Boolean.bool_and(
-                row[timestamp_col_name] >= bin_range[0],
-                row[timestamp_col_name] <= bin_range[1],
-            )
-        ),
+    filtered_window_data = varbar.add(
+        "filtered_window_data",
+        window_data.filter(filter_fn),
         hidden=True,
     )
 
@@ -156,16 +134,8 @@ def observability(
         panels.FilterEditor(filter_fn, node=window_data),
     )
 
-    filtered_window_data = varbar.add(
-        "filtered_window_data", window_data.filter(filter_fn), hidden=True
-    )
-
-    grouping_by_trace = varbar.add(
-        "grouping_fn_2",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["trace_id"]
-        ),
-        hidden=True,
+    grouping_by_trace = weave_internal.define_fn(
+        {"row": input_node.type.object_type}, lambda row: row["trace_id"]
     )
 
     colors_node = weave.ops.dict_(
@@ -181,42 +151,30 @@ def observability(
         }
     )
 
-    state_color_func = varbar.add(
-        "state_color_func",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type},
-            lambda row: colors_node.pick(row["state"]),
-        ),
-        hidden=True,
+    state_color_func = weave_internal.define_fn(
+        {"row": input_node.type.object_type},
+        lambda row: colors_node.pick(row["state"]),
     )
 
-    queue_time_data = varbar.add(
-        "queue_time_data",
-        filtered_window_data.filter(
-            lambda row: weave.ops.Boolean.bool_or(
-                row["state"] == "queued",
-                row["state"] == "starting",
-            ),
+    queue_time_data = filtered_window_data.filter(
+        lambda row: weave.ops.Boolean.bool_or(
+            row["state"] == "queued",
+            row["state"] == "starting",
         ),
-        hidden=True,
     )
 
-    is_start_stop_state = varbar.add(
-        "is_start_stop_state",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type},
-            lambda row: weave.ops.Boolean.bool_or(
-                row["state"] == "running",
+    is_start_stop_state = weave_internal.define_fn(
+        {"row": input_node.type.object_type},
+        lambda row: weave.ops.Boolean.bool_or(
+            row["state"] == "running",
+            weave.ops.Boolean.bool_or(
+                row["state"] == "finished",
                 weave.ops.Boolean.bool_or(
-                    row["state"] == "finished",
-                    weave.ops.Boolean.bool_or(
-                        row["state"] == "crashed",
-                        row["state"] == "failed",
-                    ),
+                    row["state"] == "crashed",
+                    row["state"] == "failed",
                 ),
             ),
         ),
-        hidden=True,
     )
 
     # TODO: fix colors to special function
@@ -237,16 +195,14 @@ def observability(
             }
         ),
         color_title="state",
-        color=lambda row: state_color_func(row),
-        groupby_dims=["x", "label", "color"],
+        color=state_color_func,
+        groupby_dims=["x", "label"],
         mark="bar",
-        # no_legend=True,
-        domain_x=user_zoom_range,
+        domain_x=bin_range,
     )
 
     queued_time_plot = panels.Plot(
         queue_time_data,
-        # filtered_data,
         x=lambda row: row[timestamp_col_name].bin(
             weave.ops.timestamp_bins_nice(bin_range, num_buckets / 2)
         ),
@@ -275,7 +231,7 @@ def observability(
         groupby_dims=["x", "label"],
         mark="bar",
         no_legend=True,
-        domain_x=user_zoom_range,
+        domain_x=bin_range,
     )
 
     latest_runs_plot = panels.Plot(
@@ -331,7 +287,7 @@ def observability(
         groupby_dims=["x"],
         mark="bar",
         no_legend=True,
-        domain_x=user_zoom_range,
+        domain_x=bin_range,
     )
 
     jobs_table = panels.Table(filtered_window_data.filter(is_start_stop_state))
@@ -372,7 +328,7 @@ def observability(
 
     def make_metric_plot(metric_name, y_title):
         return weave.panels.Plot(
-            filtered_data.filter(
+            filtered_window_data.filter(
                 weave_internal.define_fn(
                     {"row": source_data.type.object_type},
                     lambda row: row["state"] == "finished",
@@ -392,17 +348,17 @@ def observability(
                     "avg": row["metrics"]["system"][metric_name][0].avg(),
                 }
             ),
-            groupby_dims=["y"],
+            groupby_dims=["y", "x"],
             mark="line",
             no_legend=True,
-            domain_x=user_zoom_range,
+            domain_x=bin_range,
         )
 
     cpu_plot = make_metric_plot("cpu_cores_util", "avg cpu %")
     gpu_plot = make_metric_plot("gpu_cores_util", "avg gpu %")
     gpu_memory_plot = make_metric_plot("gpu_cores_mem", "avg gpu memory util %")
     memory_plot = weave.panels.Plot(
-        filtered_data.filter(
+        filtered_window_data.filter(
             weave_internal.define_fn(
                 {"row": source_data.type.object_type},
                 lambda row: row["state"] == "finished",
@@ -420,10 +376,10 @@ def observability(
                 "memory": row["metrics"]["system"]["memory"][0],
             }
         ),
-        groupby_dims=["y"],
+        groupby_dims=["y", "x"],
         mark="line",
         no_legend=True,
-        domain_x=user_zoom_range,
+        domain_x=bin_range,
     )
 
     errors_table = panels.Table(
