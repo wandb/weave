@@ -1,19 +1,15 @@
+/*
+Convention:
+* `fn*` functions are node transformations
+
+*/
+
+import { useMutation} from '@apollo/client';
 import { useMemo } from "react"
 
-import { constFunction, constString, Node, opArtifactAliasAlias, opArtifactName, opArtifactTypeArtifacts, opArtifactTypeName, opArtifactVersionAliases, opArtifactVersionArtifactSequence, opArtifactVersionArtifactType, opArtifactVersionCreatedAt, opArtifactVersionDescription, opArtifactVersionDigest, opArtifactVersionIsWeaveObject, opArtifactVersions, opArtifactVersionVersionId, opDict, opFilesystemArtifactWeaveType, opFilter, opFlatten, opMap, opProjectArtifactTypes, opRootProject, opTypeName } from "../../../../../../core"
+import { constFunction, constString, Node, opArtifactAliasAlias, opArtifactName, opArtifactTypeArtifacts, opArtifactTypeName, opArtifactVersionAliases, opArtifactVersionArtifactSequence, opArtifactVersionArtifactType, opArtifactVersionCreatedAt, opArtifactVersionDescription, opArtifactVersionDigest, opArtifactVersionHash, opArtifactVersionId, opArtifactVersionIsWeaveObject, opArtifactVersions, opArtifactVersionVersionId, opDict, opFilesystemArtifactWeaveType, opFilter, opFlatten, opMap, opProjectArtifactTypes, opRootProject, opTypeName } from "../../../../../../core"
 import { useNodeValue } from "../../../../../../react"
-
-type Loadable<T> = {loading: true} | {loading: false, result: T}
-
-type ObjectVersionDictType = {
-    collection_name: string,
-    type_name: string,
-    aliases: Array<string>,
-    created_at_ms: number,
-    description: string,
-    digest: string,
-    version_index: number,
-}
+import { UPDATE_ARTIFACT_DESCRIPTION } from './gql';
 
 export const useAllObjectVersions = (entity: string, project: string): Loadable<Array<ObjectVersionDictType>> => {
     const allObjectVersions = useMemo(() => allObjectVersionsNode(entity, project), [entity, project])
@@ -33,7 +29,31 @@ export const useAllObjectVersions = (entity: string, project: string): Loadable<
     }, [value])
 }
 
+export const useUpdateObjectVersionDescription = () => {
+    const [updateArtifactDescription] = useMutation(UPDATE_ARTIFACT_DESCRIPTION);
+    return (artifactID: string, description: string) => updateArtifactDescription({
+        variables: {
+            artifactID,
+            description,
+        }
+    })
+}
+
 ///
+
+type Loadable<T> = {loading: true} | {loading: false, result: T}
+
+type ObjectVersionDictType = {
+    artifact_id: string,
+    collection_name: string,
+    type_name: string,
+    aliases: Array<string>,
+    created_at_ms: number,
+    description: string,
+    hash: string,
+    version_index: number,
+}
+
 const nonUserTypes = [
     'OpDef', 'list', 'dict', 'type', 'stream_table'
 ]
@@ -45,17 +65,31 @@ const removeNonUserObjects = (objectVersions: Array<ObjectVersionDictType>) => {
 
 const opObjectVersionToDict = (objectVersionNode: Node<'artifactVersion'>) => {
     const sequenceNode = opArtifactVersionArtifactSequence({artifactVersion: objectVersionNode})
-    const artifactTypeNode = opArtifactVersionArtifactType({artifactVersion: objectVersionNode})
+    const artifactTypeNode = opArtifactVersionArtifactType({artifactVersion: objectVersionNode}) as Node<'artifactVersion'>
     return opDict({
+        artifact_id: opArtifactVersionId({artifactVersion: objectVersionNode}),
         collection_name: opArtifactName({artifact: sequenceNode}),
-        type_name: opArtifactTypeName({artifactType: artifactTypeNode}),
+        type_name: fnObjectVersionTypeVersion(artifactTypeNode),
         // type_name: opTypeName({type: opFilesystemArtifactWeaveType({artifact: objectVersionNode} as any)})
         aliases: opArtifactAliasAlias({artifactAlias:  opArtifactVersionAliases({artifactVersion: objectVersionNode})}),
         created_at_ms: opArtifactVersionCreatedAt({artifactVersion: objectVersionNode}),
         description: opArtifactVersionDescription({artifactVersion: objectVersionNode}),
-        digest: opArtifactVersionDigest({artifactVersion: objectVersionNode}),
+        hash: fnObjectVersionHash(objectVersionNode),
         version_index :opArtifactVersionVersionId({artifactVersion: objectVersionNode}),
     } as any)
+}
+
+const fnObjectVersionTypeVersion = (objectVersionNode: Node<'artifactVersion'>) => {
+    // TODO(tim/weaveflow_improved_nav): This is incorrect for now. We don't have the notion
+    // of a type version yet in the weaveflow model. We Are going to make the simplifying assumption
+    // that:
+    // 1. The name of the artifactType is the same name as the weave type
+    // 2. There is only 1 version of each type (totally wrong)
+    return  opArtifactTypeName({artifactType: objectVersionNode})
+}
+
+const fnObjectVersionHash = (objectVersionNode: Node<'artifactVersion'>) => {
+    return opArtifactVersionHash({artifactVersion: objectVersionNode});
 }
 
 const allObjectVersionsNode = (entity: string, project: string) => {
@@ -79,3 +113,5 @@ const allObjectVersionsNode = (entity: string, project: string) => {
     )})
     return weaveObjectsNode
 }
+
+

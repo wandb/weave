@@ -1,12 +1,30 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {Link} from 'react-router-dom';
 
+import {Browse2ObjectVersionItemComponent} from '../Browse2ObjectVersionItemPage';
 import {useEPPrefix} from './util';
 
-export const ObjectVersionPage: React.FC = () => {
+export const ObjectVersionPage: React.FC<{
+  entity: string;
+  project: string;
+  objectName: string;
+  digest: string;
+}> = props => {
   const prefix = useEPPrefix();
-  return (
-    <div>
+  const params = useMemo(() => {
+    return {
+      entity: props.entity,
+      project: props.project,
+      rootType: 'UNKNOWN',
+      objName: props.objectName,
+      objVersion: props.digest,
+    };
+  }, [props.digest, props.entity, props.objectName, props.project]);
+  return <Browse2ObjectVersionItemComponent params={params} />;
+};
+
+/*
+<div>
       <h1>ObjectVersionPage Placeholder</h1>
       <div>
         This is the detail page for ObjectVersion. A ObjectVersion is a
@@ -69,5 +87,4 @@ export const ObjectVersionPage: React.FC = () => {
         alt=""
       />
     </div>
-  );
-};
+    */

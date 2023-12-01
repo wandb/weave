@@ -1,4 +1,4 @@
-import {Check} from '@mui/icons-material';
+import {Check, NavigateNext} from '@mui/icons-material';
 import Box from '@mui/material/Box';
 // import {useDemoData} from '@mui/x-data-grid-generator';
 import {
@@ -7,26 +7,30 @@ import {
   GridColumnGroupingModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
-import React, {useMemo} from 'react';
-
-import {useAllObjectVersions} from './interface/dataModel';
 import moment from 'moment';
+import React, {useMemo} from 'react';
+import {useHistory} from 'react-router-dom';
+
+import {
+  useAllObjectVersions,
+  useUpdateObjectVersionDescription,
+} from './interface/dataModel';
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;
   project: string;
 }> = props => {
+  const history = useHistory();
   const allObjectVersions = useAllObjectVersions(props.entity, props.project);
-  console.log(allObjectVersions);
   const rows: GridRowsProp = useMemo(() => {
     if (allObjectVersions.loading) {
       return [];
     } else {
       return allObjectVersions.result.map((ov, i) => {
         return {
-          id: i,
+          id: ov.artifact_id,
           collection_name: ov.collection_name,
-          version_id: ov.digest,
+          hash: ov.hash,
           is_latest_in_collection: ov.aliases.includes('latest'),
           version_index: ov.version_index,
           type_version: ov.type_name,
@@ -48,7 +52,7 @@ export const ObjectVersionsPage: React.FC<{
   //   {
   //     // id: 0,
   //     collection_name: 'Model',
-  //     version_id: '1234',
+  //     hash: '1234',
   //     is_latest_in_collection: true,
   //     version_index: 4,
   //     type_version: 'GPT:1234 -> Model:5432',
@@ -63,12 +67,27 @@ export const ObjectVersionsPage: React.FC<{
   // ];
   const columns: GridColDef[] = [
     {
+      field: 'id',
+      headerName: 'View',
+      width: 30,
+      renderCell: params => {
+        // Icon to indicate navigation to the object version
+        return (
+          <NavigateNext
+            style={{
+              cursor: 'pointer',
+            }}
+          />
+        );
+      },
+    },
+    {
       field: 'collection_name',
       headerName: 'Collection Name',
       flex: 1,
       minWidth: 100,
     },
-    {field: 'version_id', headerName: 'Version ID', flex: 1, minWidth: 100},
+    {field: 'hash', headerName: 'Hash', flex: 1, minWidth: 100},
     {
       field: 'is_latest_in_collection',
       headerName: 'Is Latest',
@@ -95,7 +114,13 @@ export const ObjectVersionsPage: React.FC<{
         return moment.unix(params.value / 1000).format('YYYY-MM-DD HH:mm:ss');
       },
     },
-    {field: 'description', headerName: 'Description', flex: 1, minWidth: 100},
+    {
+      field: 'description',
+      headerName: 'Description',
+      flex: 1,
+      minWidth: 100,
+      editable: true,
+    },
     // Metadata might not be necessary right now
     // {field: 'metadata', headerName: 'Metadata', flex: 1, minWidth: 100},
     // I think tags might not be available
@@ -105,6 +130,7 @@ export const ObjectVersionsPage: React.FC<{
     // {field: 'properties', headerName: 'Properties'},
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
+  const updateDescription = useUpdateObjectVersionDescription();
   return (
     <Box
       sx={{
@@ -131,6 +157,28 @@ export const ObjectVersionsPage: React.FC<{
           experimentalFeatures={{columnGrouping: true}}
           disableRowSelectionOnClick
           columnGroupingModel={columnGroupingModel}
+          onRowClick={params => {
+            // history.push(
+            //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
+            // );
+          }}
+          onCellClick={params => {
+            // TODO: move these actions into a config
+            if (params.field === 'id') {
+              history.push(
+                `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
+              );
+            }
+          }}
+          onCellEditStop={(params, event) => {
+            const newVal = (event as any).target.value;
+            if (params.field === 'description') {
+              if (newVal === params.row.description) {
+                return;
+              }
+              updateDescription(params.row.id, (event as any).target.value);
+            }
+          }}
         />
       </Box>
     </Box>
@@ -162,8 +210,8 @@ export const ObjectVersionsPage: React.FC<{
     <ul>
       <li>
         Each row should link to the associated ObjectVersion:{' '}
-        <Link to={prefix('/objects/object_name/versions/version_id')}>
-          /objects/object_name/versions/version_id
+        <Link to={prefix('/objects/object_name/versions/hash')}>
+          /objects/object_name/versions/hash
         </Link>
         . Note: This might prefer to be a slideout like Notion rather than a
         full link to allow for "peeking".

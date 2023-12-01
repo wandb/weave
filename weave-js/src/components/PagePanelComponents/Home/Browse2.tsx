@@ -108,6 +108,7 @@ const Browse2Breadcrumbs: FC = props => {
       {refFields.map((field, idx) =>
         field === 'index' ? (
           <Typography
+            key={idx}
             sx={{
               color: theme =>
                 theme.palette.getContrastText(theme.palette.primary.main),
@@ -116,6 +117,7 @@ const Browse2Breadcrumbs: FC = props => {
           </Typography>
         ) : field === 'pick' ? (
           <Typography
+            key={idx}
             sx={{
               color: theme =>
                 theme.palette.getContrastText(theme.palette.primary.main),
@@ -124,6 +126,7 @@ const Browse2Breadcrumbs: FC = props => {
           </Typography>
         ) : (
           <AppBarLink
+            key={idx}
             to={`/${params.entity}/${params.project}/${params.rootType}/${
               params.objName
             }/${params.objVersion}/${refFields.slice(0, idx + 1).join('/')}`}>
@@ -231,8 +234,8 @@ const Browse2Mounted: FC = props => {
   );
 };
 
+const projectRoot = `:entity/:project`;
 const Browse2ProjectRoot: FC = () => {
-  const projectRoot = `:entity/:project`;
   const params = useParams<{entity: string; project: string}>();
 
   return (
@@ -258,7 +261,7 @@ const Browse2ProjectRoot: FC = () => {
         </Route>
         {/* OBJECTS */}
         <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
-          <ObjectVersionPage />
+          <ObjectVersionRoutePageBinding />
         </Route>
         <Route path={`/${projectRoot}/objects/:objectName`}>
           <ObjectPage />
@@ -310,5 +313,26 @@ const Browse2ProjectRoot: FC = () => {
         </Route>
       </Switch>
     </Box>
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const ObjectVersionRoutePageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    objectName: string;
+    digest?: string;
+  }>();
+  if (!params.digest) {
+    return <>TODO: Need to redirect</>;
+  }
+  return (
+    <ObjectVersionPage
+      entity={params.entity}
+      project={params.project}
+      objectName={params.objectName}
+      digest={params.digest}
+    />
   );
 };

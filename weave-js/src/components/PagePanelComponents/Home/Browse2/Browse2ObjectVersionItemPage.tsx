@@ -59,6 +59,12 @@ const nodeFromExtra = (node: Node, extra: string[]): Node => {
 
 export const Browse2ObjectVersionItemPage: FC = props => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
+  return <Browse2ObjectVersionItemComponent params={params} />;
+};
+
+export const Browse2ObjectVersionItemComponent: FC<{
+  params: Browse2RootObjectVersionItemParams;
+}> = ({params}) => {
   const uri = makeObjRefUri(params);
   // const history = useHistory();
   const itemNode = useMemo(() => {
