@@ -23,7 +23,7 @@ class BoardPanel:
     layout: typing.Optional[BoardPanelLayout] = None
 
 
-def varbar(editable=True, items=None, width=300) -> panel_group.Group:
+def varbar(editable=True, items=None) -> panel_group.Group:
     showExpressions = True if editable else "titleBar"
     if items is None:
         items = {}
@@ -31,7 +31,7 @@ def varbar(editable=True, items=None, width=300) -> panel_group.Group:
         config=panel_group.GroupConfig(
             layoutMode="vertical",
             equalSize=False,
-            style=f"width:{width}px;",
+            style="width:300px;",
             showExpressions=showExpressions,  # type: ignore
             allowedPanels=[
                 "Expression",
@@ -64,6 +64,7 @@ def Board(
     panels: typing.Union[panel_group.Group, list[BoardPanel]],
     editable=True,
 ):
+
     showExpressions = True if editable else "titleBar"
     vb = vars
     if not isinstance(vb, weave.panels.Group):

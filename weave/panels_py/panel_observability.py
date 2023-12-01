@@ -88,7 +88,7 @@ def observability(
         disableDeletePanel=True,
     )
 
-    varbar = panel_board.varbar(editable=False, width=280)
+    varbar = panel_board.varbar(editable=False)
     source_data = input_node
 
     filter_fn = varbar.add(
