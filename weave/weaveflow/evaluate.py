@@ -44,8 +44,8 @@ class EvaluateLLM(Evaluate):
 
         for example, prediction in zip(dataset.rows, predictions):
             # example_fields = self.format_example(example)
-            messages = self.messages_template(example, prediction)
             try:
+                messages = self.messages_template(example, prediction)
                 result = self.chat_llm.complete(
                     messages,
                     result_type,
@@ -54,9 +54,13 @@ class EvaluateLLM(Evaluate):
                 result = {"score": None, "rationale": None}
             scores.append(result["score"])
             rationales.append(result["rationale"])
+        non_none_scores = [s for s in scores if s is not None]
+        score_avg = 0
+        if len(non_none_scores) > 0:
+            score_avg = sum(non_none_scores) / len(non_none_scores)
         return {
             "columns": {"score": scores, "rationale": rationales},
-            "summary": {"score_avg": sum(scores) / len(scores)},
+            "summary": {"score_avg": score_avg},
         }
 
 
