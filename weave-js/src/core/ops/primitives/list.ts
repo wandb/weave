@@ -25,7 +25,6 @@ import {
   isAssignableTo,
   isConcreteTaggedValue,
   isFunction,
-  isList,
   isListLike,
   isTaggedValue,
   isTypedDict,
