@@ -1,9 +1,9 @@
 import moment from 'moment';
 
 import {list, listObjectType, maybe, nonNullable} from '../../model';
-import {makeOp} from '../../opStore';
 import {docType} from '../../util/docs';
-import {makeBasicDimDownOp, makeStandardOp} from '../opKinds';
+import {makeBasicDimDownOp, makeBasicOp, makeStandardOp} from '../opKinds';
+import {makeOp} from '../../opStore';
 
 // Not yet ready, needs to handle tags and nulls (see number.ts).
 // Also we'll want to figure out what kind of unit/type to return.
