@@ -203,10 +203,7 @@ class BoolToArrowBool(mappers_python.BoolToPyBool):
 
 class TimestampToArrowTimestamp(mappers_python.TimestampToPyTimestamp):
     def result_type(self):
-        return pa.timestamp("us", tz="UTC")
-
-    def apply(self, obj):
-        return obj
+        return pa.timestamp("ms", tz="UTC")
 
 
 class FloatToArrowFloat(mappers.Mapper):
@@ -305,9 +302,9 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             # Ref type
             return pa.string()
         elif self.type.name == "timestamp":
-            return pa.timestamp("us", tz="+00:00")
+            return pa.timestamp("ms", tz="+00:00")
         elif self.type.name == "date":
-            return pa.timestamp("us", tz="+00:00")
+            return pa.timestamp("ms", tz="+00:00")
         elif self.type.name == "type":
             return pa.string()
         elif self.type.name == "ndarray":
