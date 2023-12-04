@@ -149,6 +149,22 @@ def timestamp_max(self):
 
 
 @arrow_op(
+    name="ArrowWeaveListDate-sub",
+    input_type={
+        "self": ArrowWeaveListType(types.optional(types.Timestamp())),
+        "other": types.UnionType(types.Timestamp(), ARROW_WEAVE_LIST_TIMESTAMP_TYPE),
+    },
+    output_type=ArrowWeaveListType(types.TimeDelta()),
+)
+def sub(self, other):
+    if isinstance(other, ArrowWeaveList):
+        other = other._arrow_data
+    return ArrowWeaveList(
+        pc.subtract(self._arrow_data, other), types.TimeDelta(), self._artifact
+    )
+
+
+@arrow_op(
     name="ArrowWeaveListTimeDelta-totalSeconds",
     input_type={"td": ArrowWeaveListType(types.TimeDelta())},
     output_type=ArrowWeaveListType(types.Number()),
