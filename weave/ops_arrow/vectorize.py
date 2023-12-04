@@ -721,7 +721,7 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     logging.info("Vectorizing: %s", debug_str)
 
     if len(awl) == 0:
-        # Short circuit empty list for performance reasons and to avoid calling 
+        # Short circuit empty list for performance reasons and to avoid calling
         # aggregations on empty lists.
         return convert.to_arrow([], types.List(fn.type), artifact=awl._artifact)
 
