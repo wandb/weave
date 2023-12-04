@@ -7,7 +7,7 @@ Convention:
 import { useMutation} from '@apollo/client';
 import { useMemo } from "react"
 
-import { constFunction, constNone, constString, Node, opArray, opArtifactAliasAlias, opArtifactName, opArtifactTypeArtifacts, opArtifactTypeName, opArtifactVersionAliases, opArtifactVersionArtifactSequence, opArtifactVersionArtifactType, opArtifactVersionCreatedAt, opArtifactVersionDescription, opArtifactVersionDigest, opArtifactVersionHash, opArtifactVersionId, opArtifactVersionIsWeaveObject, opArtifactVersions, opArtifactVersionVersionId, opDict, opFilesystemArtifactWeaveType, opFilter, opFlatten, opMap, opProjectArtifactTypes, opProjectArtifactVersion, opRootProject, opTypeName } from "../../../../../../core"
+import { constFunction, constNone, constString, isObjectType, isSimpleTypeShape, Node, opArtifactAliasAlias, opArtifactName, opArtifactTypeArtifacts, opArtifactTypeName, opArtifactVersionAliases, opArtifactVersionArtifactSequence, opArtifactVersionArtifactType, opArtifactVersionCreatedAt, opArtifactVersionDescription, opArtifactVersionFile, opArtifactVersionHash, opArtifactVersionId, opArtifactVersionIsWeaveObject, opArtifactVersions, opArtifactVersionVersionId, opDict, opFileContents, opFilter, opFlatten, opMap, opProjectArtifactTypes, opProjectArtifactVersion, opRootProject, Type } from "../../../../../../core"
 import { useNodeValue } from "../../../../../../react"
 import { UPDATE_ARTIFACT_DESCRIPTION } from './gql';
 
@@ -21,9 +21,18 @@ export const useAllObjectVersions = (entity: string, project: string): Loadable<
         if (value.loading) {
             return {loading: true}
         } else {
+            const userObjects = removeNonUserObjects(value.result)
+            const typeFixedObjects = userObjects.map((obj) => {
+                if (obj.type_version.type_version === 'unknown') {
+                    return {
+                        ...obj,
+                        type_version: typeVersionFromTypeDict(JSON.parse((obj.type_version as any).type_version_json_string))}
+                }
+                return obj
+            })
             return {
                 loading: false,
-                result: removeNonUserObjects(value.result)
+                result: typeFixedObjects
             }
         }
     }, [value])
@@ -54,6 +63,48 @@ export const useObjectVersionTypeInfo = (entity: string, project: string, object
 
 
 
+export const useAllTypeVersions = (entity: string, project: string): Loadable<{types: TypeVersions, versions:TypeVersionCatalog}> => {
+    // This is a super inefficient way to do this... just making it work for now.
+    const allObjectVersions = useAllObjectVersions(entity, project)
+    const allTypeVersions = useMemo(() => {
+        if (allObjectVersions.loading) {
+            return {loading: true}
+        } else {
+            const typeVersionCatalog: TypeVersionCatalog = {}
+            const typeVersions: TypeVersions = {}
+            const queue = [...allObjectVersions.result.map(objectVersion => objectVersion.type_version)]
+            while (queue.length > 0) {
+                const type_version = queue.pop()!
+                const typeId = typeIdFromTypeVersion(type_version)
+                if (!(typeId in typeVersionCatalog)) {
+                    typeVersionCatalog[typeId] = {
+                        type_name: type_version.type_name,
+                        type_version: type_version.type_version,
+                        parent_type_id: type_version.parent_type ? typeIdFromTypeVersion(type_version.parent_type) : undefined,
+                    }
+                    if (type_version.parent_type) {
+                        queue.push(type_version.parent_type)
+                    }
+                }
+                if (typeVersions[type_version.type_name] === undefined) {
+                    typeVersions[type_version.type_name] = []
+                }
+                if (!typeVersions[type_version.type_name].includes(typeId)) {
+                    typeVersions[type_version.type_name].push(typeId)
+                }
+            }
+
+            return {
+                loading: false,
+                result: typeVersionCatalog
+            }
+        }
+    }
+    , [allObjectVersions])
+    return allTypeVersions as Loadable<TypeVersionCatalog>
+}
+
+
 ///
 
 type Loadable<T> = {loading: true, result: undefined | null} | {loading: false, result: T}
@@ -61,8 +112,22 @@ type Loadable<T> = {loading: true, result: undefined | null} | {loading: false, 
 type TypeVersionTypeDictType = {
     type_name: string,
     type_version: string,
+    type_dict?: string,
     parent_type?: TypeVersionTypeDictType,
 }
+
+type TypeVersionCatalog = {
+    [typeId: string]: {
+        type_name: string,
+        type_version: string,
+        parent_type_id?: string,
+    }
+}
+
+type TypeVersions = {
+    [typeName: string]: Array<string>;
+}
+
 
 type ObjectVersionDictType = {
     artifact_id: string,
@@ -85,13 +150,23 @@ const removeNonUserObjects = (objectVersions: ObjectVersionDictType[]) => {
     })
 }
 
+const typeVersionFromTypeDict = (type_dict: Type) => {
+    console.log(type_dict)
+    const type_version_id = typeIdFromTypeVersion(type_dict)
+    const type_name = isSimpleTypeShape(type_dict) ? type_dict : type_dict.type
+    return {
+        type_name: type_name,
+        type_version: type_version_id,
+        parent_type: isObjectType(type_dict) && type_dict._base_type ? typeVersionFromTypeDict(type_dict._base_type) : undefined,
+    }
+}
+
 const opObjectVersionToDict = (objectVersionNode: Node<'artifactVersion'>) => {
     const sequenceNode = opArtifactVersionArtifactSequence({artifactVersion: objectVersionNode})
-    const artifactTypeNode = opArtifactVersionArtifactType({artifactVersion: objectVersionNode}) as Node<'artifactVersion'>
     return opDict({
         artifact_id: opArtifactVersionId({artifactVersion: objectVersionNode}),
         collection_name: opArtifactName({artifact: sequenceNode}),
-        type_version: fnObjectVersionTypeVersion(artifactTypeNode),
+        type_version: fnObjectVersionTypeVersion(objectVersionNode),
         // type_name: opTypeName({type: opFilesystemArtifactWeaveType({artifact: objectVersionNode} as any)})
         aliases: opArtifactAliasAlias({artifactAlias:  opArtifactVersionAliases({artifactVersion: objectVersionNode})}),
         created_at_ms: opArtifactVersionCreatedAt({artifactVersion: objectVersionNode}),
@@ -101,15 +176,25 @@ const opObjectVersionToDict = (objectVersionNode: Node<'artifactVersion'>) => {
     } as any)
 }
 
+const fnObjectVersionTypeDictString = (objectVersionNode: Node<'artifactVersion'>) => {
+    const fileNode = opFileContents({file: opArtifactVersionFile({
+        artifactVersion: objectVersionNode,
+        path: constString('obj.type.json')
+    })})
+    return fileNode
+}
+
 const fnObjectVersionTypeVersion = (objectVersionNode: Node<'artifactVersion'>) => {
     // TODO(tim/weaveflow_improved_nav): This is incorrect for now. We don't have the notion
     // of a type version yet in the weaveflow model. We Are going to make the simplifying assumption
     // that:
     // 1. The name of the artifactType is the same name as the weave type
     // 2. There is only 1 version of each type (totally wrong)
+    const artifactTypeNode = opArtifactVersionArtifactType({artifactVersion: objectVersionNode}) as Node<'artifactVersion'>
     return  opDict({
-        type_name: opArtifactTypeName({artifactType: objectVersionNode}),
-        type_version: constString('UNKNOWN'),
+        type_name: opArtifactTypeName({artifactType: artifactTypeNode}),
+        type_version: constString("unknown"),
+        type_version_json_string: fnObjectVersionTypeDictString(objectVersionNode),
         // TODO(tim/weaveflow_improved_nav): This is incorrect for now. We don't have the notion
         parent_type: constNone()
     } as any)
@@ -141,4 +226,18 @@ const allObjectVersionsNode = (entity: string, project: string) => {
     return weaveObjectsNode
 }
 
+
+
+const hashString = (s: string) => {
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) {
+      hash = ((hash << 5) - hash) + s.charCodeAt(i);
+      hash |= 0; // Convert to 32bit integer
+    }
+    return "" + hash;
+}
+
+export const typeIdFromTypeVersion = (typeVersion: any) => {
+    return hashString(JSON.stringify(typeVersion))
+}
 

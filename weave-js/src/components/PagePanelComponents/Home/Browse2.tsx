@@ -278,7 +278,7 @@ const Browse2ProjectRoot: FC = () => {
         </Route>
         {/* OPS */}
         <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
-          <OpVersionPage />
+          <OpVersionRoutePageBinding />
         </Route>
         <Route path={`/${projectRoot}/ops/:opName`}>
           <OpPage />
@@ -339,6 +339,27 @@ const ObjectVersionRoutePageBinding = () => {
       objectName={params.objectName}
       digest={params.digest}
       refExtra={params.refExtra}
+    />
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const OpVersionRoutePageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    opName: string;
+    digest?: string;
+  }>();
+  if (!params.digest) {
+    return <>TODO: Need to redirect</>;
+  }
+  return (
+    <OpVersionPage
+      entity={params.entity}
+      project={params.project}
+      opName={params.opName}
+      digest={params.digest}
     />
   );
 };

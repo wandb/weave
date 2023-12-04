@@ -27,7 +27,20 @@ const getRootType = (t: Type): Type => {
   return t;
 };
 
-export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
+type WFDBTableType =
+  | 'Op'
+  | 'OpVersion'
+  | 'Type'
+  | 'TypeVersion'
+  | 'Trace'
+  | 'Call'
+  | 'Object'
+  | 'ObjectVersion';
+
+export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
+  objRef,
+  wfTable,
+}) => {
   const {refUIUrl} = useWeaveflowRouteContext();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
@@ -58,7 +71,7 @@ export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
   if (refTypeQuery.loading) {
     return Item;
   }
-  return <Link to={refUIUrl(rootTypeName, objRef)}>{Item}</Link>;
+  return <Link to={refUIUrl(rootTypeName, objRef, wfTable)}>{Item}</Link>;
 };
 
 export const parseRefMaybe = (s: string): ArtifactRef | null => {

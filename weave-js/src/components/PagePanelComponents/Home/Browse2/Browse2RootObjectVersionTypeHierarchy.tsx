@@ -1,13 +1,16 @@
 import {useNodeValue} from '@wandb/weave/react';
 import React, {FC, useMemo} from 'react';
+import {Link, useParams} from 'react-router-dom';
 
 import {
-  Type,
   callOpVeryUnsafe,
   constString,
   isObjectType,
   isSimpleTypeShape,
+  Type,
 } from '../../../../core';
+import {useWeaveflowRouteContext} from './context';
+import {typeIdFromTypeVersion} from './pages/interface/dataModel';
 
 const typeName = (t: Type) => {
   if (isSimpleTypeShape(t)) {
@@ -20,12 +23,14 @@ const typeName = (t: Type) => {
 export const Browse2RootObjectVersionTypeHierarchy: FC<{uri: string}> = ({
   uri,
 }) => {
+  const params = useParams<{entity: string; project: string}>();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(uri)});
     return callOpVeryUnsafe('Ref-type', {ref: refNode});
   }, [uri]);
 
   const refTypeQuery = useNodeValue(refTypeNode as any);
+
   const hierarchy = useMemo(() => {
     const hierarchy: Type[] = [];
     let currentType = refTypeQuery.result as null | Type;
@@ -39,12 +44,20 @@ export const Browse2RootObjectVersionTypeHierarchy: FC<{uri: string}> = ({
     }
     return hierarchy.reverse();
   }, [refTypeQuery]);
-
+  const urls = useWeaveflowRouteContext();
   return (
     <ul>
       {hierarchy.map((t, i) => (
         <li key={i} style={{marginLeft: i * 16}}>
-          {typeName(t)}
+          <Link
+            to={urls.typeVersionUIUrl(
+              params.entity,
+              params.project,
+              typeName(t),
+              typeIdFromTypeVersion(t)
+            )}>
+            {typeName(t)}:{typeIdFromTypeVersion(t)}
+          </Link>
         </li>
       ))}
     </ul>

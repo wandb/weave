@@ -19,6 +19,7 @@ import {SEED_BOARD_OP_NAME} from '../HomePreviewSidebar';
 import {Browse2CallsPage} from './Browse2CallsPage';
 import {Browse2OpDefPage} from './Browse2OpDefPage';
 import {Browse2RootObjectVersionOutputOf} from './Browse2RootObjectVersionOutputOf';
+import {Browse2RootObjectVersionTypeHierarchy} from './Browse2RootObjectVersionTypeHierarchy';
 import {Browse2RootObjectVersionUsers} from './Browse2RootObjectVersionUsers';
 import {Paper} from './CommonLib';
 import {PageEl} from './CommonLib';
@@ -26,7 +27,6 @@ import {PageHeader} from './CommonLib';
 import {makeObjRefUri} from './CommonLib';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {WeaveEditor} from './WeaveEditors';
-import {Browse2RootObjectVersionTypeHierarchy} from './Browse2RootObjectVersionTypeHierarchy';
 
 const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
@@ -249,10 +249,11 @@ export const Browse2ObjectVersionItemComponent: FC<{
             <Grid item xs={4}>
               <Paper>
                 <Typography variant="h6" gutterBottom>
-                  Used in runs
+                  Member of Type (aka Class Hierarchy)
                 </Typography>
-                <Browse2RootObjectVersionUsers uri={uri} />
+                <Browse2RootObjectVersionTypeHierarchy uri={uri} />
               </Paper>
+
               <Box mt={4}>
                 <Paper>
                   <Typography variant="h6" gutterBottom>
@@ -264,9 +265,9 @@ export const Browse2ObjectVersionItemComponent: FC<{
               <Box mt={4}>
                 <Paper>
                   <Typography variant="h6" gutterBottom>
-                    Member of Type (aka Class Hierarchy)
+                    Used in runs
                   </Typography>
-                  <Browse2RootObjectVersionTypeHierarchy uri={uri} />
+                  <Browse2RootObjectVersionUsers uri={uri} />
                 </Paper>
               </Box>
               <Box mt={4}>
