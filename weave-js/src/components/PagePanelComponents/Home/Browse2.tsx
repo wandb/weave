@@ -263,7 +263,8 @@ const Browse2ProjectRoot: FC = () => {
           <TypeVersionsPage />
         </Route>
         {/* OBJECTS */}
-        <Route path={`/${projectRoot}/objects/:objectName/versions/:digest?`}>
+        <Route
+          path={`/${projectRoot}/objects/:objectName/versions/:digest?/:refExtra*`}>
           <ObjectVersionRoutePageBinding />
         </Route>
         <Route path={`/${projectRoot}/objects/:objectName`}>
@@ -326,6 +327,7 @@ const ObjectVersionRoutePageBinding = () => {
     project: string;
     objectName: string;
     digest?: string;
+    refExtra?: string;
   }>();
   if (!params.digest) {
     return <>TODO: Need to redirect</>;
@@ -336,6 +338,7 @@ const ObjectVersionRoutePageBinding = () => {
       project={params.project}
       objectName={params.objectName}
       digest={params.digest}
+      refExtra={params.refExtra}
     />
   );
 };

@@ -1,85 +1,73 @@
 // import {Box, CssBaseline, Tab, Tabs, Typography} from '@material-ui/core';
-import {Divider} from '@material-ui/core';
-import {TabPanelProps} from '@mui/lab';
-import {Card, List, ListItem, TableHead} from '@mui/material';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Tab from '@mui/material/Tab';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableRow from '@mui/material/TableRow';
-import Tabs from '@mui/material/Tabs';
-import Typography from '@mui/material/Typography';
 import React, {useMemo} from 'react';
-import {Link} from 'react-router-dom';
 
 import {Browse2ObjectVersionItemComponent} from '../Browse2ObjectVersionItemPage';
+import {Browse2RootObjectVersionItemParams} from '../CommonLib';
 import {useObjectVersionTypeInfo} from './interface/dataModel';
-import {useEPPrefix} from './util';
 
-const MetadataTable = ({data}) => {
-  return (
-    // <Paper sx={{width: '100%', overflow: 'hidden'}}>
-    <Table size="small" aria-label="simple table">
-      {/* <TableHead>
-        <TableRow sx={{backgroundColor: '#f5f5f5'}}>
-          <TableCell>Key</TableCell>
-          <TableCell align="right">Value</TableCell>
-        </TableRow>
-      </TableHead> */}
-      <TableBody>
-        {Object.entries(data).map(([key, value]) => (
-          <TableRow key={key}>
-            <TableCell component="th" scope="row">
-              <strong>{key}</strong>
-            </TableCell>
-            <TableCell align="right">{value}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-    // </Paper>
-  );
-};
+// const MetadataTable = ({data}) => {
+//   return (
+//     // <Paper sx={{width: '100%', overflow: 'hidden'}}>
+//     <Table size="small" aria-label="simple table">
+//       {/* <TableHead>
+//         <TableRow sx={{backgroundColor: '#f5f5f5'}}>
+//           <TableCell>Key</TableCell>
+//           <TableCell align="right">Value</TableCell>
+//         </TableRow>
+//       </TableHead> */}
+//       <TableBody>
+//         {Object.entries(data).map(([key, value]) => (
+//           <TableRow key={key}>
+//             <TableCell component="th" scope="row">
+//               <strong>{key}</strong>
+//             </TableCell>
+//             <TableCell align="right">{value}</TableCell>
+//           </TableRow>
+//         ))}
+//       </TableBody>
+//     </Table>
+//     // </Paper>
+//   );
+// };
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
+// interface TabPanelProps {
+//   children?: React.ReactNode;
+//   index: number;
+//   value: number;
+// }
 
-function CustomTabPanel(props: TabPanelProps) {
-  const {children, value, index, ...other} = props;
+// function CustomTabPanel(props: TabPanelProps) {
+//   const {children, value, index, ...other} = props;
 
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}>
-      {value === index && (
-        <Box sx={{p: 3}}>
-          <Typography>{children}</Typography>
-        </Box>
-      )}
-    </div>
-  );
-}
+//   return (
+//     <div
+//       role="tabpanel"
+//       hidden={value !== index}
+//       id={`simple-tabpanel-${index}`}
+//       aria-labelledby={`simple-tab-${index}`}
+//       {...other}>
+//       {value === index && (
+//         <Box sx={{p: 3}}>
+//           <Typography>{children}</Typography>
+//         </Box>
+//       )}
+//     </div>
+//   );
+// }
 
-function a11yProps(index: number) {
-  return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`,
-  };
-}
+// function a11yProps(index: number) {
+//   return {
+//     id: `simple-tab-${index}`,
+//     'aria-controls': `simple-tabpanel-${index}`,
+//   };
+// }
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
   project: string;
   objectName: string;
   digest: string;
+  refExtra?: string;
 }> = props => {
   const objectVersionTypeInfo = useObjectVersionTypeInfo(
     props.entity,
@@ -94,15 +82,23 @@ export const ObjectVersionPage: React.FC<{
     }
     return target_type;
   }, [objectVersionTypeInfo.result?.type_version]);
-  const params = useMemo(() => {
+  const params: Browse2RootObjectVersionItemParams = useMemo(() => {
     return {
       entity: props.entity,
       project: props.project,
       rootType: rootType?.type_name ?? '',
       objName: props.objectName,
       objVersion: props.digest,
+      refExtra: props.refExtra,
     };
-  }, [props.digest, props.entity, props.objectName, props.project, rootType]);
+  }, [
+    props.digest,
+    props.entity,
+    props.objectName,
+    props.project,
+    props.refExtra,
+    rootType?.type_name,
+  ]);
   if (objectVersionTypeInfo.loading) {
     return <div>Loading...</div>;
   }

@@ -26,6 +26,7 @@ import {PageHeader} from './CommonLib';
 import {makeObjRefUri} from './CommonLib';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {WeaveEditor} from './WeaveEditors';
+import {Browse2RootObjectVersionTypeHierarchy} from './Browse2RootObjectVersionTypeHierarchy';
 
 const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
@@ -258,6 +259,14 @@ export const Browse2ObjectVersionItemComponent: FC<{
                     Output of run
                   </Typography>
                   <Browse2RootObjectVersionOutputOf uri={uri} />
+                </Paper>
+              </Box>
+              <Box mt={4}>
+                <Paper>
+                  <Typography variant="h6" gutterBottom>
+                    Member of Type (aka Class Hierarchy)
+                  </Typography>
+                  <Browse2RootObjectVersionTypeHierarchy uri={uri} />
                 </Paper>
               </Box>
               <Box mt={4}>
