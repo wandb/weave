@@ -1411,7 +1411,7 @@ def test_duration():
 
 
 def test_date_add():
-    dt = datetime.datetime.now(tz=datetime.timezone.utc)
+    dt = datetime.datetime.now()
     dt1 = dt + datetime.timedelta(days=1)
 
     awl_node = weave.save(arrow.to_arrow([dt, dt1]))
@@ -1426,4 +1426,21 @@ def test_date_add():
     # TODO: remove timezone addition when we have a better way of handling timezones in arrow
     dt1utc = dt1.astimezone(datetime.timezone.utc)
     expected = [dt1utc, dt1utc + datetime.timedelta(days=1)]
+    assert actual == expected
+
+
+def test_date_sub():
+    dt = datetime.datetime.now(tz=datetime.timezone.utc)
+    dt1 = dt + datetime.timedelta(days=1)
+
+    awl_node = weave.save(arrow.to_arrow([dt, dt1]))
+    fn = weave_internal.define_fn(
+        {"row": awl_node.type.object_type},
+        lambda row: date.datetime_sub(row, dt),
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    actual = list(weave.use(called))
+
+    expected = [datetime.timedelta(0), datetime.timedelta(days=1)]
     assert actual == expected
