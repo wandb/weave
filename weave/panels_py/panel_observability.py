@@ -111,17 +111,17 @@ def observability(
         hidden=True,
     )
 
-    three_days_in_seconds = 60 * 60 * 24 * 3
-    window_start = weave.ops.from_number(
-        weave.ops.datetime_now() - three_days_in_seconds
-    )
-    window_end = weave.ops.from_number(weave.ops.datetime_now())
+    # three_days_in_seconds = 60 * 60 * 24 * 3
+    # window_start = weave.ops.from_number(
+    #     weave.ops.datetime_now() - three_days_in_seconds
+    # )
+    # window_end = weave.ops.from_number(weave.ops.datetime_now())
 
     filtered_range = varbar.add(
         "filtered_range",
         weave.ops.make_list(
-            a=window_start,
-            b=window_end,
+            a=source_data[timestamp_col_name].min(),
+            b=source_data[timestamp_col_name].max(),
         ),
         hidden=True,
     )
@@ -129,7 +129,7 @@ def observability(
     user_zoom_range = varbar.add("user_zoom_range", None, hidden=True)
     varbar.add(
         "Time_range",
-        panels.DateRange(user_zoom_range, domain=filtered_range),
+        panels.DateRange(user_zoom_range, domain=source_data[timestamp_col_name]),
     )
     bin_range = varbar.add(
         "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
