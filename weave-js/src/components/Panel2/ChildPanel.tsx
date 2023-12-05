@@ -584,7 +584,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     selectedDocumentId === documentId &&
     selectedPathStr !== '<root>' &&
     selectedPathStr !== '<root>.main' &&
-    pathStr.startsWith(selectedPathStr);
+    (pathStr === selectedPathStr || isAncestor(pathStr, selectedPathStr));
 
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
