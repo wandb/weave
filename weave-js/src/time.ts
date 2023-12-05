@@ -117,7 +117,9 @@ export function monthRoundedTime(ns: number, includeMs?: boolean) {
     sDisplay = s > 0 ? s + 's' : '';
     msDisplay = ms >= 0 ? ms + 'ms' : '';
   }
-  return [moDisplay, dDisplay, hDisplay, mDisplay, sDisplay, msDisplay].filter(d => d !== '').join(' ');
+  return [moDisplay, dDisplay, hDisplay, mDisplay, sDisplay, msDisplay]
+    .filter(item => item !== '')
+    .join(' ');
   // return moDisplay + dDisplay + hDisplay + mDisplay + sDisplay + msDisplay;
 }
 

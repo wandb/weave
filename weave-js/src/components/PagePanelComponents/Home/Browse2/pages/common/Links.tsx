@@ -2,8 +2,8 @@ import React from 'react';
 import {Link} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
-import {useWeaveflowORMContext} from '../interface/wf/context';
 import {WFHighLevelCallFilter} from '../CallsPage';
+import {useWeaveflowORMContext} from '../interface/wf/context';
 
 export const TypeLink: React.FC<{typeName: string}> = props => {
   const orm = useWeaveflowORMContext();

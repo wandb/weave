@@ -63,7 +63,12 @@ export interface WFTypeVersion extends ProjectOwned {
   typeCategory: () => string | null; // not technically part of data model since it is derived from the op details
 }
 
-export type HackyOpCategory = 'train' | 'predict' | 'score' | 'evaluate' | 'tune' ;
+export type HackyOpCategory =
+  | 'train'
+  | 'predict'
+  | 'score'
+  | 'evaluate'
+  | 'tune';
 
 export interface WFOpVersion extends ProjectOwned, ArtifactVersionBacked {
   op: () => WFOp;

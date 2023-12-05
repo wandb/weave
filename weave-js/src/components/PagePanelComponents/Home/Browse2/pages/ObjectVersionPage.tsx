@@ -2,12 +2,9 @@
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
-import {
-  Browse2ObjectVersionItemComponent,
-  nodeFromExtra,
-} from '../Browse2ObjectVersionItemPage';
-import {Browse2RootObjectVersionItemParams} from '../CommonLib';
+import {nodeFromExtra} from '../Browse2ObjectVersionItemPage';
 import {WeaveEditor} from '../WeaveEditors';
+import {CallsTable} from './CallsPage';
 import {useMakeNewBoard} from './common/hooks';
 import {CallLink, ObjectLink, TypeVersionLink} from './common/Links';
 import {
@@ -15,10 +12,8 @@ import {
   SimpleKeyValueTable,
   SimplePageLayout,
 } from './common/SimplePageLayout';
-import {useObjectVersionTypeInfo} from './interface/dataModel';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFObjectVersion} from './interface/wf/types';
-import {CallsTable} from './CallsPage';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -42,7 +37,7 @@ export const ObjectVersionPage: React.FC<{
     const extraFields = props.refExtra.split('/');
     return nodeFromExtra(objNode, extraFields);
   }, [baseUri, props.refExtra]);
-  const {onMakeBoard, isGenerating} = useMakeNewBoard(itemNode);
+  const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
     <SimplePageLayout

@@ -339,32 +339,31 @@ export class WFNaiveProject implements WFProject {
 
         Object.values(call.inputs).forEach((input: any) => {
           if (typeof input === 'string') {
-            const nameParts = uriToParts(input);
-            if (nameParts) {
+            const inputCallNameParts = uriToParts(input);
+            if (inputCallNameParts) {
               const objectVersion = this.state.objectVersionsMap.get(
-                nameParts.version
+                inputCallNameParts.version
               );
               if (objectVersion) {
-                inputObjectVersionHashes.push(nameParts.version);
+                inputObjectVersionHashes.push(inputCallNameParts.version);
               }
             }
           }
-        })
+        });
 
         Object.values(call.output ?? {}).forEach((output: any) => {
           if (typeof output === 'string') {
-            const nameParts = uriToParts(output);
-            if (nameParts) {
+            const outputCallnameParts = uriToParts(output);
+            if (outputCallnameParts) {
               const objectVersion = this.state.objectVersionsMap.get(
-                nameParts.version
+                outputCallnameParts.version
               );
               if (objectVersion) {
-                outputObjectVersionHashes.push(nameParts.version);
+                outputObjectVersionHashes.push(outputCallnameParts.version);
               }
             }
           }
-        })
-
+        });
 
         return [
           call.span_id,
@@ -510,7 +509,6 @@ class WFNaiveTypeVersion implements WFTypeVersion {
   }
   typeCategory(): string | null {
     throw new Error('Method not implemented.');
-
   }
   entity(): string {
     return this.state.entity;
@@ -656,10 +654,11 @@ class WFNaiveObjectVersion implements WFObjectVersion {
     );
   }
   inputTo(): WFCall[] {
-
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        return callDict.inputObjectVersionHashes?.includes(this.objectVersionDict.versionHash)
+        return callDict.inputObjectVersionHashes?.includes(
+          this.objectVersionDict.versionHash
+        );
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
@@ -668,7 +667,9 @@ class WFNaiveObjectVersion implements WFObjectVersion {
   outputFrom(): WFCall[] {
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        return callDict.outputObjectVersionHashes?.includes(this.objectVersionDict.versionHash)
+        return callDict.outputObjectVersionHashes?.includes(
+          this.objectVersionDict.versionHash
+        );
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
@@ -724,7 +725,7 @@ class WFNaiveOpVersion implements WFOpVersion {
         return category as HackyOpCategory;
       }
     }
-    return null
+    return null;
   }
   createdAtMs(): number {
     return this.opVersionDict.createdAt;
@@ -818,7 +819,9 @@ class WFNaiveCall implements WFCall {
     throw new Error('Method not implemented.');
   }
   parentCall(): WFCall | null {
-    const parentCall = this.state.callsMap.get(this.callDict.callSpan.parent_id)
+    const parentCall = this.state.callsMap.get(
+      this.callDict.callSpan.parent_id
+    );
     if (!parentCall) {
       return null;
     }

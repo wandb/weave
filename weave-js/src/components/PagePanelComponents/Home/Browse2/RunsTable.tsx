@@ -101,7 +101,7 @@ export const RunsTable: FC<{
 
       return {
         id: call.span_id,
-        ormCall: ormCall,
+        ormCall,
         opVersion: ormCall.opVersion()?.op()?.name(),
         isRoot: ormCall.parentCall() == null,
         opCategory: ormCall.opVersion()?.opCategory(),
@@ -255,8 +255,8 @@ export const RunsTable: FC<{
         // flex: !showIO ? 1 : undefined,
         width: 100,
 
-        renderCell: params => {
-          if (params.value) {
+        renderCell: cellParams => {
+          if (cellParams.value) {
             return (
               <Box
                 sx={{
@@ -502,9 +502,9 @@ export const RunsTable: FC<{
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       columnGroupingModel={columns.colGroupingModel}
-      onCellClick={params => {
+      onCellClick={cellParams => {
         // TODO: move these actions into a config
-        if (params.field === 'id') {
+        if (cellParams.field === 'id') {
           // history.push(
           //   routeContext.objectVersionUIUrl(
           //     params.row.obj.entity(),

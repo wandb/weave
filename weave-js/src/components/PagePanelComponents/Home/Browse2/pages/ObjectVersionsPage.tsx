@@ -9,7 +9,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import moment from 'moment';
 import React, {useMemo} from 'react';
-import {Link, useHistory} from 'react-router-dom';
+import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';

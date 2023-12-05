@@ -5,19 +5,14 @@ import {Button} from 'semantic-ui-react';
 
 import {Browse2OpDefCode} from '../Browse2OpDefCode';
 import {StreamId} from '../callTree';
-import {
-  useFirstCall,
-  useOpSignature,
-  useRunsWithFeedback,
-} from '../callTreeHooks';
+import {useFirstCall, useOpSignature} from '../callTreeHooks';
 import {Paper} from '../CommonLib';
-import {RunsTable} from '../RunsTable';
+import {CallsTable} from './CallsPage';
 import {
   ScrollableTabContent,
   SimplePageLayout,
 } from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
-import {CallsTable} from './CallsPage';
 
 export const OpVersionPage: React.FC<{
   entity: string;

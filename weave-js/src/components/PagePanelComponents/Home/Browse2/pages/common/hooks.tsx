@@ -1,5 +1,5 @@
 import {urlPrefixed} from '@wandb/weave/config';
-import React, {useCallback, useState} from 'react';
+import {useCallback, useState} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
 import {Node} from '../../../../../../core';

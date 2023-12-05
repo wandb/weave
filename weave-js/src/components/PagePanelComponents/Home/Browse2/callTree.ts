@@ -11,7 +11,6 @@ import {
   listObjectType,
   Node,
   opAnd,
-  opArray,
   opCount,
   opDict,
   opFilter,
@@ -25,7 +24,6 @@ import {
   opPick,
   opRefEqual,
   opStringEqual,
-  opStringIn,
   OutputType,
   Type,
   typedDictPropertyTypes,
@@ -271,7 +269,7 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
         val: opPick({
           obj: rowVar,
           key: constString('parent_id'),
-        })
+        }),
       })
     );
   }

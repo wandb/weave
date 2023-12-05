@@ -31,7 +31,6 @@ import React, {FC, Fragment, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
-import {CallFilter} from './callTree';
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 
 const drawerWidth = 240;
