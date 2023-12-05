@@ -93,11 +93,12 @@ class DefaultToPy(mappers.Mapper):
         # attaches a ref to them. We want to publish those ops so that for example
         # ops attached to Weave Objects are published as well.
 
+        # HACK(wf-fixes1)
+
         # Just clear the ref... we don't need to recursively publish, it will
         # happen later.
         # if hasattr(obj, "_ref"):
         #     obj._ref = None
-
         # This is here because all Custom Types are stored as Refs.
         # ... but resursively calling publish is not right
         #     because publish calls us again! infinite recusion

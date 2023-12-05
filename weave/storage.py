@@ -62,7 +62,8 @@ def _ensure_object_components_are_published(
     from . import op_def
 
     # Hack because of mappers_publisher recursion bug
-    # TODO: fix
+    # TODO: Fix
+    # HACK(wf-fixes1)
     if isinstance(obj, op_def.OpDef):
         return obj
 
@@ -134,6 +135,7 @@ def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
     return _pubish_target_project.get()
 
 
+# HACK(wf-fixes1)
 PUBLISH_CACHE_BY_LOCAL_ART = {}
 
 
