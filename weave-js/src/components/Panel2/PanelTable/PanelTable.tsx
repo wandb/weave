@@ -469,8 +469,11 @@ const PanelTableInner: React.FC<
     ? undefined
     : totalRowCountUse.result;
 
-  const orderedColumns = useOrderedColumns(tableState, config.pinnedColumns);
-  console.log({orderedColumns});
+  const orderedColumns = useOrderedColumns(
+    tableState,
+    config.pinnedColumns,
+    countColumnId
+  );
 
   // TODO: remove this constraint once plots work in smaller views
 

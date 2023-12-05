@@ -235,16 +235,23 @@ export const useBaseTableColumnDefinitions = (
 
 export const useOrderedColumns = (
   tableState: Table.TableState,
-  pinnedColumns: string[]
+  pinnedColumns: string[],
+  countColumnId?: string | null
 ) => {
   return useMemo(() => {
     const allColumns = Table.getColumnRenderOrder(tableState);
-    const normalColumns = allColumns.filter(s => !pinnedColumns.includes(s));
-    const actualPinnedColumns = allColumns.filter(s =>
-      pinnedColumns.includes(s)
-    );
+    const normalColumns = allColumns
+      .filter(s => !pinnedColumns.includes(s))
+      .filter(s => s !== countColumnId);
+    const actualPinnedColumns = allColumns
+      .filter(s => pinnedColumns.includes(s))
+      .filter(s => s !== countColumnId);
+    const groupCountColumn = countColumnId ? [countColumnId] : [];
 
-    return tableState.groupBy.concat(actualPinnedColumns).concat(normalColumns);
+    return tableState.groupBy
+      .concat(groupCountColumn)
+      .concat(actualPinnedColumns)
+      .concat(normalColumns);
   }, [tableState, pinnedColumns]);
 };
 
