@@ -148,3 +148,11 @@ const ObjectVersionProducingCallsItem: React.FC<{
     </ul>
   );
 };
+
+// const ObjectVersionConsumingCalls: React.FC<{
+//   objectVersion: WFObjectVersion;
+// }> = props => {
+//   const calls = props.objectVersion.inputTo();
+
+//   return <CallsTable objectVersions={calls} />;
+// };

@@ -329,12 +329,45 @@ export class WFNaiveProject implements WFProject {
             opVersionHash = nameParts.version;
           }
         }
+        const inputObjectVersionHashes: string[] = [];
+        const outputObjectVersionHashes: string[] = [];
+
+        Object.values(call.inputs).forEach((input: any) => {
+          if (typeof input === 'string') {
+            const nameParts = uriToParts(input);
+            if (nameParts) {
+              const objectVersion = this.state.objectVersionsMap.get(
+                nameParts.version
+              );
+              if (objectVersion) {
+                inputObjectVersionHashes.push(nameParts.version);
+              }
+            }
+          }
+        })
+
+        Object.values(call.output ?? {}).forEach((output: any) => {
+          if (typeof output === 'string') {
+            const nameParts = uriToParts(output);
+            if (nameParts) {
+              const objectVersion = this.state.objectVersionsMap.get(
+                nameParts.version
+              );
+              if (objectVersion) {
+                outputObjectVersionHashes.push(nameParts.version);
+              }
+            }
+          }
+        })
+
 
         return [
           call.span_id,
           {
             callSpan: call,
             opVersionHash,
+            inputObjectVersionHashes,
+            outputObjectVersionHashes,
           },
         ];
       })
@@ -614,27 +647,19 @@ class WFNaiveObjectVersion implements WFObjectVersion {
     );
   }
   inputTo(): WFCall[] {
-    // Array<{argName: string; opVersion: WFCall}> {
-    const targetUri = `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.objectVersionDict.name}:${this.objectVersionDict.versionHash}/obj`;
+
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        return Object.values(callDict.callSpan.inputs).some((input: any) => {
-          return input === targetUri;
-        });
+        return callDict.inputObjectVersionHashes?.includes(this.objectVersionDict.versionHash)
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
       });
   }
   outputFrom(): WFCall[] {
-    const targetUri = `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.objectVersionDict.name}:${this.objectVersionDict.versionHash}/obj`;
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        return Object.values(callDict.callSpan.output ?? {}).some(
-          (input: any) => {
-            return input === targetUri;
-          }
-        );
+        return callDict.outputObjectVersionHashes?.includes(this.objectVersionDict.versionHash)
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
@@ -715,11 +740,7 @@ class WFNaiveOpVersion implements WFOpVersion {
   calls(): WFCall[] {
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        if (!callDict.callSpan.name.startsWith('wandb-artifact:///')) {
-          return false;
-        }
-        const version = callDict.callSpan.name.split(':')[2].split('/')[0];
-        return version === this.opVersionDict.versionHash;
+        return callDict.opVersionHash === this.opVersionDict.versionHash;
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
@@ -742,6 +763,8 @@ class WFNaiveOpVersion implements WFOpVersion {
 type WFNaiveCallDictType = {
   callSpan: Call;
   opVersionHash?: string;
+  inputObjectVersionHashes?: string[];
+  outputObjectVersionHashes?: string[];
 };
 class WFNaiveCall implements WFCall {
   private readonly callDict: WFNaiveCallDictType;
