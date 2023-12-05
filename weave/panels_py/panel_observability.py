@@ -324,6 +324,9 @@ def observability(
             mark="line",
             no_legend=True,
             domain_x=bin_range,
+            domain_y=weave_internal.make_const_node(
+                types.List(types.Number()), [0, 100]
+            ),
         )
 
     cpu_plot = make_metric_plot("cpu_cores_util", "avg cpu %")
