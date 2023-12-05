@@ -27,6 +27,7 @@ interface ArtifactVersionBacked {
   aliases: () => string[];
   description: () => string;
   createdAtMs: () => number;
+  refUri: () => string;
 }
 
 export interface WFType extends ProjectOwned {

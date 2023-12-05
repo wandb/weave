@@ -151,3 +151,26 @@ export const OpVersionLink: React.FC<{
     );
   }
 };
+
+export const CallLink: React.FC<{callId: string}> = props => {
+  const orm = useWeaveflowORMContext();
+  const routerContext = useWeaveflowRouteContext();
+
+  const call = orm.projectConnection.call(props.callId);
+  let callName = call.callID();
+  const callOpVersion = call.opVersion();
+  if (callOpVersion) {
+    callName = callOpVersion.op().name() + ' : ' + callOpVersion.version();
+  }
+  return (
+    <Link
+      to={routerContext.callUIUrl(
+        call.entity(),
+        call.project(),
+        call.traceID(),
+        call.callID()
+      )}>
+      {callName}
+    </Link>
+  );
+};

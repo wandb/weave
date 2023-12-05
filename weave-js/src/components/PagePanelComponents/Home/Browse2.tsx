@@ -367,7 +367,7 @@ const ObjectVersionRoutePageBinding = () => {
       entity={params.entity}
       project={params.project}
       objectName={params.objectName}
-      digest={params.digest}
+      version={params.digest}
       refExtra={params.refExtra}
     />
   );

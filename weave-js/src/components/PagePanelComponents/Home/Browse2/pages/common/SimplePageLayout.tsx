@@ -1,4 +1,25 @@
-import {Box, Tab, Tabs} from '@mui/material';
+import {
+  Cloud,
+  ContentCopy,
+  ContentCut,
+  ContentPaste,
+} from '@mui/icons-material';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import {
+  Box,
+  Divider,
+  ListItemIcon,
+  ListItemText,
+  MenuList,
+  Paper,
+  Tab,
+  Tabs,
+  Typography,
+} from '@mui/material';
+// import {Menu} from '@mui/base/Menu';
+import IconButton from '@mui/material/IconButton';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import React, {useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
@@ -8,6 +29,10 @@ export const SimplePageLayout: React.FC<{
   tabs: Array<{
     label: string;
     content: React.ReactNode;
+  }>;
+  menuItems?: Array<{
+    label: string;
+    onClick: () => void;
   }>;
 }> = props => {
   const [tabId, setTabId] = React.useState(0);
@@ -45,14 +70,24 @@ export const SimplePageLayout: React.FC<{
         }}>
         <Box
           sx={{
-            pb: 2,
-            fontWeight: 600,
-            fontSize: '1.5rem',
-            flex: '0 0 auto',
-            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: 1,
           }}>
-          {props.title}
+          <Box
+            sx={{
+              pb: 2,
+              fontWeight: 600,
+              fontSize: '1.5rem',
+              flex: '0 0 auto',
+              overflow: 'auto',
+            }}>
+            {props.title}
+          </Box>
+          {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
         </Box>
+
         <Tabs
           variant="scrollable"
           scrollButtons="auto"
@@ -73,6 +108,55 @@ export const SimplePageLayout: React.FC<{
         }}>
         <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
       </Box>
+    </Box>
+  );
+};
+
+const ActionMenu: React.FC<{
+  menuItems: Array<{
+    label: string;
+    onClick: () => void;
+  }>;
+}> = props => {
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  return (
+    <Box
+      sx={{
+        height: '47px',
+      }}>
+      <IconButton
+        aria-label="more"
+        id="long-button"
+        aria-controls={open ? 'long-menu' : undefined}
+        aria-expanded={open ? 'true' : undefined}
+        aria-haspopup="true"
+        onClick={handleClick}>
+        <MoreVertIcon />
+      </IconButton>
+      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+        <Box sx={{width: 320, maxWidth: '100%'}}>
+          <MenuList>
+            {props.menuItems.map((item, i) => (
+              <MenuItem
+                key={i}
+                onClick={() => {
+                  handleClose();
+                  item.onClick();
+                }}>
+                <ListItemText>{item.label}</ListItemText>
+              </MenuItem>
+            ))}
+          </MenuList>
+        </Box>
+      </Menu>
     </Box>
   );
 };

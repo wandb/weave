@@ -643,6 +643,9 @@ class WFNaiveObjectVersion implements WFObjectVersion {
   description(): string {
     return this.objectVersionDict.description;
   }
+  refUri(): string {
+    return `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.objectVersionDict.name}:${this.objectVersionDict.versionHash}/obj`;
+  }
 }
 
 type WFNaiveOpVersionDictType = {
@@ -731,6 +734,9 @@ class WFNaiveOpVersion implements WFOpVersion {
   project(): string {
     return this.state.project;
   }
+  refUri(): string {
+    return `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.opVersionDict.name}:${this.opVersionDict.versionHash}/obj`;
+  }
 }
 
 type WFNaiveCallDictType = {
@@ -755,7 +761,7 @@ class WFNaiveCall implements WFCall {
     return this.callDict.callSpan.trace_id;
   }
   callID(): string {
-    throw new Error('Method not implemented.');
+    return this.callDict.callSpan.span_id;
   }
   opVersion(): WFOpVersion | null {
     if (!this.callDict.opVersionHash) {
@@ -776,9 +782,9 @@ class WFNaiveCall implements WFCall {
     throw new Error('Method not implemented.');
   }
   entity(): string {
-    throw new Error('Method not implemented.');
+    return this.state.entity;
   }
   project(): string {
-    throw new Error('Method not implemented.');
+    return this.state.project;
   }
 }

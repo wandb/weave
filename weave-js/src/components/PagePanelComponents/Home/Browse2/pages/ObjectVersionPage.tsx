@@ -1,172 +1,150 @@
 // import {Box, CssBaseline, Tab, Tabs, Typography} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
-import {Browse2ObjectVersionItemComponent} from '../Browse2ObjectVersionItemPage';
+import {constString, opGet} from '../../../../../core';
+import {
+  Browse2ObjectVersionItemComponent,
+  nodeFromExtra,
+} from '../Browse2ObjectVersionItemPage';
 import {Browse2RootObjectVersionItemParams} from '../CommonLib';
+import {WeaveEditor} from '../WeaveEditors';
+import {useMakeNewBoard} from './common/hooks';
+import {CallLink, ObjectLink, TypeVersionLink} from './common/Links';
+import {
+  ScrollableTabContent,
+  SimpleKeyValueTable,
+  SimplePageLayout,
+} from './common/SimplePageLayout';
 import {useObjectVersionTypeInfo} from './interface/dataModel';
-
-// const MetadataTable = ({data}) => {
-//   return (
-//     // <Paper sx={{width: '100%', overflow: 'hidden'}}>
-//     <Table size="small" aria-label="simple table">
-//       {/* <TableHead>
-//         <TableRow sx={{backgroundColor: '#f5f5f5'}}>
-//           <TableCell>Key</TableCell>
-//           <TableCell align="right">Value</TableCell>
-//         </TableRow>
-//       </TableHead> */}
-//       <TableBody>
-//         {Object.entries(data).map(([key, value]) => (
-//           <TableRow key={key}>
-//             <TableCell component="th" scope="row">
-//               <strong>{key}</strong>
-//             </TableCell>
-//             <TableCell align="right">{value}</TableCell>
-//           </TableRow>
-//         ))}
-//       </TableBody>
-//     </Table>
-//     // </Paper>
-//   );
-// };
-
-// interface TabPanelProps {
-//   children?: React.ReactNode;
-//   index: number;
-//   value: number;
-// }
-
-// function CustomTabPanel(props: TabPanelProps) {
-//   const {children, value, index, ...other} = props;
-
-//   return (
-//     <div
-//       role="tabpanel"
-//       hidden={value !== index}
-//       id={`simple-tabpanel-${index}`}
-//       aria-labelledby={`simple-tab-${index}`}
-//       {...other}>
-//       {value === index && (
-//         <Box sx={{p: 3}}>
-//           <Typography>{children}</Typography>
-//         </Box>
-//       )}
-//     </div>
-//   );
-// }
-
-// function a11yProps(index: number) {
-//   return {
-//     id: `simple-tab-${index}`,
-//     'aria-controls': `simple-tabpanel-${index}`,
-//   };
-// }
+import {useWeaveflowORMContext} from './interface/wf/context';
+import {WFObjectVersion} from './interface/wf/types';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
   project: string;
   objectName: string;
-  digest: string;
+  version: string;
   refExtra?: string;
 }> = props => {
-  const objectVersionTypeInfo = useObjectVersionTypeInfo(
-    props.entity,
-    props.project,
+  const orm = useWeaveflowORMContext();
+  const objectVersion = orm.projectConnection.objectVersion(
     props.objectName,
-    props.digest
+    props.version
   );
-  const rootType = useMemo(() => {
-    let targetType = objectVersionTypeInfo.result?.type_version;
-    while (targetType?.parent_type) {
-      targetType = targetType.parent_type;
+  const baseUri = objectVersion.refUri();
+  const fullUri = baseUri + (props.refExtra ?? '');
+  const itemNode = useMemo(() => {
+    const objNode = opGet({uri: constString(baseUri)});
+    if (props.refExtra == null) {
+      return objNode;
     }
-    return targetType;
-  }, [objectVersionTypeInfo.result?.type_version]);
-  const params: Browse2RootObjectVersionItemParams = useMemo(() => {
-    return {
-      entity: props.entity,
-      project: props.project,
-      rootType: rootType?.type_name ?? '',
-      objName: props.objectName,
-      objVersion: props.digest,
-      refExtra: props.refExtra,
-    };
-  }, [
-    props.digest,
-    props.entity,
-    props.objectName,
-    props.project,
-    props.refExtra,
-    rootType?.type_name,
-  ]);
-  if (objectVersionTypeInfo.loading) {
-    return <div>Loading...</div>;
-  }
-  return <Browse2ObjectVersionItemComponent params={params} />;
+    const extraFields = props.refExtra.split('/');
+    return nodeFromExtra(objNode, extraFields);
+  }, [baseUri, props.refExtra]);
+  const {onMakeBoard, isGenerating} = useMakeNewBoard(itemNode);
+
+  return (
+    <SimplePageLayout
+      title={props.objectName + ' : ' + props.version}
+      menuItems={[
+        {
+          label: 'Open in Board',
+          onClick: () => {
+            onMakeBoard();
+          },
+        },
+        {
+          label: '(TODO) Compare',
+          onClick: () => {
+            console.log('(TODO) Compare');
+          },
+        },
+        {
+          label: '(TODO) Process with Function',
+          onClick: () => {
+            console.log('(TODO) Process with Function');
+          },
+        },
+        {
+          label: '(TODO) Add to Hub',
+          onClick: () => {
+            console.log('(TODO) Add to Hub');
+          },
+        },
+      ]}
+      tabs={[
+        {
+          label: 'Values',
+          content: (
+            <ScrollableTabContent>
+              <WeaveEditor objType={props.objectName} node={itemNode} />
+            </ScrollableTabContent>
+          ),
+        },
+        {
+          label: 'Overview',
+          content: (
+            <ScrollableTabContent>
+              <SimpleKeyValueTable
+                data={{
+                  Object: (
+                    <ObjectLink objectName={objectVersion.object().name()} />
+                  ),
+                  'Type Version': (
+                    <TypeVersionLink
+                      typeName={objectVersion.typeVersion().type().name()}
+                      version={objectVersion.typeVersion().version()}
+                    />
+                  ),
+                  Ref: fullUri,
+                  'Producing Calls': (
+                    <ObjectVersionProducingCallsItem
+                      objectVersion={objectVersion}
+                    />
+                  ),
+                }}
+              />
+            </ScrollableTabContent>
+          ),
+        },
+        {
+          label: 'Consuming Calls',
+          content: <div>Calls</div>,
+        },
+
+        {
+          label: 'Boards',
+          content: <div>Boards</div>,
+        },
+        {
+          label: 'DAG',
+          content: <div>DAG</div>,
+        },
+      ]}
+    />
+  );
 };
 
-/*
-<div>
-      <h1>ObjectVersionPage Placeholder</h1>
-      <div>
-        This is the detail page for ObjectVersion. A ObjectVersion is a
-        "version" of a saved weave object. In the user's mind it is analogous to
-        a specific instance.
-      </div>
-      <div>Migration Notes:</div>
-      <ul>
-        <li>
-          Weaveflow pretty much already has this page (
-          <a href="https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/Dataset/eval_dataset/696d98783ec24548e08b">
-            https://weave.wandb.test/browse2/dannygoldstein/hooman-eval-notion2/Dataset/eval_dataset/696d98783ec24548e08b
-          </a>
-          ) that includes most of what we will want here. However, this is one
-          of the most important pages, so it is is worth enumerating the primary
-          features
-        </li>
-      </ul>
-      <div>Primary Features:</div>
-      <ul>
-        <li>Property Values (possibly editable)</li>
-        <li>(future) Objet/Call DAG Visual</li>
-      </ul>
-      <div>Links:</div>
-      <ul>
-        <li>
-          Link to parent TypeVersion ({' '}
-          <Link to={prefix('/types/type_name/versions/version_id')}>
-            /types/[type_name]/versions/[version_id]
-          </Link>
-          )
-        </li>
-        <li>
-          Link to parent Object ({' '}
-          <Link to={prefix('/objects/object_name')}>
-            /objects/[object_name]
-          </Link>
-          )
-        </li>
-        <li>
-          Link to Producing Call ({' '}
-          <Link to={prefix('/calls/call_id')}>/calls/call_id</Link>)
-        </li>
-        <li>
-          Link to all Consuming Calls ({' '}
-          <Link to={prefix('/calls?filter=uses=object_version_id')}>
-            /types/[type_name]/versions/[version_id]
-          </Link>
-          )
-        </li>
-      </ul>
-      <div>Inspiration</div>
-      Existing Weaveflow Page
-      <br />
-      <img
-        src="https://github.com/wandb/weave/blob/a0d44639b972421890ed6149f9cbc01211749291/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/objectversion_example.png?raw=true"
-        style={{
-          width: '100%',
-        }}
-        alt=""
-      />
-    </div>
-    */
+const ObjectVersionProducingCallsItem: React.FC<{
+  objectVersion: WFObjectVersion;
+}> = props => {
+  const producingCalls = props.objectVersion.outputFrom().filter(call => {
+    return call.opVersion() != null;
+  });
+  if (producingCalls.length === 0) {
+    return <div>-</div>;
+  } else if (producingCalls.length === 1) {
+    return <CallLink callId={producingCalls[0].callID()} />;
+  }
+  return (
+    <ul>
+      {producingCalls.map(call => {
+        return (
+          <li key={call.callID()}>
+            <CallLink callId={call.callID()} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
