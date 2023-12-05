@@ -1,3 +1,4 @@
+import {Box, Chip} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -8,6 +9,7 @@ import {
 import {parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
+import moment from 'moment';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {Link, useParams} from 'react-router-dom';
 
@@ -15,11 +17,9 @@ import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {useWeaveflowRouteContext} from './context';
-import {SmallRef} from './SmallRef';
-import moment from 'moment';
-import {Box, Chip} from '@mui/material';
-import {useWeaveflowORMContext} from './pages/interface/wf/context';
 import {OpVersionLink} from './pages/common/Links';
+import {useWeaveflowORMContext} from './pages/interface/wf/context';
+import {SmallRef} from './SmallRef';
 
 type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
