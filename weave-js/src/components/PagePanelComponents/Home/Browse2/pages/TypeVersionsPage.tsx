@@ -11,6 +11,7 @@ import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
 import {useWeaveflowORMContext} from './interface/wf/context';
+import {SimplePageLayout} from '../SimplePageLayout';
 
 const basicField = (
   field: string,
@@ -76,65 +77,49 @@ export const TypeVersionsPage: React.FC<{
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        flexGrow: 1,
-      }}>
-      <Box
-        sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          p: 3,
-          borderBottom: '1px solid #e0e0e0',
-        }}>
-        <h1>All Type (Version)s</h1>
-      </Box>
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-        <DataGridPro
-          rows={rows}
-          initialState={{
-            sorting: {
-              sortModel: [{field: 'date_created', sort: 'desc'}],
-            },
-          }}
-          // {...data}
-          // loading={data.rows.length === 0}
-          rowHeight={38}
-          columns={columns}
-          experimentalFeatures={{columnGrouping: true}}
-          disableRowSelectionOnClick
-          columnGroupingModel={columnGroupingModel}
-          onRowClick={params => {
-            // history.push(
-            //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
-            // );
-          }}
-          onCellClick={params => {
-            // TODO: move these actions into a config
-            if (params.field === 'id') {
-              history.push(
-                routeContext.typeVersionUIUrl(
-                  props.entity,
-                  props.project,
-                  params.row.type,
-                  params.row.version
-                )
-              );
-            }
-          }}
-        />
-      </Box>
-    </Box>
+    <SimplePageLayout
+      title="Types"
+      tabs={[
+        {
+          label: 'All',
+          content: (
+            <DataGridPro
+              rows={rows}
+              initialState={{
+                sorting: {
+                  sortModel: [{field: 'date_created', sort: 'desc'}],
+                },
+              }}
+              // {...data}
+              // loading={data.rows.length === 0}
+              rowHeight={38}
+              columns={columns}
+              experimentalFeatures={{columnGrouping: true}}
+              disableRowSelectionOnClick
+              columnGroupingModel={columnGroupingModel}
+              onRowClick={params => {
+                // history.push(
+                //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
+                // );
+              }}
+              onCellClick={params => {
+                // TODO: move these actions into a config
+                if (params.field === 'id') {
+                  history.push(
+                    routeContext.typeVersionUIUrl(
+                      props.entity,
+                      props.project,
+                      params.row.type,
+                      params.row.version
+                    )
+                  );
+                }
+              }}
+            />
+          ),
+        },
+      ]}
+    />
   );
 };
 
