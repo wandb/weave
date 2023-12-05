@@ -38,7 +38,7 @@ export const Browse2TraceComponent: FC<{params: Browse2TracePageParams}> = ({
   );
   return (
     <PageEl>
-      <PageHeader
+      {/* <PageHeader
         objectType="Trace"
         objectName={
           params.traceId + params.spanId != null ? '/' + params.spanId : ''
@@ -58,7 +58,7 @@ export const Browse2TraceComponent: FC<{params: Browse2TracePageParams}> = ({
             </Button>
           </Box>
         }
-      />
+      /> */}
 
       <Browse2Trace
         streamId={{

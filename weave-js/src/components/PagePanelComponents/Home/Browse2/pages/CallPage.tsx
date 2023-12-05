@@ -2,6 +2,7 @@ import React, {useMemo} from 'react';
 
 import {Browse2TraceComponent} from '../Browse2TracePage';
 import {useWeaveflowORMContext} from './interface/wf/context';
+import {SimplePageLayout} from './common/SimplePageLayout';
 
 export const CallPage: React.FC<{
   entity: string;
@@ -9,15 +10,41 @@ export const CallPage: React.FC<{
   callId: string;
 }> = props => {
   const orm = useWeaveflowORMContext();
+  const call = orm.projectConnection.call(props.callId);
   const params = useMemo(() => {
     return {
       entity: props.entity,
       project: props.project,
-      traceId: orm.projectConnection.call(props.callId).traceID(),
+      traceId: call.traceID(),
       spanId: props.callId,
     };
-  }, [orm.projectConnection, props.callId, props.entity, props.project]);
-  return <Browse2TraceComponent params={params} />;
+  }, [call, props.callId, props.entity, props.project]);
+  const title = `${call.opVersion()?.op().name()}: ${call.callID()}`;
+  return (
+    <SimplePageLayout
+      title={title}
+      menuItems={[
+        {
+          label: 'Open in Board',
+          onClick: () => {
+            console.log('TODO: Open in Board');
+          },
+        },
+        {
+          label: 'Compare',
+          onClick: () => {
+            console.log('TODO: Compare');
+          },
+        },
+      ]}
+      tabs={[
+        {
+          label: 'Trace',
+          content: <Browse2TraceComponent params={params} />,
+        },
+      ]}
+    />
+  );
 };
 
 // {/* <div>
