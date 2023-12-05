@@ -104,6 +104,7 @@ export const RunsTable: FC<{
         ormCall: ormCall,
         opVersion: ormCall.opVersion()?.op()?.name(),
         isRoot: ormCall.parentCall() == null,
+        opCategory: ormCall.opVersion()?.opCategory(),
         trace_id: call.trace_id,
         status_code: call.status_code,
         timestamp: call.timestamp,
@@ -222,6 +223,31 @@ export const RunsTable: FC<{
         field: 'latency',
         headerName: 'Latency',
         flex: !showIO ? 1 : undefined,
+      },
+      {
+        field: 'opCategory',
+        headerName: 'Op Category',
+        width: 150,
+        renderCell: cellParams => {
+          if (cellParams.value == null) {
+            return '';
+          }
+
+          const color = {
+            train: 'success',
+            predict: 'info',
+            score: 'error',
+            evaluate: 'warning',
+            // 'tune': 'warning',
+          }[cellParams.row.opCategory + ''];
+          return (
+            <Chip
+              label={cellParams.row.opCategory}
+              size="small"
+              color={color as any}
+            />
+          );
+        },
       },
       {
         field: 'isRoot',

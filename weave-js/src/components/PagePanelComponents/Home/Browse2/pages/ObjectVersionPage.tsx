@@ -18,6 +18,7 @@ import {
 import {useObjectVersionTypeInfo} from './interface/dataModel';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFObjectVersion} from './interface/wf/types';
+import {CallsTable} from './CallsPage';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -109,7 +110,15 @@ export const ObjectVersionPage: React.FC<{
         },
         {
           label: 'Consuming Calls',
-          content: <div>Calls</div>,
+          content: (
+            <CallsTable
+              entity={props.entity}
+              project={props.project}
+              frozenFilter={{
+                inputObjectVersions: [props.objectName + ':' + props.version],
+              }}
+            />
+          ),
         },
 
         {

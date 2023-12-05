@@ -1,3 +1,4 @@
+import {OpenInNew} from '@mui/icons-material';
 import {
   Autocomplete,
   Box,
@@ -10,21 +11,21 @@ import {
   ListItemText,
   TextField,
 } from '@mui/material';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {CallFilter} from '../callTree';
 import {useRunsWithFeedback} from '../callTreeHooks';
 import {RunsTable} from '../RunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {HackyOpCategory} from './interface/wf/types';
 import {useWeaveflowORMContext} from './interface/wf/context';
-import {OpenInNew} from '@mui/icons-material';
-import {useHistory} from 'react-router-dom';
+import {HackyOpCategory} from './interface/wf/types';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
-  opCategory?: HackyOpCategory;
+  opCategory?: HackyOpCategory | null;
   opVersions?: string[];
+  inputObjectVersions?: string[];
 };
 
 export const CallsPage: React.FC<{
@@ -59,22 +60,57 @@ export const CallsTable: React.FC<{
     const options = versions.map(v => v.op().name() + ':' + v.version());
     return options;
   }, [orm.projectConnection]);
+  const objectVersionOptions = useMemo(() => {
+    const versions = orm.projectConnection.objectVersions();
+    const options = versions.map(v => v.object().name() + ':' + v.version());
+    return options;
+  }, [orm.projectConnection]);
+  const opCategoryOptions = useMemo(() => {
+    return orm.projectConnection.opCategories();
+  }, [orm.projectConnection]);
+
   const [filter, setFilter] = useState<WFHighLevelCallFilter>(
     props.initialFilter ?? {}
   );
+  useEffect(() => {
+    if (props.initialFilter) {
+      setFilter(props.initialFilter);
+    }
+  }, [props.initialFilter]);
   const effectiveFilter = useMemo(() => {
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);
   const useLowLevelFilter: CallFilter = useMemo(() => {
-    return {
-      traceRootsOnly: effectiveFilter.traceRootsOnly,
-      opUris: effectiveFilter.opVersions?.map(uri => {
+    const opUrisFromVersions =
+      effectiveFilter.opVersions?.map(uri => {
         const [opName, version] = uri.split(':');
         const opVersion = orm.projectConnection.opVersion(opName, version);
         return opVersion.refUri();
+      }) ?? [];
+    let opUrisFromCategory = orm.projectConnection
+      .opVersions()
+      .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
+      .map(ov => ov.refUri());
+    if (opUrisFromCategory.length === 0 && effectiveFilter.opCategory) {
+      opUrisFromCategory = ['DOES_NOT_EXIST:VALUE'];
+    }
+    return {
+      traceRootsOnly: effectiveFilter.traceRootsOnly,
+      opUris: Array.from(
+        new Set([...opUrisFromVersions, ...opUrisFromCategory])
+      ),
+      inputUris: effectiveFilter.inputObjectVersions?.map(uri => {
+        const [objectName, version] = uri.split(':');
+        const objectVersion = orm.projectConnection.objectVersion(
+          objectName,
+          version
+        );
+        return objectVersion.refUri();
       }),
     };
   }, [
+    effectiveFilter.inputObjectVersions,
+    effectiveFilter.opCategory,
     effectiveFilter.opVersions,
     effectiveFilter.traceRootsOnly,
     orm.projectConnection,
@@ -87,6 +123,7 @@ export const CallsTable: React.FC<{
     },
     useLowLevelFilter
   );
+
   return (
     <Box
       sx={{
@@ -171,10 +208,20 @@ export const CallsTable: React.FC<{
                 // onChange={(event, newValue) => {
                 //   props.navigateToProject(newValue);
                 // }}
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'opCategory'
+                )}
                 renderInput={params => (
                   <TextField {...params} label="Op Category" />
                 )}
-                options={[]}
+                value={effectiveFilter.opCategory}
+                onChange={(event, newValue) => {
+                  setFilter({
+                    ...filter,
+                    opCategory: newValue,
+                  });
+                }}
+                options={opCategoryOptions}
               />
             </FormControl>
           </ListItem>
@@ -208,6 +255,10 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
+                multiple
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'inputObjectVersions'
+                )}
                 // disablePortal
                 // disableClearable
                 // options={projects}
@@ -218,7 +269,14 @@ export const CallsTable: React.FC<{
                 renderInput={params => (
                   <TextField {...params} label="Consumes Objects" />
                 )}
-                options={[]}
+                value={effectiveFilter.inputObjectVersions ?? []}
+                onChange={(event, newValue) => {
+                  setFilter({
+                    ...filter,
+                    inputObjectVersions: newValue,
+                  });
+                }}
+                options={objectVersionOptions}
               />
             </FormControl>
           </ListItem>
