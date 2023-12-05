@@ -252,7 +252,7 @@ export const useOrderedColumns = (
       .concat(groupCountColumn)
       .concat(actualPinnedColumns)
       .concat(normalColumns);
-  }, [tableState, pinnedColumns]);
+  }, [tableState, pinnedColumns, countColumnId]);
 };
 
 export const getTableMeasurements = (args: {

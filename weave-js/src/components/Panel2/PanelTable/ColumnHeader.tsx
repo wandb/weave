@@ -4,8 +4,6 @@ import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDr
 import {INPUT_SLIDER_CLASS} from '@wandb/weave/common/components/elements/SliderInput';
 import * as SemanticHacks from '@wandb/weave/common/util/semanticHacks';
 import {
-  varNode,
-  constFunction,
   canGroupType,
   canSortType,
   EditingNode,
@@ -14,9 +12,11 @@ import {
   listObjectType,
   Node,
   NodeOrVoidNode,
-  voidNode,
   opCount,
+  varNode,
+  voidNode,
 } from '@wandb/weave/core';
+import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
@@ -32,7 +32,6 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import * as Table from './tableState';
 import {stripTag} from './util';
-import {TableState} from '@wandb/weave/index';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -338,7 +337,7 @@ export const ColumnHeader: React.FC<{
           console.log({rowsNodeType: rowsNode.type});
           let newTableState: Table.TableState | null = null;
           if (countColumnId == null) {
-            let {table, columnId} = Table.addColumnToTable(
+            const {table, columnId} = Table.addColumnToTable(
               tableState,
               opCount({arr: varNode(rowsNode.type, 'row')})
               // constFunction(
@@ -482,6 +481,7 @@ export const ColumnHeader: React.FC<{
     doUngroup,
     isPinned,
     setColumnPinState,
+    rowsNode.type,
   ]);
 
   const colIsSorted =
