@@ -258,7 +258,7 @@ export const ColumnHeader: React.FC<{
   const doUngroup = useCallback(async () => {
     let newTableState: Table.TableState | null = null;
     console.log({countColumnId});
-    if (countColumnId) {
+    if (countColumnId && tableState.groupBy.length === 1) {
       console.log({tableStateBeforeRemove: tableState});
       newTableState = Table.removeColumn(tableState, countColumnId);
       console.log({newTableStateAfterRemove: newTableState});
