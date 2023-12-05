@@ -120,11 +120,8 @@ export const useAllOpVersions = (
   }, [value]);
 };
 
-export const fnAllWeaveObjects = (
-  entity: string,
-  project: string
-)  => {
-  const allObjectVersions = allObjectVersionsNode(entity, project)
+export const fnAllWeaveObjects = (entity: string, project: string) => {
+  const allObjectVersions = allObjectVersionsNode(entity, project);
   const asDictNode = opMap({
     arr: allObjectVersions,
     mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
@@ -132,7 +129,7 @@ export const fnAllWeaveObjects = (
     }),
   });
   return asDictNode;
-}
+};
 
 export const useUpdateObjectVersionDescription = () => {
   const [updateArtifactDescription] = useMutation(UPDATE_ARTIFACT_DESCRIPTION);
@@ -213,8 +210,6 @@ export const useAllTypeVersions = (
   return allTypeVersions as Loadable<TypeVersionCatalog>;
 };
 
-
-
 ///
 
 type Loadable<T> =
@@ -267,7 +262,9 @@ const removeNonUserObjects = (objectVersions: ObjectVersionDictType[]) => {
   });
 };
 
-export const typeVersionFromTypeDict = (typeDict: Type): TypeVersionTypeDictType => {
+export const typeVersionFromTypeDict = (
+  typeDict: Type
+): TypeVersionTypeDictType => {
   const typeVersionId = typeIdFromTypeVersion(typeDict);
   const typeName = isSimpleTypeShape(typeDict) ? typeDict : typeDict.type;
   return {

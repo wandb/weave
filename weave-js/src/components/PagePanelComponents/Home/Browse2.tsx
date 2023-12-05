@@ -19,6 +19,7 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {useWeaveContext} from '../../../context';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
@@ -33,6 +34,7 @@ import {BoardPage} from './Browse2/pages/BoardPage';
 import {BoardsPage} from './Browse2/pages/BoardsPage';
 import {CallPage} from './Browse2/pages/CallPage';
 import {CallsPage} from './Browse2/pages/CallsPage';
+import {WeaveflowORMContextProvider} from './Browse2/pages/interface/wf/context';
 import {WFNaiveProject} from './Browse2/pages/interface/wf/naive';
 import {ObjectPage} from './Browse2/pages/ObjectPage';
 import {ObjectsPage} from './Browse2/pages/ObjectsPage';
@@ -48,8 +50,6 @@ import {TypePage} from './Browse2/pages/TypePage';
 import {TypesPage} from './Browse2/pages/TypesPage';
 import {TypeVersionPage} from './Browse2/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse2/pages/TypeVersionsPage';
-import {useWeaveContext} from '../../../context';
-import {project} from '../../../core/_external/util/urls';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -242,6 +242,7 @@ const Browse2Mounted: FC = props => {
 
 const projectRoot = `:entity/:project`;
 const Browse2ProjectRoot: FC = () => {
+  const [loading, setLoading] = React.useState(true);
   const params = useParams<{entity: string; project: string}>();
   const {client: weaveClient} = useWeaveContext();
   const projectData = useMemo(
@@ -249,86 +250,94 @@ const Browse2ProjectRoot: FC = () => {
     [params.entity, params.project, weaveClient]
   );
   useEffect(() => {
-    projectData.init();
+    projectData.init().then(() => setLoading(false));
   }, [projectData]);
   console.log(projectData);
+  if (loading) {
+    return <>Loading...</>;
+  }
 
   return (
-    <Box
-      sx={{
-        flex: '1 1 auto',
-        width: '100%',
-        overflow: 'auto',
-      }}>
-      <Switch>
-        {/* TYPES */}
-        <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
-          <TypeVersionPage />
-        </Route>
-        <Route path={`/${projectRoot}/types/:typeName`}>
-          <TypePage />
-        </Route>
-        <Route path={`/${projectRoot}/types`}>
-          <TypesPage />
-        </Route>
-        <Route path={`/${projectRoot}/type-versions`}>
-          <TypeVersionsPage />
-        </Route>
-        {/* OBJECTS */}
-        <Route
-          path={`/${projectRoot}/objects/:objectName/versions/:digest?/:refExtra*`}>
-          <ObjectVersionRoutePageBinding />
-        </Route>
-        <Route path={`/${projectRoot}/objects/:objectName`}>
-          <ObjectPage />
-        </Route>
-        <Route path={`/${projectRoot}/objects`}>
-          <ObjectsPage />
-        </Route>
-        <Route path={`/${projectRoot}/object-versions`}>
-          <ObjectVersionsPage entity={params.entity} project={params.project} />
-        </Route>
-        {/* OPS */}
-        <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
-          <OpVersionRoutePageBinding />
-        </Route>
-        <Route path={`/${projectRoot}/ops/:opName`}>
-          <OpPage />
-        </Route>
-        <Route path={`/${projectRoot}/ops`}>
-          <OpsPage />
-        </Route>
-        <Route path={`/${projectRoot}/op-versions`}>
-          <OpVersionsPage entity={params.entity} project={params.project} />
-        </Route>
-        {/* CALLS */}
-        <Route path={`/${projectRoot}/calls/:callId`}>
-          <CallPage />
-        </Route>
-        <Route path={`/${projectRoot}/calls`}>
-          <CallsPage />
-        </Route>
-        {/* BOARDS */}
-        <Route
-          path={[
-            `/${projectRoot}/boards/_new_board_`,
-            `/${projectRoot}/boards/:boardId`,
-            `/${projectRoot}/boards/:boardId/version/:versionId`,
-          ]}>
-          <BoardPage />
-        </Route>
-        <Route path={`/${projectRoot}/boards`}>
-          <BoardsPage />
-        </Route>
-        {/* TABLES */}
-        <Route path={`/${projectRoot}/tables/:tableId`}>
-          <TablePage />
-        </Route>
-        <Route path={`/${projectRoot}/tables`}>
-          <TablesPage />
-        </Route>
-      </Switch>
-    </Box>
+    <WeaveflowORMContextProvider projectConnection={projectData}>
+      <Box
+        sx={{
+          flex: '1 1 auto',
+          width: '100%',
+          overflow: 'auto',
+        }}>
+        <Switch>
+          {/* TYPES */}
+          <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
+            <TypeVersionPage />
+          </Route>
+          <Route path={`/${projectRoot}/types/:typeName`}>
+            <TypePage />
+          </Route>
+          <Route path={`/${projectRoot}/types`}>
+            <TypesPage />
+          </Route>
+          <Route path={`/${projectRoot}/type-versions`}>
+            <TypeVersionsPage />
+          </Route>
+          {/* OBJECTS */}
+          <Route
+            path={`/${projectRoot}/objects/:objectName/versions/:digest?/:refExtra*`}>
+            <ObjectVersionRoutePageBinding />
+          </Route>
+          <Route path={`/${projectRoot}/objects/:objectName`}>
+            <ObjectPage />
+          </Route>
+          <Route path={`/${projectRoot}/objects`}>
+            <ObjectsPage />
+          </Route>
+          <Route path={`/${projectRoot}/object-versions`}>
+            <ObjectVersionsPage
+              entity={params.entity}
+              project={params.project}
+            />
+          </Route>
+          {/* OPS */}
+          <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
+            <OpVersionRoutePageBinding />
+          </Route>
+          <Route path={`/${projectRoot}/ops/:opName`}>
+            <OpPage />
+          </Route>
+          <Route path={`/${projectRoot}/ops`}>
+            <OpsPage />
+          </Route>
+          <Route path={`/${projectRoot}/op-versions`}>
+            <OpVersionsPage entity={params.entity} project={params.project} />
+          </Route>
+          {/* CALLS */}
+          <Route path={`/${projectRoot}/calls/:callId`}>
+            <CallPage />
+          </Route>
+          <Route path={`/${projectRoot}/calls`}>
+            <CallsPage />
+          </Route>
+          {/* BOARDS */}
+          <Route
+            path={[
+              `/${projectRoot}/boards/_new_board_`,
+              `/${projectRoot}/boards/:boardId`,
+              `/${projectRoot}/boards/:boardId/version/:versionId`,
+            ]}>
+            <BoardPage />
+          </Route>
+          <Route path={`/${projectRoot}/boards`}>
+            <BoardsPage />
+          </Route>
+          {/* TABLES */}
+          <Route path={`/${projectRoot}/tables/:tableId`}>
+            <TablePage />
+          </Route>
+          <Route path={`/${projectRoot}/tables`}>
+            <TablesPage />
+          </Route>
+        </Switch>
+      </Box>
+    </WeaveflowORMContextProvider>
   );
 };
 

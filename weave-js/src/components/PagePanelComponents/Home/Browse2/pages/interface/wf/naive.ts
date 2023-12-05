@@ -1,6 +1,12 @@
-import {Type} from '../../../../../../../core';
+import {opDict, Type} from '../../../../../../../core';
 import {Client as WeaveClient} from '../../../../../../../core/client/types';
-import { ObjectVersionDictType, fnAllWeaveObjects, typeVersionFromTypeDict } from '../dataModel';
+import { Call } from '../../../callTree';
+import { fnFeedbackNode, fnRunsNode, joinRunsWithFeedback } from '../../../callTreeHooks';
+import {
+  fnAllWeaveObjects,
+  ObjectVersionDictType,
+  typeVersionFromTypeDict,
+} from '../dataModel';
 import {
   WFCall,
   WFObject,
@@ -50,9 +56,7 @@ export class WFNaiveProject implements WFProject {
   async init(): Promise<void> {
     if (!this.initialized && !this.loading) {
       this.loading = true;
-      await this.loadOps();
-      await this.loadObjects();
-      await this.loadCalls();
+      await this.loadAll();
       this.loading = false;
       this.initialized = true;
     }
@@ -159,12 +163,20 @@ export class WFNaiveProject implements WFProject {
     });
   }
 
-  private async loadOps(): Promise<void> {
-    const weaveObjectsNode = fnAllWeaveObjects(this.state.entity, this.state.project);
-    const weaveObjectsValue = await this.weaveClient.query(weaveObjectsNode) as ObjectVersionDictType[]
+  private async loadAll(): Promise<void> {
+    const weaveObjectsNode = fnAllWeaveObjects(
+      this.state.entity,
+      this.state.project
+    );
+    const runsNode = fnRunsNode({entityName: this.state.entity, projectName: this.state.project, streamName: 'stream'},{} )
+    const feedbackNode = fnFeedbackNode(this.state.entity, this.state.project)
+    const {weaveObjectsNode: weaveObjectsValue, runsNode: runsValue, feedbackNode: feedbackValue} = (await this.weaveClient.query(
+      opDict({weaveObjectsNode, runsNode, feedbackNode} as any)
+    )) as {weaveObjectsNode: ObjectVersionDictType[], runsNode: Call[], feedbackNode: any[]};
+    const joinedCalls = joinRunsWithFeedback(runsValue, feedbackValue ?? [])
     const objects = weaveObjectsValue.map(obj => {
       if (obj.type_version.type_version === 'unknown') {
-        return {
+        return { 
           ...obj,
           type_version: typeVersionFromTypeDict(
             JSON.parse((obj.type_version as any).type_version_json_string)
@@ -173,28 +185,95 @@ export class WFNaiveProject implements WFProject {
       }
       return obj;
     });
-    const opVersions = objects.filter(obj => obj.type_version.type_name === 'OpDef');
-    const objectVersions = objects.filter(obj => ['OpDef', 'stream_table', 'type'].includes(obj.type_version.type_name));
-    
-    this.state.opVersionsMap = new Map(opVersions.map(opVersion => {return [opVersion.hash, {
-      opName: opVersion.collection_name,
-      opVersionHash: opVersion.hash,
-      inputTypes: {},
-      outputType: null,
-      invokes: [],
-      description: opVersion.description,
-      versionIndex: opVersion.version_index,
-      code: undefined,
-      createdAt: opVersion.created_at_ms,
-    }]}))
-    
-  }
+    const opVersions = objects.filter(
+      obj => obj.type_version.type_name === 'OpDef'
+    );
+    const objectVersions = objects.filter(obj =>
+      !['OpDef', 'stream_table', 'type'].includes(obj.type_version.type_name)
+    );
+    const objectTypeVersions = objectVersions.map(obj => obj.type_version);
 
-  private async loadObjects(): Promise<void> {
-    // remember to load type/versions within objects as well.
-  }
 
-  private async loadCalls(): Promise<void> {}
+    this.state.opVersionsMap = new Map(
+      opVersions.map(opVersion => {
+        return [
+          opVersion.hash,
+          {
+            name: opVersion.collection_name,
+            versionHash: opVersion.hash,
+            createdAt: opVersion.created_at_ms,
+            aliases: opVersion.aliases,
+            description: opVersion.description,
+            versionIndex: opVersion.version_index,
+            inputTypes: {},
+            outputType: null,
+            invokes: [],
+            code: undefined,
+          },
+        ];
+      })
+    );
+
+    this.state.opsMap = new Map(
+      Array.from(this.state.opVersionsMap.entries()).map(
+        ([opVersionHash, opVersionDict]) => {
+          return [opVersionDict.name, {}];
+        }
+      )
+    );
+
+    this.state.objectVersionsMap = new Map(
+      objectVersions.map(objectVersion => {
+        return [
+          objectVersion.hash,
+          {
+            name: objectVersion.collection_name,
+            versionHash: objectVersion.hash,
+            createdAt: objectVersion.created_at_ms,
+            aliases: objectVersion.aliases,
+            description: objectVersion.description,
+            versionIndex: objectVersion.version_index,
+            typeVersionHash: objectVersion.type_version.type_version,
+          },
+        ];
+      })
+    );
+
+    this.state.objectsMap = new Map(
+      Array.from(this.state.objectVersionsMap.entries()).map(
+        ([objectVersionHash, objectVersionDict]) => {
+          return [objectVersionDict.name, {}];
+        }
+      )
+    );
+
+    this.state.typeVersionsMap = new Map(objectTypeVersions.map(typeVersion => {
+      return [typeVersion.type_version, {
+        name: typeVersion.type_name,
+        versionHash: typeVersion.type_version,
+        parentTypeVersionHash: typeVersion.parent_type?.type_version ?? undefined
+      }]
+    }));
+
+    this.state.typesMap = new Map(
+      Array.from(this.state.typeVersionsMap.entries()).map(
+        ([typeVersionHash, typeVersionDict]) => {
+          return [typeVersionDict.name, {}];
+        }
+      )
+    );
+
+    this.state.callsMap = new Map(
+      joinedCalls.map(call => {
+        return [
+          call.span_id,
+          {
+            callSpan: call,
+          },
+        ];
+      })
+    )
+  }
 }
 
 type WFNaiveTypeDictType = {};
@@ -226,7 +305,7 @@ class WFNaiveType implements WFType {
     return Object.keys(this.state.typeVersionsMap)
       .filter(
         typeVersionId =>
-          this.state.typeVersionsMap.get(typeVersionId)?.typeName ===
+          this.state.typeVersionsMap.get(typeVersionId)?.name ===
           this.typeName
       )
       .map(typeVersionId => {
@@ -296,8 +375,9 @@ class WFNaiveOp implements WFOp {
 }
 
 type WFNaiveTypeVersionDictType = {
-  typeName: string;
-  typeVersionId: string;
+  name: string;
+  versionHash: string;
+  parentTypeVersionHash?: string;
 };
 
 class WFNaiveTypeVersion implements WFTypeVersion {
@@ -321,10 +401,10 @@ class WFNaiveTypeVersion implements WFTypeVersion {
     return this.state.project;
   }
   type(): WFType {
-    return new WFNaiveType(this.state, this.typeVersionDict.typeName);
+    return new WFNaiveType(this.state, this.typeVersionDict.name);
   }
   version(): string {
-    return this.typeVersionDict.typeVersionId;
+    return this.typeVersionDict.versionHash;
   }
   rawWeaveType(): Type {
     throw new Error('Method not implemented.');
@@ -349,7 +429,20 @@ class WFNaiveTypeVersion implements WFTypeVersion {
   }
 }
 
-type WFNaiveObjectVersionDictType = {};
+type WFNaiveObjectVersionDictType = {
+  // Standard Artifact properties
+  name: string;
+  versionHash: string;
+  description: string;
+  versionIndex: number;
+  createdAt: number;
+  aliases: string[];
+
+  // Op Specific properties
+  typeVersionHash: string;
+
+  // Relationships
+};
 class WFNaiveObjectVersion implements WFObjectVersion {
   private readonly objectVersionDict: WFNaiveObjectVersionDictType;
   constructor(
@@ -400,18 +493,24 @@ class WFNaiveObjectVersion implements WFObjectVersion {
 }
 
 type WFNaiveOpVersionDictType = {
-  opName: string;
-  opVersionHash: string;
+  // Standard Artifact properties
+  name: string;
+  versionHash: string;
+  description: string;
+  versionIndex: number;
+  createdAt: number;
+  aliases: string[];
+
+  // Op Specific properties
+  code?: string;
   inputTypes: {[argName: string]: unknown};
   outputType: unknown;
+
+  // Relationships
   invokes: Array<{
     opName: string;
     opVersionHash: string;
   }>;
-  description: string;
-  versionIndex: number;
-  code?: string;
-  createdAt: number;
 };
 class WFNaiveOpVersion implements WFOpVersion {
   private readonly opVersionDict: WFNaiveOpVersionDictType;
@@ -462,7 +561,9 @@ class WFNaiveOpVersion implements WFOpVersion {
   }
 }
 
-type WFNaiveCallDictType = {};
+type WFNaiveCallDictType = {
+  callSpan: Call;
+};
 class WFNaiveCall implements WFCall {
   private readonly callDict: WFNaiveCallDictType;
   constructor(
