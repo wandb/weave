@@ -252,7 +252,8 @@ export const useOrderedColumns = (
       .concat(groupCountColumn)
       .concat(actualPinnedColumns)
       .concat(normalColumns);
-  }, [tableState, pinnedColumns, countColumnId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableState, pinnedColumns]);
 };
 
 export const getTableMeasurements = (args: {
