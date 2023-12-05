@@ -246,14 +246,30 @@ export class WFNaiveProject implements WFProject {
         }
       )
     );
-
-    this.state.typeVersionsMap = new Map(objectTypeVersions.map(typeVersion => {
-      return [typeVersion.type_version, {
+    
+    const typeVersionsDict: {[key: string]: WFNaiveTypeVersionDictType} = {}
+    const objectTypeVersionsQueue = [...objectTypeVersions];
+    while (objectTypeVersionsQueue.length > 0) {
+      const typeVersion = objectTypeVersionsQueue.pop();
+      if (!typeVersion) {
+        continue;
+      }
+      if (typeVersion.type_version in typeVersionsDict) {
+        continue;
+      }
+      typeVersionsDict[typeVersion.type_version] = {
         name: typeVersion.type_name,
         versionHash: typeVersion.type_version,
         parentTypeVersionHash: typeVersion.parent_type?.type_version ?? undefined
-      }]
-    }));
+      }
+      if (typeVersion.parent_type && !(typeVersion.parent_type.type_version in typeVersionsDict)) {
+      objectTypeVersionsQueue.push(typeVersion.parent_type);
+      }
+    }
+
+
+
+    this.state.typeVersionsMap = new Map(Object.entries(typeVersionsDict));
 
     this.state.typesMap = new Map(
       Array.from(this.state.typeVersionsMap.entries()).map(
@@ -413,10 +429,21 @@ class WFNaiveTypeVersion implements WFTypeVersion {
     throw new Error('Method not implemented.');
   }
   parentTypeVersion(): WFTypeVersion | null {
-    throw new Error('Method not implemented.');
+    if (!this.typeVersionDict.parentTypeVersionHash) {
+      return null;
+    }
+    return new WFNaiveTypeVersion(
+      this.state,
+      this.typeVersionDict.parentTypeVersionHash
+    );
   }
   childTypeVersions(): WFTypeVersion[] {
-    throw new Error('Method not implemented.');
+    return Array.from(this.state.typeVersionsMap.values()).filter(
+      typeVersionDict =>  typeVersionDict.parentTypeVersionHash === this.typeVersionDict.versionHash).map(
+        typeVersionDict => {
+          return new WFNaiveTypeVersion(this.state, typeVersionDict.versionHash);
+        }
+      );
   }
   inputsTo(): Array<{argName: string; opVersion: WFOpVersion}> {
     throw new Error('Method not implemented.');
@@ -425,7 +452,13 @@ class WFNaiveTypeVersion implements WFTypeVersion {
     throw new Error('Method not implemented.');
   }
   objectVersions(): WFObjectVersion[] {
-    throw new Error('Method not implemented.');
+    return Array.from(this.state.objectVersionsMap.values()).filter(
+      objectVersionDict => objectVersionDict.typeVersionHash === this.typeVersionDict.versionHash
+    ).map(
+      objectVersionDict => {
+        return new WFNaiveObjectVersion(this.state, objectVersionDict.versionHash);
+      }
+    );
   }
 }
 

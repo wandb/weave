@@ -277,7 +277,7 @@ const Browse2ProjectRoot: FC = () => {
             <TypesPage />
           </Route>
           <Route path={`/${projectRoot}/type-versions`}>
-            <TypeVersionsPage />
+            <TypeVersionsPage entity={params.entity} project={params.project} />
           </Route>
           {/* OBJECTS */}
           <Route
