@@ -1,99 +1,137 @@
+import _ from 'lodash';
 import React from 'react';
 
-import {SimplePageLayout} from '../SimplePageLayout';
+import {TypeLink, TypeVersionLink} from './common/Links';
+import {
+  ScrollableTabContent,
+  SimpleKeyValueTable,
+  SimplePageLayout,
+} from './common/SimplePageLayout';
+import {useWeaveflowORMContext} from './interface/wf/context';
+import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
+import {ObjectVersionsTable} from './ObjectVersionsPage';
 
 export const TypeVersionPage: React.FC<{
   entity: string;
   project: string;
   typeName: string;
   version: string;
-}> = () => {
+}> = props => {
+  const orm = useWeaveflowORMContext();
+  const typeVersion = orm.projectConnection.typeVersion(
+    props.typeName,
+    props.version
+  );
   return (
     <SimplePageLayout
-      title="TypeVersion Page"
+      title={props.typeName + ' : ' + props.version}
       tabs={[
         {
           label: 'Overview',
-          content: <div>Overview</div>,
+          content: (
+            <ScrollableTabContent>
+              <SimpleKeyValueTable
+                data={{
+                  'Type Name': (
+                    <TypeLink typeName={typeVersion.type().name()} />
+                  ),
+                  Version: typeVersion.version(),
+                  'Property Types': (
+                    <PropertyTypeTree
+                      typeTree={typeVersion.propertyTypeTree()}
+                      skipType={true}
+                    />
+                  ),
+                  Hierarchy: <TypeHierarchy typeVersion={typeVersion} />,
+                }}
+              />
+            </ScrollableTabContent>
+          ),
         },
         {
-          label: 'Properties',
-          content: <div>Properties</div>,
+          label: 'Objects',
+          content: <TypeVersionObjectVersions typeVersion={typeVersion} />,
         },
         {
-          label: 'Hierarchy',
-          content: <div>Hierarchy</div>,
+          label: 'Child Types',
+          content: <div>TODO</div>,
+        },
+        {
+          label: 'Consuming Ops',
+          content: <div>TODO</div>,
+        },
+        {
+          label: 'Producing Ops',
+          content: <div>TODO</div>,
+        },
+        {
+          label: 'DAG',
+          content: <div>TODO</div>,
         },
       ]}
     />
   );
 };
 
-// {/* <div>
-//       <h1>TypeVersionPage Placeholder</h1>
-//       <div>
-//         This is the detail page for TypeVersion. A TypeVersion is a "version" of
-//         a weave "type". In the user's mind it is analogous to a specific
-//         implementation of a python class.
-//       </div>
-//       <div>Migration Notes:</div>
-//       <ul>
-//         <li>THIS IS COMPLETELY MISSING IN WEAVEFLOW</li>
-//       </ul>
-//       <div>Primary Features:</div>
-//       <ul>
-//         <li>
-//           Property Types - with links to child type pages if they are other
-//           objects
-//         </li>
-//         <li>A type Hierarchy (with links to each parent type)</li>
-//         <li>(future) Type/OpDef DAG Visual</li>
-//       </ul>
-//       <div>Links:</div>
-//       <ul>
-//         <li>
-//           Link to parent Type ({' '}
-//           <Link to={prefix('/types/type_name')}>/types/[type_name]</Link>)
-//         </li>
-//         <li>
-//           Connection to all child ObjectVersions instances ({' '}
-//           <Link
-//             to={prefix(
-//               '/object-versions?filter=instance_of=type_name:version'
-//             )}>
-//             /object-versions?filter=instance_of=type_name:version
-//           </Link>
-//           )
-//         </li>
-//         <li>
-//           Connection to all child TypeVersions ({' '}
-//           <Link
-//             to={prefix(
-//               '/type-versions?filter=descendant_of=type_name:version,alias=latest'
-//             )}>
-//             /type-versions?filter=descendant_of=type_name:version,alias=latest
-//           </Link>
-//           )
-//         </li>
-//         <li>
-//           Connection to all consuming OpVersions ({' '}
-//           <Link
-//             to={prefix(
-//               '/op-versions?filter=consumes=type_name:version,alias=latest'
-//             )}>
-//             /op-versions?filter=consumes=type_name:version,alias=latest
-//           </Link>
-//           )
-//         </li>
-//         <li>
-//           Connection to all producing OpVersions ({' '}
-//           <Link
-//             to={prefix(
-//               '/op-versions?filter=produces=type_name:version,alias=latest'
-//             )}>
-//             /op-versions?filter=produces=type_name:version,alias=latest
-//           </Link>
-//           )
-//         </li>
-//       </ul>
-//     </div> */}
+const PropertyTypeTree: React.FC<{
+  typeTree: HackyTypeTree;
+  skipType: boolean;
+}> = props => {
+  if (typeof props.typeTree === 'string') {
+    return <>{props.typeTree}</>;
+  }
+  return (
+    <SimpleKeyValueTable
+      data={_.fromPairs(
+        _.entries(props.typeTree)
+          .filter(
+            ([key, value]) =>
+              !key.startsWith('_') &&
+              value !== 'OpDef' &&
+              (!props.skipType || key !== 'type')
+          )
+          .map(([key, value]) => {
+            if (typeof value === 'string' && key === 'type') {
+              return [key, <TypeLink typeName={value} />];
+            }
+            return [
+              key,
+              <PropertyTypeTree typeTree={value} skipType={false} />,
+            ];
+          })
+      )}
+    />
+  );
+};
+
+const TypeHierarchy: React.FC<{typeVersion: WFTypeVersion}> = props => {
+  const parentType = props.typeVersion.parentTypeVersion();
+  const inner = (
+    <ul
+      style={{
+        paddingLeft: '1rem',
+        margin: 0,
+      }}>
+      <li>
+        <TypeVersionLink
+          typeName={props.typeVersion.type().name()}
+          version={props.typeVersion.version()}
+        />
+      </li>
+      {props.children}
+    </ul>
+  );
+  if (!parentType) {
+    return inner;
+  } else {
+    return <TypeHierarchy typeVersion={parentType}> {inner}</TypeHierarchy>;
+  }
+};
+
+const TypeVersionObjectVersions: React.FC<{
+  typeVersion: WFTypeVersion;
+}> = props => {
+  const objectVersions = props.typeVersion.objectVersions();
+
+  return <ObjectVersionsTable objectVersions={objectVersions} />;
+};

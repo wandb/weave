@@ -10,8 +10,8 @@ import React, {useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
+import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
-import {SimplePageLayout} from '../SimplePageLayout';
 
 const basicField = (
   field: string,

@@ -224,6 +224,7 @@ type TypeVersionTypeDictType = {
   type_version: string;
   type_dict?: string;
   parent_type?: TypeVersionTypeDictType;
+  type_version_json_string?: string;
 };
 
 type TypeVersionCatalog = {

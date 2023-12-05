@@ -44,11 +44,14 @@ export interface WFObject extends ProjectOwned {
   objectVersions: () => WFObjectVersion[];
 }
 
+export type HackyTypeTree = string | {[propName: string]: HackyTypeTree};
+
 export interface WFTypeVersion extends ProjectOwned {
   type: () => WFType;
   version: () => string;
   rawWeaveType: () => Type;
-  properties: () => {[propName: string]: WFTypeVersion};
+  propertyTypeTree: () => HackyTypeTree;
+  // properties: () => {[propName: string]: WFTypeVersion};
   parentTypeVersion: () => WFTypeVersion | null;
   childTypeVersions: () => WFTypeVersion[];
   inputTo: () => Array<{argName: string; opVersion: WFOpVersion}>;

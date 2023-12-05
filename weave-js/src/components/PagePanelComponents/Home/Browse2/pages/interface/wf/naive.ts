@@ -1,4 +1,11 @@
-import {opDict, Type} from '../../../../../../../core';
+import {
+  isObjectType,
+  isSimpleTypeShape,
+  isTypedDictLike,
+  opDict,
+  Type,
+  typedDictPropertyTypes,
+} from '../../../../../../../core';
 import {Client as WeaveClient} from '../../../../../../../core/client/types';
 import {Call} from '../../../callTree';
 import {
@@ -12,6 +19,7 @@ import {
   typeVersionFromTypeDict,
 } from '../dataModel';
 import {
+  HackyTypeTree,
   WFCall,
   WFObject,
   WFObjectVersion,
@@ -115,12 +123,12 @@ export class WFNaiveProject implements WFProject {
     });
   }
   typeVersion(name: string, version: string): WFTypeVersion {
-    if (!this.state.typeVersionsMap.has(name)) {
+    if (!this.state.typeVersionsMap.has(version)) {
       throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
+        `Cannot find version: ${version} in project: ${this.state.project}`
       );
     }
-    return new WFNaiveTypeVersion(this.state, name);
+    return new WFNaiveTypeVersion(this.state, version);
   }
   typeVersions(): WFTypeVersion[] {
     return Array.from(this.state.typeVersionsMap.keys()).map(opName => {
@@ -128,12 +136,12 @@ export class WFNaiveProject implements WFProject {
     });
   }
   opVersion(name: string, version: string): WFOpVersion {
-    if (!this.state.opVersionsMap.has(name)) {
+    if (!this.state.opVersionsMap.has(version)) {
       throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
+        `Cannot find version: ${version} in project: ${this.state.project}`
       );
     }
-    return new WFNaiveOpVersion(this.state, name);
+    return new WFNaiveOpVersion(this.state, version);
   }
   opVersions(): WFOpVersion[] {
     return Array.from(this.state.opVersionsMap.keys()).map(opName => {
@@ -141,12 +149,12 @@ export class WFNaiveProject implements WFProject {
     });
   }
   objectVersion(name: string, version: string): WFObjectVersion {
-    if (!this.state.objectVersionsMap.has(name)) {
+    if (!this.state.objectVersionsMap.has(version)) {
       throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
+        `Cannot find version: ${version} in project: ${this.state.project}`
       );
     }
-    return new WFNaiveObjectVersion(this.state, name);
+    return new WFNaiveObjectVersion(this.state, version);
   }
   objectVersions(): WFObjectVersion[] {
     return Array.from(this.state.objectVersionsMap.keys()).map(opName => {
@@ -194,12 +202,18 @@ export class WFNaiveProject implements WFProject {
     };
     const joinedCalls = joinRunsWithFeedback(runsValue, feedbackValue ?? []);
     const objects = weaveObjectsValue.map(obj => {
-      if (obj.type_version.type_version === 'unknown') {
+      if (
+        obj.type_version.type_version === 'unknown' &&
+        obj.type_version.type_version_json_string
+      ) {
         return {
           ...obj,
-          type_version: typeVersionFromTypeDict(
-            JSON.parse((obj.type_version as any).type_version_json_string)
-          ),
+          type_version: {
+            ...typeVersionFromTypeDict(
+              JSON.parse(obj.type_version.type_version_json_string)
+            ),
+            type_version_json_string: obj.type_version.type_version_json_string,
+          },
         };
       }
       return obj;
@@ -212,6 +226,7 @@ export class WFNaiveProject implements WFProject {
         !['OpDef', 'stream_table', 'type'].includes(obj.type_version.type_name)
     );
     const objectTypeVersions = objectVersions.map(obj => obj.type_version);
+    console.log({objectVersions});
 
     this.state.objectVersionsMap = new Map(
       objectVersions.map(objectVersion => {
@@ -281,6 +296,9 @@ export class WFNaiveProject implements WFProject {
         versionHash: typeVersion.type_version,
         parentTypeVersionHash:
           typeVersion.parent_type?.type_version ?? undefined,
+        rawWeaveType: typeVersion.type_version_json_string
+          ? JSON.parse(typeVersion.type_version_json_string)
+          : 'unknown',
       };
       if (
         typeVersion.parent_type &&
@@ -436,6 +454,7 @@ class WFNaiveOp implements WFOp {
 type WFNaiveTypeVersionDictType = {
   name: string;
   versionHash: string;
+  rawWeaveType: Type;
   parentTypeVersionHash?: string;
 };
 
@@ -466,10 +485,10 @@ class WFNaiveTypeVersion implements WFTypeVersion {
     return this.typeVersionDict.versionHash;
   }
   rawWeaveType(): Type {
-    throw new Error('Method not implemented.');
+    return this.typeVersionDict.rawWeaveType;
   }
-  properties(): {[propName: string]: WFTypeVersion} {
-    throw new Error('Method not implemented.');
+  propertyTypeTree(): HackyTypeTree {
+    return typeToTypeTree(this.typeVersionDict.rawWeaveType);
   }
   parentTypeVersion(): WFTypeVersion | null {
     if (!this.typeVersionDict.parentTypeVersionHash) {
@@ -511,6 +530,26 @@ class WFNaiveTypeVersion implements WFTypeVersion {
       });
   }
 }
+
+const typeToTypeTree = (type: Type): HackyTypeTree => {
+  if (isSimpleTypeShape(type)) {
+    return type;
+  } else if (isTypedDictLike(type)) {
+    const result: {[propName: string]: HackyTypeTree} = {};
+    const propTypes = typedDictPropertyTypes(type);
+    for (const [key, value] of Object.entries(propTypes)) {
+      result[key] = typeToTypeTree(value);
+    }
+    return result;
+  } else if (isObjectType(type)) {
+    const result: {[propName: string]: HackyTypeTree} = {};
+    for (const [key, value] of Object.entries(type)) {
+      result[key] = typeToTypeTree(value);
+    }
+    return result;
+  }
+  return type.type;
+};
 
 type WFNaiveObjectVersionDictType = {
   // Standard Artifact properties

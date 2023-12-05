@@ -236,7 +236,7 @@ const SideNav: FC<{
             <ListSubheader
               id="nested-list-subheader"
               sx={{
-                pt: 0.5,
+                pt: 1,
               }}>
               {/* {sectionIndex !== 0 && <Divider />} */}
               {section.title}

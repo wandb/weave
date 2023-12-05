@@ -46,6 +46,9 @@ const defaultContext = {
   ) => {
     return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
   },
+  typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
+    throw new Error('Not implemented');
+  },
   typeVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -115,6 +118,9 @@ const newContext = {
       objRef.artifactVersion
     );
   },
+  typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
+    return `/${entityName}/${projectName}/types/${typeName}`;
+  },
   typeVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -166,6 +172,11 @@ const WeaveflowRouteContext = createContext<{
     rootTypeName: string,
     objRef: ArtifactRef,
     wfTable?: WFDBTableType
+  ) => string;
+  typeUIUrl: (
+    entityName: string,
+    projectName: string,
+    typeName: string
   ) => string;
   typeVersionUIUrl: (
     entityName: string,
