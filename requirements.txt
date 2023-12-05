@@ -29,5 +29,6 @@ graphql-core>3
 objgraph>=3.6.0
 tabulate
 # Weaveflow Additions
-openai>=0.27.0
+openai<=0.28.1
 tiktoken>=0.4.0
+faiss-cpu

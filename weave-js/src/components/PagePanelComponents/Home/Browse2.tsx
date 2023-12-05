@@ -11,9 +11,14 @@ import {
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
 import React, {FC} from 'react';
-import {Link as RouterLink, Route, Switch, useParams} from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Link as RouterLink,
+  Route,
+  Switch,
+  useParams,
+} from 'react-router-dom';
 
-import {URL_BROWSE2} from '../../../urls';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
@@ -56,30 +61,28 @@ const Browse2Breadcrumbs: FC = props => {
   return (
     <Breadcrumbs>
       {params.entity && (
-        <AppBarLink to={`/${URL_BROWSE2}/${params.entity}`}>
-          {params.entity}
-        </AppBarLink>
+        <AppBarLink to={`/${params.entity}`}>{params.entity}</AppBarLink>
       )}
       {params.project && (
-        <AppBarLink to={`/${URL_BROWSE2}/${params.entity}/${params.project}`}>
+        <AppBarLink to={`/${params.entity}/${params.project}`}>
           {params.project}
         </AppBarLink>
       )}
       {params.rootType && (
         <AppBarLink
-          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}`}>
+          to={`/${params.entity}/${params.project}/${params.rootType}`}>
           {params.rootType}
         </AppBarLink>
       )}
       {params.objName && (
         <AppBarLink
-          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}`}>
+          to={`/${params.entity}/${params.project}/${params.rootType}/${params.objName}`}>
           {params.objName}
         </AppBarLink>
       )}
       {params.objVersion && (
         <AppBarLink
-          to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`}>
+          to={`/${params.entity}/${params.project}/${params.rootType}/${params.objName}/${params.objVersion}`}>
           {params.objVersion}
         </AppBarLink>
       )}
@@ -102,11 +105,9 @@ const Browse2Breadcrumbs: FC = props => {
           </Typography>
         ) : (
           <AppBarLink
-            to={`/${URL_BROWSE2}/${params.entity}/${params.project}/${
-              params.rootType
-            }/${params.objName}/${params.objVersion}/${refFields
-              .slice(0, idx + 1)
-              .join('/')}`}>
+            to={`/${params.entity}/${params.project}/${params.rootType}/${
+              params.objName
+            }/${params.objVersion}/${refFields.slice(0, idx + 1).join('/')}`}>
             {field}
           </AppBarLink>
         )
@@ -115,7 +116,15 @@ const Browse2Breadcrumbs: FC = props => {
   );
 };
 
-export const Browse2: FC = props => {
+export const Browse2: FC<{basename: string}> = props => {
+  return (
+    <Router basename={props.basename}>
+      <Browse2Mounted />
+    </Router>
+  );
+};
+
+const Browse2Mounted: FC = props => {
   return (
     <div
       style={{
@@ -127,7 +136,7 @@ export const Browse2: FC = props => {
         <Toolbar>
           <IconButton
             component={RouterLink}
-            to={`/${URL_BROWSE2}`}
+            to={`/`}
             sx={{
               color: theme =>
                 theme.palette.getContrastText(theme.palette.primary.main),
@@ -139,36 +148,38 @@ export const Browse2: FC = props => {
             }}>
             <Home />
           </IconButton>
-          <Browse2Breadcrumbs />
+          <Route
+            path={`/:entity?/:project?/:rootType?/:objName?/:objVersion?/:refExtra*`}>
+            <Browse2Breadcrumbs />
+          </Route>
         </Toolbar>
       </AppBar>
       <Container maxWidth="xl">
         <Box sx={{height: 40}} />
         <Switch>
-          <Route
-            path={`/${URL_BROWSE2}/:entity/:project/trace/:traceId/:spanId?`}>
+          <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
             <Browse2TracePage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project/trace`}>
+          <Route path={`/:entity/:project/trace`}>
             <Browse2TracesPage />
           </Route>
           <Route
-            path={`/${URL_BROWSE2}/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
+            path={`/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
             <Browse2ObjectVersionItemPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project/:rootType/:objName`}>
+          <Route path={`/:entity/:project/:rootType/:objName`}>
             <Browse2ObjectPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project/:rootType`}>
+          <Route path={`/:entity/:project/:rootType`}>
             <Browse2ObjectTypePage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity/:project`}>
+          <Route path={`/:entity/:project`}>
             <Browse2ProjectPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}/:entity`}>
+          <Route path={`/:entity`}>
             <Browse2EntityPage />
           </Route>
-          <Route path={`/${URL_BROWSE2}`}>
+          <Route path={``}>
             <Browse2HomePage />
           </Route>
         </Switch>
