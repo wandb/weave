@@ -389,7 +389,7 @@ const OpVersionRoutePageBinding = () => {
       entity={params.entity}
       project={params.project}
       opName={params.opName}
-      digest={params.digest}
+      version={params.digest}
     />
   );
 };

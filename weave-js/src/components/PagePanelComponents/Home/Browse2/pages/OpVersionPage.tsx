@@ -1,12 +1,18 @@
 import React, {useMemo} from 'react';
 
+import {Browse2OpDefCode} from '../Browse2OpDefCode';
 import {Browse2OpDefComponent} from '../Browse2OpDefPage';
+import {makeObjRefUri} from '../CommonLib';
+import {
+  ScrollableTabContent,
+  SimplePageLayout,
+} from './common/SimplePageLayout';
 
 export const OpVersionPage: React.FC<{
   entity: string;
   project: string;
   opName: string;
-  digest: string;
+  version: string;
 }> = props => {
   // const prefix = useEPPrefix();
   const params = useMemo(() => {
@@ -15,10 +21,37 @@ export const OpVersionPage: React.FC<{
       project: props.project,
       rootType: '',
       objName: props.opName,
-      objVersion: props.digest,
+      objVersion: props.version,
     };
   }, [props]);
-  return <Browse2OpDefComponent params={params} />;
+  const uri = makeObjRefUri(params);
+  return (
+    <SimplePageLayout
+      title={props.opName + ' : ' + props.version}
+      tabs={[
+        {
+          label: 'Overview',
+          content: (
+            <ScrollableTabContent>
+              Overview (Type Stub) <Browse2OpDefComponent params={params} />
+            </ScrollableTabContent>
+          ),
+        },
+        {
+          label: 'Code',
+          content: (
+            <ScrollableTabContent>
+              <Browse2OpDefCode uri={uri} />
+            </ScrollableTabContent>
+          ),
+        },
+        {label: 'Calls', content: <div>Calls</div>},
+        {label: 'Execute', content: <div>Execute</div>},
+        {label: 'DAG', content: <div>DAG</div>},
+      ]}
+    />
+  );
+  // return ;
 };
 
 // <div>

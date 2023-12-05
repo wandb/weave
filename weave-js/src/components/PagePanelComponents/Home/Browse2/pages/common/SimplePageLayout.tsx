@@ -1,6 +1,8 @@
 import {Box, Tab, Tabs} from '@mui/material';
 import React, {useMemo} from 'react';
 
+import {ErrorBoundary} from '../../../../../ErrorBoundary';
+
 export const SimplePageLayout: React.FC<{
   title: string;
   tabs: Array<{
@@ -69,7 +71,7 @@ export const SimplePageLayout: React.FC<{
           flexDirection: 'column',
           flex: '1 1 auto',
         }}>
-        {tabContent}
+        <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
       </Box>
     </Box>
   );

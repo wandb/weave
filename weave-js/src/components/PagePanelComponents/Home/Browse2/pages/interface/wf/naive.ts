@@ -322,7 +322,7 @@ export class WFNaiveProject implements WFProject {
       joinedCalls.map(call => {
         const name = call.name;
         const nameParts = uriToParts(name);
-        let opVersionHash: string | undefined = undefined;
+        let opVersionHash: string | undefined;
         if (nameParts) {
           const opVersion = this.state.opVersionsMap.get(nameParts.version);
           if (opVersion) {
