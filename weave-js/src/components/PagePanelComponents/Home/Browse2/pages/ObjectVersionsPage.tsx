@@ -12,24 +12,12 @@ import React, {useMemo} from 'react';
 import {Link, useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
+import {basicField} from './common/DataTable';
 import {ObjectLink, OpVersionLink, TypeVersionLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFObjectVersion} from './interface/wf/types';
 
-const basicField = (
-  field: string,
-  headerName: string,
-  extra?: Partial<GridColDef>
-): GridColDef => {
-  return {
-    field,
-    headerName,
-    flex: extra?.flex ?? 1,
-    minWidth: extra?.minWidth ?? 100,
-    ...extra,
-  };
-};
 export const ObjectVersionsPage: React.FC<{
   entity: string;
   project: string;
@@ -38,7 +26,6 @@ export const ObjectVersionsPage: React.FC<{
   const allObjectVersions = useMemo(() => {
     return orm.projectConnection.objectVersions();
   }, [orm.projectConnection]);
-  // const allObjectVersions = useAllObjectVersions(props.entity, props.project);
 
   return (
     <SimplePageLayout
@@ -68,7 +55,6 @@ export const ObjectVersionsTable: React.FC<{
           ':' +
           firstOutputFromOpVersion.version()
         : null;
-      console.log({outputFrom, firstOutputFrom});
       return {
         id: ov.version(),
         obj: ov,
@@ -181,7 +167,7 @@ export const ObjectVersionsTable: React.FC<{
       rows={rows}
       initialState={{
         sorting: {
-          sortModel: [{field: 'date_created', sort: 'desc'}],
+          sortModel: [{field: 'createdAt', sort: 'desc'}],
         },
       }}
       rowHeight={38}
@@ -205,51 +191,3 @@ export const ObjectVersionsTable: React.FC<{
     />
   );
 };
-
-/* <div>
-    <h1>ObjectVersionsPage Placeholder</h1>
-    <h2>Filter: {filter}</h2>
-    <div>
-      This is <strong>A VERY IMPORTANT PAGE</strong>. This is a rich, realtime
-      datagrid of all ObjectVersions. It is critical that linkers and users
-      can filter this page to see exactly what they want. Moreover, it is
-      critical that the user can view in a board. The user should also be able
-      to do more advanced things like pivot, unnest, etc... in order to create
-      comparison or analysis views inline. Plots should be automatically
-      generated above the tables. The featureset is very similar to the
-      CallsPage, but operating on ObjectVersions.
-    </div>
-    <div>Migration Notes:</div>
-    <ul>
-      <li>
-        THIS IS COMPLETELY MISSING IN WEAVEFLOW. There is a VersionsTable, but
-        it is nearly empty and not filterable/dynamic and scoped to a single
-        object.
-      </li>
-    </ul>
-    <div>Links:</div>
-    <ul>
-      <li>
-        Each row should link to the associated ObjectVersion:{' '}
-        <Link to={prefix('/objects/object_name/versions/hash')}>
-          /objects/object_name/versions/hash
-        </Link>
-        . Note: This might prefer to be a slideout like Notion rather than a
-        full link to allow for "peeking".
-      </li>
-      <li>
-        Each row might also special link to the producing call:{' '}
-        <Link to={prefix('/calls/call_id')}>/calls/call_id</Link>
-      </li>
-    </ul>
-    <div>Inspiration</div>
-    The Datadog Traces page is a great point of inspiration for this page.
-    <br />
-    <img
-      src="https://github.com/wandb/weave/blob/7cbb458e83a7121042af6ab6894f999210fafa4d/weave-js/src/components/PagePanelComponents/Home/dd_placeholder.png?raw=true"
-      style={{
-        width: '100%',
-      }}
-      alt=""
-    />
-  </div> */

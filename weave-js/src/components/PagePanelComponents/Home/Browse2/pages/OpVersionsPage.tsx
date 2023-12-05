@@ -10,37 +10,44 @@ import React, {useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
+import {basicField} from './common/DataTable';
+import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
+import {WFOpVersion} from './interface/wf/types';
 
-const basicField = (
-  field: string,
-  headerName: string,
-  extra?: Partial<GridColDef>
-): GridColDef => {
-  return {
-    field,
-    headerName,
-    flex: extra?.flex ?? 1,
-    minWidth: extra?.minWidth ?? 100,
-    ...extra,
-  };
-};
 export const OpVersionsPage: React.FC<{
   entity: string;
   project: string;
 }> = props => {
-  const history = useHistory();
-  const routeContext = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext();
 
   const allOpVersions = useMemo(() => {
     return orm.projectConnection.opVersions();
   }, [orm.projectConnection]);
+  return (
+    <SimplePageLayout
+      title="Ops"
+      tabs={[
+        {
+          label: 'All',
+          content: <OpVersionsTable opVersions={allOpVersions} />,
+        },
+      ]}
+    />
+  );
+};
+
+export const OpVersionsTable: React.FC<{
+  opVersions: WFOpVersion[];
+}> = props => {
+  const history = useHistory();
+  const routeContext = useWeaveflowRouteContext();
   // const allOpVersions = useAllOpVersions(props.entity, props.project);
   const rows: GridRowsProp = useMemo(() => {
-    return allOpVersions.map((ov, i) => {
+    return props.opVersions.map((ov, i) => {
       return {
         id: ov.version(),
+        obj: ov,
         op: ov.op().name(),
         version: ov.version(),
         description: ov.description(),
@@ -57,7 +64,7 @@ export const OpVersionsPage: React.FC<{
         // description: () => string;
       };
     });
-  }, [allOpVersions]);
+  }, [props.opVersions]);
   const columns: GridColDef[] = [
     basicField('id', 'View', {
       width: 50,
@@ -87,65 +94,39 @@ export const OpVersionsPage: React.FC<{
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        flexGrow: 1,
-      }}>
-      <Box
-        sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          p: 3,
-          borderBottom: '1px solid #e0e0e0',
-        }}>
-        <h1>All Op (Version)s</h1>
-      </Box>
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-        <DataGridPro
-          rows={rows}
-          initialState={{
-            sorting: {
-              sortModel: [{field: 'date_created', sort: 'desc'}],
-            },
-          }}
-          // {...data}
-          // loading={data.rows.length === 0}
-          rowHeight={38}
-          columns={columns}
-          experimentalFeatures={{columnGrouping: true}}
-          disableRowSelectionOnClick
-          columnGroupingModel={columnGroupingModel}
-          onRowClick={params => {
-            // history.push(
-            //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
-            // );
-          }}
-          onCellClick={params => {
-            // TODO: move these actions into a config
-            if (params.field === 'id') {
-              history.push(
-                routeContext.opVersionUIUrl(
-                  props.entity,
-                  props.project,
-                  params.row.op,
-                  params.row.version
-                )
-              );
-            }
-          }}
-        />
-      </Box>
-    </Box>
+    <DataGridPro
+      rows={rows}
+      initialState={{
+        sorting: {
+          sortModel: [{field: 'date_created', sort: 'desc'}],
+        },
+      }}
+      // {...data}
+      // loading={data.rows.length === 0}
+      rowHeight={38}
+      columns={columns}
+      experimentalFeatures={{columnGrouping: true}}
+      disableRowSelectionOnClick
+      columnGroupingModel={columnGroupingModel}
+      onRowClick={params => {
+        // history.push(
+        //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
+        // );
+      }}
+      onCellClick={params => {
+        // TODO: move these actions into a config
+        if (params.field === 'id') {
+          history.push(
+            routeContext.opVersionUIUrl(
+              params.row.obj.entity(),
+              params.row.obj.project(),
+              params.row.op,
+              params.row.version
+            )
+          );
+        }
+      }}
+    />
   );
 };
 

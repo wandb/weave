@@ -10,22 +10,9 @@ import React, {useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
+import {basicField} from './common/DataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
-
-const basicField = (
-  field: string,
-  headerName: string,
-  extra?: Partial<GridColDef>
-): GridColDef => {
-  return {
-    field,
-    headerName,
-    flex: extra?.flex ?? 1,
-    minWidth: extra?.minWidth ?? 100,
-    ...extra,
-  };
-};
 
 export const TypeVersionsPage: React.FC<{
   entity: string;

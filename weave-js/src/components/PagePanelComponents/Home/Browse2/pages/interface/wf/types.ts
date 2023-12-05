@@ -54,7 +54,7 @@ export interface WFTypeVersion extends ProjectOwned {
   // properties: () => {[propName: string]: WFTypeVersion};
   parentTypeVersion: () => WFTypeVersion | null;
   childTypeVersions: () => WFTypeVersion[];
-  inputTo: () => Array<{argName: string; opVersion: WFOpVersion}>;
+  inputTo: () => WFOpVersion[];
   outputFrom: () => WFOpVersion[];
   objectVersions: () => WFObjectVersion[];
 }

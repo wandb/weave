@@ -324,9 +324,7 @@ export class WFNaiveProject implements WFProject {
         const nameParts = uriToParts(name);
         let opVersionHash: string | undefined = undefined;
         if (nameParts) {
-          const opVersion = this.state.opVersionsMap.get(
-            nameParts.version
-          );
+          const opVersion = this.state.opVersionsMap.get(nameParts.version);
           if (opVersion) {
             opVersionHash = nameParts.version;
           }
@@ -347,12 +345,12 @@ export class WFNaiveProject implements WFProject {
 const uriToParts = (uri: string) => {
   if (uri.startsWith('wandb-artifact:///') && uri.endsWith('/obj')) {
     const inner = uri.slice('wandb-artifact:///'.length, -'/obj'.length);
-    const [entity, project,nameAndVersion] = inner.split('/');
+    const [entity, project, nameAndVersion] = inner.split('/');
     const [name, version] = nameAndVersion.split(':');
     return {entity, project, name, version};
   }
-  return null
-}
+  return null;
+};
 
 type WFNaiveTypeDictType = {};
 
@@ -510,7 +508,7 @@ class WFNaiveTypeVersion implements WFTypeVersion {
         return new WFNaiveTypeVersion(this.state, typeVersionDict.versionHash);
       });
   }
-  inputTo(): Array<{argName: string; opVersion: WFOpVersion}> {
+  inputTo(): WFOpVersion[] {
     throw new Error('Method not implemented.');
   }
   outputFrom(): WFOpVersion[] {
