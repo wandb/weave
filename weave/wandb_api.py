@@ -31,11 +31,11 @@ def set_wandb_api_context(
     cookies: typing.Optional[dict],
 ) -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
     cur_ctx = get_wandb_api_context()
-    if cur_ctx:
-        # WANDB API context is only allowed to be set once per thread, since we
-        # need to use thread local storage to communicate the context to the wandb
-        # lib right now.
-        return None
+    # if cur_ctx:
+    #     # WANDB API context is only allowed to be set once per thread, since we
+    #     # need to use thread local storage to communicate the context to the wandb
+    #     # lib right now.
+    #     return None
     wandb_client_api.set_wandb_thread_local_api_settings(api_key, cookies, headers)
     return _wandb_api_context.set(WandbApiContext(user_id, api_key, headers, cookies))
 

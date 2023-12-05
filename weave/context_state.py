@@ -172,6 +172,15 @@ def lazy_execution():
         _eager_mode.reset(eager_token)
 
 
+@contextlib.contextmanager
+def set_eager_mode(eager: bool):
+    eager_token = _eager_mode.set(eager)
+    try:
+        yield
+    finally:
+        _eager_mode.reset(eager_token)
+
+
 def eager_mode():
     return _eager_mode.get()
 

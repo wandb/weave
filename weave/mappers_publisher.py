@@ -95,8 +95,36 @@ class DefaultToPy(mappers.Mapper):
 
         # Just clear the ref... we don't need to recursively publish, it will
         # happen later.
-        if hasattr(obj, "_ref"):
-            obj._ref = None
+        # if hasattr(obj, "_ref"):
+        #     obj._ref = None
+
+        # This is here because all Custom Types are stored as Refs.
+        # ... but resursively calling publish is not right
+        #     because publish calls us again! infinite recusion
+        # we should call a lower level method
+        #
+        # Wait, still wrong, the OpDef would get published inside the
+        #    wandb object without this code. That's great.
+        # What we need to do is set the mapping from local to remote
+        # when that happens, so that future attempts to publish the local
+        # object will just return the remote object.
+        #
+        # Ah, ok. The issue is:
+        #   a published object that had custom stuff, will have those
+        #     custom things as local refs
+        #   those are accessible as remote refs after publishing
+        #   if we encounter another use of that same local object again
+        #     we want to use that remotely available ref
+        #   so we need to update publish to find these and provide
+        #     them in a cache somehow
+        #   we need better ref tracking in general! we lose track of
+        #     refs because of python-reference-equality issues
+        from . import op_def
+
+        if isinstance(obj, op_def.OpDef):
+            from . import api
+
+            api.publish(obj, f"{obj.name}")
 
         return obj
 

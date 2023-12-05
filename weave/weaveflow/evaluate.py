@@ -33,27 +33,23 @@ class EvaluateLLM(Evaluate):
 
     @weave.op()
     def compute(self, dataset: Dataset, predictions: list[typing.Any]) -> typing.Any:
-        scores = []
-        rationales = []
         result_type = weave.types.TypedDict(
             {
                 "score": weave.types.Float(),
                 "rationale": weave.types.String(),
             }
         )
+        # TODO: get rid of this const() wrap... why do I need it?
+        from .. import weave_internal
 
-        for example, prediction in zip(dataset.rows, predictions):
-            # example_fields = self.format_example(example)
-            try:
-                messages = self.messages_template(example, prediction)
-                result = self.chat_llm.complete(
-                    messages,
-                    result_type,
-                )
-            except:
-                result = {"score": None, "rationale": None}
-            scores.append(result["score"])
-            rationales.append(result["rationale"])
+        all_messages = dataset.rows.apply(
+            lambda r, i: self.messages_template(r, weave_internal.const(predictions)[i])
+        )
+        results = all_messages.apply(lambda m: self.chat_llm.complete(m, result_type))
+
+        scores = results.column("score")
+        rationales = results.column("rationale")
+
         non_none_scores = [s for s in scores if s is not None]
         score_avg = 0
         if len(non_none_scores) > 0:

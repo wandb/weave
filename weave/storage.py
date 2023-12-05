@@ -59,6 +59,12 @@ def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
     from weave.mappers_publisher import map_to_python_remote
+    from . import op_def
+
+    # Hack because of mappers_publisher recursion bug
+    # TODO: fix
+    if isinstance(obj, op_def.OpDef):
+        return obj
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)
@@ -128,6 +134,9 @@ def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
     return _pubish_target_project.get()
 
 
+PUBLISH_CACHE_BY_LOCAL_ART = {}
+
+
 def _direct_publish(
     obj: typing.Any,
     name: typing.Optional[str] = None,
@@ -141,6 +150,12 @@ def _direct_publish(
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     _merge: typing.Optional[bool] = False,
 ) -> artifact_wandb.WandbArtifactRef:
+    _orig_ref = _get_ref(obj)
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        res = PUBLISH_CACHE_BY_LOCAL_ART.get(_orig_ref)
+        if res is not None:
+            return res
+
     weave_type = assume_weave_type or _get_weave_type(obj)
 
     target_project_from_context = get_publish_target_project()
@@ -182,6 +197,9 @@ def _direct_publish(
             artifact_collection_exists=bool(_merge),
             _lite_run=_lite_run,
         )
+
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        PUBLISH_CACHE_BY_LOCAL_ART[_orig_ref] = ref
 
     return ref
 

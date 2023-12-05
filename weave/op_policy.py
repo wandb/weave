@@ -66,6 +66,8 @@ PARALLEL_OP_NAMES = CACHE_AND_PARALLEL_OP_NAMES
 
 
 def should_run_in_parallel(op_name: str) -> bool:
+    if "://" in op_name:
+        return True
     if op_name.startswith("mapped_"):
         op_name = op_name[len("mapped_") :]
     return op_name in PARALLEL_OP_NAMES
