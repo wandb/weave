@@ -49,6 +49,16 @@ const defaultContext = {
   typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
     throw new Error('Not implemented');
   },
+  objectUIUrl: (
+    entityName: string,
+    projectName: string,
+    objectName: string
+  ) => {
+    throw new Error('Not implemented');
+  },
+  opUIUrl: (entityName: string, projectName: string, opName: string) => {
+    throw new Error('Not implemented');
+  },
   typeVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -121,6 +131,16 @@ const newContext = {
   typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
     return `/${entityName}/${projectName}/types/${typeName}`;
   },
+  objectUIUrl: (
+    entityName: string,
+    projectName: string,
+    objectName: string
+  ) => {
+    return `/${entityName}/${projectName}/objects/${objectName}`;
+  },
+  opUIUrl: (entityName: string, projectName: string, opName: string) => {
+    return `/${entityName}/${projectName}/ops/${opName}`;
+  },
   typeVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -178,6 +198,12 @@ const WeaveflowRouteContext = createContext<{
     projectName: string,
     typeName: string
   ) => string;
+  objectUIUrl: (
+    entityName: string,
+    projectName: string,
+    objectName: string
+  ) => string;
+  opUIUrl: (entityName: string, projectName: string, opName: string) => string;
   typeVersionUIUrl: (
     entityName: string,
     projectName: string,

@@ -1,15 +1,18 @@
 import {Box} from '@material-ui/core';
 import {NavigateNext} from '@mui/icons-material';
+import {Chip} from '@mui/material';
 import {
   DataGridPro,
   GridColDef,
   GridColumnGroupingModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
+import moment from 'moment';
 import React, {useMemo} from 'react';
-import {useHistory} from 'react-router-dom';
+import {Link, useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
+import {ObjectLink, OpVersionLink, TypeVersionLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFObjectVersion} from './interface/wf/types';
@@ -57,14 +60,24 @@ export const ObjectVersionsTable: React.FC<{
   const routeContext = useWeaveflowRouteContext();
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
+      const outputFrom = ov.outputFrom();
+      const firstOutputFromOpVersion =
+        outputFrom.length > 0 ? outputFrom[0].opVersion() : null;
+      const firstOutputFrom = firstOutputFromOpVersion
+        ? firstOutputFromOpVersion.op().name() +
+          ':' +
+          firstOutputFromOpVersion.version()
+        : null;
+      console.log({outputFrom, firstOutputFrom});
       return {
         id: ov.version(),
         obj: ov,
         object: ov.object().name(),
         version: ov.version(),
-        typeVersion: ov.typeVersion(),
-        inputTo: ov.inputTo(),
-        outputFrom: ov.outputFrom(),
+        typeVersion:
+          ov.typeVersion().type().name() + ':' + ov.typeVersion().version(),
+        inputTo: ov.inputTo().length,
+        outputFrom: firstOutputFrom,
         description: ov.description(),
         versionIndex: ov.versionIndex(),
         createdAt: ov.createdAtMs(),
@@ -74,7 +87,9 @@ export const ObjectVersionsTable: React.FC<{
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
     basicField('id', 'View', {
-      width: 30,
+      width: 50,
+      minWidth: 50,
+      maxWidth: 50,
       renderCell: params => {
         // Icon to indicate navigation to the object version
         return (
@@ -86,15 +101,79 @@ export const ObjectVersionsTable: React.FC<{
         );
       },
     }),
-    basicField('object', 'Object'),
-    basicField('version', 'Version'),
-    basicField('typeVersion', 'Type Version'),
-    basicField('inputTo', 'Input To'),
-    basicField('outputFrom', 'Output From'),
+    basicField('object', 'Object', {
+      renderCell: params => <ObjectLink objectName={params.value as string} />,
+    }),
+    basicField('version', 'Version', {}),
+    basicField('typeVersion', 'Type Version', {
+      renderCell: params => (
+        <TypeVersionLink
+          typeName={params.row.obj.typeVersion().type().name()}
+          version={params.row.obj.typeVersion().version()}
+        />
+      ),
+    }),
+    basicField('inputTo', 'Input To', {
+      renderCell: params => {
+        if (params.value === 0) {
+          return '';
+        }
+
+        return (
+          <Link to={''}>{params.value} calls (TODO: link with filter)</Link>
+        );
+      },
+    }),
+    basicField('outputFrom', 'Output From', {
+      renderCell: params => {
+        if (!params.value) {
+          return '';
+        }
+        const outputFrom = params.row.obj.outputFrom();
+        if (outputFrom.length === 0) {
+          return '';
+        }
+        if (outputFrom.length === 1) {
+          return (
+            <OpVersionLink
+              opName={outputFrom[0].opVersion().op().name()}
+              version={outputFrom[0].opVersion().version()}
+            />
+          );
+        }
+        return (
+          <Link to={''}>
+            {outputFrom.length} calls (TODO: link with filter)
+          </Link>
+        );
+      },
+    }),
     basicField('description', 'Description'),
-    basicField('versionIndex', 'Version Index'),
-    basicField('createdAt', 'Created At'),
-    basicField('isLatest', 'Is Latest'),
+    basicField('versionIndex', 'Version'),
+    basicField('createdAt', 'Created At', {
+      renderCell: params => {
+        return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
+      },
+    }),
+    basicField('isLatest', 'Latest', {
+      renderCell: params => {
+        if (params.value) {
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                width: '100%',
+              }}>
+              <Chip label="Yes" size="small" />
+            </Box>
+          );
+        }
+        return '';
+      },
+    }),
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
   return (

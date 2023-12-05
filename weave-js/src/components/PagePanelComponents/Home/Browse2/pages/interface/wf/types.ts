@@ -87,7 +87,7 @@ export interface WFObjectVersion extends ProjectOwned, ArtifactVersionBacked {
 export interface WFCall extends ProjectOwned {
   callID: () => string;
   traceID: () => string;
-  opVersion: () => WFOpVersion;
+  opVersion: () => WFOpVersion | null;
   inputs: () => {[argName: string]: WFObjectVersion};
   output: () => WFObjectVersion;
   parentCall: () => WFCall | null;

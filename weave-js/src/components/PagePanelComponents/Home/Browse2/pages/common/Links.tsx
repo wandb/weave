@@ -54,3 +54,100 @@ export const TypeVersionLink: React.FC<{
     );
   }
 };
+
+export const ObjectLink: React.FC<{objectName: string}> = props => {
+  const orm = useWeaveflowORMContext();
+  const routerContext = useWeaveflowRouteContext();
+  try {
+    const object = orm.projectConnection.object(props.objectName);
+    return (
+      <Link
+        to={routerContext.objectUIUrl(
+          object.entity(),
+          object.project(),
+          object.name()
+        )}>
+        {props.objectName}
+      </Link>
+    );
+  } catch (e) {
+    return <span>{props.objectName}</span>;
+  }
+};
+
+export const ObjectVersionLink: React.FC<{
+  objectName: string;
+  version: string;
+}> = props => {
+  const orm = useWeaveflowORMContext();
+  const routerContext = useWeaveflowRouteContext();
+  try {
+    const objectVersion = orm.projectConnection.objectVersion(
+      props.objectName,
+      props.version
+    );
+    return (
+      <Link
+        to={routerContext.objectVersionUIUrl(
+          objectVersion.entity(),
+          objectVersion.project(),
+          objectVersion.object().name(),
+          objectVersion.version()
+        )}>
+        {props.objectName} : {props.version}
+      </Link>
+    );
+  } catch (e) {
+    return (
+      <span>
+        {props.objectName}: {props.version}
+      </span>
+    );
+  }
+};
+
+export const OpLink: React.FC<{opName: string}> = props => {
+  const orm = useWeaveflowORMContext();
+  const routerContext = useWeaveflowRouteContext();
+  try {
+    const op = orm.projectConnection.op(props.opName);
+    return (
+      <Link to={routerContext.opUIUrl(op.entity(), op.project(), op.name())}>
+        {props.opName}
+      </Link>
+    );
+  } catch (e) {
+    return <span>{props.opName}</span>;
+  }
+};
+
+export const OpVersionLink: React.FC<{
+  opName: string;
+  version: string;
+}> = props => {
+  const orm = useWeaveflowORMContext();
+  const routerContext = useWeaveflowRouteContext();
+  try {
+    const opVersion = orm.projectConnection.opVersion(
+      props.opName,
+      props.version
+    );
+    return (
+      <Link
+        to={routerContext.opVersionUIUrl(
+          opVersion.entity(),
+          opVersion.project(),
+          opVersion.op().name(),
+          opVersion.version()
+        )}>
+        {props.opName} : {props.version}
+      </Link>
+    );
+  } catch (e) {
+    return (
+      <span>
+        {props.opName}: {props.version}
+      </span>
+    );
+  }
+};

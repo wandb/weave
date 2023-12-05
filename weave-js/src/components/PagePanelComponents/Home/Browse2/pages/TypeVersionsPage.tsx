@@ -55,7 +55,9 @@ export const TypeVersionsPage: React.FC<{
   }, [allTypeVersions]);
   const columns: GridColDef[] = [
     basicField('id', 'View', {
-      width: 30,
+      width: 50,
+      minWidth: 50,
+      maxWidth: 50,
       renderCell: params => {
         // Icon to indicate navigation to the object version
         return (

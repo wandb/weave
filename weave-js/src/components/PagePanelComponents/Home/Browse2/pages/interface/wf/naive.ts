@@ -320,23 +320,23 @@ export class WFNaiveProject implements WFProject {
 
     this.state.callsMap = new Map(
       joinedCalls.map(call => {
-        // const inputKeys = Object.keys(call.inputs)
-        // inputKeys
-        // let refNdx = 0
-        // while (('_ref' + refNdx) in call.inputs && call.inputs[('_ref' + refNdx)]) {
-        //   const uri = call.inputs[('_ref' + refNdx)]
-        //   const uriParts = uriToParts(uri)
-        //   if (uriParts) {
-        //     const objectVersion = this.state.objectVersionsMap.get(uriParts.version)
-        //     if (objectVersion) {
-        //       call.inputs[('_ref' + refNdx)] = objectVersion
-        //     }
-        //   }
-        // }
+        const name = call.name;
+        const nameParts = uriToParts(name);
+        let opVersionHash: string | undefined = undefined;
+        if (nameParts) {
+          const opVersion = this.state.opVersionsMap.get(
+            nameParts.version
+          );
+          if (opVersion) {
+            opVersionHash = nameParts.version;
+          }
+        }
+
         return [
           call.span_id,
           {
             callSpan: call,
+            opVersionHash,
           },
         ];
       })
@@ -344,15 +344,15 @@ export class WFNaiveProject implements WFProject {
   }
 }
 
-// const uriToParts = (uri: string) => {
-//   if (uri.startsWith('wandb-artifact:///') && uri.endsWith('/obj')) {
-//     const inner = uri.slice('wandb-artifact:///'.length, -'/obj'.length);
-//     const [entity, project, collection, nameAndVersion] = inner.split('/');
-//     const [name, version] = nameAndVersion.split(':');
-//     return {entity, project, collection, name, version};
-//   }
-//   return null
-// }
+const uriToParts = (uri: string) => {
+  if (uri.startsWith('wandb-artifact:///') && uri.endsWith('/obj')) {
+    const inner = uri.slice('wandb-artifact:///'.length, -'/obj'.length);
+    const [entity, project,nameAndVersion] = inner.split('/');
+    const [name, version] = nameAndVersion.split(':');
+    return {entity, project, name, version};
+  }
+  return null
+}
 
 type WFNaiveTypeDictType = {};
 
@@ -737,6 +737,7 @@ class WFNaiveOpVersion implements WFOpVersion {
 
 type WFNaiveCallDictType = {
   callSpan: Call;
+  opVersionHash?: string;
 };
 class WFNaiveCall implements WFCall {
   private readonly callDict: WFNaiveCallDictType;
@@ -758,8 +759,11 @@ class WFNaiveCall implements WFCall {
   callID(): string {
     throw new Error('Method not implemented.');
   }
-  opVersion(): WFOpVersion {
-    throw new Error('Method not implemented.');
+  opVersion(): WFOpVersion | null {
+    if (!this.callDict.opVersionHash) {
+      return null;
+    }
+    return new WFNaiveOpVersion(this.state, this.callDict.opVersionHash);
   }
   inputs(): {[argName: string]: WFObjectVersion} {
     throw new Error('Method not implemented.');
