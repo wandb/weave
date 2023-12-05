@@ -55,6 +55,7 @@ import {useHistory, useLocation} from 'react-router-dom';
 
 import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
+import {useWeaveflowRouteContext} from './context';
 import {
   mutationPublishArtifact,
   mutationSet,
@@ -62,7 +63,6 @@ import {
   weaveGet,
 } from './easyWeave';
 import {parseRefMaybe, SmallRef} from './SmallRef';
-import {refPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {
   if (isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))) {
@@ -135,6 +135,7 @@ const WeaveEditorCommit: FC<{
   handleClearEdits: () => void;
 }> = ({objType, rootObjectRef, node, edits, handleClose, handleClearEdits}) => {
   const weave = useWeaveContext();
+  const routeContext = useWeaveflowRouteContext();
   const history = useHistory();
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
@@ -179,7 +180,7 @@ const WeaveEditorCommit: FC<{
     setWorking('done');
 
     handleClearEdits();
-    history.push(refPageUrl(objType, finalRootUri));
+    history.push(routeContext.refPageUrl(objType, finalRootUri));
     handleClose();
   }, [
     node,
@@ -189,6 +190,7 @@ const WeaveEditorCommit: FC<{
     rootObjectRef.artifactName,
     handleClearEdits,
     history,
+    routeContext,
     objType,
     handleClose,
     edits,

@@ -6,6 +6,7 @@ import {useHistory, useParams} from 'react-router-dom';
 import {Browse2Trace} from './Browse2Trace';
 import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
+import {useWeaveflowRouteContext} from './context';
 
 interface Browse2TracePageParams {
   entity: string;
@@ -15,13 +16,25 @@ interface Browse2TracePageParams {
 }
 export const Browse2TracePage: FC = () => {
   const params = useParams<Browse2TracePageParams>();
+  return <Browse2TraceComponent params={params} />;
+};
+
+export const Browse2TraceComponent: FC<{params: Browse2TracePageParams}> = ({
+  params,
+}) => {
   const history = useHistory();
+  const routeContext = useWeaveflowRouteContext();
   const setSelectedSpanId = useCallback(
     (spanId: string) =>
       history.push(
-        `/${params.entity}/${params.project}/trace/${params.traceId}/${spanId}`
+        routeContext.callUIUrl(
+          params.entity,
+          params.project,
+          params.traceId,
+          spanId
+        )
       ),
-    [history, params.entity, params.project, params.traceId]
+    [history, params.entity, params.project, params.traceId, routeContext]
   );
   return (
     <PageEl>

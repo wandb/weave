@@ -1,4 +1,4 @@
-import {ArtifactRef, isWandbArtifactRef} from '@wandb/weave/react';
+import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import React, {createContext, useContext} from 'react';
 
 export const useWeaveflowRouteContext = () => {
@@ -68,7 +68,19 @@ const defaultContext = {
     opName: string,
     opVersionHash: string
   ) => {
-    throw new Error('Not implemented');
+    return `/${entityName}/${projectName}/OpDef/${opName}/${opVersionHash}`;
+  },
+  opPageUrl: (opUri: string) => {
+    const parsed = parseRef(opUri);
+    if (!isWandbArtifactRef(parsed)) {
+      throw new Error('non wandb artifact ref not yet handled');
+    }
+    return defaultContext.opVersionUIUrl(
+      parsed.entityName,
+      parsed.projectName,
+      parsed.artifactName,
+      parsed.artifactVersion
+    );
   },
 };
 
@@ -135,6 +147,18 @@ const newContext = {
   ) => {
     return `/${entityName}/${projectName}/calls/${callId}`;
   },
+  opPageUrl: (opUri: string) => {
+    const parsed = parseRef(opUri);
+    if (!isWandbArtifactRef(parsed)) {
+      throw new Error('non wandb artifact ref not yet handled');
+    }
+    return newContext.opVersionUIUrl(
+      parsed.entityName,
+      parsed.projectName,
+      parsed.artifactName,
+      parsed.artifactVersion
+    );
+  },
 };
 
 const WeaveflowRouteContext = createContext<{
@@ -167,4 +191,5 @@ const WeaveflowRouteContext = createContext<{
     traceId: string,
     callId: string
   ) => string;
+  opPageUrl: (opUri: string) => string;
 }>(defaultContext);

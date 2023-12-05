@@ -13,6 +13,7 @@ import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useState} from 'react';
 
 import {Link} from './CommonLib';
+import {useWeaveflowRouteContext} from './context';
 import {
   mutationAppend,
   mutationPublishArtifact,
@@ -22,7 +23,6 @@ import {
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
 import {ProjectNamePicker} from './ProjectPicker';
-import {refPageUrl} from './url';
 
 interface AddRowToPaneFormState {
   projectName?: string;
@@ -37,6 +37,7 @@ export const AddRowToTable: FC<{
   initialFormState: AddRowToPaneFormState;
 }> = ({entityName, open, handleClose, initialFormState}) => {
   const weave = useWeaveContext();
+  const routeContext = useWeaveflowRouteContext();
   const [projectName, setProjectName] = useState<string | null>(
     initialFormState.projectName ?? null
   );
@@ -143,7 +144,9 @@ export const AddRowToTable: FC<{
             {working === 'done' && (
               <Box mt={2}>
                 <Typography>
-                  <Link to={refPageUrl('Dataset', newUri!)}>View Dataset</Link>
+                  <Link to={routeContext.refPageUrl('Dataset', newUri!)}>
+                    View Dataset
+                  </Link>
                 </Typography>
               </Box>
             )}

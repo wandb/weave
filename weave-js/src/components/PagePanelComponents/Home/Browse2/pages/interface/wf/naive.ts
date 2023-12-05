@@ -713,6 +713,9 @@ class WFNaiveCall implements WFCall {
     }
     this.callDict = callDict;
   }
+  traceID(): string {
+    return this.callDict.callSpan.trace_id;
+  }
   callID(): string {
     throw new Error('Method not implemented.');
   }

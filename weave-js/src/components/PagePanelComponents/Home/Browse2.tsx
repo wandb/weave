@@ -311,7 +311,7 @@ const Browse2ProjectRoot: FC = () => {
           </Route>
           {/* CALLS */}
           <Route path={`/${projectRoot}/calls/:callId`}>
-            <CallPage />
+            <CallPageBinding />
           </Route>
           <Route path={`/${projectRoot}/calls`}>
             <CallsPage entity={params.entity} project={params.project} />
@@ -381,6 +381,22 @@ const OpVersionRoutePageBinding = () => {
       project={params.project}
       opName={params.opName}
       digest={params.digest}
+    />
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const CallPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    callId: string;
+  }>();
+  return (
+    <CallPage
+      entity={params.entity}
+      project={params.project}
+      callId={params.callId}
     />
   );
 };
