@@ -3,6 +3,7 @@ import {Link} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
 import {useWeaveflowORMContext} from '../interface/wf/context';
+import {WFHighLevelCallFilter} from '../CallsPage';
 
 export const TypeLink: React.FC<{typeName: string}> = props => {
   const orm = useWeaveflowORMContext();
@@ -171,6 +172,21 @@ export const CallLink: React.FC<{callId: string}> = props => {
         call.callID()
       )}>
       {callName}
+    </Link>
+  );
+};
+
+export const CallsLink: React.FC<{
+  entity: string;
+  project: string;
+  callCount: number;
+  filter?: WFHighLevelCallFilter;
+}> = props => {
+  const routerContext = useWeaveflowRouteContext();
+  return (
+    <Link
+      to={routerContext.callsUIUrl(props.entity, props.project, props.filter)}>
+      {props.callCount} calls
     </Link>
   );
 };

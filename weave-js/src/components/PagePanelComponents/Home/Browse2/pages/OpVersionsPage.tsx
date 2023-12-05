@@ -12,7 +12,7 @@ import {Link, useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
-import {OpLink} from './common/Links';
+import {CallsLink, OpLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFOpVersion} from './interface/wf/types';
@@ -123,7 +123,16 @@ export const OpVersionsTable: React.FC<{
         }
 
         return (
-          <Link to={''}>{params.value} calls (TODO: link with filter)</Link>
+          <CallsLink
+            entity={params.row.obj.entity()}
+            project={params.row.obj.project()}
+            callCount={params.value}
+            filter={{
+              opVersions: [
+                params.row.obj.op().name() + ':' + params.row.obj.version(),
+              ],
+            }}
+          />
         );
       },
     }),

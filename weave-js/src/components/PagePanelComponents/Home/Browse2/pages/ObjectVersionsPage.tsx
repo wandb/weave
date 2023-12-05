@@ -13,7 +13,12 @@ import {Link, useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
-import {ObjectLink, OpVersionLink, TypeVersionLink} from './common/Links';
+import {
+  CallsLink,
+  ObjectLink,
+  OpVersionLink,
+  TypeVersionLink,
+} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFObjectVersion} from './interface/wf/types';
@@ -106,7 +111,16 @@ export const ObjectVersionsTable: React.FC<{
         }
 
         return (
-          <Link to={''}>{params.value} calls (TODO: link with filter)</Link>
+          <CallsLink
+            entity={params.row.obj.entity()}
+            project={params.row.obj.project()}
+            callCount={params.value}
+            filter={{
+              inputObjectVersions: [
+                params.row.obj.object().name() + ':' + params.row.obj.version(),
+              ],
+            }}
+          />
         );
       },
     }),
@@ -119,19 +133,19 @@ export const ObjectVersionsTable: React.FC<{
         if (outputFrom.length === 0) {
           return '';
         }
-        if (outputFrom.length === 1) {
-          return (
-            <OpVersionLink
-              opName={outputFrom[0].opVersion().op().name()}
-              version={outputFrom[0].opVersion().version()}
-            />
-          );
-        }
+        // if (outputFrom.length === 1) {
         return (
-          <Link to={''}>
-            {outputFrom.length} calls (TODO: link with filter)
-          </Link>
+          <OpVersionLink
+            opName={outputFrom[0].opVersion().op().name()}
+            version={outputFrom[0].opVersion().version()}
+          />
         );
+        // }
+        // return (
+        //   <Link to={''}>
+        //     {outputFrom.length} calls (TODO: link with filter)
+        //   </Link>
+        // );
       },
     }),
     basicField('description', 'Description'),
