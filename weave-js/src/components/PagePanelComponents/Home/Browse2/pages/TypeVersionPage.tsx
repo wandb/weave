@@ -1,57 +1,31 @@
 import React from 'react';
-import {Link} from 'react-router-dom';
 
-import {useEPPrefix} from './util';
-import {Box, Tab, Tabs, Divider} from '@mui/material';
+import {SimplePageLayout} from '../SimplePageLayout';
 
-export const TypeVersionPage: React.FC = () => {
+export const TypeVersionPage: React.FC<{
+  entity: string;
+  project: string;
+  typeName: string;
+  version: string;
+}> = () => {
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        flexGrow: 1,
-      }}>
-      <Box
-        sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          // pt: 3,
-          pb: 0,
-          pl: 3,
-          pr: 3,
-          height: 65, // manual to match sidebar
-          borderBottom: '1px solid #e0e0e0',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-        }}>
-        <Box
-          sx={{
-            pb: 2.5,
-            // fontSize: '1.5rem',
-            fontWeight: 600,
-            fontSize: '1.5rem',
-          }}>
-          TypeVersion Page
-        </Box>
-        <Tabs value={0}>
-          <Tab label="Overview" />
-          <Tab label="Properties" />
-          <Tab label="Hierarchy" />
-        </Tabs>
-      </Box>
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}></Box>
-    </Box>
+    <SimplePageLayout
+      title="TypeVersion Page"
+      tabs={[
+        {
+          label: 'Overview',
+          content: <div>Overview</div>,
+        },
+        {
+          label: 'Properties',
+          content: <div>Properties</div>,
+        },
+        {
+          label: 'Hierarchy',
+          content: <div>Hierarchy</div>,
+        },
+      ]}
+    />
   );
 };
 

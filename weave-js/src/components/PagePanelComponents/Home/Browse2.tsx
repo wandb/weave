@@ -278,7 +278,7 @@ const Browse2ProjectRoot: FC = () => {
         <Switch>
           {/* TYPES */}
           <Route path={`/${projectRoot}/types/:typeName/versions/:digest?`}>
-            <TypeVersionPage />
+            <TypeVersionRoutePageBinding />
           </Route>
           <Route path={`/${projectRoot}/types/:typeName`}>
             <TypePage />
@@ -391,6 +391,27 @@ const OpVersionRoutePageBinding = () => {
       project={params.project}
       opName={params.opName}
       digest={params.digest}
+    />
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const TypeVersionRoutePageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    typeName: string;
+    digest?: string;
+  }>();
+  if (!params.digest) {
+    return <>TODO: Need to redirect</>;
+  }
+  return (
+    <TypeVersionPage
+      entity={params.entity}
+      project={params.project}
+      typeName={params.typeName}
+      version={params.digest}
     />
   );
 };
