@@ -19,21 +19,20 @@ import {
   StreamId,
 } from './callTree';
 
-export const fnRunsNode =(
-  streamId: StreamId,
-  filters: CallFilter
-) => {
+export const fnRunsNode = (streamId: StreamId, filters: CallFilter) => {
   const rowsNode = callsTableNode(streamId);
-    const filtered = callsTableFilter(rowsNode, filters);
-    return callsTableSelect(filtered);
-}
+  const filtered = callsTableFilter(rowsNode, filters);
+  return callsTableSelect(filtered);
+};
 
 export const useRuns = (
   streamId: StreamId,
   filters: CallFilter
 ): {loading: boolean; result: Span[]} => {
-  const traceSpansNode = useMemo(() => fnRunsNode(streamId, filters)
-  , [filters, streamId]);
+  const traceSpansNode = useMemo(
+    () => fnRunsNode(streamId, filters),
+    [filters, streamId]
+  );
   const traceSpansQuery = useNodeValue(traceSpansNode);
 
   return useMemo(
@@ -100,8 +99,8 @@ export const useOpSignature = (
 };
 
 export const fnFeedbackNode = (entityName: string, projectName: string) => {
-  return listSelectAll(feedbackTableNode(entityName, projectName))
-}
+  return listSelectAll(feedbackTableNode(entityName, projectName));
+};
 
 export const useAllFeedback = (entityName: string, projectName: string) => {
   const feedbackNode = useMemo(
@@ -139,15 +138,15 @@ export const useLastRunFeedback = (
 
 export const joinRunsWithFeedback = (runs: Call[], feedback: any) => {
   const lastFeedbackByRunId: {[key: string]: any} = {};
-    for (const row of feedback) {
-      lastFeedbackByRunId[row.run_id] = row.feedback;
-    }
-    const result = runs.map(run => ({
-      ...run,
-      feedback: lastFeedbackByRunId[run.span_id],
-    }));
-    return result
-}
+  for (const row of feedback) {
+    lastFeedbackByRunId[row.run_id] = row.feedback;
+  }
+  const result = runs.map(run => ({
+    ...run,
+    feedback: lastFeedbackByRunId[run.span_id],
+  }));
+  return result;
+};
 
 export const useRunsWithFeedback = (
   streamId: StreamId,
@@ -168,7 +167,7 @@ export const useRunsWithFeedback = (
     }
     const runs = runsQuery.result;
     const feedback = feedbackQuery.result ?? [];
-    const result = joinRunsWithFeedback(runs, feedback)
+    const result = joinRunsWithFeedback(runs, feedback);
     return {
       loading: false,
       result,

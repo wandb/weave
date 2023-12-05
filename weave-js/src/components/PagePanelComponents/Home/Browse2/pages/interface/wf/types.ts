@@ -77,7 +77,7 @@ export interface WFObjectVersion extends ProjectOwned, ArtifactVersionBacked {
     objectVersion: WFObjectVersion;
   } | null;
   typeVersion: () => WFTypeVersion;
-  inputTo: () => WFCall[]; //Array<{argName: string; opVersion: WFCall}>;
+  inputTo: () => WFCall[]; // Array<{argName: string; opVersion: WFCall}>;
   outputFrom: () => WFCall[];
 }
 

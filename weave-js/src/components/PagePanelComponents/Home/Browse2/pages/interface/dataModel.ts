@@ -207,7 +207,10 @@ export const useAllTypeVersions = (
       };
     }
   }, [allObjectVersions]);
-  return allTypeVersions as Loadable<TypeVersionCatalog>;
+  return allTypeVersions as Loadable<{
+    types: TypeVersions;
+    versions: TypeVersionCatalog;
+  }>;
 };
 
 ///
@@ -408,7 +411,9 @@ const allOpVersionNodes = (entity: string, project: string) => {
 const hashString = (s: string) => {
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
+    // tslint:disable-next-line: no-bitwise
     hash = (hash << 5) - hash + s.charCodeAt(i);
+    // tslint:disable-next-line: no-bitwise
     hash |= 0; // Convert to 32bit integer
   }
   return '' + hash;
