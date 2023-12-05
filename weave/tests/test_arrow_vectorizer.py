@@ -1412,6 +1412,9 @@ def test_duration():
 
 def test_date_add():
     dt = datetime.datetime.now()
+
+    # TODO: remove ms truncation when we can store more precise datetimes in arrow
+    dt = dt.replace(microsecond=dt.microsecond // 1000 * 1000)
     dt1 = dt + datetime.timedelta(days=1)
 
     awl_node = weave.save(arrow.to_arrow([dt, dt1]))
@@ -1431,6 +1434,9 @@ def test_date_add():
 
 def test_date_sub():
     dt = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    # TODO: remove ms truncation when we can store more precise datetimes in arrow
+    dt = dt.replace(microsecond=dt.microsecond // 1000 * 1000)
     dt1 = dt + datetime.timedelta(days=1)
 
     awl_node = weave.save(arrow.to_arrow([dt, dt1]))
