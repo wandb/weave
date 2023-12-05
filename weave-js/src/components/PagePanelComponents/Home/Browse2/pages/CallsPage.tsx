@@ -1,18 +1,13 @@
 import {Box} from '@material-ui/core';
 import React from 'react';
-import {Link} from 'react-router-dom';
 
 import {useRunsWithFeedback} from '../callTreeHooks';
 import {RunsTable} from '../RunsTable';
-import {useEPPrefix, useQuery} from './util';
 
 export const CallsPage: React.FC<{
   entity: string;
   project: string;
 }> = props => {
-  const search = useQuery();
-  const filter = search.filter;
-  const prefix = useEPPrefix();
   const runs = useRunsWithFeedback(
     {
       entityName: props.entity,

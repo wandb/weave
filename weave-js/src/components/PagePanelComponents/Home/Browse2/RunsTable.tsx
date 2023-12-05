@@ -327,7 +327,7 @@ export const RunsTable: FC<{
     }
 
     return {cols, colGroupingModel};
-  }, [params.entity, params.project, spans]);
+  }, [params.entity, params.project, routeContext, spans]);
   const autosized = useRef(false);
   useEffect(() => {
     if (autosized.current) {

@@ -1,4 +1,3 @@
-import {Box} from '@material-ui/core';
 import {NavigateNext} from '@mui/icons-material';
 import {
   DataGridPro,

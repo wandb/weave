@@ -8,7 +8,6 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import CssBaseline from '@mui/material/CssBaseline';
 import {LicenseInfo} from '@mui/x-license-pro';
 import React, {FC, useEffect, useMemo} from 'react';
 import {

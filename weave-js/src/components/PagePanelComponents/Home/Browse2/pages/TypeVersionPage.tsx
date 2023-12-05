@@ -11,6 +11,7 @@ import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
 import {ObjectVersionsTable} from './ObjectVersionsPage';
 import {OpVersionsTable} from './OpVersionsPage';
+import {TypeVersionsTable} from './TypeVersionsPage';
 
 export const TypeVersionPage: React.FC<{
   entity: string;
@@ -55,7 +56,7 @@ export const TypeVersionPage: React.FC<{
         },
         {
           label: 'Child Types',
-          content: <div>TODO</div>,
+          content: <TypeVersionChildTypes typeVersion={typeVersion} />,
         },
         {
           label: 'Consuming Ops',
@@ -151,4 +152,12 @@ const TypeVersionProducingOps: React.FC<{
   const opVersions = props.typeVersion.outputFrom();
 
   return <OpVersionsTable opVersions={opVersions} />;
+};
+
+const TypeVersionChildTypes: React.FC<{
+  typeVersion: WFTypeVersion;
+}> = props => {
+  const typeVersions = props.typeVersion.childTypeVersions();
+
+  return <TypeVersionsTable typeVersions={typeVersions} />;
 };

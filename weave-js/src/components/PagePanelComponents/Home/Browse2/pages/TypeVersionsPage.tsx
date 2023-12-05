@@ -1,4 +1,3 @@
-import {Box} from '@material-ui/core';
 import {NavigateNext} from '@mui/icons-material';
 import {
   DataGridPro,
@@ -13,23 +12,41 @@ import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
+import {WFTypeVersion} from './interface/wf/types';
 
 export const TypeVersionsPage: React.FC<{
   entity: string;
   project: string;
 }> = props => {
-  const history = useHistory();
-  const routeContext = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext();
 
   const allTypeVersions = useMemo(() => {
     return orm.projectConnection.typeVersions();
   }, [orm.projectConnection]);
+  return (
+    <SimplePageLayout
+      title="Types"
+      tabs={[
+        {
+          label: 'All',
+          content: <TypeVersionsTable typeVersions={allTypeVersions} />,
+        },
+      ]}
+    />
+  );
+};
+
+export const TypeVersionsTable: React.FC<{
+  typeVersions: WFTypeVersion[];
+}> = props => {
+  const history = useHistory();
+  const routeContext = useWeaveflowRouteContext();
   // const allObjectVersions = useAllObjectVersions(props.entity, props.project);
   const rows: GridRowsProp = useMemo(() => {
-    return allTypeVersions.map((tv, i) => {
+    return props.typeVersions.map((tv, i) => {
       return {
         id: tv.version(),
+        obj: tv,
         type: tv.type().name(),
         version: tv.version(),
         parentType: tv.parentTypeVersion(),
@@ -39,7 +56,7 @@ export const TypeVersionsPage: React.FC<{
         objectVersions: tv.objectVersions(),
       };
     });
-  }, [allTypeVersions]);
+  }, [props.typeVersions]);
   const columns: GridColDef[] = [
     basicField('id', 'View', {
       width: 50,
@@ -66,48 +83,38 @@ export const TypeVersionsPage: React.FC<{
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
   return (
-    <SimplePageLayout
-      title="Types"
-      tabs={[
-        {
-          label: 'All',
-          content: (
-            <DataGridPro
-              rows={rows}
-              initialState={{
-                sorting: {
-                  sortModel: [{field: 'date_created', sort: 'desc'}],
-                },
-              }}
-              // {...data}
-              // loading={data.rows.length === 0}
-              rowHeight={38}
-              columns={columns}
-              experimentalFeatures={{columnGrouping: true}}
-              disableRowSelectionOnClick
-              columnGroupingModel={columnGroupingModel}
-              onRowClick={params => {
-                // history.push(
-                //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
-                // );
-              }}
-              onCellClick={params => {
-                // TODO: move these actions into a config
-                if (params.field === 'id') {
-                  history.push(
-                    routeContext.typeVersionUIUrl(
-                      props.entity,
-                      props.project,
-                      params.row.type,
-                      params.row.version
-                    )
-                  );
-                }
-              }}
-            />
-          ),
+    <DataGridPro
+      rows={rows}
+      initialState={{
+        sorting: {
+          sortModel: [{field: 'date_created', sort: 'desc'}],
         },
-      ]}
+      }}
+      // {...data}
+      // loading={data.rows.length === 0}
+      rowHeight={38}
+      columns={columns}
+      experimentalFeatures={{columnGrouping: true}}
+      disableRowSelectionOnClick
+      columnGroupingModel={columnGroupingModel}
+      onRowClick={params => {
+        // history.push(
+        //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
+        // );
+      }}
+      onCellClick={params => {
+        // TODO: move these actions into a config
+        if (params.field === 'id') {
+          history.push(
+            routeContext.typeVersionUIUrl(
+              params.row.obj.entity(),
+              params.row.obj.project(),
+              params.row.type,
+              params.row.version
+            )
+          );
+        }
+      }}
     />
   );
 };
