@@ -76,11 +76,11 @@ export const ObjectVersionPage: React.FC<{
     props.digest
   );
   const rootType = useMemo(() => {
-    let target_type = objectVersionTypeInfo.result?.type_version;
-    while (target_type?.parent_type) {
-      target_type = target_type.parent_type;
+    let targetType = objectVersionTypeInfo.result?.type_version;
+    while (targetType?.parent_type) {
+      targetType = targetType.parent_type;
     }
-    return target_type;
+    return targetType;
   }, [objectVersionTypeInfo.result?.type_version]);
   const params: Browse2RootObjectVersionItemParams = useMemo(() => {
     return {

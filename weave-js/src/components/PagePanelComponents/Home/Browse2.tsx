@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC} from 'react';
+import React, {FC, useEffect, useMemo} from 'react';
 import {
   BrowserRouter as Router,
   Link as RouterLink,
@@ -33,6 +33,7 @@ import {BoardPage} from './Browse2/pages/BoardPage';
 import {BoardsPage} from './Browse2/pages/BoardsPage';
 import {CallPage} from './Browse2/pages/CallPage';
 import {CallsPage} from './Browse2/pages/CallsPage';
+import {WFNaiveProject} from './Browse2/pages/interface/wf/naive';
 import {ObjectPage} from './Browse2/pages/ObjectPage';
 import {ObjectsPage} from './Browse2/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse2/pages/ObjectVersionPage';
@@ -47,6 +48,8 @@ import {TypePage} from './Browse2/pages/TypePage';
 import {TypesPage} from './Browse2/pages/TypesPage';
 import {TypeVersionPage} from './Browse2/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse2/pages/TypeVersionsPage';
+import {useWeaveContext} from '../../../context';
+import {project} from '../../../core/_external/util/urls';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -189,10 +192,10 @@ const Browse2Mounted: FC = props => {
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              pt: 3,
-              pr: 3,
-              pb: 0,
-              pl: 3,
+              // pt: 3,
+              // pr: 3,
+              // pb: 0,
+              // pl: 3,
             }}>
             <Toolbar />
             <NewWeaveflowRouteContextProvider>
@@ -240,6 +243,15 @@ const Browse2Mounted: FC = props => {
 const projectRoot = `:entity/:project`;
 const Browse2ProjectRoot: FC = () => {
   const params = useParams<{entity: string; project: string}>();
+  const {client: weaveClient} = useWeaveContext();
+  const projectData = useMemo(
+    () => new WFNaiveProject(params.entity, params.project, weaveClient),
+    [params.entity, params.project, weaveClient]
+  );
+  useEffect(() => {
+    projectData.init();
+  }, [projectData]);
+  console.log(projectData);
 
   return (
     <Box
@@ -287,7 +299,7 @@ const Browse2ProjectRoot: FC = () => {
           <OpsPage />
         </Route>
         <Route path={`/${projectRoot}/op-versions`}>
-          <OpVersionsPage />
+          <OpVersionsPage entity={params.entity} project={params.project} />
         </Route>
         {/* CALLS */}
         <Route path={`/${projectRoot}/calls/:callId`}>

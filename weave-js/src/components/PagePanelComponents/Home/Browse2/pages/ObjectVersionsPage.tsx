@@ -48,23 +48,6 @@ export const ObjectVersionsPage: React.FC<{
       });
     }
   }, [allObjectVersions]);
-  // const rows: GridRowsProp = [
-  //   {
-  //     // id: 0,
-  //     collection_name: 'Model',
-  //     hash: '1234',
-  //     is_latest_in_collection: true,
-  //     version_index: 4,
-  //     type_version: 'GPT:1234 -> Model:5432',
-  //     // TODO: Tim: We need an efficient way to look up the producing call.
-  //     produced_by: 'Call xyz',
-  //     date_created: '2021-10-01',
-  //     description: 'This is a model',
-  //     // metadata: {},
-  //     // tags: [],
-  //     // properties: {a: 'b', c: 'd'},
-  //   },
-  // ];
   const columns: GridColDef[] = [
     {
       field: 'id',

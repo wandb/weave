@@ -32,17 +32,17 @@ export const Browse2RootObjectVersionTypeHierarchy: FC<{uri: string}> = ({
   const refTypeQuery = useNodeValue(refTypeNode as any);
 
   const hierarchy = useMemo(() => {
-    const hierarchy: Type[] = [];
+    const typeHierarchy: Type[] = [];
     let currentType = refTypeQuery.result as null | Type;
     while (currentType) {
-      hierarchy.push(currentType);
+      typeHierarchy.push(currentType);
       if (isObjectType(currentType) && currentType._base_type) {
         currentType = currentType._base_type;
       } else {
         currentType = null;
       }
     }
-    return hierarchy.reverse();
+    return typeHierarchy.reverse();
   }, [refTypeQuery]);
   const urls = useWeaveflowRouteContext();
   return (
