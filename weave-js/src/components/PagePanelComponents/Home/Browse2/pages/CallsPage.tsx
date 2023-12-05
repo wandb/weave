@@ -3,6 +3,7 @@ import {
   Box,
   Checkbox,
   FormControl,
+  IconButton,
   List,
   ListItem,
   ListItemButton,
@@ -15,9 +16,15 @@ import {CallFilter} from '../callTree';
 import {useRunsWithFeedback} from '../callTreeHooks';
 import {RunsTable} from '../RunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {HackyOpCategory} from './interface/wf/types';
+import {useWeaveflowORMContext} from './interface/wf/context';
+import {OpenInNew} from '@mui/icons-material';
+import {useHistory} from 'react-router-dom';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
+  opCategory?: HackyOpCategory;
+  opVersions?: string[];
 };
 
 export const CallsPage: React.FC<{
@@ -44,19 +51,41 @@ export const CallsTable: React.FC<{
   frozenFilter?: WFHighLevelCallFilter;
   initialFilter?: WFHighLevelCallFilter;
 }> = props => {
+  const history = useHistory();
+  const orm = useWeaveflowORMContext();
+  const opVersionOptions = useMemo(() => {
+    const versions = orm.projectConnection.opVersions();
+    // Note: this excludes the named ones without op versions
+    const options = versions.map(v => v.op().name() + ':' + v.version());
+    return options;
+  }, [orm.projectConnection]);
   const [filter, setFilter] = useState<WFHighLevelCallFilter>(
     props.initialFilter ?? {}
   );
   const effectiveFilter = useMemo(() => {
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);
+  const useLowLevelFilter: CallFilter = useMemo(() => {
+    return {
+      traceRootsOnly: effectiveFilter.traceRootsOnly,
+      opUris: effectiveFilter.opVersions?.map(uri => {
+        const [opName, version] = uri.split(':');
+        const opVersion = orm.projectConnection.opVersion(opName, version);
+        return opVersion.refUri();
+      }),
+    };
+  }, [
+    effectiveFilter.opVersions,
+    effectiveFilter.traceRootsOnly,
+    orm.projectConnection,
+  ]);
   const runs = useRunsWithFeedback(
     {
       entityName: props.entity,
       projectName: props.project,
       streamName: 'stream',
     },
-    effectiveFilter
+    useLowLevelFilter
   );
   return (
     <Box
@@ -78,7 +107,8 @@ export const CallsTable: React.FC<{
         }}>
         <Box
           sx={{
-            p: 2,
+            pl: 2,
+            pr: 1,
             height: 57,
             flex: '0 0 auto',
             borderBottom: '1px solid #e0e0e0',
@@ -86,8 +116,25 @@ export const CallsTable: React.FC<{
             top: 0,
             zIndex: 1,
             backgroundColor: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}>
           Filters
+          {Object.keys(props.frozenFilter ?? {}).length > 0 && (
+            <IconButton
+              size="small"
+              onClick={() => {
+                // TODO: use the route context
+                history.push(
+                  `/${props.entity}/${props.project}/calls${
+                    filter ? `?filter=${JSON.stringify(effectiveFilter)}` : ''
+                  }`
+                );
+              }}>
+              <OpenInNew />
+            </IconButton>
+          )}
         </Box>
         <List
           // dense
@@ -105,6 +152,9 @@ export const CallsTable: React.FC<{
                 }}
               />
             }
+            disabled={Object.keys(props.frozenFilter ?? {}).includes(
+              'traceRootsOnly'
+            )}
             disablePadding>
             <ListItemButton>
               <ListItemText primary={`Trace Roots Only`} />
@@ -133,16 +183,24 @@ export const CallsTable: React.FC<{
               <Autocomplete
                 size={'small'}
                 // disablePortal
+                multiple
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'opVersions'
+                )}
                 // disableClearable
                 // options={projects}
-                // value={props.project}
-                // onChange={(event, newValue) => {
-                //   props.navigateToProject(newValue);
-                // }}
+                value={effectiveFilter.opVersions ?? []}
+                onChange={(event, newValue) => {
+                  setFilter({
+                    ...filter,
+                    opVersions: newValue,
+                  });
+                }}
+                // open={true}
                 renderInput={params => (
                   <TextField {...params} label="Op Version" />
                 )}
-                options={[]}
+                options={opVersionOptions}
               />
             </FormControl>
           </ListItem>

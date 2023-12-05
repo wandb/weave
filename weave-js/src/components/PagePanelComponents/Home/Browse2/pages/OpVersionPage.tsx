@@ -17,6 +17,7 @@ import {
   SimplePageLayout,
 } from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
+import {CallsTable} from './CallsPage';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -31,12 +32,6 @@ export const OpVersionPage: React.FC<{
     props.version
   );
   const uri = opVersion.refUri();
-  const filters = useMemo(() => {
-    return {
-      opUri: uri,
-      inputUris: [],
-    };
-  }, [uri]);
   const streamId = useMemo(
     () => ({
       entityName: props.entity,
@@ -45,7 +40,7 @@ export const OpVersionPage: React.FC<{
     }),
     [props.entity, props.project]
   );
-  const selectedQuery = useRunsWithFeedback(streamId, filters);
+
   return (
     <SimplePageLayout
       title={props.opName + ' : ' + props.version}
@@ -53,9 +48,13 @@ export const OpVersionPage: React.FC<{
         {
           label: 'Calls',
           content: (
-            <RunsTable
-              loading={selectedQuery.loading}
-              spans={selectedQuery.result}
+            <CallsTable
+              entity={props.entity}
+              project={props.project}
+              frozenFilter={{
+                opVersions: [props.opName + ':' + props.version],
+                traceRootsOnly: false,
+              }}
             />
           ),
         },

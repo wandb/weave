@@ -23,7 +23,7 @@ export const Browse2OpDefComponent: FC<{
   const query = useQuery();
   const filters = useMemo(() => {
     return {
-      opUri: uri,
+      opUris: [uri],
       inputUris: query.getAll('inputUri'),
     };
   }, [query, uri]);

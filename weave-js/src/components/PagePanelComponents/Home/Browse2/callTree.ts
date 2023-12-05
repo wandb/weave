@@ -11,6 +11,7 @@ import {
   listObjectType,
   Node,
   opAnd,
+  opArray,
   opCount,
   opDict,
   opFilter,
@@ -24,6 +25,7 @@ import {
   opPick,
   opRefEqual,
   opStringEqual,
+  opStringIn,
   OutputType,
   Type,
   typedDictPropertyTypes,
@@ -38,7 +40,7 @@ export interface StreamId {
 }
 
 export interface CallFilter {
-  opUri?: string;
+  opUris?: string[];
   inputUris?: string[];
   outputUris?: string[];
   traceId?: string;
@@ -195,16 +197,27 @@ export const callsTableSelect = (stNode: Node) => {
 const makeFilterExpr = (filters: CallFilter): Node | undefined => {
   const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');
   const filterClauses: Node[] = [];
-  if (filters.opUri != null) {
-    filterClauses.push(
-      opStringEqual({
-        lhs: opPick({
-          obj: rowVar,
-          key: constString('name'),
+  if (filters.opUris != null && filters.opUris.length > 0) {
+    let clause = opStringEqual({
+      lhs: opPick({
+        obj: rowVar,
+        key: constString('name'),
+      }),
+      rhs: constString(filters.opUris[0]),
+    });
+    for (const uri of filters.opUris.slice(1)) {
+      clause = opOr({
+        lhs: clause,
+        rhs: opStringEqual({
+          lhs: opPick({
+            obj: rowVar,
+            key: constString('name'),
+          }),
+          rhs: constString(uri),
         }),
-        rhs: constString(filters.opUri),
-      }) as Node
-    );
+      });
+    }
+    filterClauses.push(clause);
   }
   if (filters.inputUris != null) {
     for (const inputUri of filters.inputUris) {

@@ -15,6 +15,8 @@ export interface WFProject extends ProjectOwned {
   objectVersions: () => WFObjectVersion[];
   call: (callID: string) => WFCall;
   calls: () => WFCall[];
+  // a bit hacky here:
+  opCategories: () => HackyOpCategory[];
 }
 
 interface ProjectOwned {
@@ -58,7 +60,10 @@ export interface WFTypeVersion extends ProjectOwned {
   inputTo: () => WFOpVersion[];
   outputFrom: () => WFOpVersion[];
   objectVersions: () => WFObjectVersion[];
+  typeCategory: () => string | null; // not technically part of data model since it is derived from the op details
 }
+
+export type HackyOpCategory = 'train' | 'predict' | 'score' | 'evaluate' | 'tune' ;
 
 export interface WFOpVersion extends ProjectOwned, ArtifactVersionBacked {
   op: () => WFOp;
@@ -69,6 +74,7 @@ export interface WFOpVersion extends ProjectOwned, ArtifactVersionBacked {
   invokes: () => WFOpVersion[];
   invokedBy: () => WFOpVersion[];
   calls: () => WFCall[];
+  opCategory: () => HackyOpCategory | null; // not technically part of data model since it is derived from the op details
 }
 
 export interface WFObjectVersion extends ProjectOwned, ArtifactVersionBacked {

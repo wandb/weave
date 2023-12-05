@@ -111,6 +111,7 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
         );
       }}
       navigateToCalls={(filter?: WFHighLevelCallFilter) => {
+        // TODO: this should all be done with the route provider!!
         history.push(
           `/${params.entity}/${params.project}/calls${
             filter ? `?filter=${JSON.stringify(filter)}` : ''
@@ -302,35 +303,35 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
                 title: 'Train',
                 icon: <ModelTraining />,
                 onClick: () => {
-                  props.navigateToCalls('kind="train"');
+                  props.navigateToCalls({opCategory: 'train'});
                 },
               },
               {
                 title: 'Predict',
                 icon: <AutoFixHigh />,
                 onClick: () => {
-                  props.navigateToCalls('kind="predict"');
+                  props.navigateToCalls({opCategory: 'predict'});
                 },
               },
               {
                 title: 'Score',
                 icon: <Scoreboard />,
                 onClick: () => {
-                  props.navigateToCalls('kind="score"');
+                  props.navigateToCalls({opCategory: 'score'});
                 },
               },
               {
                 title: 'Evaluate',
                 icon: <Rule />,
                 onClick: () => {
-                  props.navigateToCalls('kind="evaluate"');
+                  props.navigateToCalls({opCategory: 'evaluate'});
                 },
               },
               {
                 title: 'Tune',
                 icon: <Tune />,
                 onClick: () => {
-                  props.navigateToCalls('kind="tune"');
+                  props.navigateToCalls({opCategory: 'tune'});
                 },
               },
             ],

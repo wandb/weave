@@ -73,7 +73,7 @@ export const useFirstCall = (
 ): {loading: boolean; result?: Span} => {
   const firstCallNode = useMemo(() => {
     const streamTableRowsNode = callsTableNode(streamId);
-    const filtered = callsTableFilter(streamTableRowsNode, {opUri});
+    const filtered = callsTableFilter(streamTableRowsNode, {opUris: [opUri]});
     const selected = callsTableSelect(filtered);
     return opIndex({arr: selected, index: constNumber(0)});
   }, [opUri, streamId]);
