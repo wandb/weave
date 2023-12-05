@@ -50,6 +50,7 @@ import {TypePage} from './Browse2/pages/TypePage';
 import {TypesPage} from './Browse2/pages/TypesPage';
 import {TypeVersionPage} from './Browse2/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse2/pages/TypeVersionsPage';
+import {useQuery} from './Browse2/pages/util';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -324,7 +325,7 @@ const Browse2ProjectRoot: FC = () => {
             <CallPageBinding />
           </Route>
           <Route path={`/${projectRoot}/calls`}>
-            <CallsPage entity={params.entity} project={params.project} />
+            <CallsPageBinding />
           </Route>
           {/* BOARDS */}
           <Route
@@ -428,6 +429,30 @@ const CallPageBinding = () => {
       entity={params.entity}
       project={params.project}
       callId={params.callId}
+    />
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const CallsPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+  }>();
+  const query = useQuery();
+  const filters = useMemo(() => {
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+  return (
+    <CallsPage
+      entity={params.entity}
+      project={params.project}
+      initialFilter={filters}
     />
   );
 };

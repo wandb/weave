@@ -17,6 +17,7 @@ import {
   opGet,
   opGroupby,
   opGroupGroupKey,
+  opIsNone,
   opMap,
   opNumberMult,
   opOr,
@@ -41,6 +42,7 @@ export interface CallFilter {
   inputUris?: string[];
   outputUris?: string[];
   traceId?: string;
+  traceRootsOnly?: boolean;
 }
 
 export interface Call {
@@ -247,6 +249,16 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
           key: constString('trace_id'),
         }),
         rhs: constString(filters.traceId),
+      })
+    );
+  }
+  if (filters.traceRootsOnly) {
+    filterClauses.push(
+      opIsNone({
+        val: opPick({
+          obj: rowVar,
+          key: constString('parent_id'),
+        })
       })
     );
   }

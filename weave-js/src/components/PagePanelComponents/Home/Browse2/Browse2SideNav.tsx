@@ -31,13 +31,15 @@ import React, {FC, Fragment, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
+import {CallFilter} from './callTree';
+import {WFHighLevelCallFilter} from './pages/CallsPage';
 
 const drawerWidth = 240;
 
 type NavigationCallbacks = {
   navigateToProject: (project: string) => void;
   navigateToObjectVersions: (filter?: string) => void;
-  navigateToCalls: (filter?: string) => void;
+  navigateToCalls: (filter?: WFHighLevelCallFilter) => void;
   navigateToTypeVersions: (filter?: string) => void;
   navigateToOpVersions: (filter?: string) => void;
   navigateToBoards: (filter?: string) => void;
@@ -108,10 +110,10 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
           }`
         );
       }}
-      navigateToCalls={(filter?: string) => {
+      navigateToCalls={(filter?: WFHighLevelCallFilter) => {
         history.push(
           `/${params.entity}/${params.project}/calls${
-            filter ? `?filter=${filter}` : ''
+            filter ? `?filter=${JSON.stringify(filter)}` : ''
           }`
         );
       }}
@@ -291,7 +293,9 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'calls',
             icon: <Segment />,
             onClick: () => {
-              props.navigateToCalls('parent_id=null');
+              props.navigateToCalls({
+                traceRootsOnly: true,
+              });
             },
             children: [
               {

@@ -182,7 +182,8 @@ export const RunsTable: FC<{
         },
       },
       {
-        flex: !showIO ? 1 : undefined,
+        // flex: !showIO ? 1 : undefined,
+        width: 100,
         field: 'span_id',
         headerName: 'ID',
         renderCell: rowParams => {
