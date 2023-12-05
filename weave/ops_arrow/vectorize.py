@@ -284,14 +284,6 @@ def _safe_get_weavified_op(op: op_def.OpDef) -> typing.Optional[graph.Node]:
         try:
             op.weave_fn = weavify.op_to_weave_fn(op)
         except (
-            # I put this here, because we need to avoid auto-vectorization.
-            # This catches a specific error that happens when we try to
-            # call openai, generally the way we do auto-vectorization is
-            # bad... its way too broad. We should make it fail if there are
-            # any function calls to non-weave-ops maybe.
-            # Another way to do it would be to not vectorize if we have a
-            # custom op, for now.
-            TypeError,
             errors.WeaveInternalError,
             errors.WeavifyError,
             errors.WeaveDispatchError,
