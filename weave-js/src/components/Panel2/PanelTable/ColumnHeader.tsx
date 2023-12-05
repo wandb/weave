@@ -154,12 +154,6 @@ export const ColumnHeader: React.FC<{
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
 
-  React.useEffect(() => {
-    return () => {
-      console.log('countColumnId - component is unmounting');
-    };
-  }, []);
-
   const [workingSelectFunction, setWorkingSelectFunction] =
     useState<EditingNode>(propsSelectFunction);
   const [workingColumnName, setWorkingColumnName] =
@@ -256,15 +250,11 @@ export const ColumnHeader: React.FC<{
   );
   const doUngroup = useCallback(async () => {
     let newTableState: Table.TableState | null = null;
-    console.log({countColumnId});
     if (countColumnId && tableState.groupBy.length === 1) {
-      console.log({tableStateBeforeRemove: tableState});
       newTableState = Table.removeColumn(tableState, countColumnId);
-      console.log({newTableStateAfterRemove: newTableState});
       if (setCountColumnId) {
         setCountColumnId(null);
       }
-      console.log('Setting countColumnId to null');
     }
     newTableState = await disableGroup(
       newTableState ?? tableState,
@@ -334,7 +324,6 @@ export const ColumnHeader: React.FC<{
         icon: 'group-runs',
         onSelect: async () => {
           recordEvent('GROUP');
-          console.log({rowsNodeType: rowsNode.type});
           let newTableState: Table.TableState | null = null;
           if (countColumnId == null) {
             const {table, columnId} = Table.addColumnToTable(
@@ -357,10 +346,7 @@ export const ColumnHeader: React.FC<{
             if (setCountColumnId) {
               setCountColumnId(columnId);
             }
-            console.log('Setting countColumnId');
           }
-          console.log({tableStateAfterAddingNumberColumn: newTableState});
-          console.log({inputArrayNode});
           newTableState = await enableGroup(
             newTableState ?? tableState,
             colId,

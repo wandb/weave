@@ -535,11 +535,6 @@ const PanelTableInner: React.FC<
     downloadCSV(rowsNode, tableState, weave, stack);
   }, [rowsNode, stack, tableState, weave]);
 
-  console.log({tableState});
-  // console.log({rowsNode});
-  const data = LLReact.useNodeValue(rowsNode);
-  console.log({data});
-
   const headerRendererForColumn = useCallback(
     (colId: string, {headerIndex}: any) => {
       return (
@@ -600,9 +595,6 @@ const PanelTableInner: React.FC<
       // the type doesn't say so. This is sort of a hard-coded way to ensure we
       // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
-        console.log("yeah we're grouped", colId);
-        console.log({rowNode});
-        console.log({rowData});
         return (
           <WeaveFormatContext.Provider value={getColumnCellFormats(colType)}>
             <GrowToParent>
