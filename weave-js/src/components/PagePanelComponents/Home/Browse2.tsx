@@ -155,11 +155,21 @@ const Browse2Mounted: FC = props => {
     '/:entity/:project/:tab(types|type-versions|objects|object-versions|ops|op-versions|calls|boards|tables)';
   return (
     <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
-      <CssBaseline />
+      {/* <CssBaseline /> */}
       <AppBar
         position="fixed"
-        sx={{zIndex: theme => theme.zIndex.drawer + 1, height: '60px'}}>
-        <Toolbar>
+        sx={{
+          zIndex: theme => theme.zIndex.drawer + 1,
+          // height: '30px',
+          // minHeight: '30px',
+        }}>
+        <Toolbar
+          // variant="dense"
+          sx={{
+            backgroundColor: '#1976d2',
+            // height: '30px',
+            minHeight: '30px',
+          }}>
           <IconButton
             component={RouterLink}
             to={`/`}

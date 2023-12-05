@@ -166,9 +166,15 @@ export const Browse2ProjectSideNav: FC<Browse2ProjectSideNavProps> = props => {
         },
       }}>
       <Toolbar />
-      <Box sx={{p: 2}}>
+      <Box
+        sx={{
+          p: 2,
+          height: 65, // manual to match sidebar
+          borderBottom: '1px solid #e0e0e0',
+        }}>
         <FormControl fullWidth>
           <Autocomplete
+            size={'small'}
             disablePortal
             disableClearable
             options={projects}
@@ -227,8 +233,12 @@ const SideNav: FC<{
       {props.sections.map((section, sectionIndex) => {
         return (
           <Fragment key={sectionIndex}>
-            <ListSubheader id="nested-list-subheader">
-              <Divider />
+            <ListSubheader
+              id="nested-list-subheader"
+              sx={{
+                pt: 0.5,
+              }}>
+              {/* {sectionIndex !== 0 && <Divider />} */}
               {section.title}
               <Divider />
             </ListSubheader>
@@ -240,7 +250,7 @@ const SideNav: FC<{
           </Fragment>
         );
       })}
-      <Divider />
+      {/* <Divider /> */}
     </Box>
   );
 };
