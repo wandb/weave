@@ -31,6 +31,7 @@ def set_wandb_api_context(
     cookies: typing.Optional[dict],
 ) -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
     cur_ctx = get_wandb_api_context()
+    # HACK(wf-fixes1)
     # if cur_ctx:
     #     # WANDB API context is only allowed to be set once per thread, since we
     #     # need to use thread local storage to communicate the context to the wandb

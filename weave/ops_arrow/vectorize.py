@@ -415,28 +415,8 @@ def vectorize(
             # Example: [[1,2,3], [3,4,5]].map(row => row.map(x => x + 1))
             return _vectorize_lambda_output_node(node, vectorized_keys)
 
-        # 1a. If there are any Any types in the op parameters, we don't try to vectorize.
-        #   Any is too vague, we need to manually map.
+        # 1b. If custom op, never try to vectorize for now.
         node_op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-        if isinstance(node_op_def.input_type, op_args.OpNamedArgs):
-            if any(
-                isinstance(t, types.Any)
-                for t in node_op_def.input_type.arg_types.values()
-            ):
-                return _create_manually_mapped_op(
-                    node_name, node_inputs, vectorized_keys
-                )
-        elif isinstance(node_op_def.input_type, op_args.OpVarArgs):
-            if isinstance(node_op_def.input_type.arg_type, types.Any):
-                return _create_manually_mapped_op(
-                    node_name, node_inputs, vectorized_keys
-                )
-        else:
-            raise errors.WeaveInternalError(
-                "Unexpected op args type: %s" % node_op_def.input_type
-            )
-
-        # 1b. If custom op, don't try to vectorize...?
         if node_op_def.location is not None:
             return _create_manually_mapped_op(node_name, node_inputs, vectorized_keys)
 
