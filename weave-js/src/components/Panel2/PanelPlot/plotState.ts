@@ -33,6 +33,7 @@ import {
 import {immerable, produce} from 'immer';
 import _ from 'lodash';
 
+import {IconName} from '../../Icon';
 import * as TableState from '../PanelTable/tableState';
 import {
   AnyPlotConfig,
@@ -314,11 +315,12 @@ class YDimensionWithConditionalY2 extends MultiFieldDimension {
   }
 }
 
-type DropdownOption = {
+export type DropdownOption = {
   key: string;
   value: any;
   text: string;
   representableAsExpression?: boolean;
+  icon?: IconName;
 };
 
 class DropDownDimension extends DimensionLike {
@@ -375,20 +377,47 @@ const lineStyleOptions = LINE_SHAPES.map(o => ({
   representableAsExpression: o !== 'series',
 }));
 
+const markShapeIcons: Record<string, IconName> = {
+  auto: 'magic-wand-stick',
+  point: 'chart-scatterplot',
+  bar: 'chart-vertical-bars',
+  boxplot: 'box-plot',
+  line: 'linear-scale',
+  area: 'area',
+};
+
 const markOptions = [
-  {key: 'auto' as const, value: null, text: 'auto' as const},
+  {
+    key: 'auto' as const,
+    value: null,
+    text: 'auto' as const,
+    icon: markShapeIcons.auto,
+  },
   ...MARK_OPTIONS.map(o => ({
     key: o,
     value: o,
     text: o,
+    icon: markShapeIcons[o],
   })),
 ];
+
+const pointShapeIcons: Record<string, IconName> = {
+  circle: 'circle',
+  square: 'square',
+  cross: 'cross',
+  diamond: 'diamond',
+  'triangle-up': 'triangle-up',
+  'triangle-down': 'triangle-down',
+  'triangle-right': 'triangle-right',
+  'triangle-left': 'triangle-left',
+};
 
 const pointShapeOptions = POINT_SHAPES.map(o => ({
   key: o,
   value: o,
   text: o === 'series' ? 'Encode from series' : o,
   representableAsExpression: o !== 'series',
+  icon: pointShapeIcons[o],
 }));
 
 export const dimensionTypeOptions = [
