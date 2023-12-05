@@ -85,11 +85,6 @@ export const TypeVersionsTable: React.FC<{
   return (
     <DataGridPro
       rows={rows}
-      initialState={{
-        sorting: {
-          sortModel: [{field: 'date_created', sort: 'desc'}],
-        },
-      }}
       // {...data}
       // loading={data.rows.length === 0}
       rowHeight={38}

@@ -12,6 +12,7 @@ import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
 import {Paper} from './CommonLib';
 import {mutationStreamTableLog} from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
+import {CenteredAnimatedLoader} from './pages/common/Loader';
 import {SpanDetails} from './SpanDetails';
 import {SpanTreeNode, SpanWithChildren} from './SpanWithChildren';
 
@@ -48,7 +49,7 @@ const SpanFeedback: FC<{streamId: StreamId; spanId: string}> = ({
   );
 
   return lastFeedbackQuery.loading ? (
-    <div>loading...</div>
+    <CenteredAnimatedLoader />
   ) : (
     <SpanFeedbackLoaded
       {...{streamId, spanId, lastFeedback: lastFeedbackQuery.result}}
@@ -149,7 +150,9 @@ export const Browse2Trace: FC<{
   };
 
   const [addRowToTableOpen, setAddRowToTableOpen] = useState(false);
-
+  if (traceSpans.loading) {
+    return <CenteredAnimatedLoader />;
+  }
   return (
     <Grid container spacing={2} alignItems="flex-start">
       <Grid

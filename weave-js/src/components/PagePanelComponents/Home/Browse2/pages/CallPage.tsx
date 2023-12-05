@@ -1,8 +1,8 @@
 import React, {useMemo} from 'react';
 
 import {Browse2TraceComponent} from '../Browse2TracePage';
-import {useWeaveflowORMContext} from './interface/wf/context';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {useWeaveflowORMContext} from './interface/wf/context';
 
 export const CallPage: React.FC<{
   entity: string;
@@ -19,7 +19,7 @@ export const CallPage: React.FC<{
       spanId: props.callId,
     };
   }, [call, props.callId, props.entity, props.project]);
-  const title = `${call.opVersion()?.op().name()}: ${call.callID()}`;
+  const title = `${call.spanName()}: ${call.callID()}`;
   return (
     <SimplePageLayout
       title={title}

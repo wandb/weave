@@ -93,4 +93,5 @@ export interface WFCall extends ProjectOwned {
   output: () => WFObjectVersion;
   parentCall: () => WFCall | null;
   childCalls: () => WFCall[];
+  spanName: () => string; // not technically part of data model since it is derived from the span details
 }

@@ -1,3 +1,4 @@
+import {Box, Chip} from '@material-ui/core';
 import {NavigateNext} from '@mui/icons-material';
 import {
   DataGridPro,
@@ -5,11 +6,13 @@ import {
   GridColumnGroupingModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
+import moment from 'moment';
 import React, {useMemo} from 'react';
-import {useHistory} from 'react-router-dom';
+import {Link, useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
+import {OpLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFOpVersion} from './interface/wf/types';
@@ -53,7 +56,7 @@ export const OpVersionsTable: React.FC<{
         versionIndex: ov.versionIndex(),
         createdAt: ov.createdAtMs(),
         isLatest: ov.aliases().includes('latest'),
-        calls: ov.calls(),
+        calls: ov.calls().length,
         // code: () => string;
         // inputTypes: () => {[argName: string]: WFTypeVersion};
         // outputType: () => WFTypeVersion;
@@ -80,16 +83,50 @@ export const OpVersionsTable: React.FC<{
         );
       },
     }),
-    basicField('op', 'Op'),
+    basicField('op', 'Op', {
+      renderCell: params => <OpLink opName={params.value as string} />,
+    }),
     basicField('version', 'Version'),
     // basicField('typeVersion', 'Type Version'),
     // basicField('inputTo', 'Input To'),
     // basicField('outputFrom', 'Output From'),
     basicField('description', 'Description'),
     basicField('versionIndex', 'Version Index'),
-    basicField('createdAt', 'Created At'),
-    basicField('isLatest', 'Is Latest'),
-    basicField('calls', 'Calls'),
+    basicField('createdAt', 'Created At', {
+      renderCell: params => {
+        return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
+      },
+    }),
+    basicField('isLatest', 'Is Latest', {
+      renderCell: params => {
+        if (params.value) {
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                width: '100%',
+              }}>
+              <Chip label="Yes" size="small" />
+            </Box>
+          );
+        }
+        return '';
+      },
+    }),
+    basicField('calls', 'Calls', {
+      renderCell: params => {
+        if (params.value === 0) {
+          return '';
+        }
+
+        return (
+          <Link to={''}>{params.value} calls (TODO: link with filter)</Link>
+        );
+      },
+    }),
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
   return (
@@ -97,7 +134,7 @@ export const OpVersionsTable: React.FC<{
       rows={rows}
       initialState={{
         sorting: {
-          sortModel: [{field: 'date_created', sort: 'desc'}],
+          sortModel: [{field: 'createdAt', sort: 'desc'}],
         },
       }}
       // {...data}

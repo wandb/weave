@@ -799,7 +799,11 @@ class WFNaiveCall implements WFCall {
     throw new Error('Method not implemented.');
   }
   parentCall(): WFCall | null {
-    throw new Error('Method not implemented.');
+    const parentCall = this.state.callsMap.get(this.callDict.callSpan.parent_id)
+    if (!parentCall) {
+      return null;
+    }
+    return new WFNaiveCall(this.state, parentCall.callSpan.span_id);
   }
   childCalls(): WFCall[] {
     throw new Error('Method not implemented.');
@@ -809,5 +813,8 @@ class WFNaiveCall implements WFCall {
   }
   project(): string {
     return this.state.project;
+  }
+  spanName(): string {
+    return this.opVersion()?.op().name() ?? this.callDict.callSpan.name;
   }
 }

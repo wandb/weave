@@ -1,6 +1,6 @@
-import {Box} from '@mui/material';
 import {
   DataGridPro as DataGrid,
+  DataGridPro,
   GridColDef,
   GridColumnGroup,
   useGridApiRef,
@@ -16,6 +16,10 @@ import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {useWeaveflowRouteContext} from './context';
 import {SmallRef} from './SmallRef';
+import moment from 'moment';
+import {Box, Chip} from '@mui/material';
+import {useWeaveflowORMContext} from './pages/interface/wf/context';
+import {OpVersionLink} from './pages/common/Links';
 
 type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
@@ -66,6 +70,9 @@ export const RunsTable: FC<{
   spans: SpanWithFeedback[];
 }> = ({loading, spans}) => {
   const routeContext = useWeaveflowRouteContext();
+  const showIO = useMemo(() => {
+    return Array.from(new Set(spans.map(span => span.name))).length === 1;
+  }, [spans]);
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
   // side
@@ -77,9 +84,11 @@ export const RunsTable: FC<{
       })),
     [spans]
   );
+  const orm = useWeaveflowORMContext();
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const tableData = useMemo(() => {
     return spans.map((call: SpanWithFeedback) => {
+      const ormCall = orm.projectConnection.call(call.span_id);
       const argOrder = call.inputs._input_order;
       let args = _.fromPairs(
         Object.entries(call.inputs).filter(
@@ -92,6 +101,9 @@ export const RunsTable: FC<{
 
       return {
         id: call.span_id,
+        ormCall: ormCall,
+        opVersion: ormCall.opVersion()?.op()?.name(),
+        isRoot: ormCall.parentCall() == null,
         trace_id: call.trace_id,
         status_code: call.status_code,
         timestamp: call.timestamp,
@@ -137,13 +149,42 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [spans]);
+  }, [orm.projectConnection, spans]);
 
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
+        field: 'status_code',
+        headerName: 'Status',
+        width: 100,
+        renderCell: cellParams => {
+          return (
+            <Chip
+              label={cellParams.row.status_code}
+              size="small"
+              color={
+                cellParams.row.status_code === 'SUCCESS'
+                  ? 'success'
+                  : cellParams.row.status_code === 'ERROR'
+                  ? 'error'
+                  : undefined
+              }
+            />
+          );
+        },
+      },
+      {
+        field: 'timestamp',
+        headerName: 'Timestamp',
+        width: 150,
+        renderCell: cellParams => {
+          return moment(cellParams.row.timestamp).format('YYYY-MM-DD HH:mm:ss');
+        },
+      },
+      {
+        flex: !showIO ? 1 : undefined,
         field: 'span_id',
-        headerName: 'Trace span',
+        headerName: 'ID',
         renderCell: rowParams => {
           return (
             <Link
@@ -159,16 +200,51 @@ export const RunsTable: FC<{
         },
       },
       {
-        field: 'timestamp',
-        headerName: 'Timestamp',
+        flex: !showIO ? 1 : undefined,
+        field: 'opVersion',
+        headerName: 'Name',
+        renderCell: rowParams => {
+          const opVersion = rowParams.row.ormCall.opVersion();
+          if (opVersion == null) {
+            return rowParams.row.ormCall.spanName();
+          }
+          return (
+            <OpVersionLink
+              opName={opVersion.op().name()}
+              version={opVersion.version()}
+            />
+          );
+        },
       },
+
       {
         field: 'latency',
         headerName: 'Latency',
+        flex: !showIO ? 1 : undefined,
       },
       {
-        field: 'status_code',
-        headerName: 'Status',
+        field: 'isRoot',
+        headerName: 'Trace Root',
+        // flex: !showIO ? 1 : undefined,
+        width: 100,
+
+        renderCell: params => {
+          if (params.value) {
+            return (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  width: '100%',
+                }}>
+                <Chip label="Yes" size="small" />
+              </Box>
+            );
+          }
+          return '';
+        },
       },
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
@@ -194,140 +270,154 @@ export const RunsTable: FC<{
       })
     );
 
-    const attributesOrder = Object.keys(attributesKeys);
-    const attributesGrouping = buildTree(attributesOrder, 'attributes');
-    colGroupingModel.push(attributesGrouping);
-    for (const key of attributesOrder) {
-      cols.push({
-        field: 'attributes.' + key,
-        headerName: key.split('.').slice(-1)[0],
-        renderCell: cellParams => {
-          if (
-            typeof cellParams.row['attributes.' + key] === 'string' &&
-            cellParams.row['attributes.' + key].startsWith('wandb-artifact:///')
-          ) {
-            return (
-              <SmallRef
-                objRef={parseRef(cellParams.row['attributes.' + key])}
-              />
-            );
-          }
-          return cellParams.row['attributes.' + key];
-        },
-      });
-    }
+    if (showIO) {
+      const attributesOrder = Object.keys(attributesKeys);
+      const attributesGrouping = buildTree(attributesOrder, 'attributes');
+      colGroupingModel.push(attributesGrouping);
+      for (const key of attributesOrder) {
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field: 'attributes.' + key,
+          headerName: key.split('.').slice(-1)[0],
+          renderCell: cellParams => {
+            if (
+              typeof cellParams.row['attributes.' + key] === 'string' &&
+              cellParams.row['attributes.' + key].startsWith(
+                'wandb-artifact:///'
+              )
+            ) {
+              return (
+                <SmallRef
+                  objRef={parseRef(cellParams.row['attributes.' + key])}
+                />
+              );
+            }
+            return cellParams.row['attributes.' + key];
+          },
+        });
+      }
 
-    const inputOrder =
-      row0.inputs._arg_order ??
-      Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
-        k => !k.startsWith('_')
+      const inputOrder =
+        row0.inputs._arg_order ??
+        Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
+          k => !k.startsWith('_')
+        );
+      const inputGroup: Exclude<
+        React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+        undefined
+      >[number] = {
+        groupId: 'inputs',
+        children: [],
+      };
+      for (const key of inputOrder) {
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field: 'input_' + key,
+          headerName: key,
+          renderCell: cellParams => {
+            if (
+              typeof cellParams.row['input_' + key] === 'string' &&
+              cellParams.row['input_' + key].startsWith('wandb-artifact:///')
+            ) {
+              return (
+                <SmallRef objRef={parseRef(cellParams.row['input_' + key])} />
+              );
+            }
+            return cellParams.row['input_' + key];
+          },
+        });
+        inputGroup.children.push({field: 'input_' + key});
+      }
+      colGroupingModel.push(inputGroup);
+
+      // All output keys as we don't have the order key yet.
+      let outputKeys: {[key: string]: true} = {};
+      spans.forEach(span => {
+        for (const [k, v] of Object.entries(flattenObject(span.output!))) {
+          if (v != null && (!k.startsWith('_') || k === '_result')) {
+            outputKeys[k] = true;
+          }
+        }
+      });
+      // sort shallowest keys first
+      outputKeys = _.fromPairs(
+        Object.entries(outputKeys).sort((a, b) => {
+          const aDepth = a[0].split('.').length;
+          const bDepth = b[0].split('.').length;
+          return aDepth - bDepth;
+        })
       );
-    const inputGroup: Exclude<
-      React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
-      undefined
-    >[number] = {
-      groupId: 'inputs',
-      children: [],
-    };
-    for (const key of inputOrder) {
-      cols.push({
-        field: 'input_' + key,
-        headerName: key,
-        renderCell: cellParams => {
-          if (
-            typeof cellParams.row['input_' + key] === 'string' &&
-            cellParams.row['input_' + key].startsWith('wandb-artifact:///')
-          ) {
-            return (
-              <SmallRef objRef={parseRef(cellParams.row['input_' + key])} />
-            );
-          }
-          return cellParams.row['input_' + key];
-        },
-      });
-      inputGroup.children.push({field: 'input_' + key});
-    }
-    colGroupingModel.push(inputGroup);
 
-    // All output keys as we don't have the order key yet.
-    let outputKeys: {[key: string]: true} = {};
-    spans.forEach(span => {
-      for (const [k, v] of Object.entries(flattenObject(span.output!))) {
-        if (v != null && (!k.startsWith('_') || k === '_result')) {
-          outputKeys[k] = true;
-        }
+      const outputOrder = Object.keys(outputKeys);
+      const outputGrouping = buildTree(outputOrder, 'output');
+      colGroupingModel.push(outputGrouping);
+      for (const key of outputOrder) {
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field: 'output.' + key,
+          headerName: key.split('.').slice(-1)[0],
+          renderCell: cellParams => {
+            if (
+              typeof cellParams.row['output.' + key] === 'string' &&
+              cellParams.row['output.' + key].startsWith('wandb-artifact:///')
+            ) {
+              return (
+                <SmallRef objRef={parseRef(cellParams.row['output.' + key])} />
+              );
+            }
+            return cellParams.row['output.' + key];
+          },
+        });
       }
-    });
-    // sort shallowest keys first
-    outputKeys = _.fromPairs(
-      Object.entries(outputKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
 
-    const outputOrder = Object.keys(outputKeys);
-    const outputGrouping = buildTree(outputOrder, 'output');
-    colGroupingModel.push(outputGrouping);
-    for (const key of outputOrder) {
-      cols.push({
-        field: 'output.' + key,
-        headerName: key.split('.').slice(-1)[0],
-        renderCell: cellParams => {
-          if (
-            typeof cellParams.row['output.' + key] === 'string' &&
-            cellParams.row['output.' + key].startsWith('wandb-artifact:///')
-          ) {
-            return (
-              <SmallRef objRef={parseRef(cellParams.row['output.' + key])} />
-            );
+      let feedbackKeys: {[key: string]: true} = {};
+      spans.forEach(span => {
+        for (const [k, v] of Object.entries(flattenObject(span.feedback!))) {
+          if (v != null && k !== '_keys') {
+            feedbackKeys[k] = true;
           }
-          return cellParams.row['output.' + key];
-        },
-      });
-    }
-
-    let feedbackKeys: {[key: string]: true} = {};
-    spans.forEach(span => {
-      for (const [k, v] of Object.entries(flattenObject(span.feedback!))) {
-        if (v != null && k !== '_keys') {
-          feedbackKeys[k] = true;
         }
-      }
-    });
-    // sort shallowest keys first
-    feedbackKeys = _.fromPairs(
-      Object.entries(feedbackKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
-
-    const feedbackOrder = Object.keys(feedbackKeys);
-    const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
-    colGroupingModel.push(feedbackGrouping);
-    for (const key of feedbackOrder) {
-      cols.push({
-        field: 'feedback.' + key,
-        headerName: key.split('.').slice(-1)[0],
-        renderCell: cellParams => {
-          if (
-            typeof cellParams.row['feedback.' + key] === 'string' &&
-            cellParams.row['feedback.' + key].startsWith('wandb-artifact:///')
-          ) {
-            return (
-              <SmallRef objRef={parseRef(cellParams.row['feedback.' + key])} />
-            );
-          }
-          return cellParams.row['feedback.' + key];
-        },
       });
+      // sort shallowest keys first
+      feedbackKeys = _.fromPairs(
+        Object.entries(feedbackKeys).sort((a, b) => {
+          const aDepth = a[0].split('.').length;
+          const bDepth = b[0].split('.').length;
+          return aDepth - bDepth;
+        })
+      );
+
+      const feedbackOrder = Object.keys(feedbackKeys);
+      const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
+      colGroupingModel.push(feedbackGrouping);
+      for (const key of feedbackOrder) {
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field: 'feedback.' + key,
+          headerName: key.split('.').slice(-1)[0],
+          renderCell: cellParams => {
+            if (
+              typeof cellParams.row['feedback.' + key] === 'string' &&
+              cellParams.row['feedback.' + key].startsWith('wandb-artifact:///')
+            ) {
+              return (
+                <SmallRef
+                  objRef={parseRef(cellParams.row['feedback.' + key])}
+                />
+              );
+            }
+            return cellParams.row['feedback.' + key];
+          },
+        });
+      }
     }
 
     return {cols, colGroupingModel};
-  }, [params.entity, params.project, routeContext, spans]);
+  }, [params.entity, params.project, routeContext, showIO, spans]);
   const autosized = useRef(false);
   useEffect(() => {
     if (autosized.current) {
@@ -343,34 +433,62 @@ export const RunsTable: FC<{
     });
   }, [apiRef, loading]);
   return (
-    <Box
-      sx={{
-        height: 460,
-        width: '100%',
-        '& .MuiDataGrid-root': {
-          border: 'none',
+    // <Box
+    //   sx={{
+    //     height: 460,
+    //     width: '100%',
+    //     '& .MuiDataGrid-root': {
+    //       border: 'none',
+    //     },
+    //     '& .MuiDataGrid-row': {
+    //       cursor: 'pointer',
+    //     },
+    //   }}>
+    // <DataGrid
+    //   autosizeOnMount
+    //   apiRef={apiRef}
+    //   density="compact"
+    //   experimentalFeatures={{columnGrouping: true}}
+    //   rows={tableData}
+    //   columns={columns.cols}
+    //   columnGroupingModel={columns.colGroupingModel}
+    //   initialState={{
+    //     pagination: {
+    //       paginationModel: {
+    //         pageSize: 10,
+    //       },
+    //     },
+    //   }}
+    //   disableRowSelectionOnClick
+    // />
+    <DataGridPro
+      apiRef={apiRef}
+      rows={tableData}
+      // density="compact"
+      initialState={{
+        sorting: {
+          sortModel: [{field: 'timestamp', sort: 'desc'}],
         },
-        '& .MuiDataGrid-row': {
-          cursor: 'pointer',
-        },
-      }}>
-      <DataGrid
-        autosizeOnMount
-        apiRef={apiRef}
-        density="compact"
-        experimentalFeatures={{columnGrouping: true}}
-        rows={tableData}
-        columns={columns.cols}
-        columnGroupingModel={columns.colGroupingModel}
-        initialState={{
-          pagination: {
-            paginationModel: {
-              pageSize: 10,
-            },
-          },
-        }}
-        disableRowSelectionOnClick
-      />
-    </Box>
+      }}
+      rowHeight={38}
+      columns={columns.cols}
+      experimentalFeatures={{columnGrouping: true}}
+      disableRowSelectionOnClick
+      columnGroupingModel={columns.colGroupingModel}
+      onCellClick={params => {
+        // TODO: move these actions into a config
+        if (params.field === 'id') {
+          // history.push(
+          //   routeContext.objectVersionUIUrl(
+          //     params.row.obj.entity(),
+          //     params.row.obj.project(),
+          //     params.row.object,
+          //     params.row.version
+          //   )
+          // );
+        }
+      }}
+    />
+    // </Box>
   );
 };

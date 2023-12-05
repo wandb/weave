@@ -1,12 +1,22 @@
+import {Box, TextField, Typography} from '@material-ui/core';
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import React, {useMemo} from 'react';
+import {Button} from 'semantic-ui-react';
 
 import {Browse2OpDefCode} from '../Browse2OpDefCode';
-import {Browse2OpDefComponent} from '../Browse2OpDefPage';
-import {makeObjRefUri} from '../CommonLib';
+import {StreamId} from '../callTree';
+import {
+  useFirstCall,
+  useOpSignature,
+  useRunsWithFeedback,
+} from '../callTreeHooks';
+import {Paper} from '../CommonLib';
+import {RunsTable} from '../RunsTable';
 import {
   ScrollableTabContent,
   SimplePageLayout,
 } from './common/SimplePageLayout';
+import {useWeaveflowORMContext} from './interface/wf/context';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -15,25 +25,46 @@ export const OpVersionPage: React.FC<{
   version: string;
 }> = props => {
   // const prefix = useEPPrefix();
-  const params = useMemo(() => {
+  const orm = useWeaveflowORMContext();
+  const opVersion = orm.projectConnection.opVersion(
+    props.opName,
+    props.version
+  );
+  const uri = opVersion.refUri();
+  const filters = useMemo(() => {
     return {
-      entity: props.entity,
-      project: props.project,
-      rootType: '',
-      objName: props.opName,
-      objVersion: props.version,
+      opUri: uri,
+      inputUris: [],
     };
-  }, [props]);
-  const uri = makeObjRefUri(params);
+  }, [uri]);
+  const streamId = useMemo(
+    () => ({
+      entityName: props.entity,
+      projectName: props.project,
+      streamName: 'stream',
+    }),
+    [props.entity, props.project]
+  );
+  const selectedQuery = useRunsWithFeedback(streamId, filters);
   return (
     <SimplePageLayout
       title={props.opName + ' : ' + props.version}
       tabs={[
         {
-          label: 'Overview',
+          label: 'Calls',
+          content: (
+            <RunsTable
+              loading={selectedQuery.loading}
+              spans={selectedQuery.result}
+            />
+          ),
+        },
+
+        {
+          label: 'Execute',
           content: (
             <ScrollableTabContent>
-              Overview (Type Stub) <Browse2OpDefComponent params={params} />
+              <OpVersionExecute streamId={streamId} uri={uri} />
             </ScrollableTabContent>
           ),
         },
@@ -45,13 +76,47 @@ export const OpVersionPage: React.FC<{
             </ScrollableTabContent>
           ),
         },
-        {label: 'Calls', content: <div>Calls</div>},
-        {label: 'Execute', content: <div>Execute</div>},
         {label: 'DAG', content: <div>DAG</div>},
       ]}
     />
   );
   // return ;
+};
+
+const OpVersionExecute: React.FC<{
+  streamId: StreamId;
+  uri: string;
+}> = ({streamId, uri}) => {
+  const firstCall = useFirstCall(streamId, uri);
+  const opSignature = useOpSignature(streamId, uri);
+  return (
+    <Paper>
+      <Typography variant="h6" gutterBottom>
+        Call Op
+      </Typography>
+      <Box sx={{width: 400}}>
+        {opSignature.result != null &&
+          Object.keys(opSignature.result.inputTypes).map(k => (
+            <Box key={k} mb={2}>
+              <TextField
+                label={k}
+                fullWidth
+                value={
+                  firstCall.result != null
+                    ? firstCall.result.inputs[k]
+                    : undefined
+                }
+              />
+            </Box>
+          ))}
+      </Box>
+      <Box pt={1}>
+        <Button variant="outlined" sx={{backgroundColor: globals.lightYellow}}>
+          Execute
+        </Button>
+      </Box>
+    </Paper>
+  );
 };
 
 // <div>

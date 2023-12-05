@@ -33,6 +33,7 @@ import {BoardPage} from './Browse2/pages/BoardPage';
 import {BoardsPage} from './Browse2/pages/BoardsPage';
 import {CallPage} from './Browse2/pages/CallPage';
 import {CallsPage} from './Browse2/pages/CallsPage';
+import {CenteredAnimatedLoader} from './Browse2/pages/common/Loader';
 import {WeaveflowORMContextProvider} from './Browse2/pages/interface/wf/context';
 import {WFNaiveProject} from './Browse2/pages/interface/wf/naive';
 import {ObjectPage} from './Browse2/pages/ObjectPage';
@@ -263,7 +264,7 @@ const Browse2ProjectRoot: FC = () => {
   }, [projectData]);
   console.log(projectData);
   if (loading) {
-    return <>Loading...</>;
+    return <CenteredAnimatedLoader />;
   }
 
   return (
