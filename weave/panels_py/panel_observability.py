@@ -192,7 +192,7 @@ def observability(
             }
         ),
         color_title="state",
-        color=state_color_func,
+        color=state_color_func.val,
         groupby_dims=["x", "label"],
         mark="bar",
         domain_x=bin_range,
