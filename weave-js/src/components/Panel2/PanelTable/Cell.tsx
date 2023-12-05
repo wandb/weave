@@ -16,6 +16,7 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import {CellWrapper} from '../PanelTable.styles';
 import * as TH from './hooks';
 import * as Table from './tableState';
+import {useNodeValue} from '@wandb/weave/react';
 
 const recordEvent = makeEventRecorder('Table');
 

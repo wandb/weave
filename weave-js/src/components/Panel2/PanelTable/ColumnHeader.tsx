@@ -4,6 +4,8 @@ import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDr
 import {INPUT_SLIDER_CLASS} from '@wandb/weave/common/components/elements/SliderInput';
 import * as SemanticHacks from '@wandb/weave/common/util/semanticHacks';
 import {
+  varNode,
+  constFunction,
   canGroupType,
   canSortType,
   EditingNode,
@@ -13,6 +15,7 @@ import {
   Node,
   NodeOrVoidNode,
   voidNode,
+  opCount,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
@@ -29,6 +32,7 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import * as Table from './tableState';
 import {stripTag} from './util';
+import {TableState} from '@wandb/weave/index';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -122,6 +126,8 @@ export const ColumnHeader: React.FC<{
   panelContext: any;
   isPinned: boolean;
   simpleTable?: boolean;
+  countColumnId?: string | null;
+  setCountColumnId?: React.Dispatch<React.SetStateAction<string | null>>;
   updatePanelContext(newContext: any): void;
   updateTableState(newTableState: Table.TableState): void;
   setColumnPinState(pin: boolean): void;
@@ -141,11 +147,19 @@ export const ColumnHeader: React.FC<{
   isPinned,
   setColumnPinState,
   simpleTable,
+  countColumnId,
+  setCountColumnId,
 }) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
+
+  React.useEffect(() => {
+    return () => {
+      console.log('countColumnId - component is unmounting');
+    };
+  }, []);
 
   const [workingSelectFunction, setWorkingSelectFunction] =
     useState<EditingNode>(propsSelectFunction);
@@ -242,8 +256,19 @@ export const ColumnHeader: React.FC<{
     ]
   );
   const doUngroup = useCallback(async () => {
-    const newTableState = await disableGroup(
-      tableState,
+    let newTableState: Table.TableState | null = null;
+    console.log({countColumnId});
+    if (countColumnId) {
+      console.log({tableStateBeforeRemove: tableState});
+      newTableState = Table.removeColumn(tableState, countColumnId);
+      console.log({newTableStateAfterRemove: newTableState});
+      if (setCountColumnId) {
+        setCountColumnId(null);
+      }
+      console.log('Setting countColumnId to null');
+    }
+    newTableState = await disableGroup(
+      newTableState ?? tableState,
       colId,
       inputArrayNode,
       weave,
@@ -252,6 +277,8 @@ export const ColumnHeader: React.FC<{
     recordEvent('UNGROUP');
     updateTableState(newTableState);
   }, [
+    countColumnId,
+    setCountColumnId,
     disableGroup,
     tableState,
     colId,
@@ -308,13 +335,41 @@ export const ColumnHeader: React.FC<{
         icon: 'group-runs',
         onSelect: async () => {
           recordEvent('GROUP');
-          const newTableState = await enableGroup(
-            tableState,
+          console.log({rowsNodeType: rowsNode.type});
+          let newTableState: Table.TableState | null = null;
+          if (countColumnId == null) {
+            let {table, columnId} = Table.addColumnToTable(
+              tableState,
+              opCount({arr: varNode(rowsNode.type, 'row')})
+              // constFunction(
+              //   {
+              //     row: {
+              //       type: 'list',
+              //       objectType: {type: 'typedDict', propertyTypes: 'any'},
+              //     },
+              //   },
+              //   ({row}) => {
+              //     console.log({rowInsideSelectFn: row});
+              //     return opCount({arr: row});
+              //   }
+              // )
+            );
+            newTableState = table;
+            if (setCountColumnId) {
+              setCountColumnId(columnId);
+            }
+            console.log('Setting countColumnId');
+          }
+          console.log({tableStateAfterAddingNumberColumn: newTableState});
+          console.log({inputArrayNode});
+          newTableState = await enableGroup(
+            newTableState ?? tableState,
             colId,
             inputArrayNode,
             weave,
             stack
           );
+          console.log({newTableState});
           updateTableState(newTableState);
         },
       });
@@ -411,6 +466,8 @@ export const ColumnHeader: React.FC<{
     }
     return menuItems;
   }, [
+    countColumnId,
+    setCountColumnId,
     isGroupCol,
     columnTypeForGroupByChecks,
     workingSelectFunction.type,
