@@ -14,7 +14,7 @@ import {Button} from '../../Button';
 import {VariableView} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
 import {ConfigSection} from '../ConfigPanel';
-import {IconAddNew, IconDelete} from '../Icons';
+import {IconDelete} from '../Icons';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
@@ -541,34 +541,30 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
 
   const addNewSeriesDom = useMemo(() => {
     return (
-      <>
-        <S.AddNewSeriesContainer
-          onClick={() => {
-            if (config.series.length > 0) {
-              const newConfig = produce(
-                PlotState.addSeriesFromSeries(
-                  config,
-                  config.series[config.series.length - 1],
-                  'y',
-                  weave
-                ),
-                draft => {
-                  draft.series[
-                    draft.series.length - 1
-                  ].seriesName = `Series ${draft.series.length}`;
-                }
-              );
-              updateConfig(newConfig);
-            }
-          }}>
-          <S.AddNewSeriesText data-testid="add-new-series-text">
-            New series
-          </S.AddNewSeriesText>
-          <S.AddNewSeriesButton>
-            <IconAddNew width="18" height="18" />
-          </S.AddNewSeriesButton>
-        </S.AddNewSeriesContainer>
-      </>
+      <Button
+        className="my-8 w-full"
+        icon="add-new"
+        variant="quiet"
+        onClick={() => {
+          if (config.series.length > 0) {
+            const newConfig = produce(
+              PlotState.addSeriesFromSeries(
+                config,
+                config.series[config.series.length - 1],
+                'y',
+                weave
+              ),
+              draft => {
+                draft.series[
+                  draft.series.length - 1
+                ].seriesName = `Series ${draft.series.length}`;
+              }
+            );
+            updateConfig(newConfig);
+          }
+        }}>
+        New series
+      </Button>
     );
   }, [config, updateConfig, weave]);
 
