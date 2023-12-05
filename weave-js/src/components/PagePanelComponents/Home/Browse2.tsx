@@ -314,7 +314,7 @@ const Browse2ProjectRoot: FC = () => {
             <CallPage />
           </Route>
           <Route path={`/${projectRoot}/calls`}>
-            <CallsPage />
+            <CallsPage entity={params.entity} project={params.project} />
           </Route>
           {/* BOARDS */}
           <Route

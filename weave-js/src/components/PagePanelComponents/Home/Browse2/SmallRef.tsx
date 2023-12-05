@@ -46,7 +46,7 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
     return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
   }, [objRef]);
-  console.log({objRef});
+
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);

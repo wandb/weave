@@ -38,6 +38,14 @@ const defaultContext = {
     }
     return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
   },
+  callUIUrl: (
+    entityName: string,
+    projectName: string,
+    traceId: string,
+    callId: string
+  ) => {
+    return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
+  },
   typeVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -73,16 +81,27 @@ const newContext = {
     if (!isWandbArtifactRef(objRef)) {
       throw new Error('Not a wandb artifact ref');
     }
-    if (wfTable === 'OpVersion') {
-      return newContext.objectVersionUIUrl(
+    if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
+      return newContext.opVersionUIUrl(
         objRef.entityName,
         objRef.projectName,
         objRef.artifactName,
         objRef.artifactVersion
       );
-    } // } else if (wfTable === 'ObjectVersion') {
-    // TODO: Redirect to correct urls
-    return `/${objRef.entityName}/${objRef.projectName}/objects/${objRef.artifactName}/versions/${objRef.artifactVersion}`;
+    } else if (wfTable === 'TypeVersion' || rootTypeName === 'type') {
+      return newContext.typeVersionUIUrl(
+        objRef.entityName,
+        objRef.projectName,
+        objRef.artifactName,
+        objRef.artifactVersion
+      );
+    }
+    return newContext.objectVersionUIUrl(
+      objRef.entityName,
+      objRef.projectName,
+      objRef.artifactName,
+      objRef.artifactVersion
+    );
   },
   typeVersionUIUrl: (
     entityName: string,
@@ -107,6 +126,14 @@ const newContext = {
     opVersionHash: string
   ) => {
     return `/${entityName}/${projectName}/ops/${opName}/versions/${opVersionHash}`;
+  },
+  callUIUrl: (
+    entityName: string,
+    projectName: string,
+    traceId: string,
+    callId: string
+  ) => {
+    return `/${entityName}/${projectName}/calls/${callId}`;
   },
 };
 
@@ -133,5 +160,11 @@ const WeaveflowRouteContext = createContext<{
     projectName: string,
     opName: string,
     opVersionHash: string
+  ) => string;
+  callUIUrl: (
+    entityName: string,
+    projectName: string,
+    traceId: string,
+    callId: string
   ) => string;
 }>(defaultContext);

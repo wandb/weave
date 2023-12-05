@@ -14,6 +14,7 @@ import {Link, useParams} from 'react-router-dom';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
+import {useWeaveflowRouteContext} from './context';
 import {SmallRef} from './SmallRef';
 
 type DataGridColumnGroupingModel = Exclude<
@@ -64,6 +65,7 @@ export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
 }> = ({loading, spans}) => {
+  const routeContext = useWeaveflowRouteContext();
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
   // side
@@ -145,7 +147,12 @@ export const RunsTable: FC<{
         renderCell: rowParams => {
           return (
             <Link
-              to={`/${params.entity}/${params.project}/trace/${rowParams.row.trace_id}/${rowParams.row.id}`}>
+              to={routeContext.callUIUrl(
+                params.entity,
+                params.project,
+                rowParams.row.trace_id,
+                rowParams.row.id
+              )}>
               {rowParams.row.id}
             </Link>
           );
