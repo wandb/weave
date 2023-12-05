@@ -22,6 +22,13 @@ interface ProjectOwned {
   project: () => string;
 }
 
+interface ArtifactVersionBacked {
+  versionIndex: () => number;
+  aliases: () => string[];
+  description: () => string;
+  createdAtMs: () => number;
+}
+
 export interface WFType extends ProjectOwned {
   name: () => string;
   typeVersions: () => WFTypeVersion[];
@@ -44,12 +51,12 @@ export interface WFTypeVersion extends ProjectOwned {
   properties: () => {[propName: string]: WFTypeVersion};
   parentTypeVersion: () => WFTypeVersion | null;
   childTypeVersions: () => WFTypeVersion[];
-  inputsTo: () => Array<{argName: string; opVersion: WFOpVersion}>;
+  inputTo: () => Array<{argName: string; opVersion: WFOpVersion}>;
   outputFrom: () => WFOpVersion[];
   objectVersions: () => WFObjectVersion[];
 }
 
-export interface WFOpVersion extends ProjectOwned {
+export interface WFOpVersion extends ProjectOwned, ArtifactVersionBacked {
   op: () => WFOp;
   version: () => string;
   code: () => string;
@@ -58,10 +65,9 @@ export interface WFOpVersion extends ProjectOwned {
   invokes: () => WFOpVersion[];
   invokedBy: () => WFOpVersion[];
   calls: () => WFCall[];
-  description: () => string;
 }
 
-export interface WFObjectVersion extends ProjectOwned {
+export interface WFObjectVersion extends ProjectOwned, ArtifactVersionBacked {
   object: () => WFObject;
   version: () => string;
   rawWeaveObject: () => any;
@@ -70,10 +76,9 @@ export interface WFObjectVersion extends ProjectOwned {
     path: string;
     objectVersion: WFObjectVersion;
   } | null;
-  type: () => WFTypeVersion;
-  inputsTo: () => Array<{argName: string; opVersion: WFCall}>;
+  typeVersion: () => WFTypeVersion;
+  inputTo: () => WFCall[]; //Array<{argName: string; opVersion: WFCall}>;
   outputFrom: () => WFCall[];
-  description: () => string;
 }
 
 export interface WFCall extends ProjectOwned {

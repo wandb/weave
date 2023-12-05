@@ -1,57 +1,60 @@
-import {Check, NavigateNext} from '@mui/icons-material';
-import Box from '@mui/material/Box';
-// import {useDemoData} from '@mui/x-data-grid-generator';
+import {Box} from '@material-ui/core';
+import {NavigateNext} from '@mui/icons-material';
 import {
   DataGridPro,
   GridColDef,
   GridColumnGroupingModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
-import moment from 'moment';
 import React, {useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {
-  useAllObjectVersions,
-  useUpdateObjectVersionDescription,
-} from './interface/dataModel';
+import {useWeaveflowRouteContext} from '../context';
+import {useWeaveflowORMContext} from './interface/wf/context';
 
+const basicField = (
+  field: string,
+  headerName: string,
+  extra?: Partial<GridColDef>
+): GridColDef => {
+  return {
+    field,
+    headerName,
+    flex: extra?.flex ?? 1,
+    minWidth: extra?.minWidth ?? 100,
+    ...extra,
+  };
+};
 export const ObjectVersionsPage: React.FC<{
   entity: string;
   project: string;
 }> = props => {
   const history = useHistory();
-  const allObjectVersions = useAllObjectVersions(props.entity, props.project);
+  const routeContext = useWeaveflowRouteContext();
+  const orm = useWeaveflowORMContext();
+
+  const allObjectVersions = useMemo(() => {
+    return orm.projectConnection.objectVersions();
+  }, [orm.projectConnection]);
+  // const allObjectVersions = useAllObjectVersions(props.entity, props.project);
   const rows: GridRowsProp = useMemo(() => {
-    if (allObjectVersions.loading) {
-      return [];
-    } else {
-      return allObjectVersions.result.map((ov, i) => {
-        return {
-          id: ov.artifact_id,
-          collection_name: ov.collection_name,
-          hash: ov.hash,
-          is_latest_in_collection: ov.aliases.includes('latest'),
-          version_index: ov.version_index,
-          type_version: ov.type_version.type_name,
-          // produced_by: ov.produced_by,
-          created_at_ms: ov.created_at_ms,
-          date_created: ov.created_at_ms,
-          // date_created: moment
-          //   .unix(ov.created_at_ms / 1000)
-          //   .format('YYYY-MM-DD HH:mm:ss'),
-          description: ov.description,
-          // metadata: {},
-          // tags: [],
-          // properties: {a: 'b', c: 'd'},
-        };
-      });
-    }
+    return allObjectVersions.map((ov, i) => {
+      return {
+        id: ov.version(),
+        object: ov.object().name(),
+        version: ov.version(),
+        typeVersion: ov.typeVersion(),
+        inputTo: ov.inputTo(),
+        outputFrom: ov.outputFrom(),
+        description: ov.description(),
+        versionIndex: ov.versionIndex(),
+        createdAt: ov.createdAtMs(),
+        isLatest: ov.aliases().includes('latest'),
+      };
+    });
   }, [allObjectVersions]);
   const columns: GridColDef[] = [
-    {
-      field: 'id',
-      headerName: 'View',
+    basicField('id', 'View', {
       width: 30,
       renderCell: params => {
         // Icon to indicate navigation to the object version
@@ -63,69 +66,43 @@ export const ObjectVersionsPage: React.FC<{
           />
         );
       },
-    },
-    {
-      field: 'collection_name',
-      headerName: 'Collection Name',
-      flex: 1,
-      minWidth: 100,
-    },
-    {field: 'hash', headerName: 'Hash', flex: 1, minWidth: 100},
-    {
-      field: 'is_latest_in_collection',
-      headerName: 'Is Latest',
-      flex: 1,
-      minWidth: 100,
-      renderCell: params => {
-        return params.value ? <Check /> : null;
-      },
-    },
-    {
-      field: 'version_index',
-      headerName: 'Version Index',
-      flex: 1,
-      minWidth: 100,
-    },
-    {field: 'type_version', headerName: 'Data Type', flex: 1, minWidth: 100},
-    // {field: 'produced_by', headerName: 'Produced By', flex: 1, minWidth: 100},
-    {
-      field: 'date_created',
-      headerName: 'Date Created',
-      flex: 1,
-      minWidth: 100,
-      renderCell: params => {
-        return moment.unix(params.value / 1000).format('YYYY-MM-DD HH:mm:ss');
-      },
-    },
-    {
-      field: 'description',
-      headerName: 'Description',
-      flex: 1,
-      minWidth: 100,
-      editable: true,
-    },
-    // Metadata might not be necessary right now
-    // {field: 'metadata', headerName: 'Metadata', flex: 1, minWidth: 100},
-    // I think tags might not be available
-    // {field: 'tags', headerName: 'Tags'},
-    // Properties are only shown when there is a type filter
-    // TODO: work this out
-    // {field: 'properties', headerName: 'Properties'},
+    }),
+    basicField('object', 'Object'),
+    basicField('version', 'Version'),
+    basicField('typeVersion', 'Type Version'),
+    basicField('inputTo', 'Input To'),
+    basicField('outputFrom', 'Output From'),
+    basicField('description', 'Description'),
+    basicField('versionIndex', 'Version Index'),
+    basicField('createdAt', 'Created At'),
+    basicField('isLatest', 'Is Latest'),
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
-  const updateDescription = useUpdateObjectVersionDescription();
   return (
     <Box
       sx={{
-        flex: '1 1 auto',
-        height: '100%',
-        width: '100%',
-        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
+        flexGrow: 1,
       }}>
-      <h1>All Object (Version)s</h1>
-      <Box sx={{flex: '1 1 auto', overflow: 'hidden'}}>
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
+          p: 3,
+          borderBottom: '1px solid #e0e0e0',
+        }}>
+        <h1>All Object (Version)s</h1>
+      </Box>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
         <DataGridPro
           rows={rows}
           initialState={{
@@ -149,17 +126,13 @@ export const ObjectVersionsPage: React.FC<{
             // TODO: move these actions into a config
             if (params.field === 'id') {
               history.push(
-                `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
+                routeContext.objectVersionUIUrl(
+                  props.entity,
+                  props.project,
+                  params.row.object,
+                  params.row.version
+                )
               );
-            }
-          }}
-          onCellEditStop={(params, event) => {
-            const newVal = (event as any).target.value;
-            if (params.field === 'description') {
-              if (newVal === params.row.description) {
-                return;
-              }
-              updateDescription(params.row.id, (event as any).target.value);
             }
           }}
         />

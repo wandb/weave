@@ -46,7 +46,7 @@ export const TypeVersionsPage: React.FC<{
         version: tv.version(),
         parentType: tv.parentTypeVersion(),
         childTypes: tv.childTypeVersions(),
-        // inputsTo: tv.inputsTo(),
+        // inputTo: tv.inputTo(),
         // outputFrom: tv.outputFrom(),
         objectVersions: tv.objectVersions(),
       };
@@ -70,7 +70,7 @@ export const TypeVersionsPage: React.FC<{
     basicField('version', 'Version'),
     basicField('parentType', 'Parent Type'),
     basicField('childTypes', 'Child Types'),
-    basicField('inputsTo', 'Inputs To'),
+    basicField('inputTo', 'Input To'),
     basicField('outputFrom', 'Output From'),
     basicField('objectVersions', 'Object Versions'),
   ];

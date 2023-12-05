@@ -193,6 +193,30 @@ export class WFNaiveProject implements WFProject {
     );
     const objectTypeVersions = objectVersions.map(obj => obj.type_version);
 
+    this.state.objectVersionsMap = new Map(
+      objectVersions.map(objectVersion => {
+        return [
+          objectVersion.hash,
+          {
+            name: objectVersion.collection_name,
+            versionHash: objectVersion.hash,
+            createdAt: objectVersion.created_at_ms,
+            aliases: objectVersion.aliases,
+            description: objectVersion.description,
+            versionIndex: objectVersion.version_index,
+            typeVersionHash: objectVersion.type_version.type_version,
+          },
+        ];
+      })
+    );
+
+    this.state.objectsMap = new Map(
+      Array.from(this.state.objectVersionsMap.entries()).map(
+        ([objectVersionHash, objectVersionDict]) => {
+          return [objectVersionDict.name, {}];
+        }
+      )
+    );
 
     this.state.opVersionsMap = new Map(
       opVersions.map(opVersion => {
@@ -222,30 +246,6 @@ export class WFNaiveProject implements WFProject {
       )
     );
 
-    this.state.objectVersionsMap = new Map(
-      objectVersions.map(objectVersion => {
-        return [
-          objectVersion.hash,
-          {
-            name: objectVersion.collection_name,
-            versionHash: objectVersion.hash,
-            createdAt: objectVersion.created_at_ms,
-            aliases: objectVersion.aliases,
-            description: objectVersion.description,
-            versionIndex: objectVersion.version_index,
-            typeVersionHash: objectVersion.type_version.type_version,
-          },
-        ];
-      })
-    );
-
-    this.state.objectsMap = new Map(
-      Array.from(this.state.objectVersionsMap.entries()).map(
-        ([objectVersionHash, objectVersionDict]) => {
-          return [objectVersionDict.name, {}];
-        }
-      )
-    );
     
     const typeVersionsDict: {[key: string]: WFNaiveTypeVersionDictType} = {}
     const objectTypeVersionsQueue = [...objectTypeVersions];
@@ -281,6 +281,19 @@ export class WFNaiveProject implements WFProject {
 
     this.state.callsMap = new Map(
       joinedCalls.map(call => {
+        // const inputKeys = Object.keys(call.inputs)
+        // inputKeys
+        // let refNdx = 0
+        // while (('_ref' + refNdx) in call.inputs && call.inputs[('_ref' + refNdx)]) {
+        //   const uri = call.inputs[('_ref' + refNdx)]
+        //   const uriParts = uriToParts(uri)
+        //   if (uriParts) {
+        //     const objectVersion = this.state.objectVersionsMap.get(uriParts.version)
+        //     if (objectVersion) {
+        //       call.inputs[('_ref' + refNdx)] = objectVersion
+        //     }
+        //   }
+        // }
         return [
           call.span_id,
           {
@@ -291,6 +304,16 @@ export class WFNaiveProject implements WFProject {
     )
   }
 }
+
+// const uriToParts = (uri: string) => {
+//   if (uri.startsWith('wandb-artifact:///') && uri.endsWith('/obj')) {
+//     const inner = uri.slice('wandb-artifact:///'.length, -'/obj'.length);
+//     const [entity, project, collection, nameAndVersion] = inner.split('/');
+//     const [name, version] = nameAndVersion.split(':');
+//     return {entity, project, collection, name, version};
+//   }
+//   return null
+// }
 
 type WFNaiveTypeDictType = {};
 
@@ -338,7 +361,7 @@ class WFNaiveObject implements WFObject {
     private readonly state: WFNaiveProjectState,
     private readonly objectName: string
   ) {
-    const objectDict = this.state.opVersionsMap.get(objectName);
+    const objectDict = this.state.objectsMap.get(objectName);
     if (!objectDict) {
       throw new Error(
         `Cannot find type with name: ${objectName} in project: ${this.state.project}`
@@ -445,7 +468,7 @@ class WFNaiveTypeVersion implements WFTypeVersion {
         }
       );
   }
-  inputsTo(): Array<{argName: string; opVersion: WFOpVersion}> {
+  inputTo(): Array<{argName: string; opVersion: WFOpVersion}> {
     throw new Error('Method not implemented.');
   }
   outputFrom(): WFOpVersion[] {
@@ -490,6 +513,15 @@ class WFNaiveObjectVersion implements WFObjectVersion {
     }
     this.objectVersionDict = objectVersionDict;
   }
+  createdAtMs (): number {
+    return this.objectVersionDict.createdAt;
+  }
+  versionIndex(): number {
+    return this.objectVersionDict.versionIndex;
+  }
+  aliases(): string[] {
+    return this.objectVersionDict.aliases;
+  }
   entity(): string {
     return this.state.entity;
   }
@@ -497,10 +529,10 @@ class WFNaiveObjectVersion implements WFObjectVersion {
     return this.state.project;
   }
   object(): WFObject {
-    throw new Error('Method not implemented.');
+    return new WFNaiveObject(this.state, this.objectVersionDict.name);
   }
   version(): string {
-    throw new Error('Method not implemented.');
+    return this.objectVersionDict.versionHash;
   }
   rawWeaveObject(): any {
     throw new Error('Method not implemented.');
@@ -511,17 +543,38 @@ class WFNaiveObjectVersion implements WFObjectVersion {
   parentObjectVersion(): {path: string; objectVersion: WFObjectVersion} | null {
     throw new Error('Method not implemented.');
   }
-  type(): WFTypeVersion {
-    throw new Error('Method not implemented.');
+  typeVersion(): WFTypeVersion {
+    return new WFNaiveTypeVersion(
+      this.state,
+      this.objectVersionDict.typeVersionHash
+    );
   }
-  inputsTo(): Array<{argName: string; opVersion: WFCall}> {
-    throw new Error('Method not implemented.');
+  inputTo(): WFCall[] { //Array<{argName: string; opVersion: WFCall}> {
+    const targetUri = `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.objectVersionDict.name}:${this.objectVersionDict.versionHash}/obj`
+    return Array.from(this.state.callsMap.values()).filter(callDict => {
+      return Object.values(callDict.callSpan.inputs).some((input: any) => {
+        return input === targetUri
+      })
+    }).map(
+      callDict => {
+        return new WFNaiveCall(this.state, callDict.callSpan.span_id);
+      }
+    )
   }
   outputFrom(): WFCall[] {
-    throw new Error('Method not implemented.');
+    const targetUri = `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.objectVersionDict.name}:${this.objectVersionDict.versionHash}/obj`
+    return Array.from(this.state.callsMap.values()).filter(callDict => {
+      return Object.values(callDict.callSpan.output ?? {}).some((input: any) => {
+        return input === targetUri
+      })
+    }).map(
+      callDict => {
+        return new WFNaiveCall(this.state, callDict.callSpan.span_id);
+      }
+    )
   }
   description(): string {
-    throw new Error('Method not implemented.');
+    return this.objectVersionDict.description;
   }
 }
 
@@ -559,11 +612,20 @@ class WFNaiveOpVersion implements WFOpVersion {
     }
     this.opVersionDict = opVersionDict;
   }
+  createdAtMs (): number {
+    return this.opVersionDict.createdAt;
+  }
+  versionIndex(): number {
+    return this.opVersionDict.versionIndex;
+  }
+  aliases(): string[] {
+    return this.opVersionDict.aliases;
+  }
   op(): WFOp {
-    throw new Error('Method not implemented.');
+    return new WFNaiveOp(this.state, this.opVersionDict.name);
   }
   version(): string {
-    throw new Error('Method not implemented.');
+    return this.opVersionDict.versionHash;
   }
   code(): string {
     throw new Error('Method not implemented.');
@@ -581,10 +643,20 @@ class WFNaiveOpVersion implements WFOpVersion {
     throw new Error('Method not implemented.');
   }
   calls(): WFCall[] {
-    throw new Error('Method not implemented.');
+    return Array.from(this.state.callsMap.values()).filter(callDict => {
+      if (!callDict.callSpan.name.startsWith("wandb-artifact:///")) {
+      return false;
+      } 
+      const version = callDict.callSpan.name.split(':')[2].split('/')[0]
+      return version === this.opVersionDict.versionHash
+    }).map(
+      callDict => {
+        return new WFNaiveCall(this.state, callDict.callSpan.span_id);
+      }
+    )
   }
   description(): string {
-    throw new Error('Method not implemented.');
+    return this.opVersionDict.description;
   }
   entity(): string {
     return this.state.entity;
