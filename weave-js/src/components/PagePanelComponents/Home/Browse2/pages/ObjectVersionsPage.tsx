@@ -31,7 +31,10 @@ import {
   OpVersionLink,
   TypeVersionLink,
 } from './common/Links';
-import {SimplePageLayout} from './common/SimplePageLayout';
+import {
+  FilterableTablePageContent,
+  SimplePageLayout,
+} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeCategory, WFObjectVersion} from './interface/wf/types';
@@ -147,59 +150,14 @@ export const FilterableObjectVersionsTable: React.FC<{
     effectiveFilter.typeVersions,
   ]);
   return (
-    <Box
-      sx={{
-        flex: '1 1 auto',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'row',
-      }}>
-      <Box
-        sx={{
-          flex: '0 0 auto',
-          height: '100%',
-          width: '240px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'auto',
-        }}>
-        <Box
-          sx={{
-            pl: 2,
-            pr: 1,
-            height: 57,
-            flex: '0 0 auto',
-            borderBottom: '1px solid #e0e0e0',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1,
-            backgroundColor: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-          Filters
-          {Object.keys(props.frozenFilter ?? {}).length > 0 && (
-            <IconButton
-              size="small"
-              onClick={() => {
-                // TODO: use the route context
-                history.push(
-                  routerContext.objectVersionsUIUrl(
-                    props.entity,
-                    props.project,
-                    effectiveFilter
-                  )
-                );
-              }}>
-              <OpenInNew />
-            </IconButton>
-          )}
-        </Box>
-        <List
-          // dense
-          sx={{width: '100%', maxWidth: 360, bgcolor: 'background.paper'}}>
+    <FilterableTablePageContent
+      filterPopoutTargetUrl={routerContext.objectVersionsUIUrl(
+        props.entity,
+        props.project,
+        effectiveFilter
+      )}
+      filterListItems={
+        <>
           <ListItem
             secondaryAction={
               <Checkbox
@@ -225,13 +183,6 @@ export const FilterableObjectVersionsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                // disablePortal
-                // disableClearable
-                // options={projects}
-                // value={props.project}
-                // onChange={(event, newValue) => {
-                //   props.navigateToProject(newValue);
-                // }}
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'typeCategory'
                 )}
@@ -254,13 +205,10 @@ export const FilterableObjectVersionsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                // disablePortal
                 multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'typeVersions'
                 )}
-                // disableClearable
-                // options={projects}
                 value={effectiveFilter.typeVersions ?? []}
                 onChange={(event, newValue) => {
                   setFilter({
@@ -268,7 +216,6 @@ export const FilterableObjectVersionsTable: React.FC<{
                     typeVersions: newValue,
                   });
                 }}
-                // open={true}
                 renderInput={params => (
                   <TextField {...params} label="Type Versions" />
                 )}
@@ -284,13 +231,6 @@ export const FilterableObjectVersionsTable: React.FC<{
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'inputToOpVersions'
                 )}
-                // disablePortal
-                // disableClearable
-                // options={projects}
-                // value={props.project}
-                // onChange={(event, newValue) => {
-                //   props.navigateToProject(newValue);
-                // }}
                 renderInput={params => (
                   <TextField {...params} label="Input To" />
                 )}
@@ -305,10 +245,10 @@ export const FilterableObjectVersionsTable: React.FC<{
               />
             </FormControl>
           </ListItem>
-        </List>
-      </Box>
+        </>
+      }>
       <ObjectVersionsTable objectVersions={filteredObjectVersions} />
-    </Box>
+    </FilterableTablePageContent>
   );
 };
 

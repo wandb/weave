@@ -1,24 +1,22 @@
-import {OpenInNew} from '@mui/icons-material';
 import {
   Autocomplete,
-  Box,
   Checkbox,
   FormControl,
-  IconButton,
-  List,
   ListItem,
   ListItemButton,
   ListItemText,
   TextField,
 } from '@mui/material';
 import React, {useEffect, useMemo, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 
 import {CallFilter} from '../callTree';
 import {useRunsWithFeedback} from '../callTreeHooks';
 import {useWeaveflowRouteContext} from '../context';
 import {RunsTable} from '../RunsTable';
-import {SimplePageLayout} from './common/SimplePageLayout';
+import {
+  FilterableTablePageContent,
+  SimplePageLayout,
+} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyOpCategory} from './interface/wf/types';
 
@@ -54,7 +52,6 @@ export const CallsTable: React.FC<{
   initialFilter?: WFHighLevelCallFilter;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
-  const history = useHistory();
   const orm = useWeaveflowORMContext();
   const opVersionOptions = useMemo(() => {
     const versions = orm.projectConnection.opVersions();
@@ -127,59 +124,14 @@ export const CallsTable: React.FC<{
   );
 
   return (
-    <Box
-      sx={{
-        flex: '1 1 auto',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'row',
-      }}>
-      <Box
-        sx={{
-          flex: '0 0 auto',
-          height: '100%',
-          width: '240px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'auto',
-        }}>
-        <Box
-          sx={{
-            pl: 2,
-            pr: 1,
-            height: 57,
-            flex: '0 0 auto',
-            borderBottom: '1px solid #e0e0e0',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1,
-            backgroundColor: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-          Filters
-          {Object.keys(props.frozenFilter ?? {}).length > 0 && (
-            <IconButton
-              size="small"
-              onClick={() => {
-                // TODO: use the route context
-                history.push(
-                  routerContext.callsUIUrl(
-                    props.entity,
-                    props.project,
-                    effectiveFilter
-                  )
-                );
-              }}>
-              <OpenInNew />
-            </IconButton>
-          )}
-        </Box>
-        <List
-          // dense
-          sx={{width: '100%', maxWidth: 360, bgcolor: 'background.paper'}}>
+    <FilterableTablePageContent
+      filterPopoutTargetUrl={routerContext.callsUIUrl(
+        props.entity,
+        props.project,
+        effectiveFilter
+      )}
+      filterListItems={
+        <>
           <ListItem
             secondaryAction={
               <Checkbox
@@ -205,13 +157,6 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                // disablePortal
-                // disableClearable
-                // options={projects}
-                // value={props.project}
-                // onChange={(event, newValue) => {
-                //   props.navigateToProject(newValue);
-                // }}
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'opCategory'
                 )}
@@ -233,13 +178,10 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                // disablePortal
                 multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'opVersions'
                 )}
-                // disableClearable
-                // options={projects}
                 value={effectiveFilter.opVersions ?? []}
                 onChange={(event, newValue) => {
                   setFilter({
@@ -247,7 +189,6 @@ export const CallsTable: React.FC<{
                     opVersions: newValue,
                   });
                 }}
-                // open={true}
                 renderInput={params => (
                   <TextField {...params} label="Op Version" />
                 )}
@@ -263,13 +204,6 @@ export const CallsTable: React.FC<{
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'inputObjectVersions'
                 )}
-                // disablePortal
-                // disableClearable
-                // options={projects}
-                // value={props.project}
-                // onChange={(event, newValue) => {
-                //   props.navigateToProject(newValue);
-                // }}
                 renderInput={params => (
                   <TextField {...params} label="Consumes Objects" />
                 )}
@@ -284,9 +218,9 @@ export const CallsTable: React.FC<{
               />
             </FormControl>
           </ListItem>
-        </List>
-      </Box>
+        </>
+      }>
       <RunsTable loading={runs.loading} spans={runs.result} />
-    </Box>
+    </FilterableTablePageContent>
   );
 };
