@@ -1,58 +1,97 @@
-import React from 'react';
-import {Link} from 'react-router-dom';
+/*
+THIS PAGE IS A TOTAL HACK - NEEDS TO BE REWRITTEN
+*/
 
-import {useEPPrefix} from './util';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 
-export const BoardPage: React.FC = () => {
-  const prefix = useEPPrefix();
+import {useWeaveContext} from '../../../../../context';
+import {constString, opGet} from '../../../../../core';
+import {
+  CHILD_PANEL_DEFAULT_CONFIG,
+  ChildPanel,
+  ChildPanelFullConfig,
+} from '../../../../Panel2/ChildPanel';
+import {PanelInteractContextProvider} from '../../../../Panel2/PanelInteractContext';
+import {PanelRenderedConfigContextProvider} from '../../../../Panel2/PanelRenderedConfigContext';
+import {PagePanelControlContextProvider} from '../../../../PagePanelContext';
+import styled from 'styled-components';
+import * as globals from '@wandb/weave/common/css/globals.styles';
+
+const WeaveRoot = styled.div<{fullScreen: boolean}>`
+  position: ${p => (p.fullScreen ? `fixed` : `absolute`)};
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: ${globals.WHITE};
+  color: ${globals.TEXT_PRIMARY_COLOR};
+`;
+WeaveRoot.displayName = 'S.WeaveRoot';
+
+export const BoardPage: React.FC<{
+  entity: string;
+  project: string;
+  boardId: string;
+  versionId?: string;
+}> = props => {
+  const expString = `get("wandb-artifact:///${props.entity}/${props.project}/${
+    props.boardId
+  }:${props.versionId ?? 'latest'}/obj")`;
+  const weave = useWeaveContext();
+  const [config, setConfig] = useState<ChildPanelFullConfig>(
+    CHILD_PANEL_DEFAULT_CONFIG
+  );
+  const updateConfig = useCallback(
+    (newConfig: Partial<ChildPanelFullConfig>) => {
+      setConfig(currentConfig => ({...currentConfig, ...newConfig}));
+      // if (newConfig.input_node != null) {
+      //   setUrlExp(newConfig.input_node);
+      // }
+    },
+    [setConfig]
+  );
+  const [loading, setLoading] = useState(true);
+  const transparentlyMountExpString = useRef('');
+  useEffect(() => {
+    const doTransparently =
+      expString != null && transparentlyMountExpString.current === expString;
+    setLoading(!doTransparently);
+    if (expString != null) {
+      weave.expression(expString, []).then(res => {
+        if (doTransparently) {
+          updateConfig({
+            input_node: res.expr as any,
+          });
+        } else {
+          updateConfig({
+            input_node: res.expr as any,
+            id: '',
+            config: undefined,
+          } as any);
+        }
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expString]);
   return (
-    <div>
-      <h1>BoardPage Placeholder</h1>
-      <div>This is the page for a single board.</div>
-      <div>
-        The exact URL structure needs some finalizing. We might have a few
-        different urls, for example:
-      </div>
-      <ul>
-        <li>
-          <pre>/boards/_new_board_</pre>
-        </li>
-        <li>
-          <pre>/boards/:boardId</pre>
-        </li>
-        <li>
-          <pre>/boards/:boardId/version/:versionId</pre>
-        </li>
-      </ul>
-      <div>Migration Notes:</div>
-      <ul>
-        <li>
-          We should re-use the components from the weave home for viewing a
-          board
-        </li>
-        <li>
-          We should re-consider persistence and model it off of the workspace
-          where one board has many "versions" (aka aliases)
-        </li>
-      </ul>
-      <div>Links:</div>
-      <ul>
-        <li>
-          Back to all boards. <Link to={prefix('/boards')}>/boards</Link>
-        </li>
-      </ul>
-      <div>Inspiration</div>
-      <a href="https://weave.wandb.ai/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2Ftimssweeney%2Fcustomer_demo%2Fc_exmaple%3A8b2b4705f6776948b84d%2Fobj%22%29">
-        Link
-      </a>
-      <br />
-      <img
-        src="https://github.com/wandb/weave/blob/562a679a24ede63dcf4295476a52d7dc38d4bd04/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/board_example.png?raw=true"
-        style={{
-          width: '100%',
-        }}
-        alt=""
-      />
-    </div>
+    <PanelRenderedConfigContextProvider>
+      <PanelInteractContextProvider>
+        <WeaveRoot className="weave-root">
+          <PagePanelControlContextProvider>
+            <ChildPanel
+              config={config}
+              updateConfig={function (
+                newConfig: ChildPanelFullConfig<any>
+              ): void {
+                // throw new Error('Function not implemented.');
+              }}
+            />
+          </PagePanelControlContextProvider>
+        </WeaveRoot>
+      </PanelInteractContextProvider>
+    </PanelRenderedConfigContextProvider>
   );
 };

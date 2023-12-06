@@ -167,7 +167,7 @@ export const useRunsWithFeedback = (
     }
     const runs = runsQuery.result;
     const feedback = feedbackQuery.result ?? [];
-    const result = joinRunsWithFeedback(runs, feedback);
+    const result = joinRunsWithFeedback(runs ?? [], feedback);
     return {
       loading: false,
       result,

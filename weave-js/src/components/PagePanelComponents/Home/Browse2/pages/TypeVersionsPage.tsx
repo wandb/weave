@@ -13,6 +13,12 @@ import {basicField} from './common/DataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFTypeVersion} from './interface/wf/types';
+import {
+  ObjectVersionLink,
+  ObjectVersionsLink,
+  TypeLink,
+  TypeVersionLink,
+} from './common/Links';
 
 export const TypeVersionsPage: React.FC<{
   entity: string;
@@ -25,7 +31,7 @@ export const TypeVersionsPage: React.FC<{
   }, [orm.projectConnection]);
   return (
     <SimplePageLayout
-      title="Types"
+      title="Type Versions"
       tabs={[
         {
           label: 'All',
@@ -39,9 +45,6 @@ export const TypeVersionsPage: React.FC<{
 export const TypeVersionsTable: React.FC<{
   typeVersions: WFTypeVersion[];
 }> = props => {
-  const history = useHistory();
-  const routeContext = useWeaveflowRouteContext();
-  // const allObjectVersions = useAllObjectVersions(props.entity, props.project);
   const rows: GridRowsProp = useMemo(() => {
     return props.typeVersions.map((tv, i) => {
       return {
@@ -53,112 +56,57 @@ export const TypeVersionsTable: React.FC<{
         childTypes: tv.childTypeVersions(),
         // inputTo: tv.inputTo(),
         // outputFrom: tv.outputFrom(),
-        objectVersions: tv.objectVersions(),
+        objectVersions: tv.objectVersions().length,
       };
     });
   }, [props.typeVersions]);
   const columns: GridColDef[] = [
-    basicField('id', 'View', {
-      width: 50,
-      minWidth: 50,
-      maxWidth: 50,
+    basicField('version', 'Version', {
       renderCell: params => {
-        // Icon to indicate navigation to the object version
         return (
-          <NavigateNext
-            style={{
-              cursor: 'pointer',
+          <TypeVersionLink
+            typeName={params.row.type}
+            version={params.row.version}
+            hideName
+          />
+        );
+      },
+    }),
+    basicField('type', 'Type', {
+      renderCell: params => {
+        return <TypeLink typeName={params.row.type} />;
+      },
+    }),
+    // Keeping it simple for now
+    // basicField('parentType', 'Parent Type'),
+    // basicField('childTypes', 'Child Types'),
+    // basicField('inputTo', 'Input To'),
+    // basicField('outputFrom', 'Output From'),
+    basicField('objectVersions', 'Object Versions', {
+      renderCell: params => {
+        if (params.value === 0) {
+          return null;
+        }
+        return (
+          <ObjectVersionsLink
+            entity={params.row.obj.entity()}
+            project={params.row.obj.project()}
+            versionsCount={params.value}
+            filter={{
+              typeVersions: [params.row.type + ':' + params.row.version],
             }}
           />
         );
       },
     }),
-    basicField('type', 'Type'),
-    basicField('version', 'Version'),
-    basicField('parentType', 'Parent Type'),
-    basicField('childTypes', 'Child Types'),
-    basicField('inputTo', 'Input To'),
-    basicField('outputFrom', 'Output From'),
-    basicField('objectVersions', 'Object Versions'),
   ];
-  const columnGroupingModel: GridColumnGroupingModel = [];
   return (
     <DataGridPro
       rows={rows}
-      // {...data}
-      // loading={data.rows.length === 0}
       rowHeight={38}
       columns={columns}
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
-      columnGroupingModel={columnGroupingModel}
-      onRowClick={params => {
-        // history.push(
-        //   `/${props.entity}/${props.project}/objects/${params.row.collection_name}/versions/${params.row.hash}`
-        // );
-      }}
-      onCellClick={params => {
-        // TODO: move these actions into a config
-        if (params.field === 'id') {
-          history.push(
-            routeContext.typeVersionUIUrl(
-              params.row.obj.entity(),
-              params.row.obj.project(),
-              params.row.type,
-              params.row.version
-            )
-          );
-        }
-      }}
     />
   );
 };
-
-// <div>
-//       <h1>TypeVersionsPage Placeholder</h1>
-//       <h2>Filter: {filter}</h2>
-//       <div>
-//         This is the listing page for TypeVersions. A TypeVersion is a "version"
-//         of a weave "type". In the user's mind it is analogous to a specific
-//         implementation of a python class.
-//       </div>
-//       <div>Migration Notes:</div>
-//       <ul>
-//         <li>
-//           From a content perspective, this is similar to the `versions` table
-//           available in weaveflow (
-//           <a href="https://weave.wandb.ai/browse2/dannygoldstein/hooman-eval-notion2/Dataset/eval_dataset">
-//             example
-//           </a>
-//           ) except that rather than just showing the versions of a single type,
-//           we show all versions of all types, filtered to whatever the user (or
-//           link source) specified.
-//         </li>
-//         <li>
-//           Notice that the sidebar `Types` links here. This might seem like a
-//           mistake, but it is not. What the user most likely _wants_ to see is a
-//           listing of all the _latest_ versions of each type (which is why the
-//           link filters to latest).
-//         </li>
-//       </ul>
-//       <div>Links:</div>
-//       <ul>
-//         <li>
-//           Each row should link to the associated type version:{' '}
-//           <Link to={prefix('/types/type_name/versions/version_id')}>
-//             /types/[type_name]/versions/[version_id]
-//           </Link>
-//         </li>
-//       </ul>
-//       <div>Inspiration</div>
-//       This page will basically be a simple table of Type Versions, with some
-//       lightweight filtering on top.
-//       <br />
-//       <img
-//         src="https://github.com/wandb/weave/blob/db555a82512c2bac881ee0c65cf6d33264f4d34c/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/simple_table.png?raw=true"
-//         style={{
-//           width: '100%',
-//         }}
-//         alt=""
-//       />
-//     </div>

@@ -1,40 +1,49 @@
+import {Box} from '@mui/material';
 import React from 'react';
-import {Link} from 'react-router-dom';
 
-import {useEPPrefix} from './util';
+import {Node} from '../../../../../core';
+import {CenterProjectBoardsBrowser2} from '../../HomeCenterEntityBrowser';
 
-export const BoardsPage: React.FC = () => {
-  const prefix = useEPPrefix();
+export const BoardsPage: React.FC<{
+  entity: string;
+  project: string;
+}> = props => {
+  const [previewNode, setPreviewNode] = React.useState<React.ReactNode>(null);
   return (
-    <div>
-      <h1>BoardsPage Placeholder</h1>
-      <div>This is the listing page for boards</div>
-      <div>Migration Notes:</div>
-      <ul>
-        <li>
-          We should try to reuse as much as possible from the homepage boards
-          table view. Most of the query layer should be reusable.
-        </li>
-      </ul>
-      <div>Links:</div>
-      <ul>
-        <li>
-          Each row should link to the associated board:{' '}
-          <Link to={prefix('/boards/my_board')}>/boards/my_board</Link>
-        </li>
-      </ul>
-      <div>Inspiration</div>
-      <a href="https://weave.wandb.test/browse/wandb/timssweeney/weave/board">
-        Link
-      </a>
-      <br />
-      <img
-        src="https://github.com/wandb/weave/blob/562a679a24ede63dcf4295476a52d7dc38d4bd04/weave-js/src/components/PagePanelComponents/Home/Browse2/pages/example_media/boards_example.png?raw=true"
+    <Box
+      style={{
+        height: '100%',
+        width: '100%',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'row',
+        flex: '1 1 auto',
+      }}>
+      <Box
         style={{
+          height: '100%',
           width: '100%',
-        }}
-        alt=""
-      />
-    </div>
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: '1 1 auto',
+        }}>
+        <CenterProjectBoardsBrowser2
+          entityName={props.entity}
+          projectName={props.project}
+          setPreviewNode={function (
+            node: React.ReactNode,
+            requestedWidth?: string | undefined
+          ): void {
+            setPreviewNode(node);
+            // throw new Error('Function not implemented.');
+          }}
+          navigateToExpression={function (expression: Node): void {
+            // throw new Error('Function not implemented.');
+          }}
+        />
+      </Box>
+      {previewNode}
+    </Box>
   );
 };

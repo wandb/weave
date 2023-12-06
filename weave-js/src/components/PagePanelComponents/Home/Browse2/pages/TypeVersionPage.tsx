@@ -58,14 +58,14 @@ export const TypeVersionPage: React.FC<{
           label: 'Child Types',
           content: <TypeVersionChildTypes typeVersion={typeVersion} />,
         },
-        {
-          label: 'Consuming Ops',
-          content: <TypeVersionConsumingOps typeVersion={typeVersion} />,
-        },
-        {
-          label: 'Producing Ops',
-          content: <TypeVersionProducingOps typeVersion={typeVersion} />,
-        },
+        // {
+        //   label: 'Consuming Ops',
+        //   content: <TypeVersionConsumingOps typeVersion={typeVersion} />,
+        // },
+        // {
+        //   label: 'Producing Ops',
+        //   content: <TypeVersionProducingOps typeVersion={typeVersion} />,
+        // },
         {
           label: 'DAG',
           content: <div>TODO</div>,

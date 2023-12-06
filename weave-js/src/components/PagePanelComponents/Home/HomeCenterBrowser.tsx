@@ -178,6 +178,7 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   setSelectedRowId?: Dispatch<SetStateAction<string | undefined>>;
   setPreviewNode?: SetPreviewNodeType;
 
+  noTitle?: boolean;
   noDataCTA?: string;
   breadcrumbs?: Array<{
     key: string;
@@ -302,33 +303,35 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
       />
 
       <CenterSpaceHeader>
-        <CenterSpaceTitle>
-          <span
-            style={{
-              color: '#8E949E',
-            }}>
-            {(props.breadcrumbs ?? []).map((comp, ndx) => {
-              const style: React.CSSProperties = {};
-              if (comp.onClick) {
-                style.cursor = 'pointer';
-              }
-              return (
-                <React.Fragment key={comp.key}>
-                  <span style={style} onClick={comp.onClick}>
-                    {comp.text}
-                  </span>
-                  <span
-                    style={{
-                      margin: '0px 10px',
-                    }}>
-                    /
-                  </span>
-                </React.Fragment>
-              );
-            })}
-          </span>
-          {props.title}
-        </CenterSpaceTitle>
+        {!props.noTitle && (
+          <CenterSpaceTitle>
+            <span
+              style={{
+                color: '#8E949E',
+              }}>
+              {(props.breadcrumbs ?? []).map((comp, ndx) => {
+                const style: React.CSSProperties = {};
+                if (comp.onClick) {
+                  style.cursor = 'pointer';
+                }
+                return (
+                  <React.Fragment key={comp.key}>
+                    <span style={style} onClick={comp.onClick}>
+                      {comp.text}
+                    </span>
+                    <span
+                      style={{
+                        margin: '0px 10px',
+                      }}>
+                      /
+                    </span>
+                  </React.Fragment>
+                );
+              })}
+            </span>
+            {props.title}
+          </CenterSpaceTitle>
+        )}
         {showControls && (
           <CenterSpaceControls>
             {props.allowSearch && (

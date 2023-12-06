@@ -333,17 +333,17 @@ const Browse2ProjectRoot: FC = () => {
               `/${projectRoot}/boards/:boardId`,
               `/${projectRoot}/boards/:boardId/version/:versionId`,
             ]}>
-            <BoardPage />
+            <BoardPageBinding />
           </Route>
           <Route path={`/${projectRoot}/boards`}>
-            <BoardsPage />
+            <BoardsPage entity={params.entity} project={params.project} />
           </Route>
           {/* TABLES */}
           <Route path={`/${projectRoot}/tables/:tableId`}>
             <TablePage />
           </Route>
           <Route path={`/${projectRoot}/tables`}>
-            <TablesPage />
+            <TablesPage entity={params.entity} project={params.project} />
           </Route>
         </Switch>
       </Box>
@@ -478,4 +478,15 @@ const ObjectVersionsPageBinding = () => {
       initialFilter={filters}
     />
   );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const BoardPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    boardId: string;
+    versionId?: string;
+  }>();
+  return <BoardPage {...params} />;
 };

@@ -4,6 +4,7 @@ import {Link} from 'react-router-dom';
 import {useWeaveflowRouteContext} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage';
 import {useWeaveflowORMContext} from '../interface/wf/context';
+import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 
 export const TypeLink: React.FC<{typeName: string}> = props => {
   const orm = useWeaveflowORMContext();
@@ -28,9 +29,13 @@ export const TypeLink: React.FC<{typeName: string}> = props => {
 export const TypeVersionLink: React.FC<{
   typeName: string;
   version: string;
+  hideName?: boolean;
 }> = props => {
   const orm = useWeaveflowORMContext();
   const routerContext = useWeaveflowRouteContext();
+  const text = props.hideName
+    ? props.version
+    : props.typeName + ': ' + props.version;
   try {
     const typeVersion = orm.projectConnection.typeVersion(
       props.typeName,
@@ -44,15 +49,12 @@ export const TypeVersionLink: React.FC<{
           typeVersion.type().name(),
           typeVersion.version()
         )}>
-        {props.typeName} : {props.version}
+        {text}
       </Link>
     );
   } catch (e) {
-    return (
-      <span>
-        {props.typeName} : {props.version}
-      </span>
-    );
+    console.error(e);
+    return <span>{text}</span>;
   }
 };
 
@@ -187,6 +189,25 @@ export const CallsLink: React.FC<{
     <Link
       to={routerContext.callsUIUrl(props.entity, props.project, props.filter)}>
       {props.callCount} calls
+    </Link>
+  );
+};
+
+export const ObjectVersionsLink: React.FC<{
+  entity: string;
+  project: string;
+  versionsCount: number;
+  filter?: WFHighLevelObjectVersionFilter;
+}> = props => {
+  const routerContext = useWeaveflowRouteContext();
+  return (
+    <Link
+      to={routerContext.objectVersionsUIUrl(
+        props.entity,
+        props.project,
+        props.filter
+      )}>
+      {props.versionsCount} objects
     </Link>
   );
 };
