@@ -125,8 +125,8 @@ export const ColumnHeader: React.FC<{
   panelContext: any;
   isPinned: boolean;
   simpleTable?: boolean;
-  countColumnId?: string | null;
-  setCountColumnId?: React.Dispatch<React.SetStateAction<string | null>>;
+  countColumnId: string | null;
+  setCountColumnId: React.Dispatch<React.SetStateAction<string | null>>;
   updatePanelContext(newContext: any): void;
   updateTableState(newTableState: Table.TableState): void;
   setColumnPinState(pin: boolean): void;
@@ -252,9 +252,7 @@ export const ColumnHeader: React.FC<{
     let newTableState: Table.TableState | null = null;
     if (countColumnId && tableState.groupBy.length === 1) {
       newTableState = Table.removeColumn(tableState, countColumnId);
-      if (setCountColumnId) {
-        setCountColumnId(null);
-      }
+      setCountColumnId(null);
     }
     newTableState = await disableGroup(
       newTableState ?? tableState,
@@ -341,9 +339,7 @@ export const ColumnHeader: React.FC<{
               ).val
             );
             newTableState = table;
-            if (setCountColumnId) {
-              setCountColumnId(columnId);
-            }
+            setCountColumnId(columnId);
           }
           newTableState = await enableGroup(
             newTableState ?? tableState,

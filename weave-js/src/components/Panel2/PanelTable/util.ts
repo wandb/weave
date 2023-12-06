@@ -236,7 +236,7 @@ export const useBaseTableColumnDefinitions = (
 export const useOrderedColumns = (
   tableState: Table.TableState,
   pinnedColumns: string[],
-  countColumnId?: string | null
+  countColumnId: string | null
 ) => {
   return useMemo(() => {
     const allColumns = Table.getColumnRenderOrder(tableState);
