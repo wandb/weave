@@ -352,7 +352,6 @@ export const ColumnHeader: React.FC<{
             weave,
             stack
           );
-          console.log({newTableState});
           updateTableState(newTableState);
         },
       });
