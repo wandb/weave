@@ -12,7 +12,9 @@ type PanelErrorProps = {
 const PanelError: React.FC<PanelErrorProps> = React.memo(
   ({message, className}) => {
     return (
-      <div className={classNames('panel-error', className)} data-test="panel-error">
+      <div
+        className={classNames('panel-error', className)}
+        data-test="panel-error">
         <Tailwind>
           <IconInfo width={24} height={24} className="m-auto mb-4" />
           <div>{message}</div>
