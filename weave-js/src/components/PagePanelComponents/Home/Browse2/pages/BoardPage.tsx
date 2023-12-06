@@ -2,10 +2,13 @@
 THIS PAGE IS A TOTAL HACK - NEEDS TO BE REWRITTEN
 */
 
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import styled from 'styled-components';
 
 import {useWeaveContext} from '../../../../../context';
-import {constString, opGet} from '../../../../../core';
+// import {constString, opGet} from '../../../../../core';
+import {PagePanelControlContextProvider} from '../../../../PagePanelContext';
 import {
   CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
@@ -13,15 +16,13 @@ import {
 } from '../../../../Panel2/ChildPanel';
 import {PanelInteractContextProvider} from '../../../../Panel2/PanelInteractContext';
 import {PanelRenderedConfigContextProvider} from '../../../../Panel2/PanelRenderedConfigContext';
-import {PagePanelControlContextProvider} from '../../../../PagePanelContext';
-import styled from 'styled-components';
-import * as globals from '@wandb/weave/common/css/globals.styles';
+import {CenteredAnimatedLoader} from './common/Loader';
 
-const WeaveRoot = styled.div<{fullScreen: boolean}>`
-  position: ${p => (p.fullScreen ? `fixed` : `absolute`)};
-  top: 0;
+const WeaveRoot = styled.div`
+  position: absolute;
+  top: 64px;
   bottom: 0;
-  left: 0;
+  left: 240px;
   right: 0;
   background-color: ${globals.WHITE};
   color: ${globals.TEXT_PRIMARY_COLOR};
@@ -76,6 +77,9 @@ export const BoardPage: React.FC<{
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expString]);
+  if (loading) {
+    return <CenteredAnimatedLoader />;
+  }
   return (
     <PanelRenderedConfigContextProvider>
       <PanelInteractContextProvider>
@@ -83,9 +87,7 @@ export const BoardPage: React.FC<{
           <PagePanelControlContextProvider>
             <ChildPanel
               config={config}
-              updateConfig={function (
-                newConfig: ChildPanelFullConfig<any>
-              ): void {
+              updateConfig={(newConfig: ChildPanelFullConfig<any>) => {
                 // throw new Error('Function not implemented.');
               }}
             />

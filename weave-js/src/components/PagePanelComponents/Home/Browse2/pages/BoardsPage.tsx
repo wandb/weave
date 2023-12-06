@@ -31,14 +31,14 @@ export const BoardsPage: React.FC<{
         <CenterProjectBoardsBrowser2
           entityName={props.entity}
           projectName={props.project}
-          setPreviewNode={function (
+          setPreviewNode={(
             node: React.ReactNode,
             requestedWidth?: string | undefined
-          ): void {
+          ) => {
             setPreviewNode(node);
             // throw new Error('Function not implemented.');
           }}
-          navigateToExpression={function (expression: Node): void {
+          navigateToExpression={(expression: Node) => {
             // throw new Error('Function not implemented.');
           }}
         />

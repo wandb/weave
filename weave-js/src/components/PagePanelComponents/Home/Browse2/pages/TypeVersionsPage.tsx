@@ -1,24 +1,11 @@
-import {NavigateNext} from '@mui/icons-material';
-import {
-  DataGridPro,
-  GridColDef,
-  GridColumnGroupingModel,
-  GridRowsProp,
-} from '@mui/x-data-grid-pro';
+import {DataGridPro, GridColDef, GridRowsProp} from '@mui/x-data-grid-pro';
 import React, {useMemo} from 'react';
-import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
+import {ObjectVersionsLink, TypeLink, TypeVersionLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFTypeVersion} from './interface/wf/types';
-import {
-  ObjectVersionLink,
-  ObjectVersionsLink,
-  TypeLink,
-  TypeVersionLink,
-} from './common/Links';
 
 export const TypeVersionsPage: React.FC<{
   entity: string;

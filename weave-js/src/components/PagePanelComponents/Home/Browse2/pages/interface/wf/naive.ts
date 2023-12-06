@@ -210,7 +210,10 @@ export class WFNaiveProject implements WFProject {
       runsNode: Call[];
       feedbackNode: any[];
     };
-    const joinedCalls = joinRunsWithFeedback(runsValue ?? [], feedbackValue ?? []);
+    const joinedCalls = joinRunsWithFeedback(
+      runsValue ?? [],
+      feedbackValue ?? []
+    );
     const objects = weaveObjectsValue.map(obj => {
       if (
         obj.type_version.type_version === 'unknown' &&

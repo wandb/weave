@@ -126,10 +126,10 @@ export const FilterableObjectVersionsTable: React.FC<{
         const inputToOpVersions = ov.inputTo().map(i => i.opVersion());
         if (
           !inputToOpVersions.some(
-            ov =>
-              ov &&
+            ovInner =>
+              ovInner &&
               effectiveFilter.inputToOpVersions?.includes(
-                ov.op().name() + ':' + ov.version()
+                ovInner.op().name() + ':' + ovInner.version()
               )
           )
         ) {

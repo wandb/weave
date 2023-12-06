@@ -10,7 +10,7 @@ import {
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
 import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
-import {OpVersionsTable} from './OpVersionsPage';
+// import {OpVersionsTable} from './OpVersionsPage';
 import {TypeVersionsTable} from './TypeVersionsPage';
 
 export const TypeVersionPage: React.FC<{
@@ -146,21 +146,21 @@ const TypeVersionObjectVersions: React.FC<{
   );
 };
 
-const TypeVersionConsumingOps: React.FC<{
-  typeVersion: WFTypeVersion;
-}> = props => {
-  const opVersions = props.typeVersion.inputTo();
+// const TypeVersionConsumingOps: React.FC<{
+//   typeVersion: WFTypeVersion;
+// }> = props => {
+//   const opVersions = props.typeVersion.inputTo();
 
-  return <OpVersionsTable opVersions={opVersions} />;
-};
+//   return <OpVersionsTable opVersions={opVersions} />;
+// };
 
-const TypeVersionProducingOps: React.FC<{
-  typeVersion: WFTypeVersion;
-}> = props => {
-  const opVersions = props.typeVersion.outputFrom();
+// const TypeVersionProducingOps: React.FC<{
+//   typeVersion: WFTypeVersion;
+// }> = props => {
+//   const opVersions = props.typeVersion.outputFrom();
 
-  return <OpVersionsTable opVersions={opVersions} />;
-};
+//   return <OpVersionsTable opVersions={opVersions} />;
+// };
 
 const TypeVersionChildTypes: React.FC<{
   typeVersion: WFTypeVersion;

@@ -549,15 +549,7 @@ export const CenterProjectBoardsBrowser2: React.FC<
       //   },
       // ],
     ];
-  }, [
-    history,
-    params.entity,
-    params.project,
-    params.assetType,
-    entityName,
-    projectName,
-    navigateToExpression,
-  ]);
+  }, [history, params.entity, params.project]);
 
   const sidebarActions = useMemo(
     () =>
@@ -1191,8 +1183,10 @@ export const CenterProjectTablesBrowser2: React.FC<
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(
-    () => [
+  > = useMemo(() => {
+    const browserActionsInner: Array<
+      CenterBrowserActionType<(typeof browserData)[number]>
+    > = [
       [
         // Home Page TODO: Enable awesome previews
         {
@@ -1210,7 +1204,14 @@ export const CenterProjectTablesBrowser2: React.FC<
                 title={row.name}
                 row={row}
                 setPreviewNode={setPreviewNode}
-                actions={sidebarActions}
+                actions={browserActionsInner.map((actionSection, index) => {
+                  if (index === 0) {
+                    return actionSection.filter(
+                      action => action.label !== 'Table overview'
+                    );
+                  }
+                  return actionSection;
+                })}
                 emptyData={row['number of rows'] === 0}
                 emptyDataMessage={<EmptyTableMessage />}>
                 <SafeHomeExpressionPreviewParts
@@ -1282,78 +1283,18 @@ export const CenterProjectTablesBrowser2: React.FC<
           },
         },
       ],
-    ],
-    [
-      params.entity,
-      params.project,
-      setPreviewNode,
-      // sidebarActions,
-      navigateToExpression,
-      entityName,
-      projectName,
-      weave,
-      makeBoardFromNode,
-    ]
-  );
-
-  const sidebarActions = useMemo(
-    () =>
-      browserActions.map((actionSection, index) => {
-        if (index === 0) {
-          return actionSection.filter(
-            action => action.label !== 'Table overview'
-          );
-        }
-        return actionSection;
-      }),
-    [browserActions]
-  );
-
-  // useEffect(() => {
-  //   if (isLoading) {
-  //     return;
-  //   }
-  //   if (params.preview) {
-  //     const row = browserData.find(b => b._id === params.preview);
-  //     if (!row) {
-  //       setPreviewNode(undefined);
-  //       return;
-  //     }
-  //     const expr = tableRowToNode(
-  //       row.kind,
-  //       params.entity!,
-  //       params.project!,
-  //       row._id
-  //     );
-  //     const node = (
-  //       <HomePreviewSidebarTemplate
-  //         title={row.name}
-  //         row={row}
-  //         setPreviewNode={setPreviewNode}
-  //         actions={sidebarActions}
-  //         emptyData={row['number of rows'] === 0}
-  //         emptyDataMessage={<EmptyTableMessage />}>
-  //         <SafeHomeExpressionPreviewParts
-  //           expr={expr}
-  //           navigateToExpression={navigateToExpression}
-  //         />
-  //       </HomePreviewSidebarTemplate>
-  //     );
-  //     setPreviewNode(node);
-  //   } else {
-  //     setPreviewNode(undefined);
-  //   }
-  // }, [
-  //   sidebarActions,
-  //   browserData,
-  //   history,
-  //   params.entity,
-  //   params.project,
-  //   params.preview,
-  //   setPreviewNode,
-  //   navigateToExpression,
-  //   isLoading,
-  // ]);
+    ];
+    return browserActionsInner;
+  }, [
+    params.entity,
+    params.project,
+    setPreviewNode,
+    navigateToExpression,
+    entityName,
+    projectName,
+    weave,
+    makeBoardFromNode,
+  ]);
 
   return (
     <>
