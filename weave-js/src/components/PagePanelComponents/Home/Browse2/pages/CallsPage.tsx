@@ -20,6 +20,7 @@ import {RunsTable} from '../RunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyOpCategory} from './interface/wf/types';
+import {useWeaveflowRouteContext} from '../context';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -52,6 +53,7 @@ export const CallsTable: React.FC<{
   frozenFilter?: WFHighLevelCallFilter;
   initialFilter?: WFHighLevelCallFilter;
 }> = props => {
+  const routerContext = useWeaveflowRouteContext();
   const history = useHistory();
   const orm = useWeaveflowORMContext();
   const opVersionOptions = useMemo(() => {
@@ -164,9 +166,11 @@ export const CallsTable: React.FC<{
               onClick={() => {
                 // TODO: use the route context
                 history.push(
-                  `/${props.entity}/${props.project}/calls${
-                    filter ? `?filter=${JSON.stringify(effectiveFilter)}` : ''
-                  }`
+                  routerContext.callsUIUrl(
+                    props.entity,
+                    props.project,
+                    effectiveFilter
+                  )
                 );
               }}>
               <OpenInNew />

@@ -66,6 +66,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   frozenFilter?: WFHighLevelObjectVersionFilter;
   initialFilter?: WFHighLevelObjectVersionFilter;
 }> = props => {
+  const routerContext = useWeaveflowRouteContext();
   const history = useHistory();
   const orm = useWeaveflowORMContext();
   const opVersionOptions = useMemo(() => {
@@ -184,9 +185,11 @@ export const FilterableObjectVersionsTable: React.FC<{
               onClick={() => {
                 // TODO: use the route context
                 history.push(
-                  `/${props.entity}/${props.project}/object-versions${
-                    filter ? `?filter=${JSON.stringify(effectiveFilter)}` : ''
-                  }`
+                  routerContext.objectVersionsUIUrl(
+                    props.entity,
+                    props.project,
+                    effectiveFilter
+                  )
                 );
               }}>
               <OpenInNew />

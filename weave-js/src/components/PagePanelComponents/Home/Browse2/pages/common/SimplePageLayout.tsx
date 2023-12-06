@@ -64,12 +64,19 @@ export const SimplePageLayout: React.FC<{
               pb: 2,
               fontWeight: 600,
               fontSize: '1.5rem',
-              flex: '0 0 auto',
-              overflow: 'auto',
+              flex: '1 1 auto',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}>
             {props.title}
           </Box>
-          {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
+          <Box
+            sx={{
+              flex: '0 0 auto',
+            }}>
+            {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
+          </Box>
         </Box>
 
         <Tabs

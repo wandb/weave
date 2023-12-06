@@ -202,7 +202,7 @@ export const RunsTable: FC<{
         },
       },
       {
-        flex: !showIO ? 1 : undefined,
+        // flex: !showIO ? 1 : undefined,
         field: 'opVersion',
         headerName: 'Name',
         renderCell: rowParams => {
@@ -249,30 +249,30 @@ export const RunsTable: FC<{
           );
         },
       },
-      {
-        field: 'isRoot',
-        headerName: 'Trace Root',
-        // flex: !showIO ? 1 : undefined,
-        width: 100,
+      // {
+      //   field: 'isRoot',
+      //   headerName: 'Trace Root',
+      //   // flex: !showIO ? 1 : undefined,
+      //   width: 100,
 
-        renderCell: cellParams => {
-          if (cellParams.value) {
-            return (
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  width: '100%',
-                }}>
-                <Chip label="Yes" size="small" />
-              </Box>
-            );
-          }
-          return '';
-        },
-      },
+      //   renderCell: cellParams => {
+      //     if (cellParams.value) {
+      //       return (
+      //         <Box
+      //           sx={{
+      //             display: 'flex',
+      //             alignItems: 'center',
+      //             justifyContent: 'center',
+      //             height: '100%',
+      //             width: '100%',
+      //           }}>
+      //           <Chip label="Yes" size="small" />
+      //         </Box>
+      //       );
+      //     }
+      //     return '';
+      //   },
+      // },
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
