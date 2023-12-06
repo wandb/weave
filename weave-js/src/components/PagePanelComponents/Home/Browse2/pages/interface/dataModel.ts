@@ -5,6 +5,7 @@ Convention:
 */
 
 import {useMutation} from '@apollo/client';
+import stringify from 'json-stable-stringify';
 import {useMemo} from 'react';
 
 import {
@@ -421,5 +422,5 @@ const hashString = (s: string) => {
 };
 
 export const typeIdFromTypeVersion = (typeVersion: any) => {
-  return hashString(JSON.stringify(typeVersion));
+  return hashString(stringify(typeVersion));
 };

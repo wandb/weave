@@ -1,4 +1,9 @@
+// import {stringify} from 'json-stringify-deterministic';
+
+import _ from 'lodash';
+
 import {
+  isNodeOrVoidNode,
   isObjectType,
   isSimpleTypeShape,
   isTypedDictLike,
@@ -7,7 +12,7 @@ import {
   typedDictPropertyTypes,
 } from '../../../../../../../core';
 import {Client as WeaveClient} from '../../../../../../../core/client/types';
-import {Call} from '../../../callTree';
+import {Call, opSignatureFromSpan} from '../../../callTree';
 import {
   fnFeedbackNode,
   fnRunsNode,
@@ -279,8 +284,10 @@ export class WFNaiveProject implements WFProject {
             versionIndex: opVersion.version_index,
             inputTypes: {},
             outputType: null,
-            invokes: [],
+            invokesOpVersionHashes: [],
             code: undefined,
+            inputTypeVersionHashes: [],
+            outputTypeVersionHashes: [],
           },
         ];
       })
@@ -384,6 +391,54 @@ export class WFNaiveProject implements WFProject {
         ];
       })
     );
+
+    // Populate invokesOpVersionHashes
+    this.opVersions().forEach(opVersion => {
+      const selfOpVersion = this.state.opVersionsMap.get(opVersion.version());
+      if (!selfOpVersion) {
+        return;
+      }
+      const calls = opVersion.calls();
+      if (calls.length === 0) {
+        return;
+      }
+      const exampleCall = calls[0];
+
+      // Populate invokesOpVersionHashes
+      const invokesMap: Set<string> = new Set();
+      const childCalls = exampleCall.childCalls();
+      childCalls.forEach(childCall => {
+        const childCallVersion = childCall.opVersion();
+        if (!childCallVersion) {
+          return;
+        }
+
+        invokesMap.add(childCallVersion.version());
+      });
+      selfOpVersion.invokesOpVersionHashes = Array.from(invokesMap);
+
+      // Populate inputTypeVersionHashes and outputTypeVersionHashes
+      const inputTypeVersionMap: Set<string> = new Set();
+      const outputTypeVersionMap: Set<string> = new Set();
+      const exampleCallDict = this.state.callsMap.get(exampleCall.callID());
+      if (!exampleCallDict) {
+        return;
+      }
+      const signature = opSignatureFromSpan(exampleCallDict.callSpan);
+      Object.values(signature.inputTypes).forEach(inputType => {
+        const inputTypeVersion = typeVersionFromTypeDict(inputType);
+        inputTypeVersionMap.add(inputTypeVersion.type_version);
+      });
+      if (
+        !_.isFunction(signature.outputType) &&
+        !isNodeOrVoidNode(signature.outputType)
+      ) {
+        const outputTypeVersion = typeVersionFromTypeDict(signature.outputType);
+        outputTypeVersionMap.add(outputTypeVersion.type_version);
+      }
+      selfOpVersion.inputTypeVersionHashes = Array.from(inputTypeVersionMap);
+      selfOpVersion.outputTypeVersionHashes = Array.from(outputTypeVersionMap);
+    });
   }
 }
 
@@ -460,7 +515,12 @@ class WFNaiveObject implements WFObject {
     return this.objectName;
   }
   objectVersions(): WFObjectVersion[] {
-    throw new Error('Method not implemented.');
+    return Object.values(this.state.objectVersionsMap)
+      .filter(objectVersionDict => objectVersionDict.name === this.objectName)
+      .map(
+        objectVersionDict =>
+          new WFNaiveObjectVersion(this.state, objectVersionDict.versionHash)
+      );
   }
 }
 
@@ -490,7 +550,12 @@ class WFNaiveOp implements WFOp {
     return this.opName;
   }
   opVersions(): WFOpVersion[] {
-    throw new Error('Method not implemented.');
+    return Object.values(this.state.opVersionsMap)
+      .filter(opVersionDict => opVersionDict.name === this.opName)
+      .map(
+        opVersionDict =>
+          new WFNaiveOpVersion(this.state, opVersionDict.versionHash)
+      );
   }
 }
 
@@ -564,10 +629,26 @@ class WFNaiveTypeVersion implements WFTypeVersion {
       });
   }
   inputTo(): WFOpVersion[] {
-    throw new Error('Method not implemented.');
+    return Array.from(this.state.callsMap.values())
+      .filter(callDict => {
+        return callDict.inputObjectVersionHashes.includes(
+          this.typeVersionDict.versionHash
+        );
+      })
+      .map(callDict => {
+        return new WFNaiveOpVersion(this.state, callDict.opVersionHash!);
+      });
   }
   outputFrom(): WFOpVersion[] {
-    throw new Error('Method not implemented.');
+    return Array.from(this.state.callsMap.values())
+      .filter(callDict => {
+        return callDict.outputObjectVersionHashes.includes(
+          this.typeVersionDict.versionHash
+        );
+      })
+      .map(callDict => {
+        return new WFNaiveOpVersion(this.state, callDict.opVersionHash!);
+      });
   }
   objectVersions(): WFObjectVersion[] {
     return Array.from(this.state.objectVersionsMap.values())
@@ -653,9 +734,6 @@ class WFNaiveObjectVersion implements WFObjectVersion {
   version(): string {
     return this.objectVersionDict.versionHash;
   }
-  rawWeaveObject(): any {
-    throw new Error('Method not implemented.');
-  }
   properties(): {[propName: string]: WFObjectVersion} {
     throw new Error('Method not implemented.');
   }
@@ -708,15 +786,11 @@ type WFNaiveOpVersionDictType = {
   aliases: string[];
 
   // Op Specific properties
-  code?: string;
-  inputTypes: {[argName: string]: unknown};
-  outputType: unknown;
+  inputTypeVersionHashes: string[];
+  outputTypeVersionHashes: string[];
 
   // Relationships
-  invokes: Array<{
-    opName: string;
-    opVersionHash: string;
-  }>;
+  invokesOpVersionHashes: string[];
 };
 class WFNaiveOpVersion implements WFOpVersion {
   private readonly opVersionDict: WFNaiveOpVersionDictType;
@@ -757,20 +831,31 @@ class WFNaiveOpVersion implements WFOpVersion {
   version(): string {
     return this.opVersionDict.versionHash;
   }
-  code(): string {
-    throw new Error('Method not implemented.');
+  inputTypesVersions(): WFTypeVersion[] {
+    return this.opVersionDict.inputTypeVersionHashes.map(typeVersionHash => {
+      return new WFNaiveTypeVersion(this.state, typeVersionHash);
+    });
   }
-  inputTypes(): {[argName: string]: WFTypeVersion} {
-    throw new Error('Method not implemented.');
-  }
-  outputType(): WFTypeVersion {
-    throw new Error('Method not implemented.');
+  outputTypeVersions(): WFTypeVersion[] {
+    return this.opVersionDict.outputTypeVersionHashes.map(typeVersionHash => {
+      return new WFNaiveTypeVersion(this.state, typeVersionHash);
+    });
   }
   invokes(): WFOpVersion[] {
-    throw new Error('Method not implemented.');
+    return this.opVersionDict.invokesOpVersionHashes.map(opVersionHash => {
+      return new WFNaiveOpVersion(this.state, opVersionHash);
+    });
   }
   invokedBy(): WFOpVersion[] {
-    throw new Error('Method not implemented.');
+    return Array.from(this.state.opVersionsMap.values())
+      .filter(opVersionDict => {
+        return opVersionDict.invokesOpVersionHashes.includes(
+          this.opVersionDict.versionHash
+        );
+      })
+      .map(opVersionDict => {
+        return new WFNaiveOpVersion(this.state, opVersionDict.versionHash);
+      });
   }
   calls(): WFCall[] {
     return Array.from(this.state.callsMap.values())
@@ -798,8 +883,8 @@ class WFNaiveOpVersion implements WFOpVersion {
 type WFNaiveCallDictType = {
   callSpan: Call;
   opVersionHash?: string;
-  inputObjectVersionHashes?: string[];
-  outputObjectVersionHashes?: string[];
+  inputObjectVersionHashes: string[];
+  outputObjectVersionHashes: string[];
 };
 class WFNaiveCall implements WFCall {
   private readonly callDict: WFNaiveCallDictType;
@@ -827,11 +912,15 @@ class WFNaiveCall implements WFCall {
     }
     return new WFNaiveOpVersion(this.state, this.callDict.opVersionHash);
   }
-  inputs(): {[argName: string]: WFObjectVersion} {
-    throw new Error('Method not implemented.');
+  inputs(): WFObjectVersion[] {
+    return this.callDict.inputObjectVersionHashes.map(objectVersionHash => {
+      return new WFNaiveObjectVersion(this.state, objectVersionHash);
+    });
   }
-  output(): WFObjectVersion {
-    throw new Error('Method not implemented.');
+  output(): WFObjectVersion[] {
+    return this.callDict.outputObjectVersionHashes.map(objectVersionHash => {
+      return new WFNaiveObjectVersion(this.state, objectVersionHash);
+    });
   }
   parentCall(): WFCall | null {
     const parentCall = this.state.callsMap.get(
@@ -843,7 +932,13 @@ class WFNaiveCall implements WFCall {
     return new WFNaiveCall(this.state, parentCall.callSpan.span_id);
   }
   childCalls(): WFCall[] {
-    throw new Error('Method not implemented.');
+    return Array.from(this.state.callsMap.values())
+      .filter(callDict => {
+        return callDict.callSpan.parent_id === this.callDict.callSpan.span_id;
+      })
+      .map(callDict => {
+        return new WFNaiveCall(this.state, callDict.callSpan.span_id);
+      });
   }
   entity(): string {
     return this.state.entity;

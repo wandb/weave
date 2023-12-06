@@ -75,9 +75,8 @@ export type HackyOpCategory =
 export interface WFOpVersion extends ProjectOwned, ArtifactVersionBacked {
   op: () => WFOp;
   version: () => string;
-  code: () => string;
-  inputTypes: () => {[argName: string]: WFTypeVersion};
-  outputType: () => WFTypeVersion;
+  inputTypesVersions: () => WFTypeVersion[]; // {[argName: string]: WFTypeVersion};
+  outputTypeVersions: () => WFTypeVersion[]; // WFTypeVersion
   invokes: () => WFOpVersion[];
   invokedBy: () => WFOpVersion[];
   calls: () => WFCall[];
@@ -87,7 +86,6 @@ export interface WFOpVersion extends ProjectOwned, ArtifactVersionBacked {
 export interface WFObjectVersion extends ProjectOwned, ArtifactVersionBacked {
   object: () => WFObject;
   version: () => string;
-  rawWeaveObject: () => any;
   properties: () => {[propName: string]: WFObjectVersion};
   parentObjectVersion: () => {
     path: string;
@@ -102,8 +100,8 @@ export interface WFCall extends ProjectOwned {
   callID: () => string;
   traceID: () => string;
   opVersion: () => WFOpVersion | null;
-  inputs: () => {[argName: string]: WFObjectVersion};
-  output: () => WFObjectVersion;
+  inputs: () => WFObjectVersion[]; // {[argName: string]: WFObjectVersion};
+  output: () => WFObjectVersion[]; // WFObjectVersion;
   parentCall: () => WFCall | null;
   childCalls: () => WFCall[];
   spanName: () => string; // not technically part of data model since it is derived from the span details
