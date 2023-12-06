@@ -13,18 +13,17 @@ PR Todos:
   - [ ] BUG: Filter controls seem to get "stuck", resulting in internal state mismatched with displayed state.
   - [ ] BUG: Clearing all filters results in no rows
   - [ ] FEAT: Enable Description Editing
+  - [ ] FEAT: TypeVersion Filter (Include Subtypes)
 
 - [ ] ObjectVersion Page
 
   - [ ] BUG: Only the main data view adapts to nested URI
   - [ ] BUG: When ops are in the data view (odd) - they have incorrect links
   - [ ] BUG: Committing edits redirects to incorrect page
-  - [ ] FEAT: Board listing Page
-  - [ ] FEAT: Record DAG
-  - [ ] FEAT: TypeVersion Filter (Include Subtypes)
-  - [ ] GAP: "Open in Board" opens in old link
+  - [ ] (Future) FEAT: Board listing Page
+  - [ ] (Future) FEAT: Record DAG
+  - [ ] (Future) GAP: "Open in Board" opens in old link
   - [ ] GAP: `/versions` does not redirect
-  - [ ] GAP: Overview - type category
 
 - Type Page
 
@@ -60,7 +59,7 @@ PR Todos:
 - OpVersion Page
 
   - [ ] GAP: Structure DAG
-  - [ ] GAP: Overview: (Type Stub, Op Category, isLatest)
+  - [ ] GAP: Overview: (Type Stub, Op Category, isLatest, Call Hierarchy)
   - [ ] GAP: Tabs (produced by and called by)
   - [ ] GAP: `/versions` does not redirect
 
@@ -109,6 +108,7 @@ PR Todos:
 
 - General
   - [ ] Deprecate `weave-js/src/components/PagePanelComponents/Home/Browse2/url.ts`
+  - [ ] No tables save their filter state back to the URL
 
 Shortcuts
 

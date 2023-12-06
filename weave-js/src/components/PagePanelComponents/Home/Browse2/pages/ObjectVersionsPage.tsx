@@ -32,6 +32,7 @@ import {
   TypeVersionLink,
 } from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeCategory, WFObjectVersion} from './interface/wf/types';
 
@@ -353,21 +354,8 @@ const ObjectVersionsTable: React.FC<{
     basicField('typeCategory', 'Category', {
       width: 100,
       renderCell: cellParams => {
-        if (cellParams.value == null) {
-          return '';
-        }
-
-        const color = {
-          model: 'success',
-          dataset: 'info',
-          // 'tune': 'warning',
-        }[cellParams.row.typeCategory + ''];
         return (
-          <Chip
-            label={cellParams.row.typeCategory}
-            size="small"
-            color={color as any}
-          />
+          <TypeVersionCategoryChip typeCategory={cellParams.row.typeCategory} />
         );
       },
     }),

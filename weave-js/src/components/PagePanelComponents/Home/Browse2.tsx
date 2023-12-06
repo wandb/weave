@@ -15,6 +15,7 @@ import {
   Link as RouterLink,
   Route,
   Switch,
+  useHistory,
   useParams,
 } from 'react-router-dom';
 
@@ -28,7 +29,10 @@ import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {RouteAwareBrowse2ProjectSideNav} from './Browse2/Browse2SideNav';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
-import {NewWeaveflowRouteContextProvider} from './Browse2/context';
+import {
+  NewWeaveflowRouteContextProvider,
+  useWeaveflowRouteContext,
+} from './Browse2/context';
 import {BoardPage} from './Browse2/pages/BoardPage';
 import {BoardsPage} from './Browse2/pages/BoardsPage';
 import {CallPage} from './Browse2/pages/CallPage';
@@ -360,8 +364,30 @@ const ObjectVersionRoutePageBinding = () => {
     digest?: string;
     refExtra?: string;
   }>();
+  const history = useHistory();
+  const routerContext = useWeaveflowRouteContext();
+  useEffect(() => {
+    if (!params.digest) {
+      // TODO: This is not correct
+      // history.replace(
+      //   routerContext.objectUIUrl(
+      //     params.entity,
+      //     params.project,
+      //     params.objectName
+      //   )
+      // );
+    }
+  }, [
+    history,
+    params.digest,
+    params.entity,
+    params.objectName,
+    params.project,
+    routerContext,
+  ]);
+
   if (!params.digest) {
-    return <>TODO: Need to redirect</>;
+    return <>Redirecting...</>;
   }
   return (
     <ObjectVersionPage
@@ -382,8 +408,27 @@ const OpVersionRoutePageBinding = () => {
     opName: string;
     digest?: string;
   }>();
+
+  const history = useHistory();
+  const routerContext = useWeaveflowRouteContext();
+  useEffect(() => {
+    if (!params.digest) {
+      // TODO: This is not correct
+      // history.replace(
+      //   routerContext.opUIUrl(params.entity, params.project, params.opName)
+      // );
+    }
+  }, [
+    history,
+    params.digest,
+    params.entity,
+    params.opName,
+    params.project,
+    routerContext,
+  ]);
+
   if (!params.digest) {
-    return <>TODO: Need to redirect</>;
+    return <>Redirecting...</>;
   }
   return (
     <OpVersionPage
@@ -403,8 +448,27 @@ const TypeVersionRoutePageBinding = () => {
     typeName: string;
     digest?: string;
   }>();
+
+  const history = useHistory();
+  const routerContext = useWeaveflowRouteContext();
+  useEffect(() => {
+    if (!params.digest) {
+      // TODO: This is not correct
+      // history.replace(
+      //   routerContext.typeUIUrl(params.entity, params.project, params.typeName)
+      // );
+    }
+  }, [
+    history,
+    params.digest,
+    params.entity,
+    params.project,
+    params.typeName,
+    routerContext,
+  ]);
+
   if (!params.digest) {
-    return <>TODO: Need to redirect</>;
+    return <>Redirecting...</>;
   }
   return (
     <TypeVersionPage

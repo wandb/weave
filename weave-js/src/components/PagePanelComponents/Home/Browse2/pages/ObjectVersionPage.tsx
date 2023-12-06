@@ -12,8 +12,11 @@ import {
   SimpleKeyValueTable,
   SimplePageLayout,
 } from './common/SimplePageLayout';
+import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFObjectVersion} from './interface/wf/types';
+import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
+import {Box} from '@material-ui/core';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -50,19 +53,19 @@ export const ObjectVersionPage: React.FC<{
           },
         },
         {
-          label: '(TODO) Compare',
+          label: '(Coming Soon) Compare',
           onClick: () => {
             console.log('(TODO) Compare');
           },
         },
         {
-          label: '(TODO) Process with Function',
+          label: '(Coming Soon) Process with Function',
           onClick: () => {
             console.log('(TODO) Process with Function');
           },
         },
         {
-          label: '(TODO) Add to Hub',
+          label: '(Coming Soon) Add to Hub',
           onClick: () => {
             console.log('(TODO) Add to Hub');
           },
@@ -87,10 +90,18 @@ export const ObjectVersionPage: React.FC<{
                     <ObjectLink objectName={objectVersion.object().name()} />
                   ),
                   'Type Version': (
-                    <TypeVersionLink
-                      typeName={objectVersion.typeVersion().type().name()}
-                      version={objectVersion.typeVersion().version()}
-                    />
+                    <>
+                      <TypeVersionCategoryChip
+                        typeCategory={objectVersion
+                          .typeVersion()
+                          .typeCategory()}
+                      />
+
+                      <TypeVersionLink
+                        typeName={objectVersion.typeVersion().type().name()}
+                        version={objectVersion.typeVersion().version()}
+                      />
+                    </>
                   ),
                   Ref: fullUri,
                   'Producing Calls': (
@@ -118,7 +129,7 @@ export const ObjectVersionPage: React.FC<{
 
         {
           label: 'Boards',
-          content: <div>Boards</div>,
+          content: <UnderConstruction />,
         },
         {
           label: 'DAG',
