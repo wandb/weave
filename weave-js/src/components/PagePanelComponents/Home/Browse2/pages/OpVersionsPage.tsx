@@ -13,15 +13,19 @@ import {useHistory} from 'react-router-dom';
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
 import {CallsLink, OpLink, OpVersionLink} from './common/Links';
-import {
-  FilterableTablePageContent,
-  SimplePageLayout,
-} from './common/SimplePageLayout';
+import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
+import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyOpCategory, WFOpVersion} from './interface/wf/types';
 
 export type WFHighLevelOpVersionFilter = {
-  // opCategory?: HackyOpCategory | null;
+  opCategory?: HackyOpCategory | null; // TODO
+  isLatest?: boolean; // TODO
+  opName?: string; // TODO
+  callsOpVersions?: string[]; // TODO
+  calledByOpVersions?: string[]; // TODO
+  consumesTypeVersions?: string[]; // TODO
+  producesTypeVersions?: string[]; // TODO
 };
 
 export const OpVersionsPage: React.FC<{
@@ -70,7 +74,7 @@ export const FilterableOpVersionsTable: React.FC<{
   }, [allOpVersions]);
 
   return (
-    <FilterableTablePageContent
+    <FilterLayoutTemplate
       filterPopoutTargetUrl={routerContext.opVersionsUIUrl(
         props.entity,
         props.project,
@@ -78,7 +82,7 @@ export const FilterableOpVersionsTable: React.FC<{
       )}
       filterListItems={<></>}>
       <OpVersionsTable opVersions={filteredOpVersions} />
-    </FilterableTablePageContent>
+    </FilterLayoutTemplate>
   );
 };
 

@@ -1,5 +1,6 @@
 import {Chip} from '@material-ui/core';
 import React from 'react';
+
 import {HackyTypeCategory} from '../interface/wf/types';
 
 const colorMap: {[key: string]: string} = {

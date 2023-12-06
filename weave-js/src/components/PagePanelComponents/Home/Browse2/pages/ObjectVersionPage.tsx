@@ -1,4 +1,3 @@
-// import {Box, CssBaseline, Tab, Tabs, Typography} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
@@ -12,11 +11,10 @@ import {
   SimpleKeyValueTable,
   SimplePageLayout,
 } from './common/SimplePageLayout';
+import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFObjectVersion} from './interface/wf/types';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {Box} from '@material-ui/core';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;

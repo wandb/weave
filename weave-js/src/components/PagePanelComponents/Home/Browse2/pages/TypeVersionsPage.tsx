@@ -4,10 +4,8 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
 import {ObjectVersionsLink, TypeLink, TypeVersionLink} from './common/Links';
-import {
-  FilterableTablePageContent,
-  SimplePageLayout,
-} from './common/SimplePageLayout';
+import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
+import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFTypeVersion} from './interface/wf/types';
 
@@ -59,7 +57,7 @@ export const FilterableTypeVersionsTable: React.FC<{
   }, [allTypeVersions]);
 
   return (
-    <FilterableTablePageContent
+    <FilterLayoutTemplate
       filterPopoutTargetUrl={routerContext.typeVersionsUIUrl(
         props.entity,
         props.project,
@@ -67,7 +65,7 @@ export const FilterableTypeVersionsTable: React.FC<{
       )}
       filterListItems={<></>}>
       <TypeVersionsTable typeVersions={filteredTypeVersions} />
-    </FilterableTablePageContent>
+    </FilterLayoutTemplate>
   );
 };
 

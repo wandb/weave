@@ -1,13 +1,5 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {
-  Box,
-  List,
-  ListItem,
-  ListItemText,
-  MenuList,
-  Tab,
-  Tabs,
-} from '@mui/material';
+import {Box, ListItemText, MenuList, Tab, Tabs} from '@mui/material';
 // import {Menu} from '@mui/base/Menu';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
@@ -15,8 +7,6 @@ import MenuItem from '@mui/material/MenuItem';
 import React, {useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {OpenInNew} from '@mui/icons-material';
-import {useHistory} from 'react-router-dom';
 
 export const SimplePageLayout: React.FC<{
   title: string;
@@ -206,64 +196,5 @@ export const SimpleKeyValueTable: React.FC<{
         ))}
       </tbody>
     </table>
-  );
-};
-
-export const FilterableTablePageContent: React.FC<{
-  filterPopoutTargetUrl: string;
-  filterListItems: React.ReactNode;
-}> = props => {
-  const history = useHistory();
-  return (
-    <Box
-      sx={{
-        flex: '1 1 auto',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'row',
-      }}>
-      <Box
-        sx={{
-          flex: '0 0 auto',
-          height: '100%',
-          width: '240px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'auto',
-        }}>
-        <Box
-          sx={{
-            pl: 2,
-            pr: 1,
-            height: 57,
-            flex: '0 0 auto',
-            borderBottom: '1px solid #e0e0e0',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1,
-            backgroundColor: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-          Filters
-          {Object.values(props.filters ?? {}).some(v => v.frozen) && (
-            <IconButton
-              size="small"
-              onClick={() => {
-                // TODO: use the route context
-                history.push(props.filterPopoutTargetUrl);
-              }}>
-              <OpenInNew />
-            </IconButton>
-          )}
-        </Box>
-        <List sx={{width: '100%', maxWidth: 360, bgcolor: 'background.paper'}}>
-          {props.filterListItems}
-        </List>
-      </Box>
-      {props.children}
-    </Box>
   );
 };

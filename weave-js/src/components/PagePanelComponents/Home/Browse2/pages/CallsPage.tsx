@@ -13,10 +13,8 @@ import {CallFilter} from '../callTree';
 import {useRunsWithFeedback} from '../callTreeHooks';
 import {useWeaveflowRouteContext} from '../context';
 import {RunsTable} from '../RunsTable';
-import {
-  FilterableTablePageContent,
-  SimplePageLayout,
-} from './common/SimplePageLayout';
+import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
+import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyOpCategory} from './interface/wf/types';
 
@@ -124,7 +122,7 @@ export const CallsTable: React.FC<{
   );
 
   return (
-    <FilterableTablePageContent
+    <FilterLayoutTemplate
       filterPopoutTargetUrl={routerContext.callsUIUrl(
         props.entity,
         props.project,
@@ -221,6 +219,6 @@ export const CallsTable: React.FC<{
         </>
       }>
       <RunsTable loading={runs.loading} spans={runs.result} />
-    </FilterableTablePageContent>
+    </FilterLayoutTemplate>
   );
 };

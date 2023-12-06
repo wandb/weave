@@ -3,8 +3,8 @@ import React, {createContext, useContext} from 'react';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
-import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
+import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
 
 export const useWeaveflowRouteContext = () => {
   const ctx = useContext(WeaveflowRouteContext);

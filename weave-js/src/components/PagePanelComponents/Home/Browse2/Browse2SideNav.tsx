@@ -43,8 +43,8 @@ type NavigationCallbacks = {
   navigateToProject: (project: string) => void;
   navigateToObjectVersions: (filter?: WFHighLevelObjectVersionFilter) => void;
   navigateToCalls: (filter?: WFHighLevelCallFilter) => void;
-  navigateToTypeVersions: (filter?: string) => void;
-  navigateToOpVersions: (filter?: string) => void;
+  navigateToTypeVersions: (filter?: WFHighLevelTypeVersionFilter) => void;
+  navigateToOpVersions: (filter?: WFHighLevelOpVersionFilter) => void;
   navigateToBoards: (filter?: string) => void;
   navigateToTables: (filter?: string) => void;
 };
@@ -266,7 +266,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             icon: <Category />,
             onClick: () => {
               props.navigateToObjectVersions({
-                latestOnly: true,
+                latest: true,
               });
             },
             children: [
