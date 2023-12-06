@@ -260,48 +260,48 @@ def observability(
         ),
         columnDirs=["desc"],
     )
-    start_stop_states_sorted_limit = weave.ops.List.limit(start_stop_states_sorted, 50)
-    start_stop_states_grouped = weave.ops.List.groupby(
-        start_stop_states_sorted_limit,
-        lambda row: row["run_id"],
-    )
+    start_stop_states_sorted_limit = weave.ops.List.limit(start_stop_states_sorted, 30)
+    # start_stop_states_grouped = weave.ops.List.groupby(
+    #     start_stop_states_sorted_limit,
+    #     lambda row: row["run_id"],
+    # )
 
-    mapped_latest_runs = weave.ops.List.map(
-        start_stop_states_grouped,
-        lambda grow: weave.ops.dict_(
-            **{
-                # "timestamps": grow[timestamp_col_name],
-                "timestamps": weave.ops.cond(
-                    weave.ops.dict_(
-                        a=grow[timestamp_col_name][0] < grow[timestamp_col_name][-1],
-                        b=True,
-                    ),
-                    weave.ops.dict_(
-                        a=grow[timestamp_col_name],
-                        b=weave.ops.make_list(
-                            a=grow[timestamp_col_name],
-                            b=now,
-                        ),
-                    ),
-                ),
-                "run_id": grow["run_id"][0],
-                "job": grow["job"][0],
-                "entity_name": grow["entity_name"][0],
-                "project_name": grow["project_name"][0],
-                "duration": weave.ops.timedelta_total_seconds(
-                    weave.ops.datetime_sub(
-                        grow[timestamp_col_name].max(), grow[timestamp_col_name].min()
-                    )
-                ),
-            }
-        ),
-    )
+    # mapped_latest_runs = weave.ops.List.map(
+    #     start_stop_states_grouped,
+    #     lambda grow: weave.ops.dict_(
+    #         **{
+    #             # "timestamps": grow[timestamp_col_name],
+    #             "timestamps": weave.ops.cond(
+    #                 weave.ops.dict_(
+    #                     a=weave.ops.List.count(grow[timestamp_col_name]) == 2,
+    #                     b=weave.ops.List.count(grow[timestamp_col_name]) == 1,
+    #                 ),
+    #                 weave.ops.dict_(
+    #                     a=grow[timestamp_col_name],
+    #                     b=weave.ops.make_list(
+    #                         a=grow[timestamp_col_name],
+    #                         b=weave.ops.from_number(now),
+    #                     ),
+    #                 ),
+    #             ),
+    #             "run_id": grow["run_id"][0],
+    #             "job": grow["job"][0],
+    #             "entity_name": grow["entity_name"][0],
+    #             "project_name": grow["project_name"][0],
+    #             "duration": weave.ops.timedelta_total_seconds(
+    #                 weave.ops.datetime_sub(
+    #                     grow[timestamp_col_name].max(), grow[timestamp_col_name].min()
+    #                 )
+    #             ),
+    #         }
+    #     ),
+    # )
 
-    latest_runs = varbar.add(
-        "latest_runs",
-        mapped_latest_runs,
-        hidden=True,
-    )
+    # latest_runs = varbar.add(
+    #     "latest_runs",
+    #     mapped_latest_runs,
+    #     hidden=True,
+    # )
 
     latest_runs_plot = panels.Plot(
         start_stop_states_sorted_limit,
@@ -325,15 +325,15 @@ def observability(
         #     )
         # ),
         y=lambda row: row["run_id"],
-        # tooltip=lambda row: weave.ops.dict_(
-        #     **{
-        #         "job": row[0]["job"],
-        #         "run id": row[0]["run_id"],
-        #         "user": row[0]["entity_name"],
-        #         "project": row[0]["project_name"],
-        #         "timestamps": row[0]["timestamps"],
-        #     }
-        # ),
+        tooltip=lambda row: weave.ops.dict_(
+            **{
+                "job": row[0]["job"],
+                "run id": row[0]["run_id"],
+                "user": row[0]["entity_name"],
+                "project": row[0]["project_name"],
+                "timestamp": row[0]["timestamp"],
+            }
+        ),
         label=lambda row: row["run_id"],
         groupby_dims=["label"],
         mark="line",
@@ -503,15 +503,6 @@ def observability(
     overview_tab.add(
         "Errors",
         errors_table,
-        layout=panels.GroupPanelLayout(x=0, y=34, w=24, h=8),
-    )
-
-    s = panels.Table(latest_runs)  # type: ignore
-    s.add_column(lambda row: row["run_id"], "Run ID")
-    s.add_column(lambda row: row["timestamps"], "timestamps")
-    overview_tab.add(
-        "Errors",
-        s,
         layout=panels.GroupPanelLayout(x=0, y=34, w=24, h=8),
     )
 
