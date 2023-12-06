@@ -9,7 +9,10 @@ import {
 } from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
-import {ObjectVersionsTable} from './ObjectVersionsPage';
+import {
+  FilterableObjectVersionsTable,
+  ObjectVersionsTable,
+} from './ObjectVersionsPage';
 import {OpVersionsTable} from './OpVersionsPage';
 import {TypeVersionsTable} from './TypeVersionsPage';
 
@@ -133,9 +136,17 @@ const TypeHierarchy: React.FC<{typeVersion: WFTypeVersion}> = props => {
 const TypeVersionObjectVersions: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  const objectVersions = props.typeVersion.objectVersions();
-
-  return <ObjectVersionsTable objectVersions={objectVersions} />;
+  return (
+    <FilterableObjectVersionsTable
+      entity={props.typeVersion.entity()}
+      project={props.typeVersion.project()}
+      frozenFilter={{
+        typeVersions: [
+          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
+        ],
+      }}
+    />
+  );
 };
 
 const TypeVersionConsumingOps: React.FC<{

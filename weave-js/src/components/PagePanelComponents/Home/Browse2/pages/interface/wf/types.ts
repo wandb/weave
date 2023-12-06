@@ -17,6 +17,7 @@ export interface WFProject extends ProjectOwned {
   calls: () => WFCall[];
   // a bit hacky here:
   opCategories: () => HackyOpCategory[];
+  typeCategories: () => HackyTypeCategory[];
 }
 
 interface ProjectOwned {
@@ -48,6 +49,9 @@ export interface WFObject extends ProjectOwned {
 }
 
 export type HackyTypeTree = string | {[propName: string]: HackyTypeTree};
+export type HackyTypeCategory =
+  | 'model'
+  | 'dataset'
 
 export interface WFTypeVersion extends ProjectOwned {
   type: () => WFType;
@@ -60,7 +64,7 @@ export interface WFTypeVersion extends ProjectOwned {
   inputTo: () => WFOpVersion[];
   outputFrom: () => WFOpVersion[];
   objectVersions: () => WFObjectVersion[];
-  typeCategory: () => string | null; // not technically part of data model since it is derived from the op details
+  typeCategory: () => HackyTypeCategory | null; // not technically part of data model since it is derived from the op details
 }
 
 export type HackyOpCategory =

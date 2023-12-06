@@ -79,9 +79,13 @@ export const ObjectLink: React.FC<{objectName: string}> = props => {
 export const ObjectVersionLink: React.FC<{
   objectName: string;
   version: string;
+  hideName?: boolean;
 }> = props => {
   const orm = useWeaveflowORMContext();
   const routerContext = useWeaveflowRouteContext();
+  const text = props.hideName
+    ? props.version
+    : props.objectName + ': ' + props.version;
   try {
     const objectVersion = orm.projectConnection.objectVersion(
       props.objectName,
@@ -95,15 +99,11 @@ export const ObjectVersionLink: React.FC<{
           objectVersion.object().name(),
           objectVersion.version()
         )}>
-        {props.objectName} : {props.version}
+        {text}
       </Link>
     );
   } catch (e) {
-    return (
-      <span>
-        {props.objectName}: {props.version}
-      </span>
-    );
+    return <span>{text}</span>;
   }
 };
 

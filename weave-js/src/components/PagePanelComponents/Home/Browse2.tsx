@@ -302,10 +302,7 @@ const Browse2ProjectRoot: FC = () => {
             <ObjectsPage />
           </Route>
           <Route path={`/${projectRoot}/object-versions`}>
-            <ObjectVersionsPage
-              entity={params.entity}
-              project={params.project}
-            />
+            <ObjectVersionsPageBinding />
           </Route>
           {/* OPS */}
           <Route path={`/${projectRoot}/ops/:opName/versions/:digest?`}>
@@ -450,6 +447,30 @@ const CallsPageBinding = () => {
   }, [query.filter]);
   return (
     <CallsPage
+      entity={params.entity}
+      project={params.project}
+      initialFilter={filters}
+    />
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const ObjectVersionsPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+  }>();
+  const query = useQuery();
+  const filters = useMemo(() => {
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+  return (
+    <ObjectVersionsPage
       entity={params.entity}
       project={params.project}
       initialFilter={filters}

@@ -20,6 +20,7 @@ import {
 } from '../dataModel';
 import {
   HackyOpCategory,
+  HackyTypeCategory,
   HackyTypeTree,
   WFCall,
   WFObject,
@@ -178,6 +179,10 @@ export class WFNaiveProject implements WFProject {
 
   opCategories(): HackyOpCategory[] {
     return ['train', 'predict', 'score', 'evaluate', 'tune'];
+  }
+
+  typeCategories(): HackyTypeCategory[]  {
+    return ['model', 'dataset'];
   }
 
   private async loadAll(): Promise<void> {
@@ -507,8 +512,15 @@ class WFNaiveTypeVersion implements WFTypeVersion {
     }
     this.typeVersionDict = typeVersionDict;
   }
-  typeCategory(): string | null {
-    throw new Error('Method not implemented.');
+  typeCategory(): HackyTypeCategory | null {
+    const opName = this.typeVersionDict.name;
+    const categories = ['model', 'dataset'];
+    for (const category of categories) {
+      if (opName.toLocaleLowerCase().includes(category)) {
+        return category as HackyTypeCategory;
+      }
+    }
+    return null;
   }
   entity(): string {
     return this.state.entity;
@@ -721,7 +733,7 @@ class WFNaiveOpVersion implements WFOpVersion {
     const opName = this.opVersionDict.name;
     const categories = ['train', 'predict', 'score', 'evaluate', 'tune'];
     for (const category of categories) {
-      if (opName.includes(category)) {
+      if (opName.toLocaleLowerCase().includes(category)) {
         return category as HackyOpCategory;
       }
     }
