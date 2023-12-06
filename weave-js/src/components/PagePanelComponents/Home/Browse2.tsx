@@ -192,7 +192,9 @@ const Browse2Mounted: FC = props => {
         </Toolbar>
       </AppBar>
       <Route path={`${projectRootPagesPath}?`}>
-        <RouteAwareBrowse2ProjectSideNav />
+        <NewWeaveflowRouteContextProvider>
+          <RouteAwareBrowse2ProjectSideNav />
+        </NewWeaveflowRouteContextProvider>
       </Route>
       <Switch>
         <Route path={projectRootPagesPath}>

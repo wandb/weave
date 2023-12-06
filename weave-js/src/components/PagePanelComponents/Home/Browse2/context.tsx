@@ -2,6 +2,7 @@ import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import React, {createContext, useContext} from 'react';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage';
+import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 
 export const useWeaveflowRouteContext = () => {
   const ctx = useContext(WeaveflowRouteContext);
@@ -89,6 +90,13 @@ const defaultContext = {
     entityName: string,
     projectName: string,
     filter?: WFHighLevelCallFilter
+  ) => {
+    throw new Error('Not implemented');
+  },
+  objectVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelObjectVersionFilter
   ) => {
     throw new Error('Not implemented');
   },
@@ -194,6 +202,18 @@ const newContext = {
       JSON.stringify(filter)
     )}`;
   },
+  objectVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelObjectVersionFilter
+  ) => {
+    if (!filter) {
+      return `/${entityName}/${projectName}/object-versions`;
+    }
+    return `/${entityName}/${projectName}/object-versions?filter=${encodeURIComponent(
+      JSON.stringify(filter)
+    )}`;
+  },
   opPageUrl: (opUri: string) => {
     const parsed = parseRef(opUri);
     if (!isWandbArtifactRef(parsed)) {
@@ -253,6 +273,11 @@ const WeaveflowRouteContext = createContext<{
     entityName: string,
     projectName: string,
     filter?: WFHighLevelCallFilter
+  ) => string;
+  objectVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelObjectVersionFilter
   ) => string;
   opPageUrl: (opUri: string) => string;
 }>(defaultContext);

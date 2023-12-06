@@ -32,12 +32,14 @@ import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
 import {WFHighLevelCallFilter} from './pages/CallsPage';
+import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
+import {useWeaveflowRouteContext} from './context';
 
 const drawerWidth = 240;
 
 type NavigationCallbacks = {
   navigateToProject: (project: string) => void;
-  navigateToObjectVersions: (filter?: string) => void;
+  navigateToObjectVersions: (filter?: WFHighLevelObjectVersionFilter) => void;
   navigateToCalls: (filter?: WFHighLevelCallFilter) => void;
   navigateToTypeVersions: (filter?: string) => void;
   navigateToOpVersions: (filter?: string) => void;
@@ -91,6 +93,7 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
     }
     return undefined;
   }, [params.tab]);
+  const router = useWeaveflowRouteContext();
   if (!currentProject || !currentEntity) {
     return null;
   }
@@ -102,20 +105,13 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
       navigateToProject={project => {
         history.push(`/${params.entity}/${project}`);
       }}
-      navigateToObjectVersions={(filter?: string) => {
+      navigateToObjectVersions={(filter?: WFHighLevelObjectVersionFilter) => {
         history.push(
-          `/${params.entity}/${params.project}/object-versions${
-            filter ? `?filter=${filter}` : ''
-          }`
+          router.objectVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToCalls={(filter?: WFHighLevelCallFilter) => {
-        // TODO: this should all be done with the route provider!!
-        history.push(
-          `/${params.entity}/${params.project}/calls${
-            filter ? `?filter=${JSON.stringify(filter)}` : ''
-          }`
-        );
+        history.push(router.callsUIUrl(params.entity, params.project, filter));
       }}
       navigateToTypeVersions={(filter?: string) => {
         history.push(
@@ -269,21 +265,27 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'objects',
             icon: <Category />,
             onClick: () => {
-              props.navigateToObjectVersions();
+              props.navigateToObjectVersions({
+                latestOnly: true,
+              });
             },
             children: [
               {
                 title: 'Models',
                 icon: <Layers />,
                 onClick: () => {
-                  props.navigateToObjectVersions('kind="model"');
+                  props.navigateToObjectVersions({
+                    typeCategory: 'model',
+                  });
                 },
               },
               {
                 title: 'Datasets',
                 icon: <Dataset />,
                 onClick: () => {
-                  props.navigateToObjectVersions('kind="dataset"');
+                  props.navigateToObjectVersions({
+                    typeCategory: 'dataset',
+                  });
                 },
               },
             ],

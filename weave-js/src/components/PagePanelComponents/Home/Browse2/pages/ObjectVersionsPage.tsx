@@ -311,8 +311,8 @@ export const FilterableObjectVersionsTable: React.FC<{
 export const ObjectVersionsTable: React.FC<{
   objectVersions: WFObjectVersion[];
 }> = props => {
-  const history = useHistory();
-  const routeContext = useWeaveflowRouteContext();
+  // const history = useHistory();
+  // const routeContext = useWeaveflowRouteContext();
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
       const outputFrom = ov.outputFrom();
