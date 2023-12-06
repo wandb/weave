@@ -208,6 +208,8 @@ const PanelStringHistogramInner: React.FC<
 
 export const Spec: Panel2.PanelSpec = {
   id: 'string-histogram',
+  icon: 'chart-horizontal-bars',
+  category: 'Data',
   Component: PanelStringHistogram,
   inputType,
   canFullscreen: true,

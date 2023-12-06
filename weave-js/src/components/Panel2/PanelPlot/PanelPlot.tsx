@@ -643,6 +643,8 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'plot',
+  icon: 'chart-horizontal-bars',
+  category: 'Data',
   initialize: async (weave, inputNode, stack) => {
     // Can't happen, id was selected based on Node type
     if (inputNode.nodeType === 'void') {

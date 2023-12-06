@@ -1468,6 +1468,8 @@ const applyTableStateToRowsNode = (
 
 export const TableSpec: Panel2.PanelSpec = {
   id: 'table',
+  icon: 'table',
+  category: 'Data',
   initialize: async (weave, inputNode, stack) => {
     if (inputNode.nodeType === 'void') {
       // Can't happen, id was selected based on Node type

@@ -316,6 +316,7 @@ export const PanelDateRange: React.FC<PanelDateRangeProps> = props => {
 export const Spec: Panel.PanelSpec = {
   hidden: true,
   id: 'DateRange',
+  icon: 'date',
   initialize: initializedPanelDateRange,
   ConfigComponent: PanelDateRangeConfigComponent,
   Component: PanelDateRange,
