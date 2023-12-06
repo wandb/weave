@@ -1,4 +1,4 @@
-import {NavigateNext, OpenInNew} from '@mui/icons-material';
+import {OpenInNew} from '@mui/icons-material';
 import {
   Autocomplete,
   Box,
@@ -311,7 +311,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   );
 };
 
-export const ObjectVersionsTable: React.FC<{
+const ObjectVersionsTable: React.FC<{
   objectVersions: WFObjectVersion[];
 }> = props => {
   // const history = useHistory();

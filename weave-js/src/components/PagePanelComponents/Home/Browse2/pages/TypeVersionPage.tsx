@@ -9,10 +9,7 @@ import {
 } from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
-import {
-  FilterableObjectVersionsTable,
-  ObjectVersionsTable,
-} from './ObjectVersionsPage';
+import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
 import {OpVersionsTable} from './OpVersionsPage';
 import {TypeVersionsTable} from './TypeVersionsPage';
 

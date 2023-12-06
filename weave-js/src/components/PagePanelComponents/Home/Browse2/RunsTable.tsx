@@ -1,4 +1,4 @@
-import {Box, Chip} from '@mui/material';
+import {Chip} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
