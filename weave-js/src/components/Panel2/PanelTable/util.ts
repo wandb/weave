@@ -240,20 +240,24 @@ export const useOrderedColumns = (
 ) => {
   return useMemo(() => {
     const allColumns = Table.getColumnRenderOrder(tableState);
+    let countColumn = countColumnId ?? '';
+    let groupCountColumn = [countColumn];
+    if (!allColumns.includes(countColumn)) {
+      countColumn = '';
+      groupCountColumn = [];
+    }
     const normalColumns = allColumns
       .filter(s => !pinnedColumns.includes(s))
-      .filter(s => s !== countColumnId);
+      .filter(s => s !== countColumn);
     const actualPinnedColumns = allColumns
       .filter(s => pinnedColumns.includes(s))
-      .filter(s => s !== countColumnId);
-    const groupCountColumn = countColumnId ? [countColumnId] : [];
+      .filter(s => s !== countColumn);
 
     return tableState.groupBy
       .concat(groupCountColumn)
       .concat(actualPinnedColumns)
       .concat(normalColumns);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableState, pinnedColumns]);
+  }, [tableState, pinnedColumns, countColumnId]);
 };
 
 export const getTableMeasurements = (args: {
