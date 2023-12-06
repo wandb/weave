@@ -38,9 +38,6 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                                 types.List(types.Number())
                             ),
                             "gpu_cores_mem": types.optional(types.List(types.Number())),
-                            # "cpu_cores_util": types.optional(types.Number()),
-                            # "gpu_cores_util": types.optional(types.Number()),
-                            # "gpu_cores_mem": types.optional(types.Number()),
                             "memory": types.optional(types.Number()),
                             "disk": types.TypedDict(
                                 {
@@ -106,7 +103,7 @@ def observability(
     grouping_fn = varbar.add(
         "grouping_fn",
         weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["job"]
+            {"row": input_node.type.object_type}, lambda row: row["entity_name"]
         ),
         hidden=True,
     )
@@ -235,7 +232,7 @@ def observability(
             )
         ),
         y_title="Time spent queued",
-        color=lambda row: grouping_fn(row),
+        label=lambda row: grouping_fn(row),
         tooltip=lambda row: weave.ops.dict_(
             **{
                 "job": row["job"][0],
@@ -248,7 +245,7 @@ def observability(
                 ),
             }
         ),
-        color_title="Group (from Grouping function)",
+        color_title="Grouping",
         color=lambda row: grouping_fn(row),
         groupby_dims=["x", "label"],
         mark="bar",
