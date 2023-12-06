@@ -5,6 +5,10 @@ export const basicField = (
   headerName: string,
   extra?: Partial<GridColDef>
 ): GridColDef => {
+  if (extra?.width) {
+    extra.minWidth = extra.width;
+    extra.maxWidth = extra.width;
+  }
   return {
     field,
     headerName,

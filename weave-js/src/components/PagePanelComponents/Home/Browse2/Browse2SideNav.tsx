@@ -31,9 +31,9 @@ import React, {FC, Fragment, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
+import {useWeaveflowRouteContext} from './context';
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
-import {useWeaveflowRouteContext} from './context';
 
 const drawerWidth = 240;
 

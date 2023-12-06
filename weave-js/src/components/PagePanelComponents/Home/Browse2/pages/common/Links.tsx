@@ -125,9 +125,13 @@ export const OpLink: React.FC<{opName: string}> = props => {
 export const OpVersionLink: React.FC<{
   opName: string;
   version: string;
+  hideName?: boolean;
 }> = props => {
   const orm = useWeaveflowORMContext();
   const routerContext = useWeaveflowRouteContext();
+  const text = props.hideName
+    ? props.version
+    : props.opName + ': ' + props.version;
   try {
     const opVersion = orm.projectConnection.opVersion(
       props.opName,
@@ -141,15 +145,11 @@ export const OpVersionLink: React.FC<{
           opVersion.op().name(),
           opVersion.version()
         )}>
-        {props.opName} : {props.version}
+        {text}
       </Link>
     );
   } catch (e) {
-    return (
-      <span>
-        {props.opName}: {props.version}
-      </span>
-    );
+    return <span>{text}</span>;
   }
 };
 

@@ -107,7 +107,7 @@ export const RunsTable: FC<{
         opCategory: ormCall.opVersion()?.opCategory(),
         trace_id: call.trace_id,
         status_code: call.status_code,
-        timestamp: call.timestamp,
+        timestampMs: call.timestamp,
         latency: monthRoundedTime(call.summary.latency_s, true),
         ..._.mapValues(
           _.mapKeys(
@@ -155,9 +155,23 @@ export const RunsTable: FC<{
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
+        field: 'timestampMs',
+        headerName: 'Timestamp',
+        width: 150,
+        minWidth: 150,
+        maxWidth: 150,
+        renderCell: cellParams => {
+          return moment(cellParams.row.timestampMs).format(
+            'YYYY-MM-DD HH:mm:ss'
+          );
+        },
+      },
+      {
         field: 'status_code',
         headerName: 'Status',
         width: 100,
+        minWidth: 100,
+        maxWidth: 100,
         renderCell: cellParams => {
           return (
             <Chip
@@ -175,59 +189,11 @@ export const RunsTable: FC<{
         },
       },
       {
-        field: 'timestamp',
-        headerName: 'Timestamp',
-        width: 150,
-        renderCell: cellParams => {
-          return moment(cellParams.row.timestamp).format('YYYY-MM-DD HH:mm:ss');
-        },
-      },
-      {
-        // flex: !showIO ? 1 : undefined,
-        width: 100,
-        field: 'span_id',
-        headerName: 'ID',
-        renderCell: rowParams => {
-          return (
-            <Link
-              to={routeContext.callUIUrl(
-                params.entity,
-                params.project,
-                rowParams.row.trace_id,
-                rowParams.row.id
-              )}>
-              {rowParams.row.id}
-            </Link>
-          );
-        },
-      },
-      {
-        // flex: !showIO ? 1 : undefined,
-        field: 'opVersion',
-        headerName: 'Name',
-        renderCell: rowParams => {
-          const opVersion = rowParams.row.ormCall.opVersion();
-          if (opVersion == null) {
-            return rowParams.row.ormCall.spanName();
-          }
-          return (
-            <OpVersionLink
-              opName={opVersion.op().name()}
-              version={opVersion.version()}
-            />
-          );
-        },
-      },
-
-      {
-        field: 'latency',
-        headerName: 'Latency',
-        flex: !showIO ? 1 : undefined,
-      },
-      {
         field: 'opCategory',
-        headerName: 'Op Category',
-        width: 150,
+        headerName: 'Category',
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
         renderCell: cellParams => {
           if (cellParams.value == null) {
             return '';
@@ -249,6 +215,53 @@ export const RunsTable: FC<{
           );
         },
       },
+
+      {
+        flex: !showIO ? 1 : undefined,
+        // width: 100,
+        field: 'span_id',
+        headerName: 'Call',
+        renderCell: rowParams => {
+          return (
+            <Link
+              to={routeContext.callUIUrl(
+                params.entity,
+                params.project,
+                rowParams.row.trace_id,
+                rowParams.row.id
+              )}>
+              {rowParams.row.id}
+            </Link>
+          );
+        },
+      },
+      {
+        flex: !showIO ? 1 : undefined,
+        field: 'opVersion',
+        headerName: 'Name',
+        renderCell: rowParams => {
+          const opVersion = rowParams.row.ormCall.opVersion();
+          if (opVersion == null) {
+            return rowParams.row.ormCall.spanName();
+          }
+          return (
+            <OpVersionLink
+              opName={opVersion.op().name()}
+              version={opVersion.version()}
+            />
+          );
+        },
+      },
+
+      {
+        field: 'latency',
+        headerName: 'Latency',
+        width: 125,
+        minWidth: 125,
+        maxWidth: 125,
+        // flex: !showIO ? 1 : undefined,
+      },
+
       // {
       //   field: 'isRoot',
       //   headerName: 'Trace Root',
@@ -494,7 +507,7 @@ export const RunsTable: FC<{
       // density="compact"
       initialState={{
         sorting: {
-          sortModel: [{field: 'timestamp', sort: 'desc'}],
+          sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
       }}
       rowHeight={38}

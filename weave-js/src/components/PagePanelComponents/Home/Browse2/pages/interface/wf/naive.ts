@@ -181,7 +181,7 @@ export class WFNaiveProject implements WFProject {
     return ['train', 'predict', 'score', 'evaluate', 'tune'];
   }
 
-  typeCategories(): HackyTypeCategory[]  {
+  typeCategories(): HackyTypeCategory[] {
     return ['model', 'dataset'];
   }
 

@@ -344,38 +344,14 @@ export const ObjectVersionsTable: React.FC<{
     });
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
-    basicField('version', 'Version', {
+    basicField('createdAt', 'Created At', {
+      width: 150,
       renderCell: params => {
-        // Icon to indicate navigation to the object version
-        return (
-          <ObjectVersionLink
-            objectName={params.row.obj.object().name()}
-            version={params.row.obj.version()}
-            hideName
-          />
-        );
+        return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
       },
     }),
-    // basicField('id', 'View', {
-    //   width: 50,
-    //   minWidth: 50,
-    //   maxWidth: 50,
-    //   renderCell: params => {
-    //     // Icon to indicate navigation to the object version
-    //     return (
-    //       <NavigateNext
-    //         style={{
-    //           cursor: 'pointer',
-    //         }}
-    //       />
-    //     );
-    //   },
-    // }),
-    basicField('object', 'Object', {
-      renderCell: params => <ObjectLink objectName={params.value as string} />,
-    }),
-    basicField('typeCategory', 'Type Category', {
-      width: 150,
+    basicField('typeCategory', 'Category', {
+      width: 100,
       renderCell: cellParams => {
         if (cellParams.value == null) {
           return '';
@@ -395,6 +371,21 @@ export const ObjectVersionsTable: React.FC<{
         );
       },
     }),
+    basicField('version', 'Version', {
+      renderCell: params => {
+        // Icon to indicate navigation to the object version
+        return (
+          <ObjectVersionLink
+            objectName={params.row.obj.object().name()}
+            version={params.row.obj.version()}
+            hideName
+          />
+        );
+      },
+    }),
+    basicField('object', 'Object', {
+      renderCell: params => <ObjectLink objectName={params.value as string} />,
+    }),
 
     basicField('typeVersion', 'Type Version', {
       renderCell: params => (
@@ -405,6 +396,7 @@ export const ObjectVersionsTable: React.FC<{
       ),
     }),
     basicField('inputTo', 'Input To', {
+      width: 100,
       renderCell: params => {
         if (params.value === 0) {
           return '';
@@ -425,6 +417,7 @@ export const ObjectVersionsTable: React.FC<{
       },
     }),
     basicField('outputFrom', 'Output From', {
+      width: 100,
       renderCell: params => {
         if (!params.value) {
           return '';
@@ -449,13 +442,12 @@ export const ObjectVersionsTable: React.FC<{
       },
     }),
     basicField('description', 'Description'),
-    basicField('versionIndex', 'Version'),
-    basicField('createdAt', 'Created At', {
-      renderCell: params => {
-        return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
-      },
+    basicField('versionIndex', 'Version', {
+      width: 100,
     }),
+
     basicField('isLatest', 'Latest', {
+      width: 100,
       renderCell: params => {
         if (params.value) {
           return (

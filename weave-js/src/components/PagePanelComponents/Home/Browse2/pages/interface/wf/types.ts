@@ -49,9 +49,7 @@ export interface WFObject extends ProjectOwned {
 }
 
 export type HackyTypeTree = string | {[propName: string]: HackyTypeTree};
-export type HackyTypeCategory =
-  | 'model'
-  | 'dataset'
+export type HackyTypeCategory = 'model' | 'dataset';
 
 export interface WFTypeVersion extends ProjectOwned {
   type: () => WFType;
