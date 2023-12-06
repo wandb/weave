@@ -34,6 +34,8 @@ import {useProjectsForEntity} from '../query';
 import {useWeaveflowRouteContext} from './context';
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
+import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
+import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
 
 const drawerWidth = 240;
 
@@ -113,21 +115,18 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
       navigateToCalls={(filter?: WFHighLevelCallFilter) => {
         history.push(router.callsUIUrl(params.entity, params.project, filter));
       }}
-      navigateToTypeVersions={(filter?: string) => {
+      navigateToTypeVersions={(filter?: WFHighLevelTypeVersionFilter) => {
         history.push(
-          `/${params.entity}/${params.project}/type-versions${
-            filter ? `?filter=${filter}` : ''
-          }`
+          router.typeVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
-      navigateToOpVersions={(filter?: string) => {
+      navigateToOpVersions={(filter?: WFHighLevelOpVersionFilter) => {
         history.push(
-          `/${params.entity}/${params.project}/op-versions${
-            filter ? `?filter=${filter}` : ''
-          }`
+          router.opVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToBoards={(filter?: string) => {
+        // TODO: Move to router
         history.push(
           `/${params.entity}/${params.project}/boards${
             filter ? `?filter=${filter}` : ''
@@ -135,6 +134,7 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
         );
       }}
       navigateToTables={(filter?: string) => {
+        // TODO: Move to router
         history.push(
           `/${params.entity}/${params.project}/tables${
             filter ? `?filter=${filter}` : ''
@@ -347,7 +347,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'types',
             icon: <TypeSpecimen />,
             onClick: () => {
-              props.navigateToTypeVersions('alias="latest"');
+              props.navigateToTypeVersions();
             },
           },
           {
@@ -355,7 +355,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'ops',
             icon: <ManageHistory />,
             onClick: () => {
-              props.navigateToOpVersions('alias="latest"');
+              props.navigateToOpVersions();
             },
           },
         ],

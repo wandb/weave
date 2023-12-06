@@ -1,31 +1,73 @@
 import {DataGridPro, GridColDef, GridRowsProp} from '@mui/x-data-grid-pro';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
+import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
 import {ObjectVersionsLink, TypeLink, TypeVersionLink} from './common/Links';
-import {SimplePageLayout} from './common/SimplePageLayout';
+import {
+  FilterableTablePageContent,
+  SimplePageLayout,
+} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {WFTypeVersion} from './interface/wf/types';
+
+export type WFHighLevelTypeVersionFilter = {};
 
 export const TypeVersionsPage: React.FC<{
   entity: string;
   project: string;
+  initialFilter?: WFHighLevelTypeVersionFilter;
 }> = props => {
-  const orm = useWeaveflowORMContext();
-
-  const allTypeVersions = useMemo(() => {
-    return orm.projectConnection.typeVersions();
-  }, [orm.projectConnection]);
   return (
     <SimplePageLayout
       title="Type Versions"
       tabs={[
         {
           label: 'All',
-          content: <TypeVersionsTable typeVersions={allTypeVersions} />,
+          content: <FilterableTypeVersionsTable {...props} />,
         },
       ]}
     />
+  );
+};
+
+export const FilterableTypeVersionsTable: React.FC<{
+  entity: string;
+  project: string;
+  frozenFilter?: WFHighLevelTypeVersionFilter;
+  initialFilter?: WFHighLevelTypeVersionFilter;
+}> = props => {
+  const [filter, setFilter] = useState<WFHighLevelTypeVersionFilter>(
+    props.initialFilter ?? {}
+  );
+  useEffect(() => {
+    if (props.initialFilter) {
+      setFilter(props.initialFilter);
+    }
+  }, [props.initialFilter]);
+  const effectiveFilter = useMemo(() => {
+    return {...filter, ...props.frozenFilter};
+  }, [filter, props.frozenFilter]);
+
+  const routerContext = useWeaveflowRouteContext();
+  const orm = useWeaveflowORMContext();
+  const allTypeVersions = useMemo(() => {
+    return orm.projectConnection.typeVersions();
+  }, [orm.projectConnection]);
+  const filteredTypeVersions = useMemo(() => {
+    return allTypeVersions;
+  }, [allTypeVersions]);
+
+  return (
+    <FilterableTablePageContent
+      filterPopoutTargetUrl={routerContext.typeVersionsUIUrl(
+        props.entity,
+        props.project,
+        effectiveFilter
+      )}
+      filterListItems={<></>}>
+      <TypeVersionsTable typeVersions={filteredTypeVersions} />
+    </FilterableTablePageContent>
   );
 };
 

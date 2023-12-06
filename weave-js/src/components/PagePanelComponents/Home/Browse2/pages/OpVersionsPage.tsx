@@ -7,35 +7,78 @@ import {
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
 import moment from 'moment';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
 import {CallsLink, OpLink, OpVersionLink} from './common/Links';
-import {SimplePageLayout} from './common/SimplePageLayout';
+import {
+  FilterableTablePageContent,
+  SimplePageLayout,
+} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
-import {WFOpVersion} from './interface/wf/types';
+import {HackyOpCategory, WFOpVersion} from './interface/wf/types';
+
+export type WFHighLevelOpVersionFilter = {
+  // opCategory?: HackyOpCategory | null;
+};
 
 export const OpVersionsPage: React.FC<{
   entity: string;
   project: string;
+  initialFilter?: WFHighLevelOpVersionFilter;
 }> = props => {
-  const orm = useWeaveflowORMContext();
-
-  const allOpVersions = useMemo(() => {
-    return orm.projectConnection.opVersions();
-  }, [orm.projectConnection]);
   return (
     <SimplePageLayout
       title="Op Versions"
       tabs={[
         {
           label: 'All',
-          content: <OpVersionsTable opVersions={allOpVersions} />,
+          content: <FilterableOpVersionsTable {...props} />,
         },
       ]}
     />
+  );
+};
+
+export const FilterableOpVersionsTable: React.FC<{
+  entity: string;
+  project: string;
+  frozenFilter?: WFHighLevelOpVersionFilter;
+  initialFilter?: WFHighLevelOpVersionFilter;
+}> = props => {
+  const [filter, setFilter] = useState<WFHighLevelOpVersionFilter>(
+    props.initialFilter ?? {}
+  );
+  useEffect(() => {
+    if (props.initialFilter) {
+      setFilter(props.initialFilter);
+    }
+  }, [props.initialFilter]);
+  const effectiveFilter = useMemo(() => {
+    return {...filter, ...props.frozenFilter};
+  }, [filter, props.frozenFilter]);
+
+  const routerContext = useWeaveflowRouteContext();
+  const orm = useWeaveflowORMContext();
+  const allOpVersions = useMemo(() => {
+    return orm.projectConnection.opVersions();
+  }, [orm.projectConnection]);
+  const filteredOpVersions = useMemo(() => {
+    return allOpVersions;
+  }, [allOpVersions]);
+
+  return (
+    <FilterableTablePageContent
+      filterPopoutTargetUrl={routerContext.opVersionsUIUrl(
+        props.entity,
+        props.project,
+        effectiveFilter
+      )}
+      filterListItems={<></>}>
+      <OpVersionsTable opVersions={filteredOpVersions} />
+    </FilterableTablePageContent>
   );
 };
 

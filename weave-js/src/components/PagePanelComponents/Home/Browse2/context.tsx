@@ -3,6 +3,8 @@ import React, {createContext, useContext} from 'react';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
+import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 
 export const useWeaveflowRouteContext = () => {
   const ctx = useContext(WeaveflowRouteContext);
@@ -70,11 +72,25 @@ const defaultContext = {
   ) => {
     throw new Error('Not implemented');
   },
+  typeVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelTypeVersionFilter
+  ) => {
+    throw new Error('Not implemented');
+  },
   objectVersionUIUrl: (
     entityName: string,
     projectName: string,
     objectName: string,
     objectVersionHash: string
+  ) => {
+    throw new Error('Not implemented');
+  },
+  opVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelOpVersionFilter
   ) => {
     throw new Error('Not implemented');
   },
@@ -166,6 +182,18 @@ const newContext = {
   ) => {
     return `/${entityName}/${projectName}/types/${typeName}/versions/${typeVersionHash}`;
   },
+  typeVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelTypeVersionFilter
+  ) => {
+    if (!filter) {
+      return `/${entityName}/${projectName}/type-versions`;
+    }
+    return `/${entityName}/${projectName}/type-versions?filter=${encodeURIComponent(
+      JSON.stringify(filter)
+    )}`;
+  },
   objectVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -173,6 +201,18 @@ const newContext = {
     objectVersionHash: string
   ) => {
     return `/${entityName}/${projectName}/objects/${objectName}/versions/${objectVersionHash}`;
+  },
+  opVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelOpVersionFilter
+  ) => {
+    if (!filter) {
+      return `/${entityName}/${projectName}/op-versions`;
+    }
+    return `/${entityName}/${projectName}/op-versions?filter=${encodeURIComponent(
+      JSON.stringify(filter)
+    )}`;
   },
   opVersionUIUrl: (
     entityName: string,
@@ -251,11 +291,21 @@ const WeaveflowRouteContext = createContext<{
     typeName: string,
     typeVersionHash: string
   ) => string;
+  typeVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelTypeVersionFilter
+  ) => string;
   objectVersionUIUrl: (
     entityName: string,
     projectName: string,
     objectName: string,
     objectVersionHash: string
+  ) => string;
+  opVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelOpVersionFilter
   ) => string;
   opVersionUIUrl: (
     entityName: string,

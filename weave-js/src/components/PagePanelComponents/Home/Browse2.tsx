@@ -294,7 +294,7 @@ const Browse2ProjectRoot: FC = () => {
             <TypesPage />
           </Route>
           <Route path={`/${projectRoot}/type-versions`}>
-            <TypeVersionsPage entity={params.entity} project={params.project} />
+            <TypeVersionsPageBinding />
           </Route>
           {/* OBJECTS */}
           <Route
@@ -321,7 +321,7 @@ const Browse2ProjectRoot: FC = () => {
             <OpsPage />
           </Route>
           <Route path={`/${projectRoot}/op-versions`}>
-            <OpVersionsPage entity={params.entity} project={params.project} />
+            <OpVersionsPageBinding />
           </Route>
           {/* CALLS */}
           <Route path={`/${projectRoot}/calls/:callId`}>
@@ -537,6 +537,54 @@ const ObjectVersionsPageBinding = () => {
   }, [query.filter]);
   return (
     <ObjectVersionsPage
+      entity={params.entity}
+      project={params.project}
+      initialFilter={filters}
+    />
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const TypeVersionsPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+  }>();
+  const query = useQuery();
+  const filters = useMemo(() => {
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+  return (
+    <TypeVersionsPage
+      entity={params.entity}
+      project={params.project}
+      initialFilter={filters}
+    />
+  );
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const OpVersionsPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+  }>();
+  const query = useQuery();
+  const filters = useMemo(() => {
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+  return (
+    <OpVersionsPage
       entity={params.entity}
       project={params.project}
       initialFilter={filters}
