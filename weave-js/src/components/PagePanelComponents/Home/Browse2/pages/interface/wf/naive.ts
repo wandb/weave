@@ -211,31 +211,33 @@ export class WFNaiveProject implements WFProject {
     } = (await this.weaveClient.query(
       opDict({weaveObjectsNode, runsNode, feedbackNode} as any)
     )) as {
-      weaveObjectsNode: ObjectVersionDictType[];
-      runsNode: Call[];
-      feedbackNode: any[];
+      weaveObjectsNode?: ObjectVersionDictType[];
+      runsNode?: Call[];
+      feedbackNode?: any[];
     };
     const joinedCalls = joinRunsWithFeedback(
       runsValue ?? [],
       feedbackValue ?? []
     );
-    const objects = weaveObjectsValue.map(obj => {
-      if (
-        obj.type_version.type_version === 'unknown' &&
-        obj.type_version.type_version_json_string
-      ) {
-        return {
-          ...obj,
-          type_version: {
-            ...typeVersionFromTypeDict(
-              JSON.parse(obj.type_version.type_version_json_string)
-            ),
-            type_version_json_string: obj.type_version.type_version_json_string,
-          },
-        };
-      }
-      return obj;
-    });
+    const objects =
+      weaveObjectsValue?.map(obj => {
+        if (
+          obj.type_version.type_version === 'unknown' &&
+          obj.type_version.type_version_json_string
+        ) {
+          return {
+            ...obj,
+            type_version: {
+              ...typeVersionFromTypeDict(
+                JSON.parse(obj.type_version.type_version_json_string)
+              ),
+              type_version_json_string:
+                obj.type_version.type_version_json_string,
+            },
+          };
+        }
+        return obj;
+      }) ?? [];
     const opVersions = objects.filter(
       obj => obj.type_version.type_name === 'OpDef'
     );
