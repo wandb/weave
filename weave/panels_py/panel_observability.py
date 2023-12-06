@@ -235,7 +235,7 @@ def observability(
             )
         ),
         y_title="Time spent queued",
-        color=lambda row: grouping_fn(row),
+        label=lambda row: grouping_fn(row),
         tooltip=lambda row: weave.ops.dict_(
             **{
                 "job": row["job"][0],
