@@ -6,6 +6,7 @@ import * as SemanticHacks from '@wandb/weave/common/util/semanticHacks';
 import {
   canGroupType,
   canSortType,
+  constFunction,
   EditingNode,
   isListLike,
   isVoidNode,
@@ -13,7 +14,6 @@ import {
   Node,
   NodeOrVoidNode,
   opCount,
-  varNode,
   voidNode,
 } from '@wandb/weave/core';
 import {TableState} from '@wandb/weave/index';
@@ -328,19 +328,17 @@ export const ColumnHeader: React.FC<{
           if (countColumnId == null) {
             const {table, columnId} = Table.addColumnToTable(
               tableState,
-              opCount({arr: varNode(rowsNode.type, 'row')})
-              // constFunction(
-              //   {
-              //     row: {
-              //       type: 'list',
-              //       objectType: {type: 'typedDict', propertyTypes: 'any'},
-              //     },
-              //   },
-              //   ({row}) => {
-              //     console.log({rowInsideSelectFn: row});
-              //     return opCount({arr: row});
-              //   }
-              // )
+              constFunction(
+                {
+                  row: {
+                    type: 'list',
+                    objectType: 'any',
+                  },
+                },
+                ({row}) => {
+                  return opCount({arr: row});
+                }
+              ).val
             );
             newTableState = table;
             if (setCountColumnId) {
@@ -467,7 +465,6 @@ export const ColumnHeader: React.FC<{
     doUngroup,
     isPinned,
     setColumnPinState,
-    rowsNode.type,
   ]);
 
   const colIsSorted =
