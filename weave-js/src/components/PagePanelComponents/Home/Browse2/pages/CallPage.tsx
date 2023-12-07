@@ -25,13 +25,13 @@ export const CallPage: React.FC<{
       title={title}
       menuItems={[
         {
-          label: 'Open in Board',
+          label: '(Under Construction) Open in Board',
           onClick: () => {
             console.log('TODO: Open in Board');
           },
         },
         {
-          label: 'Compare',
+          label: '(Under Construction) Compare',
           onClick: () => {
             console.log('TODO: Compare');
           },

@@ -7,13 +7,13 @@ import {
   SimpleKeyValueTable,
   SimplePageLayout,
 } from './common/SimplePageLayout';
+import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
 import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
 import {FilterableOpVersionsTable} from './OpVersionsPage';
 import {FilterableTypeVersionsTable} from './TypeVersionsPage';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 
 export const TypeVersionPage: React.FC<{
   entity: string;

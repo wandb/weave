@@ -30,11 +30,12 @@ import {
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
+import {useUpdateObjectVersionDescription} from './interface/dataModel';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeCategory, WFObjectVersion} from './interface/wf/types';
-import {useMutation} from '@apollo/client';
-import {UPDATE_ARTIFACT_DESCRIPTION} from './interface/gql';
-import {useUpdateObjectVersionDescription} from './interface/dataModel';
+
+// TODO: This file follows the older pattern - need to update it to use the same
+// one as TypeVersionsPage or OpVersionsPage
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;
@@ -293,7 +294,7 @@ const ObjectVersionsTable: React.FC<{
 }> = props => {
   // const history = useHistory();
   // const routeContext = useWeaveflowRouteContext();
-  const updateDescription = useUpdateObjectVersionDescription();
+  // const updateDescription = useUpdateObjectVersionDescription();
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
       const outputFrom = ov.outputFrom();
@@ -314,7 +315,7 @@ const ObjectVersionsTable: React.FC<{
           ov.typeVersion().type().name() + ':' + ov.typeVersion().version(),
         inputTo: ov.inputTo().length,
         outputFrom: firstOutputFrom,
-        description: ov.description(),
+        // description: ov.description(),
         versionIndex: ov.versionIndex(),
         createdAt: ov.createdAtMs(),
         isLatest: ov.aliases().includes('latest'),
@@ -407,9 +408,9 @@ const ObjectVersionsTable: React.FC<{
         // );
       },
     }),
-    basicField('description', 'Description', {
-      editable: true,
-    }),
+    // basicField('description', 'Description', {
+    //   editable: true,
+    // }),
     basicField('versionIndex', 'Version', {
       width: 100,
     }),
@@ -449,18 +450,18 @@ const ObjectVersionsTable: React.FC<{
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       columnGroupingModel={columnGroupingModel}
-      onCellEditStop={(params, event) => {
-        if (params.field === 'description') {
-          const newDesc = (event as any).target.value;
-          updateDescription(
-            params.row.obj.entity(),
-            params.row.obj.project(),
-            params.row.obj.object().name(),
-            params.row.obj.version(),
-            newDesc
-          );
-        }
-      }}
+      // onCellEditStop={(params, event) => {
+      //   if (params.field === 'description') {
+      //     const newDesc = (event as any).target.value;
+      //     updateDescription(
+      //       params.row.obj.entity(),
+      //       params.row.obj.project(),
+      //       params.row.obj.object().name(),
+      //       params.row.obj.version(),
+      //       newDesc
+      //     );
+      //   }
+      // }}
     />
   );
 };

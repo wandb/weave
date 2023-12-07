@@ -18,18 +18,8 @@ PR Todos:
   - [ ] GAP: Overview: (Type Stub, Op Category, isLatest, Call Hierarchy)
 
 - OpVersions Page: Done
-
-- Call Page
-
-  - CHECK: Add "TODO" to overflow menu
-  - CHECK: Add to dataset? What does this do now?
-  - CHECK: Feedback
-  - [ ] BUG: Function link is broken (possibly same as other issues above)
-
-- Calls Page
-
-  - [ ] FEAT: Show outputs when narrowed to a single op version
-
+- Call Page: Done
+- Calls Page: Done
 - Board Page: (Future)
 - Boards Page: (Future)
 - Table Page: (Future)
@@ -45,6 +35,8 @@ PR Todos:
 
 - Bugs:
   - [ ] Do to static state, committing changes errors when attempting to load the new page.
+  - [ ] Add to Dataset is broken - might be due to weird imports in server
+  - [ ] Feedback does not save correctly
 
 ---
 
@@ -79,6 +71,7 @@ Future:
 - [ ] Odd Behavior: Only the main data view adapts to nested URI
 - [ ] (Future) FEAT: ObjectVersion Board listing Page
 - [ ] (Future) GAP: ObjectVersion "Open in Board" opens in old link
+- [ ] FEAT: Show outputs when narrowed to a single op version
 
 Needs Cleanup:
 

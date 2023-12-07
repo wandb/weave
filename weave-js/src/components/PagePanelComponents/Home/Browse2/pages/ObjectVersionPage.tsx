@@ -51,21 +51,21 @@ export const ObjectVersionPage: React.FC<{
           },
         },
         {
-          label: '(Coming Soon) Compare',
+          label: '(Under Construction) Compare',
           onClick: () => {
-            console.log('(TODO) Compare');
+            console.log('(Under Construction) Compare');
           },
         },
         {
-          label: '(Coming Soon) Process with Function',
+          label: '(Under Construction) Process with Function',
           onClick: () => {
-            console.log('(TODO) Process with Function');
+            console.log('(Under Construction) Process with Function');
           },
         },
         {
           label: '(Coming Soon) Add to Hub',
           onClick: () => {
-            console.log('(TODO) Add to Hub');
+            console.log('(Under Construction) Add to Hub');
           },
         },
       ]}

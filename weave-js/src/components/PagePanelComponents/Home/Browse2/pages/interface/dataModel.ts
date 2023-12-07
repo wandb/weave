@@ -43,7 +43,7 @@ import {
   Type,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
-import {UPDATE_ARTIFACT_DESCRIPTION} from './gql';
+// import {UPDATE_ARTIFACT_DESCRIPTION} from './gql';
 
 export const useAllObjectVersions = (
   entity: string,
@@ -133,45 +133,45 @@ export const fnAllWeaveObjects = (entity: string, project: string) => {
   return asDictNode;
 };
 
-export const useUpdateObjectVersionDescription = () => {
-  const weave = useWeaveContext();
-  const [updateArtifactDescription] = useMutation(UPDATE_ARTIFACT_DESCRIPTION);
-  return useCallback(
-    (
-      entity: string,
-      project: string,
-      artifactName: string,
-      alias: string,
-      description: string
-    ) => {
-      const doWork = async () => {
-        const projectNode = opRootProject({
-          entityName: constString(entity),
-          projectName: constString(project),
-        });
-        const artifactNode = opProjectArtifactVersion({
-          project: projectNode,
-          artifactName: constString(artifactName),
-          artifactVersionAlias: constString(alias),
-        });
-        const artifactIDNode = opArtifactVersionId({
-          artifactVersion: artifactNode,
-        });
-        const artifactIdValue: string = await weave.client.query(
-          artifactIDNode
-        );
-        await updateArtifactDescription({
-          variables: {
-            artifactID: artifactIdValue,
-            description,
-          },
-        });
-      };
-      return doWork();
-    },
-    [updateArtifactDescription, weave.client]
-  );
-};
+// export const useUpdateObjectVersionDescription = () => {
+//   const weave = useWeaveContext();
+//   const [updateArtifactDescription] = useMutation(UPDATE_ARTIFACT_DESCRIPTION);
+//   return useCallback(
+//     (
+//       entity: string,
+//       project: string,
+//       artifactName: string,
+//       alias: string,
+//       description: string
+//     ) => {
+//       const doWork = async () => {
+//         const projectNode = opRootProject({
+//           entityName: constString(entity),
+//           projectName: constString(project),
+//         });
+//         const artifactNode = opProjectArtifactVersion({
+//           project: projectNode,
+//           artifactName: constString(artifactName),
+//           artifactVersionAlias: constString(alias),
+//         });
+//         const artifactIDNode = opArtifactVersionId({
+//           artifactVersion: artifactNode,
+//         });
+//         const artifactIdValue: string = await weave.client.query(
+//           artifactIDNode
+//         );
+//         await updateArtifactDescription({
+//           variables: {
+//             artifactID: artifactIdValue,
+//             description,
+//           },
+//         });
+//       };
+//       return doWork();
+//     },
+//     [updateArtifactDescription, weave.client]
+//   );
+// };
 
 export const useObjectVersionTypeInfo = (
   entity: string,

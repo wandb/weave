@@ -26,7 +26,6 @@ interface ProjectOwned {
 }
 
 interface ArtifactVersionBacked {
-  artifactId: () => string;
   versionIndex: () => number;
   aliases: () => string[];
   description: () => string;
