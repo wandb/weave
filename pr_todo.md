@@ -12,10 +12,6 @@ Pages:
 - Call Page: Done
 - Calls Page: Done
 
-Python API
-
-- [ ] Need to update URLs
-
 Bugs:
 
 - [ ] Do to static state, committing changes errors when attempting to load the new page.
