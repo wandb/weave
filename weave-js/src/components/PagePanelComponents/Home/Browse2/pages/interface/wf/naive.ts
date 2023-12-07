@@ -484,7 +484,6 @@ class WFNaiveType implements WFType {
     return this.state.project;
   }
   typeVersions(): WFTypeVersion[] {
-    
     return Array.from(this.state.typeVersionsMap.keys())
       .filter(
         typeVersionId =>
@@ -557,7 +556,6 @@ class WFNaiveOp implements WFOp {
     return this.opName;
   }
   opVersions(): WFOpVersion[] {
-    
     return Array.from(this.state.opVersionsMap.values())
       .filter(opVersionDict => opVersionDict.name === this.opName)
       .map(

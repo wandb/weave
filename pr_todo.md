@@ -1,27 +1,8 @@
-Pages:
-
-- Object Page: Done
-- ObjectVersions Page
-- ObjectVersion Page: Done
-- Type Page: Done
-- TypeVersion Page Done
-- TypeVersions Page: Done
-- Op Page: Done
-- OpVersion Page: Done
-- OpVersions Page: Done
-- Call Page: Done
-- Calls Page: Done
-
 Bugs:
 
 - [ ] Do to static state, committing changes errors when attempting to load the new page.
 - [ ] Add to Dataset is broken - might be due to weird imports in server
 - [ ] Feedback does not save correctly
-
-Needs Cleanup:
-
-- [ ] Use of version hashes in filter - need to convert everything to uris
-- [ ] Various locations use context to get entity/project - this is bad as it assumes all links are within the same project
 
 ---
 
@@ -34,6 +15,8 @@ Shortcuts Taken
 - Since OpDefs do not store their type stub, we have to infer it from the first call!
 - Since OpDefs do not store their invoke list, we have to infer it from the first call!
 - There is a not-well defined mapping between an in-memory WeaveType and it's corresponding virtual "TypeVersion"
+- A lot of locations assume the same entity/project as the current one - probably need to audit this
+- The filters are using `name:version` as the reference - should probably make this full path
 
 Query & Performance:
 
@@ -46,22 +29,16 @@ Query & Performance:
 Future:
 
 - Project Selector should limit to only "good" projects
-- Project Homepage is a big opportunity for innovation
-- Tab state not saved
+- Project Homepage is a big opportunity for innovation (currently just redirects to calls)
+- Selected Tab state not saved
 - "Peak" style previews
 - Ability to open any of the Table Pages in a board
 - Structure and Record DAGS
-- Board and Table Support
+- Board and Table Support (also in detail pages)
 - Pinnable filters
-- Odd Behavior: Only the main data view adapts to nested URI
-- (Future) FEAT: ObjectVersion Board listing Page
-- (Future) GAP: ObjectVersion "Open in Board" opens in old link
+- Odd Behavior: Only the main data view of objectversion adapts to nested URI
 - FEAT: Show outputs when narrowed to a single op version
 - FEAT: TypeVersion Filter (Include Subtypes)
 - Ops Page: (Future)
 - Types Page: (Future)
 - Objects Page: (Future)
-- Board Page: (Future)
-- Boards Page: (Future)
-- Table Page: (Future)
-- Tables: (Future)
