@@ -269,7 +269,6 @@ const Browse2ProjectRoot: FC = () => {
   useEffect(() => {
     projectData.init().then(() => setLoading(false));
   }, [projectData]);
-  console.log(projectData);
   if (loading) {
     return <CenteredAnimatedLoader />;
   }

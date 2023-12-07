@@ -9,11 +9,7 @@ PR Todos:
 
 - [ ] ObjectVersion Page
 
-  - [ ] BUG: When ops are in the data view (odd) - they have incorrect links
   - [ ] BUG: Committing edits redirects to incorrect page
-  - [ ] (Future) FEAT: Board listing Page
-  - [ ] (Future) FEAT: Record DAG
-  - [ ] (Future) GAP: "Open in Board" opens in old link
 
 - Type Page: Done
 - Types Page: (Future)
@@ -83,6 +79,8 @@ Future:
 - [ ] Board and Table Support
 - [ ] Pinnable filters
 - [ ] Odd Behavior: Only the main data view adapts to nested URI
+- [ ] (Future) FEAT: ObjectVersion Board listing Page
+- [ ] (Future) GAP: ObjectVersion "Open in Board" opens in old link
 
 Needs Cleanup:
 

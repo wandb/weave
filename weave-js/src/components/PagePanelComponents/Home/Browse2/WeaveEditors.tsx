@@ -275,7 +275,7 @@ export const WeaveEditor: FC<{
   useEffect(() => {
     const doRefine = async () => {
       const refined = await weave.refineNode(node, stack);
-      console.log('GOT REFINED', refined);
+      // console.log('GOT REFINED', refined);
       setRefinedNode(refined);
     };
     doRefine();
@@ -717,7 +717,9 @@ export const WeaveViewOpDef: FC<{
   if (opDefQuery.loading) {
     return <div>loading</div>;
   } else if (opDefRef != null) {
-    return <SmallRef objRef={opDefRef} />;
+    // return <SmallRef objRef={opDefRef} />;
+    // This is broken in weave when there is a nested op def
+    return opDefRef.artifactName + ':' + opDefRef.artifactVersion.slice(0, 6);
   } else {
     return <div>invalid op def</div>;
   }

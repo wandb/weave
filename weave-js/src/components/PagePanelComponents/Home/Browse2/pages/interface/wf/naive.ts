@@ -241,7 +241,6 @@ export class WFNaiveProject implements WFProject {
         !['OpDef', 'stream_table', 'type'].includes(obj.type_version.type_name)
     );
     const objectTypeVersions = objectVersions.map(obj => obj.type_version);
-    console.log({objectVersions});
 
     this.state.objectVersionsMap = new Map(
       objectVersions.map(objectVersion => {

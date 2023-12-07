@@ -671,7 +671,6 @@ const InvokesFilterControlListItem: React.FC<{
         return o.op().name() + ':' + o.version();
       });
   }, [orm.projectConnection]);
-  console.log(props.filter);
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -709,7 +708,6 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
         return o.type().name() + ':' + o.version();
       });
   }, [orm.projectConnection]);
-  console.log(props.filter);
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -749,7 +747,7 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
         return o.type().name() + ':' + o.version();
       });
   }, [orm.projectConnection]);
-  console.log(props.filter);
+
   return (
     <ListItem>
       <FormControl fullWidth>
