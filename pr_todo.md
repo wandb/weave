@@ -10,10 +10,7 @@ PR Todos:
 - TypeVersions Page: Done
 - Op Page: Done
 - Ops Page: (Future)
-- OpVersion Page
-
-  - [ ] GAP: Overview: (Type Stub, Op Category, isLatest, Call Hierarchy)
-
+- OpVersion Page: Done
 - OpVersions Page: Done
 - Call Page: Done
 - Calls Page: Done

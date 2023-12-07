@@ -71,14 +71,6 @@ export const ObjectVersionPage: React.FC<{
       ]}
       tabs={[
         {
-          label: 'Values',
-          content: (
-            <ScrollableTabContent>
-              <WeaveEditor objType={props.objectName} node={itemNode} />
-            </ScrollableTabContent>
-          ),
-        },
-        {
           label: 'Overview',
           content: (
             <ScrollableTabContent>
@@ -109,6 +101,14 @@ export const ObjectVersionPage: React.FC<{
                   ),
                 }}
               />
+            </ScrollableTabContent>
+          ),
+        },
+        {
+          label: 'Values',
+          content: (
+            <ScrollableTabContent>
+              <WeaveEditor objType={props.objectName} node={itemNode} />
             </ScrollableTabContent>
           ),
         },

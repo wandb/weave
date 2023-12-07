@@ -10,11 +10,15 @@ import {Paper} from '../CommonLib';
 import {CallsTable} from './CallsPage';
 import {
   ScrollableTabContent,
+  SimpleKeyValueTable,
   SimplePageLayout,
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {FilterableOpVersionsTable} from './OpVersionsPage';
+import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
+import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
+import {WFOpVersion} from './interface/wf/types';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -43,6 +47,49 @@ export const OpVersionPage: React.FC<{
     <SimplePageLayout
       title={props.opName + ' : ' + props.version}
       tabs={[
+        {
+          label: 'Overview',
+          content: (
+            <ScrollableTabContent>
+              <SimpleKeyValueTable
+                data={{
+                  Name: <OpLink opName={props.opName} />,
+                  Category: (
+                    <OpVersionCategoryChip
+                      opCategory={opVersion.opCategory()}
+                    />
+                  ),
+                  Version: props.version,
+                  'Input Types': (
+                    <ul style={{margin: 0}}>
+                      {opVersion.inputTypesVersions().map((t, i) => (
+                        <li key={i}>
+                          <TypeVersionLink
+                            typeName={t.type().name()}
+                            version={t.version()}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  ),
+                  'Output Types': (
+                    <ul style={{margin: 0}}>
+                      {opVersion.outputTypeVersions().map((t, i) => (
+                        <li key={i}>
+                          <TypeVersionLink
+                            typeName={t.type().name()}
+                            version={t.version()}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  ),
+                  'Call Tree': <OpVersionOpTree opVersion={opVersion} />,
+                }}
+              />
+            </ScrollableTabContent>
+          ),
+        },
         {
           label: 'Calls',
           content: (
@@ -118,6 +165,21 @@ export const OpVersionPage: React.FC<{
     />
   );
   // return ;
+};
+
+const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
+  return (
+    <ul style={{margin: 0}}>
+      {opVersion.invokes().map((v, i) => {
+        return (
+          <li key={i}>
+            <OpVersionLink opName={v.op().name()} version={v.version()} />
+            <OpVersionOpTree opVersion={v} />
+          </li>
+        );
+      })}
+    </ul>
+  );
 };
 
 const OpVersionExecute: React.FC<{
