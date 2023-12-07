@@ -101,7 +101,7 @@ export const FilterableTable = <
   // Apply the data transformations
   const dataGridRowData = useMemo(() => {
     return filteredData.map(obj => {
-      const rowData: {[columnId: string]: any} = {id: obj.id};
+      const rowData: {[columnId: string]: any} = {...obj};
       Object.values(props.columns).forEach(column => {
         if (column.gridDisplay) {
           rowData[column.columnId] = column.gridDisplay.columnValue(obj);

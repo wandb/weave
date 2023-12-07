@@ -26,6 +26,7 @@ export const OpVersionPage: React.FC<{
     props.opName,
     props.version
   );
+  console.log('opVersion', opVersion);
   const uri = opVersion.refUri();
   const streamId = useMemo(
     () => ({

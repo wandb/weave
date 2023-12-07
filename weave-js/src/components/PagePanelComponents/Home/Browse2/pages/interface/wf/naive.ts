@@ -284,8 +284,8 @@ export class WFNaiveProject implements WFProject {
             aliases: opVersion.aliases,
             description: opVersion.description,
             versionIndex: opVersion.version_index,
-            inputTypes: {},
-            outputType: null,
+            // inputTypes: {},
+            // outputType: null,
             invokesOpVersionHashes: [],
             code: undefined,
             inputTypeVersionHashes: [],
@@ -426,18 +426,28 @@ export class WFNaiveProject implements WFProject {
       if (!exampleCallDict) {
         return;
       }
-      const signature = opSignatureFromSpan(exampleCallDict.callSpan);
-      Object.values(signature.inputTypes).forEach(inputType => {
-        const inputTypeVersion = typeVersionFromTypeDict(inputType);
-        inputTypeVersionMap.add(inputTypeVersion.type_version);
+      // if (exampleCall.opVersion()?.op().name() === "SummaryModel-get_topics") {
+      //   console.log({exampleCallDict})
+      // }
+      exampleCall.inputs().forEach(input => {
+      // const signature = opSignatureFromSpan(exampleCallDict.callSpan);
+      // console.log({signature})
+      // Object.values(signature.inputTypes).forEach(inputType => {
+        // const inputTypeVersion = typeVersionFromTypeDict(inputType);
+        inputTypeVersionMap.add(input.typeVersion().version());
       });
-      if (
-        !_.isFunction(signature.outputType) &&
-        !isNodeOrVoidNode(signature.outputType)
-      ) {
-        const outputTypeVersion = typeVersionFromTypeDict(signature.outputType);
-        outputTypeVersionMap.add(outputTypeVersion.type_version);
-      }
+      exampleCall.output().forEach(output => {
+      // Object.values(signature.outputType).forEach(outputType => {
+        // const outputTypeVersion = typeVersionFromTypeDict(outputType);
+        outputTypeVersionMap.add(output.typeVersion().version());
+      })
+      // if (
+      //   !_.isFunction(signature.outputType) &&
+      //   !isNodeOrVoidNode(signature.outputType)
+      // ) {
+      //   const outputTypeVersion = typeVersionFromTypeDict(signature.outputType);
+      //   outputTypeVersionMap.add(outputTypeVersion.type_version);
+      // }
       selfOpVersion.inputTypeVersionHashes = Array.from(inputTypeVersionMap);
       selfOpVersion.outputTypeVersionHashes = Array.from(outputTypeVersionMap);
     });
@@ -631,25 +641,25 @@ class WFNaiveTypeVersion implements WFTypeVersion {
       });
   }
   inputTo(): WFOpVersion[] {
-    return Array.from(this.state.callsMap.values())
-      .filter(callDict => {
-        return callDict.inputObjectVersionHashes.includes(
+    return Array.from(this.state.opVersionsMap.values())
+      .filter(opVersionDict => {
+        return opVersionDict.inputTypeVersionHashes.includes(
           this.typeVersionDict.versionHash
         );
       })
-      .map(callDict => {
-        return new WFNaiveOpVersion(this.state, callDict.opVersionHash!);
+      .map(opVersionDict => {
+        return new WFNaiveOpVersion(this.state, opVersionDict.versionHash);
       });
   }
   outputFrom(): WFOpVersion[] {
-    return Array.from(this.state.callsMap.values())
-      .filter(callDict => {
-        return callDict.outputObjectVersionHashes.includes(
+    return Array.from(this.state.opVersionsMap.values())
+      .filter(opVersionDict => {
+        return opVersionDict.outputTypeVersionHashes.includes(
           this.typeVersionDict.versionHash
         );
       })
-      .map(callDict => {
-        return new WFNaiveOpVersion(this.state, callDict.opVersionHash!);
+      .map(opVersionDict => {
+        return new WFNaiveOpVersion(this.state, opVersionDict.versionHash);
       });
   }
   objectVersions(): WFObjectVersion[] {

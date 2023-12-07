@@ -10,8 +10,7 @@ import {
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
 import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
-// import {OpVersionsTable} from './OpVersionsPage';
-import {TypeVersionsTable} from './TypeVersionsPage';
+import {FilterableTypeVersionsTable} from './TypeVersionsPage';
 
 export const TypeVersionPage: React.FC<{
   entity: string;
@@ -165,7 +164,14 @@ const TypeVersionObjectVersions: React.FC<{
 const TypeVersionChildTypes: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  const typeVersions = props.typeVersion.childTypeVersions();
-
-  return <TypeVersionsTable typeVersions={typeVersions} />;
+  return (
+    <FilterableTypeVersionsTable
+      entity={props.typeVersion.entity()}
+      project={props.typeVersion.project()}
+      frozenFilter={{
+        parentType:
+          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
+      }}
+    />
+  );
 };

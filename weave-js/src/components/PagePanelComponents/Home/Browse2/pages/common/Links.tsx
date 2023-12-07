@@ -5,6 +5,8 @@ import {useWeaveflowRouteContext} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage';
 import {useWeaveflowORMContext} from '../interface/wf/context';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
+import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
+import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
 
 export const TypeLink: React.FC<{typeName: string}> = props => {
   const orm = useWeaveflowORMContext();
@@ -208,6 +210,44 @@ export const ObjectVersionsLink: React.FC<{
         props.filter
       )}>
       {props.versionsCount} objects
+    </Link>
+  );
+};
+
+export const OpVersionsLink: React.FC<{
+  entity: string;
+  project: string;
+  versionCount: number;
+  filter?: WFHighLevelOpVersionFilter;
+}> = props => {
+  const routerContext = useWeaveflowRouteContext();
+  return (
+    <Link
+      to={routerContext.opVersionsUIUrl(
+        props.entity,
+        props.project,
+        props.filter
+      )}>
+      {props.versionCount} versions
+    </Link>
+  );
+};
+
+export const TypeVersionsLink: React.FC<{
+  entity: string;
+  project: string;
+  versionCount: number;
+  filter?: WFHighLevelTypeVersionFilter;
+}> = props => {
+  const routerContext = useWeaveflowRouteContext();
+  return (
+    <Link
+      to={routerContext.typeVersionsUIUrl(
+        props.entity,
+        props.project,
+        props.filter
+      )}>
+      {props.versionCount} versions
     </Link>
   );
 };

@@ -528,6 +528,9 @@ const ObjectVersionsPageBinding = () => {
   }>();
   const query = useQuery();
   const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
     try {
       return JSON.parse(query.filter);
     } catch (e) {
@@ -552,6 +555,9 @@ const TypeVersionsPageBinding = () => {
   }>();
   const query = useQuery();
   const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
     try {
       return JSON.parse(query.filter);
     } catch (e) {
@@ -576,6 +582,9 @@ const OpVersionsPageBinding = () => {
   }>();
   const query = useQuery();
   const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
     try {
       return JSON.parse(query.filter);
     } catch (e) {
