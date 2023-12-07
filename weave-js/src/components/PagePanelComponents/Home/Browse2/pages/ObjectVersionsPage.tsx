@@ -318,14 +318,7 @@ const ObjectVersionsTable: React.FC<{
         return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
       },
     }),
-    basicField('typeCategory', 'Category', {
-      width: 100,
-      renderCell: cellParams => {
-        return (
-          <TypeVersionCategoryChip typeCategory={cellParams.row.typeCategory} />
-        );
-      },
-    }),
+
     basicField('version', 'Version', {
       renderCell: params => {
         // Icon to indicate navigation to the object version
@@ -335,6 +328,14 @@ const ObjectVersionsTable: React.FC<{
             version={params.row.obj.version()}
             hideName
           />
+        );
+      },
+    }),
+    basicField('typeCategory', 'Category', {
+      width: 100,
+      renderCell: cellParams => {
+        return (
+          <TypeVersionCategoryChip typeCategory={cellParams.row.typeCategory} />
         );
       },
     }),

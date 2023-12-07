@@ -166,28 +166,27 @@ export const RunsTable: FC<{
           );
         },
       },
+
       {
-        field: 'status_code',
-        headerName: 'Status',
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
-        renderCell: cellParams => {
+        flex: !showIO ? 1 : undefined,
+        // width: 100,
+        field: 'span_id',
+        headerName: 'Call',
+        renderCell: rowParams => {
           return (
-            <Chip
-              label={cellParams.row.status_code}
-              size="small"
-              color={
-                cellParams.row.status_code === 'SUCCESS'
-                  ? 'success'
-                  : cellParams.row.status_code === 'ERROR'
-                  ? 'error'
-                  : undefined
-              }
-            />
+            <Link
+              to={routeContext.callUIUrl(
+                params.entity,
+                params.project,
+                rowParams.row.trace_id,
+                rowParams.row.id
+              )}>
+              {rowParams.row.id}
+            </Link>
           );
         },
       },
+
       {
         field: 'opCategory',
         headerName: 'Category',
@@ -218,25 +217,6 @@ export const RunsTable: FC<{
 
       {
         flex: !showIO ? 1 : undefined,
-        // width: 100,
-        field: 'span_id',
-        headerName: 'Call',
-        renderCell: rowParams => {
-          return (
-            <Link
-              to={routeContext.callUIUrl(
-                params.entity,
-                params.project,
-                rowParams.row.trace_id,
-                rowParams.row.id
-              )}>
-              {rowParams.row.id}
-            </Link>
-          );
-        },
-      },
-      {
-        flex: !showIO ? 1 : undefined,
         field: 'opVersion',
         headerName: 'Name',
         renderCell: rowParams => {
@@ -252,7 +232,28 @@ export const RunsTable: FC<{
           );
         },
       },
-
+      {
+        field: 'status_code',
+        headerName: 'Status',
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
+        renderCell: cellParams => {
+          return (
+            <Chip
+              label={cellParams.row.status_code}
+              size="small"
+              color={
+                cellParams.row.status_code === 'SUCCESS'
+                  ? 'success'
+                  : cellParams.row.status_code === 'ERROR'
+                  ? 'error'
+                  : undefined
+              }
+            />
+          );
+        },
+      },
       {
         field: 'latency',
         headerName: 'Latency',

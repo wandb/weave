@@ -101,42 +101,6 @@ export const FilterableTypeVersionsTable: React.FC<{
         'version',
         WFHighLevelTypeVersionFilter
       >,
-      typeName: {
-        columnId: 'typeName',
-        gridDisplay: {
-          columnLabel: 'Type',
-          columnValue: ({obj}) => {
-            return obj.type().name();
-          },
-          gridColDefOptions: {
-            renderCell: params => {
-              return <TypeLink typeName={params.row.obj.type().name()} />;
-            },
-          },
-        },
-        filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (filter.typeName == null) {
-              return true;
-            }
-            return obj.type().name() === filter.typeName;
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <TypeNameFilterControlListItem
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFTypeVersion},
-        string,
-        string,
-        'typeName',
-        WFHighLevelTypeVersionFilter
-      >,
       typeCategory: {
         columnId: 'typeCategory',
         gridDisplay: {
@@ -177,6 +141,43 @@ export const FilterableTypeVersionsTable: React.FC<{
         'typeCategory',
         WFHighLevelTypeVersionFilter
       >,
+      typeName: {
+        columnId: 'typeName',
+        gridDisplay: {
+          columnLabel: 'Type',
+          columnValue: ({obj}) => {
+            return obj.type().name();
+          },
+          gridColDefOptions: {
+            renderCell: params => {
+              return <TypeLink typeName={params.row.obj.type().name()} />;
+            },
+          },
+        },
+        filterControls: {
+          filterPredicate: ({obj}, filter) => {
+            if (filter.typeName == null) {
+              return true;
+            }
+            return obj.type().name() === filter.typeName;
+          },
+          filterControlListItem: cellProps => {
+            return (
+              <TypeNameFilterControlListItem
+                frozenFilter={props.frozenFilter}
+                {...cellProps}
+              />
+            );
+          },
+        },
+      } as WFHighLevelDataColumn<
+        {obj: WFTypeVersion},
+        string,
+        string,
+        'typeName',
+        WFHighLevelTypeVersionFilter
+      >,
+
       objectVersions: {
         columnId: 'objectVersions',
         gridDisplay: {

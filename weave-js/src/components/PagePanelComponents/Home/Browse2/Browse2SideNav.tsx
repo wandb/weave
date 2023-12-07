@@ -285,7 +285,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             // ],
           },
           {
-            title: 'Traces', // 'Traces (Calls)',
+            title: 'Calls', // 'Traces (Calls)',
             selected: props.selectedCategory === 'calls',
             icon: <Segment />,
             onClick: () => {
