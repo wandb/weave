@@ -16,7 +16,7 @@ import {
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
 import moment from 'moment';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
@@ -27,11 +27,7 @@ import {
   OpVersionLink,
   TypeVersionLink,
 } from './common/Links';
-import {
-  FilterableTable,
-  FilterLayoutTemplate,
-  WFHighLevelDataColumn,
-} from './common/SimpleFilterableDataTable';
+import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './interface/wf/context';

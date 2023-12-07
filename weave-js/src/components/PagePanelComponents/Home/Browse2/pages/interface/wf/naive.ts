@@ -3,7 +3,6 @@
 import _ from 'lodash';
 
 import {
-  isNodeOrVoidNode,
   isObjectType,
   isSimpleTypeShape,
   isTypedDictLike,
@@ -12,7 +11,7 @@ import {
   typedDictPropertyTypes,
 } from '../../../../../../../core';
 import {Client as WeaveClient} from '../../../../../../../core/client/types';
-import {Call, opSignatureFromSpan} from '../../../callTree';
+import {Call} from '../../../callTree';
 import {
   fnFeedbackNode,
   fnRunsNode,
@@ -430,17 +429,17 @@ export class WFNaiveProject implements WFProject {
       //   console.log({exampleCallDict})
       // }
       exampleCall.inputs().forEach(input => {
-      // const signature = opSignatureFromSpan(exampleCallDict.callSpan);
-      // console.log({signature})
-      // Object.values(signature.inputTypes).forEach(inputType => {
+        // const signature = opSignatureFromSpan(exampleCallDict.callSpan);
+        // console.log({signature})
+        // Object.values(signature.inputTypes).forEach(inputType => {
         // const inputTypeVersion = typeVersionFromTypeDict(inputType);
         inputTypeVersionMap.add(input.typeVersion().version());
       });
       exampleCall.output().forEach(output => {
-      // Object.values(signature.outputType).forEach(outputType => {
+        // Object.values(signature.outputType).forEach(outputType => {
         // const outputTypeVersion = typeVersionFromTypeDict(outputType);
         outputTypeVersionMap.add(output.typeVersion().version());
-      })
+      });
       // if (
       //   !_.isFunction(signature.outputType) &&
       //   !isNodeOrVoidNode(signature.outputType)

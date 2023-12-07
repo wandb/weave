@@ -33,8 +33,6 @@ interface ArtifactVersionBacked {
   refUri: () => string;
 }
 
-
-
 export interface WFType extends ProjectOwned {
   name: () => string;
   typeVersions: () => WFTypeVersion[];

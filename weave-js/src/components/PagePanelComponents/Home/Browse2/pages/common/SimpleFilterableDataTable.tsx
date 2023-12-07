@@ -119,6 +119,7 @@ export const FilterableTable = <
         return {
           field: column.columnId,
           headerName: column.gridDisplay!.columnLabel,
+          flex: column.gridDisplay!.gridColDefOptions?.width ? 0 : 1,
           ...column.gridDisplay!.gridColDefOptions,
         };
       });

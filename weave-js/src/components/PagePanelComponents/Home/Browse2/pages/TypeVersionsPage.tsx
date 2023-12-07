@@ -1,12 +1,9 @@
 import {Autocomplete, FormControl, ListItem, TextField} from '@mui/material';
-import {DataGridPro, GridColDef, GridRowsProp} from '@mui/x-data-grid-pro';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
-import {basicField} from './common/DataTable';
 import {
   ObjectVersionsLink,
-  OpVersionLink,
   OpVersionsLink,
   TypeLink,
   TypeVersionLink,
@@ -14,7 +11,6 @@ import {
 } from './common/Links';
 import {
   FilterableTable,
-  FilterLayoutTemplate,
   WFHighLevelDataColumn,
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
@@ -23,7 +19,7 @@ import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeCategory, WFTypeVersion} from './interface/wf/types';
 
 export type WFHighLevelTypeVersionFilter = {
-  type?: string | null;
+  typeName?: string | null;
   typeCategory?: HackyTypeCategory | null;
   inputTo?: string[];
   outputFrom?: string[];
@@ -105,8 +101,8 @@ export const FilterableTypeVersionsTable: React.FC<{
         'version',
         WFHighLevelTypeVersionFilter
       >,
-      type: {
-        columnId: 'type',
+      typeName: {
+        columnId: 'typeName',
         gridDisplay: {
           columnLabel: 'Type',
           columnValue: ({obj}) => {
@@ -120,10 +116,10 @@ export const FilterableTypeVersionsTable: React.FC<{
         },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
-            if (filter.type == null) {
+            if (filter.typeName == null) {
               return true;
             }
-            return obj.type().name() === filter.type;
+            return obj.type().name() === filter.typeName;
           },
           filterControlListItem: cellProps => {
             return (
@@ -138,7 +134,7 @@ export const FilterableTypeVersionsTable: React.FC<{
         {obj: WFTypeVersion},
         string,
         string,
-        'type',
+        'typeName',
         WFHighLevelTypeVersionFilter
       >,
       typeCategory: {
@@ -268,7 +264,7 @@ export const FilterableTypeVersionsTable: React.FC<{
         },
       } as WFHighLevelDataColumn<
         {obj: WFTypeVersion},
-        any,
+        string[],
         number,
         'inputTo',
         WFHighLevelTypeVersionFilter
@@ -324,7 +320,7 @@ export const FilterableTypeVersionsTable: React.FC<{
         },
       } as WFHighLevelDataColumn<
         {obj: WFTypeVersion},
-        any,
+        string[],
         number,
         'outputFrom',
         WFHighLevelTypeVersionFilter
@@ -389,7 +385,7 @@ export const FilterableTypeVersionsTable: React.FC<{
         },
       } as WFHighLevelDataColumn<
         {obj: WFTypeVersion},
-        any,
+        string,
         string | null,
         'parentType',
         WFHighLevelTypeVersionFilter
@@ -492,10 +488,10 @@ const TypeNameFilterControlListItem: React.FC<{
           size={'small'}
           disabled={Object.keys(props.frozenFilter ?? {}).includes('type')}
           renderInput={params => <TextField {...params} label="Type Name" />}
-          value={props.filter.type ?? null}
+          value={props.filter.typeName ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
-              type: newValue,
+              typeName: newValue,
             });
           }}
           options={options}

@@ -41,12 +41,7 @@ PR Todos:
   - [ ] GAP: Overview - type category
   - [ ] GAP: `/versions` does not redirect
 
-- TypeVersions Page
-
-  - [ ] GAP: Implement Filters: (Type Category, Type Name, Consumed By, Produced By, Child Of Type, Parent Of Type)
-  - [ ] GAP: Navbar link still uses old filter
-  - [ ] GAP: Columns: Type Category, Consumed By (count), produced by (count), Type Hierarchy, Child Types (count)
-  - [ ] BUG: Fix Navbar - no special link
+- TypeVersions Page: Done
 
 - Op Page
 
@@ -136,3 +131,14 @@ Future:
 - [ ] Tab state not saved
 - [ ] "Peak" style previews
 - [ ] Ability to open any of the Table Pages in a board
+
+Needs Cleanup:
+
+- [ ] Use of version hashes in filter - need to convert everything to uris
+- [ ] Various locations use context to get entity/project - this is bad as it assumes all links are within the same project
+
+,
+filterControls: {
+filterPredicate: ({obj}, filter) => {},
+filterControlListItem: ({filter, updateFilter}) => {},
+}

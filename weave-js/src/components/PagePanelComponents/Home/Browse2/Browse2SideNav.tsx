@@ -355,7 +355,9 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             selected: props.selectedCategory === 'ops',
             icon: <ManageHistory />,
             onClick: () => {
-              props.navigateToOpVersions();
+              props.navigateToOpVersions({
+                isLatest: true,
+              });
             },
           },
         ],
