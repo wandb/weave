@@ -22,13 +22,13 @@ import {
 import {useWeaveContext} from '../../../context';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
-import {Browse2ObjectTypePage} from './Browse2/Browse2ObjectTypePage';
-import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPage';
-import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
+// import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
+// import {Browse2ObjectTypePage} from './Browse2/Browse2ObjectTypePage';
+// import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPage';
+// import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {RouteAwareBrowse2ProjectSideNav} from './Browse2/Browse2SideNav';
-import {Browse2TracePage} from './Browse2/Browse2TracePage';
-import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
+// import {Browse2TracePage} from './Browse2/Browse2TracePage';
+// import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
 import {
   NewWeaveflowRouteContextProvider,
   useWeaveflowRouteContext,
@@ -201,7 +201,7 @@ const Browse2Mounted: FC = props => {
         </NewWeaveflowRouteContextProvider>
       </Route>
       <Switch>
-        <Route path={projectRootPagesPath}>
+        <Route path={[projectRootPagesPath, `/:entity/:project`]}>
           <Box
             component="main"
             sx={{
@@ -224,7 +224,7 @@ const Browse2Mounted: FC = props => {
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
             <Toolbar />
             <Switch>
-              <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
+              {/* <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
                 <Browse2TracePage />
               </Route>
               <Route path={`/:entity/:project/trace`}>
@@ -242,7 +242,7 @@ const Browse2Mounted: FC = props => {
               </Route>
               <Route path={`/:entity/:project`}>
                 <Browse2ProjectPage />
-              </Route>
+              </Route> */}
               <Route path={`/:entity`}>
                 <Browse2EntityPage />
               </Route>
@@ -260,7 +260,8 @@ const Browse2Mounted: FC = props => {
 const projectRoot = `:entity/:project`;
 const Browse2ProjectRoot: FC = () => {
   const [loading, setLoading] = React.useState(true);
-  const params = useParams<{entity: string; project: string}>();
+  const params = useParams<{entity: string; project: string; tab: string}>();
+  const history = useHistory();
   const {client: weaveClient} = useWeaveContext();
   const projectData = useMemo(
     () => new WFNaiveProject(params.entity, params.project, weaveClient),
@@ -269,7 +270,16 @@ const Browse2ProjectRoot: FC = () => {
   useEffect(() => {
     projectData.init().then(() => setLoading(false));
   }, [projectData]);
-  if (loading) {
+
+  useEffect(() => {
+    if (params.tab == null) {
+      history.push(
+        `/${params.entity}/${params.project}/calls?filter=%7B"traceRootsOnly"%3Atrue%7D`
+      );
+    }
+  }, [history, params.entity, params.project, params.tab]);
+
+  if (loading || params.tab == null) {
     return <CenteredAnimatedLoader />;
   }
 
@@ -500,6 +510,9 @@ const CallsPageBinding = () => {
   }>();
   const query = useQuery();
   const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
     try {
       return JSON.parse(query.filter);
     } catch (e) {

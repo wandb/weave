@@ -504,6 +504,7 @@ export const RunsTable: FC<{
     // />
     <DataGridPro
       apiRef={apiRef}
+      loading={loading}
       rows={tableData}
       // density="compact"
       initialState={{
