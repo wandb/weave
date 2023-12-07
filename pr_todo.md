@@ -4,13 +4,11 @@ PR Todos:
 - Objects Page: (Future)
 - ObjectVersions Page
 
-  - [ ] BUG: Clearing all filters results in no rows
   - [ ] FEAT: Enable Description Editing
   - [ ] FEAT: TypeVersion Filter (Include Subtypes)
 
 - [ ] ObjectVersion Page
 
-  - [ ] BUG: Only the main data view adapts to nested URI
   - [ ] BUG: When ops are in the data view (odd) - they have incorrect links
   - [ ] BUG: Committing edits redirects to incorrect page
   - [ ] (Future) FEAT: Board listing Page
@@ -35,8 +33,6 @@ PR Todos:
 
 - OpVersions Page
 
-  - [ ] GAP: Implement Filters: (Op Category, Latest, Op Name, Calls, Called By, Consumes Type (count), Produces Type)
-  - [ ] GAP: Columns: Op Category, Op Name, Calls, Called By, Consumes Type, Produces Type
   - [ ] FEAT: Enable Description Editing
   - [ ] BUG: Fix Navbar to do proper linking
 
@@ -94,6 +90,7 @@ Future:
 - [ ] Structure and Record DAGS
 - [ ] Board and Table Support
 - [ ] Pinnable filters
+- [ ] Odd Behavior: Only the main data view adapts to nested URI
 
 Needs Cleanup:
 
