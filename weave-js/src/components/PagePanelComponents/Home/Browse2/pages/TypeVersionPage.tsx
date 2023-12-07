@@ -7,9 +7,11 @@ import {
   SimpleKeyValueTable,
   SimplePageLayout,
 } from './common/SimplePageLayout';
+import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
 import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
+import {FilterableOpVersionsTable} from './OpVersionsPage';
 import {FilterableTypeVersionsTable} from './TypeVersionsPage';
 
 export const TypeVersionPage: React.FC<{
@@ -57,17 +59,27 @@ export const TypeVersionPage: React.FC<{
           label: 'Child Types',
           content: <TypeVersionChildTypes typeVersion={typeVersion} />,
         },
-        // {
-        //   label: 'Consuming Ops',
-        //   content: <TypeVersionConsumingOps typeVersion={typeVersion} />,
-        // },
-        // {
-        //   label: 'Producing Ops',
-        //   content: <TypeVersionProducingOps typeVersion={typeVersion} />,
-        // },
+        {
+          label: 'Consuming Ops',
+          content: <TypeVersionConsumingOps typeVersion={typeVersion} />,
+        },
+        {
+          label: 'Producing Ops',
+          content: <TypeVersionProducingOps typeVersion={typeVersion} />,
+        },
         {
           label: 'DAG',
-          content: <div>TODO</div>,
+          content: (
+            <UnderConstruction
+              title="Structure DAG"
+              message={
+                <>
+                  This page will show a "Structure" DAG of Types and Ops
+                  centered at this particular type.
+                </>
+              }
+            />
+          ),
         },
       ]}
     />
@@ -145,21 +157,37 @@ const TypeVersionObjectVersions: React.FC<{
   );
 };
 
-// const TypeVersionConsumingOps: React.FC<{
-//   typeVersion: WFTypeVersion;
-// }> = props => {
-//   const opVersions = props.typeVersion.inputTo();
+const TypeVersionConsumingOps: React.FC<{
+  typeVersion: WFTypeVersion;
+}> = props => {
+  return (
+    <FilterableOpVersionsTable
+      entity={props.typeVersion.entity()}
+      project={props.typeVersion.project()}
+      frozenFilter={{
+        consumesTypeVersions: [
+          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
+        ],
+      }}
+    />
+  );
+};
 
-//   return <OpVersionsTable opVersions={opVersions} />;
-// };
-
-// const TypeVersionProducingOps: React.FC<{
-//   typeVersion: WFTypeVersion;
-// }> = props => {
-//   const opVersions = props.typeVersion.outputFrom();
-
-//   return <OpVersionsTable opVersions={opVersions} />;
-// };
+const TypeVersionProducingOps: React.FC<{
+  typeVersion: WFTypeVersion;
+}> = props => {
+  return (
+    <FilterableOpVersionsTable
+      entity={props.typeVersion.entity()}
+      project={props.typeVersion.project()}
+      frozenFilter={{
+        producesTypeVersions: [
+          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
+        ],
+      }}
+    />
+  );
+};
 
 const TypeVersionChildTypes: React.FC<{
   typeVersion: WFTypeVersion;

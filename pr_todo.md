@@ -35,9 +35,6 @@ PR Todos:
 
 - TypeVersion Page
 
-  - [ ] GAP: Show Consuming Ops
-  - [ ] GAP: Show Producing Ops
-  - [ ] GAP: Structure DAG
   - [ ] GAP: Overview - type category
   - [ ] GAP: `/versions` does not redirect
 
@@ -53,9 +50,7 @@ PR Todos:
 
 - OpVersion Page
 
-  - [ ] GAP: Structure DAG
   - [ ] GAP: Overview: (Type Stub, Op Category, isLatest, Call Hierarchy)
-  - [ ] GAP: Tabs (produced by and called by)
   - [ ] GAP: `/versions` does not redirect
 
 - OpVersions Page
@@ -131,6 +126,8 @@ Future:
 - [ ] Tab state not saved
 - [ ] "Peak" style previews
 - [ ] Ability to open any of the Table Pages in a board
+- [ ] Structure and Record DAGS
+- [ ] Board and Table Support
 
 Needs Cleanup:
 

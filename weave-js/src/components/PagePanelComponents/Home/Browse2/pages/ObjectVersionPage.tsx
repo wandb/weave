@@ -127,11 +127,31 @@ export const ObjectVersionPage: React.FC<{
 
         {
           label: 'Boards',
-          content: <UnderConstruction />,
+          content: (
+            <UnderConstruction
+              title="Boards"
+              message={
+                <>
+                  This will show a listing of all boards that reference this
+                  object.
+                </>
+              }
+            />
+          ),
         },
         {
           label: 'DAG',
-          content: <div>DAG</div>,
+          content: (
+            <UnderConstruction
+              title="Record DAG"
+              message={
+                <>
+                  This page will show a "Record" DAG of Objects and Calls
+                  centered at this particular Object Version.
+                </>
+              }
+            />
+          ),
         },
       ]}
     />
@@ -161,11 +181,3 @@ const ObjectVersionProducingCallsItem: React.FC<{
     </ul>
   );
 };
-
-// const ObjectVersionConsumingCalls: React.FC<{
-//   objectVersion: WFObjectVersion;
-// }> = props => {
-//   const calls = props.objectVersion.inputTo();
-
-//   return <CallsTable objectVersions={calls} />;
-// };

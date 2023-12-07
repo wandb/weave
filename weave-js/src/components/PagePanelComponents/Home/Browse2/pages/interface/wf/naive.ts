@@ -1,7 +1,3 @@
-// import {stringify} from 'json-stringify-deterministic';
-
-import _ from 'lodash';
-
 import {
   isObjectType,
   isSimpleTypeShape,
