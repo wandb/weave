@@ -37,8 +37,8 @@ Secondary.displayName = 'S.Secondary';
 export const PanelExpression: React.FC<PanelExpressionProps> = props => {
   return (
     <Container>
-      <Primary>Panel requires configuration</Primary>
-      <Secondary>Please configure in the inspector.</Secondary>
+      <Primary>Empty panel</Primary>
+      <Secondary>Open the panel editor to configure.</Secondary>
     </Container>
   );
 };
