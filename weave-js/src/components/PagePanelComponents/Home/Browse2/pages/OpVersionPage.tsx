@@ -104,7 +104,7 @@ export const OpVersionPage: React.FC<{
           ),
         },
         {
-          label: 'Invoked By',
+          label: 'Invokes',
           content: (
             <FilterableOpVersionsTable
               entity={opVersion.entity()}
@@ -118,7 +118,7 @@ export const OpVersionPage: React.FC<{
           ),
         },
         {
-          label: 'Invokes',
+          label: 'Invoked By',
           content: (
             <FilterableOpVersionsTable
               entity={opVersion.entity()}
