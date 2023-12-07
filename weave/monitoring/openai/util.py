@@ -14,18 +14,10 @@ from .models import *
 T = TypeVar("T")
 
 
-# def coalesce(*args: Optional[T]) -> Optional[T]:
-#     return next((arg for arg in args if arg is not None), None)
-
-
-def update_combined_choice(
-    combined_choice: CombinedChoice, choice: Choice
-) -> CombinedChoice:
+def update_combined_choice(combined_choice: CombinedChoice, choice: Choice) -> CombinedChoice:
     combined_choice.content += choice.delta.content or ""
     combined_choice.role = combined_choice.role or choice.delta.role
-    combined_choice.function_call = (
-        combined_choice.function_call or choice.delta.function_call
-    )
+    combined_choice.function_call = combined_choice.function_call or choice.delta.function_call
     combined_choice.tool_calls = combined_choice.tool_calls or choice.delta.tool_calls
     if choice.finish_reason:
         combined_choice.finish_reason = choice.finish_reason
@@ -46,9 +38,7 @@ def reconstruct_completion(
             index = choice.index
             if index not in combined_results:
                 combined_results[index] = CombinedChoice()
-            combined_results[index] = update_combined_choice(
-                combined_results[index], choice
-            )
+            combined_results[index] = update_combined_choice(combined_results[index], choice)
 
     # Construct ChatCompletionChoice objects
     combined_choices = [
@@ -91,9 +81,7 @@ def reconstruct_completion(
     )
 
 
-def num_tokens_from_messages(
-    messages: List[ChatCompletionMessage], model: str = "gpt-3.5-turbo-0613"
-) -> int:
+def num_tokens_from_messages(messages: List[ChatCompletionMessage], model: str = "gpt-3.5-turbo-0613") -> int:
     model_defaults = {
         "gpt-3.5-turbo-0613": ModelTokensConfig(per_message=3, per_name=1),
         "gpt-3.5-turbo-16k-0613": ModelTokensConfig(per_message=3, per_name=1),
@@ -107,9 +95,7 @@ def num_tokens_from_messages(
     config = model_defaults.get(model)
     if config is None:
         if "gpt-3.5-turbo" in model:
-            print(
-                "Warning: gpt-3.5-turbo may update over time. Assuming gpt-3.5-turbo-0613."
-            )
+            print("Warning: gpt-3.5-turbo may update over time. Assuming gpt-3.5-turbo-0613.")
             return num_tokens_from_messages(messages, "gpt-3.5-turbo-0613")
         elif "gpt-4" in model:
             print("Warning: gpt-4 may update over time. Assuming gpt-4-0613.")
