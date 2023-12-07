@@ -195,7 +195,7 @@ export const FilterableObjectVersionsTable: React.FC<{
             secondaryAction={
               <Checkbox
                 edge="end"
-                checked={effectiveFilter.latest}
+                checked={!!effectiveFilter.latest}
                 onChange={() => {
                   setFilter({
                     ...filter,
@@ -220,7 +220,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                 renderInput={params => (
                   <TextField {...params} label="Object Name" />
                 )}
-                value={effectiveFilter.objectName}
+                value={effectiveFilter.objectName ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
@@ -242,7 +242,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                 renderInput={params => (
                   <TextField {...params} label="Type Category" />
                 )}
-                value={effectiveFilter.typeCategory}
+                value={effectiveFilter.typeCategory ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,

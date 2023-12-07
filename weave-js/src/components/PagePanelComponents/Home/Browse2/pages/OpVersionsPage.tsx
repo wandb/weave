@@ -527,7 +527,7 @@ export const FilterableOpVersionsTable: React.FC<{
                 secondaryAction={
                   <Checkbox
                     edge="end"
-                    checked={colProps.filter?.isLatest}
+                    checked={!!colProps.filter?.isLatest}
                     onChange={() => {
                       colProps.updateFilter({
                         isLatest: !colProps.filter?.isLatest,

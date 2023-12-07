@@ -152,7 +152,7 @@ export const CallsTable: React.FC<{
             secondaryAction={
               <Checkbox
                 edge="end"
-                checked={effectiveFilter.traceRootsOnly}
+                checked={!!effectiveFilter.traceRootsOnly}
                 onChange={() => {
                   setFilter({
                     ...filter,
@@ -179,7 +179,7 @@ export const CallsTable: React.FC<{
                 renderInput={params => (
                   <TextField {...params} label="Op Category" />
                 )}
-                value={effectiveFilter.opCategory}
+                value={effectiveFilter.opCategory ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,

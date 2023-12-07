@@ -531,7 +531,7 @@ const InputToFilterControlListItem: React.FC<{
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes('inputTo')}
           renderInput={params => <TextField {...params} label="Input To" />}
-          value={props.filter.inputTo}
+          value={props.filter.inputTo ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
               inputTo: newValue,
@@ -568,7 +568,7 @@ const OutputFromFilterControlListItem: React.FC<{
             'outputFrom'
           )}
           renderInput={params => <TextField {...params} label="Output From" />}
-          value={props.filter.outputFrom}
+          value={props.filter.outputFrom ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
               outputFrom: newValue,
@@ -604,7 +604,7 @@ const ParentTypeFilterControlListItem: React.FC<{
             'parentType'
           )}
           renderInput={params => <TextField {...params} label="Parent Type" />}
-          value={props.filter.parentType}
+          value={props.filter.parentType ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
               parentType: newValue,
