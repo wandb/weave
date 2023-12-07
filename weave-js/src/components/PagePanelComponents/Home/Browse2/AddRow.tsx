@@ -21,6 +21,8 @@ import {
 } from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
+import {useWeaveflowORMContext} from './pages/interface/wf/context';
+import {WFNaiveProject} from './pages/interface/wf/naive';
 import {ProjectNamePicker} from './ProjectPicker';
 import {refPageUrl} from './url';
 
@@ -58,7 +60,7 @@ export const AddRowToTable: FC<{
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
   const [newUri, setNewUri] = useState<string | null>(null);
-
+  const orm = useWeaveflowORMContext();
   const addRowToDataset = useCallback(async () => {
     if (projectName && datasetName) {
       setWorking('addingRow');
@@ -83,10 +85,15 @@ export const AddRowToTable: FC<{
         projectName,
         datasetName.name
       );
+
+      if ((orm.projectConnection as WFNaiveProject).reload) {
+        await (orm.projectConnection as WFNaiveProject).reload();
+      }
+
       setNewUri(finalRootUri);
       setWorking('done');
     }
-  }, [datasetName, entityName, projectName, row, weave]);
+  }, [datasetName, entityName, orm.projectConnection, projectName, row, weave]);
 
   const handleSubmit = useCallback(() => {
     addRowToDataset();

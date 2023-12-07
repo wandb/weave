@@ -68,11 +68,17 @@ export class WFNaiveProject implements WFProject {
   }
 
   async init(): Promise<void> {
-    if (!this.initialized && !this.loading) {
+    if (!this.initialized) {
+      await this.reload();
+    }
+    return Promise.resolve();
+  }
+
+  async reload(): Promise<void> {
+    if (!this.loading) {
       this.loading = true;
       await this.loadAll();
       this.loading = false;
-      this.initialized = true;
     }
     return Promise.resolve();
   }
@@ -199,13 +205,17 @@ export class WFNaiveProject implements WFProject {
       {}
     );
     const feedbackNode = fnFeedbackNode(this.state.entity, this.state.project);
+    const targetNode = opDict({
+      weaveObjectsNode,
+      runsNode,
+      feedbackNode,
+    } as any);
+    await this.weaveClient.clearCacheForNode(targetNode);
     const {
       weaveObjectsNode: weaveObjectsValue,
       runsNode: runsValue,
       feedbackNode: feedbackValue,
-    } = (await this.weaveClient.query(
-      opDict({weaveObjectsNode, runsNode, feedbackNode} as any)
-    )) as {
+    } = (await this.weaveClient.query(targetNode as any)) as {
       weaveObjectsNode?: ObjectVersionDictType[];
       runsNode?: Call[];
       feedbackNode?: any[];

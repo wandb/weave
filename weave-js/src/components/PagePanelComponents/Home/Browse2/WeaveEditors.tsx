@@ -61,6 +61,8 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
+import {useWeaveflowORMContext} from './pages/interface/wf/context';
+import {WFNaiveProject} from './pages/interface/wf/naive';
 import {parseRefMaybe} from './SmallRef';
 import {refPageUrl} from './url';
 
@@ -139,7 +141,7 @@ const WeaveEditorCommit: FC<{
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
-
+  const orm = useWeaveflowORMContext();
   const handleSubmit = useCallback(async () => {
     setWorking('addingRow');
 
@@ -176,6 +178,11 @@ const WeaveEditorCommit: FC<{
       rootObjectRef.projectName,
       rootObjectRef.artifactName
     );
+
+    if ((orm.projectConnection as WFNaiveProject).reload) {
+      await (orm.projectConnection as WFNaiveProject).reload();
+    }
+
     setWorking('done');
 
     handleClearEdits();
@@ -187,6 +194,7 @@ const WeaveEditorCommit: FC<{
     rootObjectRef.entityName,
     rootObjectRef.projectName,
     rootObjectRef.artifactName,
+    orm.projectConnection,
     handleClearEdits,
     history,
     objType,
