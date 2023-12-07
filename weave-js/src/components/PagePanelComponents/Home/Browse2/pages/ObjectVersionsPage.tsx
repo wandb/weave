@@ -106,7 +106,10 @@ export const FilterableObjectVersionsTable: React.FC<{
   }, [orm.projectConnection]);
   const filteredObjectVersions = useMemo(() => {
     return allObjectVersions.filter(ov => {
-      if (effectiveFilter.typeVersions) {
+      if (
+        effectiveFilter.typeVersions &&
+        effectiveFilter.typeVersions.length > 0
+      ) {
         if (
           !effectiveFilter.typeVersions.includes(
             ov.typeVersion().type().name() +
@@ -127,7 +130,10 @@ export const FilterableObjectVersionsTable: React.FC<{
           return false;
         }
       }
-      if (effectiveFilter.inputToOpVersions) {
+      if (
+        effectiveFilter.inputToOpVersions &&
+        effectiveFilter.inputToOpVersions.length > 0
+      ) {
         const inputToOpVersions = ov.inputTo().map(i => i.opVersion());
         if (
           !inputToOpVersions.some(

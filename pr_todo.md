@@ -4,7 +4,6 @@ PR Todos:
 - Objects Page: (Future)
 - ObjectVersions Page
 
-  - [ ] BUG: Filter controls seem to get "stuck", resulting in internal state mismatched with displayed state.
   - [ ] BUG: Clearing all filters results in no rows
   - [ ] FEAT: Enable Description Editing
   - [ ] FEAT: TypeVersion Filter (Include Subtypes)
@@ -64,6 +63,8 @@ PR Todos:
 - General
   - [ ] Deprecate `weave-js/src/components/PagePanelComponents/Home/Browse2/url.ts`
   - [ ] No tables save their filter state back to the URL
+
+---
 
 Shortcuts Taken
 
