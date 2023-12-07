@@ -59,8 +59,8 @@ def custom_dd_patch():
         with tracer.trace(
             "wandb_gql.Client.execute",
         ) as span:
-            span.set_tag("document", wandb_graphql.print_ast(document))
-            span.set_tag("variable_values", kwargs.get("variable_values", {}))
+            span.set_tag("document", wandb_graphql.print_ast(document), '')
+            span.set_tag("variable_values", kwargs.get("variable_values", {}), '')
             return orig_execute(self, document, *args, **kwargs)
 
     wandb_gql.Client.execute = execute
@@ -339,10 +339,10 @@ def execute():
                 root_span.set_tag(
                     "profile_url",
                     "http://localhost:8080/snakeviz/"
-                    + urllib.parse.quote(profile_filename),
+                    + urllib.parse.quote(profile_filename), ''
                 )
     if root_span is not None:
-        root_span.set_tag("request_size", len(req_bytes))
+        root_span.set_tag("request_size", len(req_bytes), len(req_bytes))
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
     response_payload = _value_or_errors_to_response(fixed_response)

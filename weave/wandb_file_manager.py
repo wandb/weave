@@ -151,7 +151,7 @@ class WandbFileManagerAsync:
                 "Artifact URI has no path in call to ensure_file"
             )
         with tracer.trace("wandb_file_manager.ensure_file") as span:
-            span.set_tag("uri", str(art_uri))
+            span.set_tag("uri", str(art_uri), '')
             res = await self.local_path_and_download_url(art_uri)
             if res is None:
                 return None
@@ -192,7 +192,7 @@ class WandbFileManagerAsync:
                 "Artifact URI has no path in call to ensure_file"
             )
         with tracer.trace("wandb_file_manager.ensure_file_downloaded") as span:
-            span.set_tag("download_url", str(download_url))
+            span.set_tag("download_url", str(download_url), '')
             file_path = f"wandb_file_manager/{path}"
             if await self.fs.exists(file_path):
                 return file_path
@@ -223,7 +223,7 @@ class WandbFileManagerAsync:
                 "Artifact URI has no path in call to ensure_file"
             )
         with tracer.trace("wandb_file_manager.direct_url") as span:
-            span.set_tag("uri", str(art_uri))
+            span.set_tag("uri", str(art_uri), '')
             res = await self.local_path_and_download_url(art_uri)
             if res is None:
                 return None
@@ -318,7 +318,7 @@ class WandbFileManager:
                 "Artifact URI has no path in call to ensure_file"
             )
         with tracer.trace("wandb_file_manager.ensure_file_downloaded") as span:
-            span.set_tag("download_url", str(download_url))
+            span.set_tag("download_url", str(download_url), '')
             file_path = f"wandb_file_manager/{path}"
             if self.fs.exists(file_path):
                 return file_path
@@ -345,7 +345,7 @@ class WandbFileManager:
                 "Artifact URI has no path in call to ensure_file"
             )
         with tracer.trace("wandb_file_manager.ensure_file") as span:
-            span.set_tag("uri", str(art_uri))
+            span.set_tag("uri", str(art_uri), '')
             res = self.local_path_and_download_url(art_uri)
             if res is None:
                 return None
@@ -375,7 +375,7 @@ class WandbFileManager:
                 "Artifact URI has no path in call to ensure_file"
             )
         with tracer.trace("wandb_file_manager.direct_url") as span:
-            span.set_tag("uri", str(art_uri))
+            span.set_tag("uri", str(art_uri), '')
             res = self.local_path_and_download_url(art_uri)
             if res is None:
                 return None
