@@ -1,16 +1,9 @@
 import {
-  AutoFixHigh,
   Category,
   DashboardCustomize,
-  Dataset,
-  Layers,
   ManageHistory,
-  ModelTraining,
-  Rule,
-  Scoreboard,
   Segment,
   TableChart,
-  Tune,
   TypeSpecimen,
 } from '@mui/icons-material';
 import {
@@ -269,26 +262,27 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
                 latest: true,
               });
             },
-            children: [
-              {
-                title: 'Models',
-                icon: <Layers />,
-                onClick: () => {
-                  props.navigateToObjectVersions({
-                    typeCategory: 'model',
-                  });
-                },
-              },
-              {
-                title: 'Datasets',
-                icon: <Dataset />,
-                onClick: () => {
-                  props.navigateToObjectVersions({
-                    typeCategory: 'dataset',
-                  });
-                },
-              },
-            ],
+            // TODO: Get Feedback from team on this
+            // children: [
+            //   {
+            //     title: 'Models',
+            //     icon: <Layers />,
+            //     onClick: () => {
+            //       props.navigateToObjectVersions({
+            //         typeCategory: 'model',
+            //       });
+            //     },
+            //   },
+            //   {
+            //     title: 'Datasets',
+            //     icon: <Dataset />,
+            //     onClick: () => {
+            //       props.navigateToObjectVersions({
+            //         typeCategory: 'dataset',
+            //       });
+            //     },
+            //   },
+            // ],
           },
           {
             title: 'Traces', // 'Traces (Calls)',
@@ -299,43 +293,44 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
                 traceRootsOnly: true,
               });
             },
-            children: [
-              {
-                title: 'Train',
-                icon: <ModelTraining />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'train'});
-                },
-              },
-              {
-                title: 'Predict',
-                icon: <AutoFixHigh />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'predict'});
-                },
-              },
-              {
-                title: 'Score',
-                icon: <Scoreboard />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'score'});
-                },
-              },
-              {
-                title: 'Evaluate',
-                icon: <Rule />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'evaluate'});
-                },
-              },
-              {
-                title: 'Tune',
-                icon: <Tune />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'tune'});
-                },
-              },
-            ],
+            // TODO: Get Feedback from team on this
+            // children: [
+            //   {
+            //     title: 'Train',
+            //     icon: <ModelTraining />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'train'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Predict',
+            //     icon: <AutoFixHigh />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'predict'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Score',
+            //     icon: <Scoreboard />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'score'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Evaluate',
+            //     icon: <Rule />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'evaluate'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Tune',
+            //     icon: <Tune />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'tune'});
+            //     },
+            //   },
+            // ],
           },
         ],
       },

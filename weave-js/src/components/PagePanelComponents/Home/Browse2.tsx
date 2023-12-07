@@ -288,10 +288,10 @@ const Browse2ProjectRoot: FC = () => {
             <TypeVersionRoutePageBinding />
           </Route>
           <Route path={`/${projectRoot}/types/:typeName`}>
-            <TypePage />
+            <TypePageBinding />
           </Route>
           <Route path={`/${projectRoot}/types`}>
-            <TypesPage />
+            <TypesPage entity={params.entity} project={params.project} />
           </Route>
           <Route path={`/${projectRoot}/type-versions`}>
             <TypeVersionsPageBinding />
@@ -302,10 +302,10 @@ const Browse2ProjectRoot: FC = () => {
             <ObjectVersionRoutePageBinding />
           </Route>
           <Route path={`/${projectRoot}/objects/:objectName`}>
-            <ObjectPage />
+            <ObjectPageBinding />
           </Route>
           <Route path={`/${projectRoot}/objects`}>
-            <ObjectsPage />
+            <ObjectsPage entity={params.entity} project={params.project} />
           </Route>
           <Route path={`/${projectRoot}/object-versions`}>
             <ObjectVersionsPageBinding />
@@ -315,10 +315,10 @@ const Browse2ProjectRoot: FC = () => {
             <OpVersionRoutePageBinding />
           </Route>
           <Route path={`/${projectRoot}/ops/:opName`}>
-            <OpPage />
+            <OpPageBinding />
           </Route>
           <Route path={`/${projectRoot}/ops`}>
-            <OpsPage />
+            <OpsPage entity={params.entity} project={params.project} />
           </Route>
           <Route path={`/${projectRoot}/op-versions`}>
             <OpVersionsPageBinding />
@@ -610,4 +610,32 @@ const BoardPageBinding = () => {
     versionId?: string;
   }>();
   return <BoardPage {...params} />;
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const ObjectPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    objectName: string;
+  }>();
+  return <ObjectPage {...params} />;
+};
+
+const OpPageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    opName: string;
+  }>();
+  return <OpPage {...params} />;
+};
+
+const TypePageBinding = () => {
+  const params = useParams<{
+    entity: string;
+    project: string;
+    typeName: string;
+  }>();
+  return <TypePage {...params} />;
 };

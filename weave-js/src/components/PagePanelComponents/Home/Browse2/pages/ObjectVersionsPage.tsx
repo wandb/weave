@@ -52,120 +52,12 @@ export const ObjectVersionsPage: React.FC<{
 };
 
 export type WFHighLevelObjectVersionFilter = {
+  objectName?: string | null;
   typeVersions?: string[];
   latest?: boolean;
   typeCategory?: HackyTypeCategory | null;
   inputToOpVersions?: string[];
 };
-
-// export const FilterableObjectVersionsTable2: React.FC<{
-//   entity: string;
-//   project: string;
-//   frozenFilter?: WFHighLevelObjectVersionFilter;
-//   initialFilter?: WFHighLevelObjectVersionFilter;
-// }> = props => {
-//   const routerContext = useWeaveflowRouteContext();
-//   const orm = useWeaveflowORMContext();
-
-//   const getInitialData = useCallback(
-//     (filter: WFHighLevelObjectVersionFilter) => {
-//       return orm.projectConnection.objectVersions().map(o => {
-//         return {id: o.version(), obj: o};
-//       });
-//     },
-//     [orm.projectConnection]
-//   );
-
-//   const getFilterPopoutTargetUrl = useCallback(
-//     (filter: WFHighLevelObjectVersionFilter) => {
-//       return routerContext.objectVersionsUIUrl(
-//         props.entity,
-//         props.project,
-//         filter
-//       );
-//     },
-//     [props.entity, props.project, routerContext]
-//   );
-
-//   const columns = useMemo(() => {
-//     return {
-//       latest: {
-//         columnId: 'latest',
-//         gridDisplay: {
-//           columnLabel: 'Latest',
-//           columnValue: ({obj}) => {
-//             return obj.aliases().includes('latest');
-//           },
-//           gridColDefOptions: {
-//             width: 100,
-//             renderCell: params => {
-//               if (params.value) {
-//                 return (
-//                   <Box
-//                     sx={{
-//                       display: 'flex',
-//                       alignItems: 'center',
-//                       justifyContent: 'center',
-//                       height: '100%',
-//                       width: '100%',
-//                     }}>
-//                     <Chip label="Yes" size="small" />
-//                   </Box>
-//                 );
-//               }
-//               return '';
-//             },
-//           },
-//         },
-//         filterControls: {
-//           filterPredicate: ({obj}, {latest}) => {
-//             return !latest || obj.aliases().includes('latest') === latest;
-//           },
-//           filterControlListItem: colProps => {
-//             return (
-//               <ListItem
-//                 secondaryAction={
-//                   <Checkbox
-//                     edge="end"
-//                     checked={colProps.filter?.latest}
-//                     onChange={() => {
-//                       colProps.updateFilter({
-//                         latest: !colProps.filter?.latest,
-//                       });
-//                     }}
-//                   />
-//                 }
-//                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
-//                   'latest'
-//                 )}
-//                 disablePadding>
-//                 <ListItemButton>
-//                   <ListItemText primary={`Latest Only`} />
-//                 </ListItemButton>
-//               </ListItem>
-//             );
-//           },
-//         },
-//       } as WFHighLevelDataColumn<
-//         {obj: WFObjectVersion},
-//         boolean,
-//         boolean,
-//         'latest',
-//         WFHighLevelObjectVersionFilter
-//       >,
-//     };
-//   }, [props.frozenFilter]);
-
-//   return (
-//     <FilterableTable
-//       getInitialData={getInitialData}
-//       columns={columns}
-//       getFilterPopoutTargetUrl={getFilterPopoutTargetUrl}
-//       frozenFilter={props.frozenFilter}
-//       initialFilter={props.initialFilter}
-//     />
-//   );
-// };
 
 export const FilterableObjectVersionsTable: React.FC<{
   entity: string;
@@ -175,6 +67,12 @@ export const FilterableObjectVersionsTable: React.FC<{
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext();
+
+  const objectOptions = useMemo(() => {
+    const objects = orm.projectConnection.objects();
+    const options = objects.map(v => v.name());
+    return options;
+  }, [orm.projectConnection]);
 
   const opVersionOptions = useMemo(() => {
     const versions = orm.projectConnection.opVersions();
@@ -243,12 +141,18 @@ export const FilterableObjectVersionsTable: React.FC<{
           return false;
         }
       }
+      if (effectiveFilter.objectName) {
+        if (effectiveFilter.objectName !== ov.object().name()) {
+          return false;
+        }
+      }
       return true;
     });
   }, [
     allObjectVersions,
     effectiveFilter.inputToOpVersions,
     effectiveFilter.latest,
+    effectiveFilter.objectName,
     effectiveFilter.typeCategory,
     effectiveFilter.typeVersions,
   ]);
@@ -280,6 +184,28 @@ export const FilterableObjectVersionsTable: React.FC<{
               <ListItemText primary={`Latest Only`} />
             </ListItemButton>
           </ListItem>
+          <ListItem>
+            <FormControl fullWidth>
+              <Autocomplete
+                size={'small'}
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'objectName'
+                )}
+                renderInput={params => (
+                  <TextField {...params} label="Object Name" />
+                )}
+                value={effectiveFilter.objectName}
+                onChange={(event, newValue) => {
+                  setFilter({
+                    ...filter,
+                    objectName: newValue,
+                  });
+                }}
+                options={objectOptions}
+              />
+            </FormControl>
+          </ListItem>
+
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete

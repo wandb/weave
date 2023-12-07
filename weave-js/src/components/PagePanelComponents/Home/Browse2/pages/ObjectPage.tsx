@@ -1,25 +1,30 @@
 import React from 'react';
-import {Link} from 'react-router-dom';
 
-import {useEPPrefix} from './util';
+import {SimplePageLayout} from './common/SimplePageLayout';
+import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
 
-export const ObjectPage: React.FC = () => {
-  const prefix = useEPPrefix();
+export const ObjectPage: React.FC<{
+  entity: string;
+  project: string;
+  objectName: string;
+}> = props => {
   return (
-    <div>
-      <h1>ObjectPage Placeholder</h1>
-      <div>
-        Just a simple page of the Object (named collection of ObjectVersions).
-      </div>
-      <div>Links:</div>
-      <ul>
-        <li>
-          Link to ObjectVersions for this Object:{' '}
-          <Link to={prefix('/object-versions?filter=object=object_name')}>
-            /object-versions?filter=object=object_name
-          </Link>
-        </li>
-      </ul>
-    </div>
+    <SimplePageLayout
+      title={`Object: ${props.objectName}`}
+      tabs={[
+        {
+          label: 'All Versions',
+          content: (
+            <FilterableObjectVersionsTable
+              entity={props.entity}
+              project={props.project}
+              frozenFilter={{
+                objectName: props.objectName,
+              }}
+            />
+          ),
+        },
+      ]}
+    />
   );
 };

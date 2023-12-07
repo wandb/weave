@@ -1,12 +1,10 @@
 PR Todos:
 
-- Object Page
-
-  - [ ] GAP: Not implemented
+- Object Page: Done
 
 - Objects Page
 
-  - [ ] GAP: Not implemented
+  - [ ] (Future) GAP: Not implemented
 
 - ObjectVersions Page
 
@@ -25,13 +23,11 @@ PR Todos:
   - [ ] (Future) GAP: "Open in Board" opens in old link
   - [ ] GAP: `/versions` does not redirect
 
-- Type Page
-
-  - [ ] GAP: Not implemented
+- Type Page: Done
 
 - Types Page
 
-  - [ ] GAP: Not implemented
+  - [ ] (future) GAP: Not implemented
 
 - TypeVersion Page
 
@@ -39,14 +35,10 @@ PR Todos:
   - [ ] GAP: `/versions` does not redirect
 
 - TypeVersions Page: Done
-
-- Op Page
-
-  - [ ] GAP: Not implemented
-
+- Op Page: Done
 - Ops Page
 
-  - [ ] GAP: Not implemented
+  - [ ] (future) GAP: Not implemented
 
 - OpVersion Page
 
@@ -87,10 +79,6 @@ PR Todos:
 - Tables
 
   - [ ] BUG: Does not work
-
-- Data Model
-
-  - [ ] Make op op cat inherit from parent
 
 - Python API
 
@@ -133,9 +121,3 @@ Needs Cleanup:
 
 - [ ] Use of version hashes in filter - need to convert everything to uris
 - [ ] Various locations use context to get entity/project - this is bad as it assumes all links are within the same project
-
-,
-filterControls: {
-filterPredicate: ({obj}, filter) => {},
-filterControlListItem: ({filter, updateFilter}) => {},
-}
