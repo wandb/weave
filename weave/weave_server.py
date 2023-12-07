@@ -348,8 +348,8 @@ def execute():
     response_payload = _value_or_errors_to_response(fixed_response)
 
     if root_span is not None:
-        root_span.set_metric("node_count", len(response_payload["data"]))
-        root_span.set_metric("error_count", len(response_payload["node_to_error"]))
+        root_span.set_metric("node_count", len(response_payload["data"]), len(response_payload["data"]))
+        root_span.set_metric("error_count", len(response_payload["node_to_error"]), len(response_payload["node_to_error"]))
 
     _log_errors(response_payload, response.nodes)
 

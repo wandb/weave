@@ -21,6 +21,21 @@ import dataclasses
 from . import logs
 from . import stream_data_interfaces
 
+from ddtrace import tracer as ddtrace_tracer, span as ddtrace_span
+
+class PIISpan(ddtrace_span):
+    def set_tag(self, key, val):
+        super().set_tag(key, '') if os.getenv("DISABLE_WEAVE_PII") else super().set_tag(key, val)
+    def set_metric(self, key, val):
+        super().set_metric(key, '') if os.getenv("DISABLE_WEAVE_PII") else super().set_metric(key, val)
+    def set_tag(self, key, val, pii_val):
+        super().set_tag(key, pii_val) if os.getenv("DISABLE_WEAVE_PII") else super().set_tag(key, val)
+    def set_metric(self, key, val, pii_val):
+        super().set_metric(key, pii_val) if os.getenv("DISABLE_WEAVE_PII") else super().set_metric(key, val)
+
+class PIITracer(ddtrace_tracer):
+    def trace(self, *args, **kwargs):
+        return PIISpan(*args, **kwargs)
 
 # Thanks co-pilot!
 class DummySpan:
@@ -260,8 +275,7 @@ class WeaveWriter:
 
 def tracer():
     if os.getenv("DD_ENV"):
-        from ddtrace import tracer as ddtrace_tracer
-
+        ddtrace_tracer = PIITracer()
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
             # mirror DataDog trace info to W&B.
