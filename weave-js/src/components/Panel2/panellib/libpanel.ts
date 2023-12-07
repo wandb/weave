@@ -7,6 +7,7 @@ import {
 } from '@wandb/weave/core';
 
 import {ConfiguredTransform} from '../panel';
+import {PanelCategory} from '../PanelRegistry';
 
 // Generic parameters:
 // Globals
@@ -57,6 +58,9 @@ export interface PanelSpec<X, C, T extends Type> {
   id: string;
   hidden?: boolean;
   displayName?: string;
+
+  category?: PanelCategory;
+
   // Provide initial config for panel. This is called once when the panel
   // is first created.
   initialize?: (
