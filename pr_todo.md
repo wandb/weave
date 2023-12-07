@@ -1,11 +1,7 @@
 PR Todos:
 
 - Object Page: Done
-
-- Objects Page
-
-  - [ ] (Future) GAP: Not implemented
-
+- Objects Page: (Future)
 - ObjectVersions Page
 
   - [ ] BUG: Filter controls seem to get "stuck", resulting in internal state mismatched with displayed state.
@@ -24,11 +20,7 @@ PR Todos:
   - [ ] GAP: `/versions` does not redirect
 
 - Type Page: Done
-
-- Types Page
-
-  - [ ] (future) GAP: Not implemented
-
+- Types Page: (Future)
 - TypeVersion Page
 
   - [ ] GAP: Overview - type category
@@ -36,10 +28,7 @@ PR Todos:
 
 - TypeVersions Page: Done
 - Op Page: Done
-- Ops Page
-
-  - [ ] (future) GAP: Not implemented
-
+- Ops Page: (Future)
 - OpVersion Page
 
   - [ ] GAP: Overview: (Type Stub, Op Category, isLatest, Call Hierarchy)
@@ -64,22 +53,10 @@ PR Todos:
 
   - [ ] FEAT: Show outputs when narrowed to a single op version
 
-- Board Page
-
-  - [ ] GAP: Persistence & Config Editor - there are a lot of gaps here in terms of functionality
-
-- Boards Page
-
-  - [ ] GAP: Actions probably don't work
-
-- Table Page
-
-  - [ ] BUG: Does not work
-
-- Tables
-
-  - [ ] BUG: Does not work
-
+- Board Page: (Future)
+- Boards Page: (Future)
+- Table Page: (Future)
+- Tables: (Future)
 - Python API
 
   - [ ] Need to update URLs
@@ -88,16 +65,15 @@ PR Todos:
   - [ ] Deprecate `weave-js/src/components/PagePanelComponents/Home/Browse2/url.ts`
   - [ ] No tables save their filter state back to the URL
 
-Shortcuts
+Shortcuts Taken
 
-- [ ] Op & Type category are not formally part of the data model (and therefore are inferred from names)
-- [ ] Specific Op and Type categories are hard-coded for now
-- [ ] TypeVersions are not formally part of the data model (and therefore are constructed by reading all the data & manually calculating a hash/id).
-- [ ] Only the `Calls` table is actually backed by a Weave query - the other tables are just pure data.
-- [ ] Since OpDefs do not store their type stub, we have to infer it from the first call!
-- [ ] Since OpDefs do not store their invoke list, we have to infer it from the first call!
-- [ ] There is a not-well defined mapping between an in-memory WeaveType and it's corresponding virtual "TypeVersion"
-- [ ] Pinnable filters
+- Op & Type category are not formally part of the data model (and therefore are inferred from names)
+- Specific Op and Type categories are hard-coded for now
+- TypeVersions are not formally part of the data model (and therefore are constructed by reading all the data & manually calculating a hash/id).
+- Only the `Calls` table is actually backed by a Weave query - the other tables are just pure data.
+- Since OpDefs do not store their type stub, we have to infer it from the first call!
+- Since OpDefs do not store their invoke list, we have to infer it from the first call!
+- There is a not-well defined mapping between an in-memory WeaveType and it's corresponding virtual "TypeVersion"
 
 Query & Performance:
 
@@ -116,6 +92,7 @@ Future:
 - [ ] Ability to open any of the Table Pages in a board
 - [ ] Structure and Record DAGS
 - [ ] Board and Table Support
+- [ ] Pinnable filters
 
 Needs Cleanup:
 
