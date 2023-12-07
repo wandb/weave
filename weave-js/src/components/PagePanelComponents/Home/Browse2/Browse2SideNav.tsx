@@ -277,6 +277,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
                 onClick: () => {
                   props.navigateToObjectVersions({
                     typeCategory: 'model',
+                    latest: true,
                   });
                 },
               },
