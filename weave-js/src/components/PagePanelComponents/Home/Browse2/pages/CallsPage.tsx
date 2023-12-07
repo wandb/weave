@@ -7,6 +7,7 @@ import {
   ListItemText,
   TextField,
 } from '@mui/material';
+import {isArray} from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {CallFilter} from '../callTree';
@@ -17,7 +18,6 @@ import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyOpCategory} from './interface/wf/types';
-import {isArray} from 'lodash';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -141,6 +141,7 @@ export const CallsTable: React.FC<{
 
   return (
     <FilterLayoutTemplate
+      showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
       filterPopoutTargetUrl={routerContext.callsUIUrl(
         props.entity,
         props.project,

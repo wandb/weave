@@ -151,7 +151,7 @@ export const FilterableTable = <
             col = column.filterControls.filterControlListItem({
               filter: filterCurr as Partial<CompositeFilterType>,
               updateFilter: update => {
-                setFilter({...filter, ...update});
+                setFilter({...filter, ...update} as CompositeFilterType);
               },
             });
           }
