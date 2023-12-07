@@ -81,8 +81,6 @@ def observability(
     timestamp_col_name = "timestamp"
     num_buckets = 80
 
-    now = weave.ops.datetime_now()
-
     overview_tab = weave.panels.Group(
         layoutMode="grid",
         showExpressions=False,
@@ -102,33 +100,15 @@ def observability(
         hidden=True,
     )
 
-    grouping_fn = varbar.add(
-        "grouping_fn",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["entity_name"]
-        ),
-        hidden=True,
-    )
-
     three_days_in_seconds = 60 * 60 * 24 * 3
-    window_start = varbar.add(
-        "window_start",
-        weave.ops.from_number(now - three_days_in_seconds),
-        hidden=True,
+    window_start = weave.ops.from_number(
+        weave.ops.datetime_now() - three_days_in_seconds
     )
-    window_end = varbar.add(
-        "window_end",
-        weave.ops.from_number(now),
-        hidden=True,
-    )
+    window_end = weave.ops.from_number(weave.ops.datetime_now())
 
-    filtered_range = varbar.add(
-        "filtered_range",
-        weave.ops.make_list(
-            a=window_start,
-            b=window_end,
-        ),
-        hidden=True,
+    filtered_range = weave.ops.make_list(
+        a=window_start,
+        b=window_end,
     )
 
     user_zoom_range = varbar.add("user_zoom_range", None, hidden=True)
@@ -136,19 +116,13 @@ def observability(
         "Time_range",
         panels.DateRange(user_zoom_range, domain=filtered_range),
     )
-    bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
-    )
 
+    bin_range = user_zoom_range.coalesce(filtered_range)
     window_data = source_data.filter(
         lambda row: weave.ops.Boolean.bool_and(
             row[timestamp_col_name] >= bin_range[0],
             row[timestamp_col_name] <= bin_range[1],
         )
-    )
-    varbar.add(
-        "Grouping",
-        panels.GroupingEditor(grouping_fn, node=window_data),
     )
     filtered_window_data = varbar.add(
         "filtered_window_data",
@@ -163,14 +137,14 @@ def observability(
 
     colors_node = weave.ops.dict_(
         **{
-            "running": "rgb(57, 126, 237)",
-            "failed": "rgb(255, 122, 136)",
-            "crashed": "rgb(255, 61, 90)",
-            "finished": "rgb(0, 178, 110)",
-            "starting": "rgb(125, 177, 250)",
-            "failed_rqi": "rgb(255, 199, 202)",
-            "queued": "rgb(211, 215, 222)",
-            "popped": "rgb(189, 217, 255)",
+            "running": "rgb(83, 135, 221)",
+            "failed": "rgb(255, 80, 80)",
+            "crashed": "rgb(218, 200, 76)",
+            "finished": "rgb(0, 200, 100)",
+            "starting": "rgb(218, 200, 0)",
+            "failed_rqi": "rgb(255, 0, 0)",
+            "queued": "rgb(218, 200, 200)",
+            "popped": "rgb(150, 150, 150)",
         }
     )
 
@@ -179,15 +153,11 @@ def observability(
         lambda row: colors_node.pick(row["state"]),
     )
 
-    queued_time_data = varbar.add(
-        "queued_time_data",
-        filtered_window_data.filter(
-            lambda row: weave.ops.Boolean.bool_or(
-                row["state"] == "queued",
-                row["state"] == "starting",
-            ),
+    queue_time_data = filtered_window_data.filter(
+        lambda row: weave.ops.Boolean.bool_or(
+            row["state"] == "queued",
+            row["state"] == "starting",
         ),
-        hidden=True,
     )
 
     is_start_stop_state = weave_internal.define_fn(
@@ -204,6 +174,7 @@ def observability(
         ),
     )
 
+    # TODO: fix colors to special function
     state_transitions_plot = panels.Plot(
         filtered_window_data,
         x=lambda row: row[timestamp_col_name].bin(
@@ -212,6 +183,7 @@ def observability(
         x_title="Time",
         y=lambda row: row.count(),
         y_title="Count of transitions by state",
+        # label=lambda row: state_color_func(row),
         label=lambda row: row["state"],
         tooltip=lambda row: weave.ops.dict_(
             **{
@@ -223,11 +195,11 @@ def observability(
         color=state_color_func.val,
         groupby_dims=["x", "label"],
         mark="bar",
-        domain_x=user_zoom_range,
+        domain_x=bin_range,
     )
 
     queued_time_plot = panels.Plot(
-        queued_time_data,
+        queue_time_data,
         x=lambda row: row[timestamp_col_name].bin(
             weave.ops.timestamp_bins_nice(bin_range, num_buckets / 2)
         ),
@@ -238,7 +210,7 @@ def observability(
             )
         ),
         y_title="Time spent queued",
-        label=lambda row: grouping_fn(row),
+        label=lambda row: row["trace_id"],
         tooltip=lambda row: weave.ops.dict_(
             **{
                 "job": row["job"][0],
@@ -251,53 +223,61 @@ def observability(
                 ),
             }
         ),
-        color_title="Grouping",
+        color_title="id",
+        color=lambda row: row["trace_id"],
         groupby_dims=["x", "label"],
         mark="bar",
-        domain_x=user_zoom_range,
-    )
-
-    start_stop_states = latest_runs = varbar.add(
-        "start_stop_states",
-        weave.ops.List.filter(filtered_window_data, is_start_stop_state),
-        hidden=True,
-    )
-    start_stop_states_sorted_limit = weave.ops.List.limit(start_stop_states, 30)
-    dropped = weave.ops.List.dropna(start_stop_states_sorted_limit)
-
-    latest_runs = varbar.add(
-        "latest_runs",
-        dropped,
-        hidden=True,
+        no_legend=True,
+        domain_x=bin_range,
     )
 
     latest_runs_plot = panels.Plot(
-        latest_runs,
-        x=lambda row: row[timestamp_col_name],
-        x_title="Time",
-        y_title="Run ID",
-        y=lambda row: row["run_id"],
-        tooltip=lambda row: row[0]["job"],
-        label=lambda row: row["trace_id"],
-        groupby_dims=["y"],
-        mark="line",
+        weave.ops.List.limit(
+            list_.List.sort(
+                list_.List.filter(filtered_window_data, is_start_stop_state),
+                # make_list required for sorting (?)
+                compFn=lambda row: weave.ops.make_list(
+                    timestamp=row[timestamp_col_name],
+                    # state=row["state"],
+                ),
+                columnDirs=["desc"],
+            ),
+            30,
+        ),
+        x=lambda row: row["run_id"],
+        x_title="Run ID",
+        y_title="Runtime",
+        y=lambda row: weave.ops.timedelta_total_seconds(
+            weave.ops.datetime_sub(
+                row[timestamp_col_name].max(), row[timestamp_col_name].min()
+            )
+        ),
+        tooltip=lambda row: weave.ops.dict_(
+            **{
+                "job": row[0]["job"],
+                "run id": row[0]["run_id"],
+                "user": row[0]["entity_name"],
+                "project": row[0]["project_name"],
+                "timestamp": row[0]["timestamp"],
+            }
+        ),
+        label=lambda row: row["run_id"],
+        color_title="runtime",
+        groupby_dims=["x"],
+        mark="bar",
         no_legend=True,
         domain_x=user_zoom_range,
     )
 
-    jobs = varbar.add(
-        "jobs",
-        filtered_window_data.filter(is_start_stop_state),
-        hidden=True,
-    )
-    jobs_table = panels.Table(jobs)  # type: ignore
+    jobs_table = panels.Table(filtered_window_data.filter(is_start_stop_state))  # type: ignore
     jobs_table.add_column(lambda row: row["run_id"], "Run ID", groupby=True)
     jobs_table.add_column(
         lambda row: weave.ops.timedelta_total_seconds(
             weave.ops.datetime_sub(
                 row[timestamp_col_name].max(), row[timestamp_col_name].min()
             )
-        ),
+        )
+        / row.count(),
         "runtime (s)",
         sort_dir="desc",
     )
@@ -307,88 +287,40 @@ def observability(
         "avg cpu util %",
     )
 
-    starting_runs = varbar.add(
-        "starting_runs",
+    runs_table = panels.Table(  # type: ignore
         filtered_window_data.filter(
             weave_internal.define_fn(
                 {"row": source_data.type.object_type},
                 lambda row: row["state"] == "starting",
             )
-        ),
-        hidden=True,
+        )
     )
-    runs_table = panels.Table(starting_runs)  # type: ignore
     runs_table.add_column(lambda row: row["entity_name"], "User", groupby=True)
     runs_table.add_column(lambda row: row.count(), "Count", sort_dir="desc")
 
-    finished_runs = varbar.add(
-        "finished_runs",
-        filtered_window_data.filter(
-            lambda row: weave.ops.Boolean.bool_or(
-                row["state"] == "finished",
-                weave.ops.Boolean.bool_or(
-                    row["state"] == "crashed",
-                    row["state"] == "failed",
-                ),
-            ),
-        ),
-        hidden=True,
-    )
-
-    runs_by_user_project_plot = panels.Plot(
-        finished_runs,
-        x=lambda row: row["project_name"],
-        x_title="Grouping",
-        y_title="Count by user",
-        y=lambda row: row.count(),
-        label=lambda row: grouping_fn(row),
-        groupby_dims=["x", "label"],
-        mark="bar",
-        no_legend=True,
-        domain_x=user_zoom_range,
-    )
-
-    gpu_use_by_user_plot = panels.Plot(
-        start_stop_states,
-        x=lambda row: grouping_fn(row),
-        x_title="Grouping",
-        y_title="Run duration * gpu util",
-        y=lambda row: weave.ops.Number.__mul__(
-            weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                ),
-            ),
-            row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
-        ),
-        label=lambda row: row["run_id"],
-        groupby_dims=["x", "label"],
-        mark="bar",
-        no_legend=True,
-        domain_x=user_zoom_range,
-    )
-
     def make_metric_plot(metric_name: str, y_title: str) -> panels.Plot:
         return panels.Plot(
-            finished_runs,
+            filtered_window_data.filter(
+                weave_internal.define_fn(
+                    {"row": source_data.type.object_type},
+                    lambda row: row["state"] == "finished",
+                )
+            ),
             x=lambda row: row[timestamp_col_name],
             x_title=timestamp_col_name,
-            y=lambda row: list_.List.concat(
-                row["metrics"]["system"][metric_name]
-            ).avg(),
+            y=lambda row: row["metrics"]["system"][metric_name].avg(),
             y_title=y_title,
             tooltip=lambda row: weave.ops.dict_(
                 **{
                     "user": row["entity_name"][0],
                     "run id": row["run_id"][-1],
-                    "job": row["job"][0],
                     "project": row["project_name"][0],
                     "min": row["metrics"]["system"][metric_name][0].min(),
                     "max": row["metrics"]["system"][metric_name][0].max(),
                     "avg": row["metrics"]["system"][metric_name][0].avg(),
                 }
             ),
-            groupby_dims=["x"],
+            groupby_dims=["y", "x"],
             mark="line",
             no_legend=True,
             domain_x=bin_range,
@@ -401,24 +333,28 @@ def observability(
     gpu_plot = make_metric_plot("gpu_cores_util", "avg gpu %")
     gpu_memory_plot = make_metric_plot("gpu_cores_mem", "avg gpu memory util %")
     memory_plot = weave.panels.Plot(
-        finished_runs,
+        filtered_window_data.filter(
+            weave_internal.define_fn(
+                {"row": source_data.type.object_type},
+                lambda row: row["state"] == "finished",
+            )
+        ),
         x=lambda row: row[timestamp_col_name],
         x_title=timestamp_col_name,
-        y=lambda row: row["metrics"]["system"]["memory"][0],
+        y=lambda row: row["metrics"]["system"]["memory"],
         y_title="system memory used (MB)",
         tooltip=lambda row: weave.ops.dict_(
             **{
                 "user": row["entity_name"][0],
                 "run id": row["run_id"][-1],
-                "job": row["job"][0],
                 "project": row["project_name"][0],
                 "memory": row["metrics"]["system"]["memory"][0],
             }
         ),
-        groupby_dims=["x"],
+        groupby_dims=["y", "x"],
         mark="line",
         no_legend=True,
-        domain_x=user_zoom_range,
+        domain_x=bin_range,
     )
 
     errors_table = panels.Table(  # type: ignore
@@ -436,7 +372,7 @@ def observability(
 
     # layout
     overview_tab.add(
-        "Job_status",
+        "State_transitions",
         state_transitions_plot,
         layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
@@ -456,44 +392,34 @@ def observability(
         layout=panels.GroupPanelLayout(x=0, y=14, w=12, h=8),
     )
     overview_tab.add(
-        "Runs_by_user",
+        "Runs_by_users",
         runs_table,
         layout=panels.GroupPanelLayout(x=12, y=14, w=12, h=8),
     )
     overview_tab.add(
-        "Runs_by_project",
-        runs_by_user_project_plot,
-        layout=panels.GroupPanelLayout(x=0, y=22, w=12, h=6),
-    )
-    overview_tab.add(
-        "Gpu_use_by_user",
-        gpu_use_by_user_plot,
-        layout=panels.GroupPanelLayout(x=12, y=22, w=12, h=6),
-    )
-    overview_tab.add(
         "Cpu_usage_on_run_finish",
         cpu_plot,
-        layout=panels.GroupPanelLayout(x=0, y=28, w=12, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=22, w=12, h=6),
     )
     overview_tab.add(
         "System_memory_on_run_finish",
         memory_plot,
-        layout=panels.GroupPanelLayout(x=12, y=28, w=12, h=6),
+        layout=panels.GroupPanelLayout(x=12, y=22, w=12, h=6),
     )
     overview_tab.add(
         "Gpu_usage_on_run_finish",
         gpu_plot,
-        layout=panels.GroupPanelLayout(x=0, y=34, w=12, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=28, w=12, h=6),
     )
     overview_tab.add(
         "Gpu_memory_on_run_finish",
         gpu_memory_plot,
-        layout=panels.GroupPanelLayout(x=12, y=34, w=12, h=6),
+        layout=panels.GroupPanelLayout(x=12, y=28, w=12, h=6),
     )
     overview_tab.add(
         "Errors",
         errors_table,
-        layout=panels.GroupPanelLayout(x=0, y=40, w=24, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=34, w=24, h=8),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab, editable=False)
