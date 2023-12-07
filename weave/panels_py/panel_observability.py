@@ -354,7 +354,14 @@ def observability(
 
     gpu_waste_by_user_plot = panels.Plot(
         start_stop_states,
-        x=lambda row: grouping_fn(row),
+        x=lambda row: weave.ops.Number.__mul__(
+            weave.ops.timedelta_total_seconds(
+                weave.ops.datetime_sub(
+                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                ),
+            ),
+            1000,
+        ),
         x_title="Grouping",
         y_title="Run duration * gpu waste",
         y=lambda row: weave.ops.Number.__mul__(
@@ -414,9 +421,17 @@ def observability(
                 "Gpu util %": row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
             }
         ),
+        # color=lambda row: weave.ops.Number.__mul__(
+        #     weave.ops.timedelta_total_seconds(
+        #         weave.ops.datetime_sub(
+        #             row[timestamp_col_name].max(), row[timestamp_col_name].min()
+        #         ),
+        #     ),
+        #     1000,
+        # ),
         label=lambda row: row["run_id"],
-        groupby_dims=["x", "label"],
-        mark="bar",
+        groupby_dims=["label"],
+        mark="point",
         no_legend=True,
     )
 
