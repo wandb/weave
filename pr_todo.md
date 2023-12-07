@@ -4,16 +4,12 @@ PR Todos:
 - Objects Page: (Future)
 - ObjectVersions Page
 
-  - [ ] FEAT: Enable Description Editing
   - [ ] FEAT: TypeVersion Filter (Include Subtypes)
 
-- [ ] ObjectVersion Page
-
-  - [ ] BUG: Committing edits redirects to incorrect page
-
+- [ ] ObjectVersion Page: Done
 - Type Page: Done
 - Types Page: (Future)
-- TypeVersion Page
+- TypeVersion Page Done
 - TypeVersions Page: Done
 - Op Page: Done
 - Ops Page: (Future)
@@ -21,9 +17,7 @@ PR Todos:
 
   - [ ] GAP: Overview: (Type Stub, Op Category, isLatest, Call Hierarchy)
 
-- OpVersions Page
-
-  - [ ] FEAT: Enable Description Editing
+- OpVersions Page: Done
 
 - Call Page
 
@@ -45,8 +39,12 @@ PR Todos:
   - [ ] Need to update URLs
 
 - General
+
   - [ ] Deprecate `weave-js/src/components/PagePanelComponents/Home/Browse2/url.ts`
   - [ ] No tables save their filter state back to the URL
+
+- Bugs:
+  - [ ] Do to static state, committing changes errors when attempting to load the new page.
 
 ---
 

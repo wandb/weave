@@ -457,20 +457,21 @@ export const FilterableOpVersionsTable: React.FC<{
         'producesTypeVersions',
         WFHighLevelOpVersionFilter
       >,
-      description: {
-        columnId: 'description',
-        gridDisplay: {
-          columnLabel: 'Description',
-          columnValue: obj => obj.obj.description(),
-          gridColDefOptions: {},
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        any,
-        string,
-        'description',
-        WFHighLevelOpVersionFilter
-      >,
+      // TODO: re-enable with editing support
+      // description: {
+      //   columnId: 'description',
+      //   gridDisplay: {
+      //     columnLabel: 'Description',
+      //     columnValue: obj => obj.obj.description(),
+      //     gridColDefOptions: {},
+      //   },
+      // } as WFHighLevelDataColumn<
+      //   {obj: WFOpVersion},
+      //   any,
+      //   string,
+      //   'description',
+      //   WFHighLevelOpVersionFilter
+      // >,
       versionIndex: {
         columnId: 'versionIndex',
         gridDisplay: {

@@ -32,6 +32,9 @@ import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyTypeCategory, WFObjectVersion} from './interface/wf/types';
+import {useMutation} from '@apollo/client';
+import {UPDATE_ARTIFACT_DESCRIPTION} from './interface/gql';
+import {useUpdateObjectVersionDescription} from './interface/dataModel';
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;
@@ -290,6 +293,7 @@ const ObjectVersionsTable: React.FC<{
 }> = props => {
   // const history = useHistory();
   // const routeContext = useWeaveflowRouteContext();
+  const updateDescription = useUpdateObjectVersionDescription();
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
       const outputFrom = ov.outputFrom();
@@ -403,7 +407,9 @@ const ObjectVersionsTable: React.FC<{
         // );
       },
     }),
-    basicField('description', 'Description'),
+    basicField('description', 'Description', {
+      editable: true,
+    }),
     basicField('versionIndex', 'Version', {
       width: 100,
     }),
@@ -443,19 +449,18 @@ const ObjectVersionsTable: React.FC<{
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       columnGroupingModel={columnGroupingModel}
-      // onCellClick={params => {
-      //   // TODO: move these actions into a config
-      //   if (params.field === 'id') {
-      //     history.push(
-      //       routeContext.objectVersionUIUrl(
-      //         params.row.obj.entity(),
-      //         params.row.obj.project(),
-      //         params.row.object,
-      //         params.row.version
-      //       )
-      //     );
-      //   }
-      // }}
+      onCellEditStop={(params, event) => {
+        if (params.field === 'description') {
+          const newDesc = (event as any).target.value;
+          updateDescription(
+            params.row.obj.entity(),
+            params.row.obj.project(),
+            params.row.obj.object().name(),
+            params.row.obj.version(),
+            newDesc
+          );
+        }
+      }}
     />
   );
 };

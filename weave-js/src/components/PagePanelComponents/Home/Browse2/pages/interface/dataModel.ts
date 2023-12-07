@@ -6,8 +6,9 @@ Convention:
 
 import {useMutation} from '@apollo/client';
 import stringify from 'json-stable-stringify';
-import {useMemo} from 'react';
+import {useCallback, useMemo} from 'react';
 
+import {useWeaveContext} from '../../../../../../context';
 import {
   constFunction,
   constNone,
@@ -133,14 +134,43 @@ export const fnAllWeaveObjects = (entity: string, project: string) => {
 };
 
 export const useUpdateObjectVersionDescription = () => {
+  const weave = useWeaveContext();
   const [updateArtifactDescription] = useMutation(UPDATE_ARTIFACT_DESCRIPTION);
-  return (artifactID: string, description: string) =>
-    updateArtifactDescription({
-      variables: {
-        artifactID,
-        description,
-      },
-    });
+  return useCallback(
+    (
+      entity: string,
+      project: string,
+      artifactName: string,
+      alias: string,
+      description: string
+    ) => {
+      const doWork = async () => {
+        const projectNode = opRootProject({
+          entityName: constString(entity),
+          projectName: constString(project),
+        });
+        const artifactNode = opProjectArtifactVersion({
+          project: projectNode,
+          artifactName: constString(artifactName),
+          artifactVersionAlias: constString(alias),
+        });
+        const artifactIDNode = opArtifactVersionId({
+          artifactVersion: artifactNode,
+        });
+        const artifactIdValue: string = await weave.client.query(
+          artifactIDNode
+        );
+        await updateArtifactDescription({
+          variables: {
+            artifactID: artifactIdValue,
+            description,
+          },
+        });
+      };
+      return doWork();
+    },
+    [updateArtifactDescription, weave.client]
+  );
 };
 
 export const useObjectVersionTypeInfo = (
