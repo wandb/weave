@@ -83,7 +83,7 @@ def observability(
 
     now = weave.ops.datetime_now()
 
-    overview_tab = weave.panels.Group(
+    dashboard = weave.panels.Group(
         layoutMode="grid",
         showExpressions=False,
         enableAddPanel=False,
@@ -257,17 +257,22 @@ def observability(
         domain_x=user_zoom_range,
     )
 
-    start_stop_states = latest_runs = varbar.add(
+    start_stop_states = varbar.add(
         "start_stop_states",
         weave.ops.List.filter(filtered_window_data, is_start_stop_state),
         hidden=True,
     )
-    start_stop_states_sorted_limit = weave.ops.List.limit(start_stop_states, 30)
-    dropped = weave.ops.List.dropna(start_stop_states_sorted_limit)
 
     latest_runs = varbar.add(
         "latest_runs",
-        dropped,
+        weave.ops.List.limit(
+            weave.ops.List.sort(
+                arr=start_stop_states,
+                compFn=lambda row: weave.ops.make_list(a=row["timestamp"]),
+                columnDirs=["desc"],
+            ),
+            30,
+        ),
         hidden=True,
     )
 
@@ -279,9 +284,10 @@ def observability(
         y=lambda row: row["run_id"],
         tooltip=lambda row: row[0]["job"],
         label=lambda row: row["trace_id"],
-        groupby_dims=["y"],
+        groupby_dims=["label"],
         mark="line",
         no_legend=True,
+        domain_x=user_zoom_range,
     )
 
     jobs = varbar.add(
@@ -344,7 +350,6 @@ def observability(
         groupby_dims=["x", "label"],
         mark="bar",
         no_legend=True,
-        domain_x=user_zoom_range,
     )
 
     gpu_use_by_user_plot = panels.Plot(
@@ -360,11 +365,23 @@ def observability(
             ),
             row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
         ),
+        tooltip=lambda row: weave.ops.dict_(
+            **{
+                "User": row["entity_name"][0],
+                "Duration (s) * gpu %": weave.ops.Number.__mul__(
+                    weave.ops.timedelta_total_seconds(
+                        weave.ops.datetime_sub(
+                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                        ),
+                    ),
+                    row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                ),
+            }
+        ),
         label=lambda row: row["run_id"],
         groupby_dims=["x", "label"],
         mark="bar",
         no_legend=True,
-        domain_x=user_zoom_range,
     )
 
     def make_metric_plot(metric_name: str, y_title: str) -> panels.Plot:
@@ -434,68 +451,68 @@ def observability(
     errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
 
     # layout
-    overview_tab.add(
+    dashboard.add(
         "Job_status",
         state_transitions_plot,
         layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
-    overview_tab.add(
+    dashboard.add(
         "Queued_time",
         queued_time_plot,
         layout=panels.GroupPanelLayout(x=0, y=6, w=12, h=8),
     )
-    overview_tab.add(
+    dashboard.add(
         "Lastest_runs",
         latest_runs_plot,
         layout=panels.GroupPanelLayout(x=12, y=6, w=12, h=8),
     )
-    overview_tab.add(
+    dashboard.add(
         "Longest_jobs",
         jobs_table,
         layout=panels.GroupPanelLayout(x=0, y=14, w=12, h=8),
     )
-    overview_tab.add(
+    dashboard.add(
         "Runs_by_user",
         runs_table,
         layout=panels.GroupPanelLayout(x=12, y=14, w=12, h=8),
     )
-    overview_tab.add(
+    dashboard.add(
         "Runs_by_project",
         runs_by_user_project_plot,
         layout=panels.GroupPanelLayout(x=0, y=22, w=12, h=6),
     )
-    overview_tab.add(
+    dashboard.add(
         "Gpu_use_by_user",
         gpu_use_by_user_plot,
         layout=panels.GroupPanelLayout(x=12, y=22, w=12, h=6),
     )
-    overview_tab.add(
+    dashboard.add(
         "Cpu_usage_on_run_finish",
         cpu_plot,
         layout=panels.GroupPanelLayout(x=0, y=28, w=12, h=6),
     )
-    overview_tab.add(
+    dashboard.add(
         "System_memory_on_run_finish",
         memory_plot,
         layout=panels.GroupPanelLayout(x=12, y=28, w=12, h=6),
     )
-    overview_tab.add(
+    dashboard.add(
         "Gpu_usage_on_run_finish",
         gpu_plot,
         layout=panels.GroupPanelLayout(x=0, y=34, w=12, h=6),
     )
-    overview_tab.add(
+    dashboard.add(
         "Gpu_memory_on_run_finish",
         gpu_memory_plot,
         layout=panels.GroupPanelLayout(x=12, y=34, w=12, h=6),
     )
-    overview_tab.add(
+    dashboard.add(
         "Errors",
         errors_table,
         layout=panels.GroupPanelLayout(x=0, y=40, w=24, h=8),
     )
 
-    return panels.Board(vars=varbar, panels=overview_tab, editable=False)
+    return panels.Board(vars=varbar, panels=dashboard, editable=False)
 
 
 template_registry.register(
