@@ -36,6 +36,7 @@ import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+import {useQuery} from './pages/util';
 
 const drawerWidth = 240;
 
@@ -59,6 +60,7 @@ type Browse2ProjectSideNavProps = {
     | 'ops'
     | 'boards'
     | 'tables';
+  filterCategory?: string;
 } & NavigationCallbacks;
 
 export const RouteAwareBrowse2ProjectSideNav: FC = props => {
@@ -79,7 +81,19 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
   const history = useHistory();
   const currentProject = params.project;
   const currentEntity = params.entity;
-  const selectedCategory = useMemo(() => {
+  const query = useQuery();
+  const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+  const selectedNavSection = useMemo(() => {
     if (params.tab === 'types' || params.tab === 'type-versions') {
       return 'types';
     } else if (params.tab === 'objects' || params.tab === 'object-versions') {
@@ -95,6 +109,16 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
     }
     return undefined;
   }, [params.tab]);
+  const filterCategory = useMemo(() => {
+    const category = Object.keys(filters).find(key =>
+      key.toLowerCase().includes('category')
+    );
+    if (category === undefined) {
+      return undefined;
+    }
+    return filters[category];
+  }, [filters]);
+
   const router = useWeaveflowRouteContext();
   if (!currentProject || !currentEntity) {
     return null;
@@ -103,7 +127,8 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
     <Browse2ProjectSideNav
       entity={currentEntity}
       project={currentProject}
-      selectedCategory={selectedCategory}
+      selectedCategory={selectedNavSection}
+      filterCategory={filterCategory}
       navigateToProject={project => {
         history.push(`/${params.entity}/${project}`);
       }}
@@ -262,7 +287,12 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
         items: [
           {
             title: 'Objects', // , 'Instances (ObjectVersions)',
-            selected: props.selectedCategory === 'objects',
+            selected:
+              props.selectedCategory === 'objects' &&
+              !(
+                props.filterCategory === 'model' ||
+                props.filterCategory === 'dataset'
+              ),
             icon: <Category />,
             onClick: () => {
               props.navigateToObjectVersions({
@@ -274,6 +304,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
               {
                 title: 'Models',
                 icon: <Layers />,
+                selected: props.filterCategory === 'model',
                 onClick: () => {
                   props.navigateToObjectVersions({
                     typeCategory: 'model',
@@ -284,6 +315,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
               {
                 title: 'Datasets',
                 icon: <Dataset />,
+                selected: props.filterCategory === 'dataset',
                 onClick: () => {
                   props.navigateToObjectVersions({
                     typeCategory: 'dataset',
@@ -295,7 +327,15 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
           },
           {
             title: 'Calls', // 'Traces (Calls)',
-            selected: props.selectedCategory === 'calls',
+            selected:
+              props.selectedCategory === 'calls' &&
+              !(
+                props.filterCategory === 'train' ||
+                props.filterCategory === 'predict' ||
+                props.filterCategory === 'score' ||
+                props.filterCategory === 'evaluate' ||
+                props.filterCategory === 'tune'
+              ),
             icon: <Segment />,
             onClick: () => {
               props.navigateToCalls({
@@ -306,6 +346,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
             children: [
               {
                 title: 'Train',
+                selected: props.filterCategory === 'train',
                 icon: <ModelTraining />,
                 onClick: () => {
                   props.navigateToCalls({opCategory: 'train'});
@@ -313,6 +354,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
               },
               {
                 title: 'Predict',
+                selected: props.filterCategory === 'predict',
                 icon: <AutoFixHigh />,
                 onClick: () => {
                   props.navigateToCalls({opCategory: 'predict'});
@@ -320,6 +362,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
               },
               {
                 title: 'Score',
+                selected: props.filterCategory === 'score',
                 icon: <Scoreboard />,
                 onClick: () => {
                   props.navigateToCalls({opCategory: 'score'});
@@ -327,6 +370,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
               },
               {
                 title: 'Evaluate',
+                selected: props.filterCategory === 'evaluate',
                 icon: <Rule />,
                 onClick: () => {
                   props.navigateToCalls({opCategory: 'evaluate'});
@@ -334,6 +378,7 @@ const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
               },
               {
                 title: 'Tune',
+                selected: props.filterCategory === 'tune',
                 icon: <Tune />,
                 onClick: () => {
                   props.navigateToCalls({opCategory: 'tune'});
