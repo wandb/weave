@@ -345,7 +345,6 @@ def observability(
         groupby_dims=["x", "label"],
         mark="bar",
         no_legend=True,
-        domain_x=user_zoom_range,
     )
 
     gpu_use_by_user_plot = panels.Plot(
@@ -365,7 +364,6 @@ def observability(
         groupby_dims=["x", "label"],
         mark="bar",
         no_legend=True,
-        domain_x=user_zoom_range,
     )
 
     def make_metric_plot(metric_name: str, y_title: str) -> panels.Plot:
