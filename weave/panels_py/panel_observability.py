@@ -352,30 +352,66 @@ def observability(
         no_legend=True,
     )
 
-    gpu_use_by_user_plot = panels.Plot(
+    gpu_waste_by_user_plot = panels.Plot(
         start_stop_states,
         x=lambda row: grouping_fn(row),
         x_title="Grouping",
-        y_title="Run duration * gpu util",
+        y_title="Run duration * gpu waste",
         y=lambda row: weave.ops.Number.__mul__(
-            weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
+            weave.ops.Number.__mul__(
+                weave.ops.timedelta_total_seconds(
+                    weave.ops.datetime_sub(
+                        row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                    ),
+                ),
+                1000,
+            ),
+            weave.ops.Number.__sub__(
+                1,
+                weave.ops.Number.__truediv__(
+                    row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                    100,
                 ),
             ),
-            row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
         ),
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "User": row["entity_name"][0],
-                "Duration (s) * gpu %": weave.ops.Number.__mul__(
+                "Run": weave.ops.join_to_str(
+                    weave.ops.make_list(
+                        a=row["entity_name"][0],
+                        b=row["project_name"][0],
+                        c=row["run_id"][0],
+                    ),
+                    "/",
+                ),
+                "Job": row["job"][0],
+                "Duration (s) * (1 - gpu %)": weave.ops.Number.__mul__(
+                    weave.ops.Number.__mul__(
+                        weave.ops.timedelta_total_seconds(
+                            weave.ops.datetime_sub(
+                                row[timestamp_col_name].max(),
+                                row[timestamp_col_name].min(),
+                            ),
+                        ),
+                        1000,
+                    ),
+                    weave.ops.Number.__sub__(
+                        1,
+                        weave.ops.Number.__truediv__(
+                            row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                            100,
+                        ),
+                    ),
+                ),
+                "Duration (s)": weave.ops.Number.__mul__(
                     weave.ops.timedelta_total_seconds(
                         weave.ops.datetime_sub(
                             row[timestamp_col_name].max(), row[timestamp_col_name].min()
                         ),
                     ),
-                    row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                    1000,
                 ),
+                "Gpu util %": row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
             }
         ),
         label=lambda row: row["run_id"],
@@ -482,8 +518,8 @@ def observability(
         layout=panels.GroupPanelLayout(x=0, y=22, w=12, h=6),
     )
     dashboard.add(
-        "Gpu_use_by_user",
-        gpu_use_by_user_plot,
+        "Gpu_waste_by_user",
+        gpu_waste_by_user_plot,
         layout=panels.GroupPanelLayout(x=12, y=22, w=12, h=6),
     )
     dashboard.add(
