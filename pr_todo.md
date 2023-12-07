@@ -18,9 +18,6 @@ PR Todos:
 - Type Page: Done
 - Types Page: (Future)
 - TypeVersion Page
-
-  - [ ] GAP: Overview - type category
-
 - TypeVersions Page: Done
 - Op Page: Done
 - Ops Page: (Future)
@@ -31,14 +28,12 @@ PR Todos:
 - OpVersions Page
 
   - [ ] FEAT: Enable Description Editing
-  - [ ] BUG: Fix Navbar to do proper linking
 
 - Call Page
 
   - CHECK: Add "TODO" to overflow menu
   - CHECK: Add to dataset? What does this do now?
   - CHECK: Feedback
-  - [ ] FEAT: Add op Category
   - [ ] BUG: Function link is broken (possibly same as other issues above)
 
 - Calls Page

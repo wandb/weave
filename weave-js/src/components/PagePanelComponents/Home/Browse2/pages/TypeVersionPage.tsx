@@ -13,6 +13,7 @@ import {HackyTypeTree, WFTypeVersion} from './interface/wf/types';
 import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
 import {FilterableOpVersionsTable} from './OpVersionsPage';
 import {FilterableTypeVersionsTable} from './TypeVersionsPage';
+import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 
 export const TypeVersionPage: React.FC<{
   entity: string;
@@ -37,6 +38,11 @@ export const TypeVersionPage: React.FC<{
                 data={{
                   'Type Name': (
                     <TypeLink typeName={typeVersion.type().name()} />
+                  ),
+                  Category: (
+                    <TypeVersionCategoryChip
+                      typeCategory={typeVersion.typeCategory()}
+                    />
                   ),
                   Version: typeVersion.version(),
                   'Property Types': (
