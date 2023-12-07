@@ -1,35 +1,35 @@
-PR Todos:
+Pages:
 
 - Object Page: Done
-- Objects Page: (Future)
 - ObjectVersions Page
 - ObjectVersion Page: Done
 - Type Page: Done
-- Types Page: (Future)
 - TypeVersion Page Done
 - TypeVersions Page: Done
 - Op Page: Done
-- Ops Page: (Future)
 - OpVersion Page: Done
 - OpVersions Page: Done
 - Call Page: Done
 - Calls Page: Done
-- Board Page: (Future)
-- Boards Page: (Future)
-- Table Page: (Future)
-- Tables: (Future)
-- Python API
 
-  - [ ] Need to update URLs
+Python API
 
-- General
+- [ ] Need to update URLs
 
-  - [ ] No tables save their filter state back to the URL
+General
 
-- Bugs:
-  - [ ] Do to static state, committing changes errors when attempting to load the new page.
-  - [ ] Add to Dataset is broken - might be due to weird imports in server
-  - [ ] Feedback does not save correctly
+- [ ] No Tables do not save their filter state back to the URL
+
+Bugs:
+
+- [ ] Do to static state, committing changes errors when attempting to load the new page.
+- [ ] Add to Dataset is broken - might be due to weird imports in server
+- [ ] Feedback does not save correctly
+
+Needs Cleanup:
+
+- [ ] Use of version hashes in filter - need to convert everything to uris
+- [ ] Various locations use context to get entity/project - this is bad as it assumes all links are within the same project
 
 ---
 
@@ -45,29 +45,31 @@ Shortcuts Taken
 
 Query & Performance:
 
-- [ ] Naive ORM Implementation:
-  - [ ] No support for live data
-  - [ ] Recalculates every edge
-  - [ ] Not Weave-based!
-  - [ ] Requires loading the entire project into memory!
+- Naive ORM Implementation:
+  - No support for live data
+  - Recalculates every edge
+  - Not Weave-based!
+  - Requires loading the entire project into memory!
 
 Future:
 
-- [ ] Project Selector should limit to only "good" projects
-- [ ] Project Homepage is a big opportunity for innovation
-- [ ] Tab state not saved
-- [ ] "Peak" style previews
-- [ ] Ability to open any of the Table Pages in a board
-- [ ] Structure and Record DAGS
-- [ ] Board and Table Support
-- [ ] Pinnable filters
-- [ ] Odd Behavior: Only the main data view adapts to nested URI
-- [ ] (Future) FEAT: ObjectVersion Board listing Page
-- [ ] (Future) GAP: ObjectVersion "Open in Board" opens in old link
-- [ ] FEAT: Show outputs when narrowed to a single op version
-- [ ] FEAT: TypeVersion Filter (Include Subtypes)
-
-Needs Cleanup:
-
-- [ ] Use of version hashes in filter - need to convert everything to uris
-- [ ] Various locations use context to get entity/project - this is bad as it assumes all links are within the same project
+- Project Selector should limit to only "good" projects
+- Project Homepage is a big opportunity for innovation
+- Tab state not saved
+- "Peak" style previews
+- Ability to open any of the Table Pages in a board
+- Structure and Record DAGS
+- Board and Table Support
+- Pinnable filters
+- Odd Behavior: Only the main data view adapts to nested URI
+- (Future) FEAT: ObjectVersion Board listing Page
+- (Future) GAP: ObjectVersion "Open in Board" opens in old link
+- FEAT: Show outputs when narrowed to a single op version
+- FEAT: TypeVersion Filter (Include Subtypes)
+- Ops Page: (Future)
+- Types Page: (Future)
+- Objects Page: (Future)
+- Board Page: (Future)
+- Boards Page: (Future)
+- Table Page: (Future)
+- Tables: (Future)

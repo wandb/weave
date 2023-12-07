@@ -8,6 +8,8 @@ import {StreamId} from '../callTree';
 import {useFirstCall, useOpSignature} from '../callTreeHooks';
 import {Paper} from '../CommonLib';
 import {CallsTable} from './CallsPage';
+import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
+import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
@@ -15,10 +17,8 @@ import {
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './interface/wf/context';
-import {FilterableOpVersionsTable} from './OpVersionsPage';
-import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
-import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {WFOpVersion} from './interface/wf/types';
+import {FilterableOpVersionsTable} from './OpVersionsPage';
 
 export const OpVersionPage: React.FC<{
   entity: string;
