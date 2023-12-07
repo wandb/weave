@@ -159,7 +159,7 @@ export const FilterableTable = <
         })}
       </>
     );
-  }, [effectiveFilter, filter, props.columns]);
+  }, [effectiveFilter, filter, props.columns, setFilter]);
 
   return (
     <FilterLayoutTemplate

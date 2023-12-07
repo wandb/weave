@@ -24,6 +24,7 @@ import {
   CallsLink,
   ObjectLink,
   ObjectVersionLink,
+  ObjectVersionsLink,
   OpVersionLink,
   TypeVersionLink,
 } from './common/Links';
@@ -299,13 +300,17 @@ export const FilterableObjectVersionsTable: React.FC<{
           </ListItem>
         </>
       }>
-      <ObjectVersionsTable objectVersions={filteredObjectVersions} />
+      <ObjectVersionsTable
+        objectVersions={filteredObjectVersions}
+        usingLatestFilter={effectiveFilter.latest}
+      />
     </FilterLayoutTemplate>
   );
 };
 
 const ObjectVersionsTable: React.FC<{
   objectVersions: WFObjectVersion[];
+  usingLatestFilter?: boolean;
 }> = props => {
   // const history = useHistory();
   // const routeContext = useWeaveflowRouteContext();
@@ -430,26 +435,46 @@ const ObjectVersionsTable: React.FC<{
       width: 100,
     }),
 
-    basicField('isLatest', 'Latest', {
-      width: 100,
-      renderCell: params => {
-        if (params.value) {
-          return (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                width: '100%',
-              }}>
-              <Chip label="Yes" size="small" />
-            </Box>
-          );
-        }
-        return '';
-      },
-    }),
+    ...[
+      props.usingLatestFilter
+        ? basicField('peerVersions', 'Peer Versions', {
+            width: 100,
+            renderCell: params => {
+              return (
+                <ObjectVersionsLink
+                  entity={params.row.obj.entity()}
+                  project={params.row.obj.project()}
+                  filter={{
+                    objectName: params.row.obj.object().name(),
+                  }}
+                  versionsCount={
+                    params.row.obj.object().objectVersions().length
+                  }
+                />
+              );
+            },
+          })
+        : basicField('isLatest', 'Latest', {
+            width: 100,
+            renderCell: params => {
+              if (params.value) {
+                return (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      width: '100%',
+                    }}>
+                    <Chip label="Yes" size="small" />
+                  </Box>
+                );
+              }
+              return '';
+            },
+          }),
+    ],
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
   return (
