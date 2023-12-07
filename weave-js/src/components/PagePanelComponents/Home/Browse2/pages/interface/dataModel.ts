@@ -4,11 +4,9 @@ Convention:
 
 */
 
-import {useMutation} from '@apollo/client';
 import stringify from 'json-stable-stringify';
-import {useCallback, useMemo} from 'react';
+import {useMemo} from 'react';
 
-import {useWeaveContext} from '../../../../../../context';
 import {
   constFunction,
   constNone,

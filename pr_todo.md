@@ -3,10 +3,7 @@ PR Todos:
 - Object Page: Done
 - Objects Page: (Future)
 - ObjectVersions Page
-
-  - [ ] FEAT: TypeVersion Filter (Include Subtypes)
-
-- [ ] ObjectVersion Page: Done
+- ObjectVersion Page: Done
 - Type Page: Done
 - Types Page: (Future)
 - TypeVersion Page Done
@@ -30,7 +27,6 @@ PR Todos:
 
 - General
 
-  - [ ] Deprecate `weave-js/src/components/PagePanelComponents/Home/Browse2/url.ts`
   - [ ] No tables save their filter state back to the URL
 
 - Bugs:
@@ -72,6 +68,7 @@ Future:
 - [ ] (Future) FEAT: ObjectVersion Board listing Page
 - [ ] (Future) GAP: ObjectVersion "Open in Board" opens in old link
 - [ ] FEAT: Show outputs when narrowed to a single op version
+- [ ] FEAT: TypeVersion Filter (Include Subtypes)
 
 Needs Cleanup:
 

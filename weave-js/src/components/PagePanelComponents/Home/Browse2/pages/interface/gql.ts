@@ -1,5 +1,5 @@
-import {gql} from '../../../../../../generated/gql';
-
+// import {gql} from '../../../../../../generated/gql';
+export const UPDATE_ARTIFACT_DESCRIPTION = '';
 // export const UPDATE_ARTIFACT_DESCRIPTION = gql(`
 //   mutation UpdateArtifact(
 //     $artifactID: ID!
