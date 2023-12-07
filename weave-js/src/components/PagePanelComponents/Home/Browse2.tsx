@@ -9,7 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useEffect, useMemo} from 'react';
+import React, {FC, useCallback, useEffect, useMemo} from 'react';
 import {
   BrowserRouter as Router,
   Link as RouterLink,
@@ -507,11 +507,20 @@ const CallsPageBinding = () => {
       return {};
     }
   }, [query.filter]);
+  const history = useHistory();
+  const router = useWeaveflowRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(router.callsUIUrl(params.entity, params.project, filter));
+    },
+    [history, params.entity, params.project, router]
+  );
   return (
     <CallsPage
       entity={params.entity}
       project={params.project}
       initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
     />
   );
 };
@@ -534,11 +543,22 @@ const ObjectVersionsPageBinding = () => {
       return {};
     }
   }, [query.filter]);
+  const history = useHistory();
+  const router = useWeaveflowRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(
+        router.objectVersionsUIUrl(params.entity, params.project, filter)
+      );
+    },
+    [history, params.entity, params.project, router]
+  );
   return (
     <ObjectVersionsPage
       entity={params.entity}
       project={params.project}
       initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
     />
   );
 };
@@ -561,11 +581,22 @@ const TypeVersionsPageBinding = () => {
       return {};
     }
   }, [query.filter]);
+  const history = useHistory();
+  const router = useWeaveflowRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(
+        router.typeVersionsUIUrl(params.entity, params.project, filter)
+      );
+    },
+    [history, params.entity, params.project, router]
+  );
   return (
     <TypeVersionsPage
       entity={params.entity}
       project={params.project}
       initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
     />
   );
 };
@@ -588,11 +619,22 @@ const OpVersionsPageBinding = () => {
       return {};
     }
   }, [query.filter]);
+  const history = useHistory();
+  const router = useWeaveflowRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(
+        router.opVersionsUIUrl(params.entity, params.project, filter)
+      );
+    },
+    [history, params.entity, params.project, router]
+  );
   return (
     <OpVersionsPage
       entity={params.entity}
       project={params.project}
       initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
     />
   );
 };

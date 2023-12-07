@@ -18,13 +18,15 @@ Python API
 
 General
 
-- [ ] No Tables do not save their filter state back to the URL
+- [ ] Shawn: Add peer version count when filtered to latest
+- [ ] Sidebar: correct highlighting
 
 Bugs:
 
 - [ ] Do to static state, committing changes errors when attempting to load the new page.
 - [ ] Add to Dataset is broken - might be due to weird imports in server
 - [ ] Feedback does not save correctly
+- [ ] "Latest" checkbox is not updating from url
 
 Needs Cleanup:
 

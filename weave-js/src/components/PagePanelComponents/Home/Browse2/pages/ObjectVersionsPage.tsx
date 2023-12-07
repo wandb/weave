@@ -40,6 +40,9 @@ export const ObjectVersionsPage: React.FC<{
   entity: string;
   project: string;
   initialFilter?: WFHighLevelObjectVersionFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
   return (
     <SimplePageLayout
@@ -67,6 +70,9 @@ export const FilterableObjectVersionsTable: React.FC<{
   project: string;
   frozenFilter?: WFHighLevelObjectVersionFilter;
   initialFilter?: WFHighLevelObjectVersionFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext();
@@ -93,14 +99,24 @@ export const FilterableObjectVersionsTable: React.FC<{
     );
     return options;
   }, [orm]);
-  const [filter, setFilter] = useState<WFHighLevelObjectVersionFilter>(
-    props.initialFilter ?? {}
-  );
+  const [filterState, setFilterState] =
+    useState<WFHighLevelObjectVersionFilter>(props.initialFilter ?? {});
   useEffect(() => {
     if (props.initialFilter) {
-      setFilter(props.initialFilter);
+      setFilterState(props.initialFilter);
     }
   }, [props.initialFilter]);
+
+  // If the caller is controlling the filter, use the caller's filter state
+  const filter = useMemo(
+    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
+    [filterState, props.initialFilter, props.onFilterUpdate]
+  );
+  const setFilter = useMemo(
+    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
+    [props.onFilterUpdate]
+  );
+
   const effectiveFilter = useMemo(() => {
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);

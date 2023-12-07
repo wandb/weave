@@ -17,6 +17,7 @@ import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyOpCategory} from './interface/wf/types';
+import {isArray} from 'lodash';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -29,6 +30,9 @@ export const CallsPage: React.FC<{
   entity: string;
   project: string;
   initialFilter?: WFHighLevelCallFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
   return (
     <SimplePageLayout
@@ -48,6 +52,9 @@ export const CallsTable: React.FC<{
   project: string;
   frozenFilter?: WFHighLevelCallFilter;
   initialFilter?: WFHighLevelCallFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext();
@@ -66,14 +73,25 @@ export const CallsTable: React.FC<{
     return orm.projectConnection.opCategories();
   }, [orm.projectConnection]);
 
-  const [filter, setFilter] = useState<WFHighLevelCallFilter>(
+  const [filterState, setFilterState] = useState<WFHighLevelCallFilter>(
     props.initialFilter ?? {}
   );
   useEffect(() => {
     if (props.initialFilter) {
-      setFilter(props.initialFilter);
+      setFilterState(props.initialFilter);
     }
   }, [props.initialFilter]);
+
+  // If the caller is controlling the filter, use the caller's filter state
+  const filter = useMemo(
+    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
+    [filterState, props.initialFilter, props.onFilterUpdate]
+  );
+  const setFilter = useMemo(
+    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
+    [props.onFilterUpdate]
+  );
+
   const effectiveFilter = useMemo(() => {
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);

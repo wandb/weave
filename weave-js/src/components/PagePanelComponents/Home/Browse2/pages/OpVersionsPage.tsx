@@ -29,19 +29,22 @@ import {useWeaveflowORMContext} from './interface/wf/context';
 import {HackyOpCategory, WFOpVersion} from './interface/wf/types';
 
 export type WFHighLevelOpVersionFilter = {
-  opCategory?: HackyOpCategory | null; // TODO
-  isLatest?: boolean; // TODO
-  opName?: string | null; // TODO
-  invokedByOpVersions?: string[]; // TODO
-  invokesOpVersions?: string[]; // TODO
-  consumesTypeVersions?: string[]; // TODO
-  producesTypeVersions?: string[]; // TODO
+  opCategory?: HackyOpCategory | null;
+  isLatest?: boolean;
+  opName?: string | null;
+  invokedByOpVersions?: string[];
+  invokesOpVersions?: string[];
+  consumesTypeVersions?: string[];
+  producesTypeVersions?: string[];
 };
 
 export const OpVersionsPage: React.FC<{
   entity: string;
   project: string;
   initialFilter?: WFHighLevelOpVersionFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
   return (
     <SimplePageLayout
@@ -61,6 +64,9 @@ export const FilterableOpVersionsTable: React.FC<{
   project: string;
   frozenFilter?: WFHighLevelOpVersionFilter;
   initialFilter?: WFHighLevelOpVersionFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext();
@@ -557,6 +563,7 @@ export const FilterableOpVersionsTable: React.FC<{
       getFilterPopoutTargetUrl={getFilterPopoutTargetUrl}
       frozenFilter={props.frozenFilter}
       initialFilter={props.initialFilter}
+      onFilterUpdate={props.onFilterUpdate}
     />
   );
 };

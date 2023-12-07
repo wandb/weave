@@ -1,10 +1,28 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
+import _ from 'lodash';
 import React, {createContext, useContext} from 'react';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+
+const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
+  if (!filter) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(filter).filter(
+      ([k, v]) =>
+        v != null &&
+        v !== undefined &&
+        v !== false &&
+        (_.isArray(v) ? v.length > 0 : true) &&
+        (typeof v === 'string' ? v.length > 0 : true)
+    )
+  );
+};
 
 export const useWeaveflowRouteContext = () => {
   const ctx = useContext(WeaveflowRouteContext);
@@ -187,11 +205,13 @@ const newContext = {
     projectName: string,
     filter?: WFHighLevelTypeVersionFilter
   ) => {
-    if (!filter) {
+    const prunedFilter = pruneEmptyFields(filter);
+    if (Object.keys(prunedFilter).length === 0) {
       return `/${entityName}/${projectName}/type-versions`;
     }
+
     return `/${entityName}/${projectName}/type-versions?filter=${encodeURIComponent(
-      JSON.stringify(filter)
+      JSON.stringify(prunedFilter)
     )}`;
   },
   objectVersionUIUrl: (
@@ -207,11 +227,12 @@ const newContext = {
     projectName: string,
     filter?: WFHighLevelOpVersionFilter
   ) => {
-    if (!filter) {
+    const prunedFilter = pruneEmptyFields(filter);
+    if (Object.keys(prunedFilter).length === 0) {
       return `/${entityName}/${projectName}/op-versions`;
     }
     return `/${entityName}/${projectName}/op-versions?filter=${encodeURIComponent(
-      JSON.stringify(filter)
+      JSON.stringify(prunedFilter)
     )}`;
   },
   opVersionUIUrl: (
@@ -235,11 +256,12 @@ const newContext = {
     projectName: string,
     filter?: WFHighLevelCallFilter
   ) => {
-    if (!filter) {
+    const prunedFilter = pruneEmptyFields(filter);
+    if (Object.keys(prunedFilter).length === 0) {
       return `/${entityName}/${projectName}/calls`;
     }
     return `/${entityName}/${projectName}/calls?filter=${encodeURIComponent(
-      JSON.stringify(filter)
+      JSON.stringify(prunedFilter)
     )}`;
   },
   objectVersionsUIUrl: (
@@ -247,11 +269,12 @@ const newContext = {
     projectName: string,
     filter?: WFHighLevelObjectVersionFilter
   ) => {
-    if (!filter) {
+    const prunedFilter = pruneEmptyFields(filter);
+    if (Object.keys(prunedFilter).length === 0) {
       return `/${entityName}/${projectName}/object-versions`;
     }
     return `/${entityName}/${projectName}/object-versions?filter=${encodeURIComponent(
-      JSON.stringify(filter)
+      JSON.stringify(prunedFilter)
     )}`;
   },
   opPageUrl: (opUri: string) => {

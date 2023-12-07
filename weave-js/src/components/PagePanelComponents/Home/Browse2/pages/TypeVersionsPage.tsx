@@ -30,6 +30,9 @@ export const TypeVersionsPage: React.FC<{
   entity: string;
   project: string;
   initialFilter?: WFHighLevelTypeVersionFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelTypeVersionFilter) => void;
 }> = props => {
   return (
     <SimplePageLayout
@@ -49,6 +52,9 @@ export const FilterableTypeVersionsTable: React.FC<{
   project: string;
   frozenFilter?: WFHighLevelTypeVersionFilter;
   initialFilter?: WFHighLevelTypeVersionFilter;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelTypeVersionFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext();
@@ -436,6 +442,7 @@ export const FilterableTypeVersionsTable: React.FC<{
       getFilterPopoutTargetUrl={getFilterPopoutTargetUrl}
       frozenFilter={props.frozenFilter}
       initialFilter={props.initialFilter}
+      onFilterUpdate={props.onFilterUpdate}
     />
   );
 };
