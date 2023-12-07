@@ -7,7 +7,6 @@ import {
   ListItemText,
   TextField,
 } from '@mui/material';
-import {isArray} from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {CallFilter} from '../callTree';
