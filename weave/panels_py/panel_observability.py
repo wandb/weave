@@ -282,7 +282,6 @@ def observability(
         groupby_dims=["y"],
         mark="line",
         no_legend=True,
-        domain_x=user_zoom_range,
     )
 
     jobs = varbar.add(
