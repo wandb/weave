@@ -14,14 +14,12 @@ PR Todos:
   - [ ] (Future) FEAT: Board listing Page
   - [ ] (Future) FEAT: Record DAG
   - [ ] (Future) GAP: "Open in Board" opens in old link
-  - [ ] GAP: `/versions` does not redirect
 
 - Type Page: Done
 - Types Page: (Future)
 - TypeVersion Page
 
   - [ ] GAP: Overview - type category
-  - [ ] GAP: `/versions` does not redirect
 
 - TypeVersions Page: Done
 - Op Page: Done
@@ -29,7 +27,6 @@ PR Todos:
 - OpVersion Page
 
   - [ ] GAP: Overview: (Type Stub, Op Category, isLatest, Call Hierarchy)
-  - [ ] GAP: `/versions` does not redirect
 
 - OpVersions Page
 

@@ -368,14 +368,13 @@ const ObjectVersionRoutePageBinding = () => {
   const routerContext = useWeaveflowRouteContext();
   useEffect(() => {
     if (!params.digest) {
-      // TODO: This is not correct
-      // history.replace(
-      //   routerContext.objectUIUrl(
-      //     params.entity,
-      //     params.project,
-      //     params.objectName
-      //   )
-      // );
+      history.replace(
+        routerContext.objectUIUrl(
+          params.entity,
+          params.project,
+          params.objectName
+        )
+      );
     }
   }, [
     history,
@@ -413,10 +412,9 @@ const OpVersionRoutePageBinding = () => {
   const routerContext = useWeaveflowRouteContext();
   useEffect(() => {
     if (!params.digest) {
-      // TODO: This is not correct
-      // history.replace(
-      //   routerContext.opUIUrl(params.entity, params.project, params.opName)
-      // );
+      history.replace(
+        routerContext.opUIUrl(params.entity, params.project, params.opName)
+      );
     }
   }, [
     history,
@@ -453,10 +451,9 @@ const TypeVersionRoutePageBinding = () => {
   const routerContext = useWeaveflowRouteContext();
   useEffect(() => {
     if (!params.digest) {
-      // TODO: This is not correct
-      // history.replace(
-      //   routerContext.typeUIUrl(params.entity, params.project, params.typeName)
-      // );
+      history.replace(
+        routerContext.typeUIUrl(params.entity, params.project, params.typeName)
+      );
     }
   }, [
     history,
