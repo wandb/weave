@@ -21,7 +21,7 @@ import dataclasses
 from . import logs
 from . import stream_data_interfaces
 
-from ddtrace import tracer as ddtrace_tracer, span as ddtrace_span
+from ddtrace import Tracer as ddtrace_tracer, span as ddtrace_span
 
 # wraps ddtrace tracer and span to add PII support
 class PIISpan(ddtrace_span.Span):
