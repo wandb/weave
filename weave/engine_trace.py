@@ -17,6 +17,9 @@ import logging
 import time
 import json
 import dataclasses
+from typing import Optional
+
+from ddtrace.span import Span
 
 from . import logs
 from . import stream_data_interfaces
@@ -35,10 +38,20 @@ class PIISpan(ddtrace_span.Span):
             "DISABLE_WEAVE_PII"
         ) else super().set_metric(key, val)
 
+def setSpanPiiFunctions(span):
+    span.set_pii_tag = PIISpan.set_pii_tag
+    span.set_pii_metric = PIISpan.set_pii_metric
+    return span
 
 class PIITracer(ddtrace_tracer):
     def trace(self, *args, **kwargs):
-        return PIISpan(*args, **kwargs)
+        span = super().trace(*args, **kwargs)
+        return setSpanPiiFunctions(span)
+    def current_root_span(self):
+        span = super().current_root_span()
+        if span is not None:
+            return setSpanPiiFunctions(span)
+        return span
 
 
 # Thanks co-pilot!
