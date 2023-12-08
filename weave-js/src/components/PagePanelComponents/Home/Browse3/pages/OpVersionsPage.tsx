@@ -24,8 +24,8 @@ import {
   WFHighLevelDataColumn,
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useWeaveflowORMContext} from './interface/wf/context';
-import {HackyOpCategory, WFOpVersion} from './interface/wf/types';
+import {useWeaveflowORMContext} from './wfInterface/context';
+import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
 
 export type WFHighLevelOpVersionFilter = {
   opCategory?: HackyOpCategory | null;

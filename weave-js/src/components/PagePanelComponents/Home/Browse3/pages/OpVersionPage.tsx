@@ -16,9 +16,9 @@ import {
   SimplePageLayout,
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
-import {useWeaveflowORMContext} from './interface/wf/context';
-import {WFOpVersion} from './interface/wf/types';
 import {FilterableOpVersionsTable} from './OpVersionsPage';
+import {useWeaveflowORMContext} from './wfInterface/context';
+import {WFOpVersion} from './wfInterface/types';
 
 export const OpVersionPage: React.FC<{
   entity: string;

@@ -3,10 +3,10 @@ import {Link} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage';
-import {useWeaveflowORMContext} from '../interface/wf/context';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
+import {useWeaveflowORMContext} from '../wfInterface/context';
 
 export const TypeLink: React.FC<{typeName: string}> = props => {
   const orm = useWeaveflowORMContext();

@@ -5,19 +5,19 @@ import {
   opDict,
   Type,
   typedDictPropertyTypes,
-} from '../../../../../../../core';
-import {Client as WeaveClient} from '../../../../../../../core/client/types';
-import {Call} from '../../../../Browse2/callTree';
+} from '../../../../../../core';
+import {Client as WeaveClient} from '../../../../../../core/client/types';
+import {Call} from '../../../Browse2/callTree';
 import {
   fnFeedbackNode,
   fnRunsNode,
   joinRunsWithFeedback,
-} from '../../../../Browse2/callTreeHooks';
+} from '../../../Browse2/callTreeHooks';
 import {
   fnAllWeaveObjects,
   ObjectVersionDictType,
   typeVersionFromTypeDict,
-} from '../dataModel';
+} from './query';
 import {
   HackyOpCategory,
   HackyTypeCategory,

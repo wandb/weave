@@ -31,8 +31,8 @@ import {
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useWeaveflowORMContext} from './interface/wf/context';
-import {HackyTypeCategory, WFObjectVersion} from './interface/wf/types';
+import {useWeaveflowORMContext} from './wfInterface/context';
+import {HackyTypeCategory, WFObjectVersion} from './wfInterface/types';
 
 // TODO: This file follows the older pattern - need to update it to use the same
 // one as TypeVersionsPage or OpVersionsPage

@@ -1,7 +1,7 @@
 import {Chip} from '@mui/material';
 import React from 'react';
 
-import {HackyOpCategory} from '../interface/wf/types';
+import {HackyOpCategory} from '../wfInterface/types';
 
 const colorMap: {[key: string]: string} = {
   train: 'success',

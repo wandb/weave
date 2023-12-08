@@ -1,4 +1,4 @@
-import {Type} from '../../../../../../../core';
+import {Type} from '../../../../../../core';
 
 export interface WFProject extends ProjectOwned {
   type: (name: string) => WFType;

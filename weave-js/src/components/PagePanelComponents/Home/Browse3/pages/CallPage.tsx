@@ -2,7 +2,7 @@ import React, {useMemo} from 'react';
 
 import {Browse2TraceComponent} from '../../Browse2/Browse2TracePage';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useWeaveflowORMContext} from './interface/wf/context';
+import {useWeaveflowORMContext} from './wfInterface/context';
 
 export const CallPage: React.FC<{
   entity: string;

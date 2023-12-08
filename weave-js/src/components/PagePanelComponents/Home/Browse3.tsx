@@ -32,8 +32,6 @@ import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
-import {WeaveflowORMContextProvider} from './Browse3/pages/interface/wf/context';
-import {WFNaiveProject} from './Browse3/pages/interface/wf/naive';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectsPage} from './Browse3/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
@@ -49,6 +47,8 @@ import {TypesPage} from './Browse3/pages/TypesPage';
 import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
+import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
+import {WFNaiveProject} from './Browse3/pages/wfInterface/naive';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='

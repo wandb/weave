@@ -12,8 +12,8 @@ import {useWeaveContext} from '@wandb/weave/context';
 import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useState} from 'react';
 
-import {useMaybeWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
-import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
+import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {WFNaiveProject} from '../Browse3/pages/wfInterface/naive';
 import {Link} from './CommonLib';
 import {
   mutationAppend,

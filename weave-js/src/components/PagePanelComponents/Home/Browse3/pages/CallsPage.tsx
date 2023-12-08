@@ -15,8 +15,8 @@ import {RunsTable} from '../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../context';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useWeaveflowORMContext} from './interface/wf/context';
-import {HackyOpCategory} from './interface/wf/types';
+import {useWeaveflowORMContext} from './wfInterface/context';
+import {HackyOpCategory} from './wfInterface/types';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;

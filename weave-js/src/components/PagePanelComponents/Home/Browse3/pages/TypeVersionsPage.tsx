@@ -15,8 +15,8 @@ import {
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useWeaveflowORMContext} from './interface/wf/context';
-import {HackyTypeCategory, WFTypeVersion} from './interface/wf/types';
+import {useWeaveflowORMContext} from './wfInterface/context';
+import {HackyTypeCategory, WFTypeVersion} from './wfInterface/types';
 
 export type WFHighLevelTypeVersionFilter = {
   typeName?: string | null;

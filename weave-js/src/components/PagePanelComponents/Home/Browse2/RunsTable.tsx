@@ -15,7 +15,7 @@ import {Link, useParams} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {OpVersionLink} from '../Browse3/pages/common/Links';
-import {useMaybeWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';

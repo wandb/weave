@@ -13,8 +13,8 @@ import {
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
-import {useWeaveflowORMContext} from './interface/wf/context';
-import {WFObjectVersion} from './interface/wf/types';
+import {useWeaveflowORMContext} from './wfInterface/context';
+import {WFObjectVersion} from './wfInterface/types';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
