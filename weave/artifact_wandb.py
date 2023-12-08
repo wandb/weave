@@ -839,7 +839,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
         root_type = self.type.root_type_class()
         from .op_def_type import OpDefType
 
-        if isinstance(root_type, OpDefType):
+        if issubclass(root_type, OpDefType):
             return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/ops/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
         else:
             return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/objects/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
