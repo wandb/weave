@@ -32,4 +32,4 @@ tabulate
 openai<=0.28.1
 tiktoken>=0.4.0
 faiss-cpu
-importlib-metadata<7.0.0
+importlib-metadata<=6.8.0
