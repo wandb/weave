@@ -309,20 +309,20 @@ export const addChild = (
   node: PanelTreeNode,
   path: string[],
   value: PanelTreeNode,
+  panelName: string,
   layout?: LayoutParameters
 ) => {
   const group = getPath(node, path);
   if (!isGroupNode(group)) {
     throw new Error('Cannot add child to non-group panel');
   }
-  const nextName = nextPanelName(Object.keys(group.config.items));
   const groupValue = {
     ...group,
     config: {
       ...group.config,
       items: {
         ...group.config.items,
-        [nextName]: value,
+        [panelName]: value,
       },
     },
   };
@@ -336,7 +336,7 @@ export const addChild = (
         panels: [
           ...groupValue.config.gridConfig.panels,
           {
-            id: nextName,
+            id: panelName,
             layout,
           },
         ],
