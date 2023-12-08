@@ -2,6 +2,7 @@ import {
   Frame,
   isAssignableTo,
   isTypedDict,
+  isVoidNode,
   list,
   listObjectType,
   maybe,
@@ -113,6 +114,7 @@ export const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
     return tables.map((table, i) => {
       const dims = allDims[i];
       const labelSelectFn = table.columnSelectFunctions[dims.label];
+      const colorSelectFn = table.columnSelectFunctions[dims.color];
       if (labelSelectFn.nodeType !== 'void') {
         const labelType = TableState.getTableColType(table, dims.label);
         if (frame.runColors != null) {
@@ -158,7 +160,8 @@ export const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
           isAssignableTo(
             labelType,
             oneOrMany(maybe(union(['number', 'string', 'boolean'])))
-          )
+          ) &&
+          isVoidNode(colorSelectFn)
         ) {
           return TableState.updateColumnSelect(
             table,
