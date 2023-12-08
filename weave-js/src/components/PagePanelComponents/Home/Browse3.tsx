@@ -104,8 +104,8 @@ const tabOptions = [
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = [
-  `/:entity/:project/:tab(${tabs})/:objName/versions/:objVersion/:refExtra*`,
-  `/:entity/:project/:tab(${tabs})/:objName`,
+  `/:entity/:project/:tab(${tabs})/:itemName/versions/:version/:refExtra*`,
+  `/:entity/:project/:tab(${tabs})/:itemName`,
   `/:entity/:project/:tab(${tabs})`,
   `/:entity/:project`,
 ];
@@ -631,6 +631,7 @@ const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
 const Browse3Breadcrumbs: FC = props => {
   const params = useParams<Browse3Params>();
   const refFields = params.refExtra?.split('/') ?? [];
+  console.log({params});
   return (
     <Breadcrumbs>
       {params.entity && (
