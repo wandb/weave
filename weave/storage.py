@@ -138,7 +138,9 @@ def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
 # Keep a cache of published local ref -> wandb ref. This is used to ensure
 # we publish any needed op defs at the beginning of graph execution one time,
 # to avoid parallel publishing them many times later in mapped operations.
-PUBLISH_CACHE_BY_LOCAL_ART: dict[str, Ref] = {}
+PUBLISH_CACHE_BY_LOCAL_ART: dict[
+    artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef
+] = {}
 
 
 def _direct_publish(

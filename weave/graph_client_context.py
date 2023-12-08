@@ -11,7 +11,9 @@ _graph_client: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
-def set_graph_client(client: "GraphClient") -> typing.Iterator["GraphClient"]:
+def set_graph_client(
+    client: typing.Optional["GraphClient"],
+) -> typing.Iterator[typing.Optional["GraphClient"]]:
     client_token = _graph_client.set(client)
     try:
         yield client

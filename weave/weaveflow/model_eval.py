@@ -8,7 +8,7 @@ from .evaluate import Evaluate
 
 @weave.op()
 def evaluate(eval: Evaluate, dataset: Dataset, model: Model) -> typing.Any:
-    outputs = dataset.rows.apply(lambda r: model.predict(r))
+    outputs = dataset.rows.apply(lambda r: model.predict(r))  # type: ignore
     eval_result = eval.compute(dataset, outputs)
     summary = eval_result["summary"]
 
@@ -17,7 +17,7 @@ def evaluate(eval: Evaluate, dataset: Dataset, model: Model) -> typing.Any:
         # For now, put the whole dataset into the eval data. In the future we should put
         # refs instead.
         # TODO: use refs instead
-        "dataset": dataset.rows,
+        "dataset": dataset.rows,  # type: ignore
         "output": outputs,
         **eval_result["columns"],
     }

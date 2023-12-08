@@ -181,7 +181,7 @@ def set_eager_mode(eager: bool):
         _eager_mode.reset(eager_token)
 
 
-def eager_mode():
+def eager_mode() -> bool:
     return _eager_mode.get()
 
 

@@ -39,11 +39,13 @@ class EvaluateLLM(Evaluate):
                 "rationale": weave.types.String(),
             }
         )
-        # TODO: get rid of this const() wrap... why do I need it?
         from .. import weave_internal
 
-        all_messages = dataset.rows.apply(
-            lambda r, i: self.messages_template(r, weave_internal.const(predictions)[i])
+        # TODO: get rid of this const() wrap... why do I need it?
+        all_messages = dataset.rows.apply(  # type: ignore
+            lambda r, i: self.messages_template(
+                r, weave_internal.const(predictions)[i]  # type: ignore
+            )
         )
         results = all_messages.apply(lambda m: self.chat_llm.complete(m, result_type))
 
