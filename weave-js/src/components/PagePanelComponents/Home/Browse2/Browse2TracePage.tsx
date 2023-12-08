@@ -44,40 +44,4 @@ export const Browse2TraceComponent: FC<{params: Browse2TracePageParams}> = ({
       setSelectedSpanId={setSelectedSpanId}
     />
   );
-  // return (
-  //   // <PageEl>
-  //     {/* <PageHeader
-  //       objectType="Trace"
-  //       objectName={
-  //         params.traceId + params.spanId != null ? '/' + params.spanId : ''
-  //       }
-  //       actions={
-  //         <Box display="flex" alignItems="flex-start">
-  //           <Button
-  //             variant="outlined"
-  //             sx={{marginRight: 3, backgroundColor: globals.lightYellow}}
-  //             onClick={() => console.log('new board trace')}>
-  //             Open in board
-  //           </Button>
-  //           <Button
-  //             variant="outlined"
-  //             sx={{backgroundColor: globals.lightYellow, marginRight: 3}}>
-  //             Compare
-  //           </Button>
-  //         </Box>
-  //       }
-  //     /> */}
-
-  //     <Browse2Trace
-  //       streamId={{
-  //         entityName: params.entity,
-  //         projectName: params.project,
-  //         streamName: 'stream',
-  //       }}
-  //       traceId={params.traceId}
-  //       spanId={params.spanId}
-  //       setSelectedSpanId={setSelectedSpanId}
-  //     />
-  //   // </PageEl>
-  // );
 };

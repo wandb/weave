@@ -66,7 +66,6 @@ export const Browse2ObjectVersionItemComponent: FC<{
   params: Browse2RootObjectVersionItemParams;
 }> = ({params}) => {
   const uri = makeObjRefUri(params);
-  // const history = useHistory();
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(uri)});
     if (params.refExtra == null) {

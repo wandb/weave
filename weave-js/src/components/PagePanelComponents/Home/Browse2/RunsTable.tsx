@@ -270,31 +270,6 @@ export const RunsTable: FC<{
         maxWidth: 125,
         // flex: !showIO ? 1 : undefined,
       },
-
-      // {
-      //   field: 'isRoot',
-      //   headerName: 'Trace Root',
-      //   // flex: !showIO ? 1 : undefined,
-      //   width: 100,
-
-      //   renderCell: cellParams => {
-      //     if (cellParams.value) {
-      //       return (
-      //         <Box
-      //           sx={{
-      //             display: 'flex',
-      //             alignItems: 'center',
-      //             justifyContent: 'center',
-      //             height: '100%',
-      //             width: '100%',
-      //           }}>
-      //           <Chip label="Yes" size="small" />
-      //         </Box>
-      //       );
-      //     }
-      //     return '';
-      //   },
-      // },
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
@@ -482,34 +457,6 @@ export const RunsTable: FC<{
     });
   }, [apiRef, loading]);
   return (
-    // <Box
-    //   sx={{
-    //     height: 460,
-    //     width: '100%',
-    //     '& .MuiDataGrid-root': {
-    //       border: 'none',
-    //     },
-    //     '& .MuiDataGrid-row': {
-    //       cursor: 'pointer',
-    //     },
-    //   }}>
-    // <DataGrid
-    //   autosizeOnMount
-    //   apiRef={apiRef}
-    //   density="compact"
-    //   experimentalFeatures={{columnGrouping: true}}
-    //   rows={tableData}
-    //   columns={columns.cols}
-    //   columnGroupingModel={columns.colGroupingModel}
-    //   initialState={{
-    //     pagination: {
-    //       paginationModel: {
-    //         pageSize: 10,
-    //       },
-    //     },
-    //   }}
-    //   disableRowSelectionOnClick
-    // />
     <DataGridPro
       apiRef={apiRef}
       loading={loading}
@@ -525,19 +472,6 @@ export const RunsTable: FC<{
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       columnGroupingModel={columns.colGroupingModel}
-      onCellClick={cellParams => {
-        // TODO: move these actions into a config
-        if (cellParams.field === 'id') {
-          // history.push(
-          //   routeContext.objectVersionUIUrl(
-          //     params.row.obj.entity(),
-          //     params.row.obj.project(),
-          //     params.row.object,
-          //     params.row.version
-          //   )
-          // );
-        }
-      }}
     />
     // </Box>
   );

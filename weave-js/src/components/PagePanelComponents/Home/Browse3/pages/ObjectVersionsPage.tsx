@@ -312,9 +312,6 @@ const ObjectVersionsTable: React.FC<{
   objectVersions: WFObjectVersion[];
   usingLatestFilter?: boolean;
 }> = props => {
-  // const history = useHistory();
-  // const routeContext = useWeaveflowRouteContext();
-  // const updateDescription = useUpdateObjectVersionDescription();
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
       const outputFrom = ov.outputFrom();
@@ -420,17 +417,8 @@ const ObjectVersionsTable: React.FC<{
             version={outputFrom[0].opVersion().version()}
           />
         );
-        // }
-        // return (
-        //   <Link to={''}>
-        //     {outputFrom.length} calls (TODO: link with filter)
-        //   </Link>
-        // );
       },
     }),
-    // basicField('description', 'Description', {
-    //   editable: true,
-    // }),
     basicField('versionIndex', 'Version', {
       width: 100,
     }),
@@ -490,18 +478,6 @@ const ObjectVersionsTable: React.FC<{
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       columnGroupingModel={columnGroupingModel}
-      // onCellEditStop={(params, event) => {
-      //   if (params.field === 'description') {
-      //     const newDesc = (event as any).target.value;
-      //     updateDescription(
-      //       params.row.obj.entity(),
-      //       params.row.obj.project(),
-      //       params.row.obj.object().name(),
-      //       params.row.obj.version(),
-      //       newDesc
-      //     );
-      //   }
-      // }}
     />
   );
 };
