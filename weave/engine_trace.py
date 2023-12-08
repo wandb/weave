@@ -20,8 +20,6 @@ import dataclasses
 
 from . import logs
 from . import stream_data_interfaces
-from ddtrace import Span
-
 
 def set_pii_metric(span, key, val, pii_val):
     span.set_metric(key, pii_val) if os.getenv(
