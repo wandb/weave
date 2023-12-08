@@ -59,8 +59,8 @@ def custom_dd_patch():
         with tracer.trace(
             "wandb_gql.Client.execute",
         ) as span:
-            span.set_tag("document", wandb_graphql.print_ast(document), '')
-            span.set_tag("variable_values", kwargs.get("variable_values", {}), '')
+            span.set_tag("document", wandb_graphql.print_ast(document), "")
+            span.set_tag("variable_values", kwargs.get("variable_values", {}), "")
             return orig_execute(self, document, *args, **kwargs)
 
     wandb_gql.Client.execute = execute
@@ -339,7 +339,8 @@ def execute():
                 root_span.set_tag(
                     "profile_url",
                     "http://localhost:8080/snakeviz/"
-                    + urllib.parse.quote(profile_filename), ''
+                    + urllib.parse.quote(profile_filename),
+                    "",
                 )
     if root_span is not None:
         root_span.set_tag("request_size", len(req_bytes), len(req_bytes))
@@ -348,8 +349,14 @@ def execute():
     response_payload = _value_or_errors_to_response(fixed_response)
 
     if root_span is not None:
-        root_span.set_metric("node_count", len(response_payload["data"]), len(response_payload["data"]))
-        root_span.set_metric("error_count", len(response_payload["node_to_error"]), len(response_payload["node_to_error"]))
+        root_span.set_metric(
+            "node_count", len(response_payload["data"]), len(response_payload["data"])
+        )
+        root_span.set_metric(
+            "error_count",
+            len(response_payload["node_to_error"]),
+            len(response_payload["node_to_error"]),
+        )
 
     _log_errors(response_payload, response.nodes)
 
