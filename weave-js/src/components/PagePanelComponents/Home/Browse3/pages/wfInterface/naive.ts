@@ -430,28 +430,14 @@ export class WFNaiveProject implements WFProject {
       if (!exampleCallDict) {
         return;
       }
-      // if (exampleCall.opVersion()?.op().name() === "SummaryModel-get_topics") {
-      //   console.log({exampleCallDict})
-      // }
       exampleCall.inputs().forEach(input => {
-        // const signature = opSignatureFromSpan(exampleCallDict.callSpan);
-        // console.log({signature})
-        // Object.values(signature.inputTypes).forEach(inputType => {
-        // const inputTypeVersion = typeVersionFromTypeDict(inputType);
+        
         inputTypeVersionMap.add(input.typeVersion().version());
       });
       exampleCall.output().forEach(output => {
-        // Object.values(signature.outputType).forEach(outputType => {
-        // const outputTypeVersion = typeVersionFromTypeDict(outputType);
+        
         outputTypeVersionMap.add(output.typeVersion().version());
       });
-      // if (
-      //   !_.isFunction(signature.outputType) &&
-      //   !isNodeOrVoidNode(signature.outputType)
-      // ) {
-      //   const outputTypeVersion = typeVersionFromTypeDict(signature.outputType);
-      //   outputTypeVersionMap.add(outputTypeVersion.type_version);
-      // }
       selfOpVersion.inputTypeVersionHashes = Array.from(inputTypeVersionMap);
       selfOpVersion.outputTypeVersionHashes = Array.from(outputTypeVersionMap);
     });
