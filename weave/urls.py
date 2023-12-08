@@ -1,1 +1,1 @@
-BROWSE3_PATH = 'browse3'
+BROWSE3_PATH = "browse3"

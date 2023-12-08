@@ -66,7 +66,9 @@ def bool_and(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
     return ArrowWeaveList(
-        pc.and_(self._arrow_data, other), types.Boolean(), self._artifact
+        pc.and_(self._arrow_data, pc.fill_null(pc.cast(other, pa.bool_()), False)),
+        types.Boolean(),
+        self._artifact,
     )
 
 
@@ -79,7 +81,9 @@ def bool_or(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
     return ArrowWeaveList(
-        pc.or_(self._arrow_data, other), types.Boolean(), self._artifact
+        pc.or_(self._arrow_data, pc.fill_null(pc.cast(other, pa.bool_()), False)),
+        types.Boolean(),
+        self._artifact,
     )
 
 
