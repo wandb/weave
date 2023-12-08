@@ -25,7 +25,7 @@ from ddtrace import Tracer as ddtrace_tracer, span as ddtrace_span
 
 # wraps ddtrace tracer and span to add PII support
 class PIISpan(ddtrace_span.Span):
-    def set__pii_tag(self, key, val, pii_val):
+    def set_pii_tag(self, key, val, pii_val):
         super().set_tag(key, pii_val) if os.getenv(
             "DISABLE_WEAVE_PII"
         ) else super().set_tag(key, val)
