@@ -15,6 +15,7 @@ from weave.uris import WeaveURI
 
 def generate_dockerfile(
     model_ref: str,
+    model_method: typing.Optional[str] = None,
     project_name: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
     base_image: typing.Optional[str] = "python:3.11",
@@ -33,6 +34,7 @@ def generate_dockerfile(
             "PROJECT_NAME": project_name,
             "BASE_IMAGE": base_image,
             "MODEL_REF": model_ref,
+            "MODEL_METHOD": model_method or "",
             "AUTH_ENTITY": auth_entity or "",
         }
     )
@@ -50,7 +52,7 @@ def generate_requirements_txt(model_ref: str, dir: str, dev: bool = False) -> st
         execute(["cp", str(cwd / "dist" / wheel), dir], capture=False)
         weave = f"/app/{wheel}"
     else:
-        weave = "weave @ git+https://github.com/wandb/weave@weaveflow"
+        weave = "weave @ git+https://github.com/wandb/weave@master"
     # TODO: add any additional reqs the op needs
     return f"""
 uvicorn[standard]
@@ -89,6 +91,7 @@ def enforce_login() -> None:
 
 def compile(
     model_ref: str,
+    model_method: typing.Optional[str] = None,
     wandb_project: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
     base_image: typing.Optional[str] = None,
@@ -101,7 +104,11 @@ def compile(
     with open(os.path.join(reqs, "requirements.txt"), "w") as f:
         f.write(generate_requirements_txt(model_ref, reqs, dev))
     with open(os.path.join(dir, "Dockerfile"), "w") as f:
-        f.write(generate_dockerfile(model_ref, wandb_project, auth_entity, base_image))
+        f.write(
+            generate_dockerfile(
+                model_ref, model_method, wandb_project, auth_entity, base_image
+            )
+        )
     return dir
 
 
@@ -213,6 +220,7 @@ def ensure_secret(
 # This is a sketch or the commands needed to downscope permissions and use secrets
 def deploy(
     model_ref: str,
+    model_method: typing.Optional[str] = None,
     wandb_project: typing.Optional[str] = None,
     gcp_project: typing.Optional[str] = None,
     region: typing.Optional[str] = None,
@@ -236,7 +244,7 @@ def deploy(
             print(
                 "WARNING: No service account specified.  Using the compute engine default service account..."
             )
-    dir = compile(model_ref, wandb_project, auth_entity, base_image)
+    dir = compile(model_ref, model_method, wandb_project, auth_entity, base_image)
     ref = WeaveURI.parse(model_ref)
     if not isinstance(ref, WeaveWBArtifactURI):
         raise ValueError(f"Expected a wandb artifact ref, got {type(ref)}")
@@ -281,10 +289,18 @@ def deploy(
 
 def develop(
     model_ref: str,
+    model_method: typing.Optional[str] = None,
     base_image: typing.Optional[str] = "python:3.11",
     auth_entity: typing.Optional[str] = None,
 ) -> None:
-    dir = compile(model_ref, base_image=base_image, auth_entity=auth_entity, dev=True)
+
+    dir = compile(
+        model_ref,
+        model_method=model_method,
+        base_image=base_image,
+        auth_entity=auth_entity,
+        dev=True,
+    )
     name = safe_name(WeaveURI.parse(model_ref).name)
     docker = shutil.which("docker")
     if docker is None:
