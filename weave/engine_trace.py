@@ -26,9 +26,9 @@ from ddtrace import tracer as ddtrace_tracer, span as ddtrace_span
 # wraps ddtrace tracer and span to add PII support
 class PIISpan(ddtrace_span):
     def set_tag(self, key, val):
-        raise NotImplementedError("use set_tag with 3 args, including a pii val")
+        logging.error("use set_tag with 3 args, including a pii val")
     def set_metric(self, key, val):
-        raise NotImplementedError("use set_metric with 3 args, including a pii val")
+        logging.error("use set_metric with 3 args, including a pii val")
     def set_tag(self, key, val, pii_val):
         super().set_tag(key, pii_val) if os.getenv("DISABLE_WEAVE_PII") else super().set_tag(key, val)
     def set_metric(self, key, val, pii_val):
@@ -56,7 +56,7 @@ class DummySpan:
     def set_tag(self, key, val, pii_val):
         pass
 
-    def set_meta(self, *args, **kwargs):
+    def set_meta(self, key, val, pii_val):
         pass
 
     def finish(self, *args, **kwargs):
@@ -173,10 +173,13 @@ class WeaveTraceSpan:
         else: 
             self.attributes["tags"][key] = val      
 
-    def set_meta(self, key, val):
+    def set_meta(self, key, val, pii_val):
         if "metadata" not in self.attributes:
             self.attributes["metadata"] = {}
-        self.attributes["metadata"][key] = val
+        if os.getenv("DISABLE_WEAVE_PII"):
+            self.attributes["metadata"][key] = pii_val
+        else: 
+            self.attributes["metadata"][key] = val   
 
     def finish(self, *args, **kwargs):
         pass
