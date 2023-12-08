@@ -20,7 +20,11 @@ from weave.wandb_interface.wandb_stream_table import StreamTable
 
 @pytest.fixture
 def chat_completion_request_message():
-    return [ChatCompletionRequestMessage(content="Tell me a joke", role="system", function_call=None, tool_calls=None)]
+    return [
+        ChatCompletionRequestMessage(
+            content="Tell me a joke", role="system", function_call=None, tool_calls=None
+        )
+    ]
 
 
 @pytest.fixture
@@ -48,7 +52,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content="Why", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content="Why", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -61,7 +67,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content=" don", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content=" don", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -74,7 +82,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content="'t", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content="'t", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -105,7 +115,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content=" trust", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content=" trust", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -118,7 +130,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content=" atoms", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content=" atoms", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -131,7 +145,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content="?\n\n", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content="?\n\n", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -162,7 +178,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content=" they", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content=" they", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -175,7 +193,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content=" make", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content=" make", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -188,7 +208,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content=" up", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content=" up", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -219,7 +241,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content="!", function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content="!", function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason=None,
                     index=0,
                 )
@@ -232,7 +256,9 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(content=None, function_call=None, role=None, tool_calls=None),
+                    delta=ChoiceDelta(
+                        content=None, function_call=None, role=None, tool_calls=None
+                    ),
                     finish_reason="stop",
                     index=0,
                 )
@@ -279,7 +305,9 @@ def client():
 
 @pytest.fixture
 def streaming_client(client, streaming_chat_completion_messages):
-    client.chat.completions.create.return_value = iter(streaming_chat_completion_messages)
+    client.chat.completions.create.return_value = iter(
+        streaming_chat_completion_messages
+    )
     return client
 
 
@@ -329,12 +357,21 @@ def test_reconstruct_completion(
     streaming_chat_completion_messages,
     reassembled_chat_completion_message,
 ):
-    assert util.reconstruct_completion(chat_completion_request_message, streaming_chat_completion_messages) == reassembled_chat_completion_message
+    assert (
+        util.reconstruct_completion(
+            chat_completion_request_message, streaming_chat_completion_messages
+        )
+        == reassembled_chat_completion_message
+    )
 
 
-def test_callback_reassemble_stream(mocked_streaming_create, teardown, reassembled_chat_completion_message):
+def test_callback_reassemble_stream(
+    mocked_streaming_create, teardown, reassembled_chat_completion_message
+):
     cb = ReassembleStream()
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_streaming_create, callbacks=[cb])
+    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+        mocked_streaming_create, callbacks=[cb]
+    )
     stream = chat_completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": "Tell me a joke"}],
@@ -346,13 +383,19 @@ def test_callback_reassemble_stream(mocked_streaming_create, teardown, reassembl
     assert chat_completions.context.outputs == reassembled_chat_completion_message
 
 
-def test_log_to_span(user_by_api_key_in_env, mocked_create, teardown, reassembled_chat_completion_message):
+def test_log_to_span(
+    user_by_api_key_in_env, mocked_create, teardown, reassembled_chat_completion_message
+):
     stream_name = "monitoring"
     project = "openai"
     entity = user_by_api_key_in_env.username
 
-    streamtable = make_stream_table(stream_name, project_name=project, entity_name=entity)
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_create, streamtable=streamtable)
+    streamtable = make_stream_table(
+        stream_name, project_name=project, entity_name=entity
+    )
+    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+        mocked_create, streamtable=streamtable
+    )
     create_input = dict(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": "Tell me a joke"}],
@@ -360,7 +403,11 @@ def test_log_to_span(user_by_api_key_in_env, mocked_create, teardown, reassemble
     result = chat_completions.create(**create_input)
     streamtable.finish()
 
-    hist_node = weave.ops.project(user_by_api_key_in_env.username, project).run(stream_name).history3()
+    hist_node = (
+        weave.ops.project(user_by_api_key_in_env.username, project)
+        .run(stream_name)
+        .history3()
+    )
 
     inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
     inputs_expected = ChatCompletionRequest.model_validate(create_input).model_dump()
@@ -381,7 +428,9 @@ def test_log_to_span_streaming(
     project = "openai"
     entity = user_by_api_key_in_env.username
 
-    streamtable = make_stream_table(stream_name, project_name=project, entity_name=entity)
+    streamtable = make_stream_table(
+        stream_name, project_name=project, entity_name=entity
+    )
     chat_completions = weave.monitoring.openai.openai.ChatCompletions(
         mocked_streaming_create,
         callbacks=[ReassembleStream()],
@@ -398,7 +447,11 @@ def test_log_to_span_streaming(
 
     streamtable.finish()
 
-    hist_node = weave.ops.project(user_by_api_key_in_env.username, project).run(stream_name).history3()
+    hist_node = (
+        weave.ops.project(user_by_api_key_in_env.username, project)
+        .run(stream_name)
+        .history3()
+    )
 
     inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
     inputs_expected = ChatCompletionRequest.model_validate(create_input).model_dump()
@@ -411,7 +464,9 @@ def test_log_to_span_streaming(
 
 def test_callback_ordering(mocked_streaming_create):
     cb = TestingCallback()
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_streaming_create, callbacks=[ReassembleStream(), cb])
+    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+        mocked_streaming_create, callbacks=[ReassembleStream(), cb]
+    )
     stream = chat_completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": "Tell me a joke"}],
