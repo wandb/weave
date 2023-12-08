@@ -504,7 +504,6 @@ def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
 ):
-    print("EXEC SYNC OP", op_def.name)
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
     st = mon.streamtable

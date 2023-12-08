@@ -44,7 +44,6 @@ def do_in_parallel(
     do_one: Callable[[ItemType], ResultType], items: list[ItemType]
 ) -> Iterator[ResultType]:
     parallel_budget = get_parallel_budget()
-    print("DO IN PAR", parallel_budget)
 
     if parallel_budget <= 1:
         return map(do_one, items)
