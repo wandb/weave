@@ -431,11 +431,9 @@ export class WFNaiveProject implements WFProject {
         return;
       }
       exampleCall.inputs().forEach(input => {
-        
         inputTypeVersionMap.add(input.typeVersion().version());
       });
       exampleCall.output().forEach(output => {
-        
         outputTypeVersionMap.add(output.typeVersion().version());
       });
       selfOpVersion.inputTypeVersionHashes = Array.from(inputTypeVersionMap);
