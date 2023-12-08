@@ -28,11 +28,13 @@ import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
   URL_BROWSE2,
+  URL_BROWSE3,
   URL_LOCAL,
   URL_RECENT,
   URL_TEMPLATES,
   URL_WANDB,
 } from './urls';
+import {Browse3} from './components/PagePanelComponents/Home/Browse3';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -136,7 +138,7 @@ const Main = ({browserType}: MainProps) => {
   );
 };
 
-const Browse2Wrapper: FC<{basename: string}> = props => (
+const BrowseWrapper: FC = props => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
@@ -144,7 +146,7 @@ const Browse2Wrapper: FC<{basename: string}> = props => (
           <PanelRootContextProvider>
             <WeaveViewerContextProvider>
               <PanelInteractContextProvider>
-                <Browse2 basename={props.basename} />
+                {props.children}
               </PanelInteractContextProvider>
             </WeaveViewerContextProvider>
           </PanelRootContextProvider>
@@ -178,7 +180,14 @@ ReactDOM.render(
           <Main browserType={URL_LOCAL} />
         </Route>
         <Route path={`/${URL_BROWSE2}`}>
-          <Browse2Wrapper basename={`/${URL_BROWSE2}`} />
+          <BrowseWrapper>
+            <Browse2 basename={`/${URL_BROWSE2}`} />
+          </BrowseWrapper>
+        </Route>
+        <Route path={`/${URL_BROWSE3}`}>
+          <BrowseWrapper>
+            <Browse3 basename={`/${URL_BROWSE3}`} />
+          </BrowseWrapper>
         </Route>
         <Route path="/">
           <Main />
