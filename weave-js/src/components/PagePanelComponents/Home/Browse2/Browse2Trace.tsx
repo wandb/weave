@@ -6,13 +6,13 @@ import React, {FC, useMemo, useState} from 'react';
 import {v4 as uuidv4} from 'uuid';
 
 import {flatToTrees} from '../../../Panel2/PanelTraceTree/util';
+import {CenteredAnimatedLoader} from '../Browse3/pages/common/Loader';
 import {AddRowToTable} from './AddRow';
 import {feedbackTableObjNode, Span, StreamId} from './callTree';
 import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
 import {Paper} from './CommonLib';
 import {mutationStreamTableLog} from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
-import {CenteredAnimatedLoader} from '../Browse3/pages/common/Loader';
 import {SpanDetails} from './SpanDetails';
 import {SpanTreeNode, SpanWithChildren} from './SpanWithChildren';
 

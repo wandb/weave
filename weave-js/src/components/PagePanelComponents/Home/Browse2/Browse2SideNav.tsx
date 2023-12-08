@@ -30,13 +30,13 @@ import ListItemText from '@mui/material/ListItemText';
 import React, {FC, Fragment, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
-import {useProjectsForEntity} from '../query';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {WFHighLevelCallFilter} from '../Browse3/pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from '../Browse3/pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../Browse3/pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../Browse3/pages/TypeVersionsPage';
 import {useQuery} from '../Browse3/pages/util';
+import {useProjectsForEntity} from '../query';
 
 const drawerWidth = 240;
 

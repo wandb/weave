@@ -12,6 +12,8 @@ import {useWeaveContext} from '@wandb/weave/context';
 import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useState} from 'react';
 
+import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
 import {Link} from './CommonLib';
 import {
   mutationAppend,
@@ -21,8 +23,6 @@ import {
 } from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
-import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
-import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
 import {ProjectNamePicker} from './ProjectPicker';
 import {refPageUrl} from './url';
 

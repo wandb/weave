@@ -13,12 +13,12 @@ import moment from 'moment';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {Link, useParams} from 'react-router-dom';
 
-import {flattenObject} from './browse2Util';
-import {SpanWithFeedback} from './callTree';
-import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {OpVersionLink} from '../Browse3/pages/common/Links';
 import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {flattenObject} from './browse2Util';
+import {SpanWithFeedback} from './callTree';
+import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {SmallRef} from './SmallRef';
 
 type DataGridColumnGroupingModel = Exclude<

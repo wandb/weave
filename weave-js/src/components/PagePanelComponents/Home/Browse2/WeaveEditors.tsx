@@ -53,6 +53,8 @@ import React, {
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
+import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
 import {
@@ -61,8 +63,6 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
-import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
 import {parseRefMaybe} from './SmallRef';
 import {refPageUrl} from './url';
 

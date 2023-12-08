@@ -2,9 +2,9 @@ import {useNodeValue} from '@wandb/weave/react';
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
+import {useWeaveflowRouteContext} from '../Browse3/context';
 import {callsTableFilter, callsTableNode, callsTableOpCounts} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {useWeaveflowRouteContext} from '../Browse3/context';
 import {opDisplayName} from './dataModel';
 import {LinkTable} from './LinkTable';
 
