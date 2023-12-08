@@ -60,6 +60,15 @@ export function indent(s: string, level: number) {
 export const maybePluralize = (count: number, noun: string, suffix = 's') =>
   `${count} ${noun}${count !== 1 ? suffix : ''}`;
 
+// Return a new string with all occurrences of a character at the start of the input removed.
+export const trimStartChar = (str: string, char: string): string => {
+  let s = str;
+  while (s.startsWith(char)) {
+    s = s.slice(1);
+  }
+  return s;
+};
+
 // Return a new string with all occurrences of a character at the end of the input removed.
 export const trimEndChar = (str: string, char: string): string => {
   let s = str;

@@ -11,15 +11,10 @@ import {
   Node,
   Type,
 } from '@wandb/weave/core';
-import {
-  ArtifactRef,
-  isWandbArtifactRef,
-  parseRef,
-  refUri,
-  useNodeValue,
-} from '@wandb/weave/react';
+import {ArtifactRef, parseRef, refUri, useNodeValue} from '@wandb/weave/react';
 import React, {FC, useMemo} from 'react';
 
+import {useWeaveflowRouteContext} from '../Browse3/context';
 import {Link} from './CommonLib';
 
 const getRootType = (t: Type): Type => {
@@ -32,18 +27,26 @@ const getRootType = (t: Type): Type => {
   return t;
 };
 
-const refUIUrl = (rootTypeName: string, objRef: ArtifactRef) => {
-  if (!isWandbArtifactRef(objRef)) {
-    throw new Error('Not a wandb artifact ref');
-  }
-  return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
-};
+type WFDBTableType =
+  | 'Op'
+  | 'OpVersion'
+  | 'Type'
+  | 'TypeVersion'
+  | 'Trace'
+  | 'Call'
+  | 'Object'
+  | 'ObjectVersion';
 
-export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
+export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
+  objRef,
+  wfTable,
+}) => {
+  const {refUIUrl} = useWeaveflowRouteContext();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
     return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
   }, [objRef]);
+
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
@@ -68,7 +71,7 @@ export const SmallRef: FC<{objRef: ArtifactRef}> = ({objRef}) => {
   if (refTypeQuery.loading) {
     return Item;
   }
-  return <Link to={refUIUrl(rootTypeName, objRef)}>{Item}</Link>;
+  return <Link to={refUIUrl(rootTypeName, objRef, wfTable)}>{Item}</Link>;
 };
 
 export const parseRefMaybe = (s: string): ArtifactRef | null => {

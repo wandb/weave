@@ -725,6 +725,15 @@ def _ensure_variadic_fn(
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     debug_str = graph_debug.node_expr_str_full(fn)
     logging.info("Vectorizing: %s", debug_str)
+
+    if len(awl) == 0:
+        # Short circuit empty list for performance reasons and to avoid calling
+        # aggregations on empty lists.
+        logging.info(
+            "Short circuiting vectorization on %s because it is empty.", debug_str
+        )
+        return convert.to_arrow([], types.List(fn.type), artifact=awl._artifact)
+
     from .. import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)

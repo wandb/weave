@@ -13,11 +13,17 @@ import {useQuery} from './CommonLib';
 
 export const Browse2OpDefPage: FC = () => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
+  return <Browse2OpDefComponent params={params} />;
+};
+
+export const Browse2OpDefComponent: FC<{
+  params: Browse2RootObjectVersionItemParams;
+}> = ({params}) => {
   const uri = makeObjRefUri(params);
   const query = useQuery();
   const filters = useMemo(() => {
     return {
-      opUri: uri,
+      opUris: [uri],
       inputUris: query.getAll('inputUri'),
     };
   }, [query, uri]);

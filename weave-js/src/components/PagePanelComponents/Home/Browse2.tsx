@@ -3,7 +3,6 @@ import {
   AppBar,
   Box,
   Breadcrumbs,
-  Container,
   IconButton,
   Link as MaterialLink,
   Toolbar,
@@ -27,7 +26,6 @@ import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPa
 import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
-
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
 );
@@ -89,6 +87,7 @@ const Browse2Breadcrumbs: FC = props => {
       {refFields.map((field, idx) =>
         field === 'index' ? (
           <Typography
+            key={idx}
             sx={{
               color: theme =>
                 theme.palette.getContrastText(theme.palette.primary.main),
@@ -97,6 +96,7 @@ const Browse2Breadcrumbs: FC = props => {
           </Typography>
         ) : field === 'pick' ? (
           <Typography
+            key={idx}
             sx={{
               color: theme =>
                 theme.palette.getContrastText(theme.palette.primary.main),
@@ -105,6 +105,7 @@ const Browse2Breadcrumbs: FC = props => {
           </Typography>
         ) : (
           <AppBarLink
+            key={idx}
             to={`/${params.entity}/${params.project}/${params.rootType}/${
               params.objName
             }/${params.objVersion}/${refFields.slice(0, idx + 1).join('/')}`}>
@@ -126,14 +127,22 @@ export const Browse2: FC<{basename: string}> = props => {
 
 const Browse2Mounted: FC = props => {
   return (
-    <div
-      style={{
-        height: '100vh',
-        overflow: 'auto',
-        backgroundColor: '#fafafa',
-      }}>
-      <AppBar position="static">
-        <Toolbar>
+    <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
+      {/* <CssBaseline /> */}
+      <AppBar
+        position="fixed"
+        sx={{
+          zIndex: theme => theme.zIndex.drawer + 1,
+          // height: '30px',
+          // minHeight: '30px',
+        }}>
+        <Toolbar
+          // variant="dense"
+          sx={{
+            backgroundColor: '#1976d2',
+            // height: '30px',
+            minHeight: '30px',
+          }}>
           <IconButton
             component={RouterLink}
             to={`/`}
@@ -154,8 +163,8 @@ const Browse2Mounted: FC = props => {
           </Route>
         </Toolbar>
       </AppBar>
-      <Container maxWidth="xl">
-        <Box sx={{height: 40}} />
+      <Box component="main" sx={{flexGrow: 1, p: 3}}>
+        <Toolbar />
         <Switch>
           <Route path={`/:entity/:project/trace/:traceId/:spanId?`}>
             <Browse2TracePage />
@@ -183,7 +192,7 @@ const Browse2Mounted: FC = props => {
             <Browse2HomePage />
           </Route>
         </Switch>
-      </Container>
-    </div>
+      </Box>
+    </Box>
   );
 };

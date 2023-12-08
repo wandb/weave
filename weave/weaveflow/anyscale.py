@@ -1,7 +1,8 @@
-import typing
 import dataclasses
+import typing
 
 import weave
+
 from . import chat_model
 
 
@@ -19,7 +20,12 @@ class AnyscaleChatModel(chat_model.ChatModel):
     @weave.op()
     def complete(self, messages: typing.Any) -> typing.Any:
         import os
-        from weave.monitoring import openai
+
+        import openai
+
+        from weave.monitoring.openai import patch
+
+        patch()
 
         response = openai.ChatCompletion.create(
             api_base=self.base_url,
