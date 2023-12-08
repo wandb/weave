@@ -19,7 +19,7 @@
     "generate": "graphql-codegen",
     "generate:watch": "graphql-codegen -w",
     "prettier": "prettier --config .prettierrc --check \"src/**/*.ts\" \"src/**/*.tsx\"",
-    "prettier-fix": "prettier --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
+    "prettier-fix": "prettier --loglevel warn --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
     "lint": "yarn eslint & yarn tslint & yarn prettier & wait",
     "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait"
   },
