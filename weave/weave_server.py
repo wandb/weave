@@ -342,7 +342,7 @@ def execute():
                     + urllib.parse.quote(profile_filename),
                 )
     if root_span is not None:
-        root_span.set_pii_tag("request_size", len(req_bytes), len(req_bytes))
+        root_span.set_tag("request_size", len(req_bytes))
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
     response_payload = _value_or_errors_to_response(fixed_response)
