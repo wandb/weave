@@ -5,6 +5,7 @@ import typing
 from weave import server, __version__
 
 # from .model_server import app
+from .urls import BROWSE3_PATH
 from . import api
 from . import uris
 from . import artifact_wandb
@@ -26,7 +27,7 @@ def start_ui() -> None:
     serv = server.HttpServer(port=3000)  # type: ignore
     serv.start()
     print("Server started")
-    print("http://localhost:3000/browse2")
+    print(f"http://localhost:3000/{BROWSE3_PATH}")
     while True:
         time.sleep(10)
 

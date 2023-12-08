@@ -2,6 +2,8 @@ import time
 import typing
 import os
 import dataclasses
+
+from .urls import BROWSE3_PATH
 from . import graph as _graph
 from . import graph_mapper as _graph_mapper
 from . import storage as _storage
@@ -142,7 +144,9 @@ def init(project_name: str) -> _graph_client.GraphClient:
     client = _graph_client.GraphClient(entity_name, project_name)
     _graph_client_context._graph_client.set(client)
     print("Ensure you have the prototype UI running with `weave ui`")
-    print(f"View project at http://localhost:3000/browse2/{entity_name}/{project_name}")
+    print(
+        f"View project at http://localhost:3000/{BROWSE3_PATH}/{entity_name}/{project_name}"
+    )
     return client
 
 
