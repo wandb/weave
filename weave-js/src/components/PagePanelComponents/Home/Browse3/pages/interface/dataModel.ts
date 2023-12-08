@@ -5,7 +5,6 @@ Convention:
 */
 
 import stringify from 'json-stable-stringify';
-import {useMemo} from 'react';
 
 import {
   constFunction,
@@ -34,91 +33,10 @@ import {
   opFilter,
   opFlatten,
   opMap,
-  opProjectArtifactType,
   opProjectArtifactTypes,
-  opProjectArtifactVersion,
   opRootProject,
   Type,
 } from '../../../../../../core';
-import {useNodeValue} from '../../../../../../react';
-// import {UPDATE_ARTIFACT_DESCRIPTION} from './gql';
-
-export const useAllObjectVersions = (
-  entity: string,
-  project: string
-): Loadable<ObjectVersionDictType[]> => {
-  const allObjectVersions = useMemo(
-    () => allObjectVersionsNode(entity, project),
-    [entity, project]
-  );
-  const asDictNode = opMap({
-    arr: allObjectVersions,
-    mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
-      return fnObjectVersionToDict(row as any);
-    }),
-  });
-  const value = useNodeValue(asDictNode);
-  return useMemo(() => {
-    if (value.loading) {
-      return {loading: true};
-    } else {
-      const userObjects = removeNonUserObjects(value.result);
-      const typeFixedObjects = userObjects.map(obj => {
-        if (obj.type_version.type_version === 'unknown') {
-          return {
-            ...obj,
-            type_version: typeVersionFromTypeDict(
-              JSON.parse((obj.type_version as any).type_version_json_string)
-            ),
-          };
-        }
-        return obj;
-      });
-      return {
-        loading: false,
-        result: typeFixedObjects,
-      };
-    }
-  }, [value]);
-};
-
-export const useAllOpVersions = (
-  entity: string,
-  project: string
-): Loadable<OpVersionDictType[]> => {
-  const allOpVersions = useMemo(
-    () => allOpVersionNodes(entity, project),
-    [entity, project]
-  );
-  const asDictNode = opMap({
-    arr: allOpVersions,
-    mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
-      return fnOpVersionToDict(row as any);
-    }),
-  });
-  const value = useNodeValue(asDictNode);
-  return useMemo(() => {
-    console.log(value);
-    return value;
-    // if (value.loading) {
-    //     return {loading: true}
-    // } else {
-    //     const userObjects = removeNonUserObjects(value.result)
-    //     const typeFixedObjects = userObjects.map((obj) => {
-    //         if (obj.type_version.type_version === 'unknown') {
-    //             return {
-    //                 ...obj,
-    //                 type_version: typeVersionFromTypeDict(JSON.parse((obj.type_version as any).type_version_json_string))}
-    //         }
-    //         return obj
-    //     })
-    //     return {
-    //         loading: false,
-    //         result: typeFixedObjects
-    //     }
-    // }
-  }, [value]);
-};
 
 export const fnAllWeaveObjects = (entity: string, project: string) => {
   const allObjectVersions = allObjectVersionsNode(entity, project);
@@ -131,169 +49,7 @@ export const fnAllWeaveObjects = (entity: string, project: string) => {
   return asDictNode;
 };
 
-// export const useUpdateObjectVersionDescription = () => {
-//   const weave = useWeaveContext();
-//   const [updateArtifactDescription] = useMutation(UPDATE_ARTIFACT_DESCRIPTION);
-//   return useCallback(
-//     (
-//       entity: string,
-//       project: string,
-//       artifactName: string,
-//       alias: string,
-//       description: string
-//     ) => {
-//       const doWork = async () => {
-//         const projectNode = opRootProject({
-//           entityName: constString(entity),
-//           projectName: constString(project),
-//         });
-//         const artifactNode = opProjectArtifactVersion({
-//           project: projectNode,
-//           artifactName: constString(artifactName),
-//           artifactVersionAlias: constString(alias),
-//         });
-//         const artifactIDNode = opArtifactVersionId({
-//           artifactVersion: artifactNode,
-//         });
-//         const artifactIdValue: string = await weave.client.query(
-//           artifactIDNode
-//         );
-//         await updateArtifactDescription({
-//           variables: {
-//             artifactID: artifactIdValue,
-//             description,
-//           },
-//         });
-//       };
-//       return doWork();
-//     },
-//     [updateArtifactDescription, weave.client]
-//   );
-// };
-
-export const useObjectVersionTypeInfo = (
-  entity: string,
-  project: string,
-  objectName: string,
-  objectVersionHash: string
-): Loadable<ObjectVersionDictType> => {
-  const objectVersionNode = opProjectArtifactVersion({
-    project: opRootProject({
-      entityName: constString(entity),
-      projectName: constString(project),
-    }),
-    artifactName: constString(objectName),
-    artifactVersionAlias: constString(objectVersionHash),
-  });
-  const value = useNodeValue(fnObjectVersionToDict(objectVersionNode as any));
-  return value as any;
-};
-
-export const useAllTypeVersions = (
-  entity: string,
-  project: string
-): Loadable<{types: TypeVersions; versions: TypeVersionCatalog}> => {
-  // This is a super inefficient way to do this... just making it work for now.
-  // TODO: Get all types from ops as well!
-  const allObjectVersions = useAllObjectVersions(entity, project);
-  const allTypeVersions = useMemo(() => {
-    if (allObjectVersions.loading) {
-      return {loading: true};
-    } else {
-      const typeVersionCatalog: TypeVersionCatalog = {};
-      const typeVersions: TypeVersions = {};
-      const queue = [
-        ...allObjectVersions.result.map(
-          objectVersion => objectVersion.type_version
-        ),
-      ];
-      while (queue.length > 0) {
-        const typeVersion = queue.pop()!;
-        const typeId = typeIdFromTypeVersion(typeVersion);
-        if (!(typeId in typeVersionCatalog)) {
-          typeVersionCatalog[typeId] = {
-            type_name: typeVersion.type_name,
-            type_version: typeVersion.type_version,
-            parent_type_id: typeVersion.parent_type
-              ? typeIdFromTypeVersion(typeVersion.parent_type)
-              : undefined,
-          };
-          if (typeVersion.parent_type) {
-            queue.push(typeVersion.parent_type);
-          }
-        }
-        if (typeVersions[typeVersion.type_name] === undefined) {
-          typeVersions[typeVersion.type_name] = [];
-        }
-        if (!typeVersions[typeVersion.type_name].includes(typeId)) {
-          typeVersions[typeVersion.type_name].push(typeId);
-        }
-      }
-
-      return {
-        loading: false,
-        result: typeVersionCatalog,
-      };
-    }
-  }, [allObjectVersions]);
-  return allTypeVersions as Loadable<{
-    types: TypeVersions;
-    versions: TypeVersionCatalog;
-  }>;
-};
-
 ///
-
-type Loadable<T> =
-  | {loading: true; result: undefined | null}
-  | {loading: false; result: T};
-
-type TypeVersionTypeDictType = {
-  type_name: string;
-  type_version: string;
-  type_dict?: string;
-  parent_type?: TypeVersionTypeDictType;
-  type_version_json_string?: string;
-};
-
-type TypeVersionCatalog = {
-  [typeId: string]: {
-    type_name: string;
-    type_version: string;
-    parent_type_id?: string;
-  };
-};
-
-type TypeVersions = {
-  [typeName: string]: string[];
-};
-
-export type ObjectVersionDictType = {
-  artifact_id: string;
-  collection_name: string;
-  type_version: TypeVersionTypeDictType;
-  aliases: string[];
-  created_at_ms: number;
-  description: string;
-  hash: string;
-  version_index: number;
-};
-
-type OpVersionDictType = {
-  op_name: string;
-  op_version: string;
-  input_types: {
-    [inputName: string]: TypeVersionTypeDictType;
-  };
-  output_type: TypeVersionTypeDictType;
-};
-
-const nonUserTypes = ['OpDef', 'type', 'stream_table'];
-const removeNonUserObjects = (objectVersions: ObjectVersionDictType[]) => {
-  return objectVersions.filter(objectVersion => {
-    return !nonUserTypes.includes(objectVersion.type_version.type_name);
-  });
-};
 
 export const typeVersionFromTypeDict = (
   typeDict: Type
@@ -308,6 +64,27 @@ export const typeVersionFromTypeDict = (
         ? typeVersionFromTypeDict(typeDict._base_type)
         : undefined,
   };
+};
+
+export type ObjectVersionDictType = {
+  artifact_id: string;
+  collection_name: string;
+  type_version: TypeVersionTypeDictType;
+  aliases: string[];
+  created_at_ms: number;
+  description: string;
+  hash: string;
+  version_index: number;
+};
+
+///
+
+type TypeVersionTypeDictType = {
+  type_name: string;
+  type_version: string;
+  type_dict?: string;
+  parent_type?: TypeVersionTypeDictType;
+  type_version_json_string?: string;
 };
 
 const fnObjectVersionToDict = (objectVersionNode: Node<'artifactVersion'>) => {
@@ -334,23 +111,6 @@ const fnObjectVersionToDict = (objectVersionNode: Node<'artifactVersion'>) => {
     version_index: opArtifactVersionVersionId({
       artifactVersion: objectVersionNode,
     }),
-  } as any);
-};
-
-const fnOpVersionToDict = (opVersionNode: Node<'artifactVersion'>) => {
-  const sequenceNode = opArtifactVersionArtifactSequence({
-    artifactVersion: opVersionNode,
-  });
-  return opDict({
-    artifact_id: opArtifactVersionId({artifactVersion: opVersionNode}),
-    collection_name: opArtifactName({artifact: sequenceNode}),
-    // type_version: fnObjectVersionTypeVersion(opVersionNode),
-    // type_name: opTypeName({type: opFilesystemArtifactWeaveType({artifact: opVersionNode} as any)})
-    // aliases: opArtifactAliasAlias({artifactAlias:  opArtifactVersionAliases({artifactVersion: opVersionNode})}),
-    created_at_ms: opArtifactVersionCreatedAt({artifactVersion: opVersionNode}),
-    description: opArtifactVersionDescription({artifactVersion: opVersionNode}),
-    hash: fnObjectVersionHash(opVersionNode),
-    version_index: opArtifactVersionVersionId({artifactVersion: opVersionNode}),
   } as any);
 };
 
@@ -417,27 +177,6 @@ const allObjectVersionsNode = (entity: string, project: string) => {
   return weaveObjectsNode;
 };
 
-const allOpVersionNodes = (entity: string, project: string) => {
-  const projectNode = opRootProject({
-    entityName: constString(entity),
-    projectName: constString(project),
-  });
-  const artifactTypesNode = opProjectArtifactType({
-    project: projectNode,
-    artifactTypeName: constString('OpDef'),
-  });
-  const artifactsNode = opArtifactTypeArtifacts({
-    artifactType: artifactTypesNode,
-  });
-  const artifactVersionsNode = opFlatten({
-    arr: opArtifactVersions({
-      artifact: artifactsNode,
-    }) as any,
-  });
-
-  return artifactVersionsNode;
-};
-
 const hashString = (s: string) => {
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
@@ -449,6 +188,6 @@ const hashString = (s: string) => {
   return '' + hash;
 };
 
-export const typeIdFromTypeVersion = (typeVersion: any) => {
+const typeIdFromTypeVersion = (typeVersion: any) => {
   return hashString(stringify(typeVersion));
 };
