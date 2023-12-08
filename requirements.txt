@@ -40,4 +40,4 @@ cattrs==23.2.2
 identify==2.5.32
 #
 langchain-core==0.0.6
-pytest-asyncio==21.1
+pytest-asyncio==0.21.1
