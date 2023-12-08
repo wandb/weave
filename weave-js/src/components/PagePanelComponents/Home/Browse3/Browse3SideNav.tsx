@@ -30,13 +30,13 @@ import ListItemText from '@mui/material/ListItemText';
 import React, {FC, Fragment, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../Browse3/context';
-import {WFHighLevelCallFilter} from '../Browse3/pages/CallsPage';
-import {WFHighLevelObjectVersionFilter} from '../Browse3/pages/ObjectVersionsPage';
-import {WFHighLevelOpVersionFilter} from '../Browse3/pages/OpVersionsPage';
-import {WFHighLevelTypeVersionFilter} from '../Browse3/pages/TypeVersionsPage';
-import {useQuery} from '../Browse3/pages/util';
 import {useProjectsForEntity} from '../query';
+import {useWeaveflowRouteContext} from './context';
+import {WFHighLevelCallFilter} from './pages/CallsPage';
+import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
+import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
+import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+import {useURLSearchParamsDict} from './pages/util';
 
 const drawerWidth = 240;
 
@@ -50,7 +50,7 @@ type NavigationCallbacks = {
   navigateToTables: (filter?: string) => void;
 };
 
-type Browse2ProjectSideNavProps = {
+type Browse3ProjectSideNavProps = {
   entity: string;
   project: string;
   selectedCategory?:
@@ -63,7 +63,7 @@ type Browse2ProjectSideNavProps = {
   filterCategory?: string;
 } & NavigationCallbacks;
 
-export const RouteAwareBrowse2ProjectSideNav: FC = props => {
+export const RouteAwareBrowse3ProjectSideNav: FC = props => {
   const params = useParams<{
     entity: string;
     project: string;
@@ -81,7 +81,7 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
   const history = useHistory();
   const currentProject = params.project;
   const currentEntity = params.entity;
-  const query = useQuery();
+  const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
     if (query.filter === undefined) {
       return {};
@@ -124,7 +124,7 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
     return null;
   }
   return (
-    <Browse2ProjectSideNav
+    <Browse3ProjectSideNav
       entity={currentEntity}
       project={currentProject}
       selectedCategory={selectedNavSection}
@@ -170,7 +170,7 @@ export const RouteAwareBrowse2ProjectSideNav: FC = props => {
   );
 };
 
-export const Browse2ProjectSideNav: FC<Browse2ProjectSideNavProps> = props => {
+const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const sections = useSectionsForProject(props);
   const entityProjectsValue = useProjectsForEntity(props.entity);
   const projects = useMemo(() => {
@@ -278,7 +278,7 @@ const SideNav: FC<{
   );
 };
 
-const useSectionsForProject = (props: Browse2ProjectSideNavProps) => {
+const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
   // TODO: Lookup pinned sidebar items from entity/project + user
   const sections: SectionType[] = useMemo(() => {
     return [

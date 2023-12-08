@@ -26,7 +26,6 @@ export const OpVersionPage: React.FC<{
   opName: string;
   version: string;
 }> = props => {
-  // const prefix = useEPPrefix();
   const orm = useWeaveflowORMContext();
   const opVersion = orm.projectConnection.opVersion(
     props.opName,

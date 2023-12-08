@@ -22,7 +22,7 @@ import {
 import {useWeaveContext} from '../../../context';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-import {RouteAwareBrowse2ProjectSideNav} from './Browse2/Browse2SideNav';
+import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   NewWeaveflowRouteContextProvider,
   useWeaveflowRouteContext,
@@ -48,7 +48,7 @@ import {TypePage} from './Browse3/pages/TypePage';
 import {TypesPage} from './Browse3/pages/TypesPage';
 import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
-import {useQuery} from './Browse3/pages/util';
+import {useURLSearchParamsDict} from './Browse3/pages/util';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -154,7 +154,7 @@ const Browse3Mounted: FC = props => {
           <Browse3Breadcrumbs />
         </Toolbar>
       </AppBar>
-      <RouteAwareBrowse2ProjectSideNav />
+      <RouteAwareBrowse3ProjectSideNav />
       <Switch>
         <Route path={browse3Paths}>
           <Box
@@ -427,7 +427,7 @@ const CallPageBinding = () => {
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
   const params = useParams<Browse3TabParams>();
-  const query = useQuery();
+  const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
     if (query.filter === undefined) {
       return {};
@@ -461,7 +461,7 @@ const CallsPageBinding = () => {
 const ObjectVersionsPageBinding = () => {
   const params = useParams<Browse3TabParams>();
 
-  const query = useQuery();
+  const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
     if (query.filter === undefined) {
       return {};
@@ -497,7 +497,7 @@ const ObjectVersionsPageBinding = () => {
 const TypeVersionsPageBinding = () => {
   const params = useParams<Browse3TabParams>();
 
-  const query = useQuery();
+  const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
     if (query.filter === undefined) {
       return {};
@@ -533,7 +533,7 @@ const TypeVersionsPageBinding = () => {
 const OpVersionsPageBinding = () => {
   const params = useParams<Browse3TabParams>();
 
-  const query = useQuery();
+  const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
     if (query.filter === undefined) {
       return {};

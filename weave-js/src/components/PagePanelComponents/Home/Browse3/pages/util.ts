@@ -1,8 +1,8 @@
 import _ from 'lodash';
 import React from 'react';
-import {useLocation, useParams} from 'react-router-dom';
+import {useLocation} from 'react-router-dom';
 
-export const useQuery = () => {
+export const useURLSearchParamsDict = () => {
   const {search} = useLocation();
 
   return React.useMemo(() => {
@@ -11,13 +11,4 @@ export const useQuery = () => {
     const searchDict = _.fromPairs(entries);
     return searchDict;
   }, [search]);
-};
-
-export const useEPPrefix = () => {
-  const params = useParams<{entity: string; project: string}>();
-  const {entity, project} = params;
-  if (!entity || !project) {
-    throw new Error('useEPPrefix must be called within a project route');
-  }
-  return (path: string) => `/${entity}/${project}${path}`;
 };
