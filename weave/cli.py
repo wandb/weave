@@ -26,7 +26,7 @@ def start_ui() -> None:
     serv = server.HttpServer(port=3000)  # type: ignore
     serv.start()
     print("Server started")
-    print("http://localhost:3000/browse2")
+    print("http://localhost:3000/browse3")
     while True:
         time.sleep(10)
 
