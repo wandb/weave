@@ -61,9 +61,9 @@ def _ensure_object_components_are_published(
     from weave.mappers_publisher import map_to_python_remote
     from . import op_def
 
-    # Hack because of mappers_publisher recursion bug
-    # TODO: Fix
-    # HACK(wf-fixes1)
+    # Hack because of mappers_publisher recursion bug. Just don't do the recursion
+    # if we have an OpDef. Really we should skip if we don't have a composite object
+    # but there's no standard check for that.
     if isinstance(obj, op_def.OpDef):
         return obj
 
@@ -135,8 +135,10 @@ def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
     return _pubish_target_project.get()
 
 
-# HACK(wf-fixes1)
-PUBLISH_CACHE_BY_LOCAL_ART = {}
+# Keep a cache of published local ref -> wandb ref. This is used to ensure
+# we publish any needed op defs at the beginning of graph execution one time,
+# to avoid parallel publishing them many times later in mapped operations.
+PUBLISH_CACHE_BY_LOCAL_ART: dict[str, Ref] = {}
 
 
 def _direct_publish(
