@@ -227,6 +227,9 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                             ),
                         )
                     )
+                    compiled_nodes = list(compile_results)
+                    publish_graph(compiled_nodes)
+
                     fg = forward_graph.ForwardGraph()
                     compile_results = compile_results.safe_apply(fg.add_node)
 
@@ -276,7 +279,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
         for op_name, group_iter in groups:
             group = list(group_iter)
             op_def = registry_mem.memory_registry.get_op(op_name)
-            if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
+            if (
+                parallel_budget != 1
+                and len(group) > 1
+                and op_policy.should_run_in_parallel(op_name)
+            ):
                 # Parallel threaded case
                 num_threads = min(len(group), parallel_budget)
                 remaining_budget_per_thread = (
@@ -427,15 +434,13 @@ def execute_async_op(
     job.start()
 
 
-def _auto_publish(
-    project_name: str, obj: typing.Any, output_refs: typing.List[ref_base.Ref]
-):
+def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
     import numpy as np
 
     if isinstance(obj, dict):
-        return {k: _auto_publish(project_name, v, output_refs) for k, v in obj.items()}
+        return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
     elif isinstance(obj, list):
-        return [_auto_publish(project_name, v, output_refs) for v in obj]
+        return [_auto_publish(v, output_refs) for v in obj]
     elif isinstance(obj, np.generic):
         return obj.item()
     elif isinstance(obj, np.ndarray):
@@ -457,9 +462,42 @@ def _auto_publish(
     return ref
 
 
-def auto_publish(project_name: str, obj: typing.Any) -> typing.Tuple[typing.Any, list]:
+def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
     refs: typing.List[ref_base.Ref] = []
-    return _auto_publish(project_name, obj, refs), refs
+    return _auto_publish(obj, refs), refs
+
+
+def publish_graph(
+    nodes: typing.List[graph.Node],
+):
+    """Publish all ops and ConstNodes found in graph"""
+
+    def _publish_node(node: graph.Node):
+        if isinstance(node, graph.OutputNode):
+            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+            if not op_def.location:
+                # Only publish custom ops
+                return
+            op_def_ref = storage._get_ref(op_def)
+            if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
+                from .api import publish
+
+                op_def_ref = publish(
+                    op_def,
+                    f"{op_def.name}",
+                )
+        elif isinstance(node, graph.ConstNode):
+            auto_publish(node.val)
+
+    mon = monitor.default_monitor()
+    # We're checking mon.streamtable, which is available if weave.init is called.
+    # But if the user instead called init_monitor, this check would pass but the
+    # later publish calls would fill since weave.init is required for those.
+    # Our intention is to replace init_monitor with weave.init, but that is not
+    # yet complete.
+    # TODO: Fix
+    if mon.streamtable:
+        graph.map_nodes_full(nodes, _publish_node)
 
 
 def execute_sync_op(
@@ -471,16 +509,13 @@ def execute_sync_op(
     st = mon.streamtable
     if op_def.location and st:
         op_def_ref = storage._get_ref(op_def)
-        project_name = st._project_name
         if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
-            op_def._ref = None  # type: ignore
-            from .api import publish
-
-            op_def_ref = publish(
-                op_def,
-                f"{op_def.name}",
+            # This should have already been published by publish_graph if monitoring
+            # is turned on.
+            raise errors.WeaveInternalError(
+                "Found unpublished custom OpDef with monitoring turned on", op_def
             )
-        mon_span_inputs, refs = auto_publish(project_name, inputs)
+        mon_span_inputs, refs = auto_publish(inputs)
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
             span.inputs["_keys"] = list(inputs.keys())
@@ -500,7 +535,7 @@ def execute_sync_op(
             log_res = res
             if not isinstance(log_res, dict):
                 log_res = {"_result": log_res}
-            span.output, refs = auto_publish(project_name, log_res)
+            span.output, refs = auto_publish(log_res)
             for i, ref in enumerate(refs[:3]):
                 span.output["_ref%s" % i] = ref
             span.output["_keys"] = list(log_res.keys())
