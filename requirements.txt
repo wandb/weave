@@ -35,3 +35,6 @@ faiss-cpu
 
 importlib-metadata==6.8.0
 types-setuptools==68.2.0.2
+#
+cattrs==23.2.2
+identify==2.5.32
