@@ -187,51 +187,59 @@ export const RunsTable: FC<{
         },
       },
 
-      {
-        field: 'opCategory',
-        headerName: 'Category',
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
-        renderCell: cellParams => {
-          if (cellParams.value == null) {
-            return '';
-          }
+      ...(orm
+        ? [
+            {
+              field: 'opCategory',
+              headerName: 'Category',
+              width: 100,
+              minWidth: 100,
+              maxWidth: 100,
+              renderCell: (cellParams: any) => {
+                if (cellParams.value == null) {
+                  return '';
+                }
 
-          const color = {
-            train: 'success',
-            predict: 'info',
-            score: 'error',
-            evaluate: 'warning',
-            // 'tune': 'warning',
-          }[cellParams.row.opCategory + ''];
-          return (
-            <Chip
-              label={cellParams.row.opCategory}
-              size="small"
-              color={color as any}
-            />
-          );
-        },
-      },
+                const color = {
+                  train: 'success',
+                  predict: 'info',
+                  score: 'error',
+                  evaluate: 'warning',
+                  // 'tune': 'warning',
+                }[cellParams.row.opCategory + ''];
+                return (
+                  <Chip
+                    label={cellParams.row.opCategory}
+                    size="small"
+                    color={color as any}
+                  />
+                );
+              },
+            },
+          ]
+        : []),
 
-      {
-        flex: !showIO ? 1 : undefined,
-        field: 'opVersion',
-        headerName: 'Name',
-        renderCell: rowParams => {
-          const opVersion = rowParams.row.ormCall.opVersion();
-          if (opVersion == null) {
-            return rowParams.row.ormCall.spanName();
-          }
-          return (
-            <OpVersionLink
-              opName={opVersion.op().name()}
-              version={opVersion.version()}
-            />
-          );
-        },
-      },
+      ...(orm
+        ? [
+            {
+              flex: !showIO ? 1 : undefined,
+              field: 'opVersion',
+              headerName: 'Name',
+              renderCell: (rowParams: any) => {
+                const opVersion = rowParams.row.ormCall?.opVersion();
+                if (opVersion == null) {
+                  return rowParams.row.ormCall?.spanName();
+                }
+                return (
+                  <OpVersionLink
+                    opName={opVersion.op().name()}
+                    version={opVersion.version()}
+                  />
+                );
+              },
+            },
+          ]
+        : []),
       {
         field: 'status_code',
         headerName: 'Status',
@@ -458,7 +466,7 @@ export const RunsTable: FC<{
     }
 
     return {cols, colGroupingModel};
-  }, [params.entity, params.project, routeContext, showIO, spans]);
+  }, [orm, params.entity, params.project, routeContext, showIO, spans]);
   const autosized = useRef(false);
   useEffect(() => {
     if (autosized.current) {
