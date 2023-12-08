@@ -381,7 +381,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                             span.finish()
 
                     if span is not None:
-                        span.set_pii_tag(
+                        span.set_tag(
                             "bytes_read_to_arrow",
                             report["bytes_read_to_arrow"],
                             report["bytes_read_to_arrow"],
