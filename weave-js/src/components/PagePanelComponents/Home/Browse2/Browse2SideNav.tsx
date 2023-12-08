@@ -31,12 +31,12 @@ import React, {FC, Fragment, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
-import {useWeaveflowRouteContext} from './context';
-import {WFHighLevelCallFilter} from './pages/CallsPage';
-import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
-import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
-import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
-import {useQuery} from './pages/util';
+import {useWeaveflowRouteContext} from '../Browse3/context';
+import {WFHighLevelCallFilter} from '../Browse3/pages/CallsPage';
+import {WFHighLevelObjectVersionFilter} from '../Browse3/pages/ObjectVersionsPage';
+import {WFHighLevelOpVersionFilter} from '../Browse3/pages/OpVersionsPage';
+import {WFHighLevelTypeVersionFilter} from '../Browse3/pages/TypeVersionsPage';
+import {useQuery} from '../Browse3/pages/util';
 
 const drawerWidth = 240;
 

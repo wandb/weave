@@ -9,8 +9,8 @@ import {
   isSimpleTypeShape,
   Type,
 } from '../../../../core';
-import {useWeaveflowRouteContext} from './context';
-import {typeIdFromTypeVersion} from './pages/interface/dataModel';
+import {useWeaveflowRouteContext} from '../Browse3/context';
+import {typeIdFromTypeVersion} from '../Browse3/pages/interface/dataModel';
 
 const typeName = (t: Type) => {
   if (isSimpleTypeShape(t)) {

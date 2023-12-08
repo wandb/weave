@@ -7,12 +7,12 @@ import {
   typedDictPropertyTypes,
 } from '../../../../../../../core';
 import {Client as WeaveClient} from '../../../../../../../core/client/types';
-import {Call} from '../../../callTree';
+import {Call} from '../../../../Browse2/callTree';
 import {
   fnFeedbackNode,
   fnRunsNode,
   joinRunsWithFeedback,
-} from '../../../callTreeHooks';
+} from '../../../../Browse2/callTreeHooks';
 import {
   fnAllWeaveObjects,
   ObjectVersionDictType,

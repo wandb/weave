@@ -15,7 +15,7 @@ import {ArtifactRef, parseRef, refUri, useNodeValue} from '@wandb/weave/react';
 import React, {FC, useMemo} from 'react';
 
 import {Link} from './CommonLib';
-import {useWeaveflowRouteContext} from './context';
+import {useWeaveflowRouteContext} from '../Browse3/context';
 
 const getRootType = (t: Type): Type => {
   if (

@@ -61,8 +61,8 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {useWeaveflowORMContext} from './pages/interface/wf/context';
-import {WFNaiveProject} from './pages/interface/wf/naive';
+import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
 import {parseRefMaybe} from './SmallRef';
 import {refPageUrl} from './url';
 

@@ -16,9 +16,9 @@ import {Link, useParams} from 'react-router-dom';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {useWeaveflowRouteContext} from './context';
-import {OpVersionLink} from './pages/common/Links';
-import {useWeaveflowORMContext} from './pages/interface/wf/context';
+import {useWeaveflowRouteContext} from '../Browse3/context';
+import {OpVersionLink} from '../Browse3/pages/common/Links';
+import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
 import {SmallRef} from './SmallRef';
 
 type DataGridColumnGroupingModel = Exclude<

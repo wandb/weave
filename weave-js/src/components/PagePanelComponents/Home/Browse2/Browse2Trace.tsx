@@ -12,7 +12,7 @@ import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
 import {Paper} from './CommonLib';
 import {mutationStreamTableLog} from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
-import {CenteredAnimatedLoader} from './pages/common/Loader';
+import {CenteredAnimatedLoader} from '../Browse3/pages/common/Loader';
 import {SpanDetails} from './SpanDetails';
 import {SpanTreeNode, SpanWithChildren} from './SpanWithChildren';
 

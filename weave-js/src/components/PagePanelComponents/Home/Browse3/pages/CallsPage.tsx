@@ -9,10 +9,10 @@ import {
 } from '@mui/material';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {CallFilter} from '../callTree';
-import {useRunsWithFeedback} from '../callTreeHooks';
+import {CallFilter} from '../../Browse2/callTree';
+import {useRunsWithFeedback} from '../../Browse2/callTreeHooks';
 import {useWeaveflowRouteContext} from '../context';
-import {RunsTable} from '../RunsTable';
+import {RunsTable} from '../../Browse2/RunsTable';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './interface/wf/context';

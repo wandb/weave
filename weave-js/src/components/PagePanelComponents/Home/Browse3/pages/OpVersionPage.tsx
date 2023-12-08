@@ -3,10 +3,10 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import React, {useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
 
-import {Browse2OpDefCode} from '../Browse2OpDefCode';
-import {StreamId} from '../callTree';
-import {useFirstCall, useOpSignature} from '../callTreeHooks';
-import {Paper} from '../CommonLib';
+import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
+import {StreamId} from '../../Browse2/callTree';
+import {useFirstCall, useOpSignature} from '../../Browse2/callTreeHooks';
+import {Paper} from '../../Browse2/CommonLib';
 import {CallsTable} from './CallsPage';
 import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';

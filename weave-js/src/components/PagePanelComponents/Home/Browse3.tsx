@@ -26,29 +26,29 @@ import {RouteAwareBrowse2ProjectSideNav} from './Browse2/Browse2SideNav';
 import {
   NewWeaveflowRouteContextProvider,
   useWeaveflowRouteContext,
-} from './Browse2/context';
-import {BoardPage} from './Browse2/pages/BoardPage';
-import {BoardsPage} from './Browse2/pages/BoardsPage';
-import {CallPage} from './Browse2/pages/CallPage';
-import {CallsPage} from './Browse2/pages/CallsPage';
-import {CenteredAnimatedLoader} from './Browse2/pages/common/Loader';
-import {WeaveflowORMContextProvider} from './Browse2/pages/interface/wf/context';
-import {WFNaiveProject} from './Browse2/pages/interface/wf/naive';
-import {ObjectPage} from './Browse2/pages/ObjectPage';
-import {ObjectsPage} from './Browse2/pages/ObjectsPage';
-import {ObjectVersionPage} from './Browse2/pages/ObjectVersionPage';
-import {ObjectVersionsPage} from './Browse2/pages/ObjectVersionsPage';
-import {OpPage} from './Browse2/pages/OpPage';
-import {OpsPage} from './Browse2/pages/OpsPage';
-import {OpVersionPage} from './Browse2/pages/OpVersionPage';
-import {OpVersionsPage} from './Browse2/pages/OpVersionsPage';
-import {TablePage} from './Browse2/pages/TablePage';
-import {TablesPage} from './Browse2/pages/TablesPage';
-import {TypePage} from './Browse2/pages/TypePage';
-import {TypesPage} from './Browse2/pages/TypesPage';
-import {TypeVersionPage} from './Browse2/pages/TypeVersionPage';
-import {TypeVersionsPage} from './Browse2/pages/TypeVersionsPage';
-import {useQuery} from './Browse2/pages/util';
+} from './Browse3/context';
+import {BoardPage} from './Browse3/pages/BoardPage';
+import {BoardsPage} from './Browse3/pages/BoardsPage';
+import {CallPage} from './Browse3/pages/CallPage';
+import {CallsPage} from './Browse3/pages/CallsPage';
+import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
+import {WeaveflowORMContextProvider} from './Browse3/pages/interface/wf/context';
+import {WFNaiveProject} from './Browse3/pages/interface/wf/naive';
+import {ObjectPage} from './Browse3/pages/ObjectPage';
+import {ObjectsPage} from './Browse3/pages/ObjectsPage';
+import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
+import {ObjectVersionsPage} from './Browse3/pages/ObjectVersionsPage';
+import {OpPage} from './Browse3/pages/OpPage';
+import {OpsPage} from './Browse3/pages/OpsPage';
+import {OpVersionPage} from './Browse3/pages/OpVersionPage';
+import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {TablePage} from './Browse3/pages/TablePage';
+import {TablesPage} from './Browse3/pages/TablesPage';
+import {TypePage} from './Browse3/pages/TypePage';
+import {TypesPage} from './Browse3/pages/TypesPage';
+import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
+import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
+import {useQuery} from './Browse3/pages/util';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='

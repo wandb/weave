@@ -1,8 +1,8 @@
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
-import {nodeFromExtra} from '../Browse2ObjectVersionItemPage';
-import {WeaveEditor} from '../WeaveEditors';
+import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
+import {WeaveEditor} from '../../Browse2/WeaveEditors';
 import {CallsTable} from './CallsPage';
 import {useMakeNewBoard} from './common/hooks';
 import {CallLink, ObjectLink, TypeVersionLink} from './common/Links';

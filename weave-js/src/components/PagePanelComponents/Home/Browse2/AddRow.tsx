@@ -21,8 +21,8 @@ import {
 } from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
-import {useWeaveflowORMContext} from './pages/interface/wf/context';
-import {WFNaiveProject} from './pages/interface/wf/naive';
+import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
 import {ProjectNamePicker} from './ProjectPicker';
 import {refPageUrl} from './url';
 

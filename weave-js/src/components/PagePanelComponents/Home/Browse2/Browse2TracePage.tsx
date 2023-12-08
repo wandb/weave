@@ -2,7 +2,7 @@ import React, {FC, useCallback} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {Browse2Trace} from './Browse2Trace';
-import {useWeaveflowRouteContext} from './context';
+import {useWeaveflowRouteContext} from '../Browse3/context';
 
 interface Browse2TracePageParams {
   entity: string;
