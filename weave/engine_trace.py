@@ -25,12 +25,12 @@ from ddtrace import Tracer as ddtrace_tracer, span as ddtrace_span
 
 # wraps ddtrace tracer and span to add PII support
 class PIISpan(ddtrace_span.Span):
-    def set_tag(self, key, val, pii_val):
+    def set__pii_tag(self, key, val, pii_val):
         super().set_tag(key, pii_val) if os.getenv(
             "DISABLE_WEAVE_PII"
         ) else super().set_tag(key, val)
 
-    def set_metric(self, key, val, pii_val):
+    def set_pii_metric(self, key, val, pii_val):
         super().set_metric(key, pii_val) if os.getenv(
             "DISABLE_WEAVE_PII"
         ) else super().set_metric(key, val)
@@ -56,7 +56,7 @@ class DummySpan:
         logs.reset_indent(self.log_indent_token)
         logging.debug("<- %s", self.args[0])
 
-    def set_tag(self, key, val, pii_val):
+    def set_pii_tag(self, key, val, pii_val):
         pass
 
     def set_meta(self, key, val, pii_val):
@@ -168,7 +168,7 @@ class WeaveTraceSpan:
             self.span.attributes = {}
         return self.span.attributes
 
-    def set_tag(self, key, val, pii_val):
+    def set_pii_tag(self, key, val, pii_val):
         if "tags" not in self.attributes:
             self.attributes["tags"] = {}
         if os.getenv("DISABLE_WEAVE_PII"):
