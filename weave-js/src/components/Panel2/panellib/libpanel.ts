@@ -7,7 +7,6 @@ import {
 } from '@wandb/weave/core';
 
 import {ConfiguredTransform} from '../panel';
-import {PanelCategory} from '../PanelRegistry';
 
 // Generic parameters:
 // Globals
@@ -53,6 +52,10 @@ interface Dimensions {
   width: number | undefined;
   height: number | undefined;
 }
+
+// Category for grouping types in the Panel Type selector.
+// We expect this set to change based on feedback.
+export type PanelCategory = 'Primitive' | 'Data' | 'Organize' | 'Other';
 
 export interface PanelSpec<X, C, T extends Type> {
   id: string;

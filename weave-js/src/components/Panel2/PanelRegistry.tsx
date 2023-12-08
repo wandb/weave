@@ -82,10 +82,6 @@ export type ConverterSpecArray = Panel.PanelConvertSpec[];
 
 let panelSpecs: Panel.PanelSpec[] = [];
 
-// Category for grouping types in the Panel Type selector.
-// We expect this set to change based on feedback.
-export type PanelCategory = 'Primitive' | 'Data' | 'Organize' | 'Other';
-
 const initSpecs = () => {
   if (panelSpecs.length === 0) {
     panelSpecs = [
