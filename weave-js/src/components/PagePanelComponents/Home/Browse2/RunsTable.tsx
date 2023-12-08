@@ -15,7 +15,7 @@ import {Link, useParams} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {OpVersionLink} from '../Browse3/pages/common/Links';
-import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {useMaybeWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
@@ -84,11 +84,11 @@ export const RunsTable: FC<{
       })),
     [spans]
   );
-  const orm = useWeaveflowORMContext();
+  const orm = useMaybeWeaveflowORMContext();
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const tableData = useMemo(() => {
     return spans.map((call: SpanWithFeedback) => {
-      const ormCall = orm.projectConnection.call(call.span_id);
+      const ormCall = orm?.projectConnection.call(call.span_id);
       const argOrder = call.inputs._input_order;
       let args = _.fromPairs(
         Object.entries(call.inputs).filter(
@@ -102,9 +102,9 @@ export const RunsTable: FC<{
       return {
         id: call.span_id,
         ormCall,
-        opVersion: ormCall.opVersion()?.op()?.name(),
-        isRoot: ormCall.parentCall() == null,
-        opCategory: ormCall.opVersion()?.opCategory(),
+        opVersion: ormCall?.opVersion()?.op()?.name(),
+        isRoot: ormCall?.parentCall() == null,
+        opCategory: ormCall?.opVersion()?.opCategory(),
         trace_id: call.trace_id,
         status_code: call.status_code,
         timestampMs: call.timestamp,
@@ -150,7 +150,7 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [orm.projectConnection, spans]);
+  }, [orm?.projectConnection, spans]);
 
   const columns = useMemo(() => {
     const cols: GridColDef[] = [

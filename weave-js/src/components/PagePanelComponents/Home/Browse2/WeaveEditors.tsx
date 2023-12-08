@@ -53,7 +53,7 @@ import React, {
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
-import {useWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
+import {useMaybeWeaveflowORMContext} from '../Browse3/pages/interface/wf/context';
 import {WFNaiveProject} from '../Browse3/pages/interface/wf/naive';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
@@ -141,7 +141,7 @@ const WeaveEditorCommit: FC<{
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
-  const orm = useWeaveflowORMContext();
+  const orm = useMaybeWeaveflowORMContext();
   const handleSubmit = useCallback(async () => {
     setWorking('addingRow');
 
@@ -179,8 +179,8 @@ const WeaveEditorCommit: FC<{
       rootObjectRef.artifactName
     );
 
-    if ((orm.projectConnection as WFNaiveProject).reload) {
-      await (orm.projectConnection as WFNaiveProject).reload();
+    if ((orm?.projectConnection as WFNaiveProject).reload) {
+      await (orm!.projectConnection as WFNaiveProject).reload();
     }
 
     setWorking('done');
@@ -194,7 +194,7 @@ const WeaveEditorCommit: FC<{
     rootObjectRef.entityName,
     rootObjectRef.projectName,
     rootObjectRef.artifactName,
-    orm.projectConnection,
+    orm,
     handleClearEdits,
     history,
     objType,

@@ -16,6 +16,11 @@ export const useWeaveflowORMContext = () => {
   return ctx;
 };
 
+export const useMaybeWeaveflowORMContext = () => {
+  const ctx = useContext(WeaveflowORMContext);
+  return ctx;
+};
+
 export const WeaveflowORMContextProvider = ({
   children,
   projectConnection,
