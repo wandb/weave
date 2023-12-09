@@ -1,6 +1,7 @@
 import * as RadixSlider from '@radix-ui/react-slider';
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
+
 import {Tailwind} from '../Tailwind';
 
 export type SliderRootProps = React.ComponentProps<typeof RadixSlider.Root>;

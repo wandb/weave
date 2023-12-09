@@ -11,6 +11,7 @@ from . import util
 
 ARROW_WEAVE_LIST_TIMESTAMP_TYPE = ArrowWeaveListType(types.Timestamp())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
+ARROW_WEAVE_LIST_TIMEDELTA_TYPE = ArrowWeaveListType(types.TimeDelta())
 
 binary_input_type = {
     "self": ARROW_WEAVE_LIST_TIMESTAMP_TYPE,
@@ -146,3 +147,47 @@ def timestamp_min(self):
 def timestamp_max(self):
     array = self._arrow_data_asarray_no_tags()
     return pc.max(array).as_py()
+
+
+@arrow_op(
+    name="ArrowWeaveListDate-sub",
+    input_type={
+        "self": ArrowWeaveListType(types.optional(types.Timestamp())),
+        "other": types.UnionType(types.Timestamp(), ARROW_WEAVE_LIST_TIMESTAMP_TYPE),
+    },
+    output_type=ArrowWeaveListType(types.TimeDelta()),
+)
+def sub(self, other):
+    if isinstance(other, ArrowWeaveList):
+        other = other._arrow_data
+    return ArrowWeaveList(
+        pc.subtract(self._arrow_data, other), types.TimeDelta(), self._artifact
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveListDate-add",
+    input_type={
+        "self": ArrowWeaveListType(types.optional(types.Timestamp())),
+        "other": types.UnionType(types.TimeDelta(), ARROW_WEAVE_LIST_TIMEDELTA_TYPE),
+    },
+    output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
+)
+def add(self, other):
+    if isinstance(other, ArrowWeaveList):
+        other = other._arrow_data
+    return ArrowWeaveList(
+        pc.add(self._arrow_data, other),
+        types.optional(types.Timestamp()),
+        self._artifact,
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveListTimeDelta-totalSeconds",
+    input_type={"td": ArrowWeaveListType(types.TimeDelta())},
+    output_type=ArrowWeaveListType(types.Number()),
+)
+def timedelta_total_seconds(td):
+    new_arrow_data = pc.divide(pc.cast(td._arrow_data, pa.int64()), 1e6)
+    return ArrowWeaveList(new_arrow_data, types.Number(), td._artifact)

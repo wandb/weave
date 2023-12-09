@@ -7,12 +7,14 @@ from . import op_args
 from . import weave_types as types
 from . import infer_types
 
+InputTypeItemType = typing.Union[types.Type, typing.Callable[..., types.Type]]
+InputTypeType = typing.Union[op_args.OpArgs, typing.Mapping[str, InputTypeItemType]]
+MaybeInputTypeType = typing.Optional[InputTypeType]
+
 
 def determine_input_type(
     pyfunc: typing.Callable,
-    expected_input_type: typing.Optional[
-        typing.Union[op_args.OpArgs, typing.Dict[str, types.Type]]
-    ] = None,
+    expected_input_type: MaybeInputTypeType = None,
     # TODO: I really don't like this boolean flag here.
     allow_unknowns: bool = False,
 ) -> op_args.OpArgs:
@@ -104,11 +106,13 @@ def determine_input_type(
     return weave_input_type
 
 
+OutputTypeType = typing.Union[types.Type, typing.Callable[..., types.Type]]
+MaybeOutputTypeType = typing.Optional[OutputTypeType]
+
+
 def determine_output_type(
     pyfunc: typing.Callable,
-    expected_output_type: typing.Optional[
-        typing.Union[types.Type, typing.Callable[..., types.Type]]
-    ] = None,
+    expected_output_type: MaybeOutputTypeType = None,
     allow_unknowns: bool = False,
 ) -> typing.Union[types.Type, typing.Callable[..., types.Type]]:
     type_hints = _get_type_hints(pyfunc)
@@ -161,9 +165,7 @@ def get_signature(pyfunc: typing.Callable) -> inspect.Signature:
     return inspect.signature(pyfunc)
 
 
-def _create_args_from_op_input_type(
-    input_type: typing.Union[op_args.OpArgs, typing.Dict[str, types.Type]]
-) -> op_args.OpArgs:
+def _create_args_from_op_input_type(input_type: InputTypeType) -> op_args.OpArgs:
     if isinstance(input_type, op_args.OpArgs):
         return input_type
     if not isinstance(input_type, dict):

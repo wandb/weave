@@ -15,14 +15,15 @@ import {
   absoluteTargetMutation,
   makeMutation,
   useClientContext,
+  useMakeMutation,
   useNodeValue,
   useRefreshAllNodes,
 } from '@wandb/weave/react';
+import moment from 'moment';
 import {useCallback, useMemo} from 'react';
 
-import {usePanelContext} from './PanelContext';
-import moment from 'moment';
 import {uriFromNode} from '../PagePanelComponents/util';
+import {usePanelContext} from './PanelContext';
 
 export const useBoardGeneratorsForNode = (
   node: Node,
@@ -79,6 +80,16 @@ export const getNamePartFromURI = (uri: string) => {
   }
   parts = parts[1].split(':')[0].split('/');
   return parts[parts.length - 1];
+};
+
+export const getPartsFromURI = (uri: string) => {
+  const parts = uri.split('://');
+  if (parts.length !== 2) {
+    return null;
+  }
+  const artifactName = parts[1].split(':')[0];
+  const entityProjectNameList = artifactName.split('/');
+  return entityProjectNameList;
 };
 
 const getNameFromRootURINode = (node: Node) => {
@@ -166,6 +177,52 @@ const makeBoardName = (
   const suffix = moment().format('YY_MM_DD_hh_mm_ss');
   return `${objectName}${prefix}-${suffix}`;
 };
+
+export function useMakePublicBoardFromNode() {
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
+  const makeMutation2 = useMakeMutation();
+
+  return useCallback(
+    (
+      inputNode: Node,
+      onCreated: (newPanel: Node) => void,
+      boardTemplate: string,
+      boardName?: string,
+      projectName?: string,
+      entityName?: string
+    ) => {
+      boardName = makeBoardName(boardTemplate, inputNode, boardName);
+      if (!(entityName && projectName)) {
+        const uri = getRootURIFromNode(inputNode);
+        if (!uri) {
+          return null;
+        }
+        const parts = getPartsFromURI(uri);
+        if (!parts) {
+          return null;
+        }
+        entityName = parts[0];
+        projectName = parts[1];
+      }
+
+      return makeBoardFromNode(boardTemplate, inputNode, draftNode => {
+        makeMutation2(
+          draftNode,
+          'publish_artifact',
+          {
+            artifact_name: constString(boardName!),
+            project_name: constString(projectName!),
+            entity_name: constString(entityName!),
+          },
+          publishedNode => {
+            onCreated(publishedNode as any);
+          }
+        );
+      });
+    },
+    [makeBoardFromNode, makeMutation2]
+  );
+}
 
 export const useMakeLocalBoardFromNode = () => {
   const simpleSetter = useMakeSimpleSetMutation();

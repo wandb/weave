@@ -3,6 +3,7 @@ import * as _ from 'lodash';
 import * as Urls from '../../_external/util/urls';
 import * as callFunction from '../../callers';
 import {Client, EngineClient} from '../../client';
+import {Engine} from '../../engine';
 import {refineNode} from '../../hl';
 import {nullableTaggableStrip} from '../../model';
 import {constNode, constNumber} from '../../model/graph/construction';
@@ -16,7 +17,6 @@ import * as Obj from '../../util/obj';
 import * as String from '../../util/string';
 import * as OpKinds from '../opKinds';
 import {connectionToNodes} from './util';
-import {Engine} from '../../engine';
 
 const makeRunOp = OpKinds.makeTaggingStandardOp;
 

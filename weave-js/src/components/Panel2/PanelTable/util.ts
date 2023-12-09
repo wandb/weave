@@ -11,6 +11,7 @@ import {
   Node,
   NodeOrVoidNode,
   nonNullableDeep,
+  nullableTaggableStrip,
   opIndex,
   opIndexCheckpoint,
   OpStore,
@@ -22,10 +23,30 @@ import {
 import _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
-import {useRefEqualExpr} from '../../../react';
+import {Stack} from '../../../core';
 import {usePanelContext} from '../PanelContext';
+import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';
+
+// Formatting for PanelNumbers and PanelStrings inside Tables
+export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
+  const t = nullableTaggableStrip(colType);
+  const numberFormat =
+    t === 'number'
+      ? {
+          textAlign: 'right' as const,
+          justifyContent: 'normal',
+          alignContent: 'normal',
+          padding: '4px 8px 0 0',
+        }
+      : {};
+  const stringFormat = {spacing: t === 'string'};
+  return {
+    numberFormat,
+    stringFormat,
+  };
+};
 
 export const stripTag = (type: Type): Type => {
   return isTaggedValue(type) ? taggedValueValueType(type) : type;
@@ -72,8 +93,10 @@ export const useAutomatedTableState = (
   currentTableState: Table.TableState | undefined,
   weave: WeaveInterface
 ) => {
-  let {stack} = usePanelContext();
-  ({node: input as any, stack} = useRefEqualExpr(input, stack));
+  const {stack} = usePanelContext();
+  // TODO: This was reversing stack and breaking stuff!
+  // TODO TODO TODO
+  // ({node: input as any, stack} = useRefEqualExpr(input, stack));
   const {table: autoTable} = useMemo(() => {
     const dereffedInput = dereferenceAllVars(input, stack).node as Node;
     return Table.initTableFromTableType(dereffedInput, weave);
@@ -367,4 +390,11 @@ export const useBaseTableData = (
   }, [unfilteredRowsNode, adjustedPinnedRows]);
 
   return {unpinnedData, pinnedData};
+};
+
+// This is used to determine if a PanelTable is a ChildPanel
+// We do not want to render row selection styles if the activeData of the PanelTable cannot be used
+// If PanelTable is a ChildPanel, there will exist a variable in the stack that is an input
+export const tableIsPanelVariable = (stack: Stack) => {
+  return stack && stack.find(node => node.name === 'input') !== undefined;
 };

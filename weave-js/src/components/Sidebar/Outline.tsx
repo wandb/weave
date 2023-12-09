@@ -3,6 +3,7 @@ import * as _ from 'lodash';
 import React, {useCallback, useState} from 'react';
 import styled, {css} from 'styled-components';
 
+import {Icon, IconHideHidden, IconLockClosed, IconName} from '../Icon';
 import {IconButton} from '../IconButton';
 import {getPanelStacksForType} from '../Panel2/availablePanels';
 import {ChildPanelConfig, ChildPanelFullConfig} from '../Panel2/ChildPanel';
@@ -10,14 +11,14 @@ import {
   IconCaret as IconCaretUnstyled,
   IconOverflowHorizontal as IconOverflowHorizontalUnstyled,
 } from '../Panel2/Icons';
-import {panelChildren} from '../Panel2/panelTree';
-import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
 import {
   usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
-import {Icon, IconHideHidden, IconLockClosed, IconName} from '../Icon';
+import {panelChildren} from '../Panel2/panelTree';
 import {Tooltip} from '../Tooltip';
+import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
 
 const OutlineItem = styled.div``;
 OutlineItem.displayName = 'S.OutlineItem';
@@ -290,7 +291,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
 };
 
 export interface OutlineProps {
-  config: ChildPanelFullConfig;
+  config: ChildPanelFullConfig<PanelGroupConfig>;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2: (
     change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig

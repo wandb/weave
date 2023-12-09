@@ -1,19 +1,19 @@
-import {SetPreviewNodeType} from './common';
-import React from 'react';
-import * as LayoutElements from './LayoutElements';
-import {Type, opGetFeaturedBoardTemplates} from '@wandb/weave/core';
-import {useNodeValue} from '@wandb/weave/react';
-import {Panel2Loader} from '../../Panel2/PanelComp';
-
-import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
-import {HomeFeaturedTemplateDrawer} from './HomeFeaturedTemplates';
 import {
   MOON_250,
   MOON_350,
   MOON_500,
 } from '@wandb/weave/common/css/color.styles';
-import {Button} from '../../Button';
+import {opGetFeaturedBoardTemplates, Type} from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
+import React from 'react';
 import styled from 'styled-components';
+
+import {Button} from '../../Button';
+import {Panel2Loader} from '../../Panel2/PanelComp';
+import {SetPreviewNodeType} from './common';
+import {HomeFeaturedTemplateDrawer} from './HomeFeaturedTemplates';
+import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
+import * as LayoutElements from './LayoutElements';
 
 const Template = styled(LayoutElements.VStack)`
   width: 332px;

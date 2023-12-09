@@ -3,7 +3,7 @@
  * typescript, we want to have stubs that correctly build the graph.
  */
 
-import {Node, OutputNode, Type, list, maybe, typedDict} from '../../model';
+import {list, maybe, Node, OutputNode, Type, typedDict} from '../../model';
 
 // This is similar to callOpVeryUnsafe, but with proper typing.
 export function directlyConstructOpCall<T extends Type = 'any'>(
@@ -167,6 +167,10 @@ export const opGetFeaturedBoardTemplatesForNode = (inputs: {
     inputs,
     list(typedDict({}))
   );
+};
+
+export const opRunDefaultColorIndex = (inputs: {run: Node<'run'>}) => {
+  return directlyConstructOpCall('run-defaultColorIndex', inputs, 'number');
 };
 
 export const opRunHistoryLineCount = (inputs: {run: Node<'run'>}) => {

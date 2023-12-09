@@ -18,15 +18,10 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import React, {useCallback, useEffect, useMemo} from 'react';
-import * as ConfigPanel from '../ConfigPanel';
 
 import {useWeaveContext} from '../../../context';
+import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
-
-import {
-  PanelTraceTreeTraceTableViewerCommon,
-  updateTableState,
-} from './panelTraceTreeTableViewerCommon';
 import {
   AddColumnEntries,
   addColumnsToTable,
@@ -34,6 +29,10 @@ import {
   emptyTable,
   getRowExampleNode,
 } from '../PanelTable/tableState';
+import {
+  PanelTraceTreeTraceTableViewerCommon,
+  updateTableState,
+} from './panelTraceTreeTableViewerCommon';
 
 const inputType = {
   type: 'list' as const,

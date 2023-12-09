@@ -16,6 +16,9 @@ from . import object_context
 
 from .language_features.tagging import tag_store
 
+if typing.TYPE_CHECKING:
+    from . import graph
+
 
 class FilesystemArtifactType(types.Type):
     def save_instance(
@@ -85,6 +88,11 @@ class FilesystemArtifact(artifact_base.Artifact):
     def get(self, key: str, type_: types.Type) -> typing.Any:
         return self.ref_from_local_str(key, type_).get()
 
+    def as_node(self) -> "graph.Node":
+        from .ops_primitives.weave_api import get as op_get
+
+        return op_get(str(self))
+
     @property
     def is_saved(self) -> bool:
         raise NotImplementedError
@@ -99,6 +107,10 @@ class FilesystemArtifact(artifact_base.Artifact):
     def new_file(
         self, path: str, binary: bool = False
     ) -> typing.Generator[typing.IO, None, None]:
+        raise NotImplementedError
+
+    @contextlib.contextmanager
+    def writeable_file_path(self, path: str) -> typing.Generator[str, None, None]:
         raise NotImplementedError
 
     def ref_from_local_str(self, s: str, type: "types.Type") -> "FilesystemArtifactRef":

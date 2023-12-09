@@ -1,5 +1,6 @@
 from . import wb_domain_types as wdt
 from .wandb_domain_gql import (
+    gql_direct_edge_op,
     gql_prop_op,
     gql_connection_op,
     gql_root_op,
@@ -25,7 +26,13 @@ gql_prop_op("org-name", wdt.OrgType, "name", types.String())
 
 
 # Section 4/6: Direct Relationship Ops
-
+gql_direct_edge_op(
+    "org-teams",
+    wdt.OrgType,
+    "teams",
+    wdt.EntityType,
+    is_many=True,
+)
 
 # Section 5/6: Connection Ops
 gql_connection_op(

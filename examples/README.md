@@ -48,9 +48,9 @@ Colabs to get started:
 ### Build interactive Weave Boards
 
 - in Google Colab: [Weave Board Quickstart: Generative AI Playground](https://colab.research.google.com/drive/1gcR-ucIgjDbDEBFykEpJ3kkBoBQ84Ipr)
-- [Monitor time-series data](../examples/experimental/app/Monitor.ipynb)
+- [Monitor time-series data](../examples/experimental/Monitor.ipynb)
 - [Visual storytelling](../examples/experimental/skip_test/Diffusion%20explore.ipynb)
-- [Remix art](../examples/experimental/app/art_explore.ipynb)
+- [Remix art](../examples/experimental/skip_test/art_explore.ipynb)
 
 ### Explore the Ecosystem
 

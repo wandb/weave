@@ -7,15 +7,28 @@ import {useHistory} from 'react-router-dom';
 import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
 
+import {getCookie} from '../common/util/cookie';
 import getConfig from '../config';
 import {useWeaveContext} from '../context';
+import {
+  useIsAuthenticated,
+  useIsSignupRequired,
+  useWeaveViewer,
+} from '../context/WeaveViewerContext';
+import {
+  datadogSetUserInfo,
+  DDUserInfoType,
+} from '../integrations/analytics/datadog';
 import {useNodeWithServerType} from '../react';
-import {getCookie} from '../common/util/cookie';
 import {consoleLog} from '../util';
 import {trackPage} from '../util/events';
+import {urlWandbFrontend} from '../util/urls';
+import {useWeaveAutomation} from './automation';
+import {BetaIndicator} from './PagePanelComponents/BetaIndicator';
+import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {Home} from './PagePanelComponents/Home/Home';
-import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
+import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {
   inJupyterCell,
   isServedLocally,
@@ -23,6 +36,10 @@ import {
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
+import {
+  PagePanelControlContextProvider,
+  usePagePanelControlRequestedActions,
+} from './PagePanelContext';
 import {
   CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
@@ -46,22 +63,6 @@ import {
 } from './Panel2/PanelInteractContext';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
-import {useWeaveAutomation} from './automation';
-import {
-  PagePanelControlContextProvider,
-  usePagePanelControlRequestedActions,
-} from './PagePanelContext';
-import {
-  useIsAuthenticated,
-  useIsSignupRequired,
-  useWeaveViewer,
-} from '../context/WeaveViewerContext';
-import {HelpCTA} from './PagePanelComponents/HelpCTA';
-import {urlWandbFrontend} from '../util/urls';
-import {
-  DDUserInfoType,
-  datadogSetUserInfo,
-} from '../integrations/analytics/datadog';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -83,6 +84,7 @@ const JupyterControlsHelpText = styled.div<{active: boolean}>`
   opacity: ${props => (props.active ? 0.8 : 0)};
   transition: visibility 0s, opacity 0.3s ease-in-out;
 `;
+JupyterControlsHelpText.displayName = 'S.JupyterControlsHelpText';
 
 const JupyterControlsMain = styled.div<{reveal?: boolean}>`
   position: absolute;
@@ -104,6 +106,7 @@ const JupyterControlsMain = styled.div<{reveal?: boolean}>`
   padding: 8px 0px;
   z-index: 100;
 `;
+JupyterControlsMain.displayName = 'S.JupyterControlsMain';
 
 const JupyterControlsIcon = styled.div`
   width: 25px;
@@ -120,6 +123,7 @@ const JupyterControlsIcon = styled.div`
     color: #0096ad;
   }
 `;
+JupyterControlsIcon.displayName = 'S.JupyterControlsIcon';
 
 const HOST_SESSION_ID_COOKIE = `host_session_id`;
 
@@ -468,6 +472,7 @@ const PagePanel = ({browserType}: PagePanelProps) => {
             )}
             {/* <ArtifactManager /> */}
             {!inJupyter && <HelpCTA />}
+            {!inJupyter && <BetaIndicator />}
           </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>
@@ -724,9 +729,11 @@ const WeaveRoot = styled.div<{fullScreen: boolean}>`
   background-color: ${globals.WHITE};
   color: ${globals.TEXT_PRIMARY_COLOR};
 `;
+WeaveRoot.displayName = 'S.WeaveRoot';
 
 const PageContentContainer = styled.div`
   flex: 1 1 300px;
   overflow: hidden;
   display: flex;
 `;
+PageContentContainer.displayName = 'S.PageContentContainer';

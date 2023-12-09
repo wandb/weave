@@ -68,6 +68,7 @@ import type {OpStore} from './opStore/types';
 import {findConsumingOp, isBinaryOp, opDisplayName} from './opStore/util';
 import {getStackAtNodeOrOp} from './refineHelpers';
 import {notEmpty} from './util/obj';
+import {trimStartChar} from './util/string';
 
 export interface AutosuggestResult<
   Replacement extends EditingNode | EditingOp
@@ -813,14 +814,15 @@ export async function autosuggest(
       );
     } else {
       // result = result.filter(item => item.suggestionString.includes(query));
+      const lowerQuery = trimStartChar(query, '.').toLocaleLowerCase();
       result = result.sort((a, b) => {
         return (
-          (b.suggestionString.includes(query!) ||
-          b.suggestionString.startsWith('"')
+          (b.suggestionString.startsWith('"') ||
+          b.suggestionString.toLocaleLowerCase().includes(lowerQuery)
             ? 1
             : -1) -
-          (a.suggestionString.includes(query!) ||
-          a.suggestionString.startsWith('"')
+          (a.suggestionString.startsWith('"') ||
+          a.suggestionString.toLocaleLowerCase().includes(lowerQuery)
             ? 1
             : -1)
         );

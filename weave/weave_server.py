@@ -104,6 +104,13 @@ def import_ecosystem():
 
     if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
         try:
+            from weave.weaveflow import faiss
+
+            # Turn eager mode back off.
+            context_state._eager_mode.set(False)
+        except (ImportError, OSError, wandb.Error):
+            print("Error: Couldn't import faiss module for Weaveflow.")
+        try:
             from weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
@@ -386,6 +393,11 @@ def send_local_file(path):
     if local_artifacts_path not in list(abspath.parents):
         abort(403)
     return send_from_directory("/", path)
+
+
+@blueprint.before_request
+def _disable_eager_mode():
+    context_state._eager_mode.set(False)
 
 
 def frontend_env():

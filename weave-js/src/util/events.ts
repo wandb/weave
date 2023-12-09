@@ -1,5 +1,6 @@
 import Analytics from '@segment/analytics.js-core/build/analytics';
 import SegmentIntegration from '@segment/analytics.js-integration-segmentio';
+
 import getConfig from '../config';
 
 let isSetup = false;

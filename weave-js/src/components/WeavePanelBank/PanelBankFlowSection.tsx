@@ -18,14 +18,15 @@ import EmptyPanelBankSectionWatermark from './PanelBankEmptySectionWatermark';
 import {
   getBoxDimensions,
   getPagingParams,
+  getSnappedDimension,
+  getSnappedItemCount,
   isMobile,
   panelOnActivePage,
-  getSnappedItemCount,
-  getSnappedDimension,
 } from './panelbankFlow';
 import {isFirefox} from './panelbankUtil';
 
 type AllPanelBankFlowSectionProps = PanelBankSectionComponentSharedProps & {
+  panelBankSectionConfigRef: Required<PanelBankSectionConfig>;
   flowConfig: PanelBankFlowSectionConfig;
   currentPage: number;
   setCurrentPage: (newCurrentPage: number) => void;
@@ -378,7 +379,7 @@ export function actionSetFlowConfig(
 ): PanelBankSectionConfig {
   return produce(sectionConfig, draft => {
     draft.flowConfig = {
-      ...sectionConfig.flowConfig,
+      ...sectionConfig.flowConfig!,
       ...newFlowConfig,
     };
   });
@@ -405,7 +406,9 @@ const PanelBankFlowSectionComp = (
     ) => void;
   } & PanelBankSectionComponentSharedProps
 ) => {
-  const {panelBankSectionConfigRef, updateConfig} = props;
+  const {updateConfig} = props;
+  const panelBankSectionConfigRef =
+    props.panelBankSectionConfigRef as Required<PanelBankSectionConfig>;
   const {flowConfig} = panelBankSectionConfigRef;
 
   const updateFlowConfig = useAction(updateConfig, actionSetFlowConfig);
@@ -428,6 +431,7 @@ const PanelBankFlowSectionComp = (
   return (
     <PanelBankFlowSectionInnerComp
       {...props}
+      panelBankSectionConfigRef={panelBankSectionConfigRef}
       currentPage={currentPage}
       setCurrentPage={setCurrentPage}
       flowConfig={flowConfig}

@@ -1,8 +1,9 @@
+import moment from 'moment';
+
 import {constNone, constTimestamp} from '../../model';
 import {testClient} from '../../testUtil';
 import {opTimestampMax, opTimestampRelativeStringAutoFormat} from './date';
 import {opArray} from './literals';
-import moment from 'moment';
 
 describe('date ops', () => {
   describe('relativeStringAutoFormat', () => {

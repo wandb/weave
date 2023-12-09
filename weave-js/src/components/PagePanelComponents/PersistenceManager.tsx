@@ -1,22 +1,31 @@
 import {useMutation as useApolloMutation} from '@apollo/client';
-import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {Popover} from '@material-ui/core';
 import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isMac} from '@wandb/weave/common/util/browser';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {
-  NodeOrVoidNode,
-  OutputNode,
+  constString,
   isConstNode,
   isOutputNode,
   mapNodes,
+  NodeOrVoidNode,
+  opGet,
   opProjectArtifact,
   opRootProject,
-  constString,
+  OutputNode,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
+import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 import {useMutation, useNodeWithServerType} from '@wandb/weave/react';
+import {useNodeValue} from '@wandb/weave/react';
+import {urlProjectAssets} from '@wandb/weave/urls';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import _ from 'lodash';
+import moment from 'moment';
 import React, {
   Dispatch,
   SetStateAction,
@@ -26,11 +35,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {Button, Input, Modal} from 'semantic-ui-react';
 import {useHistory} from 'react-router-dom';
-
-import {Popover} from '@material-ui/core';
+import {Button, Input, Modal} from 'semantic-ui-react';
 import styled, {css} from 'styled-components';
+
+import {getFullChildPanel} from '../Panel2/ChildPanel';
 import {
   IconAddNew,
   IconBack,
@@ -44,23 +53,33 @@ import {
   IconUp as IconUpUnstyled,
   IconWeaveLogo,
 } from '../Panel2/Icons';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
+import {
+  useNewDashFromItems,
+  useNewPanelFromRootQueryCallback,
+} from '../Panel2/PanelRootBrowser/util';
+import {mapPanels} from '../Panel2/panelTree';
+import {DeleteActionModal} from './DeleteActionModal';
+import {UPDATE_ARTIFACT_COLLECTION} from './graphql';
+import {DELETE_ARTIFACT_SEQUENCE} from './graphql';
 import {
   useBranchPointFromURIString,
   usePreviousVersionFromURIString,
 } from './hooks';
 import {
+  getAvailableActions,
   PersistenceAction,
   PersistenceDeleteActionType,
   PersistenceRenameActionType,
   PersistenceState,
   PersistenceStoreActionType,
   TakeActionType,
-  getAvailableActions,
   useStateMachine,
 } from './persistenceStateMachine';
+import {PublishModal} from './PublishModal';
 import {
-  BranchPointType,
   branchPointIsRemote,
+  BranchPointType,
   determineURIIdentifier,
   determineURISource,
   isLocalURI,
@@ -68,23 +87,6 @@ import {
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './util';
-import moment from 'moment';
-import {
-  useNewDashFromItems,
-  useNewPanelFromRootQueryCallback,
-} from '../Panel2/PanelRootBrowser/util';
-import {PanelGroupConfig} from '../Panel2/PanelGroup';
-import {getFullChildPanel} from '../Panel2/ChildPanel';
-import {useNodeValue} from '@wandb/weave/react';
-import _ from 'lodash';
-import {mapPanels} from '../Panel2/panelTree';
-import {DeleteActionModal} from './DeleteActionModal';
-import {PublishModal} from './PublishModal';
-import {DELETE_ARTIFACT_SEQUENCE} from './graphql';
-import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
-import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
-import {trackPublishBoardClicked} from '@wandb/weave/util/events';
-import {urlProjectAssets} from '@wandb/weave/urls';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -223,7 +225,9 @@ const HeaderLeftControls = styled.div`
   flex: 1 1 30px;
 `;
 
-const WeaveLogo = styled(IconWeaveLogo)<{open: boolean}>`
+const WeaveLogo = styled(IconWeaveLogo).attrs({
+  className: 'night-aware',
+})<{open: boolean}>`
   width: 32px;
   height: 32px;
   transform: rotate(${props => (props.open ? 180 : 0)}deg);
@@ -314,6 +318,7 @@ const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
   commit: 'Publish changes',
   rename_local: 'Rename',
+  commit_rename: 'Rename & publish',
   publish_as: 'Publish As',
   publish_new: 'Publish board',
   rename_remote: 'Rename',
@@ -392,6 +397,9 @@ const HeaderFileControls: React.FC<{
     DELETE_ARTIFACT_SEQUENCE
   );
   const isLocal = maybeURI != null && isLocalURI(maybeURI);
+  const [updateArtifactCollection] = useApolloMutation(
+    UPDATE_ARTIFACT_COLLECTION
+  );
   const entityProjectName = determineURISource(maybeURI, branchPoint);
   const {name: currName, version: currentVersion} =
     determineURIIdentifier(maybeURI);
@@ -436,6 +444,40 @@ const HeaderFileControls: React.FC<{
     skip: entityName === '' || projectName === '',
   });
 
+  const artifactSequenceID = useMemo(() => {
+    return !artifactNodeValue.loading && artifactNodeValue.result
+      ? (artifactNodeValue.result.id as any)
+      : '';
+  }, [artifactNodeValue.result, artifactNodeValue.loading]);
+
+  const renameRemoteBoard = useCallback(
+    async (newName: string) => {
+      try {
+        await updateArtifactCollection({
+          variables: {
+            artifactSequenceID,
+            name: newName,
+          },
+        });
+        // Refresh the board
+        const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
+        updateNode(opGet({uri: constString(uri)}));
+        setActing(false);
+        setActionRenameOpen(false);
+      } catch (e) {
+        console.error('Failed to rename artifact collection.');
+        toast('Something went wrong while trying to rename this board.');
+      }
+    },
+    [
+      entityName,
+      projectName,
+      updateNode,
+      artifactSequenceID,
+      updateArtifactCollection,
+    ]
+  );
+
   const resetAfterDeletion = useCallback(() => {
     setActing(false);
     setActionDeleteOpen(false);
@@ -447,10 +489,6 @@ const HeaderFileControls: React.FC<{
   }, [entityName, projectName, history, goHome]);
 
   const deleteRemoteBoard = useCallback(async () => {
-    const artifactSequenceID =
-      !artifactNodeValue.loading && artifactNodeValue.result
-        ? artifactNodeValue.result.id
-        : '';
     try {
       await deleteArtifactCollection({
         variables: {
@@ -461,11 +499,7 @@ const HeaderFileControls: React.FC<{
       console.error('Failed to delete artifact collection.');
       toast('Something went wrong while trying to delete this board.');
     }
-  }, [
-    artifactNodeValue.result,
-    artifactNodeValue.loading,
-    deleteArtifactCollection,
-  ]);
+  }, [deleteArtifactCollection, artifactSequenceID]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -516,7 +550,7 @@ const HeaderFileControls: React.FC<{
             onClick={() => {
               setAnchorFileEl(headerEl);
             }}>
-            {entityProjectName.entity}/{entityProjectName.project}/
+            {entityName}/{projectName}/
           </HeaderCenterControlsSecondary>
         )}
         <HeaderCenterControlsPrimary
@@ -665,12 +699,19 @@ const HeaderFileControls: React.FC<{
           actionName={renameAction}
           open={actionRenameOpen}
           onClose={() => setActionRenameOpen(false)}
-          onRename={newName => {
-            setActing(true);
-            takeAction(renameAction, {name: newName}, () => {
-              setActing(false);
-              setActionRenameOpen(false);
-            });
+          onRename={async newName => {
+            if (renameAction === 'rename_remote') {
+              renameRemoteBoard(newName);
+            } else if (renameAction === 'commit_rename') {
+              setActing(true);
+              takeAction('commit', {name: newName}, () => {
+                renameRemoteBoard(newName).then(() => {
+                  // console.log("Board renamed successfully.")
+                });
+              });
+            } else {
+              takeAction(renameAction, {name: newName});
+            }
           }}
         />
       )}

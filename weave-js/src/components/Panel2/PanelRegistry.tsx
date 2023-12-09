@@ -37,6 +37,7 @@ import {Spec as PlotSpec} from './PanelPlot/PanelPlot';
 import {Spec as PrecomputedHistogramSpec} from './PanelPrecomputedHistogram';
 import {Spec as ProjectionSpec} from './PanelProjectionConverter';
 import {Spec as ProjectOverviewSpec} from './PanelProjectOverview';
+import {Spec as RawFallbackSpec} from './PanelRawFallback';
 import {weavePythonPanelSpecs} from './PanelRegistryWeavePython';
 // converters
 import {Spec as RowSpec} from './PanelRow';
@@ -51,19 +52,18 @@ import {TableSpec} from './PanelTable/PanelTable';
 // import {Spec as NumberToTimestampSpec} from './PanelNumberToTimestamp';
 import {Spec as MultiTableSpec2} from './PanelTableMerge';
 import {Spec as TraceSpec} from './PanelTrace';
-import {Spec as TraceTreeModelSpec} from './PanelTraceTree/PanelTraceTreeModel';
-import {Spec as PanelTraceTreeTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer';
-import {Spec as PanelTraceTreeFromHistoryTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeFromHistoryTableViewer';
-import {Spec as TraceTreeTraceSpec} from './PanelTraceTree/PanelTraceTreeTrace';
 import {Spec as PanelTraceSpec} from './PanelTraceTree/PanelTrace';
 import {Spec as PanelTraceSpanSpec} from './PanelTraceTree/PanelTraceSpan';
 import {Spec as PanelTraceSpanModelSpec} from './PanelTraceTree/PanelTraceSpanModel';
+import {Spec as PanelTraceTreeFromHistoryTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeFromHistoryTableViewer';
+import {Spec as TraceTreeModelSpec} from './PanelTraceTree/PanelTraceTreeModel';
+import {Spec as PanelTraceTreeTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer';
+import {Spec as TraceTreeTraceSpec} from './PanelTraceTree/PanelTraceTreeTrace';
 import {Spec as TypeSpec} from './PanelType';
 import {Spec as UnknownSpec} from './PanelUnknown';
 import {Spec as VideoSpec} from './PanelVideo';
 import {Spec as WBObjectSpec} from './PanelWBObject';
 import {Spec as WebVizSpec} from './PanelWebViz';
-import {Spec as RawFallbackSpec} from './PanelRawFallback';
 
 // TODO: Wrap Panel components with makeSpec calls
 

@@ -8,6 +8,7 @@ import {Error as VegaLogLevelError, transforms, View as VegaView} from 'vega';
 
 import {useDeepMemo} from '../../state/hooks';
 import * as QueryResult from '../../state/queryGraph/queryResult';
+import {printPDFInNewWindow} from '../../util/printPDF';
 import {RunColorConfig} from '../../util/section';
 import {UserSettings} from '../../util/vega2';
 import {
@@ -28,7 +29,6 @@ import {WBSelect} from '../WBSelect';
 import * as S from './CustomPanelRenderer.styles';
 import Rasterize from './Rasterize';
 import {patchWBVegaSpec} from './vegaSpecPatches';
-import {printPDFInNewWindow} from '../../util/printPDF';
 
 type PanelExportRef = {
   onDownloadSVG: (name: string) => Promise<void>;

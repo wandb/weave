@@ -1,48 +1,47 @@
+import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
+import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
+import {MOON_50} from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
+import {Icon} from '@wandb/weave/components/Icon';
 import {
+  constBoolean,
   constFunction,
   constNodeUnsafe,
-  isFunctionLiteral,
-  varNode,
-  voidNode,
-  Node,
-  opStringEqual,
+  constNumber,
   constString,
-  opIndex,
-  opPick,
-  pickSuggestions,
-  opUnique,
+  isFunctionLiteral,
+  Node,
   NodeOrVoidNode,
   opAnd,
-  Type,
-  opStringNotEqual,
-  opNumberEqual,
-  opNumberNotEqual,
-  opNumberLess,
-  opNumberLessEqual,
-  opNumberGreater,
-  opNumberGreaterEqual,
   opBooleanEqual,
   opBooleanNotEqual,
-  constNumber,
-  constBoolean,
+  opIndex,
+  opNumberEqual,
+  opNumberGreater,
+  opNumberGreaterEqual,
+  opNumberLess,
+  opNumberLessEqual,
+  opNumberNotEqual,
   opOr,
+  opPick,
+  opStringEqual,
+  opStringNotEqual,
+  opUnique,
+  pickSuggestions,
+  Type,
+  varNode,
+  voidNode,
   // opLimit,
 } from '@wandb/weave/core';
-import {Icon} from '@wandb/weave/components/Icon';
-import {Button} from '@wandb/weave/components/Button';
-import {MOON_50} from '@wandb/weave/common/css/color.styles';
-
 import * as _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
+import {Popup} from 'semantic-ui-react';
 
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
-import {Popup} from 'semantic-ui-react';
-import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
-import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
-import {VisualEditorMode, getSimpleKeyType} from './visualEditors';
+import {getSimpleKeyType, VisualEditorMode} from './visualEditors';
 
 const inputType = {
   type: 'function' as const,

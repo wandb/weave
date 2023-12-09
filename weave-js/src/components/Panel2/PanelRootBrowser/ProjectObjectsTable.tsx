@@ -12,6 +12,7 @@ import {
 } from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import React, {useCallback, useMemo} from 'react';
+import styled from 'styled-components';
 
 import * as Panel2 from '../panel';
 import {PanelCard} from '../PanelCard';
@@ -25,7 +26,6 @@ import {
   useCopiedVariableName,
   useNewPanelFromRootQueryCallback,
 } from './util';
-import styled from 'styled-components';
 
 const useUniqueTypeNames = (projectNode: Node) => {
   const unique = opUnique({

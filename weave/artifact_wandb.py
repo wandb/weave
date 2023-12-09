@@ -12,6 +12,8 @@ from wandb import Artifact
 from wandb.apis import public as wb_public
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
+from .urls import BROWSE3_PATH
+
 
 from . import uris
 from . import util
@@ -24,6 +26,8 @@ from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
 from . import memo
+from . import eager
+from . import graph_client_context
 from .wandb_interface import wandb_artifact_pusher
 from . import engine_trace
 
@@ -31,6 +35,7 @@ from urllib import parse
 
 if typing.TYPE_CHECKING:
     from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+    from . import run
 
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -97,7 +102,12 @@ class WandbArtifactManifest:
 def get_wandb_read_artifact(path: str):
     tracer = engine_trace.tracer()
     with tracer.trace("get_wandb_read_artifact"):
-        return wandb_client_api.wandb_public_api().artifact(path)
+        try:
+            return wandb_client_api.wandb_public_api().artifact(path)
+        except wandb_client_api.WandbCommError:
+            raise errors.WeaveArtifactVersionNotFound(
+                f"Could not find artifact with path {path} in W&B"
+            )
 
 
 def is_valid_version_index(version_index: str) -> bool:
@@ -571,7 +581,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
-            raise FileNotFoundError("Path not in artifact")
+            raise FileNotFoundError("Path not in artifact %s %s" % (self, name))
         return self.io_service.fs.path(fs_path)
 
     def size(self, path: str) -> int:
@@ -613,6 +623,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             yield f
 
     @contextlib.contextmanager
+    def writeable_file_path(self, path):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            full_path = os.path.join(tmpdir, path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            yield full_path
+            self._writeable_artifact.add_file(full_path, path)
+
+    @contextlib.contextmanager
     def new_dir(self, path):
         if not self._writeable_artifact:
             raise errors.WeaveInternalError("cannot add new file to readonly artifact")
@@ -645,6 +663,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         project: str = DEFAULT_WEAVE_OBJ_PROJECT,
         entity_name: typing.Optional[str] = None,
         branch: typing.Optional[str] = None,
+        artifact_collection_exists: bool = False,
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
@@ -654,6 +673,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             project,
             entity_name,
             additional_aliases,
+            artifact_collection_exists=artifact_collection_exists,
             _lite_run=_lite_run,
         )
         version = res.version_str if branch is None else branch
@@ -807,6 +827,27 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             WandbArtifact(uri.name, uri=uri),
             path=uri.path,
         )
+
+    def input_to(self) -> eager.WeaveIter["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_input_to(self)
+
+    def output_of(self) -> typing.Optional["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_output_of(self)
+
+    @property
+    def ui_url(self):
+        root_type = self.type.root_type_class()
+        from .op_def_type import OpDefType
+
+        if issubclass(root_type, OpDefType):
+            return f"http://localhost:3000/{BROWSE3_PATH}/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/ops/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
+        else:
+            return f"http://localhost:3000/{BROWSE3_PATH}/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/objects/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
+
+        # Before Tim's Weaveflow changes
+        # return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
 
 
 types.WandbArtifactRefType.instance_class = WandbArtifactRef

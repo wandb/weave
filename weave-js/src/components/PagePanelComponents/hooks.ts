@@ -1,15 +1,16 @@
 import {
   constNone,
   constString,
+  opFilesystemArtifactPreviousUri,
+  opFilesystemArtifactRootFromUri,
+  opGenerateCodeForObject,
+  opGet,
   opRef,
   opRefBranchPoint,
-  opFilesystemArtifactRootFromUri,
-  opFilesystemArtifactPreviousUri,
-  opGet,
-  opGenerateCodeForObject,
 } from '@wandb/weave/core';
 import {useClientContext, useNodeValue} from '@wandb/weave/react';
 import {useCallback, useMemo, useState} from 'react';
+
 import {BranchPointType, isLocalURI} from './util';
 
 export const useBranchPointFromURIString = (

@@ -1,38 +1,38 @@
-import React, {useCallback, useMemo} from 'react';
-import _ from 'lodash';
-
 import {
+  constNodeUnsafe,
   constString,
   defaultLanguageBinding,
   escapeDots,
   isAssignableTo,
-  isTypedDictLike,
-  opObjGetAttr,
-  opPick as actualOpPick,
-  typedDictPropertyTypes,
-  varNode,
   isObjectType,
-  Node,
-  unionObjectTypeAttrTypes,
   isObjectTypeLike,
-  Type,
+  isTypedDictLike,
+  Node,
   nonNullable,
   opIsNone,
+  opObjGetAttr,
+  opPick as actualOpPick,
+  Type,
   typedDict,
+  typedDictPropertyTypes,
   TypedDictType,
-  constNodeUnsafe,
+  unionObjectTypeAttrTypes,
+  varNode,
 } from '@wandb/weave/core';
-
+import {useNodeValue} from '@wandb/weave/react';
+import _ from 'lodash';
+import React, {useCallback, useMemo} from 'react';
 import {Icon} from 'semantic-ui-react';
+
 import {useWeaveContext} from '../../context';
-import * as Panel2 from './panel';
+import {ChildPanel} from './ChildPanel';
+import * as ConfigPanel from './ConfigPanel';
 import * as KeyValTable from './KeyValTable';
-import {PanelString, Spec as PanelStringSpec} from './PanelString';
-import {PanelNumber, Spec as PanelNumberSpec} from './PanelNumber';
+import * as Panel2 from './panel';
 import {Spec as PanelDateSpec} from './PanelDate';
 import PanelDate from './PanelDate/Component';
-import * as ConfigPanel from './ConfigPanel';
-import {useNodeValue} from '@wandb/weave/react';
+import {PanelNumber, Spec as PanelNumberSpec} from './PanelNumber';
+import {PanelString, Spec as PanelStringSpec} from './PanelString';
 
 const inputType = {
   type: 'union' as const,
@@ -366,8 +366,21 @@ const PanelObjectChild: React.FC<
             />
           </div>
         ) : (
-          <div style={{paddingLeft: '1em'}}>
+          <div style={{paddingLeft: '1em', height: 400, width: '100%'}}>
             {defaultLanguageBinding.printType(childType, true)}
+            {/* TODO: This is not probably what we always want! - came from weaveflow */}
+            <ChildPanel
+              config={config?.children?.[k] ?? childNode}
+              updateConfig={newConfig => {
+                updateConfig({
+                  ...config,
+                  children: {
+                    ...config?.children,
+                    [k]: newConfig,
+                  },
+                });
+              }}
+            />
           </div>
         )}
       </KeyValTable.Val>

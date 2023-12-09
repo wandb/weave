@@ -2,10 +2,10 @@
  * Display an info message to the user.
  */
 
-import {IconName} from './Icon';
 import React from 'react';
 
 import * as S from './Alert.styles';
+import {IconName} from './Icon';
 
 export const AlertSeverities = {
   Error: 'error',

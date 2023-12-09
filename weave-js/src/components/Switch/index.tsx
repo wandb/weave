@@ -1,5 +1,5 @@
-import React from 'react';
 import * as Switch from '@radix-ui/react-switch';
+import React from 'react';
 import {twMerge} from 'tailwind-merge';
 
 export const Root = ({

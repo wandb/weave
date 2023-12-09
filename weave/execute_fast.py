@@ -112,8 +112,8 @@ def _can_fast_map(map_fn):
         lambda n: isinstance(n, graph.OutputNode)
         and (
             op_can_be_async(n.from_op.name)
-            or op_policy.should_cache(n.from_op.full_name)
-            or op_policy.should_run_in_parallel(n.from_op.full_name)
+            or op_policy.should_cache(n.from_op.name)
+            or op_policy.should_run_in_parallel(n.from_op.name)
         ),
     )
     return len(not_fastmappable_nodes) == 0

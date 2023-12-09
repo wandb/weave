@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import {useLayoutEffect, useState} from 'react';
+
 import {LARGE_BREAKPOINT, MEDIUM_BREAKPOINT} from '../css/breakpoints.styles';
 
 export type ResponsiveSize = 'small' | 'medium' | 'large';

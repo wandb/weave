@@ -1,6 +1,5 @@
 import {
   allObjPaths,
-  rootObject,
   constFunction,
   ConstNode,
   constNodeUnsafe,
@@ -8,6 +7,7 @@ import {
   constString,
   dereferenceAllVars,
   escapeDots,
+  filterNodes,
   Frame,
   isAssignableTo,
   isFunction,
@@ -41,9 +41,11 @@ import {
   OpStore,
   opUnique,
   OutputNode,
+  PathType,
   pushFrame,
   refineNode,
   resolveVar,
+  rootObject,
   simpleNodeString,
   Stack,
   Type,
@@ -51,8 +53,6 @@ import {
   varNode,
   voidNode,
   WeaveInterface,
-  PathType,
-  filterNodes,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';

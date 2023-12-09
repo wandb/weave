@@ -1,4 +1,4 @@
-import {NodeOrVoidNode, Type, isAssignableTo} from '@wandb/weave/core';
+import {isAssignableTo, NodeOrVoidNode, Type} from '@wandb/weave/core';
 
 export const REMOTE_URI_PREFIX = 'wandb-artifact:///';
 export const LOCAL_URI_PREFIX = 'local-artifact:///';

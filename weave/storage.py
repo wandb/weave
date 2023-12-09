@@ -4,6 +4,8 @@ import typing
 import datetime
 import pathlib
 import functools
+import contextvars
+import contextlib
 
 from . import errors
 from . import ref_base
@@ -57,6 +59,13 @@ def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
     from weave.mappers_publisher import map_to_python_remote
+    from . import op_def
+
+    # Hack because of mappers_publisher recursion bug. Just don't do the recursion
+    # if we have an OpDef. Really we should skip if we don't have a composite object
+    # but there's no standard check for that.
+    if isinstance(obj, op_def.OpDef):
+        return obj
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)
@@ -104,6 +113,36 @@ def _assert_valid_artifact_name(part: typing.Optional[str] = None):
         )
 
 
+class PublishTargetProject(typing.TypedDict):
+    # TODO: should include entity_name as well, but we defalt that right now...
+    # entity_name: str
+    project_name: str
+
+
+_pubish_target_project: contextvars.ContextVar[
+    typing.Optional[typing.Optional[PublishTargetProject]]
+] = contextvars.ContextVar("publish_target_project", default=None)
+
+
+@contextlib.contextmanager
+def publish_target_project(project: PublishTargetProject):
+    token = _pubish_target_project.set(project)
+    yield
+    _pubish_target_project.reset(token)
+
+
+def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
+    return _pubish_target_project.get()
+
+
+# Keep a cache of published local ref -> wandb ref. This is used to ensure
+# we publish any needed op defs at the beginning of graph execution one time,
+# to avoid parallel publishing them many times later in mapped operations.
+PUBLISH_CACHE_BY_LOCAL_ART: dict[
+    artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef
+] = {}
+
+
 def _direct_publish(
     obj: typing.Any,
     name: typing.Optional[str] = None,
@@ -115,12 +154,23 @@ def _direct_publish(
     assume_weave_type: typing.Optional[types.Type] = None,
     *,
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
-):
+    _merge: typing.Optional[bool] = False,
+) -> artifact_wandb.WandbArtifactRef:
+    _orig_ref = _get_ref(obj)
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        res = PUBLISH_CACHE_BY_LOCAL_ART.get(_orig_ref)
+        if res is not None:
+            return res
+
     weave_type = assume_weave_type or _get_weave_type(obj)
 
-    wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
+    target_project_from_context = get_publish_target_project()
+    if target_project_from_context is not None:
+        wb_project_name = target_project_from_context["project_name"]
+    else:
+        wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
     name = name or _get_name(weave_type, obj)
-    wb_artifact_type_name = wb_artifact_type_name or weave_type.name
+    wb_artifact_type_name = wb_artifact_type_name or weave_type.root_type_class().name
 
     _assert_valid_artifact_name(name)
     _assert_valid_project_name(wb_project_name)
@@ -132,19 +182,30 @@ def _direct_publish(
     obj = box.box(obj)
     artifact = artifact_wandb.WandbArtifact(name, type=wb_artifact_type_name)
     artifact.metadata.update(metadata or {})
-    obj = _ensure_object_components_are_published(obj, weave_type, artifact)
+
+    # Use context to ensure any recursively published objects go to the same project
+    with publish_target_project({"project_name": wb_project_name}):
+        obj = _ensure_object_components_are_published(obj, weave_type, artifact)
     artifact_fs.update_weave_meta(weave_type, artifact)
     ref = artifact.set("obj", weave_type, obj)
+    if not isinstance(ref, artifact_wandb.WandbArtifactRef):
+        raise errors.WeaveSerializeError(
+            "Expected a WandbArtifactRef, got %s" % type(ref)
+        )
 
     # Only save if we have a ref into the artifact we created above. Otherwise
-    #     nothing new was created, so just return the existing ref.
+    # nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
         artifact.save(
             project=wb_project_name,
             entity_name=wb_entity_name,
             branch=branch_name,
+            artifact_collection_exists=bool(_merge),
             _lite_run=_lite_run,
         )
+
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        PUBLISH_CACHE_BY_LOCAL_ART[_orig_ref] = ref
 
     return ref
 

@@ -5,6 +5,7 @@ import React from 'react';
 import {Tailwind} from '../Tailwind';
 
 export type CheckboxState = RadixCheckbox.CheckedState;
+export type CheckboxSize = 'small' | 'medium';
 
 /**
  * - {@link RadixCheckbox.CheckboxProps}
@@ -17,6 +18,7 @@ export type CheckboxProps = Omit<
 > & {
   // "true | false | 'indeterminate'" is the type of RadixCheckbox.CheckedState
   checked: CheckboxState;
+  size?: CheckboxSize;
 };
 
 /**
@@ -25,29 +27,47 @@ export type CheckboxProps = Omit<
  * the `defaultChecked` is omitted and the `checked` prop is required.
  */
 
-export const Checkbox = ({checked, className, ...props}: CheckboxProps) => {
+export const Checkbox = ({
+  checked,
+  className,
+  size = 'medium',
+  ...props
+}: CheckboxProps) => {
+  const isSmall = size === 'small';
+  const isMedium = size === 'medium';
+  const isIndeterminate = checked === 'indeterminate';
+
   return (
     <Tailwind style={{display: 'flex', alignItems: 'center'}}>
       <RadixCheckbox.Root
         className={classNames(
           'night-aware',
           'inline-flex items-center justify-center',
-          'h-18 w-18',
           'rounded border-[1.5px]  dark:border-moon-250',
           'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
           checked ? 'border-moon-800' : 'border-moon-500',
+          {
+            'h-14 w-14': isSmall,
+            'h-18 w-18': isMedium,
+          },
           {className}
         )}
         checked={checked}
         {...props}>
         <RadixCheckbox.Indicator
           className={classNames(
-            'relative h-10 w-10 rounded-[1.5px]',
+            'relative rounded-[1.5px]',
             'radix-state-checked:bg-teal-500 radix-state-indeterminate:bg-transparent radix-state-unchecked:bg-transparent',
             {
-              // Indeterminate state styles
-              "after:absolute after:top-4 after:block after:w-10 after:rounded-[1px] after:border-t-2 after:border-moon-800 after:content-[''] dark:after:border-moon-250":
-                checked === 'indeterminate',
+              'h-8 w-8': isSmall,
+              'h-10 w-10': isMedium,
+            },
+            // Indeterminate state styles
+            {
+              "after:absolute after:block after:rounded-[1px] after:border-t-2 after:border-moon-800 after:content-[''] dark:after:border-moon-250":
+                isIndeterminate,
+              'after:top-3 after:w-8': isIndeterminate && isSmall,
+              'after:top-4 after:w-10': isIndeterminate && isMedium,
             }
           )}
         />

@@ -1,10 +1,9 @@
-import getConfig from '../../config';
 import {
   callOpVeryUnsafe,
   ConstNode,
   constNodeUnsafe,
-  functionType,
   FunctionType,
+  functionType,
   isFunction,
   loadRemoteOpStore,
   Node,
@@ -20,6 +19,7 @@ import {
 import {memoize} from 'lodash';
 import React, {useCallback, useMemo, useRef} from 'react';
 
+import getConfig from '../../config';
 import {useGatedValue} from '../../hookUtils';
 import {useNodeValue} from '../../react';
 import {consoleWarn} from '../../util';

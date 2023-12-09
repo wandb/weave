@@ -11,6 +11,8 @@ The UI state is a tree of panels. There are three types of non-leaf panels:
 
 */
 
+import {difference} from '@wandb/weave/common/util/data';
+import {ID} from '@wandb/weave/common/util/id';
 import {
   Client,
   Definition,
@@ -23,13 +25,17 @@ import {
   pushFrameDefs,
   refineEditingNode,
   Stack,
-  updateVarTypes,
   updateVarNames,
+  updateVarTypes,
   voidNode,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import * as _ from 'lodash';
 
+import {
+  LayoutParameters,
+  PanelBankSectionConfig,
+} from '../WeavePanelBank/panelbank';
 import {
   ChildPanelConfig,
   childPanelFromTableState,
@@ -42,8 +48,6 @@ import {
   PANEL_GROUP2_ID,
   PanelGroupConfig,
 } from './PanelGroup';
-import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
-import {difference} from '@wandb/weave/common/util/data';
 
 export type PanelTreeNode = ChildPanelConfig;
 
@@ -189,8 +193,8 @@ export const makePanel = (
 };
 
 export const makeGroup = (
-  items: {[key: string]: ChildPanelConfig},
-  options?: {[key: string]: any}
+  items: PanelGroupConfig['items'],
+  options?: Omit<PanelGroupConfig, 'items'>
 ) => {
   return makePanel('Group', {items, ...options});
 };
@@ -304,22 +308,43 @@ export const movePath = (
 export const addChild = (
   node: PanelTreeNode,
   path: string[],
-  value: PanelTreeNode
+  value: PanelTreeNode,
+  layout?: LayoutParameters
 ) => {
   const group = getPath(node, path);
   if (!isGroupNode(group)) {
     throw new Error('Cannot add child to non-group panel');
   }
-  return setPath(node, path, {
+  const nextName = nextPanelName(Object.keys(group.config.items));
+  const groupValue = {
     ...group,
     config: {
       ...group.config,
       items: {
         ...group.config.items,
-        [nextPanelName(Object.keys(group.config.items))]: value,
+        [nextName]: value,
       },
     },
-  });
+  };
+
+  // Set the location for the new child
+  if (layout && groupValue.config.gridConfig) {
+    groupValue.config = {
+      ...groupValue.config,
+      gridConfig: {
+        ...groupValue.config.gridConfig,
+        panels: [
+          ...groupValue.config.gridConfig.panels,
+          {
+            id: nextName,
+            layout,
+          },
+        ],
+      },
+    };
+  }
+
+  return setPath(node, path, groupValue);
 };
 
 type DefinitionWithDirtyHandler = Definition & {
@@ -493,17 +518,40 @@ const isDashboard = (node: PanelTreeNode): node is Dashboard => {
   );
 };
 
+/**
+ * Returns whether a path points to the "main" group in a {@link Dashboard}
+ */
+export const isMain = (path: string[]): boolean => {
+  return path[0] === 'main' && path.length === 1;
+};
+
+/**
+ * Returns whether a path points to a panel *inside* the "main" group
+ * in a {@link Dashboard}. **This excludes "main" itself!**
+ *
+ * @param path  path to the target panel
+ * @param depth max depth of panels to include. For example, depth 1 will
+ *              only return true for top-level panels in main.
+ */
+export const isInsideMain = (path: string[], depth = Infinity): boolean => {
+  if (depth < 1) {
+    throw new Error('depth must be at least 1');
+  }
+  return path[0] === 'main' && path.length > 1 && path.length <= 1 + depth;
+};
+
 export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
   if (isDashboard(node)) {
     return node;
   }
   let main = node;
   const mainConfig = {
-    layoutMode: 'grid',
+    layoutMode: 'grid' as const,
     showExpressions: true,
     enableAddPanel: true,
     disableDeletePanel: true,
     gridConfig: {
+      id: ID(),
       panels: [
         {
           id: 'panel0',
@@ -569,11 +617,12 @@ export const ensureDashboardFromItems = (
   vars: {[name: string]: NodeOrVoidNode}
 ): ChildPanelFullConfig => {
   const mainConfig = {
-    layoutMode: 'grid',
+    layoutMode: 'grid' as const,
     showExpressions: true,
     enableAddPanel: true,
     disableDeletePanel: true,
     gridConfig: {
+      id: ID(),
       panels: Object.entries(seedItems).map(([name, item], ndx) => ({
         id: name,
         layout: {

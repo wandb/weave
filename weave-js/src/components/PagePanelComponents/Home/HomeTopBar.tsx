@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+
 import {IconWeaveLogo} from '../../Panel2/Icons';
 
 export const HomeTopBar: React.FC = () => {
@@ -20,6 +21,7 @@ const TopBar = styled.div`
   align-items: center;
   justify-content: space-between;
 `;
+TopBar.displayName = 'S.TopBar';
 
 const TopBarLeft = styled.div`
   display: flex;
@@ -27,9 +29,13 @@ const TopBarLeft = styled.div`
   font-size: 18px;
   font-weight: 600;
 `;
+TopBarLeft.displayName = 'S.TopBarLeft';
 
-const WeaveLogo = styled(IconWeaveLogo)`
+const WeaveLogo = styled(IconWeaveLogo).attrs({
+  className: 'night-aware',
+})`
   width: 32px;
   height: 32px;
   margin-right: 12px;
 `;
+WeaveLogo.displayName = 'S.WeaveLogo';
