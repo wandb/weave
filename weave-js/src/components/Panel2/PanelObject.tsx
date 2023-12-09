@@ -31,6 +31,7 @@ import * as KeyValTable from './KeyValTable';
 import * as Panel2 from './panel';
 import {Spec as PanelDateSpec} from './PanelDate';
 import PanelDate from './PanelDate/Component';
+import {PanelInteractContextProvider} from './PanelInteractContext';
 import {PanelNumber, Spec as PanelNumberSpec} from './PanelNumber';
 import {PanelString, Spec as PanelStringSpec} from './PanelString';
 
@@ -369,18 +370,20 @@ const PanelObjectChild: React.FC<
           <div style={{paddingLeft: '1em', height: 400, width: '100%'}}>
             {defaultLanguageBinding.printType(childType, true)}
             {/* TODO: This is not probably what we always want! - came from weaveflow */}
-            <ChildPanel
-              config={config?.children?.[k] ?? childNode}
-              updateConfig={newConfig => {
-                updateConfig({
-                  ...config,
-                  children: {
-                    ...config?.children,
-                    [k]: newConfig,
-                  },
-                });
-              }}
-            />
+            <PanelInteractContextProvider>
+              <ChildPanel
+                config={config?.children?.[k] ?? childNode}
+                updateConfig={newConfig => {
+                  updateConfig({
+                    ...config,
+                    children: {
+                      ...config?.children,
+                      [k]: newConfig,
+                    },
+                  });
+                }}
+              />
+            </PanelInteractContextProvider>
           </div>
         )}
       </KeyValTable.Val>
