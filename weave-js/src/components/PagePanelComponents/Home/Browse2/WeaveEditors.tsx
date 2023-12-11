@@ -64,7 +64,7 @@ import {
   weaveGet,
 } from './easyWeave';
 import {parseRefMaybe} from './SmallRef';
-import {refPageUrl} from './url';
+import {useRefPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {
   if (isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))) {
@@ -137,6 +137,7 @@ const WeaveEditorCommit: FC<{
   handleClearEdits: () => void;
 }> = ({objType, rootObjectRef, node, edits, handleClose, handleClearEdits}) => {
   const weave = useWeaveContext();
+  const refPageUrl = useRefPageUrl();
   const history = useHistory();
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
@@ -197,6 +198,7 @@ const WeaveEditorCommit: FC<{
     orm,
     handleClearEdits,
     history,
+    refPageUrl,
     objType,
     handleClose,
     edits,

@@ -1,11 +1,25 @@
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 
-export const refPageUrl = (objectType: string, refS: string) => {
-  const ref = parseRef(refS);
-  if (!isWandbArtifactRef(ref)) {
-    throw new Error('Not a wandb artifact ref: ' + refS);
+import { useWeaveflowRouteContext } from '../Browse3/context';
+
+export const useRefPageUrl = () => {
+  const routerContext = useWeaveflowRouteContext();
+  const refPageUrl = (objectType: string, refS: string) => {
+    const ref = parseRef(refS);
+    if (!isWandbArtifactRef(ref)) {
+      throw new Error('Not a wandb artifact ref: ' + refS);
+    }
+
+    return routerContext.refUIUrl(
+      objectType, {
+        entityName: ref.entityName,
+        projectName: ref.projectName,
+        artifactName: ref.artifactName,
+        artifactVersion: ref.artifactVersion,
+        artifactPath: ''
+      }
+    )
+
   }
-  // const res = `/${ref.entityName}/${ref.projectName}/${objectType}/${ref.artifactName}/${ref.artifactVersion}`;
-  const res = `/${ref.entityName}/${ref.projectName}/objects/${ref.artifactName}/versions/${ref.artifactVersion}`;
-  return res;
+return refPageUrl;
 };

@@ -453,7 +453,7 @@ export const FilterableTypeVersionsTable: React.FC<{
         WFHighLevelTypeVersionFilter
       >,
     };
-  }, [props.frozenFilter]);
+  }, [props.entity, props.frozenFilter, props.project]);
 
   return (
     <FilterableTable

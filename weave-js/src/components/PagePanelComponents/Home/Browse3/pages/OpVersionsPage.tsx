@@ -573,7 +573,7 @@ export const FilterableOpVersionsTable: React.FC<{
         WFHighLevelOpVersionFilter
       >, // filter me
     };
-  }, [props.frozenFilter]);
+  }, [props.entity, props.frozenFilter, props.project]);
 
   return (
     <FilterableTable
