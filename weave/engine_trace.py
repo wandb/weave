@@ -25,16 +25,22 @@ from . import stream_data_interfaces
 from ddtrace import Tracer as ddtrace_tracer, span as ddtrace_span
 
 # wraps ddtrace tracer and span to add PII support
+
+old_set_tag = ddtrace_span.Span.set_tag
+old_set_metric = ddtrace_span.Span.set_metric
 class PIISpan(ddtrace_span.Span):
     def set_tag(self, key, val, pii_val=""):
-        super().set_tag(key, pii_val) if os.getenv(
+        old_set_tag(self, key, pii_val) if os.getenv(
             "DISABLE_WEAVE_PII"
-        ) else super().set_tag(key, val)
+        ) else old_set_tag(self,key, val)
 
     def set_metric(self, key, val, pii_val=""):
-        super().set_metric(key, pii_val) if os.getenv(
+        old_set_metric(self, key, pii_val) if os.getenv(
             "DISABLE_WEAVE_PII"
-        ) else super().set_metric(key, val)
+        ) else old_set_metric(self, key, val)
+
+ddtrace_span.Span.set_metric = PIISpan.set_metric
+ddtrace_span.Span.set_tag = PIISpan.set_tag
 
 # def setSpanPiiFunctions(span):
 #     span.set_tag = PIISpan.set_tag
@@ -296,7 +302,6 @@ class WeaveWriter:
 def tracer():
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
-        ddtrace_span.Span = PIISpan
         # ddtrace_tracer = PIITracer()
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
