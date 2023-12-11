@@ -6,6 +6,7 @@ import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+import {string} from 'slate';
 
 const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
   if (!filter) {
@@ -60,6 +61,12 @@ const defaultContext = {
       throw new Error('Not a wandb artifact ref');
     }
     return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
+  },
+  entityUrl: (entityName: string) => {
+    return `/${entityName}`;
+  },
+  projectUrl: (entityName: string, projectName: string) => {
+    return `/${entityName}/${projectName}`;
   },
   callUIUrl: (
     entityName: string,
@@ -179,6 +186,12 @@ const newContext = {
       objRef.artifactVersion
     );
   },
+  entityUrl: (entityName: string) => {
+    return `/${entityName}`;
+  },
+  projectUrl: (entityName: string, projectName: string) => {
+    return `/${entityName}/${projectName}`;
+  },
   typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
     return `/${entityName}/${projectName}/types/${typeName}`;
   },
@@ -297,6 +310,8 @@ const WeaveflowRouteContext = createContext<{
     objRef: ArtifactRef,
     wfTable?: WFDBTableType
   ) => string;
+  entityUrl: (entityName: string) => string;
+  projectUrl: (entityName: string, projectName: string) => string;
   typeUIUrl: (
     entityName: string,
     projectName: string,

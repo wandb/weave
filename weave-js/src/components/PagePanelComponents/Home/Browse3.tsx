@@ -213,14 +213,17 @@ const Browse3ProjectRootORMProvider: FC = props => {
 const Browse3ProjectRoot: FC = () => {
   const history = useHistory();
   const params = useParams<Browse3ProjectMountedParams>();
+  const router = useWeaveflowRouteContext();
 
   useEffect(() => {
     if (params.tab == null) {
       history.push(
-        `/${params.entity}/${params.project}/calls?filter=%7B"traceRootsOnly"%3Atrue%7D`
+        router.callsUIUrl(params.entity, params.project, {
+          traceRootsOnly: true,
+        })
       );
     }
-  }, [history, params.entity, params.project, params.tab]);
+  }, [history, params.entity, params.project, params.tab, router]);
 
   if (params.tab == null) {
     return <CenteredAnimatedLoader />;

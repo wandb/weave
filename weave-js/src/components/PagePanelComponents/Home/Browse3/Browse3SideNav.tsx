@@ -130,7 +130,7 @@ export const RouteAwareBrowse3ProjectSideNav: FC = props => {
       selectedCategory={selectedNavSection}
       filterCategory={filterCategory}
       navigateToProject={project => {
-        history.push(`/${params.entity}/${project}`);
+        history.push(router.projectUrl(params.entity, project));
       }}
       navigateToObjectVersions={(filter?: WFHighLevelObjectVersionFilter) => {
         history.push(
