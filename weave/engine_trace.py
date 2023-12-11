@@ -22,43 +22,27 @@ from typing import Optional
 from . import logs
 from . import stream_data_interfaces
 
-from ddtrace import Tracer as ddtrace_tracer, span as ddtrace_span
+from ddtrace import span as ddtrace_span
 
-# wraps ddtrace tracer and span to add PII support
-
+# replaces ddtrace.Span.set_tag and ddtrace.Span.set_metric
 old_set_tag = ddtrace_span.Span.set_tag
 old_set_metric = ddtrace_span.Span.set_metric
-class PIISpan(ddtrace_span.Span):
-    def set_tag(self, key, val, pii_val=""):
-        old_set_tag(self, key, pii_val) if os.getenv(
-            "DISABLE_WEAVE_PII"
-        ) else old_set_tag(self,key, val)
-
-    def set_metric(self, key, val, pii_val=""):
-        old_set_metric(self, key, pii_val) if os.getenv(
-            "DISABLE_WEAVE_PII"
-        ) else old_set_metric(self, key, val)
-
-ddtrace_span.Span.set_metric = PIISpan.set_metric
-ddtrace_span.Span.set_tag = PIISpan.set_tag
-
-# def setSpanPiiFunctions(span):
-#     span.set_tag = PIISpan.set_tag
-#     span.set_metric = PIISpan.set_metric
-#     return span
 
 
-# class PIITracer(ddtrace_tracer):
-#     def trace(self, *args, **kwargs):
-#         span = super().trace(*args, **kwargs)
-#         return setSpanPiiFunctions(span)
+def set_tag(self, key, val="", pii_val=""):
+    old_set_tag(self, key, pii_val) if os.getenv("DISABLE_WEAVE_PII") else old_set_tag(
+        self, key, val
+    )
 
-#     def current_root_span(self):
-#         span = super().current_root_span()
-#         if span is not None:
-#             return setSpanPiiFunctions(span)
-#         return span
 
+def set_metric(self, key, val="", pii_redacted=False):
+    old_set_metric(self, key, val) if not (
+        os.getenv("DISABLE_WEAVE_PII") and pii_redacted
+    ) else old_set_metric(self, key, "")
+
+
+ddtrace_span.Span.set_metric = set_metric
+ddtrace_span.Span.set_tag = set_tag
 
 # Thanks co-pilot!
 class DummySpan:
@@ -302,6 +286,7 @@ class WeaveWriter:
 def tracer():
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
+
         # ddtrace_tracer = PIITracer()
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
