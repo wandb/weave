@@ -9,7 +9,7 @@ export const CallPage: React.FC<{
   project: string;
   callId: string;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const call = orm.projectConnection.call(props.callId);
   const params = useMemo(() => {
     return {

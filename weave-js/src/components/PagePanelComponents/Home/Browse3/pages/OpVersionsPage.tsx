@@ -68,7 +68,7 @@ export const FilterableOpVersionsTable: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
 
   const getInitialData = useCallback(
     (filter: WFHighLevelOpVersionFilter) => {
@@ -155,6 +155,8 @@ export const FilterableOpVersionsTable: React.FC<{
           filterControlListItem: cellProps => {
             return (
               <OpCategoryFilterControlListItem
+                entity={props.entity}
+                project={props.project}
                 frozenFilter={props.frozenFilter}
                 {...cellProps}
               />
@@ -195,6 +197,8 @@ export const FilterableOpVersionsTable: React.FC<{
           filterControlListItem: cellProps => {
             return (
               <OpNameFilterControlListItem
+                entity={props.entity}
+                project={props.project}
                 frozenFilter={props.frozenFilter}
                 {...cellProps}
               />
@@ -211,7 +215,7 @@ export const FilterableOpVersionsTable: React.FC<{
       calls: {
         columnId: 'calls',
         gridDisplay: {
-          columnLabel: 'Version',
+          columnLabel: 'Calls',
           columnValue: obj => obj.obj.calls().length,
           gridColDefOptions: {
             renderCell: params => {
@@ -286,6 +290,8 @@ export const FilterableOpVersionsTable: React.FC<{
           filterControlListItem: cellProps => {
             return (
               <InvokedByFilterControlListItem
+                entity={props.entity}
+                project={props.project}
                 frozenFilter={props.frozenFilter}
                 {...cellProps}
               />
@@ -343,6 +349,8 @@ export const FilterableOpVersionsTable: React.FC<{
           filterControlListItem: cellProps => {
             return (
               <InvokesFilterControlListItem
+                entity={props.entity}
+                project={props.project}
                 frozenFilter={props.frozenFilter}
                 {...cellProps}
               />
@@ -400,6 +408,8 @@ export const FilterableOpVersionsTable: React.FC<{
           filterControlListItem: cellProps => {
             return (
               <ConsumesTypeVersionFilterControlListItem
+                entity={props.entity}
+                project={props.project}
                 frozenFilter={props.frozenFilter}
                 {...cellProps}
               />
@@ -457,6 +467,8 @@ export const FilterableOpVersionsTable: React.FC<{
           filterControlListItem: cellProps => {
             return (
               <ProducesTypeVersionFilterControlListItem
+                entity={props.entity}
+                project={props.project}
                 frozenFilter={props.frozenFilter}
                 {...cellProps}
               />
@@ -576,11 +588,13 @@ export const FilterableOpVersionsTable: React.FC<{
 };
 
 const OpCategoryFilterControlListItem: React.FC<{
+  entity: string;
+  project: string;
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const options = useMemo(() => {
     return orm.projectConnection.opCategories();
   }, [orm.projectConnection]);
@@ -607,11 +621,13 @@ const OpCategoryFilterControlListItem: React.FC<{
 };
 
 const OpNameFilterControlListItem: React.FC<{
+  entity: string;
+  project: string;
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const options = useMemo(() => {
     return orm.projectConnection.ops().map(o => o.name());
   }, [orm.projectConnection]);
@@ -636,11 +652,13 @@ const OpNameFilterControlListItem: React.FC<{
 };
 
 const InvokedByFilterControlListItem: React.FC<{
+  entity: string;
+  project: string;
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const options = useMemo(() => {
     return orm.projectConnection
       .opVersions()
@@ -673,11 +691,13 @@ const InvokedByFilterControlListItem: React.FC<{
 };
 
 const InvokesFilterControlListItem: React.FC<{
+  entity: string;
+  project: string;
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const options = useMemo(() => {
     return orm.projectConnection
       .opVersions()
@@ -710,11 +730,13 @@ const InvokesFilterControlListItem: React.FC<{
 };
 
 const ConsumesTypeVersionFilterControlListItem: React.FC<{
+  entity: string;
+  project: string;
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const options = useMemo(() => {
     return orm.projectConnection
       .typeVersions()
@@ -749,11 +771,13 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
 };
 
 const ProducesTypeVersionFilterControlListItem: React.FC<{
+  entity: string;
+  project: string;
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const options = useMemo(() => {
     return orm.projectConnection
       .typeVersions()

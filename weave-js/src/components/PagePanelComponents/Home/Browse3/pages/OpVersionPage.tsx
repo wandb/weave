@@ -26,7 +26,7 @@ export const OpVersionPage: React.FC<{
   opName: string;
   version: string;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const opVersion = orm.projectConnection.opVersion(
     props.opName,
     props.version

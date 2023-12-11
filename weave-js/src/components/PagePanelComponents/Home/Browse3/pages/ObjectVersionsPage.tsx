@@ -76,7 +76,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
 
   const objectOptions = useMemo(() => {
     const objects = orm.projectConnection.objects();
