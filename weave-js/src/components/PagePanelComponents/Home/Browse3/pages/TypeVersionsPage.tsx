@@ -92,6 +92,8 @@ export const FilterableTypeVersionsTable: React.FC<{
             renderCell: params => {
               return (
                 <TypeVersionLink
+                  entityName={params.row.obj.entity()}
+                  projectName={params.row.obj.project()}
                   typeName={params.row.obj.type().name()}
                   version={params.row.obj.version()}
                   hideName
@@ -156,7 +158,13 @@ export const FilterableTypeVersionsTable: React.FC<{
           },
           gridColDefOptions: {
             renderCell: params => {
-              return <TypeLink typeName={params.row.obj.type().name()} />;
+              return (
+                <TypeLink
+                  entityName={params.row.obj.project()}
+                  projectName={params.row.obj.entity()}
+                  typeName={params.row.obj.type().name()}
+                />
+              );
             },
           },
         },
@@ -358,6 +366,8 @@ export const FilterableTypeVersionsTable: React.FC<{
               }
               return (
                 <TypeVersionLink
+                  entityName={parentTypeVersion.entity()}
+                  projectName={parentTypeVersion.project()}
                   typeName={parentTypeVersion.type().name()}
                   version={parentTypeVersion.version()}
                 />

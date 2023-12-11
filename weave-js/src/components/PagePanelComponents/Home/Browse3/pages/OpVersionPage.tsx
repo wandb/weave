@@ -52,7 +52,13 @@ export const OpVersionPage: React.FC<{
             <ScrollableTabContent>
               <SimpleKeyValueTable
                 data={{
-                  Name: <OpLink opName={props.opName} />,
+                  Name: (
+                    <OpLink
+                      entityName={opVersion.entity()}
+                      projectName={opVersion.project()}
+                      opName={props.opName}
+                    />
+                  ),
                   Category: (
                     <OpVersionCategoryChip
                       opCategory={opVersion.opCategory()}
@@ -64,6 +70,8 @@ export const OpVersionPage: React.FC<{
                       {opVersion.inputTypesVersions().map((t, i) => (
                         <li key={i}>
                           <TypeVersionLink
+                            entityName={t.entity()}
+                            projectName={t.project()}
                             typeName={t.type().name()}
                             version={t.version()}
                           />
@@ -76,6 +84,8 @@ export const OpVersionPage: React.FC<{
                       {opVersion.outputTypeVersions().map((t, i) => (
                         <li key={i}>
                           <TypeVersionLink
+                            entityName={t.entity()}
+                            projectName={t.project()}
                             typeName={t.type().name()}
                             version={t.version()}
                           />
@@ -172,7 +182,12 @@ const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
       {opVersion.invokes().map((v, i) => {
         return (
           <li key={i}>
-            <OpVersionLink opName={v.op().name()} version={v.version()} />
+            <OpVersionLink
+              entityName={v.entity()}
+              projectName={v.project()}
+              opName={v.op().name()}
+              version={v.version()}
+            />
             <OpVersionOpTree opVersion={v} />
           </li>
         );

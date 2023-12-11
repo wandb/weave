@@ -232,6 +232,8 @@ export const RunsTable: FC<{
                 }
                 return (
                   <OpVersionLink
+                    entityName={opVersion.entity()}
+                    projectName={opVersion.project()}
                     opName={opVersion.op().name()}
                     version={opVersion.version()}
                   />

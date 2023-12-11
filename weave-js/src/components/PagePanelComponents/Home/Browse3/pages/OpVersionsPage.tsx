@@ -117,6 +117,8 @@ export const FilterableOpVersionsTable: React.FC<{
             renderCell: params => {
               return (
                 <OpVersionLink
+                  entityName={params.row.obj.entity()}
+                  projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
                   version={params.row.obj.version()}
                   hideName
@@ -173,7 +175,13 @@ export const FilterableOpVersionsTable: React.FC<{
           columnValue: obj => obj.obj.op().name(),
           gridColDefOptions: {
             renderCell: params => {
-              return <OpLink opName={params.value as any} />;
+              return (
+                <OpLink
+                  entityName={params.row.obj.entity()}
+                  projectName={params.row.obj.project()}
+                  opName={params.value as any}
+                />
+              );
             },
           },
         },
