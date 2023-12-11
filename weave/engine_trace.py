@@ -37,10 +37,10 @@ class DummySpan:
         logs.reset_indent(self.log_indent_token)
         logging.debug("<- %s", self.args[0])
 
-    def set_tag(self, key, unredacted_val, redacted_val):
+    def set_tag(self, key, unredacted_val="", redacted_val=""):
         pass
 
-    def set_meta(self, key, unredacted_val, redacted_val):
+    def set_meta(self, key, unredacted_val="", redacted_val=""):
         pass
 
     def finish(self, *args, **kwargs):
@@ -149,7 +149,7 @@ class WeaveTraceSpan:
             self.span.attributes = {}
         return self.span.attributes
 
-    def set_tag(self, key, unredacted_val, redacted_val):
+    def set_tag(self, key, unredacted_val, redacted_val=""):
         if "tags" not in self.attributes:
             self.attributes["tags"] = {}
         if os.getenv("DISABLE_WEAVE_PII"):
@@ -157,7 +157,7 @@ class WeaveTraceSpan:
         else:
             self.attributes["tags"][key] = unredacted_val
 
-    def set_meta(self, key, unredacted_val, redacted_val):
+    def set_meta(self, key, unredacted_val, redacted_val=""):
         if "metadata" not in self.attributes:
             self.attributes["metadata"] = {}
         if os.getenv("DISABLE_WEAVE_PII"):
