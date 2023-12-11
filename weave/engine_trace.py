@@ -38,10 +38,10 @@ class DummySpan:
         logs.reset_indent(self.log_indent_token)
         logging.debug("<- %s", self.args[0])
 
-    def set_tag(self, key, val, pii_val):
+    def set_tag(self, key, unredacted_val, redacted_val):
         pass
 
-    def set_meta(self, key, val, pii_val):
+    def set_meta(self, key, unredacted_val, redacted_val):
         pass
 
     def finish(self, *args, **kwargs):
@@ -150,21 +150,21 @@ class WeaveTraceSpan:
             self.span.attributes = {}
         return self.span.attributes
 
-    def set_tag(self, key, val, pii_val):
+    def set_tag(self, key, unredacted_val, redacted_val):
         if "tags" not in self.attributes:
             self.attributes["tags"] = {}
         if os.getenv("DISABLE_WEAVE_PII"):
-            self.attributes["tags"][key] = pii_val
+            self.attributes["tags"][key] = redacted_val
         else:
-            self.attributes["tags"][key] = val
+            self.attributes["tags"][key] = unredacted_val
 
-    def set_meta(self, key, val, pii_val):
+    def set_meta(self, key, unredacted_val, redacted_val):
         if "metadata" not in self.attributes:
             self.attributes["metadata"] = {}
         if os.getenv("DISABLE_WEAVE_PII"):
-            self.attributes["metadata"][key] = pii_val
+            self.attributes["metadata"][key] = redacted_val
         else:
-            self.attributes["metadata"][key] = val
+            self.attributes["metadata"][key] = unredacted_val
 
     def finish(self, *args, **kwargs):
         pass
@@ -265,20 +265,23 @@ class WeaveWriter:
 def tracer():
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer, span as ddtrace_span
-        
+
         # replaces ddtrace.Span.set_tag and ddtrace.Span.set_metric
         old_set_tag = ddtrace_span.Span.set_tag
         old_set_metric = ddtrace_span.Span.set_metric
 
         # Only logged redeacted values if flag is on
         def set_tag(self, key, unredacted_val="", redacted_val=""):
-            old_set_tag(self, key, redacted_val) if os.getenv("DISABLE_WEAVE_PII") else old_set_tag(
-                self, key, unredacted_val
-            )
+            old_set_tag(self, key, redacted_val) if os.getenv(
+                "DISABLE_WEAVE_PII"
+            ) else old_set_tag(self, key, unredacted_val)
+
         # Dont log metrics if flag is on and not redacted
         def set_metric(self, key, val="", is_pii_redacted=False):
-            old_set_metric(self, key, "") if os.getenv("DISABLE_WEAVE_PII") and not is_pii_redacted else old_set_metric(self, key, val)
-            
+            old_set_metric(self, key, "") if os.getenv(
+                "DISABLE_WEAVE_PII"
+            ) and not is_pii_redacted else old_set_metric(self, key, val)
+
         ddtrace_span.Span.set_metric = set_metric
         ddtrace_span.Span.set_tag = set_tag
 

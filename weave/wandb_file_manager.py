@@ -192,7 +192,7 @@ class WandbFileManagerAsync:
                 "Artifact URI has no path in call to ensure_file"
             )
         with tracer.trace("wandb_file_manager.ensure_file_downloaded") as span:
-            span.("download_url", str(download_url), "")
+            span.set_tag("download_url", str(download_url))
             file_path = f"wandb_file_manager/{path}"
             if await self.fs.exists(file_path):
                 return file_path
