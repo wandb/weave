@@ -3,6 +3,7 @@ export {
   IconAddNew,
   IconAdminShieldSafe,
   IconAmazonSagemaker,
+  IconArea,
   IconAudioVolume,
   IconAutomationRobotArm,
   IconBack,

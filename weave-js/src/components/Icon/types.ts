@@ -2,6 +2,7 @@ export const IconNames = {
   AddNew: 'add-new',
   AdminShieldSafe: 'admin-shield-safe',
   AmazonSagemaker: 'amazon-sagemaker',
+  Area: 'area',
   AudioVolume: 'audio-volume',
   AutomationRobotArm: 'automation-robot-arm',
   Back: 'back',
