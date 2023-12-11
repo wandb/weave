@@ -359,12 +359,12 @@ def awl_from_local_parquet_path(
     artifact: typing.Optional[artifact_base.Artifact] = None,
 ) -> ArrowWeaveList:
     with tracer.trace("pq.read_metadata") as span:
-        span.set_tag("path", path, "")
+        span.set_tag("path", path)
         meta = pq.read_metadata(path)
     file_schema = meta.schema
     columns_to_read = [c for c in columns if c in file_schema.to_arrow_schema().names]
     with tracer.trace("pq.read_table") as span:
-        span.set_tag("path", path, "")
+        span.set_tag("path", path)
         table = pq.read_table(path, columns=columns_to_read)
 
     # convert table to ArrowWeaveList

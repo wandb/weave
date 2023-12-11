@@ -22,27 +22,6 @@ from typing import Optional
 from . import logs
 from . import stream_data_interfaces
 
-from ddtrace import span as ddtrace_span
-
-# replaces ddtrace.Span.set_tag and ddtrace.Span.set_metric
-old_set_tag = ddtrace_span.Span.set_tag
-old_set_metric = ddtrace_span.Span.set_metric
-
-
-def set_tag(self, key, val="", pii_val=""):
-    old_set_tag(self, key, pii_val) if os.getenv("DISABLE_WEAVE_PII") else old_set_tag(
-        self, key, val
-    )
-
-
-def set_metric(self, key, val="", pii_redacted=False):
-    old_set_metric(self, key, val) if not (
-        os.getenv("DISABLE_WEAVE_PII") and pii_redacted
-    ) else old_set_metric(self, key, "")
-
-
-ddtrace_span.Span.set_metric = set_metric
-ddtrace_span.Span.set_tag = set_tag
 
 # Thanks co-pilot!
 class DummySpan:
@@ -285,9 +264,24 @@ class WeaveWriter:
 
 def tracer():
     if os.getenv("DD_ENV"):
-        from ddtrace import tracer as ddtrace_tracer
+        from ddtrace import tracer as ddtrace_tracer, span as ddtrace_span
+        
+        # replaces ddtrace.Span.set_tag and ddtrace.Span.set_metric
+        old_set_tag = ddtrace_span.Span.set_tag
+        old_set_metric = ddtrace_span.Span.set_metric
 
-        # ddtrace_tracer = PIITracer()
+        # Only logged redeacted values if flag is on
+        def set_tag(self, key, unredacted_val="", redacted_val=""):
+            old_set_tag(self, key, redacted_val) if os.getenv("DISABLE_WEAVE_PII") else old_set_tag(
+                self, key, unredacted_val
+            )
+        # Dont log metrics if flag is on and not redacted
+        def set_metric(self, key, val="", is_pii_redacted=False):
+            old_set_metric(self, key, "") if os.getenv("DISABLE_WEAVE_PII") and not is_pii_redacted else old_set_metric(self, key, val)
+            
+        ddtrace_span.Span.set_metric = set_metric
+        ddtrace_span.Span.set_tag = set_tag
+
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
             # mirror DataDog trace info to W&B.
