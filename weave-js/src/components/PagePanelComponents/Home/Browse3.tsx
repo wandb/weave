@@ -24,7 +24,7 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
-  NewWeaveflowRouteContextProvider,
+  Browse3WeaveflowRouteContextProvider,
   useWeaveflowRouteContext,
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
@@ -113,7 +113,7 @@ const browse3Paths = [
 
 export const Browse3: FC<{basename: string}> = props => {
   return (
-    <NewWeaveflowRouteContextProvider>
+    <Browse3WeaveflowRouteContextProvider>
       <Router basename={props.basename}>
         <Switch>
           <Route path={[...browse3Paths, '/:entity', '/']}>
@@ -121,7 +121,7 @@ export const Browse3: FC<{basename: string}> = props => {
           </Route>
         </Switch>
       </Router>
-    </NewWeaveflowRouteContextProvider>
+    </Browse3WeaveflowRouteContextProvider>
   );
 };
 
