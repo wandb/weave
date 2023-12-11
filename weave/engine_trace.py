@@ -36,8 +36,6 @@ class PIISpan(ddtrace_span.Span):
             "DISABLE_WEAVE_PII"
         ) else super().set_metric(key, val)
 
-
-ddtrace_span.Span = PIISpan
 # def setSpanPiiFunctions(span):
 #     span.set_tag = PIISpan.set_tag
 #     span.set_metric = PIISpan.set_metric
@@ -297,6 +295,8 @@ class WeaveWriter:
 
 def tracer():
     if os.getenv("DD_ENV"):
+        from ddtrace import tracer as ddtrace_tracer
+        ddtrace_span.Span = PIISpan
         # ddtrace_tracer = PIITracer()
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
