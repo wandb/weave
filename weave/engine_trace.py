@@ -19,8 +19,6 @@ import json
 import dataclasses
 from typing import Optional
 
-from ddtrace.span import Span
-
 from . import logs
 from . import stream_data_interfaces
 
@@ -39,22 +37,23 @@ class PIISpan(ddtrace_span.Span):
         ) else super().set_metric(key, val)
 
 
-def setSpanPiiFunctions(span):
-    span.set_tag = PIISpan.set_tag
-    span.set_metric = PIISpan.set_metric
-    return span
+ddtrace_span.Span = PIISpan
+# def setSpanPiiFunctions(span):
+#     span.set_tag = PIISpan.set_tag
+#     span.set_metric = PIISpan.set_metric
+#     return span
 
 
-class PIITracer(ddtrace_tracer):
-    def trace(self, *args, **kwargs):
-        span = super().trace(*args, **kwargs)
-        return setSpanPiiFunctions(span)
+# class PIITracer(ddtrace_tracer):
+#     def trace(self, *args, **kwargs):
+#         span = super().trace(*args, **kwargs)
+#         return setSpanPiiFunctions(span)
 
-    def current_root_span(self):
-        span = super().current_root_span()
-        if span is not None:
-            return setSpanPiiFunctions(span)
-        return span
+#     def current_root_span(self):
+#         span = super().current_root_span()
+#         if span is not None:
+#             return setSpanPiiFunctions(span)
+#         return span
 
 
 # Thanks co-pilot!
@@ -298,7 +297,7 @@ class WeaveWriter:
 
 def tracer():
     if os.getenv("DD_ENV"):
-        ddtrace_tracer = PIITracer()
+        # ddtrace_tracer = PIITracer()
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
             # mirror DataDog trace info to W&B.
