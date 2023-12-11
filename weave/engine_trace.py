@@ -17,7 +17,6 @@ import logging
 import time
 import json
 import dataclasses
-from typing import Optional
 
 from . import logs
 from . import stream_data_interfaces
