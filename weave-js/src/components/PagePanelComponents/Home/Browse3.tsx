@@ -103,11 +103,12 @@ const tabOptions = [
   'tables',
 ];
 const tabs = tabOptions.join('|');
+const projectRoot = `:entity/:project`;
 const browse3Paths = [
-  `/:entity/:project/:tab(${tabs})/:itemName/versions/:version/:refExtra*`,
-  `/:entity/:project/:tab(${tabs})/:itemName`,
-  `/:entity/:project/:tab(${tabs})`,
-  `/:entity/:project`,
+  `/${projectRoot}/:tab(${tabs})/:itemName/versions/:version/:refExtra*`,
+  `/${projectRoot}/:tab(${tabs})/:itemName`,
+  `/${projectRoot}/:tab(${tabs})`,
+  `/${projectRoot}`,
 ];
 
 export const Browse3: FC<{basename: string}> = props => {
@@ -209,7 +210,6 @@ const Browse3ProjectRootORMProvider: FC = props => {
   );
 };
 
-const projectRoot = `:entity/:project`;
 const Browse3ProjectRoot: FC = () => {
   const history = useHistory();
   const params = useParams<Browse3ProjectMountedParams>();
