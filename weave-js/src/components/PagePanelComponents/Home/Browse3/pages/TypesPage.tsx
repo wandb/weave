@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
+
 import {useWeaveflowRouteContext} from '../context';
 
 export const TypesPage: React.FC<{
@@ -11,6 +12,6 @@ export const TypesPage: React.FC<{
   const history = useHistory();
   useEffect(() => {
     history.push(routerContext.projectUrl(props.entity, props.project));
-  }, [history, props.entity, props.project]);
+  }, [history, props.entity, props.project, routerContext]);
   return <></>;
 };

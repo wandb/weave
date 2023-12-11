@@ -10,7 +10,6 @@ import {Link, makeObjRefUri, Paper} from './CommonLib';
 import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
 import {LinkTable} from './LinkTable';
-import {useWeaveflowRouteContext} from '../Browse3/context';
 
 const Browse2Boards: FC<{entity: string; project: string}> = ({
   entity,
@@ -59,7 +58,6 @@ interface Browse2ProjectParams {
 }
 
 export const Browse2ProjectPage: FC = props => {
-  const routerContext = useWeaveflowRouteContext();
   const params = useParams<Browse2ProjectParams>();
   const rootTypeCounts = query.useProjectAssetCountGeneral(
     params.entity,
