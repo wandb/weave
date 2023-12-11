@@ -1,3 +1,5 @@
+import abc
+
 import hashlib
 import typing
 from typing import Mapping
@@ -62,10 +64,63 @@ def make_run_key(
     return RunKey(op_def.simple_name, hash.hexdigest())
 
 
-# Trace interface. Makes use of objects and mutations to store trace data.
+class Trace:
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def new_run(
+        self,
+        run_key: RunKey,
+        inputs: typing.Optional[dict[str, ref_base.Ref]] = None,
+        output: typing.Any = None,
+    ) -> graph.Node[runs.Run]:
+        """Creates a new run object. Returns the resulting run wrapped in a node to support Weave mutations."""
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
+        """Gets a node containing a run object. The run is wrapped in a Node to support Weave mutations."""
+        raise NotImplementedError()
+
+    def get_run_val(self, run_key: RunKey) -> typing.Optional[runs.Run]:
+        """Gets a run object."""
+        from . import execute_fast
+
+        res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))
+        return res
+
+    @abc.abstractmethod
+    def save_run(self, run: runs.Run):
+        """Saves a run."""
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def save_object(
+        self, obj: typing.Any, name: typing.Optional[str] = None
+    ) -> ref_base.Ref:
+        """Saves an object."""
+        raise NotImplementedError()
+
+    def save_run_output(self, od: op_def.OpDef, run_key: RunKey, output: typing.Any):
+        if not od.pure:
+            # If an op is impure, its output is saved to a name that does not
+            # include run ID. This means consuming pure runs will hit cache if
+            # the output of an impure op is the same as it was last time.
+            # However that also means we can traceback through impure ops if we want
+            # to see the actual query that run for a given object.
+            # TODO: revisit this behavior
+            return self.save_object(output)
+        # TODO: table caching is currently disabled, but this path doesn't handle it
+        # when we turn it back on!
+        return self.save_object(
+            output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output"
+        )
+
+
+# Local trace interface. Makes use of objects and mutations to store trace data.
 # Manually constructs nodes and op calls to avoid recursively calling
 # the execute engine, either via use or type refinement.
-class TraceLocal:
+class TraceLocal(Trace):
     def new_run(
         self,
         run_key: RunKey,
@@ -118,12 +173,6 @@ class TraceLocal:
             )
         return self._single_run(run_key)
 
-    def get_run_val(self, run_key: RunKey) -> typing.Optional[runs.Run]:
-        from . import execute_fast
-
-        res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))
-        return res
-
     def save_run(self, run: runs.Run):
         from .ops_primitives import weave_api
 
@@ -132,21 +181,6 @@ class TraceLocal:
             weave_api.append(self._run_table(run_key), run, {})
         else:
             weave_api.set(self._single_run(run_key), run, {})
-
-    def save_run_output(self, od: op_def.OpDef, run_key: RunKey, output: typing.Any):
-        if not od.pure:
-            # If an op is impure, its output is saved to a name that does not
-            # include run ID. This means consuming pure runs will hit cache if
-            # the output of an impure op is the same as it was last time.
-            # However that also means we can traceback through impure ops if we want
-            # to see the actual query that run for a given object.
-            # TODO: revisit this behavior
-            return self.save_object(output)
-        # TODO: table caching is currently disabled, but this path doesn't handle it
-        # when we turn it back on!
-        return self.save_object(
-            output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output"
-        )
 
     def save_object(
         self, obj: typing.Any, name: typing.Optional[str] = None
