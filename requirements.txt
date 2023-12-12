@@ -29,8 +29,6 @@ graphql-core>3
 objgraph>=3.6.0
 tabulate
 # Weaveflow Additions
-openai>=1.0.0
+openai<=0.28.1
 tiktoken>=0.4.0
 faiss-cpu
-
-pytest-asyncio<=0.21.1  # newer versions seem to be causing weave op unit test failures?
