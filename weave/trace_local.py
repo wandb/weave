@@ -7,6 +7,7 @@ import json
 import dataclasses
 import random
 import contextlib
+import time
 
 from . import storage
 from . import ref_base
@@ -85,6 +86,14 @@ class Trace(metaclass=abc.ABCMeta):
 
         # TODO: consider replacing with a call to get_mutable_run()
         return weave_internal.make_const_node(types.RunType(), run)
+
+    @contextlib.contextmanager
+    def trace(self, run_key: RunKey):
+        run = runs.Run(run_key.id, run_key.op_name)
+        run.metadata["start_time_s"] = time.time()
+        yield run
+        run.metadata["end_time_s"] = time.time()
+        run.op_name = run_key.op_name
 
     @abc.abstractmethod
     def get_mutable_run(self, run_key: RunKey) -> graph.Node[runs.Run]:

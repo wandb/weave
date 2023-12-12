@@ -765,7 +765,10 @@ def execute_forward_node(
                         next(iter(inputs.values())), box.box(result)
                     )
             else:
-                result = execute_sync_op(op_def, inputs)
+                with TRACE.trace(run_key) as span:
+                    span.inputs = inputs
+                    result = execute_sync_op(op_def, inputs)
+                    span.output = result
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)
