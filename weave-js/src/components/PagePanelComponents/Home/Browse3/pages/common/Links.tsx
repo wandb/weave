@@ -6,176 +6,149 @@ import {WFHighLevelCallFilter} from '../CallsPage';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
-import {useWeaveflowORMContext} from '../wfInterface/context';
 
-export const TypeLink: React.FC<{typeName: string}> = props => {
-  const orm = useWeaveflowORMContext();
+export const TypeLink: React.FC<{
+  entityName: string;
+  projectName: string;
+  typeName: string;
+}> = props => {
   const routerContext = useWeaveflowRouteContext();
-  try {
-    const type = orm.projectConnection.type(props.typeName);
-    return (
-      <Link
-        to={routerContext.typeUIUrl(
-          type.entity(),
-          type.project(),
-          type.name()
-        )}>
-        {props.typeName}
-      </Link>
-    );
-  } catch (e) {
-    return <span>{props.typeName}</span>;
-  }
+  return (
+    <Link
+      to={routerContext.typeUIUrl(
+        props.entityName,
+        props.projectName,
+        props.typeName
+      )}>
+      {props.typeName}
+    </Link>
+  );
 };
 
 export const TypeVersionLink: React.FC<{
+  entityName: string;
+  projectName: string;
   typeName: string;
   version: string;
   hideName?: boolean;
 }> = props => {
-  const orm = useWeaveflowORMContext();
   const routerContext = useWeaveflowRouteContext();
   const text = props.hideName
     ? props.version
     : props.typeName + ': ' + props.version;
-  try {
-    const typeVersion = orm.projectConnection.typeVersion(
-      props.typeName,
-      props.version
-    );
-    return (
-      <Link
-        to={routerContext.typeVersionUIUrl(
-          typeVersion.entity(),
-          typeVersion.project(),
-          typeVersion.type().name(),
-          typeVersion.version()
-        )}>
-        {text}
-      </Link>
-    );
-  } catch (e) {
-    console.error(e);
-    return <span>{text}</span>;
-  }
+  return (
+    <Link
+      to={routerContext.typeVersionUIUrl(
+        props.entityName,
+        props.projectName,
+        props.typeName,
+        props.version
+      )}>
+      {text}
+    </Link>
+  );
 };
 
-export const ObjectLink: React.FC<{objectName: string}> = props => {
-  const orm = useWeaveflowORMContext();
+export const ObjectLink: React.FC<{
+  entityName: string;
+  projectName: string;
+  objectName: string;
+}> = props => {
   const routerContext = useWeaveflowRouteContext();
-  try {
-    const object = orm.projectConnection.object(props.objectName);
-    return (
-      <Link
-        to={routerContext.objectUIUrl(
-          object.entity(),
-          object.project(),
-          object.name()
-        )}>
-        {props.objectName}
-      </Link>
-    );
-  } catch (e) {
-    return <span>{props.objectName}</span>;
-  }
+  return (
+    <Link
+      to={routerContext.objectUIUrl(
+        props.entityName,
+        props.projectName,
+        props.objectName
+      )}>
+      {props.objectName}
+    </Link>
+  );
 };
 
 export const ObjectVersionLink: React.FC<{
+  entityName: string;
+  projectName: string;
   objectName: string;
   version: string;
   hideName?: boolean;
 }> = props => {
-  const orm = useWeaveflowORMContext();
   const routerContext = useWeaveflowRouteContext();
   const text = props.hideName
     ? props.version
     : props.objectName + ': ' + props.version;
-  try {
-    const objectVersion = orm.projectConnection.objectVersion(
-      props.objectName,
-      props.version
-    );
-    return (
-      <Link
-        to={routerContext.objectVersionUIUrl(
-          objectVersion.entity(),
-          objectVersion.project(),
-          objectVersion.object().name(),
-          objectVersion.version()
-        )}>
-        {text}
-      </Link>
-    );
-  } catch (e) {
-    return <span>{text}</span>;
-  }
+  return (
+    <Link
+      to={routerContext.objectVersionUIUrl(
+        props.entityName,
+        props.projectName,
+        props.objectName,
+        props.version
+      )}>
+      {text}
+    </Link>
+  );
 };
 
-export const OpLink: React.FC<{opName: string}> = props => {
-  const orm = useWeaveflowORMContext();
+export const OpLink: React.FC<{
+  entityName: string;
+  projectName: string;
+  opName: string;
+}> = props => {
   const routerContext = useWeaveflowRouteContext();
-  try {
-    const op = orm.projectConnection.op(props.opName);
-    return (
-      <Link to={routerContext.opUIUrl(op.entity(), op.project(), op.name())}>
-        {props.opName}
-      </Link>
-    );
-  } catch (e) {
-    return <span>{props.opName}</span>;
-  }
+  return (
+    <Link
+      to={routerContext.opUIUrl(
+        props.entityName,
+        props.projectName,
+        props.opName
+      )}>
+      {props.opName}
+    </Link>
+  );
 };
 
 export const OpVersionLink: React.FC<{
+  entityName: string;
+  projectName: string;
   opName: string;
   version: string;
   hideName?: boolean;
 }> = props => {
-  const orm = useWeaveflowORMContext();
   const routerContext = useWeaveflowRouteContext();
   const text = props.hideName
     ? props.version
     : props.opName + ': ' + props.version;
-  try {
-    const opVersion = orm.projectConnection.opVersion(
-      props.opName,
-      props.version
-    );
-    return (
-      <Link
-        to={routerContext.opVersionUIUrl(
-          opVersion.entity(),
-          opVersion.project(),
-          opVersion.op().name(),
-          opVersion.version()
-        )}>
-        {text}
-      </Link>
-    );
-  } catch (e) {
-    return <span>{text}</span>;
-  }
+  return (
+    <Link
+      to={routerContext.opVersionUIUrl(
+        props.entityName,
+        props.projectName,
+        props.opName,
+        props.version
+      )}>
+      {text}
+    </Link>
+  );
 };
 
-export const CallLink: React.FC<{callId: string}> = props => {
-  const orm = useWeaveflowORMContext();
+export const CallLink: React.FC<{
+  entityName: string;
+  projectName: string;
+  callId: string;
+}> = props => {
   const routerContext = useWeaveflowRouteContext();
 
-  const call = orm.projectConnection.call(props.callId);
-  let callName = call.callID();
-  const callOpVersion = call.opVersion();
-  if (callOpVersion) {
-    callName = callOpVersion.op().name() + ' : ' + callOpVersion.version();
-  }
   return (
     <Link
       to={routerContext.callUIUrl(
-        call.entity(),
-        call.project(),
-        call.traceID(),
-        call.callID()
+        props.entityName,
+        props.projectName,
+        '',
+        props.callId
       )}>
-      {callName}
+      {props.callId}
     </Link>
   );
 };

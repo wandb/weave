@@ -12,10 +12,12 @@ import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-b
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
+import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
 import {ReactComponent as ImportBug} from '../../assets/icons/icon-bug.svg';
 import {ReactComponent as ImportCategoryMultimodal} from '../../assets/icons/icon-category-multimodal.svg';
 import {ReactComponent as ImportChartHorizontalBars} from '../../assets/icons/icon-chart-horizontal-bars.svg';
 import {ReactComponent as ImportChartPie} from '../../assets/icons/icon-chart-pie.svg';
+import {ReactComponent as ImportChartScatterplot} from '../../assets/icons/icon-chart-scatterplot.svg';
 import {ReactComponent as ImportChartVerticalBars} from '../../assets/icons/icon-chart-vertical-bars.svg';
 import {ReactComponent as ImportCheckmark} from '../../assets/icons/icon-checkmark.svg';
 import {ReactComponent as ImportCheckmarkCircle} from '../../assets/icons/icon-checkmark-circle.svg';
@@ -95,6 +97,7 @@ import {ReactComponent as ImportLayoutHorizontal} from '../../assets/icons/icon-
 import {ReactComponent as ImportLayoutTabs} from '../../assets/icons/icon-layout-tabs.svg';
 import {ReactComponent as ImportLayoutVertical} from '../../assets/icons/icon-layout-vertical.svg';
 import {ReactComponent as ImportLightbulbInfo} from '../../assets/icons/icon-lightbulb-info.svg';
+import {ReactComponent as ImportLinearScale} from '../../assets/icons/icon-linear-scale.svg';
 import {ReactComponent as ImportLinkAlt} from '../../assets/icons/icon-link-alt.svg';
 import {ReactComponent as ImportLinkedinSocial} from '../../assets/icons/icon-linkedin-social.svg';
 import {ReactComponent as ImportList} from '../../assets/icons/icon-list.svg';
@@ -262,6 +265,9 @@ export const IconBookDictionary = (props: SVGIconProps) => (
 export const IconBoolean = (props: SVGIconProps) => (
   <ImportBoolean {...updateIconProps(props)} />
 );
+export const IconBoxPlot = (props: SVGIconProps) => (
+  <ImportBoxPlot {...updateIconProps(props)} />
+);
 export const IconBug = (props: SVGIconProps) => (
   <ImportBug {...updateIconProps(props)} />
 );
@@ -273,6 +279,9 @@ export const IconChartHorizontalBars = (props: SVGIconProps) => (
 );
 export const IconChartPie = (props: SVGIconProps) => (
   <ImportChartPie {...updateIconProps(props)} />
+);
+export const IconChartScatterplot = (props: SVGIconProps) => (
+  <ImportChartScatterplot {...updateIconProps(props)} />
 );
 export const IconChartVerticalBars = (props: SVGIconProps) => (
   <ImportChartVerticalBars {...updateIconProps(props)} />
@@ -510,6 +519,9 @@ export const IconLayoutVertical = (props: SVGIconProps) => (
 );
 export const IconLightbulbInfo = (props: SVGIconProps) => (
   <ImportLightbulbInfo {...updateIconProps(props)} />
+);
+export const IconLinearScale = (props: SVGIconProps) => (
+  <ImportLinearScale {...updateIconProps(props)} />
 );
 export const IconLinkAlt = (props: SVGIconProps) => (
   <ImportLinkAlt {...updateIconProps(props)} />
@@ -876,10 +888,12 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'blog-report': IconBlogReport,
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
+  'box-plot': IconBoxPlot,
   bug: IconBug,
   'category-multimodal': IconCategoryMultimodal,
   'chart-horizontal-bars': IconChartHorizontalBars,
   'chart-pie': IconChartPie,
+  'chart-scatterplot': IconChartScatterplot,
   'chart-vertical-bars': IconChartVerticalBars,
   checkmark: IconCheckmark,
   'checkmark-circle': IconCheckmarkCircle,
@@ -959,6 +973,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'layout-tabs': IconLayoutTabs,
   'layout-vertical': IconLayoutVertical,
   'lightbulb-info': IconLightbulbInfo,
+  'linear-scale': IconLinearScale,
   'link-alt': IconLinkAlt,
   'linkedin-social': IconLinkedinSocial,
   list: IconList,
