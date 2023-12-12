@@ -23,6 +23,8 @@ export type WFHighLevelCallFilter = {
   opCategory?: HackyOpCategory | null;
   opVersions?: string[];
   inputObjectVersions?: string[];
+  parentId?: string | null;
+  traceId?: string | null;
 };
 
 export const CallsPage: React.FC<{
@@ -66,6 +68,20 @@ export const CallsTable: React.FC<{
   const objectVersionOptions = useMemo(() => {
     const versions = orm.projectConnection.objectVersions();
     const options = versions.map(v => v.object().name() + ':' + v.version());
+    return options;
+  }, [orm.projectConnection]);
+  const parentIdOptions = useMemo(() => {
+    const calls = orm.projectConnection.calls();
+    const options = calls
+      .map(v => v.parentCall()?.callID())
+      .filter(v => v != null);
+    return options;
+  }, [orm.projectConnection]);
+  const traceIdOptions = useMemo(() => {
+    const calls = orm.projectConnection.calls();
+    const options = Array.from(
+      new Set(calls.map(v => v.traceID()).filter(v => v != null))
+    );
     return options;
   }, [orm.projectConnection]);
   const opCategoryOptions = useMemo(() => {
@@ -121,11 +137,15 @@ export const CallsTable: React.FC<{
         );
         return objectVersion.refUri();
       }),
+      traceId: effectiveFilter.traceId ?? undefined,
+      parentId: effectiveFilter.parentId ?? undefined,
     };
   }, [
     effectiveFilter.inputObjectVersions,
     effectiveFilter.opCategory,
     effectiveFilter.opVersions,
+    effectiveFilter.parentId,
+    effectiveFilter.traceId,
     effectiveFilter.traceRootsOnly,
     orm.projectConnection,
   ]);
@@ -231,6 +251,48 @@ export const CallsTable: React.FC<{
                   });
                 }}
                 options={objectVersionOptions}
+              />
+            </FormControl>
+          </ListItem>
+          <ListItem>
+            <FormControl fullWidth>
+              <Autocomplete
+                size={'small'}
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'traceId'
+                )}
+                renderInput={params => (
+                  <TextField {...params} label="Trace Id" />
+                )}
+                value={effectiveFilter.traceId ?? null}
+                onChange={(event, newValue) => {
+                  setFilter({
+                    ...filter,
+                    traceId: newValue,
+                  });
+                }}
+                options={traceIdOptions}
+              />
+            </FormControl>
+          </ListItem>
+          <ListItem>
+            <FormControl fullWidth>
+              <Autocomplete
+                size={'small'}
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'parentId'
+                )}
+                renderInput={params => (
+                  <TextField {...params} label="Parent Id" />
+                )}
+                value={effectiveFilter.parentId ?? null}
+                onChange={(event, newValue) => {
+                  setFilter({
+                    ...filter,
+                    parentId: newValue,
+                  });
+                }}
+                options={parentIdOptions}
               />
             </FormControl>
           </ListItem>

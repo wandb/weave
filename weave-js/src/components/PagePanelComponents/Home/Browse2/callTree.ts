@@ -42,6 +42,7 @@ export interface CallFilter {
   inputUris?: string[];
   outputUris?: string[];
   traceId?: string;
+  parentId?: string;
   traceRootsOnly?: boolean;
 }
 
@@ -260,6 +261,17 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
           key: constString('trace_id'),
         }),
         rhs: constString(filters.traceId),
+      })
+    );
+  }
+  if (filters.parentId != null) {
+    filterClauses.push(
+      opStringEqual({
+        lhs: opPick({
+          obj: rowVar,
+          key: constString('parent_id'),
+        }),
+        rhs: constString(filters.parentId),
       })
     );
   }
