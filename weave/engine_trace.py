@@ -261,11 +261,14 @@ class WeaveWriter:
         self._orig_writer.flush_queue()
 
 
-def tracer():
-    if os.getenv("DD_ENV"):
-        from ddtrace import tracer as ddtrace_tracer, span as ddtrace_span
+def patch_ddtrace_set_tag():
+    from ddtrace import span as ddtrace_span
+    from inspect import signature
 
-        # replaces ddtrace.Span.set_tag and ddtrace.Span.set_metric
+    set_tag_signature = signature(ddtrace_span.Span.set_tag)
+
+    # replaces ddtrace.Span.set_tag and ddtrace.Span.set_metric if not patched already
+    if "redacted_val" not in set_tag_signature.parameters:
         old_set_tag = ddtrace_span.Span.set_tag
         old_set_metric = ddtrace_span.Span.set_metric
 
@@ -284,6 +287,12 @@ def tracer():
         ddtrace_span.Span.set_metric = set_metric
         ddtrace_span.Span.set_tag = set_tag
 
+
+def tracer():
+    if os.getenv("DD_ENV"):
+        from ddtrace import tracer as ddtrace_tracer
+
+        patch_ddtrace_set_tag()
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
             # mirror DataDog trace info to W&B.
