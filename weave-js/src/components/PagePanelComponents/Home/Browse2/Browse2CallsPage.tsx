@@ -13,7 +13,7 @@ export const Browse2CallsPage: FC = () => {
   let selectedSpan: TraceSpan | undefined;
   query.forEach((val, key) => {
     if (key === 'op') {
-      filters.opUri = val;
+      filters.opUris = [val];
     } else if (key === 'inputUri') {
       if (filters.inputUris == null) {
         filters.inputUris = [];

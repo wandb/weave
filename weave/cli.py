@@ -5,6 +5,7 @@ import typing
 from weave import server, __version__
 
 # from .model_server import app
+from .urls import BROWSE3_PATH
 from . import api
 from . import uris
 from . import artifact_wandb
@@ -26,7 +27,7 @@ def start_ui() -> None:
     serv = server.HttpServer(port=3000)  # type: ignore
     serv.start()
     print("Server started")
-    print("http://localhost:3000/browse2")
+    print(f"http://localhost:3000/{BROWSE3_PATH}")
     while True:
         time.sleep(10)
 
@@ -61,7 +62,9 @@ def serve(
     api.init(project)
     # TODO: provide more control over attributes
     with api.attributes({"env": env}):
-        api.serve(parsed_ref, method_name=method, auth_entity=auth_entity, port=port)
+        api.serve(
+            parsed_ref, method_name=method or None, auth_entity=auth_entity, port=port
+        )
 
 
 @cli.group(help="Deploy weave models.")
@@ -71,6 +74,7 @@ def deploy() -> None:
 
 @deploy.command(help="Deploy to GCP.")
 @click.argument("model_ref")
+@click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
 @click.option("--gcp-project", help="GCP project name.")
 @click.option(
@@ -80,6 +84,7 @@ def deploy() -> None:
 @click.option("--dev", is_flag=True, help="Run the function locally.")
 def gcp(
     model_ref: str,
+    method: str,
     project: str,
     gcp_project: str,
     auth_entity: str,
@@ -88,7 +93,7 @@ def gcp(
 ) -> None:
     if dev:
         print(f"Developing model {model_ref}...")
-        google.develop(model_ref, auth_entity=auth_entity)
+        google.develop(model_ref, model_method=method, auth_entity=auth_entity)
         return
     print(f"Deploying model {model_ref}...")
     if auth_entity is None:
@@ -98,6 +103,7 @@ def gcp(
     try:
         google.deploy(
             model_ref,
+            model_method=method,
             wandb_project=project,
             auth_entity=auth_entity,
             gcp_project=gcp_project,

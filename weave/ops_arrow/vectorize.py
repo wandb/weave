@@ -15,6 +15,7 @@ from .. import op_def
 from .. import dispatch
 from .. import weave_internal
 from .. import weavify
+from .. import op_args
 
 from .. import graph_debug
 
@@ -414,6 +415,11 @@ def vectorize(
             # Example: [[1,2,3], [3,4,5]].map(row => row.map(x => x + 1))
             return _vectorize_lambda_output_node(node, vectorized_keys)
 
+        # 1b. If custom op, never try to vectorize for now.
+        node_op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+        if node_op_def.location is not None:
+            return _create_manually_mapped_op(node_name, node_inputs, vectorized_keys)
+
         # 2. If the op is `dict` or `list` then we manually hard code the vectorized version
         # since dispatch will choose the non-vectorized version. Note that we transform the inputs
         # appropriately. See comments in header of function
@@ -719,6 +725,15 @@ def _ensure_variadic_fn(
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     debug_str = graph_debug.node_expr_str_full(fn)
     logging.info("Vectorizing: %s", debug_str)
+
+    if len(awl) == 0:
+        # Short circuit empty list for performance reasons and to avoid calling
+        # aggregations on empty lists.
+        logging.info(
+            "Short circuiting vectorization on %s because it is empty.", debug_str
+        )
+        return convert.to_arrow([], types.List(fn.type), artifact=awl._artifact)
+
     from .. import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)

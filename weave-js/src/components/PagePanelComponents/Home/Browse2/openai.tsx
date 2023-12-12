@@ -132,7 +132,7 @@ export const OpenAIChatMessages: FC<{messages: ChatMessage[]}> = ({
   return (
     <div>
       {messages.map((m, i) => (
-        <OpenAIChatMessage message={m} />
+        <OpenAIChatMessage key={i} message={m} />
       ))}
     </div>
   );
@@ -162,7 +162,7 @@ export const OpenAIChatInputView: FC<{chatInput: OpenAIChatInput}> = ({
   return (
     <div>
       <Box mb={1}>
-        <Typography variant="body1">
+        <Typography variant="body1" component="span">
           Model: <Chip label={chatInput.model} />
         </Typography>
       </Box>
@@ -201,7 +201,7 @@ export const OpenAIChatOutputView: FC<{chatOutput: OpenAIChatOutput}> = ({
   return (
     <div>
       <Box mb={1}>
-        <Typography variant="body1">
+        <Typography variant="body1" component="span">
           Model: <Chip label={chatOutput.model} />
         </Typography>
       </Box>

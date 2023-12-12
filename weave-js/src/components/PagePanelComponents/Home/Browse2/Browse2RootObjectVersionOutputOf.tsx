@@ -29,7 +29,7 @@ export const Browse2RootObjectVersionOutputOf: FC<{uri: string}> = ({uri}) => {
   }, [calledOpCountsQuery]);
 
   return outputOfRunRef != null ? (
-    <SmallRef objRef={outputOfRunRef} />
+    <SmallRef objRef={outputOfRunRef} wfTable="OpVersion" />
   ) : (
     <Typography>-</Typography>
   );

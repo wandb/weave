@@ -81,6 +81,9 @@ def write_artifact_to_wandb(
     # must provide an entity name.
     entity_name = entity_name or wandb_client_api.wandb_public_api().default_entity
 
+    if entity_name is None:
+        raise ValueError("entity_name must be provided")
+
     # Finalize the artifact, and return early if the digest already exists on the
     # server.
     artifact.finalize()
