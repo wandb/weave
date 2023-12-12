@@ -23,6 +23,7 @@ import {
   isGroupNode,
   isInsideMain,
   makePanel,
+  nextPanelName,
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
@@ -156,6 +157,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     },
     [updateConfig2, goBackToOutline]
   );
+
   const handleDuplicate = useCallback(
     (panelPath: string[]) => {
       updateConfig2(oldConfig => {
@@ -172,12 +174,22 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
           id: targetId,
         });
         const duplicateLayout = targetLayoutObject?.layout;
-        return addChild(oldConfig, parentPath, targetPanel, duplicateLayout);
+        const newPanelName = nextPanelName(
+          Object.keys(parentPanel.config.items)
+        );
+        const newPanelPath = [...parentPath, newPanelName];
+        const updatedConfig = addChild(
+          oldConfig,
+          parentPath,
+          targetPanel,
+          newPanelName,
+          duplicateLayout
+        );
+        setInteractingPanel('config', newPanelPath, 'input');
+        return updatedConfig;
       });
-
-      goBackToOutline?.();
     },
-    [updateConfig2, goBackToOutline]
+    [updateConfig2, setInteractingPanel]
   );
   const menuItems = useMemo(() => {
     const items = [];
@@ -196,7 +208,10 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         key: 'duplicate',
         content: 'Duplicate',
         icon: <IconCopy />,
-        onClick: () => handleDuplicate(path),
+        onClick: (ev: React.MouseEvent) => {
+          ev.stopPropagation();
+          handleDuplicate(path);
+        },
       });
     }
 
