@@ -46,9 +46,11 @@ from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
+from . import stream_data_interfaces
 from .monitoring import monitor
 
 # Language Features
+from . import eager
 from . import language_nullability
 
 from . import parallelism
@@ -496,16 +498,32 @@ def publish_graph(
     # Our intention is to replace init_monitor with weave.init, but that is not
     # yet complete.
     # TODO: Fix
-    if mon.streamtable:
+    if mon.streamtable and not context_state.monitor_is_disabled():
         graph.map_nodes_full(nodes, _publish_node)
+
+
+def implements_buffer_protocol(obj):
+    try:
+        memoryview(obj)
+        return True
+    except TypeError:
+        return False
 
 
 def hash_inputs(op_name: str, inputs: dict[str, typing.Any]) -> str:
     hasher = hashlib.sha256()
     for input in inputs:
-        hasher.update(f"Op Name: {op_name}")
-        hasher.update(f"Input name: {input}")
-        hasher.update(inputs[input])
+        hasher.update(f"Op Name: {op_name}".encode())
+        hasher.update(f"Input name: {input}".encode())
+        val = inputs[input]
+        if isinstance(inputs[input], ref_base.Ref):
+            hasher.update(str(val).encode())
+        elif implements_buffer_protocol(val):
+            hasher.update(val)
+        else:
+            raise ValueError(
+                "Value must be a string or must implement the buffer protocol"
+            )
     return hasher.hexdigest()
 
 
@@ -528,12 +546,29 @@ def execute_sync_op(
 
         input_hash = hash_inputs(op_def.name, mon_span_inputs)
 
-        prev_span = mon.streamtable.rows().filter(lambda x: )
+        with context_state.lazy_execution():
+            with context_state.monitor_disabled():
+                maybe_span_node = mon.rows()
+                if maybe_span_node is None:
+                    return None
+
+                span_node = maybe_span_node.filter(  # type: ignore
+                    lambda x: x["attributes"]["input_hash"] == input_hash
+                )
+                iter: eager.WeaveIter[
+                    stream_data_interfaces.TraceSpanDict
+                ] = eager.WeaveIter(span_node)
+                span_dict = iter[0]
+
+            if span_dict != None:
+                j = span_dict["output"]["_result"]
+                j.get()
+                return j
 
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
             span.inputs["_keys"] = list(inputs.keys())
-            span.inputs["input_hash"] = input_hash
+            span.attributes["input_hash"] = input_hash
 
             for i, ref in enumerate(refs[:3]):
                 span.inputs["_ref%s" % i] = ref

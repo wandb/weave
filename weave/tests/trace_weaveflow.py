@@ -2,7 +2,7 @@ import weave
 from weave import weaveflow
 
 
-weave.init("weave_memo_2")
+weave.init("weave_memo_5")
 
 
 @weave.type()
@@ -12,6 +12,7 @@ class CustomObject:
 
 @weave.op()
 def custom_object_adder(a: CustomObject, b: CustomObject) -> CustomObject:
+    print("hello")
     return CustomObject(a.a + b.a)
 
 
