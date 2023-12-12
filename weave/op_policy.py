@@ -76,6 +76,9 @@ def should_run_in_parallel(op_name: str) -> bool:
 
 
 def should_cache(op_name: str) -> bool:
+    if "://" in op_name:
+        # Always parallelize custom ops for now (ops that are not built-ins)
+        return True
     if op_name.startswith("mapped_"):
         return False
     return op_name in CACHE_OP_NAMES

@@ -107,7 +107,7 @@ def import_ecosystem():
             from weave.weaveflow import faiss
 
             # Turn eager mode back off.
-            context_state._eager_mode.set(False)
+            # context_state._eager_mode.set(False)
         except (ImportError, OSError, wandb.Error):
             print("Error: Couldn't import faiss module for Weaveflow.")
         try:

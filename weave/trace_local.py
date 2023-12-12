@@ -16,6 +16,9 @@ from . import graph
 from . import artifact_local
 from . import weave_internal
 from . import op_policy
+from . import monitoring
+from . import context_state
+from . import stream_data_interfaces
 
 
 @dataclasses.dataclass
@@ -64,10 +67,7 @@ def make_run_key(
     return RunKey(op_def.simple_name, hash.hexdigest())
 
 
-class Trace:
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
+class Trace(metaclass=abc.ABCMeta):
     def new_run(
         self,
         run_key: RunKey,
@@ -75,19 +75,22 @@ class Trace:
         output: typing.Any = None,
     ) -> graph.Node[runs.Run]:
         """Creates a new run object. Returns the resulting run wrapped in a node to support Weave mutations."""
-        raise NotImplementedError()
+        run = runs.Run(run_key.id, run_key.op_simple_name)
+        if inputs is not None:
+            run.inputs = inputs
+        if output is not None:
+            run.output = output
+        self.save_run(run)
 
     @abc.abstractmethod
-    def get_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
+    def get_mutable_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         """Gets a node containing a run object. The run is wrapped in a Node to support Weave mutations."""
         raise NotImplementedError()
 
-    def get_run_val(self, run_key: RunKey) -> typing.Optional[runs.Run]:
+    @abc.abstractmethod
+    def get_run(self, run_key: RunKey) -> typing.Optional[runs.Run]:
         """Gets a run object."""
-        from . import execute_fast
-
-        res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))
-        return res
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def save_run(self, run: runs.Run):
@@ -117,24 +120,75 @@ class Trace:
         )
 
 
+class TraceWeaveFlow(Trace):
+    def __init__(self, mon: monitoring.monitor.Monitor):
+        self._mon = mon
+
+    @staticmethod
+    def to_trace_span(run: runs.Run) -> stream_data_interfaces.TraceSpanDict:
+        """Currently only works for runs of simple ops."""
+        # TODO: implement auto publishing, or figure out where to do it.
+
+        return {
+            "span_id": run.id,
+            "name": run.op_name,
+            "status_code": run.state,
+            "inputs": run.inputs,
+            "output": run.output,
+        }
+
+    def get_mutable_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
+        raise NotImplementedError()
+
+    def run_from_trace_span(span: stream_data_interfaces.TraceSpanDict) -> runs.Run:
+        return runs.Run(
+            id=span["span_id"],
+            op_name=span["name"],
+            inputs=span["inputs"],
+            output=span["output"],
+            # TODO: this doesn't quite match. See stream_data_interfaces.py
+            state=span["status_code"],
+            # this is only used in the Async case for now. So we can leave
+            # this alone for the moment.
+            history=[],
+        )
+
+    def get_run(self, run_key: RunKey) -> typing.Optional[runs.Run]:
+        from . import eager
+        from . import api
+
+        with context_state.lazy_execution():
+            span_node = self._mon.rows().filter(lambda x: x["span_id"] == run_key.id)
+            iter = eager.WeaveIter(span_node)
+            span_dict: typing.Optional[stream_data_interfaces.TraceSpanDict] = iter[0]
+
+        if span_dict == None:
+            return None
+
+        return type(self).run_from_trace_span(span_dict)
+
+    def save_run(self, run: runs.Run):
+        """
+        if "://" not in run.op_name:
+            return
+        """
+
+        span = self.to_trace_span(run)
+
+        # TODO: make this synchronous! currently this could cause races
+        self._mon.streamtable.log(span)
+
+    def save_object(
+        self, obj: typing.Any, name: typing.Optional[str] = None
+    ) -> ref_base.Ref:
+        return storage.publish(obj, name=name)
+        # raise NotImplementedError("save object called")
+
+
 # Local trace interface. Makes use of objects and mutations to store trace data.
 # Manually constructs nodes and op calls to avoid recursively calling
 # the execute engine, either via use or type refinement.
 class TraceLocal(Trace):
-    def new_run(
-        self,
-        run_key: RunKey,
-        inputs: typing.Optional[dict[str, ref_base.Ref]] = None,
-        output: typing.Any = None,
-    ) -> graph.Node[runs.Run]:
-        run = runs.Run(run_key.id, run_key.op_simple_name)
-        if inputs is not None:
-            run.inputs = inputs
-        if output is not None:
-            run.output = output
-        self.save_run(run)
-        return self.get_run(run_key)
-
     def _single_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         single_uri = artifact_local.WeaveLocalArtifactURI(
             f"run-{run_key.op_simple_name}-{run_key.id}", "latest", "obj"
@@ -161,7 +215,15 @@ class TraceLocal(Trace):
         # table (until we have safe table writes)
         return op_policy.should_table_cache(run_key.op_simple_name)
 
-    def get_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
+    def get_run(self, run_key: RunKey) -> typing.Optional[runs.Run]:
+        from . import execute_fast
+
+        res = execute_fast._execute_fn_no_engine(
+            None, None, self.get_mutable_run(run_key)
+        )
+        return res
+
+    def get_mutable_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         if self._should_save_to_table(run_key):
             return weave_internal.manual_call(
                 "listobject-lookup",

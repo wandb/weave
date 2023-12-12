@@ -53,7 +53,8 @@ from . import language_nullability
 
 from . import parallelism
 
-TRACE_LOCAL = trace_local.TraceLocal()
+
+TRACE: trace_local.Trace = trace_local.TraceLocal()
 
 # Set this to true when debugging for costly, but detailed storyline of execution
 PRINT_DEBUG = False
@@ -183,7 +184,15 @@ def get_top_level_stats() -> typing.Optional[ExecuteStats]:
 
 
 def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.Any]:
+    global TRACE
     tracer = engine_trace.tracer()
+    mon = monitor.default_monitor()
+
+    if mon.streamtable is not None:
+        TRACE = trace_local.TraceWeaveFlow(mon)
+    else:
+        TRACE = trace_local.TraceLocal()
+
     with tracer.trace("execute-log-graph"):
         logging.info(
             "Executing %s leaf nodes. (showing first 10)\n%s"
@@ -228,7 +237,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                         )
                     )
                     compiled_nodes = list(compile_results)
-                    publish_graph(compiled_nodes)
+                    # publish_graph(compiled_nodes)
 
                     fg = forward_graph.ForwardGraph()
                     compile_results = compile_results.safe_apply(fg.add_node)
@@ -412,7 +421,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
 
 def async_op_body(run_key: trace_local.RunKey, run_body, inputs, wandb_api_ctx):
     with wandb_api.wandb_api_context(wandb_api_ctx):
-        run = TRACE_LOCAL.get_run(run_key)
+        run = TRACE.get_mutable_run(run_key)
         if run is None:
             raise ValueError("No run found for key: %s" % run_key)
         run.set_state("running")  # type: ignore
@@ -506,7 +515,9 @@ def execute_sync_op(
 ):
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
-    st = mon.streamtable
+    st = None  # mon.streamtable
+    # TODO: Ensure that span creation and parent id propagation works properly in TraceWeaveFlow.
+    # TODO: This may require improving or modifying the trace interface.
     if op_def.location and st:
         op_def_ref = storage._get_ref(op_def)
         if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
@@ -632,7 +643,7 @@ def execute_forward_node(
     client_cache_key = context_state.get_client_cache_key()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
-        if op_policy.should_cache(op_def.simple_name):
+        if op_policy.should_cache(op_def.name):
             if op_def.pure or client_cache_key is not None:
                 no_cache = False
 
@@ -674,11 +685,11 @@ def execute_forward_node(
             )
 
         if run_key:
-            run = TRACE_LOCAL.get_run_val(run_key)
+            run = TRACE.get_run(run_key)
             if run is not None and run != None:  # stupid box none makes us check !=
                 # Watch out, we handle loading async runs in different ways.
                 if op_def.is_async:
-                    forward_node.set_result(TRACE_LOCAL.get_run(run_key))
+                    forward_node.set_result(TRACE.get_mutable_run(run_key))
                     return {
                         "cache_used": True,
                         "already_executed": False,
@@ -688,7 +699,8 @@ def execute_forward_node(
                     if run.output is not None:
                         output_ref = run.output
                         # We must deref here to restore tags
-                        output = output_ref.get()
+                        output = _tag_safe_deref(output_ref)
+                        # output = output_ref.get()
                         logging.debug("Cache hit, returning")
 
                         # Flowed tags are not cacheable(!),
@@ -702,7 +714,7 @@ def execute_forward_node(
                             arg0_ref = next(iter(input_refs.values()))
                             arg0 = ref_base.deref(arg0_ref)
 
-                            output = output_ref.get()
+                            output = _tag_safe_deref(output_ref)
 
                             process_opdef_resolve_fn.flow_tags(arg0, output)
 
@@ -728,9 +740,9 @@ def execute_forward_node(
             for input_name, input in inputs.items():
                 ref = ref_base.get_ref(input)
                 if ref is None:
-                    ref = TRACE_LOCAL.save_object(input)
+                    ref = TRACE.save_object(input)
                 input_refs[input_name] = ref
-            run = TRACE_LOCAL.new_run(run_key, inputs=input_refs)  # type: ignore
+            run = TRACE.new_run(run_key, inputs=input_refs)  # type: ignore
             execute_async_op(op_def, input_refs, run_key)
             forward_node.set_result(run)
             return {
@@ -771,7 +783,8 @@ def execute_forward_node(
                 result = ref
             else:
                 if use_cache and run_key and not box.is_none(result):
-                    result = TRACE_LOCAL.save_run_output(op_def, run_key, result)
+                    # result = TRACE.save_run_output(op_def, run_key, result)
+                    pass
 
             forward_node.set_result(result)
 
@@ -786,7 +799,7 @@ def execute_forward_node(
                 and not box.is_none(result)
             ):
                 logging.debug("Saving run")
-                TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
+                TRACE.new_run(run_key, inputs=input_refs, output=result)
         return {
             "cache_used": False,
             "already_executed": False,
