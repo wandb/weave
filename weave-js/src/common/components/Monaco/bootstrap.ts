@@ -34,7 +34,12 @@ import yamlWorker from 'monaco-yaml/lib/esm/yaml.worker.js?worker&inline';
 import * as vegaSchema from 'vega/build/vega-schema.json';
 import * as vegaLiteSchema from 'vega-lite/build/vega-lite-schema.json';
 
+import dockerRunSchema from './schemas/dockerrun.json';
+import kubernetesJobSchema from './schemas/job.json';
+import jobsetSchema from './schemas/jobset.json';
+import pytorchJobSchema from './schemas/pytorchjob.json';
 import sweepConfigSchema from './schemas/sweep-config-schema.json';
+import volcanoJobSchema from './schemas/volcanojob.json';
 
 const jsonSchemas = [
   {
@@ -52,10 +57,35 @@ const jsonSchemas = [
 
 const yamlSchemas = [
   {
-    uri: 'http://dev.wandb.com/schema/config.json',
-    schema: {...sweepConfigSchema},
-    fileMatch: ['*'],
+    uri: 'http://dev.wandb.com/schema/pytorchjob.json',
+    schema: pytorchJobSchema,
+    fileMatch: ['pytorchjob.yaml'],
   },
+  {
+    uri: 'http://dev.wandb.com/schema/job.json',
+    schema:  kubernetesJobSchema,
+    fileMatch: ['job.yaml'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/volcanojob.json',
+    schema: volcanoJobSchema,
+    fileMatch: ['volcanojob.yaml'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/jobset.json',
+    schema: jobsetSchema,
+    fileMatch: ['jobset.yaml'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/dockerrun.json',
+    schema: dockerRunSchema,
+    fileMatch: ['dockerrun.yaml'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/sweep-config-schema.json',
+    schema: sweepConfigSchema,
+    fileMatch: ['sweep-config.yaml'],
+  }
 ];
 
 (window as any).MonacoEnvironment = {
@@ -96,7 +126,8 @@ monacoEditor.languages.registerDocumentFormattingEditProvider('json', {
 });
 
 (monacoEditor.languages as any).yaml.yamlDefaults.setDiagnosticsOptions({
-  validate: true,
+  // validate: true,
+  inlineSuggest: true,
   schemas: yamlSchemas,
   enableSchemaRequest: true,
   format: true,
