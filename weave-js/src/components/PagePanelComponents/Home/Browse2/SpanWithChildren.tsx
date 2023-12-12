@@ -35,6 +35,7 @@ export const SpanTreeNode: FC<{
       </Box>
       {call.child_spans.map(child => (
         <SpanTreeNode
+          key={child.span_id}
           level={childLevel}
           call={child}
           selectedSpanId={selectedSpanId}

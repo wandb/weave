@@ -3,6 +3,7 @@ import React, {ElementType, SVGProps} from 'react';
 import {ReactComponent as ImportAddNew} from '../../assets/icons/icon-add-new.svg';
 import {ReactComponent as ImportAdminShieldSafe} from '../../assets/icons/icon-admin-shield-safe.svg';
 import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-amazon-sagemaker.svg';
+import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
 import {ReactComponent as ImportAudioVolume} from '../../assets/icons/icon-audio-volume.svg';
 import {ReactComponent as ImportAutomationRobotArm} from '../../assets/icons/icon-automation-robot-arm.svg';
 import {ReactComponent as ImportBack} from '../../assets/icons/icon-back.svg';
@@ -126,6 +127,10 @@ import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
 import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
+import {ReactComponent as ImportPriorityCritical} from '../../assets/icons/icon-priority-critical.svg';
+import {ReactComponent as ImportPriorityHigh} from '../../assets/icons/icon-priority-high.svg';
+import {ReactComponent as ImportPriorityLow} from '../../assets/icons/icon-priority-low.svg';
+import {ReactComponent as ImportPriorityNone} from '../../assets/icons/icon-priority-none.svg';
 import {ReactComponent as ImportPrivacyOpen} from '../../assets/icons/icon-privacy-open.svg';
 import {ReactComponent as ImportPythonLogo} from '../../assets/icons/icon-python-logo.svg';
 import {ReactComponent as ImportPytorchLightningLogo} from '../../assets/icons/icon-pytorch-lightning-logo.svg';
@@ -229,6 +234,9 @@ export const IconAdminShieldSafe = (props: SVGIconProps) => (
 );
 export const IconAmazonSagemaker = (props: SVGIconProps) => (
   <ImportAmazonSagemaker {...updateIconProps(props)} />
+);
+export const IconArea = (props: SVGIconProps) => (
+  <ImportArea {...updateIconProps(props)} />
 );
 export const IconAudioVolume = (props: SVGIconProps) => (
   <ImportAudioVolume {...updateIconProps(props)} />
@@ -599,6 +607,18 @@ export const IconPin = (props: SVGIconProps) => (
 export const IconPlay = (props: SVGIconProps) => (
   <ImportPlay {...updateIconProps(props)} />
 );
+export const IconPriorityCritical = (props: SVGIconProps) => (
+  <ImportPriorityCritical {...updateIconProps(props)} />
+);
+export const IconPriorityHigh = (props: SVGIconProps) => (
+  <ImportPriorityHigh {...updateIconProps(props)} />
+);
+export const IconPriorityLow = (props: SVGIconProps) => (
+  <ImportPriorityLow {...updateIconProps(props)} />
+);
+export const IconPriorityNone = (props: SVGIconProps) => (
+  <ImportPriorityNone {...updateIconProps(props)} />
+);
 export const IconPrivacyOpen = (props: SVGIconProps) => (
   <ImportPrivacyOpen {...updateIconProps(props)} />
 );
@@ -847,6 +867,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'add-new': IconAddNew,
   'admin-shield-safe': IconAdminShieldSafe,
   'amazon-sagemaker': IconAmazonSagemaker,
+  area: IconArea,
   'audio-volume': IconAudioVolume,
   'automation-robot-arm': IconAutomationRobotArm,
   back: IconBack,
@@ -970,6 +991,10 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   photo: IconPhoto,
   pin: IconPin,
   play: IconPlay,
+  'priority-critical': IconPriorityCritical,
+  'priority-high': IconPriorityHigh,
+  'priority-low': IconPriorityLow,
+  'priority-none': IconPriorityNone,
   'privacy-open': IconPrivacyOpen,
   'python-logo': IconPythonLogo,
   'pytorch-lightning-logo': IconPytorchLightningLogo,

@@ -5,13 +5,7 @@ export const refPageUrl = (objectType: string, refS: string) => {
   if (!isWandbArtifactRef(ref)) {
     throw new Error('Not a wandb artifact ref: ' + refS);
   }
-  const res = `/${ref.entityName}/${ref.projectName}/${objectType}/${ref.artifactName}/${ref.artifactVersion}`;
+  // const res = `/${ref.entityName}/${ref.projectName}/${objectType}/${ref.artifactName}/${ref.artifactVersion}`;
+  const res = `/${ref.entityName}/${ref.projectName}/objects/${ref.artifactName}/versions/${ref.artifactVersion}`;
   return res;
-};
-export const opPageUrl = (opUri: string) => {
-  const parsed = parseRef(opUri);
-  if (!isWandbArtifactRef(parsed)) {
-    throw new Error('non wandb artifact ref not yet handled');
-  }
-  return `/${parsed.entityName}/${parsed.projectName}/OpDef/${parsed.artifactName}/${parsed.artifactVersion}`;
 };

@@ -1430,6 +1430,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )
         return weave_internal.define_fn(vars, fn).val
 
+    # TODO: This should be .map!
     def apply(
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):

@@ -53,6 +53,8 @@ import React, {
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
+import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {WFNaiveProject} from '../Browse3/pages/wfInterface/naive';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
 import {
@@ -61,7 +63,7 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {parseRefMaybe, SmallRef} from './SmallRef';
+import {parseRefMaybe} from './SmallRef';
 import {refPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {
@@ -139,7 +141,7 @@ const WeaveEditorCommit: FC<{
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
-
+  const orm = useMaybeWeaveflowORMContext();
   const handleSubmit = useCallback(async () => {
     setWorking('addingRow');
 
@@ -176,6 +178,11 @@ const WeaveEditorCommit: FC<{
       rootObjectRef.projectName,
       rootObjectRef.artifactName
     );
+
+    if ((orm?.projectConnection as WFNaiveProject).reload) {
+      await (orm!.projectConnection as WFNaiveProject).reload();
+    }
+
     setWorking('done');
 
     handleClearEdits();
@@ -187,6 +194,7 @@ const WeaveEditorCommit: FC<{
     rootObjectRef.entityName,
     rootObjectRef.projectName,
     rootObjectRef.artifactName,
+    orm,
     handleClearEdits,
     history,
     objType,
@@ -275,7 +283,7 @@ export const WeaveEditor: FC<{
   useEffect(() => {
     const doRefine = async () => {
       const refined = await weave.refineNode(node, stack);
-      console.log('GOT REFINED', refined);
+      // console.log('GOT REFINED', refined);
       setRefinedNode(refined);
     };
     doRefine();
@@ -717,7 +725,11 @@ export const WeaveViewOpDef: FC<{
   if (opDefQuery.loading) {
     return <div>loading</div>;
   } else if (opDefRef != null) {
-    return <SmallRef objRef={opDefRef} />;
+    // return <SmallRef objRef={opDefRef} />;
+    // This is broken in weave when there is a nested op def
+    return (
+      <>{opDefRef.artifactName + ':' + opDefRef.artifactVersion.slice(0, 6)}</>
+    );
   } else {
     return <div>invalid op def</div>;
   }

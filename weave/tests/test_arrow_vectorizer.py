@@ -1060,14 +1060,20 @@ def test_arrow_dict():
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
+# We have disabled auto-vectorization for all custom ops. Changing this test so that
+# it creates a built-in op instead also doesn't work. In that we automatically create
+# a mapped op. vectorizes determines that it can call the op (via the mapped op) in
+# "Part 1", so it doesn't try to weavify and vectorize. Since we're not relying on
+# auto-vectorization now, this test is disabled.
+@pytest.mark.skip("auto vectorize disabled for custom ops")
 def test_vectorize_works_recursively_on_weavifiable_op():
     # this op is weavifiable because it just calls add
     @weave.op()
-    def add_one(x: int) -> int:
+    def add_one124815(x: int) -> int:
         return x + 1
 
     weave_fn = weave_internal.define_fn(
-        {"x": weave.types.Int()}, lambda x: add_one(x)
+        {"x": weave.types.Int()}, lambda x: add_one124815(x)
     ).val
     vectorized = arrow.vectorize(weave_fn)
     expected = vectorized.to_json()

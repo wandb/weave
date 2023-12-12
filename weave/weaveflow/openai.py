@@ -30,5 +30,6 @@ class OpenaiChatModel(chat_model.ChatModel):
             api_key=os.environ[self.api_key_env_var],
             model=self.model_name,
             messages=messages,
+            request_timeout=15,
         )
         return response
