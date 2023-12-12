@@ -79,7 +79,7 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
             )}
           </Box>
           {parseRefMaybe(call.name) != null ? (
-            <SmallRef objRef={parseRefMaybe(call.name)!} />
+            <SmallRef objRef={parseRefMaybe(call.name)!} wfTable="OpVersion" />
           ) : (
             call.name
           )}

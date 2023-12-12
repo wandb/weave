@@ -32,7 +32,7 @@ export const CallViewSmall: FC<{
 }> = ({call, onClick}) => {
   return (
     <Box mb={1}>
-      <Typography>
+      <Typography component="span">
         <CallEl
           onClick={() => {
             if (onClick) {

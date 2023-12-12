@@ -866,7 +866,9 @@ const PanelTableInner: React.FC<
                       startIcon={rowSizeIconName[RowSize[rowSize]]}
                       onClick={() => setRowSize(RowSize[rowSize])}
                       active={config.rowSize === RowSize[rowSize]}
-                      variant="ghost"
+                      variant={
+                        config.rowSize === RowSize[rowSize] ? 'ghost' : 'quiet'
+                      }
                       size="small"
                     />
                   }
@@ -876,17 +878,23 @@ const PanelTableInner: React.FC<
         )}
         <div
           style={{flex: '1 0 auto', display: 'flex', justifyContent: 'center'}}>
-          <div style={{flex: '0 0 auto'}}>
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="left-arrow"
+          <div
+            style={{flex: '0 0 auto', display: 'flex', alignItems: 'center'}}>
+            <Button
+              variant="quiet"
+              size="small"
+              icon="back"
+              tooltip="First page"
               onClick={() => {
                 updateIndexOffset(0);
               }}
             />
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="chevron-left"
+            <Button
+              variant="quiet"
+              size="small"
+              icon="chevron-back"
+              tooltip="Previous page"
+              className="mr-4"
               onClick={() => {
                 updateIndexOffset(adjustedIndexOffset - nonPinnedVisibleRows);
               }}
@@ -917,7 +925,7 @@ const PanelTableInner: React.FC<
                 }
               }}
             />
-            <span style={{lineHeight: '20px'}}>
+            <span style={{lineHeight: '24px'}}>
               &nbsp;-{' '}
               {adjustedIndexOffset +
                 nonPinnedVisibleRows -
@@ -928,16 +936,21 @@ const PanelTableInner: React.FC<
                 ? 'many'
                 : totalRowCountUse.result - (useOneBasedIndex ? 0 : 1)}
             </span>
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="chevron-right"
+            <Button
+              variant="quiet"
+              size="small"
+              icon="chevron-next"
+              tooltip="Next page"
+              className="ml-4"
               onClick={() => {
                 updateIndexOffset(adjustedIndexOffset + nonPinnedVisibleRows);
               }}
             />
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="right-arrow"
+            <Button
+              variant="quiet"
+              size="small"
+              icon="forward-next"
+              tooltip="Last page"
               onClick={() => {
                 updateIndexOffset(
                   totalRowCountUse.result - nonPinnedVisibleRows
@@ -949,7 +962,7 @@ const PanelTableInner: React.FC<
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
             <Button
-              variant="ghost"
+              variant="quiet"
               size="small"
               onClick={() => {
                 downloadDataAsCSV();
@@ -961,7 +974,7 @@ const PanelTableInner: React.FC<
               trigger={
                 <Button
                   data-test="select-columns"
-                  variant="ghost"
+                  variant="quiet"
                   size="small"
                   onClick={() => {
                     recordEvent('SELECT_COLUMNS');
@@ -991,7 +1004,7 @@ const PanelTableInner: React.FC<
             </Modal>
             <Button
               data-test="auto-columns"
-              variant="ghost"
+              variant="quiet"
               size="small"
               onClick={() => {
                 recordEvent('RESET_TABLE');

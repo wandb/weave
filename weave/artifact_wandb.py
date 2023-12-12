@@ -12,6 +12,8 @@ from wandb import Artifact
 from wandb.apis import public as wb_public
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
+from .urls import BROWSE3_PATH
+
 
 from . import uris
 from . import util
@@ -836,7 +838,16 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
 
     @property
     def ui_url(self):
-        return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
+        root_type = self.type.root_type_class()
+        from .op_def_type import OpDefType
+
+        if issubclass(root_type, OpDefType):
+            return f"http://localhost:3000/{BROWSE3_PATH}/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/ops/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
+        else:
+            return f"http://localhost:3000/{BROWSE3_PATH}/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/objects/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
+
+        # Before Tim's Weaveflow changes
+        # return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
 
 
 types.WandbArtifactRefType.instance_class = WandbArtifactRef

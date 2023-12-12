@@ -27,7 +27,7 @@ import {makeObjRefUri} from './CommonLib';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {WeaveEditor} from './WeaveEditors';
 
-const nodeFromExtra = (node: Node, extra: string[]): Node => {
+export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
     return node;
   }
@@ -59,8 +59,13 @@ const nodeFromExtra = (node: Node, extra: string[]): Node => {
 
 export const Browse2ObjectVersionItemPage: FC = props => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
+  return <Browse2ObjectVersionItemComponent params={params} />;
+};
+
+export const Browse2ObjectVersionItemComponent: FC<{
+  params: Browse2RootObjectVersionItemParams;
+}> = ({params}) => {
   const uri = makeObjRefUri(params);
-  // const history = useHistory();
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(uri)});
     if (params.refExtra == null) {
@@ -240,18 +245,20 @@ export const Browse2ObjectVersionItemPage: FC = props => {
               </Box>
             </Grid>
             <Grid item xs={4}>
-              <Paper>
-                <Typography variant="h6" gutterBottom>
-                  Used in runs
-                </Typography>
-                <Browse2RootObjectVersionUsers uri={uri} />
-              </Paper>
               <Box mt={4}>
                 <Paper>
                   <Typography variant="h6" gutterBottom>
                     Output of run
                   </Typography>
                   <Browse2RootObjectVersionOutputOf uri={uri} />
+                </Paper>
+              </Box>
+              <Box mt={4}>
+                <Paper>
+                  <Typography variant="h6" gutterBottom>
+                    Used in runs
+                  </Typography>
+                  <Browse2RootObjectVersionUsers uri={uri} />
                 </Paper>
               </Box>
               <Box mt={4}>

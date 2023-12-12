@@ -6,6 +6,7 @@ import React, {FC, useMemo, useState} from 'react';
 import {v4 as uuidv4} from 'uuid';
 
 import {flatToTrees} from '../../../Panel2/PanelTraceTree/util';
+import {CenteredAnimatedLoader} from '../Browse3/pages/common/Loader';
 import {AddRowToTable} from './AddRow';
 import {feedbackTableObjNode, Span, StreamId} from './callTree';
 import {useLastRunFeedback, useTraceSpans} from './callTreeHooks';
@@ -48,7 +49,7 @@ const SpanFeedback: FC<{streamId: StreamId; spanId: string}> = ({
   );
 
   return lastFeedbackQuery.loading ? (
-    <div>loading...</div>
+    <CenteredAnimatedLoader />
   ) : (
     <SpanFeedbackLoaded
       {...{streamId, spanId, lastFeedback: lastFeedbackQuery.result}}
@@ -149,7 +150,9 @@ export const Browse2Trace: FC<{
   };
 
   const [addRowToTableOpen, setAddRowToTableOpen] = useState(false);
-
+  if (traceSpans.loading) {
+    return <CenteredAnimatedLoader />;
+  }
   return (
     <Grid container spacing={2} alignItems="flex-start">
       <Grid

@@ -87,16 +87,20 @@ class DefaultToPy(mappers.Mapper):
         if not isinstance(existing_ref, artifact_local.LocalArtifactRef):
             return obj
 
-        # This is the case where we have a default object that we already have
-        # a ref to a local artifact for. Non builtin ops satisify this condition.
-        # During startup we save any non builtin ops to local artifacts, which
-        # attaches a ref to them. We want to publish those ops so that for example
-        # ops attached to Weave Objects are published as well.
+        from . import op_def
 
-        # Just clear the ref... we don't need to recursively publish, it will
-        # happen later.
-        if hasattr(obj, "_ref"):
-            obj._ref = None
+        # Recursively do a top-level publish for OpDef objects. This is a Weaveflow
+        # hack. Weaveflow publishes the entire available graph in the execute.py
+        # prior to executing it. There are often ops inside top-level Objects, like
+        # ChatModel. We want to not publish those later, so we maintain a mapping
+        # from local artifact ref to published ref in storage.py. If we don't do
+        # a top level publish here, these ops will be published inside of their
+        # artifact instead of a new top-level one, and we won't trigger the
+        # local->publish ref cache (since that happens in _direct_publish).
+        if isinstance(obj, op_def.OpDef):
+            from . import api
+
+            storage._direct_publish(obj, f"{obj.name}")
 
         return obj
 
