@@ -45,7 +45,7 @@ def numbers_bins_equal(arr, bins):
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     step = (arr_max - arr_min) / bins
-    step = max(step, 1)
+    step = 1 if step == 0 else step
     return use(number_bins_fixed(step))
 
 
