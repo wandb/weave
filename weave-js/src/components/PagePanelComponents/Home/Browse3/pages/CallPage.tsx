@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 
 import {Browse2TraceComponent} from '../../Browse2/Browse2TracePage';
+import {CallsTable} from './CallsPage';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 
@@ -41,6 +42,18 @@ export const CallPage: React.FC<{
         {
           label: 'Trace',
           content: <Browse2TraceComponent params={params} />,
+        },
+        {
+          label: 'Calls',
+          content: (
+            <CallsTable
+              entity={props.entity}
+              project={props.project}
+              frozenFilter={{
+                parentId: props.callId,
+              }}
+            />
+          ),
         },
       ]}
     />
