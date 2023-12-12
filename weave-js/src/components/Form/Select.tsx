@@ -199,6 +199,14 @@ const getStyles = <
         },
       };
     },
+    menu: baseStyles => ({
+      ...baseStyles,
+      // TODO: Semantic-UI based dropdowns have their z-index set to 3,
+      //       which causes their selected value to appear in front of the
+      //       react-select popup. We should remove this hack once we've
+      //       eliminated Semantic-UI based dropdowns.
+      zIndex: 4,
+    }),
     menuList: baseStyles => {
       return {
         ...baseStyles,
