@@ -1,4 +1,4 @@
-import dataclasses
+import hashlib
 import logging
 import contextlib
 import contextvars
@@ -500,6 +500,15 @@ def publish_graph(
         graph.map_nodes_full(nodes, _publish_node)
 
 
+def hash_inputs(op_name: str, inputs: dict[str, typing.Any]) -> str:
+    hasher = hashlib.sha256()
+    for input in inputs:
+        hasher.update(f"Op Name: {op_name}")
+        hasher.update(f"Input name: {input}")
+        hasher.update(inputs[input])
+    return hasher.hexdigest()
+
+
 def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
@@ -516,9 +525,16 @@ def execute_sync_op(
                 "Found unpublished custom OpDef with monitoring turned on", op_def
             )
         mon_span_inputs, refs = auto_publish(inputs)
+
+        input_hash = hash_inputs(op_def.name, mon_span_inputs)
+
+        prev_span = mon.streamtable.rows().filter(lambda x: )
+
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
             span.inputs["_keys"] = list(inputs.keys())
+            span.inputs["input_hash"] = input_hash
+
             for i, ref in enumerate(refs[:3]):
                 span.inputs["_ref%s" % i] = ref
             try:
