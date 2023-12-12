@@ -6,6 +6,7 @@ from typing import Mapping
 import json
 import dataclasses
 import random
+import contextlib
 
 from . import storage
 from . import ref_base
@@ -200,6 +201,8 @@ class TraceWeaveFlow(Trace):
             raise RuntimeError("No streamtable available to save run to.")
 
         # TODO: make this synchronous! currently this could cause races
+
+        assert not st._lite_run._use_async_file_stream, "Async not yet supported"
         st.log(span)
 
     def save_object(
