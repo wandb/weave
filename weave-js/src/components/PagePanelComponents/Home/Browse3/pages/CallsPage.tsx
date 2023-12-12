@@ -124,11 +124,28 @@ export const CallsTable: React.FC<{
     if (opUrisFromCategory.length === 0 && effectiveFilter.opCategory) {
       opUrisFromCategory = ['DOES_NOT_EXIST:VALUE'];
     }
+    const opUrisFromCategorySet = new Set(opUrisFromCategory);
+    let opUris: string[] = [];
+    if (opUrisFromVersions.length === 0) {
+      opUris = Array.from(opUrisFromCategorySet);
+    } else {
+      if (opUrisFromCategorySet.size === 0) {
+        opUris = opUrisFromVersions;
+      } else {
+        opUris = Array.from(
+          new Set(
+            opUrisFromVersions.filter(uri => opUrisFromCategorySet.has(uri))
+          )
+        );
+      }
+    }
+    if (opUris.length === 0 && effectiveFilter.opCategory) {
+      opUris = ['DOES_NOT_EXIST:VALUE'];
+    }
+
     return {
       traceRootsOnly: effectiveFilter.traceRootsOnly,
-      opUris: Array.from(
-        new Set([...opUrisFromVersions, ...opUrisFromCategory])
-      ),
+      opUris: opUris,
       inputUris: effectiveFilter.inputObjectVersions?.map(uri => {
         const [objectName, version] = uri.split(':');
         const objectVersion = orm.projectConnection.objectVersion(
