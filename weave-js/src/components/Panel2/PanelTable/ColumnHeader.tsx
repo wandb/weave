@@ -163,6 +163,7 @@ export const ColumnHeader: React.FC<{
     useState<any>(propsPanelConfig);
   const enableGroup = Table.enableGroupByCol;
   const disableGroup = Table.disableGroupByCol;
+  const isGroupCountColumn = colId === 'groupCount';
 
   const applyWorkingState = useCallback(() => {
     let newState = tableState;
@@ -250,7 +251,13 @@ export const ColumnHeader: React.FC<{
   );
   const doUngroup = useCallback(async () => {
     let newTableState: Table.TableState | null = null;
-    if (countColumnId && tableState.groupBy.length === 1) {
+    const countColumnExists = Object.keys(tableState.columnNames).includes(
+      'groupCount'
+    );
+    if (countColumnId && !countColumnExists) {
+      setCountColumnId(null);
+    }
+    if (countColumnId && countColumnExists && tableState.groupBy.length === 1) {
       newTableState = Table.removeColumn(tableState, countColumnId);
       setCountColumnId(null);
     }
@@ -315,7 +322,11 @@ export const ColumnHeader: React.FC<{
       icon: 'configuration',
       onSelect: () => openColumnSettings(),
     });
-    if (!isGroupCol && canGroupType(columnTypeForGroupByChecks)) {
+    if (
+      !isGroupCol &&
+      !isGroupCountColumn &&
+      canGroupType(columnTypeForGroupByChecks)
+    ) {
       menuItems.push({
         value: 'group',
         name: 'Group by',
