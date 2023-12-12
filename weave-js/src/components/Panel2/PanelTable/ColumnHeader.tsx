@@ -336,7 +336,8 @@ export const ColumnHeader: React.FC<{
                 ({row}) => {
                   return opCount({arr: row});
                 }
-              ).val
+              ).val,
+              'groupCount'
             );
             newTableState = table;
             setCountColumnId(columnId);

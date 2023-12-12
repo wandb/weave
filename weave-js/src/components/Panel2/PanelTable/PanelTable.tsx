@@ -289,7 +289,12 @@ const PanelTableInner: React.FC<
     [tableIsPanelVariableVal]
   );
 
-  const [countColumnId, setCountColumnId] = useState<string | null>(null);
+  const includesCountColumn = Object.keys(tableState.columnNames).includes(
+    'groupCount'
+  );
+  const [countColumnId, setCountColumnId] = useState<string | null>(
+    includesCountColumn ? 'groupCount' : null
+  );
 
   const updateIndexOffset = useUpdateConfigKey('indexOffset', updateConfig);
   const updateTableState = useUpdateConfigKey('tableState', updateConfig);
