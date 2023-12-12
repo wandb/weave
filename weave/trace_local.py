@@ -82,6 +82,9 @@ class Trace(metaclass=abc.ABCMeta):
             run.output = output
         self.save_run(run)
 
+        # TODO: consider replacing with a call to get_mutable_run()
+        return weave_internal.make_const_node(types.RunType(), run)
+
     @abc.abstractmethod
     def get_mutable_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         """Gets a node containing a run object. The run is wrapped in a Node to support Weave mutations."""
@@ -135,16 +138,26 @@ class TraceWeaveFlow(Trace):
             "status_code": run.state,
             "inputs": run.inputs,
             "output": run.output,
+            "start_time_s": run.metadata["start_time_s"],
+            "end_time_s": run.metadata["end_time_s"],
+            # TODO: must implement this!
+            "parent_id": None,
+            # TODO: actually implement these in run.
+            "trace_id": None,
+            "attributes": {},
+            "exception": None,
+            "summary": None,
         }
 
     def get_mutable_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         raise NotImplementedError()
 
+    @staticmethod
     def run_from_trace_span(span: stream_data_interfaces.TraceSpanDict) -> runs.Run:
         return runs.Run(
             id=span["span_id"],
             op_name=span["name"],
-            inputs=span["inputs"],
+            inputs=span["inputs"] or {},
             output=span["output"],
             # TODO: this doesn't quite match. See stream_data_interfaces.py
             state=span["status_code"],
@@ -155,17 +168,24 @@ class TraceWeaveFlow(Trace):
 
     def get_run(self, run_key: RunKey) -> typing.Optional[runs.Run]:
         from . import eager
-        from . import api
 
         with context_state.lazy_execution():
-            span_node = self._mon.rows().filter(lambda x: x["span_id"] == run_key.id)
-            iter = eager.WeaveIter(span_node)
-            span_dict: typing.Optional[stream_data_interfaces.TraceSpanDict] = iter[0]
+            maybe_span_node = self._mon.rows()
+            if maybe_span_node is None:
+                return None
 
-        if span_dict == None:
+            span_node = maybe_span_node.filter(  # type: ignore
+                lambda x: x["span_id"] == run_key.id
+            )
+            iter: eager.WeaveIter[
+                stream_data_interfaces.TraceSpanDict
+            ] = eager.WeaveIter(span_node)
+            span_dict = iter[0]
+
+        if span_dict is None:
             return None
 
-        return type(self).run_from_trace_span(span_dict)
+        return self.run_from_trace_span(span_dict)
 
     def save_run(self, run: runs.Run):
         """
@@ -175,8 +195,12 @@ class TraceWeaveFlow(Trace):
 
         span = self.to_trace_span(run)
 
+        st = self._mon.streamtable
+        if st is None:
+            raise RuntimeError("No streamtable available to save run to.")
+
         # TODO: make this synchronous! currently this could cause races
-        self._mon.streamtable.log(span)
+        st.log(span)
 
     def save_object(
         self, obj: typing.Any, name: typing.Optional[str] = None
