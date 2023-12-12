@@ -24,7 +24,7 @@ from . import stream_data_interfaces
 
 @dataclasses.dataclass
 class RunKey:
-    op_simple_name: str
+    op_name: str
     id: str
 
 
@@ -65,7 +65,7 @@ def make_run_key(
     # For now, put op_def name in the run ID. This makes debugging much
     # easier because you can inspect the local artifact directly names.
     # This may not be what we want in production.
-    return RunKey(op_def.simple_name, hash.hexdigest())
+    return RunKey(op_def.name, hash.hexdigest())
 
 
 class Trace(metaclass=abc.ABCMeta):
@@ -76,7 +76,7 @@ class Trace(metaclass=abc.ABCMeta):
         output: typing.Any = None,
     ) -> graph.Node[runs.Run]:
         """Creates a new run object. Returns the resulting run wrapped in a node to support Weave mutations."""
-        run = runs.Run(run_key.id, run_key.op_simple_name)
+        run = runs.Run(run_key.id, run_key.op_name)
         if inputs is not None:
             run.inputs = inputs
         if output is not None:
@@ -120,7 +120,7 @@ class Trace(metaclass=abc.ABCMeta):
         # TODO: table caching is currently disabled, but this path doesn't handle it
         # when we turn it back on!
         return self.save_object(
-            output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output"
+            output, name=f"run-{run_key.op_name}-{run_key.id}-output"
         )
 
 
@@ -218,7 +218,7 @@ class TraceWeaveFlow(Trace):
 class TraceLocal(Trace):
     def _single_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         single_uri = artifact_local.WeaveLocalArtifactURI(
-            f"run-{run_key.op_simple_name}-{run_key.id}", "latest", "obj"
+            f"run-{run_key.op_name}-{run_key.id}", "latest", "obj"
         )
         return weave_internal.manual_call(
             "get",
@@ -228,7 +228,7 @@ class TraceLocal(Trace):
 
     def _run_table(self, run_key: RunKey):
         table_uri = artifact_local.WeaveLocalArtifactURI(
-            f"run-{run_key.op_simple_name}", "latest", "obj"
+            f"run-{run_key.op_name}", "latest", "obj"
         )
         return weave_internal.manual_call(
             "get",
@@ -240,7 +240,7 @@ class TraceLocal(Trace):
         # Restricted to just a couple ops for now.
         # A NOTE: for the future, async ops definitely can't be saved to
         # table (until we have safe table writes)
-        return op_policy.should_table_cache(run_key.op_simple_name)
+        return op_policy.should_table_cache(run_key.op_name)
 
     def get_run(self, run_key: RunKey) -> typing.Optional[runs.Run]:
         from . import execute_fast
