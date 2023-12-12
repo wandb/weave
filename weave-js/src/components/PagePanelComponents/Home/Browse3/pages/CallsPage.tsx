@@ -58,7 +58,7 @@ export const CallsTable: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const opVersionOptions = useMemo(() => {
     const versions = orm.projectConnection.opVersions();
     // Note: this excludes the named ones without op versions

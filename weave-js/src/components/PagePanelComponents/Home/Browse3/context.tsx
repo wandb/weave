@@ -29,13 +29,13 @@ export const useWeaveflowRouteContext = () => {
   return ctx;
 };
 
-export const NewWeaveflowRouteContextProvider = ({
+export const Browse3WeaveflowRouteContextProvider = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
   return (
-    <WeaveflowRouteContext.Provider value={newContext}>
+    <WeaveflowRouteContext.Provider value={browse3Context}>
       {children}
     </WeaveflowRouteContext.Provider>
   );
@@ -50,7 +50,7 @@ type WFDBTableType =
   | 'Call'
   | 'Object'
   | 'ObjectVersion';
-const defaultContext = {
+const browse2Context = {
   refUIUrl: (
     rootTypeName: string,
     objRef: ArtifactRef,
@@ -60,6 +60,12 @@ const defaultContext = {
       throw new Error('Not a wandb artifact ref');
     }
     return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
+  },
+  entityUrl: (entityName: string) => {
+    return `/${entityName}`;
+  },
+  projectUrl: (entityName: string, projectName: string) => {
+    return `/${entityName}/${projectName}`;
   },
   callUIUrl: (
     entityName: string,
@@ -139,7 +145,7 @@ const defaultContext = {
     if (!isWandbArtifactRef(parsed)) {
       throw new Error('non wandb artifact ref not yet handled');
     }
-    return defaultContext.opVersionUIUrl(
+    return browse2Context.opVersionUIUrl(
       parsed.entityName,
       parsed.projectName,
       parsed.artifactName,
@@ -148,7 +154,7 @@ const defaultContext = {
   },
 };
 
-const newContext = {
+const browse3Context = {
   refUIUrl: (
     rootTypeName: string,
     objRef: ArtifactRef,
@@ -158,26 +164,32 @@ const newContext = {
       throw new Error('Not a wandb artifact ref');
     }
     if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
-      return newContext.opVersionUIUrl(
+      return browse3Context.opVersionUIUrl(
         objRef.entityName,
         objRef.projectName,
         objRef.artifactName,
         objRef.artifactVersion
       );
     } else if (wfTable === 'TypeVersion' || rootTypeName === 'type') {
-      return newContext.typeVersionUIUrl(
+      return browse3Context.typeVersionUIUrl(
         objRef.entityName,
         objRef.projectName,
         objRef.artifactName,
         objRef.artifactVersion
       );
     }
-    return newContext.objectVersionUIUrl(
+    return browse3Context.objectVersionUIUrl(
       objRef.entityName,
       objRef.projectName,
       objRef.artifactName,
       objRef.artifactVersion
     );
+  },
+  entityUrl: (entityName: string) => {
+    return `/${entityName}`;
+  },
+  projectUrl: (entityName: string, projectName: string) => {
+    return `/${entityName}/${projectName}`;
   },
   typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
     return `/${entityName}/${projectName}/types/${typeName}`;
@@ -282,7 +294,7 @@ const newContext = {
     if (!isWandbArtifactRef(parsed)) {
       throw new Error('non wandb artifact ref not yet handled');
     }
-    return newContext.opVersionUIUrl(
+    return browse3Context.opVersionUIUrl(
       parsed.entityName,
       parsed.projectName,
       parsed.artifactName,
@@ -297,6 +309,8 @@ const WeaveflowRouteContext = createContext<{
     objRef: ArtifactRef,
     wfTable?: WFDBTableType
   ) => string;
+  entityUrl: (entityName: string) => string;
+  projectUrl: (entityName: string, projectName: string) => string;
   typeUIUrl: (
     entityName: string,
     projectName: string,
@@ -353,4 +367,4 @@ const WeaveflowRouteContext = createContext<{
     filter?: WFHighLevelObjectVersionFilter
   ) => string;
   opPageUrl: (opUri: string) => string;
-}>(defaultContext);
+}>(browse2Context);
