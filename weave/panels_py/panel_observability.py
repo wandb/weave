@@ -11,6 +11,22 @@ from ..ops_primitives import list_
 panels = weave.panels
 
 
+metric_bin = (
+    types.optional(
+        types.List(
+            types.TypedDict(
+                {
+                    "min": types.optional(types.Number()),
+                    "max": types.optional(types.Number()),
+                    "avg": types.optional(types.Number()),
+                    "_timestamp": types.optional(types.Number()),
+                }
+            )
+        )
+    ),
+)
+
+
 BOARD_INPUT_WEAVE_TYPE = types.List(
     types.TypedDict(
         {
@@ -56,6 +72,9 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                                     )
                                 }
                             ),
+                            "gpu_": metric_bin,
+                            "gpu_mem": metric_bin,
+                            "cpu_": metric_bin,
                         }
                     )
                 }
