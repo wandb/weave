@@ -23,7 +23,7 @@ export const ObjectVersionPage: React.FC<{
   version: string;
   refExtra?: string;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const objectVersion = orm.projectConnection.objectVersion(
     props.objectName,
     props.version
@@ -77,7 +77,11 @@ export const ObjectVersionPage: React.FC<{
               <SimpleKeyValueTable
                 data={{
                   Object: (
-                    <ObjectLink objectName={objectVersion.object().name()} />
+                    <ObjectLink
+                      entityName={objectVersion.entity()}
+                      projectName={objectVersion.project()}
+                      objectName={objectVersion.object().name()}
+                    />
                   ),
                   'Type Version': (
                     <>
@@ -88,6 +92,8 @@ export const ObjectVersionPage: React.FC<{
                       />
 
                       <TypeVersionLink
+                        entityName={objectVersion.entity()}
+                        projectName={objectVersion.project()}
                         typeName={objectVersion.typeVersion().type().name()}
                         version={objectVersion.typeVersion().version()}
                       />
@@ -167,14 +173,24 @@ const ObjectVersionProducingCallsItem: React.FC<{
   if (producingCalls.length === 0) {
     return <div>-</div>;
   } else if (producingCalls.length === 1) {
-    return <CallLink callId={producingCalls[0].callID()} />;
+    return (
+      <CallLink
+        entityName={producingCalls[0].entity()}
+        projectName={producingCalls[0].project()}
+        callId={producingCalls[0].callID()}
+      />
+    );
   }
   return (
     <ul>
       {producingCalls.map(call => {
         return (
           <li key={call.callID()}>
-            <CallLink callId={call.callID()} />
+            <CallLink
+              entityName={call.entity()}
+              projectName={call.project()}
+              callId={call.callID()}
+            />
           </li>
         );
       })}

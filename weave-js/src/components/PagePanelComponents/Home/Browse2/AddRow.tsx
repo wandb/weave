@@ -24,7 +24,7 @@ import {
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
 import {ProjectNamePicker} from './ProjectPicker';
-import {refPageUrl} from './url';
+import {useRefPageUrl} from './url';
 
 interface AddRowToPaneFormState {
   projectName?: string;
@@ -98,6 +98,8 @@ export const AddRowToTable: FC<{
   const handleSubmit = useCallback(() => {
     addRowToDataset();
   }, [addRowToDataset]);
+
+  const refPageUrl = useRefPageUrl();
 
   return (
     <Dialog fullWidth maxWidth="sm" open={open} onClose={handleClose}>

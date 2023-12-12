@@ -76,7 +76,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
   const routerContext = useWeaveflowRouteContext();
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
 
   const objectOptions = useMemo(() => {
     const objects = orm.projectConnection.objects();
@@ -352,6 +352,8 @@ const ObjectVersionsTable: React.FC<{
         // Icon to indicate navigation to the object version
         return (
           <ObjectVersionLink
+            entityName={params.row.obj.entity()}
+            projectName={params.row.obj.project()}
             objectName={params.row.obj.object().name()}
             version={params.row.obj.version()}
             hideName
@@ -368,12 +370,20 @@ const ObjectVersionsTable: React.FC<{
       },
     }),
     basicField('object', 'Object', {
-      renderCell: params => <ObjectLink objectName={params.value as string} />,
+      renderCell: params => (
+        <ObjectLink
+          entityName={params.row.obj.entity()}
+          projectName={params.row.obj.project()}
+          objectName={params.value as string}
+        />
+      ),
     }),
 
     basicField('typeVersion', 'Type Version', {
       renderCell: params => (
         <TypeVersionLink
+          entityName={params.row.obj.entity()}
+          projectName={params.row.obj.project()}
           typeName={params.row.obj.typeVersion().type().name()}
           version={params.row.obj.typeVersion().version()}
         />
@@ -413,6 +423,8 @@ const ObjectVersionsTable: React.FC<{
         // if (outputFrom.length === 1) {
         return (
           <OpVersionLink
+            entityName={outputFrom[0].entity()}
+            projectName={outputFrom[0].project()}
             opName={outputFrom[0].opVersion().op().name()}
             version={outputFrom[0].opVersion().version()}
           />

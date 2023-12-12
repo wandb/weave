@@ -21,7 +21,7 @@ export const TypeVersionPage: React.FC<{
   typeName: string;
   version: string;
 }> = props => {
-  const orm = useWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(props.entity, props.project);
   const typeVersion = orm.projectConnection.typeVersion(
     props.typeName,
     props.version
@@ -37,7 +37,11 @@ export const TypeVersionPage: React.FC<{
               <SimpleKeyValueTable
                 data={{
                   'Type Name': (
-                    <TypeLink typeName={typeVersion.type().name()} />
+                    <TypeLink
+                      entityName={typeVersion.entity()}
+                      projectName={typeVersion.project()}
+                      typeName={typeVersion.type().name()}
+                    />
                   ),
                   Category: (
                     <TypeVersionCategoryChip
@@ -47,6 +51,8 @@ export const TypeVersionPage: React.FC<{
                   Version: typeVersion.version(),
                   'Property Types': (
                     <PropertyTypeTree
+                      entityName={typeVersion.entity()}
+                      projectName={typeVersion.project()}
                       typeTree={typeVersion.propertyTypeTree()}
                       skipType={true}
                     />
@@ -93,6 +99,8 @@ export const TypeVersionPage: React.FC<{
 };
 
 const PropertyTypeTree: React.FC<{
+  entityName: string;
+  projectName: string;
   typeTree: HackyTypeTree;
   skipType: boolean;
 }> = props => {
@@ -111,11 +119,23 @@ const PropertyTypeTree: React.FC<{
           )
           .map(([key, value]) => {
             if (typeof value === 'string' && key === 'type') {
-              return [key, <TypeLink typeName={value} />];
+              return [
+                key,
+                <TypeLink
+                  entityName={props.entityName}
+                  projectName={props.projectName}
+                  typeName={value}
+                />,
+              ];
             }
             return [
               key,
-              <PropertyTypeTree typeTree={value} skipType={false} />,
+              <PropertyTypeTree
+                entityName={props.entityName}
+                projectName={props.projectName}
+                typeTree={value}
+                skipType={false}
+              />,
             ];
           })
       )}
@@ -133,6 +153,8 @@ const TypeHierarchy: React.FC<{typeVersion: WFTypeVersion}> = props => {
       }}>
       <li>
         <TypeVersionLink
+          entityName={props.typeVersion.entity()}
+          projectName={props.typeVersion.project()}
           typeName={props.typeVersion.type().name()}
           version={props.typeVersion.version()}
         />
