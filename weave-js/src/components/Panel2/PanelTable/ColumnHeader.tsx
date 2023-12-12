@@ -472,6 +472,7 @@ export const ColumnHeader: React.FC<{
     doUngroup,
     isPinned,
     setColumnPinState,
+    isGroupCountColumn,
   ]);
 
   const colIsSorted =
