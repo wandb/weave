@@ -181,6 +181,10 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
     <Drawer
       variant="permanent"
       sx={{
+        '&>div.MuiPaper-root': {
+          position: 'relative',
+        },
+        flex: '0 0 auto',
         width: drawerWidth,
         flexShrink: 0,
         [`& .MuiDrawer-paper`]: {
@@ -188,7 +192,7 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           boxSizing: 'border-box',
         },
       }}>
-      <Toolbar />
+      {/* <Toolbar /> */}
       <Box
         sx={{
           p: 2,

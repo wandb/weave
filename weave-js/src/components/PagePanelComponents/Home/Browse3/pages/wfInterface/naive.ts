@@ -210,7 +210,7 @@ export class WFNaiveProject implements WFProject {
       runsNode,
       feedbackNode,
     } as any);
-    await this.weaveClient.clearCacheForNode(targetNode);
+    // await this.weaveClient.clearCacheForNode(targetNode);
     const {
       weaveObjectsNode: weaveObjectsValue,
       runsNode: runsValue,

@@ -30,12 +30,14 @@ export const useWeaveflowRouteContext = () => {
 };
 
 export const Browse3WeaveflowRouteContextProvider = ({
+  projectRoot,
   children,
 }: {
+  projectRoot(entityName: string, projectName: string): string;
   children: React.ReactNode;
 }) => {
   return (
-    <WeaveflowRouteContext.Provider value={browse3Context}>
+    <WeaveflowRouteContext.Provider value={browse3ContextGen(projectRoot)}>
       {children}
     </WeaveflowRouteContext.Provider>
   );
@@ -65,7 +67,7 @@ const browse2Context = {
     return `/${entityName}`;
   },
   projectUrl: (entityName: string, projectName: string) => {
-    return `/${entityName}/${projectName}`;
+    return `${projectRoot(entityName, projectName)}`;
   },
   callUIUrl: (
     entityName: string,
@@ -73,7 +75,7 @@ const browse2Context = {
     traceId: string,
     callId: string
   ) => {
-    return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
+    return `${projectRoot(entityName, projectName)}/trace/${traceId}/${callId}`;
   },
   typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
     throw new Error('Not implemented');
@@ -124,7 +126,10 @@ const browse2Context = {
     opName: string,
     opVersionHash: string
   ) => {
-    return `/${entityName}/${projectName}/OpDef/${opName}/${opVersionHash}`;
+    return `${projectRoot(
+      entityName,
+      projectName
+    )}/OpDef/${opName}/${opVersionHash}`;
   },
   callsUIUrl: (
     entityName: string,
@@ -154,156 +159,180 @@ const browse2Context = {
   },
 };
 
-const browse3Context = {
-  refUIUrl: (
-    rootTypeName: string,
-    objRef: ArtifactRef,
-    wfTable?: WFDBTableType
-  ) => {
-    if (!isWandbArtifactRef(objRef)) {
-      throw new Error('Not a wandb artifact ref');
-    }
-    if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
-      return browse3Context.opVersionUIUrl(
+const browse3ContextGen = (
+  projectRoot: (entityName: string, projectName: string) => string
+) => {
+  const browse3Context = {
+    refUIUrl: (
+      rootTypeName: string,
+      objRef: ArtifactRef,
+      wfTable?: WFDBTableType
+    ) => {
+      if (!isWandbArtifactRef(objRef)) {
+        throw new Error('Not a wandb artifact ref');
+      }
+      if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
+        return browse3Context.opVersionUIUrl(
+          objRef.entityName,
+          objRef.projectName,
+          objRef.artifactName,
+          objRef.artifactVersion
+        );
+      } else if (wfTable === 'TypeVersion' || rootTypeName === 'type') {
+        return browse3Context.typeVersionUIUrl(
+          objRef.entityName,
+          objRef.projectName,
+          objRef.artifactName,
+          objRef.artifactVersion
+        );
+      }
+      return browse3Context.objectVersionUIUrl(
         objRef.entityName,
         objRef.projectName,
         objRef.artifactName,
         objRef.artifactVersion
       );
-    } else if (wfTable === 'TypeVersion' || rootTypeName === 'type') {
-      return browse3Context.typeVersionUIUrl(
-        objRef.entityName,
-        objRef.projectName,
-        objRef.artifactName,
-        objRef.artifactVersion
-      );
-    }
-    return browse3Context.objectVersionUIUrl(
-      objRef.entityName,
-      objRef.projectName,
-      objRef.artifactName,
-      objRef.artifactVersion
-    );
-  },
-  entityUrl: (entityName: string) => {
-    return `/${entityName}`;
-  },
-  projectUrl: (entityName: string, projectName: string) => {
-    return `/${entityName}/${projectName}`;
-  },
-  typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
-    return `/${entityName}/${projectName}/types/${typeName}`;
-  },
-  objectUIUrl: (
-    entityName: string,
-    projectName: string,
-    objectName: string
-  ) => {
-    return `/${entityName}/${projectName}/objects/${objectName}`;
-  },
-  opUIUrl: (entityName: string, projectName: string, opName: string) => {
-    return `/${entityName}/${projectName}/ops/${opName}`;
-  },
-  typeVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    typeName: string,
-    typeVersionHash: string
-  ) => {
-    return `/${entityName}/${projectName}/types/${typeName}/versions/${typeVersionHash}`;
-  },
-  typeVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelTypeVersionFilter
-  ) => {
-    const prunedFilter = pruneEmptyFields(filter);
-    if (Object.keys(prunedFilter).length === 0) {
-      return `/${entityName}/${projectName}/type-versions`;
-    }
+    },
+    entityUrl: (entityName: string) => {
+      return `/${entityName}`;
+    },
+    projectUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}`;
+    },
+    typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
+      return `${projectRoot(entityName, projectName)}/types/${typeName}`;
+    },
+    objectUIUrl: (
+      entityName: string,
+      projectName: string,
+      objectName: string
+    ) => {
+      return `${projectRoot(entityName, projectName)}/objects/${objectName}`;
+    },
+    opUIUrl: (entityName: string, projectName: string, opName: string) => {
+      return `${projectRoot(entityName, projectName)}/ops/${opName}`;
+    },
+    typeVersionUIUrl: (
+      entityName: string,
+      projectName: string,
+      typeName: string,
+      typeVersionHash: string
+    ) => {
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/types/${typeName}/versions/${typeVersionHash}`;
+    },
+    typeVersionsUIUrl: (
+      entityName: string,
+      projectName: string,
+      filter?: WFHighLevelTypeVersionFilter
+    ) => {
+      const prunedFilter = pruneEmptyFields(filter);
+      if (Object.keys(prunedFilter).length === 0) {
+        return `${projectRoot(entityName, projectName)}/type-versions`;
+      }
 
-    return `/${entityName}/${projectName}/type-versions?filter=${encodeURIComponent(
-      JSON.stringify(prunedFilter)
-    )}`;
-  },
-  objectVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    objectName: string,
-    objectVersionHash: string
-  ) => {
-    return `/${entityName}/${projectName}/objects/${objectName}/versions/${objectVersionHash}`;
-  },
-  opVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelOpVersionFilter
-  ) => {
-    const prunedFilter = pruneEmptyFields(filter);
-    if (Object.keys(prunedFilter).length === 0) {
-      return `/${entityName}/${projectName}/op-versions`;
-    }
-    return `/${entityName}/${projectName}/op-versions?filter=${encodeURIComponent(
-      JSON.stringify(prunedFilter)
-    )}`;
-  },
-  opVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    opName: string,
-    opVersionHash: string
-  ) => {
-    return `/${entityName}/${projectName}/ops/${opName}/versions/${opVersionHash}`;
-  },
-  callUIUrl: (
-    entityName: string,
-    projectName: string,
-    traceId: string,
-    callId: string
-  ) => {
-    return `/${entityName}/${projectName}/calls/${callId}`;
-  },
-  callsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelCallFilter
-  ) => {
-    const prunedFilter = pruneEmptyFields(filter);
-    if (Object.keys(prunedFilter).length === 0) {
-      return `/${entityName}/${projectName}/calls`;
-    }
-    return `/${entityName}/${projectName}/calls?filter=${encodeURIComponent(
-      JSON.stringify(prunedFilter)
-    )}`;
-  },
-  objectVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelObjectVersionFilter
-  ) => {
-    const prunedFilter = pruneEmptyFields(filter);
-    if (Object.keys(prunedFilter).length === 0) {
-      return `/${entityName}/${projectName}/object-versions`;
-    }
-    return `/${entityName}/${projectName}/object-versions?filter=${encodeURIComponent(
-      JSON.stringify(prunedFilter)
-    )}`;
-  },
-  opPageUrl: (opUri: string) => {
-    const parsed = parseRef(opUri);
-    if (!isWandbArtifactRef(parsed)) {
-      throw new Error('non wandb artifact ref not yet handled');
-    }
-    return browse3Context.opVersionUIUrl(
-      parsed.entityName,
-      parsed.projectName,
-      parsed.artifactName,
-      parsed.artifactVersion
-    );
-  },
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/type-versions?filter=${encodeURIComponent(
+        JSON.stringify(prunedFilter)
+      )}`;
+    },
+    objectVersionUIUrl: (
+      entityName: string,
+      projectName: string,
+      objectName: string,
+      objectVersionHash: string
+    ) => {
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/objects/${objectName}/versions/${objectVersionHash}`;
+    },
+    opVersionsUIUrl: (
+      entityName: string,
+      projectName: string,
+      filter?: WFHighLevelOpVersionFilter
+    ) => {
+      const prunedFilter = pruneEmptyFields(filter);
+      if (Object.keys(prunedFilter).length === 0) {
+        return `${projectRoot(entityName, projectName)}/op-versions`;
+      }
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/op-versions?filter=${encodeURIComponent(
+        JSON.stringify(prunedFilter)
+      )}`;
+    },
+    opVersionUIUrl: (
+      entityName: string,
+      projectName: string,
+      opName: string,
+      opVersionHash: string
+    ) => {
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/ops/${opName}/versions/${opVersionHash}`;
+    },
+    callUIUrl: (
+      entityName: string,
+      projectName: string,
+      traceId: string,
+      callId: string
+    ) => {
+      return `${projectRoot(entityName, projectName)}/calls/${callId}`;
+    },
+    callsUIUrl: (
+      entityName: string,
+      projectName: string,
+      filter?: WFHighLevelCallFilter
+    ) => {
+      const prunedFilter = pruneEmptyFields(filter);
+      if (Object.keys(prunedFilter).length === 0) {
+        return `${projectRoot(entityName, projectName)}/calls`;
+      }
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/calls?filter=${encodeURIComponent(JSON.stringify(prunedFilter))}`;
+    },
+    objectVersionsUIUrl: (
+      entityName: string,
+      projectName: string,
+      filter?: WFHighLevelObjectVersionFilter
+    ) => {
+      const prunedFilter = pruneEmptyFields(filter);
+      if (Object.keys(prunedFilter).length === 0) {
+        return `${projectRoot(entityName, projectName)}/object-versions`;
+      }
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/object-versions?filter=${encodeURIComponent(
+        JSON.stringify(prunedFilter)
+      )}`;
+    },
+    opPageUrl: (opUri: string) => {
+      const parsed = parseRef(opUri);
+      if (!isWandbArtifactRef(parsed)) {
+        throw new Error('non wandb artifact ref not yet handled');
+      }
+      return browse3Context.opVersionUIUrl(
+        parsed.entityName,
+        parsed.projectName,
+        parsed.artifactName,
+        parsed.artifactVersion
+      );
+    },
+  };
+  return browse3Context;
 };
 
-const WeaveflowRouteContext = createContext<{
+type RouteType = {
   refUIUrl: (
     rootTypeName: string,
     objRef: ArtifactRef,
@@ -367,4 +396,5 @@ const WeaveflowRouteContext = createContext<{
     filter?: WFHighLevelObjectVersionFilter
   ) => string;
   opPageUrl: (opUri: string) => string;
-}>(browse2Context);
+};
+const WeaveflowRouteContext = createContext<RouteType>(browse2Context);
