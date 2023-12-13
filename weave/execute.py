@@ -563,7 +563,9 @@ def execute_sync_op(
             if (
                 span_dict != None and span_dict is not None
             ):  # this is needed for the type checker to be happy
-                return span_dict["output"]["_result"]
+                output = span_dict["output"]
+                if output != None and output is not None:
+                    return output["_result"]
 
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
