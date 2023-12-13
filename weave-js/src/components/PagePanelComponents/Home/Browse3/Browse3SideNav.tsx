@@ -192,7 +192,6 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           boxSizing: 'border-box',
         },
       }}>
-      {/* <Toolbar /> */}
       <Box
         sx={{
           p: 2,
