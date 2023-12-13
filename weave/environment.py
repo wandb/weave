@@ -72,6 +72,7 @@ class CacheMode(enum.Enum):
 
 
 def cache_mode() -> CacheMode:
+    return CacheMode.FULL
     if util.parse_boolean_env_var("WEAVE_NO_CACHE"):
         return CacheMode.MINIMAL
     env_mode = os.getenv("WEAVE_CACHE_MODE", CacheMode.MINIMAL.value)
