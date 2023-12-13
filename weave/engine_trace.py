@@ -37,7 +37,7 @@ class DummySpan:
         logs.reset_indent(self.log_indent_token)
         logging.debug("<- %s", self.args[0])
 
-    def set_tag(self, key, unredacted_val=None, redacted_val=None):
+    def set_tag(self, key, unredacted_val, redacted_val=None):
         pass
 
     def set_meta(self, *args, **kwargs):
@@ -149,7 +149,7 @@ class WeaveTraceSpan:
             self.span.attributes = {}
         return self.span.attributes
 
-    def set_tag(self, key, unredacted_val=None, redacted_val=None):
+    def set_tag(self, key, unredacted_val, redacted_val=None):
         if "tags" not in self.attributes:
             self.attributes["tags"] = {}
         if os.getenv("DISABLE_WEAVE_PII"):
@@ -157,7 +157,7 @@ class WeaveTraceSpan:
         else:
             self.attributes["tags"][key] = unredacted_val
 
-    def set_meta(self, key, unredacted_val=None, redacted_val=None):
+    def set_meta(self, key, unredacted_val, redacted_val=None):
         if "metadata" not in self.attributes:
             self.attributes["metadata"] = {}
         if os.getenv("DISABLE_WEAVE_PII"):
@@ -273,13 +273,13 @@ def patch_ddtrace_set_tag():
         old_set_metric = ddtrace_span.Span.set_metric
 
         # Only logged redacted values if flag is on
-        def set_tag(self, key, unredacted_val=None, redacted_val=None):
+        def set_tag(self, key, unredacted_val, redacted_val=None):
             old_set_tag(self, key, redacted_val) if os.getenv(
                 "DISABLE_WEAVE_PII"
             ) else old_set_tag(self, key, unredacted_val)
 
         # Log metric if flag is off or if flag is on and redacted
-        def set_metric(self, key, val=None, is_pii_redacted=False):
+        def set_metric(self, key, val, is_pii_redacted=False):
             if not os.getenv("DISABLE_WEAVE_PII") or is_pii_redacted:
                 old_set_metric(self, key, val)
 
