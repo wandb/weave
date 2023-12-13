@@ -517,8 +517,8 @@ def hash_inputs(
             hasher.update(str(val).encode())
         else:
             # convert to JSONable representation without calling type_of
-            hashable_value = storage.to_python(input, wb_type=input_types[input])
-            serialized = json.dumps(hashable_value).encode()
+
+            serialized = json.dumps(input).encode()
             hasher.update(serialized)
     return hasher.hexdigest()
 
