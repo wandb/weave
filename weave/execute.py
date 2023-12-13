@@ -1,4 +1,4 @@
-import dataclasses
+import hashlib
 import logging
 import contextlib
 import contextvars
@@ -9,7 +9,7 @@ import time
 import threading
 import typing
 import traceback
-
+import json
 
 # Configuration
 from . import wandb_api
@@ -46,9 +46,11 @@ from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
+from . import stream_data_interfaces
 from .monitoring import monitor
 
 # Language Features
+from . import eager
 from . import language_nullability
 
 from . import parallelism
@@ -496,14 +498,37 @@ def publish_graph(
     # Our intention is to replace init_monitor with weave.init, but that is not
     # yet complete.
     # TODO: Fix
-    if mon.streamtable:
+    if mon.streamtable and not context_state.monitor_is_disabled():
         graph.map_nodes_full(nodes, _publish_node)
 
 
-def execute_sync_op(
-    op_def: op_def.OpDef,
+def hash_inputs(
+    op_name: str,
     inputs: Mapping[str, typing.Any],
-):
+) -> str:
+    hasher = hashlib.sha256()
+    for input in inputs:
+        hasher.update(f"Op Name: {op_name}".encode())
+        hasher.update(f"Input name: {input}".encode())
+
+        val = inputs[input]
+        if isinstance(val, ref_base.Ref):
+            hasher.update(str(val).encode())
+        else:
+            # The assumption here is that if we have a custom object,
+            # it has already been converted to a ref because we have
+            # already called auto_publish on it. That means if we reach
+            # this stage, anything left should be a JSONable primitive.
+            # This is all in principle though, so if it doesn't work, we may
+            # need to add a call to storage.to_python() here and possibly
+            # plumb through the input_types.
+
+            serialized = json.dumps(val).encode()
+            hasher.update(serialized)
+    return hasher.hexdigest()
+
+
+def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
     st = mon.streamtable
@@ -516,9 +541,38 @@ def execute_sync_op(
                 "Found unpublished custom OpDef with monitoring turned on", op_def
             )
         mon_span_inputs, refs = auto_publish(inputs)
+
+        input_hash = hash_inputs(
+            op_def.name,
+            mon_span_inputs,
+        )
+
+        with context_state.lazy_execution():
+            with context_state.monitor_disabled():
+                maybe_span_node = mon.rows()
+                if maybe_span_node is None:
+                    return None
+
+                span_node = maybe_span_node.filter(  # type: ignore
+                    lambda x: x["attributes"]["input_hash"] == input_hash
+                )
+                iter: eager.WeaveIter[
+                    stream_data_interfaces.TraceSpanDict
+                ] = eager.WeaveIter(span_node)
+                span_dict = iter[0]
+
+            if (
+                span_dict != None and span_dict is not None
+            ):  # this is needed for the type checker to be happy
+                output = span_dict["output"]
+                if output != None and output is not None:
+                    return output["_result"]
+
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
             span.inputs["_keys"] = list(inputs.keys())
+            span.attributes["input_hash"] = input_hash
+
             for i, ref in enumerate(refs[:3]):
                 span.inputs["_ref%s" % i] = ref
             try:

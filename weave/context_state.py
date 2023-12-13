@@ -96,6 +96,10 @@ _weave_client: contextvars.ContextVar[
     typing.Optional[client_interface.ClientInterface]
 ] = contextvars.ContextVar("weave_client", default=None)
 
+_monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "monitor_disabled", default=False
+)
+
 
 @contextlib.contextmanager
 def client(client: client_interface.ClientInterface):
@@ -139,6 +143,17 @@ def set_server(server: server_interface.BaseServer):
 _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
     "frontend_url", default=None
 )
+
+
+def monitor_is_disabled() -> bool:
+    return _monitor_disabled.get()
+
+
+@contextlib.contextmanager
+def monitor_disabled():
+    token = _monitor_disabled.set(True)
+    yield
+    _monitor_disabled.reset(token)
 
 
 def get_frontend_url() -> typing.Optional[str]:
