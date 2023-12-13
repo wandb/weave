@@ -502,14 +502,6 @@ def publish_graph(
         graph.map_nodes_full(nodes, _publish_node)
 
 
-def implements_buffer_protocol(obj):
-    try:
-        memoryview(obj)
-        return True
-    except TypeError:
-        return False
-
-
 def hash_inputs(
     op_name: str,
     inputs: Mapping[str, typing.Any],
