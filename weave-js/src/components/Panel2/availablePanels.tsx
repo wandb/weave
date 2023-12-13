@@ -16,6 +16,7 @@ import {useDeepMemo} from '../../hookUtils';
 import * as Panel from './panel';
 import * as PanelLib from './panellib/libpanel';
 import * as LibTypes from './panellib/libtypes';
+import {getStackInfo, StackInfo} from './panellib/stackinfo';
 import * as PanelRegistry from './PanelRegistry';
 import {Spec as PanelTableMergeSpec} from './PanelTableMerge';
 
@@ -212,7 +213,7 @@ export function getPanelStacksForType(
   opts: GetPanelStacksForTypeOpts = {}
 ): {
   curPanelId: string | undefined;
-  stackIds: Array<{id: string; displayName: string}>;
+  stackIds: StackInfo[];
   handler: PanelStack | undefined;
 } {
   let handlerStacks = getTypeHandlerStacks(type);
@@ -296,7 +297,7 @@ export function getPanelStacksForType(
     );
   }
 
-  const stackIds = handlerStacks.map(PanelLib.getStackIdAndName);
+  const stackIds = handlerStacks.map(getStackInfo);
   const configuredStackIndex = stackIds.findIndex(si => si.id === panelId);
   let backupConfiguredStackIndex = -1;
   // If there is not an exact match...

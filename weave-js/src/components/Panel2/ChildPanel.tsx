@@ -75,6 +75,7 @@ import PanelNameEditor from './PanelNameEditor';
 import {usePanelPanelContext} from './PanelPanelContextProvider';
 import {TableState} from './PanelTable/tableState';
 import {getConfigForPath, isInsideMain, isMain} from './panelTree';
+import {SelectPanelType} from './SelectPanelType';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -245,6 +246,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         key: si.id,
         active: isActive,
         selected: isActive,
+        icon: si.icon,
+        category: si.category,
       };
     });
   }, [handler, stackIds]);
@@ -859,12 +862,11 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
           </PanelContextProvider>
         </ConfigPanel.ConfigOption>
       )}
-
       <ConfigPanel.ConfigOption label="Panel type">
-        <ConfigPanel.ModifiedDropdownConfigField
+        <SelectPanelType
           value={curPanelId}
           options={panelOptions}
-          onChange={(e, {value}) => {
+          onChange={({value}) => {
             if (typeof value === `string` && value) {
               handlePanelChange(value);
             }
