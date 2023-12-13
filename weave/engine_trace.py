@@ -274,9 +274,10 @@ def patch_ddtrace_set_tag():
 
         # Only logged redacted values if flag is on
         def set_tag(self, key, unredacted_val=None, redacted_val=None):
-            old_set_tag(self, key, redacted_val) if os.getenv(
-                "DISABLE_WEAVE_PII"
-            ) else old_set_tag(self, key, unredacted_val)
+            if os.getenv("DISABLE_WEAVE_PII"):
+                old_set_tag(self, key, redacted_val)
+            elif unredacted_val is not None:
+                old_set_tag(self, key, unredacted_val)
 
         # Log metric if flag is off or if flag is on and redacted
         def set_metric(self, key, val, is_pii_redacted=False):
