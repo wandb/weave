@@ -45,6 +45,7 @@ export const PanelExpression: React.FC<PanelExpressionProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'Expression',
+  icon: 'code-alt',
   Component: PanelExpression,
   inputType,
   hidden: true,

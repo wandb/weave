@@ -51,6 +51,7 @@ export const PanelHexColor: React.FC<PanelHexColorProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'HexColor',
+  icon: 'color',
   Component: PanelHexColor,
   inputType,
 };

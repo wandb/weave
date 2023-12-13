@@ -390,6 +390,7 @@ const PanelObjectChild: React.FC<
 
 export const Spec: Panel2.PanelSpec = {
   id: 'object',
+  icon: 'list-bullets',
   Component: PanelObject,
   ConfigComponent: PanelObjectConfig,
   inputType,
