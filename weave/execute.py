@@ -9,7 +9,7 @@ import time
 import threading
 import typing
 import traceback
-
+import json
 
 # Configuration
 from . import wandb_api
@@ -510,26 +510,29 @@ def implements_buffer_protocol(obj):
         return False
 
 
-def hash_inputs(op_name: str, inputs: dict[str, typing.Any]) -> str:
+def hash_inputs(
+    op_name: str, inputs: dict[str, typing.Any], input_types: dict[str, types.Type]
+) -> str:
     hasher = hashlib.sha256()
     for input in inputs:
         hasher.update(f"Op Name: {op_name}".encode())
         hasher.update(f"Input name: {input}".encode())
+
         val = inputs[input]
-        if isinstance(inputs[input], ref_base.Ref):
+        if isinstance(val, ref_base.Ref):
             hasher.update(str(val).encode())
-        elif implements_buffer_protocol(val):
-            hasher.update(val)
         else:
-            raise ValueError(
-                "Value must be a string or must implement the buffer protocol"
-            )
+            # convert to JSONable representation without calling type_of
+            hashable_value = storage.to_python(input, wb_type=input_types[input])
+            serialized = json.dumps(hashable_value)
+            hasher.update(serialized)
     return hasher.hexdigest()
 
 
 def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
+    input_types: Mapping[str, types.Type],
 ):
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
@@ -544,7 +547,11 @@ def execute_sync_op(
             )
         mon_span_inputs, refs = auto_publish(inputs)
 
-        input_hash = hash_inputs(op_def.name, mon_span_inputs)
+        input_hash = hash_inputs(
+            op_def.name,
+            mon_span_inputs,
+            input_types,
+        )
 
         with context_state.lazy_execution():
             with context_state.monitor_disabled():
@@ -806,7 +813,9 @@ def execute_forward_node(
                         next(iter(inputs.values())), box.box(result)
                     )
             else:
-                result = execute_sync_op(op_def, inputs)
+                result = execute_sync_op(
+                    op_def, inputs, {input_nodes[input].type for input in inputs}
+                )
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)
