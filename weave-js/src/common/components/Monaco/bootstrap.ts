@@ -21,9 +21,10 @@
  * (seemingly) ~150K. I'm suspicious I may not have measured it right.
  */
 
-import 'monaco-editor/esm/vs/language/json/monaco.contribution';
-import 'monaco-yaml/lib/esm/monaco.contribution';
+
 import './set-window-monaco';
+import 'monaco-yaml/lib/esm/monaco.contribution';
+import 'monaco-editor/esm/vs/language/json/monaco.contribution';
 
 import stringify from 'json-stringify-pretty-compact';
 import type monaco from 'monaco-editor';
