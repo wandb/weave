@@ -21,9 +21,9 @@
  * (seemingly) ~150K. I'm suspicious I may not have measured it right.
  */
 
-import './set-window-monaco';
-import 'monaco-yaml/lib/esm/monaco.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution';
+import 'monaco-yaml/lib/esm/monaco.contribution';
+import './set-window-monaco';
 
 import stringify from 'json-stringify-pretty-compact';
 import type monaco from 'monaco-editor';
@@ -59,33 +59,33 @@ const yamlSchemas = [
   {
     uri: 'http://dev.wandb.com/schema/pytorchjob.json',
     schema: pytorchJobSchema,
-    fileMatch: ['pytorchjob.yaml'],
+    fileMatch: ['pytorchjob'],
   },
   {
     uri: 'http://dev.wandb.com/schema/job.json',
-    schema:  kubernetesJobSchema,
-    fileMatch: ['job.yaml'],
+    schema: kubernetesJobSchema,
+    fileMatch: ['kubernetes'],
   },
   {
     uri: 'http://dev.wandb.com/schema/volcanojob.json',
     schema: volcanoJobSchema,
-    fileMatch: ['volcanojob.yaml'],
+    fileMatch: ['volcano'],
   },
   {
     uri: 'http://dev.wandb.com/schema/jobset.json',
     schema: jobsetSchema,
-    fileMatch: ['jobset.yaml'],
+    fileMatch: ['jobset'],
   },
   {
     uri: 'http://dev.wandb.com/schema/dockerrun.json',
     schema: dockerRunSchema,
-    fileMatch: ['dockerrun.yaml'],
+    fileMatch: ['docker'],
   },
   {
     uri: 'http://dev.wandb.com/schema/sweep-config-schema.json',
     schema: sweepConfigSchema,
     fileMatch: ['sweep-config.yaml'],
-  }
+  },
 ];
 
 (window as any).MonacoEnvironment = {
