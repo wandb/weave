@@ -560,10 +560,10 @@ def execute_sync_op(
                 ] = eager.WeaveIter(span_node)
                 span_dict = iter[0]
 
-            if span_dict != None:
-                j = span_dict["output"]["_result"]
-                j.get()
-                return j
+            if (
+                span_dict != None and span_dict is not None
+            ):  # this is needed for the type checker to be happy
+                return span_dict["output"]["_result"]
 
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
