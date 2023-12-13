@@ -505,7 +505,6 @@ def publish_graph(
 def hash_inputs(
     op_name: str,
     inputs: Mapping[str, typing.Any],
-    input_types: Mapping[str, types.Type],
 ) -> str:
     hasher = hashlib.sha256()
     for input in inputs:
@@ -521,11 +520,7 @@ def hash_inputs(
     return hasher.hexdigest()
 
 
-def execute_sync_op(
-    op_def: op_def.OpDef,
-    inputs: Mapping[str, typing.Any],
-    input_types: Mapping[str, types.Type],
-):
+def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
     st = mon.streamtable
@@ -542,7 +537,6 @@ def execute_sync_op(
         input_hash = hash_inputs(
             op_def.name,
             mon_span_inputs,
-            input_types,
         )
 
         with context_state.lazy_execution():
@@ -805,9 +799,7 @@ def execute_forward_node(
                         next(iter(inputs.values())), box.box(result)
                     )
             else:
-                result = execute_sync_op(
-                    op_def, inputs, {input: input_nodes[input].type for input in inputs}
-                )
+                result = execute_sync_op(op_def, inputs)
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)
