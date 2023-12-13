@@ -511,7 +511,9 @@ def implements_buffer_protocol(obj):
 
 
 def hash_inputs(
-    op_name: str, inputs: dict[str, typing.Any], input_types: dict[str, types.Type]
+    op_name: str,
+    inputs: Mapping[str, typing.Any],
+    input_types: Mapping[str, types.Type],
 ) -> str:
     hasher = hashlib.sha256()
     for input in inputs:
@@ -524,7 +526,7 @@ def hash_inputs(
         else:
             # convert to JSONable representation without calling type_of
             hashable_value = storage.to_python(input, wb_type=input_types[input])
-            serialized = json.dumps(hashable_value)
+            serialized = json.dumps(hashable_value).encode()
             hasher.update(serialized)
     return hasher.hexdigest()
 
@@ -814,7 +816,7 @@ def execute_forward_node(
                     )
             else:
                 result = execute_sync_op(
-                    op_def, inputs, {input_nodes[input].type for input in inputs}
+                    op_def, inputs, {input: input_nodes[input].type for input in inputs}
                 )
 
         with tracer.trace("execute-write-cache"):
