@@ -336,10 +336,10 @@ def test_arrow_vectorizer_string_vector(name, weave_func, expected_output):
 
 @pytest.mark.parametrize(
     "name,weave_func,expected_output",
-    [("string-toNumber", lambda x: x.toNumber(), [123, 234, 456, None])],
+    [("string-toNumber", lambda x: x.toNumber(), [123, 234, 456, 5678, None])],
 )
 def test_arrow_vectorizer_string_to_int(name, weave_func, expected_output):
-    l = weave.save(arrow.to_arrow(["123", "234", "456", "a"]))
+    l = weave.save(arrow.to_arrow(["123", "234", "456", "5,678", "a"]))
 
     fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
 
