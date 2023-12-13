@@ -516,8 +516,6 @@ def hash_inputs(
         if isinstance(val, ref_base.Ref):
             hasher.update(str(val).encode())
         else:
-            # convert to JSONable representation without calling type_of
-
             serialized = json.dumps(input).encode()
             hasher.update(serialized)
     return hasher.hexdigest()
