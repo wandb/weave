@@ -515,11 +515,11 @@ def hash_inputs(
         if isinstance(val, ref_base.Ref):
             hasher.update(str(val).encode())
         else:
-            # The assumption here is that if we have a custom object, 
-            # it has already been converted to a ref because we have 
-            # already called auto_publish on it. That means if we reach 
-            # this stage, anything left should be a JSONable primitive. 
-            # This is all in principle though, so if it doesn't work, we may 
+            # The assumption here is that if we have a custom object,
+            # it has already been converted to a ref because we have
+            # already called auto_publish on it. That means if we reach
+            # this stage, anything left should be a JSONable primitive.
+            # This is all in principle though, so if it doesn't work, we may
             # need to add a call to storage.to_python() here and possibly
             # plumb through the input_types.
 
