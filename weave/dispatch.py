@@ -165,8 +165,8 @@ def _resolve_op_ambiguity(
         first_arg_type,
         [
             ("Prefer Non-Mapped", _mapped_ambiguity_resolution_rule),
-            ("Prefer Non-Tagged", _tagged_ambiguity_resolution_rule),
             ("If Null Input, Choose First", _nullability_ambiguity_resolution_rule),
+            ("Prefer Non-Tagged", _tagged_ambiguity_resolution_rule),
             (
                 "Prefer Sub Type of Super Type",
                 _subtype_sorting_ambiguity_resolution_rule,
