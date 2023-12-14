@@ -68,7 +68,11 @@
           "properties": {
             "TrainingRepositoryAccessMode": {
               "type": "string",
-              "description": "The method that your training job will use to gain access to the images in your private Docker registry. For access to an image in a private Docker registry, set to Vpc. Valid Values: Platform | Vpc"
+              "description": "The method that your training job will use to gain access to the images in your private Docker registry. For access to an image in a private Docker registry, set to Vpc.",
+              "enum": [
+                "Platform",
+                "Vpc"
+              ]
             },
             "TrainingRepositoryAuthConfig": {
               "type": "object",
@@ -92,7 +96,12 @@
         },
         "TrainingInputMode": {
           "type": "string",
-          "description": "The training input mode that the algorithm supports. For more information about input modes, see Algorithms. Pipe mode If an algorithm supports Pipe mode, Amazon SageMaker streams data directly from Amazon S3 to the container. File mode If an algorithm supports File mode, SageMaker downloads the training data from S3 to the provisioned ML storage volume, and mounts the directory to the Docker volume for the training container. You must provision the ML storage volume with sufficient capacity to accommodate the data downloaded from S3. In addition to the training data, the ML storage volume also stores the output model. The algorithm container uses the ML storage volume to also store intermediate information, if any. For distributed algorithms, training data is distributed uniformly. Your training duration is predictable if the input data objects sizes are approximately the same. SageMaker does not split the files any further for model training. If the object sizes are skewed, training won't be optimal as the data distribution is also skewed when one host in a training cluster is overloaded, thus becoming a bottleneck in training. FastFile mode If an algorithm supports FastFile mode, SageMaker streams data directly from S3 to the container with no code changes, and provides file system access to the data. Users can author their training script to interact with these files as if they were stored on disk. FastFile mode works best when the data is read sequentially. Augmented manifest files aren't supported. The startup time is lower when there are fewer files in the S3 bucket provided. Valid Values: Pipe | File | FastFile"
+          "description": "The training input mode that the algorithm supports. For more information about input modes, see Algorithms. Pipe mode If an algorithm supports Pipe mode, Amazon SageMaker streams data directly from Amazon S3 to the container. File mode If an algorithm supports File mode, SageMaker downloads the training data from S3 to the provisioned ML storage volume, and mounts the directory to the Docker volume for the training container. You must provision the ML storage volume with sufficient capacity to accommodate the data downloaded from S3. In addition to the training data, the ML storage volume also stores the output model. The algorithm container uses the ML storage volume to also store intermediate information, if any. For distributed algorithms, training data is distributed uniformly. Your training duration is predictable if the input data objects sizes are approximately the same. SageMaker does not split the files any further for model training. If the object sizes are skewed, training won't be optimal as the data distribution is also skewed when one host in a training cluster is overloaded, thus becoming a bottleneck in training. FastFile mode If an algorithm supports FastFile mode, SageMaker streams data directly from S3 to the container with no code changes, and provides file system access to the data. Users can author their training script to interact with these files as if they were stored on disk. FastFile mode works best when the data is read sequentially. Augmented manifest files aren't supported. The startup time is lower when there are fewer files in the S3 bucket provided.",
+          "enum": [
+            "Pipe",
+            "File",
+            "FastFile"
+          ]
         }
       },
       "required": [
@@ -105,12 +114,12 @@
       "properties": {
         "LocalPath": {
           "type": "string",
-          "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+          "description": "(Optional) The local directory where checkpoints are written. The default directory is /opt/ml/checkpoints/. Length Constraints: Maximum length of 4096.",
           "pattern": ".*"
         },
         "S3Uri": {
           "type": "string",
-          "description": "Depending on the value specified for the S3DataType, identifies either a key name prefix or a manifest. For example: A key name prefix might look like this: s3://bucketname/exampleprefix A manifest might look like this: s3://bucketname/example.manifest A manifest is an S3 object which is a JSON file consisting of an array of elements. The first element is a prefix which is followed by one or more suffixes. SageMaker appends the suffix elements to the prefix to get a full set of S3Uri. Note that the prefix must be a valid non-empty S3Uri that precludes users from specifying a manifest whose individual S3Uri is sourced from different S3 buckets. The following code example shows a valid manifest format: [ {\"prefix\": \"s3://customer_bucket/some/prefix/\"}, \"relative/path/to/custdata-1\", \"relative/path/custdata-2\", ... \"relative/path/custdata-N\" ] This JSON is equivalent to the following S3Uri list: s3://customer_bucket/some/prefix/relative/path/to/custdata-1 s3://customer_bucket/some/prefix/relative/path/custdata-2 ... s3://customer_bucket/some/prefix/relative/path/custdata-N The complete set of S3Uri in this manifest is the input data for the channel for this data source. The object that each S3Uri points to must be readable by the IAM role that SageMaker uses to perform tasks on your behalf. Your input bucket must be located in same AWS region as your training job. Length Constraints: Maximum length of 1024.",
+          "description": "Identifies the S3 path where you want SageMaker to store checkpoints. For example, s3://bucket-name/key-name-prefix. Length Constraints: Maximum length of 1024.",
           "pattern": "^(https|s3)://([^/]+)/?(.*)$"
         }
       },
@@ -161,7 +170,7 @@
         },
         "LocalPath": {
           "type": "string",
-          "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+          "description": "(Optional) The local directory where checkpoints are written. The default directory is /opt/ml/checkpoints/. Length Constraints: Maximum length of 4096.",
           "pattern": ".*"
         },
         "S3OutputPath": {
@@ -181,11 +190,64 @@
           "properties": {
             "InstanceType": {
               "type": "string",
-              "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+              "description": "The ML compute instance type. NoteSageMaker Training on Amazon Elastic Compute Cloud (EC2) P4de instances is in preview release starting December 9th, 2022. Amazon EC2 P4de instances (currently in preview) are powered by 8 NVIDIA A100 GPUs with 80GB high-performance HBM2e GPU memory, which accelerate the speed of training ML models that need to be trained on large datasets of high-resolution data. In this preview release, Amazon SageMaker supports ML training jobs on P4de instances (ml.p4de.24xlarge) to reduce model training time. The ml.p4de.24xlarge instances are available in the following AWS Regions. US East (N. Virginia) (us-east-1) US West (Oregon) (us-west-2) To request quota limit increase and start using P4de instances, contact the SageMaker Training service team through your account team.",
+              "enum": [
+                "ml.m4.xlarge",
+                "ml.m4.2xlarge",
+                "ml.m4.4xlarge",
+                "ml.m4.10xlarge",
+                "ml.m4.16xlarge",
+                "ml.g4dn.xlarge",
+                "ml.g4dn.2xlarge",
+                "ml.g4dn.4xlarge",
+                "ml.g4dn.8xlarge",
+                "ml.g4dn.12xlarge",
+                "ml.g4dn.16xlarge",
+                "ml.m5.large",
+                "ml.m5.xlarge",
+                "ml.m5.2xlarge",
+                "ml.m5.4xlarge",
+                "ml.m5.12xlarge",
+                "ml.m5.24xlarge",
+                "ml.c4.xlarge",
+                "ml.c4.2xlarge",
+                "ml.c4.4xlarge",
+                "ml.c4.8xlarge",
+                "ml.p2.xlarge",
+                "ml.p2.8xlarge",
+                "ml.p2.16xlarge",
+                "ml.p3.2xlarge",
+                "ml.p3.8xlarge",
+                "ml.p3.16xlarge",
+                "ml.p3dn.24xlarge",
+                "ml.p4d.24xlarge",
+                "ml.c5.xlarge",
+                "ml.c5.2xlarge",
+                "ml.c5.4xlarge",
+                "ml.c5.9xlarge",
+                "ml.c5.18xlarge",
+                "ml.c5n.xlarge",
+                "ml.c5n.2xlarge",
+                "ml.c5n.4xlarge",
+                "ml.c5n.9xlarge",
+                "ml.c5n.18xlarge",
+                "ml.g5.xlarge",
+                "ml.g5.2xlarge",
+                "ml.g5.4xlarge",
+                "ml.g5.8xlarge",
+                "ml.g5.16xlarge",
+                "ml.g5.12xlarge",
+                "ml.g5.24xlarge",
+                "ml.g5.48xlarge",
+                "ml.trn1.2xlarge",
+                "ml.trn1.32xlarge",
+                "ml.trn1n.32xlarge",
+                "ml.p5.48xlarge"
+              ]
             },
             "LocalPath": {
               "type": "string",
-              "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+              "description": "(Optional) The local directory where checkpoints are written. The default directory is /opt/ml/checkpoints/. Length Constraints: Maximum length of 4096.",
               "pattern": ".*"
             },
             "RuleConfigurationName": {
@@ -195,7 +257,7 @@
             },
             "RuleEvaluatorImage": {
               "type": "string",
-              "description": "The Amazon Elastic Container Registry Image for the managed rule evaluation. Length Constraints: Maximum length of 255.",
+              "description": "The Amazon Elastic Container (ECR) Image for the managed rule evaluation. Length Constraints: Maximum length of 255.",
               "pattern": ".*"
             },
             "RuleParameters": {
@@ -215,12 +277,13 @@
             },
             "VolumeSizeInGB": {
               "type": "number",
-              "description": "The size, in GB, of the ML storage volume attached to the processing instance. Valid Range: Minimum value of 0."
+              "description": "The size of the ML storage volume that you want to provision. ML storage volumes store model artifacts and incremental states. Training algorithms might also use the ML storage volume for scratch space. If you want to store the training data in the ML storage volume, choose File as the TrainingInputMode in the algorithm specification. When using an ML instance with NVMe SSD volumes, SageMaker doesn't provision Amazon EBS General Purpose SSD (gp2) storage. Available storage is fixed to the NVMe-type instance's storage capacity. SageMaker configures storage paths for training datasets, checkpoints, model artifacts, and outputs to use the entire capacity of the instance storage. For example, ML instance families with the NVMe-type instance storage include ml.p4d, ml.g4dn, and ml.g5. When using an ML instance with the EBS-only storage option and without instance storage, you must define the size of EBS volume through VolumeSizeInGB in the ResourceConfig API. For example, ML instance families that use EBS volumes include ml.c5 and ml.p2. To look up instance types and their instance storage types and volumes, see Amazon EC2 Instance Types. To find the default local paths defined by the SageMaker training platform, see Amazon SageMaker Training Storage Folders for Training Datasets, Checkpoints, Model Artifacts, and Outputs. Valid Range: Minimum value of 1."
             }
           },
           "required": [
             "RuleConfigurationName",
-            "RuleEvaluatorImage"
+            "RuleEvaluatorImage",
+            "VolumeSizeInGB"
           ]
         }
       ],
@@ -309,7 +372,11 @@
             },
             "CompressionType": {
               "type": "string",
-              "description": "The model output compression type. Select None to output an uncompressed model, recommended for large model outputs. Defaults to gzip. Valid Values: GZIP | NONE"
+              "description": "The model output compression type. Select None to output an uncompressed model, recommended for large model outputs. Defaults to gzip.",
+              "enum": [
+                "GZIP",
+                "NONE"
+              ]
             },
             "ContentType": {
               "type": "string",
@@ -329,7 +396,11 @@
                     },
                     "FileSystemAccessMode": {
                       "type": "string",
-                      "description": "The access mode of the mount of the directory associated with the channel. A directory can be mounted either in ro (read-only) or rw (read-write) mode. Valid Values: rw | ro"
+                      "description": "The access mode of the mount of the directory associated with the channel. A directory can be mounted either in ro (read-only) or rw (read-write) mode.",
+                      "enum": [
+                        "rw",
+                        "ro"
+                      ]
                     },
                     "FileSystemId": {
                       "type": "string",
@@ -338,7 +409,11 @@
                     },
                     "FileSystemType": {
                       "type": "string",
-                      "description": "The file system type. Valid Values: EFS | FSxLustre"
+                      "description": "The file system type.",
+                      "enum": [
+                        "EFS",
+                        "FSxLustre"
+                      ]
                     }
                   },
                   "required": [
@@ -374,15 +449,24 @@
                     },
                     "S3DataDistributionType": {
                       "type": "string",
-                      "description": "If you want SageMaker to replicate the entire dataset on each ML compute instance that is launched for model training, specify FullyReplicated. If you want SageMaker to replicate a subset of data on each ML compute instance that is launched for model training, specify ShardedByS3Key. If there are n ML compute instances launched for a training job, each instance gets approximately 1/n of the number of S3 objects. In this case, model training on each machine uses only the subset of training data. Don't choose more ML compute instances for training than available S3 objects. If you do, some nodes won't get any data and you will pay for nodes that aren't getting any training data. This applies in both File and Pipe modes. Keep this in mind when developing algorithms. In distributed training, where you use multiple ML compute EC2 instances, you might choose ShardedByS3Key. If the algorithm requires copying training data to the ML storage volume (when TrainingInputMode is set to File), this copies 1/n of the number of objects. Valid Values: FullyReplicated | ShardedByS3Key"
+                      "description": "If you want SageMaker to replicate the entire dataset on each ML compute instance that is launched for model training, specify FullyReplicated. If you want SageMaker to replicate a subset of data on each ML compute instance that is launched for model training, specify ShardedByS3Key. If there are n ML compute instances launched for a training job, each instance gets approximately 1/n of the number of S3 objects. In this case, model training on each machine uses only the subset of training data. Don't choose more ML compute instances for training than available S3 objects. If you do, some nodes won't get any data and you will pay for nodes that aren't getting any training data. This applies in both File and Pipe modes. Keep this in mind when developing algorithms. In distributed training, where you use multiple ML compute EC2 instances, you might choose ShardedByS3Key. If the algorithm requires copying training data to the ML storage volume (when TrainingInputMode is set to File), this copies 1/n of the number of objects.",
+                      "enum": [
+                        "FullyReplicated",
+                        "ShardedByS3Key"
+                      ]
                     },
                     "S3DataType": {
                       "type": "string",
-                      "description": "If you choose S3Prefix, S3Uri identifies a key name prefix. SageMaker uses all objects that match the specified key name prefix for model training. If you choose ManifestFile, S3Uri identifies an object that is a manifest file containing a list of object keys that you want SageMaker to use for model training. If you choose AugmentedManifestFile, S3Uri identifies an object that is an augmented manifest file in JSON lines format. This file contains the data you want to use for model training. AugmentedManifestFile can only be used if the Channel's input mode is Pipe. Valid Values: ManifestFile | S3Prefix | AugmentedManifestFile"
+                      "description": "If you choose S3Prefix, S3Uri identifies a key name prefix. SageMaker uses all objects that match the specified key name prefix for model training. If you choose ManifestFile, S3Uri identifies an object that is a manifest file containing a list of object keys that you want SageMaker to use for model training. If you choose AugmentedManifestFile, S3Uri identifies an object that is an augmented manifest file in JSON lines format. This file contains the data you want to use for model training. AugmentedManifestFile can only be used if the Channel's input mode is Pipe.",
+                      "enum": [
+                        "ManifestFile",
+                        "S3Prefix",
+                        "AugmentedManifestFile"
+                      ]
                     },
                     "S3Uri": {
                       "type": "string",
-                      "description": "Depending on the value specified for the S3DataType, identifies either a key name prefix or a manifest. For example: A key name prefix might look like this: s3://bucketname/exampleprefix A manifest might look like this: s3://bucketname/example.manifest A manifest is an S3 object which is a JSON file consisting of an array of elements. The first element is a prefix which is followed by one or more suffixes. SageMaker appends the suffix elements to the prefix to get a full set of S3Uri. Note that the prefix must be a valid non-empty S3Uri that precludes users from specifying a manifest whose individual S3Uri is sourced from different S3 buckets. The following code example shows a valid manifest format: [ {\"prefix\": \"s3://customer_bucket/some/prefix/\"}, \"relative/path/to/custdata-1\", \"relative/path/custdata-2\", ... \"relative/path/custdata-N\" ] This JSON is equivalent to the following S3Uri list: s3://customer_bucket/some/prefix/relative/path/to/custdata-1 s3://customer_bucket/some/prefix/relative/path/custdata-2 ... s3://customer_bucket/some/prefix/relative/path/custdata-N The complete set of S3Uri in this manifest is the input data for the channel for this data source. The object that each S3Uri points to must be readable by the IAM role that SageMaker uses to perform tasks on your behalf. Your input bucket must be located in same AWS region as your training job. Length Constraints: Maximum length of 1024.",
+                      "description": "Identifies the S3 path where you want SageMaker to store checkpoints. For example, s3://bucket-name/key-name-prefix. Length Constraints: Maximum length of 1024.",
                       "pattern": "^(https|s3)://([^/]+)/?(.*)$"
                     }
                   },
@@ -397,11 +481,20 @@
             },
             "InputMode": {
               "type": "string",
-              "description": "(Optional) The input mode to use for the data channel in a training job. If you don't set a value for InputMode, SageMaker uses the value set for TrainingInputMode. Use this parameter to override the TrainingInputMode setting in a AlgorithmSpecification request when you have a channel that needs a different input mode from the training job's general setting. To download the data from Amazon Simple Storage Service (Amazon S3) to the provisioned ML storage volume, and mount the directory to a Docker volume, use File input mode. To stream data directly from Amazon S3 to the container, choose Pipe input mode. To use a model for incremental training, choose File input model. Valid Values: Pipe | File | FastFile"
+              "description": "(Optional) The input mode to use for the data channel in a training job. If you don't set a value for InputMode, SageMaker uses the value set for TrainingInputMode. Use this parameter to override the TrainingInputMode setting in a AlgorithmSpecification request when you have a channel that needs a different input mode from the training job's general setting. To download the data from Amazon Simple Storage Service (Amazon S3) to the provisioned ML storage volume, and mount the directory to a Docker volume, use File input mode. To stream data directly from Amazon S3 to the container, choose Pipe input mode. To use a model for incremental training, choose File input model.",
+              "enum": [
+                "Pipe",
+                "File",
+                "FastFile"
+              ]
             },
             "RecordWrapperType": {
               "type": "string",
-              "description": "Specify RecordIO as the value when input data is in raw format but the training algorithm requires the RecordIO format. In this case, SageMaker wraps each individual S3 object in a RecordIO record. If the input data is already in RecordIO format, you don't need to set this attribute. For more information, see Create a Dataset Using RecordIO. In File mode, leave this field unset or set it to None. Valid Values: None | RecordIO"
+              "description": "Specify RecordIO as the value when input data is in raw format but the training algorithm requires the RecordIO format. In this case, SageMaker wraps each individual S3 object in a RecordIO record. If the input data is already in RecordIO format, you don't need to set this attribute. For more information, see Create a Dataset Using RecordIO. In File mode, leave this field unset or set it to None.",
+              "enum": [
+                "None",
+                "RecordIO"
+              ]
             },
             "ShuffleConfig": {
               "type": "object",
@@ -430,7 +523,11 @@
       "properties": {
         "CompressionType": {
           "type": "string",
-          "description": "The model output compression type. Select None to output an uncompressed model, recommended for large model outputs. Defaults to gzip. Valid Values: GZIP | NONE"
+          "description": "The model output compression type. Select None to output an uncompressed model, recommended for large model outputs. Defaults to gzip.",
+          "enum": [
+            "GZIP",
+            "NONE"
+          ]
         },
         "KmsKeyId": {
           "type": "string",
@@ -484,11 +581,64 @@
           "properties": {
             "InstanceType": {
               "type": "string",
-              "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+              "description": "The ML compute instance type. NoteSageMaker Training on Amazon Elastic Compute Cloud (EC2) P4de instances is in preview release starting December 9th, 2022. Amazon EC2 P4de instances (currently in preview) are powered by 8 NVIDIA A100 GPUs with 80GB high-performance HBM2e GPU memory, which accelerate the speed of training ML models that need to be trained on large datasets of high-resolution data. In this preview release, Amazon SageMaker supports ML training jobs on P4de instances (ml.p4de.24xlarge) to reduce model training time. The ml.p4de.24xlarge instances are available in the following AWS Regions. US East (N. Virginia) (us-east-1) US West (Oregon) (us-west-2) To request quota limit increase and start using P4de instances, contact the SageMaker Training service team through your account team.",
+              "enum": [
+                "ml.m4.xlarge",
+                "ml.m4.2xlarge",
+                "ml.m4.4xlarge",
+                "ml.m4.10xlarge",
+                "ml.m4.16xlarge",
+                "ml.g4dn.xlarge",
+                "ml.g4dn.2xlarge",
+                "ml.g4dn.4xlarge",
+                "ml.g4dn.8xlarge",
+                "ml.g4dn.12xlarge",
+                "ml.g4dn.16xlarge",
+                "ml.m5.large",
+                "ml.m5.xlarge",
+                "ml.m5.2xlarge",
+                "ml.m5.4xlarge",
+                "ml.m5.12xlarge",
+                "ml.m5.24xlarge",
+                "ml.c4.xlarge",
+                "ml.c4.2xlarge",
+                "ml.c4.4xlarge",
+                "ml.c4.8xlarge",
+                "ml.p2.xlarge",
+                "ml.p2.8xlarge",
+                "ml.p2.16xlarge",
+                "ml.p3.2xlarge",
+                "ml.p3.8xlarge",
+                "ml.p3.16xlarge",
+                "ml.p3dn.24xlarge",
+                "ml.p4d.24xlarge",
+                "ml.c5.xlarge",
+                "ml.c5.2xlarge",
+                "ml.c5.4xlarge",
+                "ml.c5.9xlarge",
+                "ml.c5.18xlarge",
+                "ml.c5n.xlarge",
+                "ml.c5n.2xlarge",
+                "ml.c5n.4xlarge",
+                "ml.c5n.9xlarge",
+                "ml.c5n.18xlarge",
+                "ml.g5.xlarge",
+                "ml.g5.2xlarge",
+                "ml.g5.4xlarge",
+                "ml.g5.8xlarge",
+                "ml.g5.16xlarge",
+                "ml.g5.12xlarge",
+                "ml.g5.24xlarge",
+                "ml.g5.48xlarge",
+                "ml.trn1.2xlarge",
+                "ml.trn1.32xlarge",
+                "ml.trn1n.32xlarge",
+                "ml.p5.48xlarge"
+              ]
             },
             "LocalPath": {
               "type": "string",
-              "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+              "description": "(Optional) The local directory where checkpoints are written. The default directory is /opt/ml/checkpoints/. Length Constraints: Maximum length of 4096.",
               "pattern": ".*"
             },
             "RuleConfigurationName": {
@@ -498,7 +648,7 @@
             },
             "RuleEvaluatorImage": {
               "type": "string",
-              "description": "The Amazon Elastic Container Registry Image for the managed rule evaluation. Length Constraints: Maximum length of 255.",
+              "description": "The Amazon Elastic Container (ECR) Image for the managed rule evaluation. Length Constraints: Maximum length of 255.",
               "pattern": ".*"
             },
             "RuleParameters": {
@@ -518,7 +668,7 @@
             },
             "VolumeSizeInGB": {
               "type": "number",
-              "description": "The size, in GB, of the ML storage volume attached to the processing instance. Valid Range: Minimum value of 0."
+              "description": "The size of the ML storage volume that you want to provision. ML storage volumes store model artifacts and incremental states. Training algorithms might also use the ML storage volume for scratch space. If you want to store the training data in the ML storage volume, choose File as the TrainingInputMode in the algorithm specification. When using an ML instance with NVMe SSD volumes, SageMaker doesn't provision Amazon EBS General Purpose SSD (gp2) storage. Available storage is fixed to the NVMe-type instance's storage capacity. SageMaker configures storage paths for training datasets, checkpoints, model artifacts, and outputs to use the entire capacity of the instance storage. For example, ML instance families with the NVMe-type instance storage include ml.p4d, ml.g4dn, and ml.g5. When using an ML instance with the EBS-only storage option and without instance storage, you must define the size of EBS volume through VolumeSizeInGB in the ResourceConfig API. For example, ML instance families that use EBS volumes include ml.c5 and ml.p2. To look up instance types and their instance storage types and volumes, see Amazon EC2 Instance Types. To find the default local paths defined by the SageMaker training platform, see Amazon SageMaker Training Storage Folders for Training Datasets, Checkpoints, Model Artifacts, and Outputs. Valid Range: Minimum value of 1."
             }
           },
           "required": []
@@ -550,7 +700,60 @@
                 },
                 "InstanceType": {
                   "type": "string",
-                  "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+                  "description": "The ML compute instance type. NoteSageMaker Training on Amazon Elastic Compute Cloud (EC2) P4de instances is in preview release starting December 9th, 2022. Amazon EC2 P4de instances (currently in preview) are powered by 8 NVIDIA A100 GPUs with 80GB high-performance HBM2e GPU memory, which accelerate the speed of training ML models that need to be trained on large datasets of high-resolution data. In this preview release, Amazon SageMaker supports ML training jobs on P4de instances (ml.p4de.24xlarge) to reduce model training time. The ml.p4de.24xlarge instances are available in the following AWS Regions. US East (N. Virginia) (us-east-1) US West (Oregon) (us-west-2) To request quota limit increase and start using P4de instances, contact the SageMaker Training service team through your account team.",
+                  "enum": [
+                    "ml.m4.xlarge",
+                    "ml.m4.2xlarge",
+                    "ml.m4.4xlarge",
+                    "ml.m4.10xlarge",
+                    "ml.m4.16xlarge",
+                    "ml.g4dn.xlarge",
+                    "ml.g4dn.2xlarge",
+                    "ml.g4dn.4xlarge",
+                    "ml.g4dn.8xlarge",
+                    "ml.g4dn.12xlarge",
+                    "ml.g4dn.16xlarge",
+                    "ml.m5.large",
+                    "ml.m5.xlarge",
+                    "ml.m5.2xlarge",
+                    "ml.m5.4xlarge",
+                    "ml.m5.12xlarge",
+                    "ml.m5.24xlarge",
+                    "ml.c4.xlarge",
+                    "ml.c4.2xlarge",
+                    "ml.c4.4xlarge",
+                    "ml.c4.8xlarge",
+                    "ml.p2.xlarge",
+                    "ml.p2.8xlarge",
+                    "ml.p2.16xlarge",
+                    "ml.p3.2xlarge",
+                    "ml.p3.8xlarge",
+                    "ml.p3.16xlarge",
+                    "ml.p3dn.24xlarge",
+                    "ml.p4d.24xlarge",
+                    "ml.c5.xlarge",
+                    "ml.c5.2xlarge",
+                    "ml.c5.4xlarge",
+                    "ml.c5.9xlarge",
+                    "ml.c5.18xlarge",
+                    "ml.c5n.xlarge",
+                    "ml.c5n.2xlarge",
+                    "ml.c5n.4xlarge",
+                    "ml.c5n.9xlarge",
+                    "ml.c5n.18xlarge",
+                    "ml.g5.xlarge",
+                    "ml.g5.2xlarge",
+                    "ml.g5.4xlarge",
+                    "ml.g5.8xlarge",
+                    "ml.g5.16xlarge",
+                    "ml.g5.12xlarge",
+                    "ml.g5.24xlarge",
+                    "ml.g5.48xlarge",
+                    "ml.trn1.2xlarge",
+                    "ml.trn1.32xlarge",
+                    "ml.trn1n.32xlarge",
+                    "ml.p5.48xlarge"
+                  ]
                 }
               },
               "required": [
@@ -562,7 +765,60 @@
         },
         "InstanceType": {
           "type": "string",
-          "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+          "description": "The ML compute instance type. NoteSageMaker Training on Amazon Elastic Compute Cloud (EC2) P4de instances is in preview release starting December 9th, 2022. Amazon EC2 P4de instances (currently in preview) are powered by 8 NVIDIA A100 GPUs with 80GB high-performance HBM2e GPU memory, which accelerate the speed of training ML models that need to be trained on large datasets of high-resolution data. In this preview release, Amazon SageMaker supports ML training jobs on P4de instances (ml.p4de.24xlarge) to reduce model training time. The ml.p4de.24xlarge instances are available in the following AWS Regions. US East (N. Virginia) (us-east-1) US West (Oregon) (us-west-2) To request quota limit increase and start using P4de instances, contact the SageMaker Training service team through your account team.",
+          "enum": [
+            "ml.m4.xlarge",
+            "ml.m4.2xlarge",
+            "ml.m4.4xlarge",
+            "ml.m4.10xlarge",
+            "ml.m4.16xlarge",
+            "ml.g4dn.xlarge",
+            "ml.g4dn.2xlarge",
+            "ml.g4dn.4xlarge",
+            "ml.g4dn.8xlarge",
+            "ml.g4dn.12xlarge",
+            "ml.g4dn.16xlarge",
+            "ml.m5.large",
+            "ml.m5.xlarge",
+            "ml.m5.2xlarge",
+            "ml.m5.4xlarge",
+            "ml.m5.12xlarge",
+            "ml.m5.24xlarge",
+            "ml.c4.xlarge",
+            "ml.c4.2xlarge",
+            "ml.c4.4xlarge",
+            "ml.c4.8xlarge",
+            "ml.p2.xlarge",
+            "ml.p2.8xlarge",
+            "ml.p2.16xlarge",
+            "ml.p3.2xlarge",
+            "ml.p3.8xlarge",
+            "ml.p3.16xlarge",
+            "ml.p3dn.24xlarge",
+            "ml.p4d.24xlarge",
+            "ml.c5.xlarge",
+            "ml.c5.2xlarge",
+            "ml.c5.4xlarge",
+            "ml.c5.9xlarge",
+            "ml.c5.18xlarge",
+            "ml.c5n.xlarge",
+            "ml.c5n.2xlarge",
+            "ml.c5n.4xlarge",
+            "ml.c5n.9xlarge",
+            "ml.c5n.18xlarge",
+            "ml.g5.xlarge",
+            "ml.g5.2xlarge",
+            "ml.g5.4xlarge",
+            "ml.g5.8xlarge",
+            "ml.g5.16xlarge",
+            "ml.g5.12xlarge",
+            "ml.g5.24xlarge",
+            "ml.g5.48xlarge",
+            "ml.trn1.2xlarge",
+            "ml.trn1.32xlarge",
+            "ml.trn1n.32xlarge",
+            "ml.p5.48xlarge"
+          ]
         },
         "KeepAlivePeriodInSeconds": {
           "type": "number",
@@ -575,7 +831,7 @@
         },
         "VolumeSizeInGB": {
           "type": "number",
-          "description": "The size, in GB, of the ML storage volume attached to the processing instance. Valid Range: Minimum value of 0."
+          "description": "The size of the ML storage volume that you want to provision. ML storage volumes store model artifacts and incremental states. Training algorithms might also use the ML storage volume for scratch space. If you want to store the training data in the ML storage volume, choose File as the TrainingInputMode in the algorithm specification. When using an ML instance with NVMe SSD volumes, SageMaker doesn't provision Amazon EBS General Purpose SSD (gp2) storage. Available storage is fixed to the NVMe-type instance's storage capacity. SageMaker configures storage paths for training datasets, checkpoints, model artifacts, and outputs to use the entire capacity of the instance storage. For example, ML instance families with the NVMe-type instance storage include ml.p4d, ml.g4dn, and ml.g5. When using an ML instance with the EBS-only storage option and without instance storage, you must define the size of EBS volume through VolumeSizeInGB in the ResourceConfig API. For example, ML instance families that use EBS volumes include ml.c5 and ml.p2. To look up instance types and their instance storage types and volumes, see Amazon EC2 Instance Types. To find the default local paths defined by the SageMaker training platform, see Amazon SageMaker Training Storage Folders for Training Datasets, Checkpoints, Model Artifacts, and Outputs. Valid Range: Minimum value of 1."
         }
       },
       "required": [],
@@ -648,7 +904,7 @@
       "properties": {
         "LocalPath": {
           "type": "string",
-          "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+          "description": "(Optional) The local directory where checkpoints are written. The default directory is /opt/ml/checkpoints/. Length Constraints: Maximum length of 4096.",
           "pattern": ".*"
         },
         "S3OutputPath": {
