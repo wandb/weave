@@ -1,0 +1,713 @@
+{
+  "type": "object",
+  "properties": {
+    "AlgorithmSpecification": {
+      "type": "object",
+      "properties": {
+        "AlgorithmName": {
+          "type": "string",
+          "description": "The name of the algorithm resource to use for the training job. This must be an algorithm resource that you created or subscribe to on AWS Marketplace. NoteYou must specify either the algorithm name to the AlgorithmName parameter or the image URI of the algorithm container to the TrainingImage parameter.Note that the AlgorithmName parameter is mutually exclusive with the TrainingImage parameter. If you specify a value for the AlgorithmName parameter, you can't specify a value for TrainingImage, and vice versa.If you specify values for both parameters, the training job might break; if you don't specify any value for both parameters, the training job might raise a null error. Length Constraints: Minimum length of 1. Maximum length of 170.",
+          "pattern": "(arn:aws[a-z\\-]*:sagemaker:[a-z0-9\\-]*:[0-9]{12}:[a-z\\-]*\\/)?([a-zA-Z0-9]([a-zA-Z0-9-]){0,62})(?<!-)$"
+        },
+        "ContainerArguments": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ],
+          "description": "The arguments for a container used to run a training job. See How Amazon SageMaker Runs Your Training Image for additional information. Array Members: Minimum number of 1 item. Maximum number of 100 items. Length Constraints: Maximum length of 256.",
+          "pattern": ".*"
+        },
+        "ContainerEntrypoint": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ],
+          "description": "The entrypoint script for a Docker container used to run a training job. This script takes precedence over the default train processing instructions. See How Amazon SageMaker Runs Your Training Image for more information. Array Members: Minimum number of 1 item. Maximum number of 100 items. Length Constraints: Maximum length of 256.",
+          "pattern": ".*"
+        },
+        "EnableSageMakerMetricsTimeSeries": {
+          "type": "boolean",
+          "description": "To generate and save time-series metrics during training, set to true. The default is false and time-series metrics aren't generated except in the following cases: You use one of the SageMaker built-in algorithms You use one of the following Prebuilt SageMaker Docker Images: Tensorflow (version >= 1.15) MXNet (version >= 1.6) PyTorch (version >= 1.3) You specify at least one MetricDefinition"
+        },
+        "MetricDefinitions": {
+          "type": "array",
+          "items": [
+            {
+              "type": "object",
+              "properties": {
+                "Name": {
+                  "type": "string",
+                  "description": "The name of the metric. Length Constraints: Minimum length of 1. Maximum length of 255.",
+                  "pattern": ".+"
+                },
+                "Regex": {
+                  "type": "string",
+                  "description": "A regular expression that searches the output of a training job and gets the value of the metric. For more information about using regular expressions to define metrics, see Defining metrics and environment variables. Length Constraints: Minimum length of 1. Maximum length of 500.",
+                  "pattern": ".+"
+                }
+              },
+              "required": [
+                "Name",
+                "Regex"
+              ]
+            }
+          ],
+          "description": "A list of metric definition objects. Each object specifies the metric name and regular expressions used to parse algorithm logs. SageMaker publishes each metric to Amazon CloudWatch. Array Members: Minimum number of 0 items. Maximum number of 40 items."
+        },
+        "TrainingImage": {
+          "type": "string",
+          "description": "The registry path of the Docker image that contains the training algorithm. For information about docker registry paths for SageMaker built-in algorithms, see Docker Registry Paths and Example Code in the Amazon SageMaker developer guide. SageMaker supports both registry/repository[:tag] and registry/repository[@digest] image path formats. For more information about using your custom training container, see Using Your Own Algorithms with Amazon SageMaker. NoteYou must specify either the algorithm name to the AlgorithmName parameter or the image URI of the algorithm container to the TrainingImage parameter.For more information, see the note in the AlgorithmName parameter description. Length Constraints: Maximum length of 255.",
+          "pattern": ".*"
+        },
+        "TrainingImageConfig": {
+          "type": "object",
+          "properties": {
+            "TrainingRepositoryAccessMode": {
+              "type": "string",
+              "description": "The method that your training job will use to gain access to the images in your private Docker registry. For access to an image in a private Docker registry, set to Vpc. Valid Values: Platform | Vpc"
+            },
+            "TrainingRepositoryAuthConfig": {
+              "type": "object",
+              "properties": {
+                "TrainingRepositoryCredentialsProviderArn": {
+                  "type": "string",
+                  "description": "The Amazon Resource Name (ARN) of an AWS Lambda function used to give SageMaker access credentials to your private Docker registry. Length Constraints: Minimum length of 1. Maximum length of 2048.",
+                  "pattern": "arn:[\\p{Alnum}\\-]+:lambda:[\\p{Alnum}\\-]+:[0-9]{12}:function:.*"
+                }
+              },
+              "required": [
+                "TrainingRepositoryCredentialsProviderArn"
+              ],
+              "description": "An object containing authentication information for a private Docker registry containing your training images."
+            }
+          },
+          "required": [
+            "TrainingRepositoryAccessMode"
+          ],
+          "description": "The configuration to use an image from a private Docker registry for a training job."
+        },
+        "TrainingInputMode": {
+          "type": "string",
+          "description": "The training input mode that the algorithm supports. For more information about input modes, see Algorithms. Pipe mode If an algorithm supports Pipe mode, Amazon SageMaker streams data directly from Amazon S3 to the container. File mode If an algorithm supports File mode, SageMaker downloads the training data from S3 to the provisioned ML storage volume, and mounts the directory to the Docker volume for the training container. You must provision the ML storage volume with sufficient capacity to accommodate the data downloaded from S3. In addition to the training data, the ML storage volume also stores the output model. The algorithm container uses the ML storage volume to also store intermediate information, if any. For distributed algorithms, training data is distributed uniformly. Your training duration is predictable if the input data objects sizes are approximately the same. SageMaker does not split the files any further for model training. If the object sizes are skewed, training won't be optimal as the data distribution is also skewed when one host in a training cluster is overloaded, thus becoming a bottleneck in training. FastFile mode If an algorithm supports FastFile mode, SageMaker streams data directly from S3 to the container with no code changes, and provides file system access to the data. Users can author their training script to interact with these files as if they were stored on disk. FastFile mode works best when the data is read sequentially. Augmented manifest files aren't supported. The startup time is lower when there are fewer files in the S3 bucket provided. Valid Values: Pipe | File | FastFile"
+        }
+      },
+      "required": [
+        "TrainingInputMode"
+      ],
+      "description": "The registry path of the Docker image that contains the training algorithm and algorithm-specific metadata, including the input mode. For more information about algorithms provided by SageMaker, see Algorithms. For information about providing your own algorithms, see Using Your Own Algorithms with Amazon SageMaker."
+    },
+    "CheckpointConfig": {
+      "type": "object",
+      "properties": {
+        "LocalPath": {
+          "type": "string",
+          "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+          "pattern": ".*"
+        },
+        "S3Uri": {
+          "type": "string",
+          "description": "Depending on the value specified for the S3DataType, identifies either a key name prefix or a manifest. For example: A key name prefix might look like this: s3://bucketname/exampleprefix A manifest might look like this: s3://bucketname/example.manifest A manifest is an S3 object which is a JSON file consisting of an array of elements. The first element is a prefix which is followed by one or more suffixes. SageMaker appends the suffix elements to the prefix to get a full set of S3Uri. Note that the prefix must be a valid non-empty S3Uri that precludes users from specifying a manifest whose individual S3Uri is sourced from different S3 buckets. The following code example shows a valid manifest format: [ {\"prefix\": \"s3://customer_bucket/some/prefix/\"}, \"relative/path/to/custdata-1\", \"relative/path/custdata-2\", ... \"relative/path/custdata-N\" ] This JSON is equivalent to the following S3Uri list: s3://customer_bucket/some/prefix/relative/path/to/custdata-1 s3://customer_bucket/some/prefix/relative/path/custdata-2 ... s3://customer_bucket/some/prefix/relative/path/custdata-N The complete set of S3Uri in this manifest is the input data for the channel for this data source. The object that each S3Uri points to must be readable by the IAM role that SageMaker uses to perform tasks on your behalf. Your input bucket must be located in same AWS region as your training job. Length Constraints: Maximum length of 1024.",
+          "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+        }
+      },
+      "required": [
+        "S3Uri"
+      ],
+      "description": "Contains information about the output location for managed spot training checkpoint data."
+    },
+    "DebugHookConfig": {
+      "type": "object",
+      "properties": {
+        "CollectionConfigurations": {
+          "type": "array",
+          "items": [
+            {
+              "type": "object",
+              "properties": {
+                "CollectionName": {
+                  "type": "string",
+                  "description": "The name of the tensor collection. The name must be unique relative to other rule configuration names. Length Constraints: Minimum length of 1. Maximum length of 256.",
+                  "pattern": ".*"
+                },
+                "CollectionParameters": {
+                  "type": "object",
+                  "properties": {
+                    "string": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [],
+                  "description": "Parameter values for the tensor collection. The allowed parameters are \"name\", \"include_regex\", \"reduction_config\", \"save_config\", \"tensor_names\", and \"save_histogram\". Map Entries: Minimum number of 0 items. Maximum number of 20 items. Key Length Constraints: Minimum length of 1. Maximum length of 256. Key Pattern: .* Value Length Constraints: Maximum length of 256. Value Pattern: .*"
+                }
+              },
+              "required": []
+            }
+          ],
+          "description": "Configuration information for Amazon SageMaker Debugger tensor collections. To learn more about how to configure the CollectionConfiguration parameter, see Use the SageMaker and Debugger Configuration API Operations to Create, Update, and Debug Your Training Job. Array Members: Minimum number of 0 items. Maximum number of 20 items."
+        },
+        "HookParameters": {
+          "type": "object",
+          "properties": {
+            "string": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "description": "Configuration information for the Amazon SageMaker Debugger hook parameters. Map Entries: Minimum number of 0 items. Maximum number of 20 items. Key Length Constraints: Minimum length of 1. Maximum length of 256. Key Pattern: .* Value Length Constraints: Maximum length of 256. Value Pattern: .*"
+        },
+        "LocalPath": {
+          "type": "string",
+          "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+          "pattern": ".*"
+        },
+        "S3OutputPath": {
+          "type": "string",
+          "description": "Path to Amazon S3 storage location for rules. Length Constraints: Maximum length of 1024.",
+          "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+        }
+      },
+      "required": [],
+      "description": "Configuration information for the Amazon SageMaker Debugger hook parameters, metric and tensor collections, and storage paths. To learn more about how to configure the DebugHookConfig parameter, see Use the SageMaker and Debugger Configuration API Operations to Create, Update, and Debug Your Training Job."
+    },
+    "DebugRuleConfigurations": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "InstanceType": {
+              "type": "string",
+              "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+            },
+            "LocalPath": {
+              "type": "string",
+              "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+              "pattern": ".*"
+            },
+            "RuleConfigurationName": {
+              "type": "string",
+              "description": "The name of the rule configuration. It must be unique relative to other rule configuration names. Length Constraints: Minimum length of 1. Maximum length of 256.",
+              "pattern": ".*"
+            },
+            "RuleEvaluatorImage": {
+              "type": "string",
+              "description": "The Amazon Elastic Container Registry Image for the managed rule evaluation. Length Constraints: Maximum length of 255.",
+              "pattern": ".*"
+            },
+            "RuleParameters": {
+              "type": "object",
+              "properties": {
+                "string": {
+                  "type": "string"
+                }
+              },
+              "required": [],
+              "description": "Runtime configuration for rule container. Map Entries: Minimum number of 0 items. Maximum number of 100 items. Key Length Constraints: Minimum length of 1. Maximum length of 256. Key Pattern: .* Value Length Constraints: Maximum length of 256. Value Pattern: .*"
+            },
+            "S3OutputPath": {
+              "type": "string",
+              "description": "Path to Amazon S3 storage location for rules. Length Constraints: Maximum length of 1024.",
+              "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+            },
+            "VolumeSizeInGB": {
+              "type": "number",
+              "description": "The size, in GB, of the ML storage volume attached to the processing instance. Valid Range: Minimum value of 0."
+            }
+          },
+          "required": [
+            "RuleConfigurationName",
+            "RuleEvaluatorImage"
+          ]
+        }
+      ],
+      "description": "Configuration information for Amazon SageMaker Debugger rules for debugging output tensors. Array Members: Minimum number of 0 items. Maximum number of 20 items."
+    },
+    "EnableInterContainerTrafficEncryption": {
+      "type": "boolean",
+      "description": "To encrypt all communications between ML compute instances in distributed training, choose True. Encryption provides greater security for distributed training, but training might take longer. How long it takes depends on the amount of communication between compute instances, especially if you use a deep learning algorithm in distributed training. For more information, see Protect Communications Between ML Compute Instances in a Distributed Training Job."
+    },
+    "EnableManagedSpotTraining": {
+      "type": "boolean",
+      "description": "To train models using managed spot training, choose True. Managed spot training provides a fully managed and scalable infrastructure for training machine learning models. this option is useful when training jobs can be interrupted and when there is flexibility when the training job is run. The complete and intermediate results of jobs are stored in an Amazon S3 bucket, and can be used as a starting point to train models incrementally. Amazon SageMaker provides metrics and logs in CloudWatch. They can be used to see when managed spot training jobs are running, interrupted, resumed, or completed."
+    },
+    "EnableNetworkIsolation": {
+      "type": "boolean",
+      "description": "Isolates the training container. No inbound or outbound network calls can be made, except for calls between peers within a training cluster for distributed training. If you enable network isolation for training jobs that are configured to use a VPC, SageMaker downloads and uploads customer data and model artifacts through the specified VPC, but the training container does not have network access."
+    },
+    "Environment": {
+      "type": "object",
+      "properties": {
+        "string": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "description": "The environment variables to set in the Docker container. Map Entries: Maximum number of 100 items. Key Length Constraints: Maximum length of 512. Key Pattern: [a-zA-Z_][a-zA-Z0-9_]* Value Length Constraints: Maximum length of 512. Value Pattern: [\\S\\s]*"
+    },
+    "ExperimentConfig": {
+      "type": "object",
+      "properties": {
+        "ExperimentName": {
+          "type": "string",
+          "description": "The name of an existing experiment to associate with the trial component. Length Constraints: Minimum length of 1. Maximum length of 120.",
+          "pattern": "^[a-zA-Z0-9](-*[a-zA-Z0-9]){0,119}"
+        },
+        "RunName": {
+          "type": "string",
+          "description": "The name of the experiment run to associate with the trial component. Length Constraints: Minimum length of 1. Maximum length of 120.",
+          "pattern": "^[a-zA-Z0-9](-*[a-zA-Z0-9]){0,119}"
+        },
+        "TrialComponentDisplayName": {
+          "type": "string",
+          "description": "The display name for the trial component. If this key isn't specified, the display name is the trial component name. Length Constraints: Minimum length of 1. Maximum length of 120.",
+          "pattern": "^[a-zA-Z0-9](-*[a-zA-Z0-9]){0,119}"
+        },
+        "TrialName": {
+          "type": "string",
+          "description": "The name of an existing trial to associate the trial component with. If not specified, a new trial is created. Length Constraints: Minimum length of 1. Maximum length of 120.",
+          "pattern": "^[a-zA-Z0-9](-*[a-zA-Z0-9]){0,119}"
+        }
+      },
+      "required": [],
+      "description": "Associates a SageMaker job as a trial component with an experiment and trial. Specified when you call the following APIs: CreateProcessingJob CreateTrainingJob CreateTransformJob"
+    },
+    "HyperParameters": {
+      "type": "object",
+      "properties": {
+        "string": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "description": "Algorithm-specific parameters that influence the quality of the model. You set hyperparameters before you start the learning process. For a list of hyperparameters for each training algorithm provided by SageMaker, see Algorithms. You can specify a maximum of 100 hyperparameters. Each hyperparameter is a key-value pair. Each key and value is limited to 256 characters, as specified by the Length Constraint. ImportantDo not include any security-sensitive information including account access IDs, secrets or tokens in any hyperparameter field. If the use of security-sensitive credentials are detected, SageMaker will reject your training job request and return an exception error. Map Entries: Minimum number of 0 items. Maximum number of 100 items. Key Length Constraints: Maximum length of 256. Key Pattern: .* Value Length Constraints: Maximum length of 2500. Value Pattern: .*"
+    },
+    "InfraCheckConfig": {
+      "type": "object",
+      "properties": {
+        "EnableInfraCheck": {
+          "type": "boolean",
+          "description": "Enables an infrastructure health check."
+        }
+      },
+      "required": [],
+      "description": "Contains information about the infrastructure health check configuration for the training job."
+    },
+    "InputDataConfig": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "ChannelName": {
+              "type": "string",
+              "description": "The name of the channel. Length Constraints: Minimum length of 1. Maximum length of 64.",
+              "pattern": "[A-Za-z0-9\\.\\-_]+"
+            },
+            "CompressionType": {
+              "type": "string",
+              "description": "The model output compression type. Select None to output an uncompressed model, recommended for large model outputs. Defaults to gzip. Valid Values: GZIP | NONE"
+            },
+            "ContentType": {
+              "type": "string",
+              "description": "The MIME type of the data. Length Constraints: Maximum length of 256.",
+              "pattern": ".*"
+            },
+            "DataSource": {
+              "type": "object",
+              "properties": {
+                "FileSystemDataSource": {
+                  "type": "object",
+                  "properties": {
+                    "DirectoryPath": {
+                      "type": "string",
+                      "description": "The full path to the directory to associate with the channel. Length Constraints: Maximum length of 4096.",
+                      "pattern": ".*"
+                    },
+                    "FileSystemAccessMode": {
+                      "type": "string",
+                      "description": "The access mode of the mount of the directory associated with the channel. A directory can be mounted either in ro (read-only) or rw (read-write) mode. Valid Values: rw | ro"
+                    },
+                    "FileSystemId": {
+                      "type": "string",
+                      "description": "The file system id. Length Constraints: Minimum length of 11.",
+                      "pattern": "^(fs-[0-9a-f]{8,})$"
+                    },
+                    "FileSystemType": {
+                      "type": "string",
+                      "description": "The file system type. Valid Values: EFS | FSxLustre"
+                    }
+                  },
+                  "required": [
+                    "DirectoryPath",
+                    "FileSystemAccessMode",
+                    "FileSystemId",
+                    "FileSystemType"
+                  ],
+                  "description": "The file system that is associated with a channel."
+                },
+                "S3DataSource": {
+                  "type": "object",
+                  "properties": {
+                    "AttributeNames": {
+                      "type": "array",
+                      "items": [
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "description": "A list of one or more attribute names to use that are found in a specified augmented manifest file. Array Members: Maximum number of 16 items. Length Constraints: Minimum length of 1. Maximum length of 256.",
+                      "pattern": ".+"
+                    },
+                    "InstanceGroupNames": {
+                      "type": "array",
+                      "items": [
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "description": "A list of names of instance groups that get data from the S3 data source. Array Members: Maximum number of 5 items. Length Constraints: Minimum length of 1. Maximum length of 64.",
+                      "pattern": ".+"
+                    },
+                    "S3DataDistributionType": {
+                      "type": "string",
+                      "description": "If you want SageMaker to replicate the entire dataset on each ML compute instance that is launched for model training, specify FullyReplicated. If you want SageMaker to replicate a subset of data on each ML compute instance that is launched for model training, specify ShardedByS3Key. If there are n ML compute instances launched for a training job, each instance gets approximately 1/n of the number of S3 objects. In this case, model training on each machine uses only the subset of training data. Don't choose more ML compute instances for training than available S3 objects. If you do, some nodes won't get any data and you will pay for nodes that aren't getting any training data. This applies in both File and Pipe modes. Keep this in mind when developing algorithms. In distributed training, where you use multiple ML compute EC2 instances, you might choose ShardedByS3Key. If the algorithm requires copying training data to the ML storage volume (when TrainingInputMode is set to File), this copies 1/n of the number of objects. Valid Values: FullyReplicated | ShardedByS3Key"
+                    },
+                    "S3DataType": {
+                      "type": "string",
+                      "description": "If you choose S3Prefix, S3Uri identifies a key name prefix. SageMaker uses all objects that match the specified key name prefix for model training. If you choose ManifestFile, S3Uri identifies an object that is a manifest file containing a list of object keys that you want SageMaker to use for model training. If you choose AugmentedManifestFile, S3Uri identifies an object that is an augmented manifest file in JSON lines format. This file contains the data you want to use for model training. AugmentedManifestFile can only be used if the Channel's input mode is Pipe. Valid Values: ManifestFile | S3Prefix | AugmentedManifestFile"
+                    },
+                    "S3Uri": {
+                      "type": "string",
+                      "description": "Depending on the value specified for the S3DataType, identifies either a key name prefix or a manifest. For example: A key name prefix might look like this: s3://bucketname/exampleprefix A manifest might look like this: s3://bucketname/example.manifest A manifest is an S3 object which is a JSON file consisting of an array of elements. The first element is a prefix which is followed by one or more suffixes. SageMaker appends the suffix elements to the prefix to get a full set of S3Uri. Note that the prefix must be a valid non-empty S3Uri that precludes users from specifying a manifest whose individual S3Uri is sourced from different S3 buckets. The following code example shows a valid manifest format: [ {\"prefix\": \"s3://customer_bucket/some/prefix/\"}, \"relative/path/to/custdata-1\", \"relative/path/custdata-2\", ... \"relative/path/custdata-N\" ] This JSON is equivalent to the following S3Uri list: s3://customer_bucket/some/prefix/relative/path/to/custdata-1 s3://customer_bucket/some/prefix/relative/path/custdata-2 ... s3://customer_bucket/some/prefix/relative/path/custdata-N The complete set of S3Uri in this manifest is the input data for the channel for this data source. The object that each S3Uri points to must be readable by the IAM role that SageMaker uses to perform tasks on your behalf. Your input bucket must be located in same AWS region as your training job. Length Constraints: Maximum length of 1024.",
+                      "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+                    }
+                  },
+                  "required": [
+                    "S3DataType"
+                  ],
+                  "description": "The S3 location of the data source that is associated with a channel."
+                }
+              },
+              "required": [],
+              "description": "The location of the channel data."
+            },
+            "InputMode": {
+              "type": "string",
+              "description": "(Optional) The input mode to use for the data channel in a training job. If you don't set a value for InputMode, SageMaker uses the value set for TrainingInputMode. Use this parameter to override the TrainingInputMode setting in a AlgorithmSpecification request when you have a channel that needs a different input mode from the training job's general setting. To download the data from Amazon Simple Storage Service (Amazon S3) to the provisioned ML storage volume, and mount the directory to a Docker volume, use File input mode. To stream data directly from Amazon S3 to the container, choose Pipe input mode. To use a model for incremental training, choose File input model. Valid Values: Pipe | File | FastFile"
+            },
+            "RecordWrapperType": {
+              "type": "string",
+              "description": "Specify RecordIO as the value when input data is in raw format but the training algorithm requires the RecordIO format. In this case, SageMaker wraps each individual S3 object in a RecordIO record. If the input data is already in RecordIO format, you don't need to set this attribute. For more information, see Create a Dataset Using RecordIO. In File mode, leave this field unset or set it to None. Valid Values: None | RecordIO"
+            },
+            "ShuffleConfig": {
+              "type": "object",
+              "properties": {
+                "Seed": {
+                  "type": "number",
+                  "description": "Determines the shuffling order in ShuffleConfig value."
+                }
+              },
+              "required": [
+                "Seed"
+              ],
+              "description": "A configuration for a shuffle option for input data in a channel. If you use S3Prefix for S3DataType, this shuffles the results of the S3 key prefix matches. If you use ManifestFile, the order of the S3 object references in the ManifestFile is shuffled. If you use AugmentedManifestFile, the order of the JSON lines in the AugmentedManifestFile is shuffled. The shuffling order is determined using the Seed value. For Pipe input mode, shuffling is done at the start of every epoch. With large datasets this ensures that the order of the training data is different for each epoch, it helps reduce bias and possible overfitting. In a multi-node training job when ShuffleConfig is combined with S3DataDistributionType of ShardedByS3Key, the data is shuffled across nodes so that the content sent to a particular node on the first epoch might be sent to a different node on the second epoch."
+            }
+          },
+          "required": [
+            "ChannelName",
+            "DataSource"
+          ]
+        }
+      ],
+      "description": "An array of Channel objects. Each channel is a named input source. InputDataConfig describes the input data and its location. Algorithms can accept input data from one or more channels. For example, an algorithm might have two channels of input data, training_data and validation_data. The configuration for each channel provides the S3, EFS, or FSx location where the input data is stored. It also provides information about the stored data: the MIME type, compression method, and whether the data is wrapped in RecordIO format. Depending on the input mode that the algorithm supports, SageMaker either copies input data files from an S3 bucket to a local directory in the Docker container, or makes it available as input streams. For example, if you specify an EFS location, input data files are available as input streams. They do not need to be downloaded. Your input must be in the same AWS region as your training job. Array Members: Minimum number of 1 item. Maximum number of 20 items."
+    },
+    "OutputDataConfig": {
+      "type": "object",
+      "properties": {
+        "CompressionType": {
+          "type": "string",
+          "description": "The model output compression type. Select None to output an uncompressed model, recommended for large model outputs. Defaults to gzip. Valid Values: GZIP | NONE"
+        },
+        "KmsKeyId": {
+          "type": "string",
+          "description": "The AWS Key Management Service (AWS KMS) key that SageMaker uses to encrypt the model artifacts at rest using Amazon S3 server-side encryption. The KmsKeyId can be any of the following formats: // KMS Key ID \"1234abcd-12ab-34cd-56ef-1234567890ab\" // Amazon Resource Name (ARN) of a KMS Key \"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\" // KMS Key Alias \"alias/ExampleAlias\" // Amazon Resource Name (ARN) of a KMS Key Alias \"arn:aws:kms:us-west-2:111122223333:alias/ExampleAlias\" If you use a KMS key ID or an alias of your KMS key, the SageMaker execution role must include permissions to call kms:Encrypt. If you don't provide a KMS key ID, SageMaker uses the default KMS key for Amazon S3 for your role's account. For more information, see KMS-Managed Encryption Keys in the Amazon Simple Storage Service Developer Guide. If the output data is stored in Amazon S3 Express One Zone, it is encrypted with server-side encryption with Amazon S3 managed keys (SSE-S3). KMS key is not supported for Amazon S3 Express One Zone The KMS key policy must grant permission to the IAM role that you specify in your CreateTrainingJob, CreateTransformJob, or CreateHyperParameterTuningJob requests. For more information, see Using Key Policies in AWS KMS in the AWS Key Management Service Developer Guide. Length Constraints: Maximum length of 2048.",
+          "pattern": ".*"
+        },
+        "S3OutputPath": {
+          "type": "string",
+          "description": "Path to Amazon S3 storage location for rules. Length Constraints: Maximum length of 1024.",
+          "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+        }
+      },
+      "required": [],
+      "description": "Specifies the path to the S3 location where you want to store model artifacts. SageMaker creates subfolders for the artifacts."
+    },
+    "ProfilerConfig": {
+      "type": "object",
+      "properties": {
+        "DisableProfiler": {
+          "type": "boolean",
+          "description": "Configuration to turn off Amazon SageMaker Debugger's system monitoring and profiling functionality. To turn it off, set to True."
+        },
+        "ProfilingIntervalInMilliseconds": {
+          "type": "number",
+          "description": "A time interval for capturing system metrics in milliseconds. Available values are 100, 200, 500, 1000 (1 second), 5000 (5 seconds), and 60000 (1 minute) milliseconds. The default value is 500 milliseconds."
+        },
+        "ProfilingParameters": {
+          "type": "object",
+          "properties": {
+            "string": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "description": "Configuration information for capturing framework metrics. Available key strings for different profiling options are DetailedProfilingConfig, PythonProfilingConfig, and DataLoaderProfilingConfig. The following codes are configuration structures for the ProfilingParameters parameter. To learn more about how to configure the ProfilingParameters parameter, see Use the SageMaker and Debugger Configuration API Operations to Create, Update, and Debug Your Training Job. Map Entries: Minimum number of 0 items. Maximum number of 20 items. Key Length Constraints: Minimum length of 1. Maximum length of 256. Key Pattern: .* Value Length Constraints: Maximum length of 256. Value Pattern: .*"
+        },
+        "S3OutputPath": {
+          "type": "string",
+          "description": "Path to Amazon S3 storage location for rules. Length Constraints: Maximum length of 1024.",
+          "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+        }
+      },
+      "required": [],
+      "description": "Configuration information for Amazon SageMaker Debugger system monitoring, framework profiling, and storage paths."
+    },
+    "ProfilerRuleConfigurations": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "InstanceType": {
+              "type": "string",
+              "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+            },
+            "LocalPath": {
+              "type": "string",
+              "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+              "pattern": ".*"
+            },
+            "RuleConfigurationName": {
+              "type": "string",
+              "description": "The name of the rule configuration. It must be unique relative to other rule configuration names. Length Constraints: Minimum length of 1. Maximum length of 256.",
+              "pattern": ".*"
+            },
+            "RuleEvaluatorImage": {
+              "type": "string",
+              "description": "The Amazon Elastic Container Registry Image for the managed rule evaluation. Length Constraints: Maximum length of 255.",
+              "pattern": ".*"
+            },
+            "RuleParameters": {
+              "type": "object",
+              "properties": {
+                "string": {
+                  "type": "string"
+                }
+              },
+              "required": [],
+              "description": "Runtime configuration for rule container. Map Entries: Minimum number of 0 items. Maximum number of 100 items. Key Length Constraints: Minimum length of 1. Maximum length of 256. Key Pattern: .* Value Length Constraints: Maximum length of 256. Value Pattern: .*"
+            },
+            "S3OutputPath": {
+              "type": "string",
+              "description": "Path to Amazon S3 storage location for rules. Length Constraints: Maximum length of 1024.",
+              "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+            },
+            "VolumeSizeInGB": {
+              "type": "number",
+              "description": "The size, in GB, of the ML storage volume attached to the processing instance. Valid Range: Minimum value of 0."
+            }
+          },
+          "required": []
+        }
+      ],
+      "description": "Configuration information for Amazon SageMaker Debugger rules for profiling system and framework metrics. Array Members: Minimum number of 0 items. Maximum number of 20 items."
+    },
+    "ResourceConfig": {
+      "type": "object",
+      "properties": {
+        "InstanceCount": {
+          "type": "number",
+          "description": "The number of ML compute instances to use. For distributed training, provide a value greater than 1. Valid Range: Minimum value of 0."
+        },
+        "InstanceGroups": {
+          "type": "array",
+          "items": [
+            {
+              "type": "object",
+              "properties": {
+                "InstanceCount": {
+                  "type": "number",
+                  "description": "The number of ML compute instances to use. For distributed training, provide a value greater than 1. Valid Range: Minimum value of 0."
+                },
+                "InstanceGroupName": {
+                  "type": "string",
+                  "description": "Specifies the name of the instance group. Length Constraints: Minimum length of 1. Maximum length of 64.",
+                  "pattern": ".+"
+                },
+                "InstanceType": {
+                  "type": "string",
+                  "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+                }
+              },
+              "required": [
+                "InstanceGroupName"
+              ]
+            }
+          ],
+          "description": "The configuration of a heterogeneous cluster in JSON format. Array Members: Maximum number of 5 items."
+        },
+        "InstanceType": {
+          "type": "string",
+          "description": "The instance type to deploy a custom rule for profiling a training job. Valid Values: ml.t3.medium | ml.t3.large | ml.t3.xlarge | ml.t3.2xlarge | ml.m4.xlarge | ml.m4.2xlarge | ml.m4.4xlarge | ml.m4.10xlarge | ml.m4.16xlarge | ml.c4.xlarge | ml.c4.2xlarge | ml.c4.4xlarge | ml.c4.8xlarge | ml.p2.xlarge | ml.p2.8xlarge | ml.p2.16xlarge | ml.p3.2xlarge | ml.p3.8xlarge | ml.p3.16xlarge | ml.c5.xlarge | ml.c5.2xlarge | ml.c5.4xlarge | ml.c5.9xlarge | ml.c5.18xlarge | ml.m5.large | ml.m5.xlarge | ml.m5.2xlarge | ml.m5.4xlarge | ml.m5.12xlarge | ml.m5.24xlarge | ml.r5.large | ml.r5.xlarge | ml.r5.2xlarge | ml.r5.4xlarge | ml.r5.8xlarge | ml.r5.12xlarge | ml.r5.16xlarge | ml.r5.24xlarge | ml.g4dn.xlarge | ml.g4dn.2xlarge | ml.g4dn.4xlarge | ml.g4dn.8xlarge | ml.g4dn.12xlarge | ml.g4dn.16xlarge"
+        },
+        "KeepAlivePeriodInSeconds": {
+          "type": "number",
+          "description": "The duration of time in seconds to retain configured resources in a warm pool for subsequent training jobs. Valid Range: Minimum value of 0. Maximum value of 3600."
+        },
+        "VolumeKmsKeyId": {
+          "type": "string",
+          "description": "The AWS KMS key that SageMaker uses to encrypt data on the storage volume attached to the ML compute instance(s) that run the training job. NoteCertain Nitro-based instances include local storage, dependent on the instance type. Local storage volumes are encrypted using a hardware module on the instance. You can't request a VolumeKmsKeyId when using an instance type with local storage.For a list of instance types that support local instance storage, see Instance Store Volumes.For more information about local instance storage encryption, see SSD Instance Store Volumes. The VolumeKmsKeyId can be in any of the following formats: // KMS Key ID \"1234abcd-12ab-34cd-56ef-1234567890ab\" // Amazon Resource Name (ARN) of a KMS Key \"arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\" Length Constraints: Maximum length of 2048.",
+          "pattern": ".*"
+        },
+        "VolumeSizeInGB": {
+          "type": "number",
+          "description": "The size, in GB, of the ML storage volume attached to the processing instance. Valid Range: Minimum value of 0."
+        }
+      },
+      "required": [],
+      "description": "The resources, including the ML compute instances and ML storage volumes, to use for model training. ML storage volumes store model artifacts and incremental states. Training algorithms might also use ML storage volumes for scratch space. If you want SageMaker to use the ML storage volume to store the training data, choose File as the TrainingInputMode in the algorithm specification. For distributed training algorithms, specify an instance count greater than 1."
+    },
+    "RetryStrategy": {
+      "type": "object",
+      "properties": {
+        "MaximumRetryAttempts": {
+          "type": "number",
+          "description": "The number of times to retry the job. When the job is retried, it's SecondaryStatus is changed to STARTING. Valid Range: Minimum value of 1. Maximum value of 30."
+        }
+      },
+      "required": [
+        "MaximumRetryAttempts"
+      ],
+      "description": "The number of times to retry the job when the job fails due to an InternalServerError."
+    },
+    "RoleArn": {
+      "type": "string",
+      "description": "The Amazon Resource Name (ARN) of an IAM role that SageMaker can assume to perform tasks on your behalf. During model training, SageMaker needs your permission to read input data from an S3 bucket, download a Docker image that contains training code, write model artifacts to an S3 bucket, write logs to Amazon CloudWatch Logs, and publish metrics to Amazon CloudWatch. You grant permissions for all of these tasks to an IAM role. For more information, see SageMaker Roles. NoteTo be able to pass this role to SageMaker, the caller of this API must have the iam:PassRole permission. Length Constraints: Minimum length of 20. Maximum length of 2048.",
+      "pattern": "^arn:aws[a-z\\-]*:iam::\\d{12}:role/?[a-zA-Z_0-9+=,.@\\-_/]+$"
+    },
+    "StoppingCondition": {
+      "type": "object",
+      "properties": {
+        "MaxPendingTimeInSeconds": {
+          "type": "number",
+          "description": "The maximum length of time, in seconds, that a training or compilation job can be pending before it is stopped. Valid Range: Minimum value of 7200. Maximum value of 2419200."
+        },
+        "MaxRuntimeInSeconds": {
+          "type": "number",
+          "description": "The maximum length of time, in seconds, that a training or compilation job can run before it is stopped. For compilation jobs, if the job does not complete during this time, a TimeOut error is generated. We recommend starting with 900 seconds and increasing as necessary based on your model. For all other jobs, if the job does not complete during this time, SageMaker ends the job. When RetryStrategy is specified in the job request, MaxRuntimeInSeconds specifies the maximum time for all of the attempts in total, not each individual attempt. The default value is 1 day. The maximum value is 28 days. The maximum time that a TrainingJob can run in total, including any time spent publishing metrics or archiving and uploading models after it has been stopped, is 30 days. Valid Range: Minimum value of 1."
+        },
+        "MaxWaitTimeInSeconds": {
+          "type": "number",
+          "description": "The maximum length of time, in seconds, that a managed Spot training job has to complete. It is the amount of time spent waiting for Spot capacity plus the amount of time the job can run. It must be equal to or greater than MaxRuntimeInSeconds. If the job does not complete during this time, SageMaker ends the job. When RetryStrategy is specified in the job request, MaxWaitTimeInSeconds specifies the maximum time for all of the attempts in total, not each individual attempt. Valid Range: Minimum value of 1."
+        }
+      },
+      "required": [],
+      "description": "Specifies a limit to how long a model training job can run. It also specifies how long a managed Spot training job has to complete. When the job reaches the time limit, SageMaker ends the training job. Use this API to cap model training costs. To stop a job, SageMaker sends the algorithm the SIGTERM signal, which delays job termination for 120 seconds. Algorithms can use this 120-second window to save the model artifacts, so the results of training are not lost."
+    },
+    "Tags": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "Key": {
+              "type": "string",
+              "description": "The tag key. Tag keys must be unique per resource. Length Constraints: Minimum length of 1. Maximum length of 128.",
+              "pattern": "^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-@]*)$"
+            },
+            "Value": {
+              "type": "string",
+              "description": "The tag value. Length Constraints: Minimum length of 0. Maximum length of 256.",
+              "pattern": "^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-@]*)$"
+            }
+          },
+          "required": [
+            "Key",
+            "Value"
+          ]
+        }
+      ],
+      "description": "An array of key-value pairs. You can use tags to categorize your AWS resources in different ways, for example, by purpose, owner, or environment. For more information, see Tagging AWS Resources. Array Members: Minimum number of 0 items. Maximum number of 50 items."
+    },
+    "TensorBoardOutputConfig": {
+      "type": "object",
+      "properties": {
+        "LocalPath": {
+          "type": "string",
+          "description": "Path to local storage location for output of rules. Defaults to /opt/ml/processing/output/rule/. Length Constraints: Maximum length of 4096.",
+          "pattern": ".*"
+        },
+        "S3OutputPath": {
+          "type": "string",
+          "description": "Path to Amazon S3 storage location for rules. Length Constraints: Maximum length of 1024.",
+          "pattern": "^(https|s3)://([^/]+)/?(.*)$"
+        }
+      },
+      "required": [],
+      "description": "Configuration of storage locations for the Amazon SageMaker Debugger TensorBoard output data."
+    },
+    "TrainingJobName": {
+      "type": "string",
+      "description": "The name of the training job. The name must be unique within an AWS Region in an AWS account. Length Constraints: Minimum length of 1. Maximum length of 63.",
+      "pattern": "^[a-zA-Z0-9](-*[a-zA-Z0-9]){0,62}"
+    },
+    "VpcConfig": {
+      "type": "object",
+      "properties": {
+        "SecurityGroupIds": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ],
+          "description": "The VPC security group IDs, in the form sg-xxxxxxxx. Specify the security groups for the VPC that is specified in the Subnets field. Array Members: Minimum number of 1 item. Maximum number of 5 items. Length Constraints: Maximum length of 32.",
+          "pattern": "[-0-9a-zA-Z]+"
+        },
+        "Subnets": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ],
+          "description": "The ID of the subnets in the VPC to which you want to connect your training job or model. For information about the availability of specific instance types, see Supported Instance Types and Availability Zones. Array Members: Minimum number of 1 item. Maximum number of 16 items. Length Constraints: Maximum length of 32.",
+          "pattern": "[-0-9a-zA-Z]+"
+        }
+      },
+      "required": [
+        "SecurityGroupIds",
+        "Subnets"
+      ],
+      "description": "A VpcConfig object that specifies the VPC that you want your training job to connect to. Control access to and from your training container by configuring the VPC. For more information, see Protect Training Jobs by Using an Amazon Virtual Private Cloud."
+    },
+    "type": {
+      "type": "object"
+    },
+    "schema": {
+      "type": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  "required": [
+    "AlgorithmSpecification",
+    "OutputDataConfig",
+    "ResourceConfig",
+    "RoleArn",
+    "StoppingCondition",
+    "TrainingJobName"
+  ]
+}

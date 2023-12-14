@@ -39,6 +39,7 @@ import dockerRunSchema from './schemas/dockerrun.json';
 import kubernetesJobSchema from './schemas/job.json';
 import jobsetSchema from './schemas/jobset.json';
 import pytorchJobSchema from './schemas/pytorchjob.json';
+import sagemakerSchema from './schemas/sagemaker.json';
 import sweepConfigSchema from './schemas/sweep-config-schema.json';
 import volcanoJobSchema from './schemas/volcanojob.json';
 
@@ -80,13 +81,18 @@ const yamlSchemas = [
   {
     uri: 'http://dev.wandb.com/schema/dockerrun.json',
     schema: dockerRunSchema,
-    fileMatch: ['docker'],
+    fileMatch: ['local-container'],
   },
   {
     uri: 'http://dev.wandb.com/schema/sweep-config-schema.json',
     schema: sweepConfigSchema,
     fileMatch: ['sweep-config.yaml'],
   },
+  {
+    uri: 'http://dev.wandb.com/schema/sagemaker.json',
+    schema: sagemakerSchema,
+    fileMatch: ['sagemaker'],
+  }
 ];
 
 (window as any).MonacoEnvironment = {
