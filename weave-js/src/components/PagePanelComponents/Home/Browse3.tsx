@@ -112,9 +112,9 @@ const browse3Paths = (projectRoot: string) => [
 
 export const Browse3: FC<{
   basename: string;
-  projectRoot(entityName: string, projectName: string): string;
   hideHeader?: boolean;
   headerOffset?: number;
+  projectRoot(entityName: string, projectName: string): string;
 }> = props => {
   return (
     <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>

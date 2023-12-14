@@ -33,8 +33,8 @@ export const Browse3WeaveflowRouteContextProvider = ({
   projectRoot,
   children,
 }: {
-  projectRoot(entityName: string, projectName: string): string;
   children: React.ReactNode;
+  projectRoot(entityName: string, projectName: string): string;
 }) => {
   return (
     <WeaveflowRouteContext.Provider value={browse3ContextGen(projectRoot)}>
