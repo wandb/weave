@@ -56,6 +56,41 @@ const jsonSchemas = [
     schema: {...vegaLiteSchema},
     uri: 'https://vega.github.io/schema/vega-lite/v4.json',
   },
+  {
+    uri: 'http://dev.wandb.com/schema/sagemaker.json',
+    schema: sagemakerSchema,
+    fileMatch: ['sagemaker'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/vertex.json',
+    schema: vertexSchema,
+    fileMatch: ['vertex', 'gcp-vertex'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/pytorchjob.json',
+    schema: pytorchJobSchema,
+    fileMatch: ['pytorchjob'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/job.json',
+    schema: kubernetesJobSchema,
+    fileMatch: ['kubernetes'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/volcanojob.json',
+    schema: volcanoJobSchema,
+    fileMatch: ['volcano'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/jobset.json',
+    schema: jobsetSchema,
+    fileMatch: ['jobset'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/dockerrun.json',
+    schema: dockerRunSchema,
+    fileMatch: ['local-container'],
+  } 
 ];
 
 const yamlSchemas = [
@@ -139,7 +174,7 @@ monacoEditor.languages.registerDocumentFormattingEditProvider('json', {
 });
 
 (monacoEditor.languages as any).yaml.yamlDefaults.setDiagnosticsOptions({
-  // validate: true,
+  validate: true,
   inlineSuggest: true,
   schemas: yamlSchemas,
   enableSchemaRequest: true,
