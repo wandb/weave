@@ -59,37 +59,37 @@ const jsonSchemas = [
   {
     uri: 'http://dev.wandb.com/schema/sagemaker.json',
     schema: sagemakerSchema,
-    fileMatch: ['sagemaker'],
+    fileMatch: ['launch/sagemaker'],
   },
   {
     uri: 'http://dev.wandb.com/schema/vertex.json',
     schema: vertexSchema,
-    fileMatch: ['vertex', 'gcp-vertex'],
+    fileMatch: ['launch/vertex', 'launch/gcp-vertex'],
   },
   {
     uri: 'http://dev.wandb.com/schema/pytorchjob.json',
     schema: pytorchJobSchema,
-    fileMatch: ['pytorchjob'],
+    fileMatch: ['launch/pytorchjob'],
   },
   {
     uri: 'http://dev.wandb.com/schema/job.json',
     schema: kubernetesJobSchema,
-    fileMatch: ['kubernetes'],
+    fileMatch: ['launch/kubernetes'],
   },
   {
     uri: 'http://dev.wandb.com/schema/volcanojob.json',
     schema: volcanoJobSchema,
-    fileMatch: ['volcano'],
+    fileMatch: ['launch/volcano'],
   },
   {
     uri: 'http://dev.wandb.com/schema/jobset.json',
     schema: jobsetSchema,
-    fileMatch: ['jobset'],
+    fileMatch: ['launch/jobset'],
   },
   {
     uri: 'http://dev.wandb.com/schema/dockerrun.json',
     schema: dockerRunSchema,
-    fileMatch: ['local-container'],
+    fileMatch: ['launch/local-container'],
   },
 ];
 
@@ -97,27 +97,27 @@ const yamlSchemas = [
   {
     uri: 'http://dev.wandb.com/schema/pytorchjob.json',
     schema: pytorchJobSchema,
-    fileMatch: ['pytorchjob'],
+    fileMatch: ['launch/pytorchjob'],
   },
   {
     uri: 'http://dev.wandb.com/schema/job.json',
     schema: kubernetesJobSchema,
-    fileMatch: ['kubernetes'],
+    fileMatch: ['launch/kubernetes'],
   },
   {
     uri: 'http://dev.wandb.com/schema/volcanojob.json',
     schema: volcanoJobSchema,
-    fileMatch: ['volcano'],
+    fileMatch: ['launch/volcano'],
   },
   {
     uri: 'http://dev.wandb.com/schema/jobset.json',
     schema: jobsetSchema,
-    fileMatch: ['jobset'],
+    fileMatch: ['launch/jobset'],
   },
   {
     uri: 'http://dev.wandb.com/schema/dockerrun.json',
     schema: dockerRunSchema,
-    fileMatch: ['local-container'],
+    fileMatch: ['launch/local-container'],
   },
   {
     uri: 'http://dev.wandb.com/schema/sweep-config-schema.json',
@@ -127,12 +127,12 @@ const yamlSchemas = [
   {
     uri: 'http://dev.wandb.com/schema/sagemaker.json',
     schema: sagemakerSchema,
-    fileMatch: ['sagemaker'],
+    fileMatch: ['launch/sagemaker'],
   },
   {
     uri: 'http://dev.wandb.com/schema/vertex.json',
     schema: vertexSchema,
-    fileMatch: ['vertex', 'gcp-vertex'],
+    fileMatch: ['launch/vertex', 'launch/gcp-vertex'],
   },
 ];
 
