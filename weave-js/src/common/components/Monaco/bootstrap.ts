@@ -41,6 +41,7 @@ import jobsetSchema from './schemas/jobset.json';
 import pytorchJobSchema from './schemas/pytorchjob.json';
 import sagemakerSchema from './schemas/sagemaker.json';
 import sweepConfigSchema from './schemas/sweep-config-schema.json';
+import vertexSchema from './schemas/vertex.json';
 import volcanoJobSchema from './schemas/volcanojob.json';
 
 const jsonSchemas = [
@@ -92,6 +93,11 @@ const yamlSchemas = [
     uri: 'http://dev.wandb.com/schema/sagemaker.json',
     schema: sagemakerSchema,
     fileMatch: ['sagemaker'],
+  },
+  {
+    uri: 'http://dev.wandb.com/schema/vertex.json',
+    schema: vertexSchema,
+    fileMatch: ['vertex', 'gcp-vertex'],
   }
 ];
 

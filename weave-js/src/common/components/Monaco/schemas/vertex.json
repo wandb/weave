@@ -1,0 +1,305 @@
+{
+  "type": "object",
+  "schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "spec": {
+      "properties": {
+        "base_output_directory": {
+          "description": "The Google Cloud Storage location where the output is to be written to.",
+          "type": "object",
+          "id": "google_cloud_aiplatform_v1_gcs_destination",
+          "properties": {
+            "output_uri_prefix": {
+              "description": "Required. Google Cloud Storage URI to output directory. If the uri doesn't end with '/', a '/' will be automatically appended. The directory is created if it doesn't exist.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "output_uri_prefix"
+          ]
+        },
+        "worker_pool_specs": {
+          "type": "array",
+          "description": "Required. The spec of the worker pools including machine type and Docker image. All worker pools except the first one are optional and can be skipped by providing an empty value.",
+          "items": {
+            "id": "google_cloud_aiplatform_v1_worker_pool_spec",
+            "description": "Represents the spec of a worker pool in a job.",
+            "properties": {
+              "nfs_mounts": {
+                "type": "array",
+                "description": "Optional. List of NFS mount spec.",
+                "items": {
+                  "description": "Represents a mount configuration for Network File System (NFS) to mount.",
+                  "type": "object",
+                  "id": "google_cloud_aiplatform_v1_nfs_mount",
+                  "properties": {
+                    "server": {
+                      "description": "Required. IP address of the NFS server.",
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "Required. Source path exported from NFS server. Has to start with '/', and combined with the ip address, it indicates the source mount path in the form of `server:path`"
+                    },
+                    "mount_point": {
+                      "description": "Required. Destination mount path. The NFS will be mounted for the user under /mnt/nfs/",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "server",
+                    "path",
+                    "mount_point"
+                  ]
+                }
+              },
+              "python_package_spec": {
+                "description": "The spec of a Python packaged code.",
+                "type": "object",
+                "properties": {
+                  "args": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "description": "Command line arguments to be passed to the Python task."
+                  },
+                  "executor_image_uri": {
+                    "description": "Required. The URI of a container image in Artifact Registry that will run the provided Python package. Vertex AI provides a wide range of executor images with pre-installed packages to meet users' various use cases. See the list of [pre-built containers for training](https://cloud.google.com/vertex-ai/docs/training/pre-built-containers). You must use an image from this list.",
+                    "type": "string"
+                  },
+                  "env": {
+                    "type": "array",
+                    "description": "Environment variables to be passed to the python module. Maximum limit is 100.",
+                    "items": {
+                      "description": "Represents an environment variable present in a Container or Python Module.",
+                      "id": "google_cloud_aiplatform_v1_env_var",
+                      "properties": {
+                        "value": {
+                          "description": "Required. Variables that reference a $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Required. Name of the environment variable. Must be a valid C identifier.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "value",
+                        "name"
+                      ]
+                    }
+                  },
+                  "package_uris": {
+                    "type": "array",
+                    "description": "Required. The Google Cloud Storage location of the Python package files which are the training program and its dependent packages. The maximum number of package URIs is 100.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "python_module": {
+                    "description": "Required. The Python module name to run after installing the packages.",
+                    "type": "string"
+                  }
+                },
+                "id": "google_cloud_aiplatform_v1_python_package_spec",
+                "required": [
+                  "executor_image_uri",
+                  "package_uris",
+                  "python_module"
+                ]
+              },
+              "container_spec": {
+                "description": "The spec of a Container.",
+                "type": "object",
+                "id": "google_cloud_aiplatform_v1_container_spec",
+                "properties": {
+                  "command": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The command to be invoked when the container is started. It overrides the entrypoint instruction in Dockerfile when provided.",
+                    "type": "array"
+                  },
+                  "image_uri": {
+                    "type": "string",
+                    "description": "Required. The URI of a container image in the Container Registry that is to be run on each worker replica."
+                  },
+                  "args": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "description": "The arguments to be passed when starting the container."
+                  },
+                  "env": {
+                    "description": "Environment variables to be passed to the container. Maximum limit is 100.",
+                    "items": {
+                      "description": "Represents an environment variable present in a Container or Python Module.",
+                      "id": "google_cloud_aiplatform_v1_env_var",
+                      "properties": {
+                        "value": {
+                          "description": "Required. Variables that reference a $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Required. Name of the environment variable. Must be a valid C identifier.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "value",
+                        "name"
+                      ]
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "image_uri"
+                ]
+              },
+              "replica_count": {
+                "description": "Optional. The number of worker replicas to use for this worker pool.",
+                "format": "int64",
+                "type": "string"
+              },
+              "disk_spec": {
+                "description": "Represents the spec of disk options.",
+                "id": "google_cloud_aiplatform_v1_disk_spec",
+                "type": "object",
+                "properties": {
+                  "boot_disk_type": {
+                    "type": "string",
+                    "description": "Type of the boot disk (default is \"pd-ssd\"). Valid values: \"pd-ssd\" (Persistent Disk Solid State Drive) or \"pd-standard\" (Persistent Disk Hard Disk Drive)."
+                  },
+                  "boot_disk_size_gb": {
+                    "type": "integer",
+                    "description": "Size in GB of the boot disk (default is 100GB).",
+                    "format": "int32"
+                  }
+                }
+              },
+              "machine_spec": {
+                "description": "Specification of a single machine.",
+                "id": "google_cloud_aiplatform_v1_machine_spec",
+                "properties": {
+                  "accelerator_type": {
+                    "type": "string",
+                    "enumDescriptions": [
+                      "Unspecified accelerator type, which means no accelerator.",
+                      "Nvidia Tesla K80 GPU.",
+                      "Nvidia Tesla P100 GPU.",
+                      "Nvidia Tesla V100 GPU.",
+                      "Nvidia Tesla P4 GPU.",
+                      "Nvidia Tesla T4 GPU.",
+                      "Nvidia Tesla A100 GPU.",
+                      "Nvidia A100 80GB GPU.",
+                      "Nvidia L4 GPU.",
+                      "TPU v2.",
+                      "TPU v3.",
+                      "TPU v4."
+                    ],
+                    "enum": [
+                      "ACCELERATOR_TYPE_UNSPECIFIED",
+                      "NVIDIA_TESLA_K80",
+                      "NVIDIA_TESLA_P100",
+                      "NVIDIA_TESLA_V100",
+                      "NVIDIA_TESLA_P4",
+                      "NVIDIA_TESLA_T4",
+                      "NVIDIA_TESLA_A100",
+                      "NVIDIA_A100_80GB",
+                      "NVIDIA_L4",
+                      "TPU_V2",
+                      "TPU_V3",
+                      "TPU_V4_POD"
+                    ],
+                    "description": "Immutable. The type of accelerator(s) that may be attached to the machine as per accelerator_count."
+                  },
+                  "machine_type": {
+                    "description": "Immutable. The type of the machine. See the [list of machine types supported for prediction](https://cloud.google.com/vertex-ai/docs/predictions/configure-compute#machine-types) See the [list of machine types supported for custom training](https://cloud.google.com/vertex-ai/docs/training/configure-compute#machine-types). For DeployedModel this field is optional, and the default value is `n1-standard-2`. For BatchPredictionJob or as part of WorkerPoolSpec this field is required.",
+                    "type": "string"
+                  },
+                  "accelerator_count": {
+                    "description": "The number of accelerators to attach to the machine.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "tpu_topology": {
+                    "description": "Immutable. The topology of the TPUs. Corresponds to the TPU topologies available from GKE. (Example: tpu_topology: \"2x2x1\").",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "required": [
+            "container_spec"
+          ]
+        },
+        "staging_bucket": {
+          "type": "string",
+          "description": "The staging bucket for the custom job.",
+          "pattern": "^gs://[a-z0-9-]+/.*$"
+        },
+        "encryption_key_spec_name": {
+          "type": "string",
+          "description": [
+            "Customer-managed encryption key name for a CustomJob. If this is set, then all resources created by the CustomJob will be encrypted with the provided encryption key."
+          ]
+        },
+        "labels": {
+          "type": "object",
+          "description": "The labels with user-defined metadata to organize CustomJobs. Label keys and values can be no longer than 64 characters (Unicode codepoints), can only contain lowercase letters, numeric characters, underscores and dashes. International characters are allowed. See https://goo.gl/xmQnxf for more information and examples of labels.."
+        }
+      },
+      "required": [
+        "worker_pool_specs",
+        "staging_bucket"
+      ],
+      "description": "Arguments to the CustomJob constructor in the Vertex AI Python SDK. See https://cloud.google.com/python/docs/reference/aiplatform/latest/google.cloud.aiplatform.CustomJob for more information."
+    },
+    "run": {
+      "type": "object",
+      "properties": {
+        "network": {
+          "description": "Optional. The full name of the Compute Engine [network](/compute/docs/networks-and-firewalls#networks) to which the Job should be peered. For example, `projects/12345/global/networks/myVPC`. [Format](/compute/docs/reference/rest/v1/networks/insert) is of the form `projects/{project}/global/networks/{network}`. Where {project} is a project number, as in `12345`, and {network} is a network name. To specify this field, you must have already [configured VPC Network Peering for Vertex AI](https://cloud.google.com/vertex-ai/docs/general/vpc-peering). If this field is left unspecified, the job is not peered with any network.",
+          "type": "string"
+        },
+        "enable_web_access": {
+          "type": "boolean",
+          "description": "Optional. Whether you want Vertex AI to enable [interactive shell access](https://cloud.google.com/vertex-ai/docs/training/monitor-debug-interactive-shell) to training containers. If set to `true`, you can access interactive shells at the URIs given by CustomJob.web_access_uris or Trial.web_access_uris (within HyperparameterTuningJob.trials)."
+        },
+        "experiment_run": {
+          "description": "Optional. The Experiment Run associated with this job. Format: `projects/{project}/locations/{location}/metadataStores/{metadataStores}/contexts/{experiment-name}-{experiment-run-name}`",
+          "type": "string"
+        },
+        "experiment": {
+          "description": "Optional. The Experiment associated with this job. Format: `projects/{project}/locations/{location}/metadataStores/{metadataStores}/contexts/{experiment-name}`",
+          "type": "string"
+        },
+        "tensorboard": {
+          "description": "Optional. The name of a Vertex AI Tensorboard resource to which this CustomJob will upload Tensorboard logs. Format: `projects/{project}/locations/{location}/tensorboards/{tensorboard}`",
+          "type": "string"
+        },
+        "service_account": {
+          "description": "Specifies the service account for workload run-as account. Users submitting jobs must have act-as permission on this run-as account. If unspecified, the [Vertex AI Custom Code Service Agent](https://cloud.google.com/vertex-ai/docs/general/access-control#service-agents) for the CustomJob's project is used.",
+          "type": "string"
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "The maximum job running time in seconds. The default is 7 days (604800 seconds). "
+        },
+        "restart_job_on_worker_restart": {
+          "type": "boolean",
+          "description": "Restarts the entire CustomJob if a worker gets restarted. This feature can be used by distributed training jobs that are not resilient to workers leaving and joining a job."
+        }
+      },
+      "description": "Arguments to the CustomJob.run (or submit, if async) method in the Vertex AI Python SDK. See https://cloud.google.com/python/docs/reference/aiplatform/latest/google.cloud.aiplatform.CustomJob#google_cloud_aiplatform_CustomJob_run for more information."
+    }
+  }
+}
