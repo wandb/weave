@@ -39,8 +39,12 @@ def op(
     """
 
     def wrap(f):
-        weave_input_type = pyfunc_type_util.determine_input_type(f, input_type)
-        weave_output_type = pyfunc_type_util.determine_output_type(f, output_type)
+        weave_input_type = pyfunc_type_util.determine_input_type(
+            f, input_type, allow_unknowns=True
+        )
+        weave_output_type = pyfunc_type_util.determine_output_type(
+            f, output_type, allow_unknowns=True
+        )
 
         fq_op_name = name
         if fq_op_name is None:
