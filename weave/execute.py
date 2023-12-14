@@ -438,8 +438,26 @@ def execute_async_op(
     job.start()
 
 
+def publish_enabled():
+    # only auto publish if we have inited monitoring (with weave.init or init_monitor)
+    # and eager mode is on, as in weaveflow
+
+    # We're checking mon.streamtable, which is available if weave.init is called.
+    # But if the user instead called init_monitor, this check would pass but the
+    # later publish calls would fill since weave.init is required for those.
+    # Our intention is to replace init_monitor with weave.init, but that is not
+    # yet complete.
+    # TODO: Fix
+    return monitor.default_monitor().streamtable and context_state.eager_mode()
+
+
 def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
     import numpy as np
+
+    ref = storage.get_ref(obj)
+    if ref:
+        output_refs.append(ref)
+        return ref
 
     if isinstance(obj, dict):
         return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
@@ -456,7 +474,6 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
         return obj
     from .api import publish
 
-    ref = storage.get_ref(obj)
     if not ref:
         ref = publish(
             obj,
@@ -493,14 +510,7 @@ def publish_graph(
         elif isinstance(node, graph.ConstNode):
             auto_publish(node.val)
 
-    mon = monitor.default_monitor()
-    # We're checking mon.streamtable, which is available if weave.init is called.
-    # But if the user instead called init_monitor, this check would pass but the
-    # later publish calls would fill since weave.init is required for those.
-    # Our intention is to replace init_monitor with weave.init, but that is not
-    # yet complete.
-    # TODO: Fix
-    if mon.streamtable and not context_state.monitor_is_disabled():
+    if publish_enabled():
         graph.map_nodes_full(nodes, _publish_node)
 
 
@@ -533,8 +543,7 @@ def hash_inputs(
 def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
-    st = mon.streamtable
-    if op_def.location and st:
+    if publish_enabled() and op_def.location:
         op_def_ref = storage._get_ref(op_def)
         if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
             # This should have already been published by publish_graph if monitoring
@@ -550,18 +559,17 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
         )
 
         with context_state.lazy_execution():
-            with context_state.monitor_disabled():
-                maybe_span_node = mon.rows()
-                if maybe_span_node is None:
-                    return None
+            maybe_span_node = mon.rows()
+            if maybe_span_node is None:
+                return None
 
-                span_node = maybe_span_node.filter(  # type: ignore
-                    lambda x: x["attributes"]["input_hash"] == input_hash
-                )
-                iter: eager.WeaveIter[
-                    stream_data_interfaces.TraceSpanDict
-                ] = eager.WeaveIter(span_node)
-                span_dict = iter[0]
+            span_node = maybe_span_node.filter(  # type: ignore
+                lambda x: x["attributes"]["input_hash"] == input_hash
+            )
+            iter: eager.WeaveIter[
+                stream_data_interfaces.TraceSpanDict
+            ] = eager.WeaveIter(span_node)
+            span_dict = iter[0]
 
             if (
                 span_dict != None and span_dict is not None
@@ -577,6 +585,7 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
 
             for i, ref in enumerate(refs[:3]):
                 span.inputs["_ref%s" % i] = ref
+                span.inputs["_ref_digest%s" % i] = ref.digest
             try:
                 res = op_def.resolve_fn(**inputs)
             except Exception as e:
