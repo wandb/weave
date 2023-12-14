@@ -6,6 +6,7 @@ from . import registry_mem
 from . import op_def
 from . import op_args
 from . import derive_op
+from . import context_state
 from . import weave_types as types
 from . import pyfunc_type_util
 
@@ -38,12 +39,16 @@ def op(
     input_type, output_type as arguments to op (Python types preferred).
     """
 
+    # For builtins, enforce that parameter and return types must be declared.
+    # For user ops, allow missing types.
+    allow_unknowns = not context_state._loading_built_ins.get()
+
     def wrap(f):
         weave_input_type = pyfunc_type_util.determine_input_type(
-            f, input_type, allow_unknowns=True
+            f, input_type, allow_unknowns=allow_unknowns
         )
         weave_output_type = pyfunc_type_util.determine_output_type(
-            f, output_type, allow_unknowns=True
+            f, output_type, allow_unknowns=allow_unknowns
         )
 
         fq_op_name = name
