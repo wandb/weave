@@ -103,13 +103,13 @@ def import_ecosystem():
         pass
 
     if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
-        try:
-            from weave.weaveflow import faiss
+        # try:
+        #     from weave.weaveflow import faiss
 
-            # Turn eager mode back off.
-            context_state._eager_mode.set(False)
-        except (ImportError, OSError, wandb.Error):
-            print("Error: Couldn't import faiss module for Weaveflow.")
+        #     # Turn eager mode back off.
+        #     context_state._eager_mode.set(False)
+        # except (ImportError, OSError, wandb.Error):
+        #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
             from weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
