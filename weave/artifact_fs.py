@@ -256,7 +256,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
             # TODO: fix
             from . import types_numpy
 
-            if isinstance(ot, types.List):
+            if types.is_list_like(ot):
                 self._type = ot.object_type
             elif isinstance(ot, types_numpy.NumpyArrayType):
                 # The Numpy type implementation is not consistent with how list extra refs

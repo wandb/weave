@@ -49,9 +49,6 @@ class Ref:
         if self._obj is not None:
             return self._obj
 
-        if self.extra is not None:
-            raise ValueError("Cannot get object from Ref with extra for now")
-
         if not self.is_saved:
             # PR TODO: this path needs to happen in FSArtifact, as you can
             # always get the value of a MemArtifact
