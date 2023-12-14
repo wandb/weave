@@ -2,6 +2,7 @@ import {produce} from 'immer';
 import _ from 'lodash';
 import React, {FC, memo} from 'react';
 
+import {Select} from '../../Form/Select';
 import * as ConfigPanel from '../ConfigPanel';
 import {AxisName, PanelPlotProps} from './types';
 import {
@@ -12,10 +13,10 @@ import {
   ScaleType,
 } from './versions';
 
-type ScaleOption = {text: string; value: ScaleType};
+type ScaleOption = {label: string; value: ScaleType};
 
 const SCALE_TYPE_OPTIONS: ScaleOption[] = SCALE_TYPES.map(t => ({
-  text: _.capitalize(t),
+  label: _.capitalize(t),
   value: t,
 }));
 
@@ -44,6 +45,9 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
 }) => {
   const currentScaleType =
     getScaleValue<ScaleType>(`scaleType`) ?? DEFAULT_SCALE_TYPE;
+  const currentScaleOption = SCALE_TYPE_OPTIONS.find(
+    o => o.value === currentScaleType
+  );
 
   const scaleTypeSpecificProp = SCALE_TYPE_SPECIFIC_PROPS[currentScaleType];
   const scaleTypeSpecificPropValue: number | undefined =
@@ -55,11 +59,14 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
   return (
     <>
       <ConfigPanel.ConfigOption label={`${axis.toUpperCase()} Axis Scale`}>
-        <ConfigPanel.ModifiedDropdownConfigField
+        <Select<ScaleOption>
           options={SCALE_TYPE_OPTIONS}
-          value={currentScaleType}
-          onChange={(event, {value}) => {
-            setScaleValue(`scaleType`, value as ScaleType);
+          value={currentScaleOption}
+          isSearchable={false}
+          onChange={option => {
+            if (option) {
+              setScaleValue('scaleType', option.value as ScaleType);
+            }
           }}
         />
       </ConfigPanel.ConfigOption>
