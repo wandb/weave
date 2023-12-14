@@ -1291,7 +1291,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             # in this list
             if isinstance(ref, artifact_base.ArtifactRef):
                 result = box.box(result)
-                new_ref = ref.with_extra(self.object_type, result, str(index))
+                new_ref = ref.with_extra(self.object_type, result, [str(index)])
                 ref_base._put_ref(result, new_ref)
             return result
         return awl
