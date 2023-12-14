@@ -1618,3 +1618,19 @@ def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
     arrs = convert.unify_types(*arrs)
     zipped = arrow_zip(*[a._arrow_data for a in arrs])
     return ArrowWeaveList(zipped, types.List(arrs[0].object_type), None)
+
+
+def convert_arrow_timestamp_to_epoch_ms(awl: ArrowWeaveList):
+    def convert(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
+        _, non_none_type = types.split_none(col.object_type)
+        if isinstance(non_none_type, types.Timestamp):
+            return ArrowWeaveList(
+                pc.milliseconds_between(
+                    pa.scalar(0, col._arrow_data.type), col._arrow_data
+                ),
+                types.optional(types.Int()),
+                awl._artifact,
+            )
+        return None
+
+    return awl.map_column(convert)

@@ -457,7 +457,7 @@ def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     elif isinstance(obj, list):
         return [to_weavejs(item, artifact=artifact) for item in obj]
     elif isinstance(obj, arrow_list.ArrowWeaveList):
-        return convert_timestamps_to_epoch_ms(obj.to_pylist_notags())
+        return arrow_list.convert_arrow_timestamp_to_epoch_ms(obj).to_pylist_notags()
 
     wb_type = types.TypeRegistry.type_of(obj)
 
