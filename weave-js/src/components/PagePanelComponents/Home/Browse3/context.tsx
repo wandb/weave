@@ -67,7 +67,7 @@ const browse2Context = {
     return `/${entityName}`;
   },
   projectUrl: (entityName: string, projectName: string) => {
-    return `${projectRoot(entityName, projectName)}`;
+    return `/${entityName}/${projectName}`;
   },
   callUIUrl: (
     entityName: string,
@@ -75,7 +75,7 @@ const browse2Context = {
     traceId: string,
     callId: string
   ) => {
-    return `${projectRoot(entityName, projectName)}/trace/${traceId}/${callId}`;
+    return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
   },
   typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
     throw new Error('Not implemented');
@@ -126,10 +126,7 @@ const browse2Context = {
     opName: string,
     opVersionHash: string
   ) => {
-    return `${projectRoot(
-      entityName,
-      projectName
-    )}/OpDef/${opName}/${opVersionHash}`;
+    return `/${entityName}/${projectName}/OpDef/${opName}/${opVersionHash}`;
   },
   callsUIUrl: (
     entityName: string,

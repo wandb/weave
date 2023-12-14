@@ -19,7 +19,6 @@ import {
   FormControl,
   ListSubheader,
   TextField,
-  Toolbar,
 } from '@mui/material';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
