@@ -145,10 +145,6 @@ _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.Contex
 )
 
 
-def monitor_is_disabled() -> bool:
-    return _monitor_disabled.get()
-
-
 @contextlib.contextmanager
 def monitor_disabled():
     token = _monitor_disabled.set(True)

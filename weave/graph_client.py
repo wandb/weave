@@ -74,6 +74,14 @@ class GraphClient:
             filter_node = rows_node.filter(lambda row: row["inputs._ref0"] == ref)  # type: ignore
             return WeaveIter(filter_node, cls=Run)
 
+    def ref_value_input_to(
+        self, ref: artifact_wandb.WandbArtifactRef
+    ) -> WeaveIter[Run]:
+        with context_state.lazy_execution():
+            rows_node = self.runs_st.rows()
+            filter_node = rows_node.filter(lambda row: row["inputs._ref_digest0"] == ref.digest)  # type: ignore
+            return WeaveIter(filter_node, cls=Run)
+
     def ref_output_of(
         self, ref: artifact_wandb.WandbArtifactRef
     ) -> typing.Optional[Run]:

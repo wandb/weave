@@ -1,8 +1,11 @@
 import typing
 import weakref
+import hashlib
+import json
 import contextlib
 import contextvars
 import collections
+import functools
 
 from . import uris
 from . import box
@@ -46,6 +49,9 @@ class Ref:
         if self._obj is not None:
             return self._obj
 
+        if self.extra is not None:
+            raise ValueError("Cannot get object from Ref with extra for now")
+
         if not self.is_saved:
             # PR TODO: this path needs to happen in FSArtifact, as you can
             # always get the value of a MemArtifact
@@ -70,6 +76,18 @@ class Ref:
     @property
     def type(self) -> "types.Type":
         raise NotImplementedError
+
+    @functools.cached_property
+    def digest(self) -> str:
+        hash = hashlib.md5()
+        # This can encounter non-serialized objects, even though Ref
+        # must be a pointer to an object that can only contain serializable
+        # stuff and refs. But we recursively deserialize all sub-refs when
+        # fetching a ref. So we need to walk obj, converting objs back to
+        # refs where we can, before this json.dumps call.
+        # TODO: fix
+        hash.update(json.dumps(self.obj).encode())
+        return hash.hexdigest()
 
     @classmethod
     def from_str(cls, s: str) -> "Ref":
