@@ -90,7 +90,7 @@ const jsonSchemas = [
     uri: 'http://dev.wandb.com/schema/dockerrun.json',
     schema: dockerRunSchema,
     fileMatch: ['local-container'],
-  } 
+  },
 ];
 
 const yamlSchemas = [
@@ -133,7 +133,7 @@ const yamlSchemas = [
     uri: 'http://dev.wandb.com/schema/vertex.json',
     schema: vertexSchema,
     fileMatch: ['vertex', 'gcp-vertex'],
-  }
+  },
 ];
 
 (window as any).MonacoEnvironment = {
