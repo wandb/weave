@@ -139,9 +139,12 @@ class OpDefType(types.Type):
 
     def load_instance(cls, artifact, name, extra=None):
         if environment.wandb_production():
-            raise errors.WeaveInternalError(
-                "Loading ops from artifacts is not supported in production mode."
-            )
+            # Returning None here instead of erroring allows the Weaveflow app
+            # to reference op defs without crashing.
+            return None
+            # raise errors.WeaveInternalError(
+            #     "Loading ops from artifacts is not supported in production mode."
+            # )
         try:
             with artifact.open(f"{name}.json") as f:
                 op_spec = json.load(f)
