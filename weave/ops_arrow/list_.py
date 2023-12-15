@@ -1620,6 +1620,7 @@ def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
     return ArrowWeaveList(zipped, types.List(arrs[0].object_type), None)
 
 
+# Converts timestamp columns to ms for serialization back to web client
 def convert_arrow_timestamp_to_epoch_ms(awl: ArrowWeaveList):
     def convert(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         _, non_none_type = types.split_none(col.object_type)
