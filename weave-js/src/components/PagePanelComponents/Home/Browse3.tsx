@@ -11,12 +11,10 @@ import {
 import {LicenseInfo} from '@mui/x-license-pro';
 import React, {FC, useCallback, useEffect, useMemo} from 'react';
 import {
-  BrowserRouter as Router,
   Link as RouterLink,
   Route,
   Switch,
   useHistory,
-  useLocation,
   useParams,
 } from 'react-router-dom';
 
