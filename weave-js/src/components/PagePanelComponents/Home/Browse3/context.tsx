@@ -1,11 +1,12 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {createContext, useContext} from 'react';
+import React, {createContext, useCallback, useContext} from 'react';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+import {useLocation} from 'react-router-dom';
 
 const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
   if (!filter) {
@@ -38,6 +39,108 @@ export const Browse3WeaveflowRouteContextProvider = ({
 }) => {
   return (
     <WeaveflowRouteContext.Provider value={browse3ContextGen(projectRoot)}>
+      {children}
+    </WeaveflowRouteContext.Provider>
+  );
+};
+
+const useSetSearchParam = () => {
+  const location = useLocation();
+  return useCallback(
+    (key: string, value: string | null) => {
+      const searchParams = new URLSearchParams(location.search);
+      if (value === null) {
+        searchParams.delete(key);
+      } else {
+        searchParams.set(key, value);
+      }
+      const newSearch = searchParams.toString();
+      const newUrl = `${location.pathname}?${newSearch}`;
+      return newUrl;
+    },
+    [location]
+  );
+};
+
+export const Browse3WeaveflowPeekRouteContextProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const setSearchParam = useSetSearchParam();
+
+  const baseContext = browse3ContextGen(
+    (entityName: string, projectName: string) => {
+      return `/${entityName}/${projectName}`;
+    }
+  );
+  const wrappedContext = {
+    refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
+      return setSearchParam('peekPath', baseContext.refUIUrl(...args));
+    },
+    entityUrl: (...args: Parameters<typeof baseContext.entityUrl>) => {
+      return setSearchParam('peekPath', baseContext.entityUrl(...args));
+    },
+    projectUrl: (...args: Parameters<typeof baseContext.projectUrl>) => {
+      return setSearchParam('peekPath', baseContext.projectUrl(...args));
+    },
+    typeUIUrl: (...args: Parameters<typeof baseContext.typeUIUrl>) => {
+      return setSearchParam('peekPath', baseContext.typeUIUrl(...args));
+    },
+    objectUIUrl: (...args: Parameters<typeof baseContext.objectUIUrl>) => {
+      return setSearchParam('peekPath', baseContext.objectUIUrl(...args));
+    },
+    opUIUrl: (...args: Parameters<typeof baseContext.opUIUrl>) => {
+      return setSearchParam('peekPath', baseContext.opUIUrl(...args));
+    },
+    typeVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.typeVersionUIUrl>
+    ) => {
+      return setSearchParam('peekPath', baseContext.typeVersionUIUrl(...args));
+    },
+    typeVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.typeVersionsUIUrl>
+    ) => {
+      return setSearchParam('peekPath', baseContext.typeVersionsUIUrl(...args));
+    },
+    objectVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.objectVersionUIUrl>
+    ) => {
+      return setSearchParam(
+        'peekPath',
+        baseContext.objectVersionUIUrl(...args)
+      );
+    },
+    opVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.opVersionsUIUrl>
+    ) => {
+      return setSearchParam('peekPath', baseContext.opVersionsUIUrl(...args));
+    },
+    opVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.opVersionUIUrl>
+    ) => {
+      return setSearchParam('peekPath', baseContext.opVersionUIUrl(...args));
+    },
+    callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
+      return setSearchParam('peekPath', baseContext.callUIUrl(...args));
+    },
+    callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
+      return setSearchParam('peekPath', baseContext.callsUIUrl(...args));
+    },
+    objectVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.objectVersionsUIUrl>
+    ) => {
+      return setSearchParam(
+        'peekPath',
+        baseContext.objectVersionsUIUrl(...args)
+      );
+    },
+    opPageUrl: (...args: Parameters<typeof baseContext.opPageUrl>) => {
+      return setSearchParam('peekPath', baseContext.opPageUrl(...args));
+    },
+  };
+  return (
+    <WeaveflowRouteContext.Provider value={wrappedContext}>
       {children}
     </WeaveflowRouteContext.Provider>
   );

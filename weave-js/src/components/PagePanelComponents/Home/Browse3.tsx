@@ -13,9 +13,11 @@ import React, {FC, useCallback, useEffect, useMemo} from 'react';
 import {
   BrowserRouter as Router,
   Link as RouterLink,
+  Redirect,
   Route,
   Switch,
   useHistory,
+  useLocation,
   useParams,
 } from 'react-router-dom';
 
@@ -24,6 +26,7 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
+  Browse3WeaveflowPeekRouteContextProvider,
   Browse3WeaveflowRouteContextProvider,
   useWeaveflowRouteContext,
 } from './Browse3/context';
@@ -205,7 +208,9 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <Browse3ProjectRootORMProvider>
-                <Browse3ProjectRoot />
+                <Browse3LocationAwareProjectRoot
+                  projectRoot={router.projectUrl(':entity', ':project')}
+                />
               </Browse3ProjectRootORMProvider>
             </Box>
           </Box>
@@ -247,101 +252,175 @@ const Browse3ProjectRootORMProvider: FC = props => {
   );
 };
 
-const Browse3ProjectRoot: FC = () => {
+const Browse3LocationAwareProjectRoot: FC<{projectRoot: string}> = ({
+  projectRoot,
+}) => {
   const history = useHistory();
   const params = useParams<Browse3ProjectMountedParams>();
+  const query = useURLSearchParamsDict();
+  return (
+    <Browse3ProjectRoot
+      projectRoot={projectRoot}
+      entityName={params.entity}
+      projectName={params.project}
+      location={history.location}
+      peekLocationPath={query.peekPath ?? undefined}
+    />
+  );
+};
+
+const Browse3ProjectRoot: FC<{
+  projectRoot: string;
+  entityName: string;
+  projectName: string;
+  location: ReturnType<typeof useHistory>['location'];
+  peekLocationPath?: string;
+}> = ({projectRoot, entityName, projectName, location, peekLocationPath}) => {
   const router = useWeaveflowRouteContext();
-  const projectRoot = router.projectUrl(':entity', ':project');
-
-  useEffect(() => {
-    if (params.tab == null) {
-      history.push(
-        router.callsUIUrl(params.entity, params.project, {
-          traceRootsOnly: true,
-        })
-      );
+  const customLocation = useMemo(() => {
+    if (!peekLocationPath) {
+      return null;
     }
-  }, [history, params.entity, params.project, params.tab, router]);
-
-  if (params.tab == null) {
-    return <CenteredAnimatedLoader />;
-  }
-
+    const parts = peekLocationPath.split('?');
+    const search = parts.length > 1 ? parts[1] : '';
+    return {
+      key: 'ac3df4', // not with HashHistory!
+      pathname: parts[0],
+      search: search,
+      hash: '',
+      state: {
+        '[userDefined]': true,
+      },
+    };
+  }, [peekLocationPath]);
+  console.log({customLocation});
   return (
     <Box
       sx={{
         flex: '1 1 auto',
         width: '100%',
-        overflow: 'auto',
+        overflow: 'hidden',
+        flexDirection: 'column',
       }}>
-      <Switch>
-        {/* TYPES */}
-        <Route path={`${projectRoot}/types/:itemName/versions/:version?`}>
-          <TypeVersionRoutePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/types/:itemName`}>
-          <TypePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/types`}>
-          <TypesPage entity={params.entity} project={params.project} />
-        </Route>
-        <Route path={`${projectRoot}/type-versions`}>
-          <TypeVersionsPageBinding />
-        </Route>
-        {/* OBJECTS */}
-        <Route
-          path={`${projectRoot}/objects/:itemName/versions/:version?/:refExtra*`}>
-          <ObjectVersionRoutePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/objects/:itemName`}>
-          <ObjectPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/objects`}>
-          <ObjectsPage entity={params.entity} project={params.project} />
-        </Route>
-        <Route path={`${projectRoot}/object-versions`}>
-          <ObjectVersionsPageBinding />
-        </Route>
-        {/* OPS */}
-        <Route path={`${projectRoot}/ops/:itemName/versions/:version?`}>
-          <OpVersionRoutePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/ops/:itemName`}>
-          <OpPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/ops`}>
-          <OpsPage entity={params.entity} project={params.project} />
-        </Route>
-        <Route path={`${projectRoot}/op-versions`}>
-          <OpVersionsPageBinding />
-        </Route>
-        {/* CALLS */}
-        <Route path={`${projectRoot}/calls/:itemName`}>
-          <CallPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/calls`}>
-          <CallsPageBinding />
-        </Route>
-        {/* BOARDS */}
-        <Route
-          path={[
-            `${projectRoot}/boards/_new_board_`,
-            `${projectRoot}/boards/:boardId`,
-            `${projectRoot}/boards/:boardId/version/:versionId`,
-          ]}>
-          <BoardPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/boards`}>
-          <BoardsPage entity={params.entity} project={params.project} />
-        </Route>
-        {/* TABLES */}
-        <Route path={`${projectRoot}/tables/:tableId`}>
-          <TablePage />
-        </Route>
-        <Route path={`${projectRoot}/tables`}>
-          <TablesPage entity={params.entity} project={params.project} />
-        </Route>
-      </Switch>
+      {customLocation && (
+        <Box
+          sx={{
+            // zIndex: 2,
+            // position: 'absolute',
+            flex: '1 1 50%',
+            backgroundColor: 'white',
+            right: 0,
+            width: '50%',
+            height: '100%',
+            overflow: 'hidden',
+            borderRight: '1px solid #444',
+            boxShadow: '-2px 0px 10px 3px rgba(0, 0, 0, 0.2)',
+          }}
+          // Stacked loook
+          // sx={{
+          //   zIndex: 2,
+          //   position: 'absolute',
+          //   backgroundColor: 'white',
+          //   right: 0,
+          //   width: '50%',
+          //   height: '100%',
+          //   overflow: 'hidden',
+          //   borderRight: '1px solid #444',
+          //   boxShadow: '-2px 0px 10px 3px rgba(0, 0, 0, 0.2)',
+          // }}
+        >
+          <Browse3WeaveflowPeekRouteContextProvider>
+            <Browse3ProjectRoot
+              projectRoot="/:entity/:project"
+              entityName={entityName}
+              projectName={projectName}
+              location={customLocation}
+            />
+          </Browse3WeaveflowPeekRouteContextProvider>
+        </Box>
+      )}{' '}
+      <Box
+        sx={{
+          flex: '1 1 50%',
+          width: '100%',
+          overflow: 'auto',
+        }}>
+        <Switch location={location}>
+          {/* TYPES */}
+          <Route path={`${projectRoot}/types/:itemName/versions/:version?`}>
+            <TypeVersionRoutePageBinding />
+          </Route>
+          <Route path={`${projectRoot}/types/:itemName`}>
+            <TypePageBinding />
+          </Route>
+          <Route path={`${projectRoot}/types`}>
+            <TypesPageBinding />
+          </Route>
+          <Route path={`${projectRoot}/type-versions`}>
+            <TypeVersionsPageBinding />
+          </Route>
+          {/* OBJECTS */}
+          <Route
+            path={`${projectRoot}/objects/:itemName/versions/:version?/:refExtra*`}>
+            <ObjectVersionRoutePageBinding />
+          </Route>
+          <Route path={`${projectRoot}/objects/:itemName`}>
+            <ObjectPageBinding />
+          </Route>
+          <Route path={`${projectRoot}/objects`}>
+            <ObjectsPageBinding />
+          </Route>
+          <Route path={`${projectRoot}/object-versions`}>
+            <ObjectVersionsPageBinding />
+          </Route>
+          {/* OPS */}
+          <Route path={`${projectRoot}/ops/:itemName/versions/:version?`}>
+            <OpVersionRoutePageBinding />
+          </Route>
+          <Route path={`${projectRoot}/ops/:itemName`}>
+            <OpPageBinding />
+          </Route>
+          <Route path={`${projectRoot}/ops`}>
+            <OpsPageBinding />
+          </Route>
+          <Route path={`${projectRoot}/op-versions`}>
+            <OpVersionsPageBinding />
+          </Route>
+          {/* CALLS */}
+          <Route path={`${projectRoot}/calls/:itemName`}>
+            <CallPageBinding />
+          </Route>
+          <Route path={`${projectRoot}/calls`}>
+            <CallsPageBinding />
+          </Route>
+          {/* BOARDS */}
+          <Route
+            path={[
+              `${projectRoot}/boards/_new_board_`,
+              `${projectRoot}/boards/:boardId`,
+              `${projectRoot}/boards/:boardId/version/:versionId`,
+            ]}>
+            <BoardPageBinding />
+          </Route>
+          <Route path={`${projectRoot}/boards`}>
+            <BoardsPageBinding />
+          </Route>
+          {/* TABLES */}
+          <Route path={`${projectRoot}/tables/:tableId`}>
+            <TablePage />
+          </Route>
+          <Route path={`${projectRoot}/tables`}>
+            <TablesPageBinding />
+          </Route>
+          <Route>
+            <Redirect
+              to={router.callsUIUrl(entityName, projectName, {
+                traceRootsOnly: true,
+              })}
+            />
+          </Route>
+        </Switch>
+      </Box>
     </Box>
   );
 };
@@ -489,12 +568,14 @@ const CallsPageBinding = () => {
     [history, params.entity, params.project, router]
   );
   return (
-    <CallsPage
-      entity={params.entity}
-      project={params.project}
-      initialFilter={filters}
-      onFilterUpdate={onFilterUpdate}
-    />
+    <Browse3WeaveflowPeekRouteContextProvider>
+      <CallsPage
+        entity={params.entity}
+        project={params.project}
+        initialFilter={filters}
+        onFilterUpdate={onFilterUpdate}
+      />
+    </Browse3WeaveflowPeekRouteContextProvider>
   );
 };
 
@@ -653,6 +734,36 @@ const TypePageBinding = () => {
       typeName={params.itemName}
     />
   );
+};
+
+const TypesPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <TypesPage entity={params.entity} project={params.project} />;
+};
+
+const OpsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <OpsPage entity={params.entity} project={params.project} />;
+};
+
+const ObjectsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <ObjectsPage entity={params.entity} project={params.project} />;
+};
+
+const BoardsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <BoardsPage entity={params.entity} project={params.project} />;
+};
+
+const TablesPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <TablesPage entity={params.entity} project={params.project} />;
 };
 
 const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
