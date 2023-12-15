@@ -54,8 +54,8 @@ type NavigationCallbacks = {
   navigateToCalls: (filter?: WFHighLevelCallFilter) => void;
   navigateToTypeVersions: (filter?: WFHighLevelTypeVersionFilter) => void;
   navigateToOpVersions: (filter?: WFHighLevelOpVersionFilter) => void;
-  navigateToBoards: (filter?: string) => void;
-  navigateToTables: (filter?: string) => void;
+  navigateToBoards: () => void;
+  navigateToTables: () => void;
   navigateAwayFromProject?: () => void;
 };
 
@@ -161,21 +161,11 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
           router.opVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
-      navigateToBoards={(filter?: string) => {
-        // TODO: Move to router
-        history.push(
-          `/${params.entity}/${params.project}/boards${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
+      navigateToBoards={() => {
+        history.push(router.boardsUIUrl(params.entity, params.project));
       }}
-      navigateToTables={(filter?: string) => {
-        // TODO: Move to router
-        history.push(
-          `/${params.entity}/${params.project}/tables${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
+      navigateToTables={() => {
+        history.push(router.tablesUIUrl(params.entity, params.project));
       }}
       navigateAwayFromProject={props.navigateAwayFromProject}
     />
@@ -228,7 +218,10 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
       }}>
       <Box
         sx={{
-          p: 1,
+          pl: 1,
+          pr: 1,
+          pt: 2,
+          pb: 2,
           height: 65, // manual to match sidebar
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',

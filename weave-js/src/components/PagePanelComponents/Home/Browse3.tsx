@@ -21,6 +21,7 @@ import {
 
 import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
+import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
@@ -223,9 +224,11 @@ const Browse3Mounted: FC<{
                 display: 'flex',
                 flexDirection: 'column',
               }}>
-              <Browse3ProjectRootORMProvider>
-                <Browse3ProjectRoot />
-              </Browse3ProjectRootORMProvider>
+              <ErrorBoundary>
+                <Browse3ProjectRootORMProvider>
+                  <Browse3ProjectRoot />
+                </Browse3ProjectRootORMProvider>
+              </ErrorBoundary>
             </Box>
           </Box>
         </Route>
