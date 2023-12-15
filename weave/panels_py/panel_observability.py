@@ -304,10 +304,7 @@ def observability(
                         a=weave.ops.join_to_str(row["job"].unique(), ","),
                         # b=weave.ops.join_to_str(
                         #     weave.ops.make_list(
-                        #         a=weave.ops.List.limit(
-                        #             row["job"].unique(),
-                        #             3,
-                        #         ),
+                        #         a=row["job"].unique(),
                         #         b=weave.ops.make_list(
                         #             a=weave_internal.make_const_node(
                         #                 types.String(),
@@ -315,6 +312,16 @@ def observability(
                         #             ),
                         #         ),
                         #     ).concat(),
+                        #     ",",
+                        # ),
+                        # b=weave.ops.join_to_str(
+                        #     weave.ops.make_list(
+                        #         a=weave.ops.join_to_str(row["job"].unique(), ","),
+                        #         b=weave_internal.make_const_node(
+                        #             types.String(),
+                        #             f"... ({row.count() - 3} more)",
+                        #         ),
+                        #     ),
                         #     ",",
                         # ),
                         b=weave.ops.join_to_str(row["job"].unique(), ","),
@@ -432,6 +439,8 @@ def observability(
                 # b=weave.ops.String.__eq__(row["state"][-1], "running"),
                 a=row["state"][-1] != "running",
                 b=row["state"][-1] == "running",
+                # a=row["state"].unique().count() == 3,
+                # b=weave.ops.List.count(row["state"].unique()) != 3,
                 # a=True,
                 # b=False,
             ),
@@ -706,31 +715,31 @@ def observability(
         domain_y=weave_internal.make_const_node(types.List(types.Number()), [0, 100]),
     )
 
-    errors_table = panels.Table(  # type: ignore
-        filtered_window_data.filter(
-            weave_internal.define_fn(
-                {"row": source_data.type.object_type},
-                lambda row: row["error"] != None,
-            )
-        )
-    )
-    errors_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
-    errors_table.add_column(lambda row: row["job"], "Job")
-    errors_table.add_column(
-        lambda row: weave.panels.WeaveLink(
-            row["run_id"],
-            vars={
-                "entity_name": row["entity_name"],
-                "project_name": row["project_name"],
-                "run_id": row["run_id"],
-            },
-            to=lambda input, vars: weave.ops.project(
-                vars["entity_name"], vars["project_name"]
-            ).run(vars["run_id"]),
-        ),
-        "Run",
-    )
-    errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
+    # errors_table = panels.Table(  # type: ignore
+    #     filtered_window_data.filter(
+    #         weave_internal.define_fn(
+    #             {"row": source_data.type.object_type},
+    #             lambda row: row["error"] != None,
+    #         )
+    #     )
+    # )
+    # errors_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
+    # errors_table.add_column(lambda row: row["job"], "Job")
+    # errors_table.add_column(
+    #     lambda row: weave.panels.WeaveLink(
+    #         row["run_id"],
+    #         vars={
+    #             "entity_name": row["entity_name"],
+    #             "project_name": row["project_name"],
+    #             "run_id": row["run_id"],
+    #         },
+    #         to=lambda input, vars: weave.ops.project(
+    #             vars["entity_name"], vars["project_name"]
+    #         ).run(vars["run_id"]),
+    #     ),
+    #     "Run",
+    # )
+    # errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
 
     # layout
     dashboard.add(
@@ -773,11 +782,11 @@ def observability(
         runs_user_and_grouping_plot,
         layout=panels.GroupPanelLayout(x=0, y=30, w=12, h=8),
     )
-    dashboard.add(
-        "Errors",
-        errors_table,
-        layout=panels.GroupPanelLayout(x=0, y=46, w=24, h=8),
-    )
+    # dashboard.add(
+    #     "Errors",
+    #     errors_table,
+    #     layout=panels.GroupPanelLayout(x=0, y=46, w=24, h=8),
+    # )
 
     return panels.Board(vars=varbar, panels=dashboard, editable=False)
 
