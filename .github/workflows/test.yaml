@@ -44,8 +44,8 @@ jobs:
     timeout-minutes: 7
     needs:
       - build-container
-    runs-on: [self-hosted, gke-runner]
-    # runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
@@ -145,8 +145,8 @@ jobs:
       # - lint
       # - test
     if: always()
-    runs-on: [self-hosted, gke-runner]
-    # runs-on: ubuntu-latest
+    3 runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
 
