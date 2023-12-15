@@ -20,6 +20,7 @@ import {
 
 import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
+import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
@@ -136,8 +137,8 @@ export const Browse3: FC<{
         <Route
           path={[
             ...browse3Paths(props.projectRoot(':entity', ':project')),
-            '/:entity',
-            '/',
+            `/${URL_BROWSE3}/:entity`,
+            `/${URL_BROWSE3}`,
           ]}>
           <Browse3Mounted
             hideHeader={props.hideHeader}
@@ -231,10 +232,10 @@ const Browse3Mounted: FC<{
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
             <Switch>
-              <Route path={`/:entity`}>
+              <Route path={`/${URL_BROWSE3}/:entity`}>
                 <Browse2EntityPage />
               </Route>
-              <Route path={``}>
+              <Route path={`/${URL_BROWSE3}`}>
                 <Browse2HomePage />
               </Route>
             </Switch>
@@ -726,27 +727,30 @@ const Browse3Breadcrumbs: FC = props => {
   return (
     <Breadcrumbs>
       {params.entity && (
-        <AppBarLink to={`/${params.entity}`}>{params.entity}</AppBarLink>
+        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}`}>
+          {params.entity}
+        </AppBarLink>
       )}
       {params.project && (
-        <AppBarLink to={`/${params.entity}/${params.project}`}>
+        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}/${params.project}`}>
           {params.project}
         </AppBarLink>
       )}
       {params.tab && (
-        <AppBarLink to={`/${params.entity}/${params.project}/${params.tab}`}>
+        <AppBarLink
+          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}`}>
           {params.tab}
         </AppBarLink>
       )}
       {params.itemName && (
         <AppBarLink
-          to={`/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
+          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
           {params.itemName}
         </AppBarLink>
       )}
       {params.version && (
         <AppBarLink
-          to={`/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
+          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
           {params.version}
         </AppBarLink>
       )}
@@ -772,9 +776,9 @@ const Browse3Breadcrumbs: FC = props => {
         ) : (
           <AppBarLink
             key={idx}
-            to={`/${params.entity}/${params.project}/${params.tab}/${
-              params.itemName
-            }/versions/${params.version}/${refFields
+            to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
+              params.tab
+            }/${params.itemName}/versions/${params.version}/${refFields
               .slice(0, idx + 1)
               .join('/')}`}>
             {field}
