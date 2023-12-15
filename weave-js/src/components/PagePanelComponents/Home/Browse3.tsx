@@ -120,6 +120,7 @@ export const Browse3: FC<{
   basename: string;
   hideHeader?: boolean;
   headerOffset?: number;
+  navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
   const weaveContext = useWeaveContext();
@@ -143,6 +144,7 @@ export const Browse3: FC<{
             <Browse3Mounted
               hideHeader={props.hideHeader}
               headerOffset={props.headerOffset}
+              navigateAwayFromProject={props.navigateAwayFromProject}
             />
           </Route>
         </Switch>
@@ -154,6 +156,7 @@ export const Browse3: FC<{
 const Browse3Mounted: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
+  navigateAwayFromProject?: () => void;
 }> = props => {
   const router = useWeaveflowRouteContext();
   return (
@@ -207,7 +210,9 @@ const Browse3Mounted: FC<{
               display: 'flex',
               flexDirection: 'row',
             }}>
-            <RouteAwareBrowse3ProjectSideNav />
+            <RouteAwareBrowse3ProjectSideNav
+              navigateAwayFromProject={props.navigateAwayFromProject}
+            />
             <Box
               component="main"
               sx={{
