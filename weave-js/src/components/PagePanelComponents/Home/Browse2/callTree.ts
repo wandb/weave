@@ -114,8 +114,16 @@ const callsTableWeaveType: Type = {
   },
 };
 
+ // Optimization: Our client-side caching will NOT cache get ops that reference
+ // `latest` alias. See `defaultCachePolicy` in `cachePolicy.ts`. However, since
+ // stream tables always point to the same run, we can just use `v0` here. This
+ // allows the client to load the cached stream table rows, then update the UI
+ // when new rows are returned. The better fix would be to pre-compile the
+ // aliases out of the graph, but that's a bigger change.
+const STREAM_TABLE_ALIAS = 'v0'
+
 export const callsTableNode = (streamId: StreamId) => {
-  const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
+  const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:${STREAM_TABLE_ALIAS}/obj`;
   const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
     stream_table: opGet({
       uri: constString(predsRefStr),
@@ -403,7 +411,7 @@ export const feedbackTableObjNode = (
   entityName: string,
   projectName: string
 ) => {
-  const predsRefStr = `wandb-artifact:///${entityName}/${projectName}/run-feedback:latest/obj`;
+  const predsRefStr = `wandb-artifact:///${entityName}/${projectName}/run-feedback:${STREAM_TABLE_ALIAS}/obj`;
   return opGet({
     uri: constString(predsRefStr),
   });
