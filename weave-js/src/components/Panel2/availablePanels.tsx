@@ -430,6 +430,6 @@ export function panelSpecById(panelId: string) {
   return PanelRegistry.PanelSpecs().find(p => p.id === panelId);
 }
 
-// PanelPanel is currently not able to be nested within othe childpanel
+// PanelPanel is currently not able to be nested within other childpanel
 // based on stack, exclude panelpanel if nested
 export const excludePanelPanel = (stack: Stack) => stack.length > 0;
