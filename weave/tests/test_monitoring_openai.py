@@ -410,11 +410,11 @@ def test_log_to_span(
     )
 
     inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
-    inputs_expected = ChatCompletionRequest.model_validate(create_input).model_dump()
+    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
     assert inputs_st == inputs_expected
 
     outputs_st = weave.use(hist_node["output"]).to_pylist_tagged()[0]
-    outputs_expected = reassembled_chat_completion_message.model_dump()
+    outputs_expected = reassembled_chat_completion_message.dict()
     assert outputs_st == outputs_expected
 
 
@@ -454,11 +454,11 @@ def test_log_to_span_streaming(
     )
 
     inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
-    inputs_expected = ChatCompletionRequest.model_validate(create_input).model_dump()
+    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
     assert inputs_st == inputs_expected
 
     outputs_st = weave.use(hist_node["output"]).to_pylist_tagged()[0]
-    outputs_expected = reassembled_chat_completion_message.model_dump()
+    outputs_expected = reassembled_chat_completion_message.dict()
     assert outputs_st == outputs_expected
 
 

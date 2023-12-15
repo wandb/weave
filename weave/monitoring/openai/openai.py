@@ -45,7 +45,7 @@ class Callback:
 class ReassembleStream(Callback):
     def before_send_request(self, context: Context, *args: Any, **kwargs: Any) -> None:
         sig = match_signature(old_create, *args, **kwargs)
-        context.inputs = ChatCompletionRequest.model_validate(sig)
+        context.inputs = ChatCompletionRequest.parse_obj(sig)
 
     def before_end(self, context: Context, *args: Any, **kwargs: Any) -> None:
         if hasattr(context, "chunks") and context.inputs is not None:
@@ -250,6 +250,6 @@ def span_context(
             span.exception = e
         finally:
             sig = match_signature(old_create, *args, **kwargs)
-            span.inputs = ChatCompletionRequest.model_validate(sig).model_dump()
+            span.inputs = ChatCompletionRequest.parse_obj(sig).dict()
             if context.outputs is not None:
-                span.output = context.outputs.model_dump()
+                span.output = context.outputs.dict()
