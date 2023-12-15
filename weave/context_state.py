@@ -66,6 +66,13 @@ _loading_built_ins: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
+def loading_builtins(builtins):
+    token = _loading_built_ins.set(builtins)
+    yield _loading_built_ins.get()
+    _loading_built_ins.reset(token)
+
+
+@contextlib.contextmanager
 def loading_op_location(location):
     token = _loading_op_location.set(location)
     yield _loading_op_location.get()
@@ -95,6 +102,10 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 _weave_client: contextvars.ContextVar[
     typing.Optional[client_interface.ClientInterface]
 ] = contextvars.ContextVar("weave_client", default=None)
+
+_monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "monitor_disabled", default=False
+)
 
 
 @contextlib.contextmanager
@@ -139,6 +150,13 @@ def set_server(server: server_interface.BaseServer):
 _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
     "frontend_url", default=None
 )
+
+
+@contextlib.contextmanager
+def monitor_disabled():
+    token = _monitor_disabled.set(True)
+    yield
+    _monitor_disabled.reset(token)
 
 
 def get_frontend_url() -> typing.Optional[str]:

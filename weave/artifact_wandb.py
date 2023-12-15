@@ -832,6 +832,10 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
         client = graph_client_context.require_graph_client()
         return client.ref_input_to(self)
 
+    def value_input_to(self) -> eager.WeaveIter["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_value_input_to(self)
+
     def output_of(self) -> typing.Optional["run.Run"]:
         client = graph_client_context.require_graph_client()
         return client.ref_output_of(self)
