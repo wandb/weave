@@ -240,13 +240,11 @@ const useNaiveProjectDataConnection = (entity: string, project: string) => {
     if (bootstrapValue.result == null) {
       return null;
     }
-    console.time('construct');
     const connection = new WFNaiveProject(
       entity,
       project,
       bootstrapValue.result as any
     );
-    console.timeEnd('construct');
     return connection;
   }, [bootstrapValue.result, entity, project]);
 };
