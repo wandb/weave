@@ -35,16 +35,16 @@ class ChatModel:
         )
         import time
         import json
-        from io import StringIO
+        from io import BytesIO
 
-        train_str = StringIO()
-        valid_str = StringIO()
+        train_str = BytesIO()
+        valid_str = BytesIO()
 
         for row in train_dataset.rows:
-            train_str.write(json.dumps(row) + "\n")
+            train_str.write((json.dumps(row) + "\n").encode())
 
         for row in valid_dataset.rows:
-            valid_str.write(json.dumps(row) + "\n")
+            valid_str.write((json.dumps(row) + "\n").encode())
 
         train_str.seek(0)
         valid_str.seek(0)
@@ -55,7 +55,7 @@ class ChatModel:
         valid_file_id = client.files.create(file=valid_str, purpose="fine-tune").id
         print("Valid file ID", valid_file_id)
 
-        finetuning_job_id = client.fine_tuning.create(
+        finetuning_job_id = client.fine_tuning.jobs.create(
             training_file=training_file_id,
             validation_file=valid_file_id,
             hyperparameters=hyperparameters,
@@ -65,16 +65,16 @@ class ChatModel:
 
         while True:
             # This should be tracked with an async run
-            fine_tune_result = client.fine_tuning.retrieve(
+            fine_tune_result = client.fine_tuning.jobs.retrieve(
                 finetuning_job_id,
             )
 
             print("RESULT", fine_tune_result)
             if (
-                fine_tune_result["finished_at"] != None
-                and fine_tune_result["fine_tuned_model"] != None
+                fine_tune_result.finished_at != None
+                and fine_tune_result.fine_tuned_model != None
             ):
                 break
             time.sleep(5)
 
-        return self.__class__(fine_tune_result["fine_tuned_model"])  # type: ignore
+        return self.__class__(fine_tune_result.fine_tuned_model)  # type: ignore
