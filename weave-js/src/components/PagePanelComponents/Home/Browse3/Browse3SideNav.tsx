@@ -19,7 +19,6 @@ import {
   FormControl,
   ListSubheader,
   TextField,
-  Toolbar,
 } from '@mui/material';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
@@ -27,7 +26,7 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import React, {FC, Fragment, useMemo} from 'react';
+import React, {FC, Fragment, useEffect, useMemo, useState} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
@@ -176,19 +175,32 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const projects = useMemo(() => {
     return [props.project, ...(entityProjectsValue.result ?? [])];
   }, [entityProjectsValue.result, props.project]);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setWidth(drawerWidth);
+    }, 150);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <Drawer
       variant="permanent"
       sx={{
-        width: drawerWidth,
+        '&>div.MuiPaper-root': {
+          position: 'relative',
+          zIndex: 900,
+        },
+        flex: '0 0 auto',
+        width,
         flexShrink: 0,
         [`& .MuiDrawer-paper`]: {
-          width: drawerWidth,
+          width,
           boxSizing: 'border-box',
+          transition: 'width 0.15s ease-in-out',
         },
+        transition: 'width 0.15s ease-in-out',
       }}>
-      <Toolbar />
       <Box
         sx={{
           p: 2,

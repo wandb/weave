@@ -103,21 +103,33 @@ const tabOptions = [
   'tables',
 ];
 const tabs = tabOptions.join('|');
-const projectRoot = `:entity/:project`;
-const browse3Paths = [
-  `/${projectRoot}/:tab(${tabs})/:itemName/versions/:version/:refExtra*`,
-  `/${projectRoot}/:tab(${tabs})/:itemName`,
-  `/${projectRoot}/:tab(${tabs})`,
-  `/${projectRoot}`,
+const browse3Paths = (projectRoot: string) => [
+  `${projectRoot}/:tab(${tabs})/:itemName/versions/:version/:refExtra*`,
+  `${projectRoot}/:tab(${tabs})/:itemName`,
+  `${projectRoot}/:tab(${tabs})`,
+  `${projectRoot}`,
 ];
 
-export const Browse3: FC<{basename: string}> = props => {
+export const Browse3: FC<{
+  basename: string;
+  hideHeader?: boolean;
+  headerOffset?: number;
+  projectRoot(entityName: string, projectName: string): string;
+}> = props => {
   return (
-    <Browse3WeaveflowRouteContextProvider>
+    <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
       <Router basename={props.basename}>
         <Switch>
-          <Route path={[...browse3Paths, '/:entity', '/']}>
-            <Browse3Mounted />
+          <Route
+            path={[
+              ...browse3Paths(props.projectRoot(':entity', ':project')),
+              '/:entity',
+              '/',
+            ]}>
+            <Browse3Mounted
+              hideHeader={props.hideHeader}
+              headerOffset={props.headerOffset}
+            />
           </Route>
         </Switch>
       </Router>
@@ -125,56 +137,81 @@ export const Browse3: FC<{basename: string}> = props => {
   );
 };
 
-const Browse3Mounted: FC = props => {
+const Browse3Mounted: FC<{
+  hideHeader?: boolean;
+  headerOffset?: number;
+}> = props => {
+  const router = useWeaveflowRouteContext();
   return (
-    <Box sx={{display: 'flex', height: '100vh', overflow: 'auto'}}>
-      <AppBar
-        position="fixed"
-        sx={{
-          zIndex: theme => theme.zIndex.drawer + 1,
-        }}>
-        <Toolbar
+    <Box
+      sx={{
+        display: 'flex',
+        height: `calc(100vh - ${props.headerOffset ?? 0}px)`,
+        overflow: 'auto',
+        flexDirection: 'column',
+      }}>
+      {!props.hideHeader && (
+        <AppBar
           sx={{
-            backgroundColor: '#1976d2',
-            minHeight: '30px',
+            zIndex: theme => theme.zIndex.drawer + 1,
+            height: '60px',
+            flex: '0 0 auto',
+            position: 'static',
           }}>
-          <IconButton
-            component={RouterLink}
-            to={`/`}
+          <Toolbar
             sx={{
-              color: theme =>
-                theme.palette.getContrastText(theme.palette.primary.main),
-              '&:hover': {
-                color: theme =>
-                  theme.palette.getContrastText(theme.palette.primary.dark),
-              },
-              marginRight: theme => theme.spacing(2),
+              backgroundColor: '#1976d2',
+              minHeight: '30px',
             }}>
-            <Home />
-          </IconButton>
-          <Browse3Breadcrumbs />
-        </Toolbar>
-      </AppBar>
-      <RouteAwareBrowse3ProjectSideNav />
+            <IconButton
+              component={RouterLink}
+              to={`/`}
+              sx={{
+                color: theme =>
+                  theme.palette.getContrastText(theme.palette.primary.main),
+                '&:hover': {
+                  color: theme =>
+                    theme.palette.getContrastText(theme.palette.primary.dark),
+                },
+                marginRight: theme => theme.spacing(2),
+              }}>
+              <Home />
+            </IconButton>
+            <Browse3Breadcrumbs />
+          </Toolbar>
+        </AppBar>
+      )}
       <Switch>
-        <Route path={browse3Paths}>
+        <Route path={browse3Paths(router.projectUrl(':entity', ':project'))}>
           <Box
             component="main"
             sx={{
-              flexGrow: 1,
+              flex: '1 1 auto',
+              height: '100%',
+              width: '100%',
               overflow: 'hidden',
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: 'row',
             }}>
-            <Toolbar />
-            <Browse3ProjectRootORMProvider>
-              <Browse3ProjectRoot />
-            </Browse3ProjectRootORMProvider>
+            <RouteAwareBrowse3ProjectSideNav />
+            <Box
+              component="main"
+              sx={{
+                flex: '1 1 auto',
+                height: '100%',
+                width: '100%',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+              <Browse3ProjectRootORMProvider>
+                <Browse3ProjectRoot />
+              </Browse3ProjectRootORMProvider>
+            </Box>
           </Box>
         </Route>
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
-            <Toolbar />
             <Switch>
               <Route path={`/:entity`}>
                 <Browse2EntityPage />
@@ -214,6 +251,7 @@ const Browse3ProjectRoot: FC = () => {
   const history = useHistory();
   const params = useParams<Browse3ProjectMountedParams>();
   const router = useWeaveflowRouteContext();
+  const projectRoot = router.projectUrl(':entity', ':project');
 
   useEffect(() => {
     if (params.tab == null) {
@@ -238,69 +276,69 @@ const Browse3ProjectRoot: FC = () => {
       }}>
       <Switch>
         {/* TYPES */}
-        <Route path={`/${projectRoot}/types/:itemName/versions/:version?`}>
+        <Route path={`${projectRoot}/types/:itemName/versions/:version?`}>
           <TypeVersionRoutePageBinding />
         </Route>
-        <Route path={`/${projectRoot}/types/:itemName`}>
+        <Route path={`${projectRoot}/types/:itemName`}>
           <TypePageBinding />
         </Route>
-        <Route path={`/${projectRoot}/types`}>
+        <Route path={`${projectRoot}/types`}>
           <TypesPage entity={params.entity} project={params.project} />
         </Route>
-        <Route path={`/${projectRoot}/type-versions`}>
+        <Route path={`${projectRoot}/type-versions`}>
           <TypeVersionsPageBinding />
         </Route>
         {/* OBJECTS */}
         <Route
-          path={`/${projectRoot}/objects/:itemName/versions/:version?/:refExtra*`}>
+          path={`${projectRoot}/objects/:itemName/versions/:version?/:refExtra*`}>
           <ObjectVersionRoutePageBinding />
         </Route>
-        <Route path={`/${projectRoot}/objects/:itemName`}>
+        <Route path={`${projectRoot}/objects/:itemName`}>
           <ObjectPageBinding />
         </Route>
-        <Route path={`/${projectRoot}/objects`}>
+        <Route path={`${projectRoot}/objects`}>
           <ObjectsPage entity={params.entity} project={params.project} />
         </Route>
-        <Route path={`/${projectRoot}/object-versions`}>
+        <Route path={`${projectRoot}/object-versions`}>
           <ObjectVersionsPageBinding />
         </Route>
         {/* OPS */}
-        <Route path={`/${projectRoot}/ops/:itemName/versions/:version?`}>
+        <Route path={`${projectRoot}/ops/:itemName/versions/:version?`}>
           <OpVersionRoutePageBinding />
         </Route>
-        <Route path={`/${projectRoot}/ops/:itemName`}>
+        <Route path={`${projectRoot}/ops/:itemName`}>
           <OpPageBinding />
         </Route>
-        <Route path={`/${projectRoot}/ops`}>
+        <Route path={`${projectRoot}/ops`}>
           <OpsPage entity={params.entity} project={params.project} />
         </Route>
-        <Route path={`/${projectRoot}/op-versions`}>
+        <Route path={`${projectRoot}/op-versions`}>
           <OpVersionsPageBinding />
         </Route>
         {/* CALLS */}
-        <Route path={`/${projectRoot}/calls/:itemName`}>
+        <Route path={`${projectRoot}/calls/:itemName`}>
           <CallPageBinding />
         </Route>
-        <Route path={`/${projectRoot}/calls`}>
+        <Route path={`${projectRoot}/calls`}>
           <CallsPageBinding />
         </Route>
         {/* BOARDS */}
         <Route
           path={[
-            `/${projectRoot}/boards/_new_board_`,
-            `/${projectRoot}/boards/:boardId`,
-            `/${projectRoot}/boards/:boardId/version/:versionId`,
+            `${projectRoot}/boards/_new_board_`,
+            `${projectRoot}/boards/:boardId`,
+            `${projectRoot}/boards/:boardId/version/:versionId`,
           ]}>
           <BoardPageBinding />
         </Route>
-        <Route path={`/${projectRoot}/boards`}>
+        <Route path={`${projectRoot}/boards`}>
           <BoardsPage entity={params.entity} project={params.project} />
         </Route>
         {/* TABLES */}
-        <Route path={`/${projectRoot}/tables/:tableId`}>
+        <Route path={`${projectRoot}/tables/:tableId`}>
           <TablePage />
         </Route>
-        <Route path={`/${projectRoot}/tables`}>
+        <Route path={`${projectRoot}/tables`}>
           <TablesPage entity={params.entity} project={params.project} />
         </Route>
       </Switch>
@@ -634,7 +672,7 @@ const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
 const Browse3Breadcrumbs: FC = props => {
   const params = useParams<Browse3Params>();
   const refFields = params.refExtra?.split('/') ?? [];
-  console.log({params});
+
   return (
     <Breadcrumbs>
       {params.entity && (
