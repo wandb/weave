@@ -28,7 +28,9 @@ class ChatModel:
             )
 
         import os
-        import openai
+        from openai import OpenAI
+        
+        client = OpenAI()
         import time
         import json
         from io import StringIO
@@ -48,39 +50,31 @@ class ChatModel:
         api_base = self.base_url
         api_key = os.environ[self.api_key_env_var]
 
-        training_file_id = openai.File.create(
-            api_base=api_base,
-            api_key=api_key,
-            file=train_str,
-            purpose="fine-tune",
-        ).id
+        training_file_id = client.files.create(api_base=api_base,
+        api_key=api_key,
+        file=train_str,
+        purpose="fine-tune").id
         print("Training file ID", training_file_id)
 
-        valid_file_id = openai.File.create(
-            api_base=api_base,
-            api_key=api_key,
-            file=valid_str,
-            purpose="fine-tune",
-        ).id
+        valid_file_id = client.files.create(api_base=api_base,
+        api_key=api_key,
+        file=valid_str,
+        purpose="fine-tune").id
         print("Valid file ID", valid_file_id)
 
-        finetuning_job_id = openai.FineTuningJob.create(
-            api_base=api_base,
-            api_key=api_key,
-            training_file=training_file_id,
-            validation_file=valid_file_id,
-            hyperparameters=hyperparameters,
-            model=self.model_name,
-        ).id
+        finetuning_job_id = client.fine_tuning.create(api_base=api_base,
+        api_key=api_key,
+        training_file=training_file_id,
+        validation_file=valid_file_id,
+        hyperparameters=hyperparameters,
+        model=self.model_name).id
         print("Fine-tuning job ID", finetuning_job_id)
 
         while True:
             # This should be tracked with an async run
-            fine_tune_result = openai.FineTuningJob.retrieve(
-                finetuning_job_id,
-                api_base=api_base,
-                api_key=api_key,
-            )
+            fine_tune_result = client.fine_tuning.retrieve(finetuning_job_id,
+            api_base=api_base,
+            api_key=api_key)
 
             print("RESULT", fine_tune_result)
             if (

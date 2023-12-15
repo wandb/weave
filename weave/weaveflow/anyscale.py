@@ -21,16 +21,16 @@ class AnyscaleChatModel(chat_model.ChatModel):
     def complete(self, messages: typing.Any) -> typing.Any:
         import os
 
-        import openai
+        from openai import OpenAI
+        
+        client = OpenAI()
 
         from weave.monitoring.openai import patch
 
         patch()
 
-        response = openai.ChatCompletion.create(
-            api_base=self.base_url,
-            api_key=os.environ[self.api_key_env_var],
-            model=self.model_name,
-            messages=messages,
-        )
+        response = client.chat.completions.create(api_base=self.base_url,
+        api_key=os.environ[self.api_key_env_var],
+        model=self.model_name,
+        messages=messages)
         return response
