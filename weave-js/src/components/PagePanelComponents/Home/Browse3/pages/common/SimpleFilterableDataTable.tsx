@@ -164,6 +164,7 @@ export const FilterableTable = <
   return (
     <FilterLayoutTemplate
       filterPopoutTargetUrl={props.getFilterPopoutTargetUrl?.(effectiveFilter)}
+      showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
       showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
       filterListItems={filterListItems}>
       <DataGridPro
@@ -179,6 +180,7 @@ export const FilterableTable = <
 
 export const FilterLayoutTemplate: React.FC<{
   filterPopoutTargetUrl?: string;
+  showFilterIndicator?: boolean;
   showPopoutButton?: boolean;
   filterListItems: React.ReactNode;
 }> = props => {
@@ -259,7 +261,17 @@ export const FilterLayoutTemplate: React.FC<{
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <Badge badgeContent={4} color="primary" variant="dot">
+            {props.showFilterIndicator ? (
+              <Badge color="primary" variant="dot">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setIsOpen(o => !o);
+                  }}>
+                  <FilterList />
+                </IconButton>
+              </Badge>
+            ) : (
               <IconButton
                 size="small"
                 onClick={() => {
@@ -267,7 +279,7 @@ export const FilterLayoutTemplate: React.FC<{
                 }}>
                 <FilterList />
               </IconButton>
-            </Badge>
+            )}
           </Box>
         )}
       </Box>
