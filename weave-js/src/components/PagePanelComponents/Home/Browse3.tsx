@@ -50,7 +50,9 @@ import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
 import {
-  fnNaiveBootstrapNode,
+  fnNaiveBootstrapFeedback,
+  fnNaiveBootstrapObjects,
+  fnNaiveBootstrapRuns,
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 
@@ -232,21 +234,39 @@ const Browse3Mounted: FC<{
 };
 
 const useNaiveProjectDataConnection = (entity: string, project: string) => {
-  const bootstrapNode = useMemo(() => {
-    return fnNaiveBootstrapNode(entity, project);
+  const objectsNode = useMemo(() => {
+    return fnNaiveBootstrapObjects(entity, project);
   }, [entity, project]);
-  const bootstrapValue = useNodeValue(bootstrapNode);
+  const runsNode = useMemo(() => {
+    return fnNaiveBootstrapRuns(entity, project);
+  }, [entity, project]);
+  const feedbackNode = useMemo(() => {
+    return fnNaiveBootstrapFeedback(entity, project);
+  }, [entity, project]);
+  const objectsValue = useNodeValue(objectsNode);
+  const runsValue = useNodeValue(runsNode);
+  const feedbackValue = useNodeValue(feedbackNode);
   return useMemo(() => {
-    if (bootstrapValue.result == null) {
+    if (
+      objectsValue.result == null &&
+      runsValue.result == null &&
+      feedbackValue.result == null
+    ) {
       return null;
     }
-    const connection = new WFNaiveProject(
-      entity,
-      project,
-      bootstrapValue.result as any
-    );
+    const connection = new WFNaiveProject(entity, project, {
+      objects: objectsValue.result,
+      runs: runsValue.result,
+      feedback: feedbackValue.result,
+    });
     return connection;
-  }, [bootstrapValue.result, entity, project]);
+  }, [
+    entity,
+    feedbackValue.result,
+    objectsValue.result,
+    project,
+    runsValue.result,
+  ]);
 };
 
 const Browse3ProjectRootORMProvider: FC = props => {

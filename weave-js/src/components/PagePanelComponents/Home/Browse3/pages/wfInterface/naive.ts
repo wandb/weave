@@ -3,7 +3,6 @@ import {
   isSimpleTypeShape,
   isTypedDictLike,
   Node,
-  opDict,
   Type,
   typedDictPropertyTypes,
 } from '../../../../../../core';
@@ -45,12 +44,14 @@ type WFNaiveProjectState = {
 };
 
 
-export const fnNaiveBootstrapNode = (entity: string, project: string): Node => {
-  const weaveObjectsNode = fnAllWeaveObjects(
+export const fnNaiveBootstrapObjects = (entity: string, project: string): Node => {
+  return  fnAllWeaveObjects(
     entity,
     project
   );
-  const runsNode = fnRunsNode(
+  }
+export const fnNaiveBootstrapRuns = (entity: string, project: string): Node => {
+  return fnRunsNode(
     {
       entityName: entity,
       projectName: project,
@@ -58,28 +59,21 @@ export const fnNaiveBootstrapNode = (entity: string, project: string): Node => {
     },
     {}
   );
-  const feedbackNode = fnFeedbackNode(entity, project);
-  const targetNode = opDict({
-    weaveObjectsValue: weaveObjectsNode,
-    runsValue: runsNode,
-    feedbackValue: feedbackNode,
-  } as any);
-
-  return targetNode
+}
+export const fnNaiveBootstrapFeedback = (entity: string, project: string): Node => {
+  return fnFeedbackNode(entity, project);
 }
 
 export class WFNaiveProject implements WFProject {
-  private initialized: boolean = false;
-  private loading: boolean = false;
   private state: WFNaiveProjectState;
 
   constructor(
     entity: string,
     project: string,
     bootstrapData: {
-      weaveObjectsValue?: ObjectVersionDictType[];
-      runsValue?: Call[];
-      feedbackValue?: any[];
+      objects?: ObjectVersionDictType[];
+      runs?: Call[];
+      feedback?: any[];
     }
   ) {
     this.state = {
@@ -95,7 +89,7 @@ export class WFNaiveProject implements WFProject {
     };
 
   this.bootstrapFromData(
-    bootstrapData.weaveObjectsValue, bootstrapData.runsValue, bootstrapData.feedbackValue
+    bootstrapData.objects, bootstrapData.runs, bootstrapData.feedback
   );
   }
 

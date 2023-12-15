@@ -175,13 +175,13 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const projects = useMemo(() => {
     return [props.project, ...(entityProjectsValue.result ?? [])];
   }, [entityProjectsValue.result, props.project]);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setWidth(drawerWidth);
-    }, 150);
-    return () => clearTimeout(t);
-  }, []);
+  const [width, setWidth] = useState(drawerWidth);
+  // useEffect(() => {
+  //   const t = setTimeout(() => {
+  //     setWidth(drawerWidth);
+  //   }, 250);
+  //   return () => clearTimeout(t);
+  // }, []);
 
   return (
     <Drawer
@@ -197,9 +197,9 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
         [`& .MuiDrawer-paper`]: {
           width,
           boxSizing: 'border-box',
-          transition: 'width 0.15s ease-in-out',
+          // transition: 'width 0.25s ease-in-out',
         },
-        transition: 'width 0.15s ease-in-out',
+        // transition: 'width 0.25s ease-in-out',
       }}>
       <Box
         sx={{
