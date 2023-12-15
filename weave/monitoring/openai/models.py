@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+from .. import monitor
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,7 +23,7 @@ class ChatCompletionRequestMessage(ChatCompletionMessage):
 
 
 class ChatCompletionRequest(BaseModel):
-    model_config = ConfigDict(use_enum_values=True, exclude_none=True)
+    model_config = ConfigDict(use_enum_values=True)
 
     model: str = ""
     messages: List[ChatCompletionRequestMessage] = Field(default_factory=list)
@@ -34,5 +35,6 @@ class ChatCompletionRequest(BaseModel):
 class Context(BaseModel):
     model_config = ConfigDict(extra="allow")
 
+    # span: Optional[monitor.Span]
     inputs: Optional[ChatCompletionRequest] = None
     outputs: Optional[ChatCompletion] = None
