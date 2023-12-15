@@ -50,7 +50,7 @@ class ReassembleStream(Callback):
     def before_end(self, context: Context, *args: Any, **kwargs: Any) -> None:
         if hasattr(context, "chunks") and context.inputs is not None:
             input_messages = context.inputs.messages
-            context.outputs = reconstruct_completion(input_messages, context.chunks)
+            context.outputs = reconstruct_completion(input_messages, context.chunks)  # type: ignore
 
 
 class AsyncChatCompletions:
@@ -96,11 +96,11 @@ class AsyncChatCompletions:
                 )
 
             stream = await self._base_create(*args, **kwargs)
-            self.context.chunks = []
+            self.context.chunks = []  # type: ignore
             async for chunk in stream:
                 await self._use_callbacks("before_yield_chunk", *args, **kwargs)
                 yield chunk
-                self.context.chunks.append(chunk)
+                self.context.chunks.append(chunk)  # type: ignore
                 await self._use_callbacks("after_yield_chunk", *args, **kwargs)
             await self._use_callbacks("before_end", *args, **kwargs)
 
@@ -164,11 +164,11 @@ class ChatCompletions:
             self._use_callbacks("before_send_request", *args, **kwargs)
 
             stream = self._base_create(*args, **kwargs)
-            self.context.chunks = []
+            self.context.chunks = []  # type: ignore
             for chunk in stream:
                 self._use_callbacks("before_yield_chunk", *args, **kwargs)
                 yield chunk
-                self.context.chunks.append(chunk)
+                self.context.chunks.append(chunk)  # type: ignore
                 self._use_callbacks("after_yield_chunk", *args, **kwargs)
 
             self._use_callbacks("before_end", *args, **kwargs)
