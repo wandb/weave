@@ -86,6 +86,17 @@ def list_dim_downresolver(
 ):
     without_tags = self.without_tags()
     a = arrow_as_array(without_tags._arrow_data)
+    
+    if output_object_type == None:
+        output_object_type = without_tags.object_type.object_type  # type: ignore
+
+    if isinstance(a, pa.NullArray):
+        return ArrowWeaveList(
+            pa.nulls(len(a)),
+            output_object_type,
+            self._artifact,
+        )
+    
     values = a.flatten()
 
     start_indexes = a.offsets[:-1]
@@ -100,8 +111,7 @@ def list_dim_downresolver(
     result = pa.compute.replace_with_mask(
         nulls, non_0len, non_0len_agged.combine_chunks()
     )
-    if output_object_type == None:
-        output_object_type = without_tags.object_type.object_type  # type: ignore
+
     return ArrowWeaveList(
         result,
         output_object_type,
