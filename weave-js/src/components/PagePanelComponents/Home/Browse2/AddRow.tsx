@@ -12,8 +12,6 @@ import {useWeaveContext} from '@wandb/weave/context';
 import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useState} from 'react';
 
-import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
-import {WFNaiveProject} from '../Browse3/pages/wfInterface/naive';
 import {Link} from './CommonLib';
 import {
   mutationAppend,
@@ -60,7 +58,6 @@ export const AddRowToTable: FC<{
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
   const [newUri, setNewUri] = useState<string | null>(null);
-  const orm = useMaybeWeaveflowORMContext();
   const addRowToDataset = useCallback(async () => {
     if (projectName && datasetName) {
       setWorking('addingRow');
@@ -86,14 +83,14 @@ export const AddRowToTable: FC<{
         datasetName.name
       );
 
-      if ((orm?.projectConnection as WFNaiveProject).reload) {
-        await (orm!.projectConnection as WFNaiveProject).reload();
-      }
+      // if ((orm?.projectConnection as WFNaiveProject).reload) {
+      //   await (orm!.projectConnection as WFNaiveProject).reload();
+      // }
 
       setNewUri(finalRootUri);
       setWorking('done');
     }
-  }, [datasetName, entityName, orm, projectName, row, weave]);
+  }, [datasetName, entityName, projectName, row, weave]);
 
   const handleSubmit = useCallback(() => {
     addRowToDataset();

@@ -9,6 +9,7 @@ import {useFirstCall, useOpSignature} from '../../Browse2/callTreeHooks';
 import {Paper} from '../../Browse2/CommonLib';
 import {CallsTable} from './CallsPage';
 import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   ScrollableTabContent,
@@ -31,20 +32,33 @@ export const OpVersionPage: React.FC<{
     props.opName,
     props.version
   );
+  if (opVersion == null) {
+    return <CenteredAnimatedLoader />;
+  }
+  return <OpVersionPageInner opVersion={opVersion} />;
+};
 
+const OpVersionPageInner: React.FC<{
+  opVersion: WFOpVersion;
+}> = ({opVersion}) => {
   const uri = opVersion.refUri();
+  const entity = opVersion.entity();
+  const project = opVersion.project();
+  const opName = opVersion.op().name();
+  const opVersionHash = opVersion.version();
+
   const streamId = useMemo(
     () => ({
-      entityName: props.entity,
-      projectName: props.project,
+      entityName: entity,
+      projectName: project,
       streamName: 'stream',
     }),
-    [props.entity, props.project]
+    [entity, project]
   );
 
   return (
     <SimplePageLayout
-      title={props.opName + ' : ' + props.version}
+      title={opName + ' : ' + opVersionHash}
       tabs={[
         {
           label: 'Overview',
@@ -56,7 +70,7 @@ export const OpVersionPage: React.FC<{
                     <OpLink
                       entityName={opVersion.entity()}
                       projectName={opVersion.project()}
-                      opName={props.opName}
+                      opName={opName}
                     />
                   ),
                   Category: (
@@ -64,7 +78,7 @@ export const OpVersionPage: React.FC<{
                       opCategory={opVersion.opCategory()}
                     />
                   ),
-                  Version: props.version,
+                  Version: opVersionHash,
                   'Input Types': (
                     <ul style={{margin: 0}}>
                       {opVersion.inputTypesVersions().map((t, i) => (
@@ -103,10 +117,10 @@ export const OpVersionPage: React.FC<{
           label: 'Calls',
           content: (
             <CallsTable
-              entity={props.entity}
-              project={props.project}
+              entity={entity}
+              project={project}
               frozenFilter={{
-                opVersions: [props.opName + ':' + props.version],
+                opVersions: [opName + ':' + opVersionHash],
                 traceRootsOnly: false,
               }}
             />
