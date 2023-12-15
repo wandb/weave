@@ -676,27 +676,27 @@ const Browse3Breadcrumbs: FC = props => {
   return (
     <Breadcrumbs>
       {params.entity && (
-        <AppBarLink to={`${params.entity}`}>{params.entity}</AppBarLink>
+        <AppBarLink to={`/${params.entity}`}>{params.entity}</AppBarLink>
       )}
       {params.project && (
-        <AppBarLink to={`${params.entity}/${params.project}`}>
+        <AppBarLink to={`/${params.entity}/${params.project}`}>
           {params.project}
         </AppBarLink>
       )}
       {params.tab && (
-        <AppBarLink to={`${params.entity}/${params.project}/${params.tab}`}>
+        <AppBarLink to={`/${params.entity}/${params.project}/${params.tab}`}>
           {params.tab}
         </AppBarLink>
       )}
       {params.itemName && (
         <AppBarLink
-          to={`${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
+          to={`/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
           {params.itemName}
         </AppBarLink>
       )}
       {params.version && (
         <AppBarLink
-          to={`${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
+          to={`/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
           {params.version}
         </AppBarLink>
       )}
@@ -722,7 +722,7 @@ const Browse3Breadcrumbs: FC = props => {
         ) : (
           <AppBarLink
             key={idx}
-            to={`${params.entity}/${params.project}/${params.tab}/${
+            to={`/${params.entity}/${params.project}/${params.tab}/${
               params.itemName
             }/versions/${params.version}/${refFields
               .slice(0, idx + 1)
