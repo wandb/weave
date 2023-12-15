@@ -300,48 +300,12 @@ const Browse3ProjectRoot: FC<{
         flex: '1 1 auto',
         width: '100%',
         overflow: 'hidden',
-        flexDirection: 'column',
+        display: 'flex',
+        flexDirection: 'row',
       }}>
-      {customLocation && (
-        <Box
-          sx={{
-            // zIndex: 2,
-            // position: 'absolute',
-            flex: '1 1 50%',
-            backgroundColor: 'white',
-            right: 0,
-            width: '50%',
-            height: '100%',
-            overflow: 'hidden',
-            borderRight: '1px solid #444',
-            boxShadow: '-2px 0px 10px 3px rgba(0, 0, 0, 0.2)',
-          }}
-          // Stacked loook
-          // sx={{
-          //   zIndex: 2,
-          //   position: 'absolute',
-          //   backgroundColor: 'white',
-          //   right: 0,
-          //   width: '50%',
-          //   height: '100%',
-          //   overflow: 'hidden',
-          //   borderRight: '1px solid #444',
-          //   boxShadow: '-2px 0px 10px 3px rgba(0, 0, 0, 0.2)',
-          // }}
-        >
-          <Browse3WeaveflowPeekRouteContextProvider>
-            <Browse3ProjectRoot
-              projectRoot="/:entity/:project"
-              entityName={entityName}
-              projectName={projectName}
-              location={customLocation}
-            />
-          </Browse3WeaveflowPeekRouteContextProvider>
-        </Box>
-      )}{' '}
       <Box
         sx={{
-          flex: '1 1 50%',
+          flex: `1 1 ${customLocation ? '35%' : 'auto'}`,
           width: '100%',
           overflow: 'auto',
         }}>
@@ -421,6 +385,43 @@ const Browse3ProjectRoot: FC<{
           </Route>
         </Switch>
       </Box>
+      {customLocation && (
+        <Box
+          sx={{
+            // zIndex: 2,
+            // position: 'absolute',
+            flex: '1 1 50%',
+            backgroundColor: 'white',
+            right: 0,
+            width: '65%',
+            height: '100%',
+            overflow: 'hidden',
+            borderRight: '1px solid #444',
+            // boxShadow: '-2px 0px 10px 3px rgba(0, 0, 0, 0.2)',
+          }}
+          // Stacked loook
+          // sx={{
+          //   zIndex: 2,
+          //   position: 'absolute',
+          //   backgroundColor: 'white',
+          //   right: 0,
+          //   width: '50%',
+          //   height: '100%',
+          //   overflow: 'hidden',
+          //   borderRight: '1px solid #444',
+          //   boxShadow: '-2px 0px 10px 3px rgba(0, 0, 0, 0.2)',
+          // }}
+        >
+          <Browse3WeaveflowPeekRouteContextProvider>
+            <Browse3ProjectRoot
+              projectRoot="/:entity/:project"
+              entityName={entityName}
+              projectName={projectName}
+              location={customLocation}
+            />
+          </Browse3WeaveflowPeekRouteContextProvider>
+        </Box>
+      )}
     </Box>
   );
 };
