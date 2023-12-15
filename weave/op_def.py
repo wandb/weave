@@ -350,7 +350,6 @@ class OpDef:
                 graph.expr_vars(arg_node) for arg_node in refine_params.values()
             )
         ):
-
             called_refine_output_type = _self.refine_output_type(**refine_params)
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):

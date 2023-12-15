@@ -67,7 +67,7 @@ def history_with_columns(run: wdt.Run, history_cols: list[str]):
 
 def _get_history(run: wdt.Run, columns=None):
     with tracer.trace("get_history") as span:
-        span.set_tag("history_version", 1)
+        span.set_tag("history_version", 1, 1)
     # we have fetched some specific rows.
     # download the files from the urls
 

@@ -66,6 +66,13 @@ _loading_built_ins: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
+def loading_builtins(builtins):
+    token = _loading_built_ins.set(builtins)
+    yield _loading_built_ins.get()
+    _loading_built_ins.reset(token)
+
+
+@contextlib.contextmanager
 def loading_op_location(location):
     token = _loading_op_location.set(location)
     yield _loading_op_location.get()
@@ -143,10 +150,6 @@ def set_server(server: server_interface.BaseServer):
 _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
     "frontend_url", default=None
 )
-
-
-def monitor_is_disabled() -> bool:
-    return _monitor_disabled.get()
 
 
 @contextlib.contextmanager

@@ -150,9 +150,17 @@ def flatten_typed_dicts(type_: types.TypedDict) -> list[str]:
     props = type_.property_types
     paths = []
     for key, val in props.items():
-        if types.optional(types.TypedDict({})).assign_type(
-            val
-        ) and not types.NoneType().assign_type(val):
+        _, non_none_val_type = types.split_none(val)
+        # The prior code did an assignment check like this:
+        #   if types.optional(types.TypedDict({})).assign_type(
+        #       val
+        #   ) and not types.NoneType().assign_type(val):
+        #   However that doesn't work because Ref<TypedDict<A>> is assignable
+        #   to TypedDict<A>
+        # Do we care about a Union of TypedDict? I don't think so, since we're
+        # operating on ArrowWeaveList here, which always does merge types and so can only
+        # have a union with a single TypedDict in it
+        if isinstance(non_none_val_type, types.TypedDict):
             subpaths = flatten_typed_dicts(typing.cast(types.TypedDict, val))
             paths += [f"{key}.{path}" for path in subpaths]
         else:
