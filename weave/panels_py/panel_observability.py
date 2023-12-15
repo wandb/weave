@@ -430,10 +430,10 @@ def observability(
             weave.ops.dict_(
                 # a=weave.ops.String.__ne__(row["state"][-1], "running"),
                 # b=weave.ops.String.__eq__(row["state"][-1], "running"),
-                # a=row["state"][-1] != "running",
-                # b=row["state"][-1] == "running",
-                a=True,
-                b=False,
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+                # a=True,
+                # b=False,
             ),
             weave.ops.dict_(
                 a=weave.ops.timedelta_total_seconds(
@@ -485,7 +485,6 @@ def observability(
         #         )
         #     ),
         # },
-        # {"when": True, "then": 0},
         # ],
         # )
         "Runtime (s)"
@@ -508,56 +507,56 @@ def observability(
         "Avg. sys. mem (MB)",
     )
 
-    runs_table_data = weave.ops.List.groupby(
-        filtered_window_data, lambda row: row["trace_id"]
-    )
-    runs_table_data_mapped = weave.ops.List.map(
-        runs_table_data,
-        lambda row: weave.ops.dict_(
-            **{
-                "trace_id": row["trace_id"][0],
-                "user": row["entity_name"][0],
-                "run_ids": row["run_id"],
-                "states": row["state"],
-            }
-        ),
-    )
-    runs_table = panels.Table(runs_table_data_mapped)  # type: ignore
-    runs_table.add_column(lambda row: row["user"], "User", groupby=True)
-    runs_table.add_column(lambda row: row["states"], "State")
+    # runs_table_data = weave.ops.List.groupby(
+    #     filtered_window_data, lambda row: row["trace_id"]
+    # )
+    # runs_table_data_mapped = weave.ops.List.map(
+    #     runs_table_data,
+    #     lambda row: weave.ops.dict_(
+    #         **{
+    #             "trace_id": row["trace_id"][0],
+    #             "user": row["entity_name"][0],
+    #             "run_ids": row["run_id"],
+    #             "states": row["state"],
+    #         }
+    #     ),
+    # )
+    # runs_table = panels.Table(runs_table_data_mapped)  # type: ignore
+    # runs_table.add_column(lambda row: row["user"], "User", groupby=True)
+    # runs_table.add_column(lambda row: row["states"], "State")
 
-    # runs_table = panels.Table(filtered_window_data)  # type: ignore
-    # runs_table.add_column(lambda row: row["entity_name"], "User", groupby=True)
-    # runs_table.add_column(
-    #     lambda row: row.filter(lambda row: row["state"] == "pending").count(),
-    #     "Jobs enqueued",
-    #     sort_dir="desc",
-    # )
-    # runs_table.add_column(
-    #     lambda row: row.filter(lambda row: row["state"] == "failed rqi").count(),
-    #     "Failed to init",
-    # )
-    # runs_table.add_column(
-    #     lambda row: row.filter(lambda row: row["state"] == "running").count(),
-    #     "Started",
-    # )
-    # runs_table.add_column(
-    #     lambda row: row.filter(lambda row: row["state"] == "running").count(),
-    #     "Running",
-    # )
-    # runs_table.add_column(
-    #     lambda row: row.filter(lambda row: row["state"] == "finished").count(),
-    #     "Finished",
-    # )
-    # runs_table.add_column(
-    #     lambda row: row.filter(
-    #         lambda row: weave.ops.Boolean.bool_or(
-    #             row["state"] == "crashed",
-    #             row["state"] == "failed",
-    #         ),
-    #     ).count(),
-    #     "Failed",
-    # )
+    runs_table = panels.Table(filtered_window_data)  # type: ignore
+    runs_table.add_column(lambda row: row["entity_name"], "User", groupby=True)
+    runs_table.add_column(
+        lambda row: row.filter(lambda row: row["state"] == "pending").count(),
+        "Jobs enqueued",
+        sort_dir="desc",
+    )
+    runs_table.add_column(
+        lambda row: row.filter(lambda row: row["state"] == "failed rqi").count(),
+        "Failed to init",
+    )
+    runs_table.add_column(
+        lambda row: row.filter(lambda row: row["state"] == "running").count(),
+        "Started",
+    )
+    runs_table.add_column(
+        lambda row: row.filter(lambda row: row["state"] == "running").count(),
+        "Running",
+    )
+    runs_table.add_column(
+        lambda row: row.filter(lambda row: row["state"] == "finished").count(),
+        "Finished",
+    )
+    runs_table.add_column(
+        lambda row: row.filter(
+            lambda row: weave.ops.Boolean.bool_or(
+                row["state"] == "crashed",
+                row["state"] == "failed",
+            ),
+        ).count(),
+        "Failed",
+    )
 
     finished_runs = varbar.add(
         "finished_runs",
@@ -661,7 +660,14 @@ def observability(
         y=lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Run": f'{row["entity_name"][0]}/{row["project_name"][0]}/{row["run_id"][0]}',
+                "Run": weave.ops.join_to_str(
+                    weave.ops.make_list(
+                        a=row["entity_name"][0],
+                        b=row["project_name"][0],
+                        c=row["run_id"][0],
+                    ),
+                    "/",
+                ),
                 "Job": row["job"][0],
                 "Duration * (1 - cpu %)": weave.ops.Number.__mul__(
                     weave.ops.Number.__mul__(
