@@ -43,13 +43,12 @@ type WFNaiveProjectState = {
   callsMap: Map<string, WFNaiveCallDictType>;
 };
 
-
-export const fnNaiveBootstrapObjects = (entity: string, project: string): Node => {
-  return  fnAllWeaveObjects(
-    entity,
-    project
-  );
-  }
+export const fnNaiveBootstrapObjects = (
+  entity: string,
+  project: string
+): Node => {
+  return fnAllWeaveObjects(entity, project);
+};
 export const fnNaiveBootstrapRuns = (entity: string, project: string): Node => {
   return fnRunsNode(
     {
@@ -59,10 +58,13 @@ export const fnNaiveBootstrapRuns = (entity: string, project: string): Node => {
     },
     {}
   );
-}
-export const fnNaiveBootstrapFeedback = (entity: string, project: string): Node => {
+};
+export const fnNaiveBootstrapFeedback = (
+  entity: string,
+  project: string
+): Node => {
   return fnFeedbackNode(entity, project);
-}
+};
 
 export class WFNaiveProject implements WFProject {
   private state: WFNaiveProjectState;
@@ -88,9 +90,11 @@ export class WFNaiveProject implements WFProject {
       callsMap: new Map(),
     };
 
-  this.bootstrapFromData(
-    bootstrapData.objects, bootstrapData.runs, bootstrapData.feedback
-  );
+    this.bootstrapFromData(
+      bootstrapData.objects,
+      bootstrapData.runs,
+      bootstrapData.feedback
+    );
   }
 
   entity(): string {
@@ -211,7 +215,7 @@ export class WFNaiveProject implements WFProject {
   private bootstrapFromData(
     weaveObjectsValue?: ObjectVersionDictType[],
     runsValue?: Call[],
-    feedbackValue?: any[],
+    feedbackValue?: any[]
   ): void {
     const joinedCalls = joinRunsWithFeedback(
       runsValue ?? [],

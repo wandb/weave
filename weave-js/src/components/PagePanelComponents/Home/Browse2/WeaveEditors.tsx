@@ -53,8 +53,6 @@ import React, {
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
-import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
-import {WFNaiveProject} from '../Browse3/pages/wfInterface/naive';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
 import {
@@ -142,7 +140,6 @@ const WeaveEditorCommit: FC<{
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
-  const orm = useMaybeWeaveflowORMContext();
   const handleSubmit = useCallback(async () => {
     setWorking('addingRow');
 

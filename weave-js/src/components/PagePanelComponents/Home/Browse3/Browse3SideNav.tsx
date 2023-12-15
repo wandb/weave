@@ -194,10 +194,10 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           zIndex: 900,
         },
         flex: '0 0 auto',
-        width: width,
+        width,
         flexShrink: 0,
         [`& .MuiDrawer-paper`]: {
-          width: width,
+          width,
           boxSizing: 'border-box',
           transition: `width ${wbSideBarSpeed}s linear`,
         },
