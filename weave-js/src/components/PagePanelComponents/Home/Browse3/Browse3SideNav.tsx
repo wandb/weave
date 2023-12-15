@@ -175,13 +175,15 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const projects = useMemo(() => {
     return [props.project, ...(entityProjectsValue.result ?? [])];
   }, [entityProjectsValue.result, props.project]);
-  const [width, setWidth] = useState(drawerWidth);
-  // useEffect(() => {
-  //   const t = setTimeout(() => {
-  //     setWidth(drawerWidth);
-  //   }, 250);
-  //   return () => clearTimeout(t);
-  // }, []);
+  const wbSidebarWidth = 56;
+  const wbSideBarSpeed = 0.2;
+  const [width, setWidth] = useState(drawerWidth - wbSidebarWidth);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setWidth(drawerWidth);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <Drawer
@@ -192,14 +194,14 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           zIndex: 900,
         },
         flex: '0 0 auto',
-        width,
+        width: width,
         flexShrink: 0,
         [`& .MuiDrawer-paper`]: {
-          width,
+          width: width,
           boxSizing: 'border-box',
-          // transition: 'width 0.25s ease-in-out',
+          transition: `width ${wbSideBarSpeed}s linear`,
         },
-        // transition: 'width 0.25s ease-in-out',
+        transition: `width ${wbSideBarSpeed}s linear`,
       }}>
       <Box
         sx={{
