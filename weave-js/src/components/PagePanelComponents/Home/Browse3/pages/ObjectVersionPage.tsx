@@ -43,6 +43,7 @@ const ObjectVersionPageInner: React.FC<{
   const objectVersionHash = objectVersion.version();
   const typeName = objectVersion.typeVersion().type().name();
   const typeVersionHash = objectVersion.typeVersion().version();
+  const objecTypeCategory = objectVersion.typeVersion().typeCategory();
   const baseUri = objectVersion.refUri();
   const fullUri = baseUri + (refExtra ?? '');
   const itemNode = useMemo(() => {
@@ -101,9 +102,7 @@ const ObjectVersionPageInner: React.FC<{
                   'Type Version': (
                     <>
                       <TypeVersionCategoryChip
-                        typeCategory={props.objectVersion
-                          .typeVersion()
-                          .typeCategory()}
+                        typeCategory={objecTypeCategory}
                       />
 
                       <TypeVersionLink

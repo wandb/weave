@@ -180,9 +180,9 @@ const WeaveEditorCommit: FC<{
       rootObjectRef.artifactName
     );
 
-    if ((orm?.projectConnection as WFNaiveProject).reload) {
-      await (orm!.projectConnection as WFNaiveProject).reload();
-    }
+    // if ((orm?.projectConnection as WFNaiveProject).reload) {
+    //   await (orm!.projectConnection as WFNaiveProject).reload();
+    // }
 
     setWorking('done');
 
@@ -195,7 +195,6 @@ const WeaveEditorCommit: FC<{
     rootObjectRef.entityName,
     rootObjectRef.projectName,
     rootObjectRef.artifactName,
-    orm,
     handleClearEdits,
     history,
     refPageUrl,

@@ -86,14 +86,14 @@ export const AddRowToTable: FC<{
         datasetName.name
       );
 
-      if ((orm?.projectConnection as WFNaiveProject).reload) {
-        await (orm!.projectConnection as WFNaiveProject).reload();
-      }
+      // if ((orm?.projectConnection as WFNaiveProject).reload) {
+      //   await (orm!.projectConnection as WFNaiveProject).reload();
+      // }
 
       setNewUri(finalRootUri);
       setWorking('done');
     }
-  }, [datasetName, entityName, orm, projectName, row, weave]);
+  }, [datasetName, entityName, projectName, row, weave]);
 
   const handleSubmit = useCallback(() => {
     addRowToDataset();

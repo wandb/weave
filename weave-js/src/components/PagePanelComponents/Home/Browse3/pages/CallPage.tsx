@@ -32,7 +32,7 @@ const CallPageInner: React.FC<{
     return {
       entity: entityName,
       project: projectName,
-      traceId: traceId,
+      traceId,
       spanId: callId,
     };
   }, [entityName, projectName, traceId, callId]);

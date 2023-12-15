@@ -20,6 +20,7 @@ import {
 } from 'react-router-dom';
 
 import {useWeaveContext} from '../../../context';
+import {useNodeValue} from '../../../react';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
@@ -48,7 +49,10 @@ import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
-import {WFNaiveProject} from './Browse3/pages/wfInterface/naive';
+import {
+  fnNaiveBootstrapNode,
+  WFNaiveProject,
+} from './Browse3/pages/wfInterface/naive';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -227,17 +231,33 @@ const Browse3Mounted: FC<{
   );
 };
 
+const useNaiveProjectDataConnection = (entity: string, project: string) => {
+  const bootstrapNode = useMemo(() => {
+    return fnNaiveBootstrapNode(entity, project);
+  }, [entity, project]);
+  const bootstrapValue = useNodeValue(bootstrapNode);
+  return useMemo(() => {
+    if (bootstrapValue.result == null) {
+      return null;
+    }
+    console.time('construct');
+    const connection = new WFNaiveProject(
+      entity,
+      project,
+      bootstrapValue.result as any
+    );
+    console.timeEnd('construct');
+    return connection;
+  }, [bootstrapValue.result, entity, project]);
+};
+
 const Browse3ProjectRootORMProvider: FC = props => {
-  const [loading, setLoading] = React.useState(true);
   const params = useParams<Browse3ProjectMountedParams>();
-  const {client: weaveClient} = useWeaveContext();
-  const projectData = useMemo(() => {
-    return new WFNaiveProject(params.entity, params.project, weaveClient);
-  }, [params.entity, params.project, weaveClient]);
-  useEffect(() => {
-    projectData.init().then(() => setLoading(false));
-  }, [projectData]);
-  if (loading) {
+  const projectData = useNaiveProjectDataConnection(
+    params.entity,
+    params.project
+  );
+  if (!projectData) {
     return <CenteredAnimatedLoader />;
   }
   return (

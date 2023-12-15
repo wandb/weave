@@ -2,11 +2,11 @@ import {
   isObjectType,
   isSimpleTypeShape,
   isTypedDictLike,
+  Node,
   opDict,
   Type,
   typedDictPropertyTypes,
 } from '../../../../../../core';
-import {Client as WeaveClient} from '../../../../../../core/client/types';
 import {Call} from '../../../Browse2/callTree';
 import {
   fnFeedbackNode,
@@ -44,6 +44,30 @@ type WFNaiveProjectState = {
   callsMap: Map<string, WFNaiveCallDictType>;
 };
 
+
+export const fnNaiveBootstrapNode = (entity: string, project: string): Node => {
+  const weaveObjectsNode = fnAllWeaveObjects(
+    entity,
+    project
+  );
+  const runsNode = fnRunsNode(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    {}
+  );
+  const feedbackNode = fnFeedbackNode(entity, project);
+  const targetNode = opDict({
+    weaveObjectsValue: weaveObjectsNode,
+    runsValue: runsNode,
+    feedbackValue: feedbackNode,
+  } as any);
+
+  return targetNode
+}
+
 export class WFNaiveProject implements WFProject {
   private initialized: boolean = false;
   private loading: boolean = false;
@@ -52,7 +76,11 @@ export class WFNaiveProject implements WFProject {
   constructor(
     entity: string,
     project: string,
-    private readonly weaveClient: WeaveClient
+    bootstrapData: {
+      weaveObjectsValue?: ObjectVersionDictType[];
+      runsValue?: Call[];
+      feedbackValue?: any[];
+    }
   ) {
     this.state = {
       entity,
@@ -65,22 +93,10 @@ export class WFNaiveProject implements WFProject {
       objectVersionsMap: new Map(),
       callsMap: new Map(),
     };
-  }
 
-  async init(): Promise<void> {
-    if (!this.initialized) {
-      await this.reload();
-    }
-    return Promise.resolve();
-  }
-
-  async reload(): Promise<void> {
-    if (!this.loading) {
-      this.loading = true;
-      await this.loadAll();
-      this.loading = false;
-    }
-    return Promise.resolve();
+  this.bootstrapFromData(
+    bootstrapData.weaveObjectsValue, bootstrapData.runsValue, bootstrapData.feedbackValue
+  );
   }
 
   entity(): string {
@@ -90,7 +106,7 @@ export class WFNaiveProject implements WFProject {
     return this.state.project;
   }
 
-  type(name: string): WFType| null {
+  type(name: string): WFType | null {
     if (!this.state.typesMap.has(name)) {
       return null;
       // throw new Error(
@@ -105,7 +121,7 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveType(this.state, typeName);
     });
   }
-  op(name: string): WFOp| null {
+  op(name: string): WFOp | null {
     if (!this.state.opsMap.has(name)) {
       return null;
       // throw new Error(
@@ -119,7 +135,7 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveOp(this.state, opName);
     });
   }
-  object(name: string): WFObject| null {
+  object(name: string): WFObject | null {
     if (!this.state.objectsMap.has(name)) {
       return null;
       // throw new Error(
@@ -133,7 +149,7 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveObject(this.state, opName);
     });
   }
-  typeVersion(name: string, version: string): WFTypeVersion| null {
+  typeVersion(name: string, version: string): WFTypeVersion | null {
     if (!this.state.typeVersionsMap.has(version)) {
       return null;
       // throw new Error(
@@ -147,7 +163,7 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveTypeVersion(this.state, opName);
     });
   }
-  opVersion(name: string, version: string): WFOpVersion| null {
+  opVersion(name: string, version: string): WFOpVersion | null {
     if (!this.state.opVersionsMap.has(version)) {
       return null;
       // throw new Error(
@@ -161,7 +177,7 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveOpVersion(this.state, opName);
     });
   }
-  objectVersion(name: string, version: string): WFObjectVersion| null {
+  objectVersion(name: string, version: string): WFObjectVersion | null {
     if (!this.state.objectVersionsMap.has(version)) {
       return null;
       // throw new Error(
@@ -198,35 +214,11 @@ export class WFNaiveProject implements WFProject {
     return ['model', 'dataset'];
   }
 
-  private async loadAll(): Promise<void> {
-    const weaveObjectsNode = fnAllWeaveObjects(
-      this.state.entity,
-      this.state.project
-    );
-    const runsNode = fnRunsNode(
-      {
-        entityName: this.state.entity,
-        projectName: this.state.project,
-        streamName: 'stream',
-      },
-      {}
-    );
-    const feedbackNode = fnFeedbackNode(this.state.entity, this.state.project);
-    const targetNode = opDict({
-      weaveObjectsNode,
-      runsNode,
-      feedbackNode,
-    } as any);
-    await this.weaveClient.clearCacheForNode(targetNode);
-    const {
-      weaveObjectsNode: weaveObjectsValue,
-      runsNode: runsValue,
-      feedbackNode: feedbackValue,
-    } = (await this.weaveClient.query(targetNode as any)) as {
-      weaveObjectsNode?: ObjectVersionDictType[];
-      runsNode?: Call[];
-      feedbackNode?: any[];
-    };
+  private bootstrapFromData(
+    weaveObjectsValue?: ObjectVersionDictType[],
+    runsValue?: Call[],
+    feedbackValue?: any[],
+  ): void {
     const joinedCalls = joinRunsWithFeedback(
       runsValue ?? [],
       feedbackValue ?? []
