@@ -184,6 +184,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   ]);
   return (
     <FilterLayoutTemplate
+      showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
       filterPopoutTargetUrl={routerContext.objectVersionsUIUrl(
         props.entity,
         props.project,
