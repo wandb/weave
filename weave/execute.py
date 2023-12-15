@@ -507,7 +507,9 @@ def publish_graph(
                     op_def,
                     f"{op_def.name}",
                 )
-        elif isinstance(node, graph.ConstNode):
+        elif isinstance(node, graph.ConstNode) and not isinstance(
+            node.type, types.Function
+        ):
             auto_publish(node.val)
 
     if publish_enabled():
@@ -558,25 +560,27 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             mon_span_inputs,
         )
 
-        with context_state.lazy_execution():
-            maybe_span_node = mon.rows()
-            if maybe_span_node is None:
-                return None
+        # with context_state.lazy_execution():
+        #     # There's a bug where we're not compile node-op expanding
+        #     # streamtable-rows.
+        #     maybe_span_node = mon.rows()
+        #     if maybe_span_node is None:
+        #         return None
 
-            span_node = maybe_span_node.filter(  # type: ignore
-                lambda x: x["attributes"]["input_hash"] == input_hash
-            )
-            iter: eager.WeaveIter[
-                stream_data_interfaces.TraceSpanDict
-            ] = eager.WeaveIter(span_node)
-            span_dict = iter[0]
+        #     span_node = maybe_span_node.filter(  # type: ignore
+        #         lambda x: x["attributes"]["input_hash"] == input_hash
+        #     )
+        #     iter: eager.WeaveIter[
+        #         stream_data_interfaces.TraceSpanDict
+        #     ] = eager.WeaveIter(span_node)
+        #     span_dict = iter[0]
 
-            if (
-                span_dict != None and span_dict is not None
-            ):  # this is needed for the type checker to be happy
-                output = span_dict["output"]
-                if output != None and output is not None:
-                    return output["_result"]
+        #     if (
+        #         span_dict != None and span_dict is not None
+        #     ):  # this is needed for the type checker to be happy
+        #         output = span_dict.get("output")
+        #         if output != None and output is not None:
+        #             return output["_result"]
 
         with mon.span(str(op_def_ref)) as span:
             span.inputs = mon_span_inputs
