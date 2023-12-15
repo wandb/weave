@@ -6,6 +6,7 @@ import {WeaveEditor} from '../../Browse2/WeaveEditors';
 import {CallsTable} from './CallsPage';
 import {useMakeNewBoard} from './common/hooks';
 import {CallLink, ObjectLink, TypeVersionLink} from './common/Links';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
@@ -28,21 +29,37 @@ export const ObjectVersionPage: React.FC<{
     props.objectName,
     props.version
   );
+  if (!objectVersion) {
+    return <CenteredAnimatedLoader />;
+  }
+  return <ObjectVersionPageInner {...props} objectVersion={objectVersion} />;
+};
+const ObjectVersionPageInner: React.FC<{
+  objectVersion: WFObjectVersion;
+  refExtra?: string;
+}> = ({objectVersion, refExtra}) => {
+  const entityName = objectVersion.entity();
+  const projectName = objectVersion.project();
+  const objectName = objectVersion.object().name();
+  const objectVersionHash = objectVersion.version();
+  const typeName = objectVersion.typeVersion().type().name();
+  const typeVersionHash = objectVersion.typeVersion().version();
+  const objecTypeCategory = objectVersion.typeVersion().typeCategory();
   const baseUri = objectVersion.refUri();
-  const fullUri = baseUri + (props.refExtra ?? '');
+  const fullUri = baseUri + (refExtra ?? '');
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
-    if (props.refExtra == null) {
+    if (refExtra == null) {
       return objNode;
     }
-    const extraFields = props.refExtra.split('/');
+    const extraFields = refExtra.split('/');
     return nodeFromExtra(objNode, extraFields);
-  }, [baseUri, props.refExtra]);
+  }, [baseUri, refExtra]);
   const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
     <SimplePageLayout
-      title={props.objectName + ' : ' + props.version}
+      title={objectName + ' : ' + objectVersionHash}
       menuItems={[
         {
           label: 'Open in Board',
@@ -78,24 +95,22 @@ export const ObjectVersionPage: React.FC<{
                 data={{
                   Object: (
                     <ObjectLink
-                      entityName={objectVersion.entity()}
-                      projectName={objectVersion.project()}
-                      objectName={objectVersion.object().name()}
+                      entityName={entityName}
+                      projectName={projectName}
+                      objectName={objectName}
                     />
                   ),
                   'Type Version': (
                     <>
                       <TypeVersionCategoryChip
-                        typeCategory={objectVersion
-                          .typeVersion()
-                          .typeCategory()}
+                        typeCategory={objecTypeCategory}
                       />
 
                       <TypeVersionLink
-                        entityName={objectVersion.entity()}
-                        projectName={objectVersion.project()}
-                        typeName={objectVersion.typeVersion().type().name()}
-                        version={objectVersion.typeVersion().version()}
+                        entityName={entityName}
+                        projectName={projectName}
+                        typeName={typeName}
+                        version={typeVersionHash}
                       />
                     </>
                   ),
@@ -114,7 +129,7 @@ export const ObjectVersionPage: React.FC<{
           label: 'Values',
           content: (
             <ScrollableTabContent>
-              <WeaveEditor objType={props.objectName} node={itemNode} />
+              <WeaveEditor objType={objectName} node={itemNode} />
             </ScrollableTabContent>
           ),
         },
@@ -122,10 +137,10 @@ export const ObjectVersionPage: React.FC<{
           label: 'Consuming Calls',
           content: (
             <CallsTable
-              entity={props.entity}
-              project={props.project}
+              entity={entityName}
+              project={projectName}
               frozenFilter={{
-                inputObjectVersions: [props.objectName + ':' + props.version],
+                inputObjectVersions: [objectName + ':' + objectVersionHash],
               }}
             />
           ),

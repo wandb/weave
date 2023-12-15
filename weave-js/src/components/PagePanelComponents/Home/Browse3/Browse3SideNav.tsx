@@ -6,6 +6,7 @@ import {
   Layers,
   ManageHistory,
   ModelTraining,
+  NavigateBefore,
   Rule,
   Scoreboard,
   Segment,
@@ -17,6 +18,7 @@ import {
   Autocomplete,
   Box,
   FormControl,
+  IconButton,
   ListSubheader,
   TextField,
 } from '@mui/material';
@@ -26,7 +28,14 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import React, {FC, Fragment, useEffect, useMemo, useState} from 'react';
+import React, {
+  FC,
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
@@ -45,8 +54,9 @@ type NavigationCallbacks = {
   navigateToCalls: (filter?: WFHighLevelCallFilter) => void;
   navigateToTypeVersions: (filter?: WFHighLevelTypeVersionFilter) => void;
   navigateToOpVersions: (filter?: WFHighLevelOpVersionFilter) => void;
-  navigateToBoards: (filter?: string) => void;
-  navigateToTables: (filter?: string) => void;
+  navigateToBoards: () => void;
+  navigateToTables: () => void;
+  navigateAwayFromProject?: () => void;
 };
 
 type Browse3ProjectSideNavProps = {
@@ -62,7 +72,9 @@ type Browse3ProjectSideNavProps = {
   filterCategory?: string;
 } & NavigationCallbacks;
 
-export const RouteAwareBrowse3ProjectSideNav: FC = props => {
+export const RouteAwareBrowse3ProjectSideNav: FC<{
+  navigateAwayFromProject?: () => void;
+}> = props => {
   const params = useParams<{
     entity: string;
     project: string;
@@ -149,22 +161,13 @@ export const RouteAwareBrowse3ProjectSideNav: FC = props => {
           router.opVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
-      navigateToBoards={(filter?: string) => {
-        // TODO: Move to router
-        history.push(
-          `/${params.entity}/${params.project}/boards${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
+      navigateToBoards={() => {
+        history.push(router.boardsUIUrl(params.entity, params.project));
       }}
-      navigateToTables={(filter?: string) => {
-        // TODO: Move to router
-        history.push(
-          `/${params.entity}/${params.project}/tables${
-            filter ? `?filter=${filter}` : ''
-          }`
-        );
+      navigateToTables={() => {
+        history.push(router.tablesUIUrl(params.entity, params.project));
       }}
+      navigateAwayFromProject={props.navigateAwayFromProject}
     />
   );
 };
@@ -175,11 +178,23 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const projects = useMemo(() => {
     return [props.project, ...(entityProjectsValue.result ?? [])];
   }, [entityProjectsValue.result, props.project]);
-  const [width, setWidth] = useState(0);
+  const wbSidebarWidth = 56;
+  const wbSideBarSpeed = 0.2;
+  const initialWidth = drawerWidth - wbSidebarWidth;
+  const [width, setWidth] = useState(initialWidth);
+  const onNavigateAwayFromProject = useCallback(() => {
+    if (!props.navigateAwayFromProject) {
+      return;
+    }
+    setWidth(0);
+    setTimeout(() => {
+      props.navigateAwayFromProject!();
+    }, wbSideBarSpeed * 1000);
+  }, [props.navigateAwayFromProject]);
   useEffect(() => {
     const t = setTimeout(() => {
       setWidth(drawerWidth);
-    }, 150);
+    }, 0);
     return () => clearTimeout(t);
   }, []);
 
@@ -197,16 +212,33 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
         [`& .MuiDrawer-paper`]: {
           width,
           boxSizing: 'border-box',
-          transition: 'width 0.15s ease-in-out',
+          transition: `width ${wbSideBarSpeed}s linear`,
         },
-        transition: 'width 0.15s ease-in-out',
+        transition: `width ${wbSideBarSpeed}s linear`,
       }}>
       <Box
         sx={{
-          p: 2,
+          pl: 1,
+          pr: 1,
+          pt: 2,
+          pb: 2,
           height: 65, // manual to match sidebar
           borderBottom: '1px solid #e0e0e0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexDirection: 'row',
+          gap: 1,
         }}>
+        {props.navigateAwayFromProject && (
+          <IconButton
+            size="small"
+            onClick={() => {
+              onNavigateAwayFromProject();
+            }}>
+            <NavigateBefore />
+          </IconButton>
+        )}
         <FormControl fullWidth>
           <Autocomplete
             size={'small'}

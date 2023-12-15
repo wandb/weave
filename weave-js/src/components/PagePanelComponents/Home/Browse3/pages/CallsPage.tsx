@@ -112,11 +112,13 @@ export const CallsTable: React.FC<{
   }, [filter, props.frozenFilter]);
   const useLowLevelFilter: CallFilter = useMemo(() => {
     const opUrisFromVersions =
-      effectiveFilter.opVersions?.map(uri => {
-        const [opName, version] = uri.split(':');
-        const opVersion = orm.projectConnection.opVersion(opName, version);
-        return opVersion.refUri();
-      }) ?? [];
+      (effectiveFilter.opVersions
+        ?.map(uri => {
+          const [opName, version] = uri.split(':');
+          const opVersion = orm.projectConnection.opVersion(opName, version);
+          return opVersion?.refUri();
+        })
+        .filter(item => item != null) as string[]) ?? [];
     let opUrisFromCategory = orm.projectConnection
       .opVersions()
       .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
@@ -129,14 +131,16 @@ export const CallsTable: React.FC<{
       opUris: Array.from(
         new Set([...opUrisFromVersions, ...opUrisFromCategory])
       ),
-      inputUris: effectiveFilter.inputObjectVersions?.map(uri => {
-        const [objectName, version] = uri.split(':');
-        const objectVersion = orm.projectConnection.objectVersion(
-          objectName,
-          version
-        );
-        return objectVersion.refUri();
-      }),
+      inputUris: effectiveFilter.inputObjectVersions
+        ?.map(uri => {
+          const [objectName, version] = uri.split(':');
+          const objectVersion = orm.projectConnection.objectVersion(
+            objectName,
+            version
+          );
+          return objectVersion?.refUri();
+        })
+        .filter(item => item != null) as string[],
       traceId: effectiveFilter.traceId ?? undefined,
       parentId: effectiveFilter.parentId ?? undefined,
     };

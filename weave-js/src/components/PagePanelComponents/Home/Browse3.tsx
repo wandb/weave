@@ -11,7 +11,6 @@ import {
 import {LicenseInfo} from '@mui/x-license-pro';
 import React, {FC, useCallback, useEffect, useMemo} from 'react';
 import {
-  BrowserRouter as Router,
   Link as RouterLink,
   Route,
   Switch,
@@ -20,6 +19,9 @@ import {
 } from 'react-router-dom';
 
 import {useWeaveContext} from '../../../context';
+import {useNodeValue} from '../../../react';
+import {URL_BROWSE3} from '../../../urls';
+import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
@@ -48,7 +50,12 @@ import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
-import {WFNaiveProject} from './Browse3/pages/wfInterface/naive';
+import {
+  fnNaiveBootstrapFeedback,
+  fnNaiveBootstrapObjects,
+  fnNaiveBootstrapRuns,
+  WFNaiveProject,
+} from './Browse3/pages/wfInterface/naive';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -111,28 +118,35 @@ const browse3Paths = (projectRoot: string) => [
 ];
 
 export const Browse3: FC<{
-  basename: string;
   hideHeader?: boolean;
   headerOffset?: number;
+  navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
+  const weaveContext = useWeaveContext();
+  useEffect(() => {
+    const previousPolling = weaveContext.client.isPolling();
+    weaveContext.client.setPolling(true);
+    return () => {
+      weaveContext.client.setPolling(previousPolling);
+    };
+  }, [props.projectRoot, weaveContext]);
   return (
     <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-      <Router basename={props.basename}>
-        <Switch>
-          <Route
-            path={[
-              ...browse3Paths(props.projectRoot(':entity', ':project')),
-              '/:entity',
-              '/',
-            ]}>
-            <Browse3Mounted
-              hideHeader={props.hideHeader}
-              headerOffset={props.headerOffset}
-            />
-          </Route>
-        </Switch>
-      </Router>
+      <Switch>
+        <Route
+          path={[
+            ...browse3Paths(props.projectRoot(':entity', ':project')),
+            `/${URL_BROWSE3}/:entity`,
+            `/${URL_BROWSE3}`,
+          ]}>
+          <Browse3Mounted
+            hideHeader={props.hideHeader}
+            headerOffset={props.headerOffset}
+            navigateAwayFromProject={props.navigateAwayFromProject}
+          />
+        </Route>
+      </Switch>
     </Browse3WeaveflowRouteContextProvider>
   );
 };
@@ -140,6 +154,7 @@ export const Browse3: FC<{
 const Browse3Mounted: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
+  navigateAwayFromProject?: () => void;
 }> = props => {
   const router = useWeaveflowRouteContext();
   return (
@@ -193,7 +208,9 @@ const Browse3Mounted: FC<{
               display: 'flex',
               flexDirection: 'row',
             }}>
-            <RouteAwareBrowse3ProjectSideNav />
+            <RouteAwareBrowse3ProjectSideNav
+              navigateAwayFromProject={props.navigateAwayFromProject}
+            />
             <Box
               component="main"
               sx={{
@@ -204,19 +221,21 @@ const Browse3Mounted: FC<{
                 display: 'flex',
                 flexDirection: 'column',
               }}>
-              <Browse3ProjectRootORMProvider>
-                <Browse3ProjectRoot />
-              </Browse3ProjectRootORMProvider>
+              <ErrorBoundary>
+                <Browse3ProjectRootORMProvider>
+                  <Browse3ProjectRoot />
+                </Browse3ProjectRootORMProvider>
+              </ErrorBoundary>
             </Box>
           </Box>
         </Route>
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
             <Switch>
-              <Route path={`/:entity`}>
+              <Route path={`/${URL_BROWSE3}/:entity`}>
                 <Browse2EntityPage />
               </Route>
-              <Route path={``}>
+              <Route path={`/${URL_BROWSE3}`}>
                 <Browse2HomePage />
               </Route>
             </Switch>
@@ -227,17 +246,49 @@ const Browse3Mounted: FC<{
   );
 };
 
+const useNaiveProjectDataConnection = (entity: string, project: string) => {
+  const objectsNode = useMemo(() => {
+    return fnNaiveBootstrapObjects(entity, project);
+  }, [entity, project]);
+  const runsNode = useMemo(() => {
+    return fnNaiveBootstrapRuns(entity, project);
+  }, [entity, project]);
+  const feedbackNode = useMemo(() => {
+    return fnNaiveBootstrapFeedback(entity, project);
+  }, [entity, project]);
+  const objectsValue = useNodeValue(objectsNode);
+  const runsValue = useNodeValue(runsNode);
+  const feedbackValue = useNodeValue(feedbackNode);
+  return useMemo(() => {
+    if (
+      objectsValue.result == null &&
+      runsValue.result == null &&
+      feedbackValue.result == null
+    ) {
+      return null;
+    }
+    const connection = new WFNaiveProject(entity, project, {
+      objects: objectsValue.result,
+      runs: runsValue.result,
+      feedback: feedbackValue.result,
+    });
+    return connection;
+  }, [
+    entity,
+    feedbackValue.result,
+    objectsValue.result,
+    project,
+    runsValue.result,
+  ]);
+};
+
 const Browse3ProjectRootORMProvider: FC = props => {
-  const [loading, setLoading] = React.useState(true);
   const params = useParams<Browse3ProjectMountedParams>();
-  const {client: weaveClient} = useWeaveContext();
-  const projectData = useMemo(() => {
-    return new WFNaiveProject(params.entity, params.project, weaveClient);
-  }, [params.entity, params.project, weaveClient]);
-  useEffect(() => {
-    projectData.init().then(() => setLoading(false));
-  }, [projectData]);
-  if (loading) {
+  const projectData = useNaiveProjectDataConnection(
+    params.entity,
+    params.project
+  );
+  if (!projectData) {
     return <CenteredAnimatedLoader />;
   }
   return (
@@ -255,7 +306,7 @@ const Browse3ProjectRoot: FC = () => {
 
   useEffect(() => {
     if (params.tab == null) {
-      history.push(
+      history.replace(
         router.callsUIUrl(params.entity, params.project, {
           traceRootsOnly: true,
         })
@@ -676,27 +727,30 @@ const Browse3Breadcrumbs: FC = props => {
   return (
     <Breadcrumbs>
       {params.entity && (
-        <AppBarLink to={`/${params.entity}`}>{params.entity}</AppBarLink>
+        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}`}>
+          {params.entity}
+        </AppBarLink>
       )}
       {params.project && (
-        <AppBarLink to={`/${params.entity}/${params.project}`}>
+        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}/${params.project}`}>
           {params.project}
         </AppBarLink>
       )}
       {params.tab && (
-        <AppBarLink to={`/${params.entity}/${params.project}/${params.tab}`}>
+        <AppBarLink
+          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}`}>
           {params.tab}
         </AppBarLink>
       )}
       {params.itemName && (
         <AppBarLink
-          to={`/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
+          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
           {params.itemName}
         </AppBarLink>
       )}
       {params.version && (
         <AppBarLink
-          to={`/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
+          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
           {params.version}
         </AppBarLink>
       )}
@@ -722,9 +776,9 @@ const Browse3Breadcrumbs: FC = props => {
         ) : (
           <AppBarLink
             key={idx}
-            to={`/${params.entity}/${params.project}/${params.tab}/${
-              params.itemName
-            }/versions/${params.version}/${refFields
+            to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
+              params.tab
+            }/${params.itemName}/versions/${params.version}/${refFields
               .slice(0, idx + 1)
               .join('/')}`}>
             {field}
