@@ -1,4 +1,4 @@
-import {FilterList, FirstPage, LastPage, OpenInNew} from '@mui/icons-material';
+import {FilterList, LastPage, OpenInNew} from '@mui/icons-material';
 import {Badge, Box, List} from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import {DataGridPro, GridColDef, GridValidRowModel} from '@mui/x-data-grid-pro';
@@ -199,7 +199,7 @@ export const FilterLayoutTemplate: React.FC<{
           flex: '0 0 auto',
           height: '100%',
           width: isOpen ? '240px' : '55px',
-          transition: 'width 0.2s ease-in-out',
+          transition: 'width 0.1s ease-in-out',
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',
