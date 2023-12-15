@@ -92,7 +92,7 @@ def list_dim_downresolver(
 
     if isinstance(a, pa.NullArray):
         return ArrowWeaveList(
-            pa.nulls(len(a)),
+            a,
             output_object_type,
             self._artifact,
         )
