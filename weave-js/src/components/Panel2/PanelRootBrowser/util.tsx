@@ -34,20 +34,20 @@ import {
 import _ from 'lodash';
 import {useCallback, useMemo} from 'react';
 
+import {ChildPanelFullConfig} from '../ChildPanel';
 import {usePanelContext} from '../PanelContext';
-import {toWeaveType} from '../toWeaveType';
+import {
+  addNamedColumnToTable,
+  emptyTable,
+  getRowExampleNode,
+} from '../PanelTable/tableState';
 import {
   ensureDashboard,
   ensureDashboardFromItems,
   ensureSimpleDashboard,
   PanelTreeNode,
 } from '../panelTree';
-import {
-  emptyTable,
-  getRowExampleNode,
-  addNamedColumnToTable,
-} from '../PanelTable/tableState';
-import {ChildPanelFullConfig} from '../ChildPanel';
+import {toWeaveType} from '../toWeaveType';
 
 export const useCopiedVariableName = (
   expr: Node,

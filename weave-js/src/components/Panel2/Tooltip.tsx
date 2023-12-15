@@ -41,6 +41,7 @@ const TriggerWrapper = styled.div`
     background-color: ${globals.GOLD_LIGHT}29; /* 16% opacity */
   }
 `;
+TriggerWrapper.displayName = 'S.TriggerWrapper';
 
 type Anchor = 'topleft' | 'topright' | 'bottomleft' | 'bottomright';
 type Direction = 'horizontal' | 'vertical';
@@ -79,6 +80,7 @@ const TooltipWrapper = styled.div<{
   // for the tooltip to properly show in fullscreen mode.
   z-index: 2147483606;
 `;
+TooltipWrapper.displayName = 'S.TooltipWrapper';
 
 const TooltipFrame = styled.div`
   background: white;
@@ -96,12 +98,14 @@ const TooltipFrame = styled.div`
   flex-direction: column;
   overflow: hidden;
 `;
+TooltipFrame.displayName = 'S.TooltipFrame';
 
 const TooltipHeaderText = styled.span`
   font-size: 16px;
   font-weight: 600;
   line-height: 22.4px;
 `;
+TooltipHeaderText.displayName = 'S.TooltipHeaderText';
 
 const TooltipButtons = styled.div`
   display: flex;
@@ -141,6 +145,7 @@ const TooltipButtons = styled.div`
     color: ${globals.TEAL};
   }
 `;
+TooltipButtons.displayName = 'S.TooltipButtons';
 
 const TooltipHeader = styled.div`
   padding: 0px 16px;
@@ -152,6 +157,7 @@ const TooltipHeader = styled.div`
   align-items: center;
   border-bottom: 1px solid ${globals.GRAY_350};
 `;
+TooltipHeader.displayName = 'S.TooltipHeader';
 
 const TooltipBody = styled.div`
   padding: 12px 16px;
@@ -169,6 +175,7 @@ const TooltipBody = styled.div`
     font-size: 14px;
   }
 `;
+TooltipBody.displayName = 'S.TooltipBody';
 
 interface TooltipPosition {
   x: number;

@@ -52,6 +52,13 @@ gql_prop_op(
     types.String(),
 )
 
+gql_prop_op(
+    "user-userInfo",
+    wdt.UserType,
+    "userInfo",
+    types.Dict(types.String(), types.Any()),
+)
+
 # Section 4/6: Direct Relationship Ops
 # None
 

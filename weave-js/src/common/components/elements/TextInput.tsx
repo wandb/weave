@@ -1,9 +1,9 @@
 import React, {FC} from 'react';
 import {InputOnChangeData} from 'semantic-ui-react';
-import {TextInput as TextInputNew} from './TextInputNew';
 
-import * as S from './TextInput.styles';
 import {useWeaveSidebarConfigStylingEnabled} from '../../../context';
+import * as S from './TextInput.styles';
+import {TextInput as TextInputNew} from './TextInputNew';
 
 interface TextInputProps {
   dataTest: string;

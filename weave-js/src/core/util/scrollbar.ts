@@ -1,5 +1,5 @@
-import {useState, useRef, useCallback, useMemo, MouseEvent} from 'react';
 import _ from 'lodash';
+import {MouseEvent, useCallback, useMemo, useRef, useState} from 'react';
 
 type ScrollbarVisibility = {
   visible: boolean;

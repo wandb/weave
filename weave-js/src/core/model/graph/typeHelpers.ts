@@ -5,6 +5,7 @@ import type {
   BaseNode,
   ConstNode,
   InputTypes,
+  Node,
   NodeOrVoidNode,
   OutputNode,
   OutputTypeAsNode,
@@ -46,6 +47,12 @@ export function isVoidNode(maybeNode: any): maybeNode is VoidNode {
     isBaseNode(maybeNode) &&
     has('nodeType', maybeNode) &&
     maybeNode.nodeType === 'void'
+  );
+}
+
+export function isNonVoidNode(maybeNode: any): maybeNode is Node {
+  return (
+    isOutputNode(maybeNode) || isVarNode(maybeNode) || isConstNode(maybeNode)
   );
 }
 

@@ -1,4 +1,5 @@
 // import {ErrorBoundary} from 'react-error-boundary';
+import {datadogRum} from '@datadog/browser-rum';
 import {
   callOpVeryUnsafe,
   constNodeUnsafe,
@@ -14,14 +15,17 @@ import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useRef, useState} from 'react';
 import {Button, Modal, Popup} from 'semantic-ui-react';
 
+import {WeaveApp} from '../..';
 import {
-  useWeaveFeaturesContext,
   useWeaveErrorBoundaryInPanelComp2Enabled,
+  useWeaveFeaturesContext,
 } from '../../context';
 // import {useExpressionHoverHandlers} from './PanelContext';
 import {useWeaveContext} from '../../context';
+import {weaveErrorToDDPayload} from '../../errors';
 import {useDeepMemo} from '../../hookUtils';
 import * as CGReact from '../../react';
+import {ErrorPanel} from '../ErrorPanel';
 import {panelSpecById} from './availablePanels';
 import {ComputeGraphViz} from './ComputeGraphViz';
 import * as Panel2 from './panel';
@@ -29,12 +33,8 @@ import * as S from './PanelComp.styles';
 import {usePanelContext} from './PanelContext';
 import {PanelExportUpdaterContext} from './PanelExportContext';
 import * as PanelLib from './panellib/libpanel';
-import * as TSTypeWithPath from './tsTypeWithPath';
 import {HOVER_DELAY_MS} from './Tooltip';
-import {ErrorPanel} from '../ErrorPanel';
-import {weaveErrorToDDPayload} from '../../errors';
-import {datadogRum} from '@datadog/browser-rum';
-import {WeaveApp} from '../..';
+import * as TSTypeWithPath from './tsTypeWithPath';
 
 class PanelCompErrorBoundary extends React.Component<
   {

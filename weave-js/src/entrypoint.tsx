@@ -1,26 +1,40 @@
 import './globalStyleImports';
 
 import {ApolloProvider} from '@apollo/client';
-import React from 'react';
+import {
+  getNightMode,
+  updateUserInfo,
+  useViewerUserInfo,
+} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import React, {FC, useEffect} from 'react';
 import ReactDOM from 'react-dom';
-import {BrowserRouter as Router, Switch, Route} from 'react-router-dom';
+import useMousetrap from 'react-hook-mousetrap';
+import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
 
 import {apolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
+import {Browse2} from './components/PagePanelComponents/Home/Browse2';
+import {Browse3} from './components/PagePanelComponents/Home/Browse3';
+import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
+import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
+import getConfig from './config';
+import {
+  useIsAuthenticated,
+  WeaveViewerContextProvider,
+} from './context/WeaveViewerContext';
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
+  URL_BROWSE2,
+  URL_BROWSE3,
   URL_LOCAL,
-  URL_TEMPLATES,
   URL_RECENT,
+  URL_TEMPLATES,
   URL_WANDB,
 } from './urls';
-import getConfig from './config';
-import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
-import {WeaveViewerContextProvider} from './context/WeaveViewerContext';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -57,18 +71,83 @@ class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   }
 }
 
+type ThemerProps = {
+  children: React.ReactNode;
+};
+
+const setPageNightMode = (isNightMode: boolean) => {
+  if (isNightMode) {
+    // Note: This adds the 'night-mode' class to the <html> element.
+    // If we add the class to a different element, the night mode css filter breaks position:fixed components, e.g. <ViewBar>.
+    // Google 'css filter position fixed' for more details.
+    // Surprising fix found here: https://developpaper.com/explain-the-reasons-and-solutions-of-the-conflict-between-filter-and-fixed-in-detail/
+    document.documentElement.classList.add('night-mode');
+    // Used for tailwind dark mode
+    document.documentElement.setAttribute('data-mode', 'dark');
+  } else {
+    document.documentElement.classList.remove('night-mode');
+    document.documentElement.removeAttribute('data-mode');
+  }
+};
+
+// Handle light/dark mode theme
+const Themer = ({children}: ThemerProps) => {
+  const {loading, userInfo} = useViewerUserInfo();
+
+  useMousetrap('option+m', () => {
+    const isNightMode = getNightMode(userInfo);
+    setPageNightMode(!isNightMode);
+    userInfo.betaFeatures.night = !isNightMode;
+    updateUserInfo(userInfo);
+  });
+
+  useEffect(() => {
+    if (!loading) {
+      const isNightMode = getNightMode(userInfo);
+      setPageNightMode(isNightMode);
+    }
+  }, [loading, userInfo]);
+
+  return loading ? null : <>{children}</>;
+};
+
 type MainProps = {
   browserType?: string;
 };
 
-const Main = ({browserType}: MainProps) => (
+const Main = ({browserType}: MainProps) => {
+  // If we aren't authenticated, we don't have the ability to see/set the
+  // user's night mode preference, so we just omit the theme support entirely.
+  const isAuthed = useIsAuthenticated();
+  let page = <PagePanel browserType={browserType} />;
+  if (isAuthed) {
+    page = <Themer>{page}</Themer>;
+  }
+  return (
+    <React.Suspense fallback="loading">
+      <ErrorBoundary>
+        <NotebookComputeGraphContextProvider>
+          <StateInspector name="WeaveApp">
+            <PanelRootContextProvider>
+              <WeaveViewerContextProvider>{page}</WeaveViewerContextProvider>
+            </PanelRootContextProvider>
+          </StateInspector>
+        </NotebookComputeGraphContextProvider>
+      </ErrorBoundary>
+    </React.Suspense>
+  );
+};
+
+const BrowseWrapper: FC = props => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
         <StateInspector name="WeaveApp">
           <PanelRootContextProvider>
             <WeaveViewerContextProvider>
-              <PagePanel browserType={browserType} />
+              <PanelInteractContextProvider>
+                {props.children}
+              </PanelInteractContextProvider>
             </WeaveViewerContextProvider>
           </PanelRootContextProvider>
         </StateInspector>
@@ -99,6 +178,21 @@ ReactDOM.render(
         </Route>
         <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
           <Main browserType={URL_LOCAL} />
+        </Route>
+        <Route path={`/${URL_BROWSE2}`}>
+          <BrowseWrapper>
+            <Browse2 basename={`/${URL_BROWSE2}`} />
+          </BrowseWrapper>
+        </Route>
+        <Route path={`/${URL_BROWSE3}`}>
+          <BrowseWrapper>
+            <Browse3
+              basename={`/${URL_BROWSE3}`}
+              projectRoot={(entityName: string, projectName: string) => {
+                return `/${entityName}/${projectName}`;
+              }}
+            />
+          </BrowseWrapper>
         </Route>
         <Route path="/">
           <Main />

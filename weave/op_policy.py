@@ -48,7 +48,16 @@ CACHE_OP_NAMES = (
     + CACHE_NON_PURE_OP_NAMES
 )
 
-ARROW_FS_OPS = ["run-history3", "run-history3_with_columns", "table-rows"]
+ARROW_FS_OPS = [
+    "run-history3",
+    "run-history3_with_columns",
+    "table-rows",
+    "partitionedtable-rows",
+    "joinedtable-rows",
+    "mapped_table-rows",
+    "mapped_partitionedtable-rows",
+    "mapped_joinedtable-rows",
+]
 
 
 # history ops are parallelized by derive_op only, in a custom way
@@ -57,6 +66,10 @@ PARALLEL_OP_NAMES = CACHE_AND_PARALLEL_OP_NAMES
 
 
 def should_run_in_parallel(op_name: str) -> bool:
+    # Uncomment to enable parallelism for custom ops (weaveflow)
+    # if "://" in op_name:
+    #     # Always parallelize custom ops for now (ops that are not built-ins)
+    #     return True
     if op_name.startswith("mapped_"):
         op_name = op_name[len("mapped_") :]
     return op_name in PARALLEL_OP_NAMES

@@ -1,7 +1,8 @@
-import React, {Component, ErrorInfo, ReactNode} from 'react';
-import {ErrorPanel} from './ErrorPanel';
 import {datadogRum} from '@datadog/browser-rum';
+import React, {Component, ErrorInfo, ReactNode} from 'react';
+
 import {weaveErrorToDDPayload} from '../errors';
+import {ErrorPanel} from './ErrorPanel';
 
 type Props = {
   children?: ReactNode;
@@ -12,13 +13,12 @@ type State = {
 };
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-  };
-
   public static getDerivedStateFromError(_: Error): State {
     return {hasError: true};
   }
+  public state: State = {
+    hasError: false,
+  };
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     datadogRum.addAction(

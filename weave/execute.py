@@ -1,4 +1,4 @@
-import dataclasses
+import hashlib
 import logging
 import contextlib
 import contextvars
@@ -9,7 +9,7 @@ import time
 import threading
 import typing
 import traceback
-
+import json
 
 # Configuration
 from . import wandb_api
@@ -38,14 +38,19 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
+from . import storage
+from . import artifact_wandb
 from . import op_policy
 from . import trace_local
 from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
+from . import stream_data_interfaces
+from .monitoring import monitor
 
 # Language Features
+from . import eager
 from . import language_nullability
 
 from . import parallelism
@@ -224,6 +229,9 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                             ),
                         )
                     )
+                    compiled_nodes = list(compile_results)
+                    publish_graph(compiled_nodes)
+
                     fg = forward_graph.ForwardGraph()
                     compile_results = compile_results.safe_apply(fg.add_node)
 
@@ -273,7 +281,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
         for op_name, group_iter in groups:
             group = list(group_iter)
             op_def = registry_mem.memory_registry.get_op(op_name)
-            if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
+            if (
+                parallel_budget != 1
+                and len(group) > 1
+                and op_policy.should_run_in_parallel(op_name)
+            ):
                 # Parallel threaded case
                 num_threads = min(len(group), parallel_budget)
                 remaining_budget_per_thread = (
@@ -379,7 +391,9 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
 
                     if span is not None:
                         span.set_tag(
-                            "bytes_read_to_arrow", report["bytes_read_to_arrow"]
+                            "bytes_read_to_arrow",
+                            report["bytes_read_to_arrow"],
+                            report["bytes_read_to_arrow"],
                         )
 
                     stats.add_node(
@@ -424,11 +438,182 @@ def execute_async_op(
     job.start()
 
 
-def execute_sync_op(
-    op_def: op_def.OpDef,
-    inputs: Mapping[str, typing.Any],
+def publish_enabled():
+    # only auto publish if we have inited monitoring (with weave.init or init_monitor)
+    # and eager mode is on, as in weaveflow
+
+    # We're checking mon.streamtable, which is available if weave.init is called.
+    # But if the user instead called init_monitor, this check would pass but the
+    # later publish calls would fill since weave.init is required for those.
+    # Our intention is to replace init_monitor with weave.init, but that is not
+    # yet complete.
+    # TODO: Fix
+    return monitor.default_monitor().streamtable and context_state.eager_mode()
+
+
+def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
+    import numpy as np
+
+    ref = storage.get_ref(obj)
+    if ref:
+        output_refs.append(ref)
+        return ref
+
+    if isinstance(obj, dict):
+        return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_auto_publish(v, output_refs) for v in obj]
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    weave_type = types.TypeRegistry.type_of(obj)
+    if not (
+        types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
+    ):
+        return obj
+    from .api import publish
+
+    if not ref:
+        ref = publish(
+            obj,
+            f"{obj.__class__.__name__}",
+        )
+    output_refs.append(ref)
+    return ref
+
+
+def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
+    refs: typing.List[ref_base.Ref] = []
+    return _auto_publish(obj, refs), refs
+
+
+def publish_graph(
+    nodes: typing.List[graph.Node],
 ):
-    return op_def.resolve_fn(**inputs)
+    """Publish all ops and ConstNodes found in graph"""
+
+    def _publish_node(node: graph.Node):
+        if isinstance(node, graph.OutputNode):
+            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+            if not op_def.location:
+                # Only publish custom ops
+                return
+            op_def_ref = storage._get_ref(op_def)
+            if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
+                from .api import publish
+
+                op_def_ref = publish(
+                    op_def,
+                    f"{op_def.name}",
+                )
+        elif isinstance(node, graph.ConstNode):
+            auto_publish(node.val)
+
+    if publish_enabled():
+        graph.map_nodes_full(nodes, _publish_node)
+
+
+def hash_inputs(
+    op_name: str,
+    inputs: Mapping[str, typing.Any],
+) -> str:
+    hasher = hashlib.sha256()
+    for input in inputs:
+        hasher.update(f"Op Name: {op_name}".encode())
+        hasher.update(f"Input name: {input}".encode())
+
+        val = inputs[input]
+        if isinstance(val, ref_base.Ref):
+            hasher.update(str(val).encode())
+        else:
+            # The assumption here is that if we have a custom object,
+            # it has already been converted to a ref because we have
+            # already called auto_publish on it. That means if we reach
+            # this stage, anything left should be a JSONable primitive.
+            # This is all in principle though, so if it doesn't work, we may
+            # need to add a call to storage.to_python() here and possibly
+            # plumb through the input_types.
+
+            serialized = json.dumps(val).encode()
+            hasher.update(serialized)
+    return hasher.hexdigest()
+
+
+def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
+    mon = monitor.default_monitor()
+    mon_span_inputs = {**inputs}
+    if publish_enabled() and op_def.location:
+        op_def_ref = storage._get_ref(op_def)
+        if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
+            # This should have already been published by publish_graph if monitoring
+            # is turned on.
+            raise errors.WeaveInternalError(
+                "Found unpublished custom OpDef with monitoring turned on", op_def
+            )
+        mon_span_inputs, refs = auto_publish(inputs)
+
+        input_hash = hash_inputs(
+            op_def.name,
+            mon_span_inputs,
+        )
+
+        with context_state.lazy_execution():
+            maybe_span_node = mon.rows()
+            if maybe_span_node is None:
+                return None
+
+            span_node = maybe_span_node.filter(  # type: ignore
+                lambda x: x["attributes"]["input_hash"] == input_hash
+            )
+            iter: eager.WeaveIter[
+                stream_data_interfaces.TraceSpanDict
+            ] = eager.WeaveIter(span_node)
+            span_dict = iter[0]
+
+            if (
+                span_dict != None and span_dict is not None
+            ):  # this is needed for the type checker to be happy
+                output = span_dict["output"]
+                if output != None and output is not None:
+                    return output["_result"]
+
+        with mon.span(str(op_def_ref)) as span:
+            span.inputs = mon_span_inputs
+            span.inputs["_keys"] = list(inputs.keys())
+            span.attributes["input_hash"] = input_hash
+
+            for i, ref in enumerate(refs[:3]):
+                span.inputs["_ref%s" % i] = ref
+                span.inputs["_ref_digest%s" % i] = ref.digest
+            try:
+                res = op_def.resolve_fn(**inputs)
+            except Exception as e:
+                span.status_code = monitor.StatusCode.ERROR
+                span.exception = e
+                raise
+
+            # Note this unboxes, but doesn't move tags.
+            # We should not allow tagging in the standard user / eager path anyway
+            if isinstance(res, box.BoxedNone):
+                res = None
+            log_res = res
+            if not isinstance(log_res, dict):
+                log_res = {"_result": log_res}
+            span.output, refs = auto_publish(log_res)
+            for i, ref in enumerate(refs[:3]):
+                span.output["_ref%s" % i] = ref
+            span.output["_keys"] = list(log_res.keys())
+    else:
+        res = op_def.resolve_fn(**inputs)
+
+    # TODO: not simple name
+    # TODO: capture publish time here?
+    # TODO: yeah we need to capture all engine overhead so prob want this
+    #    at a higher level... in the engine (execute_forward_node or higher)
+    # TODO: this needs to work with local object saving as well
+    # TODO: generalize "self" publishing above
+    return res
 
 
 def is_run_op(op_call: graph.Op):
@@ -450,10 +635,13 @@ def get_bytes_read_to_arrow(node: graph.Node, result: typing.Any) -> int:
     if (
         isinstance(node, graph.OutputNode)
         and node.from_op.name in op_policy.ARROW_FS_OPS
-        and isinstance(result, ArrowWeaveList)
     ):
-        return result._arrow_data.nbytes
-
+        if node.from_op.name.startswith("mapped"):
+            return sum(
+                r._arrow_data.nbytes for r in result if isinstance(r, ArrowWeaveList)
+            )
+        if isinstance(result, ArrowWeaveList):
+            return result._arrow_data.nbytes
     return 0
 
 

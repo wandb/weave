@@ -1,3 +1,4 @@
+import {useWeaveRefinementInReactHooksDisabled} from '@wandb/weave/context';
 import {Node, pushFrame, Stack, WeaveInterface} from '@wandb/weave/core';
 
 import {
@@ -6,7 +7,6 @@ import {
   vectorizePromiseFn,
 } from './hooks';
 import * as Table from './tableState';
-import {useWeaveRefinementInReactHooksDisabled} from '@wandb/weave/context';
 
 // This refines all table state expressions when their input variable values
 // change. This is is complicated by the fact that grouped v. ungrouped

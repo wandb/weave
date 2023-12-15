@@ -3,6 +3,7 @@
 import * as w from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {useMemo} from 'react';
+
 import {
   getLocalArtifactDataNode,
   opFilterArtifactsToWeaveObjects,
@@ -52,6 +53,28 @@ export const useUserEntities = (
       loading: entityNameValue.loading,
     }),
     [entityNameValue.loading, entityNameValue.result]
+  );
+};
+
+export const useProjectsForEntity = (
+  entityName: string
+): {
+  result: string[];
+  loading: boolean;
+} => {
+  const projectsNode = w.opEntityProjects({
+    entity: w.opRootEntity({
+      entityName: w.constString(entityName),
+    }),
+  });
+  const projectNamesNode = w.opProjectName({project: projectsNode});
+  const projectNamesValue = useNodeValue(projectNamesNode);
+  return useMemo(
+    () => ({
+      result: projectNamesValue.result ?? [],
+      loading: projectNamesValue.loading,
+    }),
+    [projectNamesValue.loading, projectNamesValue.result]
   );
 };
 
@@ -193,6 +216,52 @@ export const useProjectAssetCount = (
   };
 };
 
+export const useProjectAssetCountGeneral = (
+  entityName: string,
+  projectName: string
+): {
+  result: Array<{_id: string; [key: string]: any}>;
+  loading: boolean;
+} => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+  const arifactTypesNode = w.opProjectArtifactTypes({
+    project: projectNode,
+  });
+  const assetCountsNode = w.opMap({
+    arr: arifactTypesNode,
+    mapFn: w.constFunction({row: 'artifactType'}, ({row}) => {
+      const artifactTypeNode = w.opArtifactTypeArtifacts({
+        artifactType: row,
+      });
+      const artifactCountNode = w.opCount({
+        arr: artifactTypeNode,
+      });
+      const artifactTypeName = w.opArtifactTypeName({
+        artifactType: row,
+      });
+      return w.opDict({
+        artifactTypeName,
+        artifactCount: artifactCountNode,
+      } as any);
+    }),
+  });
+  const resultQuery = useNodeValue(assetCountsNode);
+
+  return useMemo(() => {
+    const resultRows = resultQuery.result ?? [];
+    return {
+      result: resultRows.map((row: any) => ({
+        name: row.artifactTypeName,
+        'object count': row.artifactCount,
+      })),
+      loading: resultQuery.loading,
+    };
+  }, [resultQuery]);
+};
+
 const opProjectBoardCount = ({project}: {project: w.Node}) => {
   return w.opCount({arr: opProjectBoardArtifacts({project})});
 };
@@ -221,12 +290,23 @@ const projectBoardsNode = (entityName: string, projectName: string) => {
 const opProjectBoardArtifacts = ({project}: {project: w.Node}) => {
   let artifactsNode;
   if (ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE) {
-    const artifactTypesNode = w.opProjectArtifactType({
-      project,
-      artifactType: w.constString('Group'),
+    const preWeaveflowArtifactTypesNode = w.opArtifactTypeArtifacts({
+      artifactType: w.opProjectArtifactType({
+        project,
+        artifactType: w.constString('Group'),
+      }),
     });
-    artifactsNode = w.opArtifactTypeArtifacts({
-      artifactType: artifactTypesNode,
+    const postWeaveflowArtifactTypesNode = w.opArtifactTypeArtifacts({
+      artifactType: w.opProjectArtifactType({
+        project,
+        artifactType: w.constString('Panel'),
+      }),
+    });
+    artifactsNode = w.opConcat({
+      arr: w.opArray({
+        a: preWeaveflowArtifactTypesNode,
+        b: postWeaveflowArtifactTypesNode,
+      } as any),
     });
   } else {
     const artifactTypesNode = w.opProjectArtifactTypes({
@@ -353,6 +433,132 @@ export const useProjectBoards = (
     }),
     [artifactDetailsValue.loading, artifactDetailsValue.result]
   );
+};
+
+export const useProjectObjectsOfType = (
+  entityName: string,
+  projectName: string,
+  assetType: string
+): {
+  result: Array<{
+    name: string;
+    createdAt: number;
+    versionCount: number;
+  }>;
+  loading: boolean;
+} => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+  const arifactTypeNode = w.opProjectArtifactType({
+    project: projectNode,
+    artifactType: w.constString(assetType),
+  });
+  const artifactsNode = w.opArtifactTypeArtifacts({
+    artifactType: arifactTypeNode,
+  });
+  const artifactsInfoNode = w.opMap({
+    arr: artifactsNode,
+    mapFn: w.constFunction({row: 'artifact'}, ({row}) => {
+      const artifactVersionsNode = w.opArtifactVersions({
+        artifactType: row,
+      });
+      const artifactVersionCountNode = w.opCount({
+        arr: artifactVersionsNode,
+      });
+      const artifactName = w.opArtifactName({
+        artifact: row,
+      });
+      return w.opDict({
+        name: artifactName,
+        createdAt: w.opArtifactCreatedAt({artifact: row}),
+        versionCount: artifactVersionCountNode,
+      } as any);
+    }),
+  });
+  const resultQuery = useNodeValue(artifactsInfoNode);
+  return useMemo(() => {
+    return {
+      result: resultQuery.result ?? [],
+      loading: resultQuery.loading,
+    };
+  }, [resultQuery]);
+};
+
+export const useObjectAliases = (
+  entityName: string,
+  projectName: string,
+  objectName: string
+): {
+  result: string[];
+  loading: boolean;
+} => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+  const artifactNode = w.opProjectArtifact({
+    project: projectNode,
+    artifactName: w.constString(objectName),
+  });
+  const artifactAliasesNode = w.opArtifactAliases({
+    artifact: artifactNode,
+  });
+  const aliasNamesNode = w.opArtifactAliasAlias({alias: artifactAliasesNode});
+  const resultQuery = useNodeValue(aliasNamesNode);
+  return useMemo(() => {
+    return {
+      result: resultQuery.result ?? [],
+      loading: resultQuery.loading,
+    };
+  }, [resultQuery]);
+};
+
+export const useObjectVersions = (
+  entityName: string,
+  projectName: string,
+  objectName: string
+): {
+  result: Array<{
+    name: string;
+    createdAt: number;
+    digest: string;
+  }>;
+  loading: boolean;
+} => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+  const artifactNode = w.opProjectArtifact({
+    project: projectNode,
+    artifactName: w.constString(objectName),
+  });
+  const artifactVersionsNode = w.opArtifactVersions({
+    artifact: artifactNode,
+  });
+
+  const queryNode = w.opMap({
+    arr: artifactVersionsNode,
+    mapFn: w.constFunction({row: 'artifactVersion'}, ({row}) => {
+      return w.opDict({
+        createdAt: w.opArtifactVersionCreatedAt({
+          artifactVersion: row,
+        }),
+        digest: w.opArtifactVersionHash({
+          artifactVersion: row,
+        }),
+      } as any);
+    }),
+  });
+  const resultQuery = useNodeValue(queryNode);
+  return useMemo(() => {
+    return {
+      result: (resultQuery.result as any) ?? [],
+      loading: resultQuery.loading,
+    };
+  }, [resultQuery]);
 };
 
 export const useProjectLegacyTraces = (

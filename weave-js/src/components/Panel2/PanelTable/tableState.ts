@@ -1,6 +1,5 @@
 import {
   allObjPaths,
-  rootObject,
   constFunction,
   ConstNode,
   constNodeUnsafe,
@@ -8,6 +7,7 @@ import {
   constString,
   dereferenceAllVars,
   escapeDots,
+  filterNodes,
   Frame,
   isAssignableTo,
   isFunction,
@@ -41,9 +41,11 @@ import {
   OpStore,
   opUnique,
   OutputNode,
+  PathType,
   pushFrame,
   refineNode,
   resolveVar,
+  rootObject,
   simpleNodeString,
   Stack,
   Type,
@@ -51,8 +53,6 @@ import {
   varNode,
   voidNode,
   WeaveInterface,
-  PathType,
-  filterNodes,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -508,8 +508,16 @@ export function equalStates(aTable: TableState, bTable?: TableState) {
   return true;
 }
 
-export function appendEmptyColumn(ts: TableState, index?: number) {
-  const colId = index == null ? newColumnId(ts) : `col-${index}`;
+export function appendEmptyColumn(
+  ts: TableState,
+  index?: number,
+  customId?: string
+) {
+  const colId = customId
+    ? customId
+    : index == null
+    ? newColumnId(ts)
+    : `col-${index}`;
   return produce(ts, draft => {
     draft.columns[colId] = {
       panelId: '',
@@ -1507,9 +1515,10 @@ export function getCellValueNode(
 
 export function addColumnToTable(
   table: TableState,
-  selectFn: NodeOrVoidNode<Type>
+  selectFn: NodeOrVoidNode<Type>,
+  customId?: string
 ): {table: TableState; columnId: string} {
-  table = appendEmptyColumn(table);
+  table = appendEmptyColumn(table, undefined, customId);
   const columnId = table.order[table.order.length - 1];
   table = updateColumnSelect(table, columnId, selectFn);
 

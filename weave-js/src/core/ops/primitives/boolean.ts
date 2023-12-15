@@ -1,11 +1,11 @@
 import {
+  getValueFromTaggedValue,
   maybe,
+  Node,
   skipTaggable,
+  Type,
   typedDictPropertyTypes,
   union,
-  Node,
-  Type,
-  getValueFromTaggedValue,
 } from '../../model';
 import {makeEqualOp, makeNotEqualOp, makeStandardOp} from '../opKinds';
 import {opDict} from './literals';

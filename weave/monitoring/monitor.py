@@ -16,6 +16,7 @@ from ..wandb_interface.wandb_stream_table import StreamTable
 from .. import errors
 from .. import graph
 from .. import stream_data_interfaces
+from .. import graph_client_context
 
 logger = logging.getLogger(__name__)
 
@@ -180,14 +181,25 @@ class SpanWithInputsAndOutput(Span):
 
 @dataclasses.dataclass
 class Monitor:
-    # When this is None, monitor is disabled
+    # Can be init'd with a specific streamtable
     _streamtable: typing.Optional[StreamTable]
 
     _showed_not_logging_warning: bool = False
 
+    @property
+    def streamtable(self) -> typing.Optional[StreamTable]:
+        if self._streamtable:
+            return self._streamtable
+        # If we weren't init'd with a streamtable, try to get the global
+        # one.
+        client = graph_client_context.get_graph_client()
+        if client:
+            self._streamtable = client.runs_st
+        return self._streamtable
+
     @contextlib.contextmanager
     def span(self, name: str) -> typing.Iterator[Span]:
-        if not self._showed_not_logging_warning and self._streamtable is None:
+        if not self._showed_not_logging_warning and self.streamtable is None:
             self._showed_not_logging_warning = True
             print(
                 "WARNING: Not logging spans.  Call weave.monitor.init_monitor() to enable logging."
@@ -200,7 +212,7 @@ class Monitor:
             trace_id = parent_span.trace_id
         else:
             parent_id = None
-        span = Span(name, self._streamtable, parent_id, trace_id, _attributes.get())
+        span = Span(name, self.streamtable, parent_id, trace_id, _attributes.get())
         token = _current_span.set(span)
         try:
             yield span
@@ -270,14 +282,17 @@ class Monitor:
                                 raise
                             return output
 
+                sync_wrapper.__name__ = fn.__name__
+                sync_wrapper.__doc__ = fn.__doc__
+
                 return sync_wrapper
 
         return decorator
 
     def rows(self) -> typing.Optional[graph.Node]:
-        if self._streamtable is None:
+        if self.streamtable is None:
             return None
-        return self._streamtable.rows()
+        return self.streamtable.rows()
 
 
 def _init_monitor_streamtable(stream_key: str) -> typing.Optional[StreamTable]:
@@ -325,9 +340,24 @@ def new_monitor(stream_key: str) -> Monitor:
 def init_monitor(stream_key: str) -> Monitor:
     """Initialize the global monitor and return it."""
     global _global_monitor
+    client = graph_client_context.get_graph_client()
+    if client:
+        raise ValueError("weave.init already called, init_monitor is invalid.")
     stream_table = _init_monitor_streamtable(stream_key)
     if _global_monitor is None:
         _global_monitor = Monitor(stream_table)
     else:
         _global_monitor._streamtable = stream_table
     return _global_monitor
+
+
+def deinit_monitor() -> None:
+    global _global_monitor
+    _global_monitor = None
+
+
+def trace(
+    preprocess: typing.Optional[typing.Callable] = None,
+    postprocess: typing.Optional[typing.Callable] = None,
+) -> typing.Callable[..., typing.Callable[..., typing.Any]]:
+    return default_monitor().trace(preprocess=preprocess, postprocess=postprocess)

@@ -50,6 +50,16 @@ class ObjectToArrowStruct(mappers_python.ObjectToPyDict):
         return pa.struct(fields)
 
 
+class TimeDeltaToArrowTimeDelta(mappers.Mapper):
+    def result_type(self):
+        return pa.duration("us")
+
+
+class ArrowTimeDeltaToTimeDelta(mappers.Mapper):
+    def apply(self, obj):
+        return obj.as_py()
+
+
 class StringToArrow(mappers_python.StringToPyString):
     def result_type(self):
         if _in_tagging_context.get():
@@ -285,6 +295,9 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             or self.type.name == "ArrowTable"
             or self.type.name == "FilesystemArtifact"
             or self.type.name == "file"
+            or self.type.name == "WandbArtifactRef"
+            or self.type.name == "LocalArtifactRef"
+            or self.type.name == "OpDef"
         ):
             # Ref type
             return pa.string()
@@ -381,6 +394,8 @@ def map_to_arrow_(
         return NoneToArrowNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
         return UnknownToArrowNone(type, mapper, artifact, path)
+    elif isinstance(type, types.TimeDelta):
+        return TimeDeltaToArrowTimeDelta(type, mapper, artifact, path)
     else:
         return DefaultToArrow(type, mapper, artifact, path)
 
@@ -416,6 +431,8 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
         return mappers_python.NoneToPyNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
         return UnknownToArrowNone(type, mapper, artifact, path)
+    elif isinstance(type, types.TimeDelta):
+        return ArrowTimeDeltaToTimeDelta(type, mapper, artifact, path)
     else:
         return DefaultFromArrow(type, mapper, artifact, path)
 

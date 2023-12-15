@@ -1,21 +1,21 @@
 import {
-  NodeOrVoidNode,
   constNodeUnsafe,
   isNullable,
   listObjectType,
+  NodeOrVoidNode,
   opUnique,
   voidNode,
 } from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
+import {Checkbox} from 'semantic-ui-react';
 
 import {useMutation, useNodeValue} from '../../react';
-import * as Panel2 from './panel';
 import {
   ConfigOption,
   ConfigSection,
   ExpressionConfigField,
 } from './ConfigPanel';
-import {Checkbox} from 'semantic-ui-react';
+import * as Panel2 from './panel';
 import {useUpdateConfig2} from './PanelComp';
 
 const inputType = {

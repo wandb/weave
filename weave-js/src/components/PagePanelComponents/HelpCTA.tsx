@@ -1,7 +1,8 @@
 import React from 'react';
-import * as LE from './Home/LayoutElements';
-import {IconHelpAlt} from '../Icon';
 import styled from 'styled-components';
+
+import {IconHelpAlt} from '../Icon';
+import * as LE from './Home/LayoutElements';
 
 const HelpCTAOuter = styled(LE.HStack)`
   position: absolute;

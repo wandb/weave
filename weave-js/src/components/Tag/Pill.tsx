@@ -1,7 +1,7 @@
-import {Icon, IconName} from '../Icon';
 import React, {FC} from 'react';
 import {twMerge} from 'tailwind-merge';
 
+import {Icon, IconName} from '../Icon';
 import {Tailwind} from '../Tailwind';
 import {getTagColorClass, TagColorName} from './utils';
 

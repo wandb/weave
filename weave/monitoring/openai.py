@@ -208,3 +208,6 @@ class Completion:
         return monitored_create(
             openai.Completion.create, process_completion_choice, count_completion_tokens
         )(**kwargs)
+
+
+error = openai.error

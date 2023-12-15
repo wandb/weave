@@ -1,5 +1,6 @@
 import {
   constFunction,
+  isAssignableTo,
   isVoidNode,
   Node,
   NodeOrVoidNode,
@@ -7,6 +8,8 @@ import {
   opMapEach,
   opPick,
   opRunId,
+  taggedValue,
+  typedDict,
   voidNode,
   withNamedTag,
 } from '@wandb/weave/core';
@@ -17,7 +20,14 @@ import {usePanelContext} from '.././PanelContext';
 export const useColorNode = (inputNode: Node): NodeOrVoidNode => {
   const {frame} = usePanelContext();
   return useMemo(() => {
-    if (frame.runColors == null || isVoidNode(frame.runColors)) {
+    if (
+      frame.runColors == null ||
+      isVoidNode(frame.runColors) ||
+      !isAssignableTo(
+        inputNode.type,
+        taggedValue(typedDict({run: 'run'}), 'any')
+      )
+    ) {
       return voidNode();
     }
     return opMapEach({

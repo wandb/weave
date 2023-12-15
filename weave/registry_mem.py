@@ -25,7 +25,8 @@ class Registry:
     # common_name: name: op_def
     _ops_by_common_name: typing.Dict[str, dict[str, op_def.OpDef]]
 
-    _op_versions: typing.Dict[typing.Tuple[str, str], op_def.OpDef]
+    # Ops stored by their URI (for ops that are non-builtin).
+    _op_versions: typing.Dict[str, op_def.OpDef]
 
     # Maintains a timestamp of when the registry was last updated.
     # This is useful for caching the ops dictionary when serving
@@ -57,6 +58,12 @@ class Registry:
             ref = storage.save(op, name=op.name + ":latest")
             version = ref.version
             location = ref.artifact.path_uri("obj")
+        # Hmm...
+        # if location:
+        #     # PR: Something is f'd and we don't get the right "obj" on location
+        #     # TODO: Fix
+        #     location.path = "obj"
+
         version = location.version if location is not None else None
         op.version = version
         op.location = location
@@ -64,8 +71,8 @@ class Registry:
         # if not is_loading:
         self._ops[op.name] = op
         self._ops_by_common_name.setdefault(op.common_name, {})[op.name] = op
-        if version:
-            self._op_versions[(op.name, version)] = op
+        if location:
+            self._op_versions[str(location)] = op
         return op
 
     def have_op(self, op_name: str) -> bool:
@@ -74,7 +81,7 @@ class Registry:
     def get_op(self, uri: str) -> op_def.OpDef:
         object_uri = uris.WeaveURI.parse(uri)
         if object_uri.version is not None:
-            object_key = (object_uri.name, object_uri.version)
+            object_key = str(object_uri)
             if object_key in self._op_versions:
                 res = self._op_versions[object_key]
             else:
@@ -152,20 +159,18 @@ class Registry:
         self._ops_by_common_name[op.common_name].pop(name)
         self._ops_by_common_name.setdefault(op.common_name, {})[new_name] = op
 
-        old_version = op.version
+        old_location = op.location
 
         # TODO(DG): find a better way to do this than to save the op again
         # see comment here: https://github.com/wandb/weave-internal/pull/554#discussion_r1103875156
         if op.location is not None:
             ref = storage.save(op, name=new_name)
-            location = ref.artifact.uri_obj
-            version = ref.version
-            op.version = version
-            op.location = location
+            op.version = ref.version
+            op.location = uris.WeaveURI.parse(ref.uri)
 
         if op.version is not None:
-            self._op_versions.pop((name, old_version))
-            self._op_versions[(new_name, op.version)] = op
+            self._op_versions.pop(str(old_location))
+            self._op_versions[str(op.location)] = op
 
     # def register_type(self, type: weave_types.Type):
     #    self._types[type.name] = type

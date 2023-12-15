@@ -76,7 +76,32 @@ type Query {
   repo(id: ID!): Repo
 }
 
+input UpdateUserInput {
+  id: ID # null implies "self" -- only admins can edit others
+  primaryEmail: String
+  defaultEntity: String
+  defaultFramework: String # deprecated
+  photoUrl: String
+  code: String
+  name: String @constraints(max: 64)
+  userInfo: JSONString
+  hideTeamsFromPublic: Boolean
+  settingsVisited: Boolean
+  galleryVisited: Boolean
+  onboardingHidden: Boolean
+  private: Boolean
+  admin: Boolean
+  password: String
+  clientMutationId: String
+}
+
+type UpdateUserPayload {
+  user: User
+  clientMutationId: String
+}
+
 type Mutation {
+  updateUser(input: UpdateUserInput!): UpdateUserPayload @audit
   deleteView(input: DeleteViewInput!): DeleteViewPayload
   upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
   updateArtifactSequence(

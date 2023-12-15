@@ -25,8 +25,8 @@ import {
 import * as ConfigPanel from './ConfigPanel';
 import {Tabs} from './LayoutTabs';
 import * as Panel2 from './panel';
-import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {useUpdateConfig2} from './PanelComp';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
 
 type PanelFacetTabsConfig = {
   tab: NodeOrVoidNode;

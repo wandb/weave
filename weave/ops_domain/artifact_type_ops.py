@@ -3,6 +3,7 @@ import typing
 from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
 from . import wb_domain_types as wdt
+from .. import weave_types as types
 
 from .wandb_domain_gql import (
     gql_prop_op,
@@ -64,12 +65,14 @@ first_100_artifacts_alias = _make_alias("first: 100", prefix="artifacts")
             }}
         }}
     }}""",
-        gql_op_output_type=lambda inputs, input_type: wdt.ArtifactVersionType.with_keys(
-            typing.cast(typing.Any, input_type)
-            .keys[first_100_collections_alias]["edges"]
-            .object_type["node"][first_100_artifacts_alias]["edges"]
-            .object_type["node"]
-            .property_types
+        gql_op_output_type=lambda inputs, input_type: types.List(
+            wdt.ArtifactVersionType.with_keys(
+                typing.cast(typing.Any, input_type)
+                .keys[first_100_collections_alias]["edges"]
+                .object_type["node"][first_100_artifacts_alias]["edges"]
+                .object_type["node"]
+                .property_types
+            )
         ),
     ),
 )

@@ -1,7 +1,3 @@
-import * as Panel2 from '../panel';
-import React, {useCallback, useMemo} from 'react';
-import {TraceTreeSpanViewer} from './PanelTraceTreeTrace';
-import {useNodeValue} from '@wandb/weave/react';
 import {
   constFunction,
   constNumber,
@@ -9,9 +5,14 @@ import {
   opLimit,
   opMap,
 } from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
+import React, {useCallback, useMemo} from 'react';
 import {Loader} from 'semantic-ui-react';
-import {SpanWeaveType, flatToTrees, unifyRoots} from './util';
+
+import * as Panel2 from '../panel';
 import {opSpanAsDictToLegacySpanShape} from './common';
+import {TraceTreeSpanViewer} from './PanelTraceTreeTrace';
+import {flatToTrees, SpanWeaveType, unifyRoots} from './util';
 
 const inputType = {
   type: 'list' as const,

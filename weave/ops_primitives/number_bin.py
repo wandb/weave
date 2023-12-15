@@ -41,9 +41,11 @@ def number_bins_fixed(step):
     render_info={"type": "function"},
 )
 def numbers_bins_equal(arr, bins):
+    arr = [i for i in arr if i != None]
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     step = (arr_max - arr_min) / bins
+    step = 1 if step == 0 else step
     return use(number_bins_fixed(step))
 
 

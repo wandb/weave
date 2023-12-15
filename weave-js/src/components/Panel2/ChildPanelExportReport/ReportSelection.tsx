@@ -1,23 +1,23 @@
 import * as w from '@wandb/weave/core';
 import React, {useEffect, useMemo} from 'react';
 
-import {useNodeValue} from '../../../react';
+import {useNodeValue, useValue} from '../../../react';
 import {Select} from '../../Form/Select';
 import {ChildPanelFullConfig} from '../ChildPanel';
 import {
   customEntitySelectComps,
   customReportSelectComps,
 } from './customSelectComponents';
+import {SelectedExistingReport} from './SelectedExistingReport';
 import {
   DEFAULT_REPORT_OPTION,
   EntityOption,
+  GroupedReportOption,
+  isNewReportOption,
+  ProjectOption,
   ReportOption,
   useEntityAndProject,
-  GroupedReportOption,
-  ProjectOption,
-  isNewReportOption,
 } from './utils';
-import {SelectedExistingReport} from './SelectedExistingReport';
 
 type ReportSelectionProps = {
   rootConfig: ChildPanelFullConfig;
@@ -40,7 +40,8 @@ export const ReportSelection = ({
   setSelectedProject,
   onChange,
 }: ReportSelectionProps) => {
-  const {entityName} = useEntityAndProject(rootConfig);
+  const {entityName: boardEntityName, projectName: boardProjectName} =
+    useEntityAndProject(rootConfig);
 
   // Get all of user's entities
   const entitiesMetaNode = w.opMap({
@@ -54,7 +55,7 @@ export const ReportSelection = ({
   });
   const entities = useNodeValue(entitiesMetaNode);
   const selectedEntityNode = w.opRootEntity({
-    entityName: w.constString(selectedEntity?.name ?? entityName),
+    entityName: w.constString(selectedEntity?.name ?? boardEntityName),
   });
 
   // Get list of reports across all entities and projects
@@ -73,9 +74,9 @@ export const ReportSelection = ({
       } as any);
     }),
   });
-  const reports = useNodeValue(reportsMetaNode ?? w.voidNode(), {
-    skip: entities.loading,
-  });
+  const reports = useValue(reportsMetaNode ?? w.voidNode());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => reports.refresh(), []);
   const groupedReportOptions = useMemo(() => {
     return [
       {
@@ -102,32 +103,54 @@ export const ReportSelection = ({
     skip:
       selectedEntity == null ||
       entities.loading ||
-      isNewReportOption(selectedReport),
+      !isNewReportOption(selectedReport),
   });
 
   useEffect(() => {
-    // Default initial entity value based on url
-    if (!entities.loading && entities.result.length > 0) {
-      const foundEntity = entities.result.find(
-        (item: EntityOption) => item.name === entityName
+    // Default initial entity value based on board location
+    if (!selectedEntity && !entities.loading && entities.result.length > 0) {
+      const boardEntity = entities.result.find(
+        (item: EntityOption) => item.name === boardEntityName
       );
-      setSelectedEntity(foundEntity ?? entities.result[0]);
+      setSelectedEntity(boardEntity ?? null);
     }
-  }, [entityName, entities, setSelectedEntity]);
+  }, [boardEntityName, entities, selectedEntity, setSelectedEntity]);
 
   useEffect(() => {
     // Default report value to `New report` option if no reports are found
     if (
+      selectedEntity != null &&
       !reports.loading &&
       reports.result.length === 0 &&
       selectedReport == null
     ) {
       setSelectedReport(DEFAULT_REPORT_OPTION);
     }
-  }, [reports, setSelectedReport, selectedReport]);
+  }, [reports, setSelectedReport, selectedEntity, selectedReport]);
+
+  useEffect(() => {
+    // Default initial project value based on board location
+    if (
+      isNewReportOption(selectedReport) &&
+      !selectedProject &&
+      !projects.loading &&
+      projects.result.length > 0
+    ) {
+      const boardProject = projects.result.find(
+        (item: ProjectOption) => item.name === boardProjectName
+      );
+      setSelectedProject(boardProject ?? null);
+    }
+  }, [
+    boardProjectName,
+    projects,
+    selectedProject,
+    selectedReport,
+    setSelectedProject,
+  ]);
 
   return (
-    <div className="mt-8 flex-1">
+    <div className="flex-1">
       <label
         htmlFor="entity-selector"
         className="mb-4 block font-semibold text-moon-800">
@@ -177,7 +200,7 @@ export const ReportSelection = ({
             className="mb-16"
             id="report-selector"
             isLoading={reports.loading}
-            isDisabled={entities.loading || reports.loading}
+            isDisabled={!selectedEntity || entities.loading || reports.loading}
             options={groupedReportOptions}
             placeholder={!reports.loading && 'Select a report...'}
             getOptionLabel={option => option.name}
@@ -211,7 +234,11 @@ export const ReportSelection = ({
             className="mb-16"
             id="project-selector"
             isLoading={projects.loading}
-            isDisabled={projects.loading || projects.result.length === 0}
+            isDisabled={
+              !selectedReport ||
+              projects.loading ||
+              projects.result.length === 0
+            }
             options={projects.result}
             placeholder={
               !projects.loading && projects.result.length === 0

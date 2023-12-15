@@ -1,4 +1,5 @@
-import * as Table from './tableState';
+import * as _ from 'lodash';
+
 import {
   constNodeUnsafe,
   constNumber,
@@ -20,8 +21,7 @@ import {
   varNode,
   withGroupTag,
 } from '../../../core';
-import * as _ from 'lodash';
-
+import * as Table from './tableState';
 import {
   getTableCellTypes,
   getTableCellValues,

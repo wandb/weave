@@ -20,6 +20,7 @@ import {
   SimpleType,
   TableType,
   TaggedValueType,
+  TimestampType,
   Type,
   TypedDictType,
   Union,
@@ -33,6 +34,13 @@ import {
 
 export function isSimpleTypeShape(t: Type): t is SimpleType {
   return typeof t === 'string';
+}
+
+export function getTypeName(t: Type): string {
+  if (isSimpleTypeShape(t)) {
+    return t;
+  }
+  return t.type;
 }
 
 // Returns a list of all paths for the object.
@@ -1024,7 +1032,7 @@ export function isJoinedTable(t: Type): t is TableType {
   return !isSimpleTypeShape(t) && t?.type === 'joined-table';
 }
 
-export function isTimestamp(t: Type): t is ListType {
+export function isTimestamp(t: Type): t is TimestampType {
   return !isSimpleTypeShape(t) && t.type === 'timestamp';
 }
 

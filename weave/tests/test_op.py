@@ -5,6 +5,7 @@ from .. import graph
 from .. import types
 from .. import weave_internal
 from .. import storage
+from .. import context_state
 from . import test_helpers
 from .. import uris
 
@@ -124,10 +125,11 @@ def test_op_callable_output_type_and_return_type_declared():
 
 def test_op_no_arg_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        with context_state.loading_builtins(True):
 
-        @weave.op()
-        def op_callable_output_type_and_return_type_declared(a: int):
-            return str(a)
+            @weave.op()
+            def op_callable_output_type_and_return_type_declared(a: int):
+                return str(a)
 
 
 class SomeUnknownObj:
@@ -144,10 +146,11 @@ def test_op_unknown_arg_type():
 
 def test_op_no_return_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        with context_state.loading_builtins(True):
 
-        @weave.op(input_type={"a": types.Int()})
-        def op_callable_output_type_and_return_type_declared(a: int):
-            return str(a)
+            @weave.op(input_type={"a": types.Int()})
+            def op_callable_output_type_and_return_type_declared(a: int):
+                return str(a)
 
 
 def test_op_inferred_list_return():

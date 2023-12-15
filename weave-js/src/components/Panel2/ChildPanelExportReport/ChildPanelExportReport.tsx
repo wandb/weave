@@ -1,31 +1,32 @@
 import {useLazyQuery, useMutation} from '@apollo/client';
 import {coreAppUrl} from '@wandb/weave/config';
-import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {opRootViewer} from '@wandb/weave/core';
+import * as Urls from '@wandb/weave/core/_external/util/urls';
 import {UpsertReportMutationVariables} from '@wandb/weave/generated/graphql';
-import {useNodeValue} from '@wandb/weave/react';
-import React, {useMemo, useState} from 'react';
+import {useNodeValue, useNodeValueExecutor} from '@wandb/weave/react';
+import classNames from 'classnames';
 import _ from 'lodash';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
-import {Alert} from '../../Alert.styles';
 import {Button} from '../../Button';
-import {ChildPanelFullConfig} from '../ChildPanel';
 import {Tailwind} from '../../Tailwind';
+import {ChildPanelFullConfig} from '../ChildPanel';
 import {useCloseDrawer, useSelectedPath} from '../PanelInteractContext';
+import {isInsideMain} from '../panelTree';
 import {AddPanelErrorAlert} from './AddPanelErrorAlert';
-import {ReportDraftDialog} from './ReportDraftDialog';
-import {ReportSelection} from './ReportSelection';
 import {computeReportSlateNode} from './computeReportSlateNode';
 import {DELETE_REPORT_DRAFT, GET_REPORT, UPSERT_REPORT} from './graphql';
+import {ReportDraftDialog} from './ReportDraftDialog';
+import {ReportSelection} from './ReportSelection';
 import {
-  EntityOption,
-  ProjectOption,
-  ReportOption,
   editDraftVariables,
+  EntityOption,
   getReportDraftByUser,
   isNewReportOption,
   newDraftVariables,
   newReportVariables,
+  ProjectOption,
+  ReportOption,
 } from './utils';
 
 type ChildPanelExportReportProps = {
@@ -40,9 +41,28 @@ export const ChildPanelExportReport = ({
   rootConfig,
 }: ChildPanelExportReportProps) => {
   const {result: viewer} = useNodeValue(opRootViewer({}));
-  const {result: fullConfig} = useNodeValue(rootConfig.input_node);
+  const executor = useNodeValueExecutor();
   const selectedPath = useSelectedPath();
   const closeDrawer = useCloseDrawer();
+
+  // Export is only allowed for panels *inside* main (excluding main itself)
+  useEffect(() => {
+    if (!isInsideMain(selectedPath)) {
+      closeDrawer();
+    }
+  }, [selectedPath, closeDrawer]);
+
+  // If selected path changes while the drawer is open, highlight the
+  // new panel name to alert the user that the target panel changed.
+  const panelName = useMemo(() => _.last(selectedPath), [selectedPath]);
+  const [isPanelNameHighlighted, setIsPanelNameHighlighted] = useState<
+    null | boolean
+  >(null); // initial `null` lets us skip highlight when drawer is first opened
+  useEffect(() => {
+    setIsPanelNameHighlighted(prev => (prev === null ? false : true));
+    const timeout = setTimeout(() => setIsPanelNameHighlighted(false), 1500);
+    return () => clearTimeout(timeout);
+  }, [selectedPath]);
 
   const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(
     null
@@ -61,13 +81,13 @@ export const ChildPanelExportReport = ({
   const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
   const [error, setError] = useState<any>(null);
 
-  const slateNode = useMemo(
-    () =>
-      fullConfig && selectedPath
-        ? computeReportSlateNode(fullConfig, selectedPath)
-        : undefined,
-    [fullConfig, selectedPath]
-  );
+  const getSlateNode = useCallback(async () => {
+    const fullConfig = await executor(rootConfig.input_node);
+    const slateNode = computeReportSlateNode(fullConfig, selectedPath);
+    const {documentId} = slateNode.config.panelConfig.config;
+    return {slateNode, documentId};
+  }, [executor, rootConfig.input_node, selectedPath]);
+
   const publishedReport = reportQueryData?.view;
   const activeReportDraft = useMemo(
     () =>
@@ -79,10 +99,7 @@ export const ChildPanelExportReport = ({
 
   const isNewReportSelected = isNewReportOption(selectedReport);
   const hasRequiredData =
-    slateNode != null &&
-    selectedEntity != null &&
-    selectedReport != null &&
-    selectedProject != null;
+    selectedEntity != null && selectedReport != null && selectedProject != null;
   const hasActiveDraft = publishedReport != null && activeReportDraft != null;
   const isAddPanelDisabled = !hasRequiredData || isAddingPanel;
 
@@ -92,7 +109,10 @@ export const ChildPanelExportReport = ({
     setIsAddingPanel(false);
   };
 
-  const submit = async (variables: UpsertReportMutationVariables) => {
+  const submit = async (
+    variables: UpsertReportMutationVariables,
+    documentId: string
+  ) => {
     if (!hasRequiredData) {
       return;
     }
@@ -105,7 +125,7 @@ export const ChildPanelExportReport = ({
         reportID: upsertedDraft.id,
         reportName: upsertedDraft.displayName ?? '',
       },
-      `#${slateNode.config.panelConfig.config.documentId}`
+      `#${documentId}`
     );
     // eslint-disable-next-line wandb/no-unprefixed-urls
     window.open(coreAppUrl(reportDraftPath), '_blank');
@@ -119,13 +139,15 @@ export const ChildPanelExportReport = ({
     }
     try {
       setIsAddingPanel(true);
+      const {slateNode, documentId} = await getSlateNode();
       if (isNewReportSelected) {
         return submit(
           newReportVariables(
             selectedEntity.name,
             selectedProject.name,
             slateNode
-          )
+          ),
+          documentId
         );
       }
       const {data} = await getReport({
@@ -146,7 +168,8 @@ export const ChildPanelExportReport = ({
             selectedProject.name,
             report,
             slateNode
-          )
+          ),
+          documentId
         );
       }
     } catch (err) {
@@ -155,11 +178,15 @@ export const ChildPanelExportReport = ({
   };
 
   const onContinueDraft = async () => {
-    if (!hasActiveDraft || !slateNode) {
+    if (!hasActiveDraft) {
       return;
     }
     try {
-      await submit(editDraftVariables(activeReportDraft, slateNode));
+      const {slateNode, documentId} = await getSlateNode();
+      await submit(
+        editDraftVariables(activeReportDraft, slateNode),
+        documentId
+      );
     } catch (err) {
       handleError(err);
     }
@@ -173,13 +200,15 @@ export const ChildPanelExportReport = ({
       await deleteReportDraft({
         variables: {id: activeReportDraft.id},
       });
+      const {slateNode, documentId} = await getSlateNode();
       await submit(
         newDraftVariables(
           selectedEntity.name,
           selectedProject.name,
           publishedReport,
           slateNode
-        )
+        ),
+        documentId
       );
     } catch (err) {
       handleError(err);
@@ -191,17 +220,18 @@ export const ChildPanelExportReport = ({
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-moon-250 px-16 py-12">
           <h2 className="text-lg font-semibold">
-            Add {_.last(selectedPath)} to report
+            Add{' '}
+            <span
+              className={classNames('transition', {
+                'bg-gold-300/[0.5]': isPanelNameHighlighted,
+              })}>
+              {panelName}
+            </span>{' '}
+            to report
           </h2>
           <Button icon="close" variant="ghost" onClick={closeDrawer} />
         </div>
         <div className="flex-1 gap-8 p-16">
-          <Alert severity="warning">
-            <p>
-              <b>🚧 Work in progress!</b> This feature is under development
-              behind an internal-only feature flag.
-            </p>
-          </Alert>
           <ReportSelection
             rootConfig={rootConfig}
             selectedEntity={selectedEntity}

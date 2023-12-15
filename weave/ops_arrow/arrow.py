@@ -256,6 +256,10 @@ class ArrowWeaveListType(types.Type):
             )
 
         res.validate()
+
+        if extra is not None:
+            return res[int(extra[0])]
+
         return res
 
 
@@ -392,7 +396,7 @@ def _object_type_is_basic(object_type):
     if isinstance(object_type, types.Const):
         object_type = object_type.val_type
     return isinstance(object_type, types.BasicType) or (
-        isinstance(object_type, types.Timestamp)
+        isinstance(object_type, (types.Timestamp, types.TimeDelta))
     )
 
 

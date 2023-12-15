@@ -1,8 +1,9 @@
 import React, {forwardRef, useEffect, useRef, useState} from 'react';
 import styled from 'styled-components';
-import {MOON_300, MOON_600, hexToRGB} from '../common/css/globals.styles';
-import {Tooltip} from './Tooltip';
+
+import {hexToRGB, MOON_300, MOON_600} from '../common/css/globals.styles';
 import {Icon} from './Icon';
+import {Tooltip} from './Tooltip';
 
 const DEFAULT_TITLE = 'Something went wrong.';
 const DEFAULT_SUBTITLE = 'Please check the panel configuration for errors.';

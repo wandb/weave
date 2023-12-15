@@ -32,5 +32,16 @@ class ArtifactRef(ref_base.Ref):
         self.path = path
         super().__init__(obj=obj, type=type, extra=extra)
 
+    def with_extra(
+        self, new_type: types.Type, obj: typing.Any, extra: list[str]
+    ) -> "ArtifactRef":
+        return self.__class__(
+            artifact=self.artifact,
+            path=self.path,
+            type=new_type,
+            obj=obj,
+            extra=extra,
+        )
+
     def local_ref_str(self) -> str:
         raise NotImplementedError
