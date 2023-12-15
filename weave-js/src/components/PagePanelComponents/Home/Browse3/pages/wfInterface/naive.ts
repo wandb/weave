@@ -90,11 +90,12 @@ export class WFNaiveProject implements WFProject {
     return this.state.project;
   }
 
-  type(name: string): WFType {
+  type(name: string): WFType| null {
     if (!this.state.typesMap.has(name)) {
-      throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version with name: ${name} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveType(this.state, name);
   }
@@ -104,11 +105,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveType(this.state, typeName);
     });
   }
-  op(name: string): WFOp {
+  op(name: string): WFOp| null {
     if (!this.state.opsMap.has(name)) {
-      throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version with name: ${name} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveOp(this.state, name);
   }
@@ -117,11 +119,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveOp(this.state, opName);
     });
   }
-  object(name: string): WFObject {
+  object(name: string): WFObject| null {
     if (!this.state.objectsMap.has(name)) {
-      throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version with name: ${name} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveObject(this.state, name);
   }
@@ -130,11 +133,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveObject(this.state, opName);
     });
   }
-  typeVersion(name: string, version: string): WFTypeVersion {
+  typeVersion(name: string, version: string): WFTypeVersion| null {
     if (!this.state.typeVersionsMap.has(version)) {
-      throw new Error(
-        `Cannot find version: ${version} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version: ${version} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveTypeVersion(this.state, version);
   }
@@ -143,11 +147,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveTypeVersion(this.state, opName);
     });
   }
-  opVersion(name: string, version: string): WFOpVersion {
+  opVersion(name: string, version: string): WFOpVersion| null {
     if (!this.state.opVersionsMap.has(version)) {
-      throw new Error(
-        `Cannot find version: ${version} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version: ${version} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveOpVersion(this.state, version);
   }
@@ -156,11 +161,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveOpVersion(this.state, opName);
     });
   }
-  objectVersion(name: string, version: string): WFObjectVersion {
+  objectVersion(name: string, version: string): WFObjectVersion| null {
     if (!this.state.objectVersionsMap.has(version)) {
-      throw new Error(
-        `Cannot find version: ${version} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version: ${version} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveObjectVersion(this.state, version);
   }
@@ -169,11 +175,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveObjectVersion(this.state, opName);
     });
   }
-  call(callID: string): any {
+  call(callID: string): WFCall | null {
     if (!this.state.callsMap.has(callID)) {
-      throw new Error(
-        `Cannot find call with callID: ${callID} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find call with callID: ${callID} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveCall(this.state, callID);
   }

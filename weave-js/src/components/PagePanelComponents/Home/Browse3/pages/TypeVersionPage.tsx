@@ -26,9 +26,19 @@ export const TypeVersionPage: React.FC<{
     props.typeName,
     props.version
   );
+  if (typeVersion == null) {
+    return <>Type Verison not found</>;
+  }
+  return <TypeVersionPageInner typeVersion={typeVersion} />;
+};
+const TypeVersionPageInner: React.FC<{
+  typeVersion: WFTypeVersion;
+}> = ({typeVersion}) => {
+  const typeName = typeVersion.type().name();
+  const typeVersionHash = typeVersion.version();
   return (
     <SimplePageLayout
-      title={props.typeName + ' : ' + props.version}
+      title={typeName + ' : ' + typeVersionHash}
       tabs={[
         {
           label: 'Overview',

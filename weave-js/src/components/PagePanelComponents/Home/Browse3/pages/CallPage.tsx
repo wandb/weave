@@ -4,6 +4,7 @@ import {Browse2TraceComponent} from '../../Browse2/Browse2TracePage';
 import {CallsTable} from './CallsPage';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
+import {WFCall} from './wfInterface/types';
 
 export const CallPage: React.FC<{
   entity: string;
@@ -12,15 +13,30 @@ export const CallPage: React.FC<{
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const call = orm.projectConnection.call(props.callId);
+  if (!call) {
+    return <div>Call not found</div>;
+  }
+  return <CallPageInner {...props} call={call} />;
+};
+
+const CallPageInner: React.FC<{
+  call: WFCall;
+}> = ({call}) => {
+  const entityName = call.entity();
+  const projectName = call.project();
+  const traceId = call.traceID();
+  const callId = call.callID();
+  const spanName = call.spanName();
+
   const params = useMemo(() => {
     return {
-      entity: props.entity,
-      project: props.project,
-      traceId: call.traceID(),
-      spanId: props.callId,
+      entity: entityName,
+      project: projectName,
+      traceId: traceId,
+      spanId: callId,
     };
-  }, [call, props.callId, props.entity, props.project]);
-  const title = `${call.spanName()}: ${call.callID()}`;
+  }, [entityName, projectName, traceId, callId]);
+  const title = `${spanName}: ${callId}`;
   return (
     <SimplePageLayout
       title={title}
@@ -47,10 +63,10 @@ export const CallPage: React.FC<{
           label: 'Calls',
           content: (
             <CallsTable
-              entity={props.entity}
-              project={props.project}
+              entity={entityName}
+              project={projectName}
               frozenFilter={{
-                parentId: props.callId,
+                parentId: callId,
               }}
             />
           ),

@@ -1,19 +1,19 @@
 import {Type} from '../../../../../../core';
 
 export interface WFProject extends ProjectOwned {
-  type: (name: string) => WFType;
+  type: (name: string) => WFType | null;
   types: () => WFType[];
-  op: (name: string) => WFOp;
+  op: (name: string) => WFOp| null;
   ops: () => WFOp[];
-  object: (name: string) => WFObject;
+  object: (name: string) => WFObject| null;
   objects: () => WFObject[];
-  typeVersion: (name: string, version: string) => WFTypeVersion;
+  typeVersion: (name: string, version: string) => WFTypeVersion| null;
   typeVersions: () => WFTypeVersion[];
-  opVersion: (name: string, version: string) => WFOpVersion;
+  opVersion: (name: string, version: string) => WFOpVersion| null;
   opVersions: () => WFOpVersion[];
-  objectVersion: (name: string, version: string) => WFObjectVersion;
+  objectVersion: (name: string, version: string) => WFObjectVersion| null;
   objectVersions: () => WFObjectVersion[];
-  call: (callID: string) => WFCall;
+  call: (callID: string) => WFCall| null;
   calls: () => WFCall[];
   // a bit hacky here:
   opCategories: () => HackyOpCategory[];
