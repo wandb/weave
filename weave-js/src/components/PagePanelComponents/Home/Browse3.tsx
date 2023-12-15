@@ -16,6 +16,7 @@ import {
   Route,
   Switch,
   useHistory,
+  useLocation,
   useParams,
 } from 'react-router-dom';
 
@@ -118,7 +119,6 @@ const browse3Paths = (projectRoot: string) => [
 ];
 
 export const Browse3: FC<{
-  basename: string;
   hideHeader?: boolean;
   headerOffset?: number;
   navigateAwayFromProject?: () => void;
@@ -134,22 +134,20 @@ export const Browse3: FC<{
   }, [props.projectRoot, weaveContext]);
   return (
     <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-      <Router basename={props.basename}>
-        <Switch>
-          <Route
-            path={[
-              ...browse3Paths(props.projectRoot(':entity', ':project')),
-              '/:entity',
-              '/',
-            ]}>
-            <Browse3Mounted
-              hideHeader={props.hideHeader}
-              headerOffset={props.headerOffset}
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            />
-          </Route>
-        </Switch>
-      </Router>
+      <Switch>
+        <Route
+          path={[
+            ...browse3Paths(props.projectRoot(':entity', ':project')),
+            '/:entity',
+            '/',
+          ]}>
+          <Browse3Mounted
+            hideHeader={props.hideHeader}
+            headerOffset={props.headerOffset}
+            navigateAwayFromProject={props.navigateAwayFromProject}
+          />
+        </Route>
+      </Switch>
     </Browse3WeaveflowRouteContextProvider>
   );
 };

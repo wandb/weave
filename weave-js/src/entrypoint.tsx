@@ -187,9 +187,8 @@ ReactDOM.render(
         <Route path={`/${URL_BROWSE3}`}>
           <BrowseWrapper>
             <Browse3
-              basename={`/${URL_BROWSE3}`}
               projectRoot={(entityName: string, projectName: string) => {
-                return `/${entityName}/${projectName}`;
+                return `/${URL_BROWSE3}/${entityName}/${projectName}`;
               }}
             />
           </BrowseWrapper>
