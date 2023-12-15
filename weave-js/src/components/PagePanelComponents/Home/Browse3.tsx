@@ -152,14 +152,11 @@ const Browse3Mounted: FC<{
       }}>
       {!props.hideHeader && (
         <AppBar
-          // position="fixed"
           sx={{
             zIndex: theme => theme.zIndex.drawer + 1,
             height: '60px',
             flex: '0 0 auto',
             position: 'static',
-            // display: 'block',
-            // position: 'initial',
           }}>
           <Toolbar
             sx={{
@@ -207,7 +204,6 @@ const Browse3Mounted: FC<{
                 display: 'flex',
                 flexDirection: 'column',
               }}>
-              {/* <Toolbar /> */}
               <Browse3ProjectRootORMProvider>
                 <Browse3ProjectRoot />
               </Browse3ProjectRootORMProvider>
@@ -216,7 +212,6 @@ const Browse3Mounted: FC<{
         </Route>
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
-            {/* <Toolbar /> */}
             <Switch>
               <Route path={`/:entity`}>
                 <Browse2EntityPage />
