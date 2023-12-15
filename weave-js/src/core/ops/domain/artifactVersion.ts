@@ -114,22 +114,6 @@ export const opArtifactVersionSize = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.size,
 });
 
-// export const opArtifactVersionTTLIsInherited = makeArtifactVersionOp({
-//   name: 'artifactVersion-ttlIsInherited',
-//   argTypes: artifactVersionArgTypes,
-//   description: `Returns the original duration in seconds that a ${docType(
-//     'artifactVersion'
-//   )} is expected to live for before it gets deleted`,
-//   argDescriptions: {
-//     artifactVersion: artifactVersionArgDescription,
-//   },
-//   returnValueDescription: `The original duration in seconds that an ${docType(
-//     'artifactVersion'
-//   )} is expected to live for before it gets deleted`,
-//   returnType: inputTypes => 'number',
-//   resolver: ({artifactVersion}) => artifactVersion.ttlDurationSeconds,
-// });
-
 export const opArtifactVersionTTLDurationSeconds = makeArtifactVersionOp({
   name: 'artifactVersion-ttlDurationSeconds',
   argTypes: artifactVersionArgTypes,
@@ -144,6 +128,22 @@ export const opArtifactVersionTTLDurationSeconds = makeArtifactVersionOp({
   )} is expected to live for before it gets deleted`,
   returnType: inputTypes => 'number',
   resolver: ({artifactVersion}) => artifactVersion.ttlDurationSeconds,
+});
+
+export const opArtifactVersionTTLIsInherited = makeArtifactVersionOp({
+  name: 'artifactVersion-ttlIsInherited',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns if the artifact TTL is inherited ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns if the artifact TTL is inherited ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.ttlIsInherited,
 });
 
 export const opArtifactVersionCreatedAt = makeArtifactVersionOp({

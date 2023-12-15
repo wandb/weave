@@ -1110,6 +1110,8 @@ export const toGqlField = (
     return gqlBasicField('metadata');
   } else if (forwardOp.op.name === 'artifactVersion-ttlDurationSeconds') {
     return gqlBasicField('ttlDurationSeconds');
+  } else if (forwardOp.op.name === 'artifactVersion-ttlIsInherited') {
+    return gqlBasicField('ttlIsInherited');
   } else if (forwardOp.op.name === 'artifactVersion-artifactType') {
     return [gqlObjectField(forwardGraph, forwardOp, 'artifactType')];
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {
