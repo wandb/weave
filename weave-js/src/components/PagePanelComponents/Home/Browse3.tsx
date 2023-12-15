@@ -122,6 +122,14 @@ export const Browse3: FC<{
   headerOffset?: number;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
+  const weaveContext = useWeaveContext();
+  useEffect(() => {
+    const previousPolling = weaveContext.client.isPolling();
+    weaveContext.client.setPolling(true);
+    return () => {
+      weaveContext.client.setPolling(previousPolling);
+    };
+  }, [props.projectRoot, weaveContext]);
   return (
     <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
       <Router basename={props.basename}>
