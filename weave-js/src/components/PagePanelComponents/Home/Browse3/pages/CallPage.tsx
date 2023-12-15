@@ -2,6 +2,7 @@ import React, {useMemo} from 'react';
 
 import {Browse2TraceComponent} from '../../Browse2/Browse2TracePage';
 import {CallsTable} from './CallsPage';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
@@ -14,7 +15,7 @@ export const CallPage: React.FC<{
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const call = orm.projectConnection.call(props.callId);
   if (!call) {
-    return <div>Call not found</div>;
+    return <CenteredAnimatedLoader />;
   }
   return <CallPageInner {...props} call={call} />;
 };

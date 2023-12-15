@@ -9,6 +9,7 @@ import {useFirstCall, useOpSignature} from '../../Browse2/callTreeHooks';
 import {Paper} from '../../Browse2/CommonLib';
 import {CallsTable} from './CallsPage';
 import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   ScrollableTabContent,
@@ -32,7 +33,7 @@ export const OpVersionPage: React.FC<{
     props.version
   );
   if (opVersion == null) {
-    return <>Op Version not found</>;
+    return <CenteredAnimatedLoader />;
   }
   return <OpVersionPageInner opVersion={opVersion} />;
 };

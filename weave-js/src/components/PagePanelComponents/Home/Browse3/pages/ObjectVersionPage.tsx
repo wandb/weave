@@ -6,6 +6,7 @@ import {WeaveEditor} from '../../Browse2/WeaveEditors';
 import {CallsTable} from './CallsPage';
 import {useMakeNewBoard} from './common/hooks';
 import {CallLink, ObjectLink, TypeVersionLink} from './common/Links';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
@@ -29,7 +30,7 @@ export const ObjectVersionPage: React.FC<{
     props.version
   );
   if (!objectVersion) {
-    return <div>Object Version not found</div>;
+    return <CenteredAnimatedLoader />;
   }
   return <ObjectVersionPageInner {...props} objectVersion={objectVersion} />;
 };

@@ -2,6 +2,7 @@ import _ from 'lodash';
 import React from 'react';
 
 import {TypeLink, TypeVersionLink} from './common/Links';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
@@ -27,7 +28,7 @@ export const TypeVersionPage: React.FC<{
     props.version
   );
   if (typeVersion == null) {
-    return <>Type Verison not found</>;
+    return <CenteredAnimatedLoader />;
   }
   return <TypeVersionPageInner typeVersion={typeVersion} />;
 };

@@ -305,7 +305,7 @@ const Browse3ProjectRoot: FC = () => {
 
   useEffect(() => {
     if (params.tab == null) {
-      history.push(
+      history.replace(
         router.callsUIUrl(params.entity, params.project, {
           traceRootsOnly: true,
         })
