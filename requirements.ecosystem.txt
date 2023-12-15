@@ -1,5 +1,5 @@
 h5py>=3.8.0
-openai>=1.0.0
+openai>=0.26.4,<1.0.0 # 1.0.0 adds breaking changes for monitor api, after updates remove pin
 matplotlib!=3.5,>3
 shap>=0.41.0
 xgboost>=1.7.3
