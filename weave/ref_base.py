@@ -20,6 +20,17 @@ if typing.TYPE_CHECKING:
     from . import weave_types as types
 
 
+def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, dict):
+        return {k: _map_to_ref_strs(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_map_to_ref_strs(v) for v in obj]
+    ref = get_ref(obj)
+    if ref is not None:
+        return str(ref)
+    return obj
+
+
 class Ref:
     _obj: typing.Any
     _type: typing.Optional["types.Type"]
@@ -83,7 +94,8 @@ class Ref:
         # fetching a ref. So we need to walk obj, converting objs back to
         # refs where we can, before this json.dumps call.
         # TODO: fix
-        hash.update(json.dumps(self.obj).encode())
+        with_refs = _map_to_ref_strs(self.obj)
+        hash.update(json.dumps(with_refs).encode())
         return hash.hexdigest()
 
     @classmethod
