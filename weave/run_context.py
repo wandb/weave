@@ -1,25 +1,44 @@
 import contextlib
 import contextvars
 import typing
+import copy
 
 if typing.TYPE_CHECKING:
     from .run import Run
 
-_current_run: contextvars.ContextVar[typing.Optional["Run"]] = contextvars.ContextVar(
-    "run", default=None
+_run_stack: contextvars.ContextVar[list["Run"]] = contextvars.ContextVar(
+    "run", default=[]
 )
 
 
 @contextlib.contextmanager
-def set_current_run(
-    client: typing.Optional["Run"],
+def current_run(
+    run: "Run",
 ) -> typing.Iterator[typing.Optional["Run"]]:
-    client_token = _current_run.set(client)
+    new_stack = copy.copy(_run_stack.get())
+    new_stack.append(run)
+
+    token = _run_stack.set(new_stack)
     try:
-        yield client
+        yield new_stack
     finally:
-        _current_run.reset(client_token)
+        _run_stack.reset(token)
 
 
 def get_current_run() -> typing.Optional["Run"]:
-    return _current_run.get()
+    return _run_stack.get()[-1] if _run_stack.get() else None
+
+
+def get_run_stack() -> list["Run"]:
+    return _run_stack.get()
+
+
+@contextlib.contextmanager
+def set_run_stack(
+    stack: list["Run"],
+) -> typing.Iterator[typing.Optional["Run"]]:
+    token = _run_stack.set(stack)
+    try:
+        yield stack
+    finally:
+        _run_stack.reset(token)

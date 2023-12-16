@@ -81,23 +81,26 @@ class GraphClient:
         self, op_name: str, inputs: dict[str, typing.Any]
     ) -> typing.Optional[Run]:
         inputs_digest = hash_inputs(inputs)
+        from . import compile
+
         with context_state.lazy_execution():
-            rows_node = self.runs_st.rows()
-            filter_node = rows_node.filter(
-                lambda row: ops_primitives.Boolean.bool_and(
-                    row["name"] == op_name,
-                    row["attributes"]["_inputs_digest"] == inputs_digest,
-                )
-            )[
-                0
-            ]  # type: ignore
-            run_attrs = weave_internal.use(select_all(filter_node))
-            if not isinstance(run_attrs, dict):
-                return None
-            if run_attrs.get("span_id") == None:
-                return None
-            run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
-            return Run(run_attrs)
+            with compile.enable_compile():
+                rows_node = self.runs_st.rows()
+                filter_node = rows_node.filter(
+                    lambda row: ops_primitives.Boolean.bool_and(
+                        row["name"] == op_name,
+                        row["attributes"]["_inputs_digest"] == inputs_digest,
+                    )
+                )[
+                    0
+                ]  # type: ignore
+                run_attrs = weave_internal.use(select_all(filter_node))
+                if not isinstance(run_attrs, dict):
+                    return None
+                if run_attrs.get("span_id") == None:
+                    return None
+                run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
+                return Run(run_attrs)
 
     def run_children(self, run_id: str) -> WeaveIter[Run]:
         with context_state.lazy_execution():
@@ -180,7 +183,7 @@ class GraphClient:
     def create_run(
         self,
         op_name: str,
-        parent_id: typing.Optional[str],
+        parent: typing.Optional["Run"],
         inputs: typing.Dict[str, typing.Any],
         input_refs: list[artifact_wandb.WandbArtifactRef],
     ) -> Run:
@@ -191,8 +194,16 @@ class GraphClient:
         for i, ref in enumerate(input_refs[:3]):
             inputs["_ref%s" % i] = ref
             inputs["_ref_digest%s" % i] = ref.digest
+
+        if parent:
+            trace_id = parent.trace_id
+            parent_id = parent.id
+        else:
+            trace_id = str(uuid.uuid4())
+            parent_id = None
         span = stream_data_interfaces.TraceSpanDict(
             span_id=str(uuid.uuid4()),
+            trace_id=trace_id,
             parent_id=parent_id,
             name=op_name,
             status_code="UNSET",
@@ -200,6 +211,8 @@ class GraphClient:
             inputs=inputs,
             attributes=attrs,
         )
+        # Don't log create for now
+        # self.runs_st.log(span)
         return Run(span)
 
     def fail_run(self, run: Run, exception: Exception) -> None:
@@ -207,6 +220,7 @@ class GraphClient:
         span["end_time_s"] = time.time()
         span["status_code"] = "ERROR"
         span["exception"] = str(exception)
+        span["summary"] = {"latency_s": span["end_time_s"] - span["start_time_s"]}
         self.runs_st.log(span)
 
     def finish_run(
@@ -226,6 +240,7 @@ class GraphClient:
         span["end_time_s"] = time.time()
         span["status_code"] = "SUCCESS"
         span["output"] = output
+        span["summary"] = {"latency_s": span["end_time_s"] - span["start_time_s"]}
         self.runs_st.log(span)
 
     def add_feedback(self, run_id: str, feedback: dict[str, typing.Any]) -> None:

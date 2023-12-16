@@ -438,19 +438,6 @@ def execute_async_op(
     job.start()
 
 
-def publish_enabled():
-    # only auto publish if we have inited monitoring (with weave.init or init_monitor)
-    # and eager mode is on, as in weaveflow
-
-    # We're checking mon.streamtable, which is available if weave.init is called.
-    # But if the user instead called init_monitor, this check would pass but the
-    # later publish calls would fill since weave.init is required for those.
-    # Our intention is to replace init_monitor with weave.init, but that is not
-    # yet complete.
-    # TODO: Fix
-    return monitor.default_monitor().streamtable and context_state.eager_mode()
-
-
 def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
     import numpy as np
 
@@ -475,7 +462,7 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
 
     client = graph_client_context.require_graph_client()
     if not ref:
-        ref = client.save_object(obj, f"{obj.__class__.__name}", "latest")
+        ref = client.save_object(obj, f"{obj.__class__.__name__}", "latest")
 
     output_refs.append(ref)
     return ref
@@ -490,29 +477,30 @@ def publish_graph(
     nodes: typing.List[graph.Node],
 ):
     """Publish all ops and ConstNodes found in graph"""
-    client = graph_client_context.require_graph_client()
+    client = graph_client_context.get_graph_client()
+    if client is not None and context_state.eager_mode():
 
-    def _publish_node(node: graph.Node):
-        if isinstance(node, graph.OutputNode):
-            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-            if not op_def.location:
-                # Only publish custom ops
-                return
-            op_def_ref = storage._get_ref(op_def)
-            if not client.ref_is_own(op_def_ref):
-                op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-        elif isinstance(node, graph.ConstNode) and not isinstance(
-            node.type, types.Function
-        ):
-            auto_publish(node.val)
+        def _publish_node(node: graph.Node):
+            if isinstance(node, graph.OutputNode):
+                op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+                if not op_def.location:
+                    # Only publish custom ops
+                    return
+                op_def_ref = storage._get_ref(op_def)
+                if not client.ref_is_own(op_def_ref):
+                    op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
+            elif isinstance(node, graph.ConstNode) and not isinstance(
+                node.type, types.Function
+            ):
+                auto_publish(node.val)
 
-    if publish_enabled():
         graph.map_nodes_full(nodes, _publish_node)
 
 
 def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     mon_span_inputs = {**inputs}
-    if publish_enabled() and op_def.location:
+    client = graph_client_context.get_graph_client()
+    if client is not None and context_state.eager_mode() and op_def.location:
         op_def_ref = storage._get_ref(op_def)
         if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
             # This should have already been published by publish_graph if monitoring
@@ -522,21 +510,24 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             )
         mon_span_inputs, refs = auto_publish(inputs)
 
-        client = graph_client_context.require_graph_client()
-
-        found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
-        if found_run:
-            return found_run.output
+        # Memoization disabled for now.
+        # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
+        # if found_run:
+        #     return found_run.output
 
         parent_run = run_context.get_current_run()
-        run = client.create_run(str(op_def_ref), parent_run.id, mon_span_inputs, refs)
+        if not parent_run:
+            print("Running ", op_def.name)
+        run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
         try:
-            with run_context.set_current_run(run):
+            with run_context.current_run(run):
                 res = op_def.resolve_fn(**inputs)
-            res = op_def.resolve_fn(**inputs)
         except Exception as e:
             client.fail_run(run, e)
+            print("Error running ", op_def.name)
             raise
+        if not parent_run:
+            print("View run:", run.ui_url)
         if isinstance(res, box.BoxedNone):
             res = None
         output, output_refs = auto_publish(res)

@@ -59,7 +59,7 @@ const browse2Context = {
     wfTable?: WFDBTableType
   ) => {
     if (!isWandbArtifactRef(objRef)) {
-      throw new Error('Not a wandb artifact ref');
+      throw new Error('Not a wandb artifact ref: ' + JSON.stringify(objRef));
     }
     return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
   },
@@ -172,7 +172,7 @@ const browse3ContextGen = (
       wfTable?: WFDBTableType
     ) => {
       if (!isWandbArtifactRef(objRef)) {
-        throw new Error('Not a wandb artifact ref');
+        throw new Error('Not a wandb artifact ref: ' + JSON.stringify(objRef));
       }
       if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
         return browse3Context.opVersionUIUrl(

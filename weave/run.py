@@ -1,5 +1,6 @@
 import typing
 
+from .urls import BROWSE3_PATH
 from . import uris
 from . import artifact_wandb
 from . import stream_data_interfaces
@@ -21,8 +22,17 @@ class Run:
         return self._attrs["span_id"]
 
     @property
+    def trace_id(self) -> str:
+        return self._attrs["trace_id"]
+
+    @property
     def uri(self) -> str:
         return self._attrs["name"]
+
+    @property
+    def ui_url(self):
+        gc = graph_client_context.require_graph_client()
+        return f"http://localhost:3000/{BROWSE3_PATH}/{gc.entity_name}/{gc.project_name}/calls/{self.id}"
 
     @property
     def op_ref(self) -> typing.Optional[artifact_wandb.WandbArtifactRef]:
