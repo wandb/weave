@@ -477,8 +477,9 @@ def publish_graph(
     nodes: typing.List[graph.Node],
 ):
     """Publish all ops and ConstNodes found in graph"""
-    client = graph_client_context.get_graph_client()
-    if client is not None and context_state.eager_mode():
+    maybe_client = graph_client_context.get_graph_client()
+    if maybe_client is not None and context_state.eager_mode():
+        client = typing.cast(graph_client_context.GraphClient, maybe_client)
 
         def _publish_node(node: graph.Node):
             if isinstance(node, graph.OutputNode):

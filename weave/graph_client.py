@@ -86,7 +86,7 @@ class GraphClient:
         with context_state.lazy_execution():
             with compile.enable_compile():
                 rows_node = self.runs_st.rows()
-                filter_node = rows_node.filter(
+                filter_node = rows_node.filter(  # type: ignore
                     lambda row: ops_primitives.Boolean.bool_and(
                         row["name"] == op_name,
                         row["attributes"]["_inputs_digest"] == inputs_digest,
@@ -162,7 +162,7 @@ class GraphClient:
                 return None
             return feedback_attrs
 
-    def ref_is_own(self, ref: ref_base.Ref) -> bool:
+    def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         return isinstance(ref, artifact_wandb.WandbArtifactRef)
 
     ##### Write API
@@ -201,15 +201,20 @@ class GraphClient:
         else:
             trace_id = str(uuid.uuid4())
             parent_id = None
+        cur_time = time.time()
         span = stream_data_interfaces.TraceSpanDict(
             span_id=str(uuid.uuid4()),
             trace_id=trace_id,
             parent_id=parent_id,
             name=op_name,
             status_code="UNSET",
-            start_time_s=time.time(),
+            start_time_s=cur_time,
+            end_time_s=cur_time,  # currently required, so set to start time for now?
             inputs=inputs,
             attributes=attrs,
+            output=None,
+            summary=None,
+            exception=None,
         )
         # Don't log create for now
         # self.runs_st.log(span)

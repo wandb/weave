@@ -30,7 +30,7 @@ class Run:
         return self._attrs["name"]
 
     @property
-    def ui_url(self):
+    def ui_url(self) -> str:
         gc = graph_client_context.require_graph_client()
         return f"http://localhost:3000/{BROWSE3_PATH}/{gc.entity_name}/{gc.project_name}/calls/{self.id}"
 

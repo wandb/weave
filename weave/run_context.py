@@ -14,7 +14,7 @@ _run_stack: contextvars.ContextVar[list["Run"]] = contextvars.ContextVar(
 @contextlib.contextmanager
 def current_run(
     run: "Run",
-) -> typing.Iterator[typing.Optional["Run"]]:
+) -> typing.Iterator[list["Run"]]:
     new_stack = copy.copy(_run_stack.get())
     new_stack.append(run)
 
@@ -36,7 +36,7 @@ def get_run_stack() -> list["Run"]:
 @contextlib.contextmanager
 def set_run_stack(
     stack: list["Run"],
-) -> typing.Iterator[typing.Optional["Run"]]:
+) -> typing.Iterator[list["Run"]]:
     token = _run_stack.set(stack)
     try:
         yield stack
