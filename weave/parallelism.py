@@ -6,6 +6,7 @@ from typing import Optional, Callable, TypeVar, Iterator, Generator
 from . import context
 from . import context_state
 from . import graph_client_context
+from . import run_context
 from . import execute
 from . import forward_graph
 from . import memo
@@ -56,6 +57,7 @@ def do_in_parallel(
     top_level_stats = execute.get_top_level_stats()
     eager_mode = context_state.eager_mode()
     graph_client = graph_client_context.get_graph_client()
+    current_run = run_context.get_current_run()
 
     def do_one_with_memo_and_parallel_budget(x: ItemType) -> ResultType:
         memo_token = memo._memo_storage.set(memo_ctx)
@@ -64,14 +66,15 @@ def do_in_parallel(
         try:
             with parallel_budget_ctx(remaining_budget_per_thread):
                 with graph_client_context.set_graph_client(graph_client):
-                    with context_state.set_eager_mode(eager_mode):
-                        with wandb_api.wandb_api_context(wandb_api_ctx):
-                            with context.execution_client():
-                                with forward_graph.node_result_store(
-                                    result_store
-                                ) as thread_result_store:
-                                    with execute.top_level_stats() as thread_top_level_stats:
-                                        return do_one(x)
+                    with run_context.set_current_run(current_run):
+                        with context_state.set_eager_mode(eager_mode):
+                            with wandb_api.wandb_api_context(wandb_api_ctx):
+                                with context.execution_client():
+                                    with forward_graph.node_result_store(
+                                        result_store
+                                    ) as thread_result_store:
+                                        with execute.top_level_stats() as thread_top_level_stats:
+                                            return do_one(x)
         finally:
             memo._memo_storage.reset(memo_token)
             if thread_result_store is not None:

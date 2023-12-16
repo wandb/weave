@@ -7,7 +7,7 @@ import typing
 def test_digestrefs():
     from weave import weaveflow
 
-    graph_client = weave.init("digestrefs3")
+    graph_client = weave.init("digestrefs4")
 
     ds = weave.WeaveList(
         [

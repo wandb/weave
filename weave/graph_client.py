@@ -1,22 +1,44 @@
-import contextvars
-import contextlib
+import copy
 import dataclasses
 import functools
+import hashlib
 import uuid
+import time
+import json
 import typing
 
+from collections.abc import Mapping
 from . import context_state
-from . import uris
 from . import weave_internal
 from . import monitoring
-from . import wandb_api
 from . import artifact_wandb
-from . import graph
 from . import op_def
+from . import ops_primitives
+from . import ref_base
 from . import stream_data_interfaces
 from . import weave_types as types
 from .eager import WeaveIter, select_all
 from .run import Run
+from . import stream_data_interfaces
+
+
+def refs_to_str(val: typing.Any) -> typing.Any:
+    if isinstance(val, ref_base.Ref):
+        return str(val)
+    elif isinstance(val, dict):
+        return {k: refs_to_str(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [refs_to_str(v) for v in val]
+    else:
+        return val
+
+
+def hash_inputs(
+    inputs: Mapping[str, typing.Any],
+) -> str:
+    hasher = hashlib.md5()
+    hasher.update(json.dumps(refs_to_str(inputs)).encode())
+    return hasher.hexdigest()
 
 
 @dataclasses.dataclass
@@ -38,6 +60,8 @@ class GraphClient:
             f"{self.entity_name}/{self.project_name}/run-feedback"
         )
 
+    ##### Read API
+
     def runs(self) -> WeaveIter[Run]:
         return WeaveIter(self.runs_st.rows(), cls=Run)
 
@@ -49,6 +73,28 @@ class GraphClient:
             if not isinstance(run_attrs, dict):
                 return None
             if run_attrs["span_id"] == None:
+                return None
+            run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
+            return Run(run_attrs)
+
+    def find_op_run(
+        self, op_name: str, inputs: dict[str, typing.Any]
+    ) -> typing.Optional[Run]:
+        inputs_digest = hash_inputs(inputs)
+        with context_state.lazy_execution():
+            rows_node = self.runs_st.rows()
+            filter_node = rows_node.filter(
+                lambda row: ops_primitives.Boolean.bool_and(
+                    row["name"] == op_name,
+                    row["attributes"]["_inputs_digest"] == inputs_digest,
+                )
+            )[
+                0
+            ]  # type: ignore
+            run_attrs = weave_internal.use(select_all(filter_node))
+            if not isinstance(run_attrs, dict):
+                return None
+            if run_attrs.get("span_id") == None:
                 return None
             run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
             return Run(run_attrs)
@@ -96,12 +142,6 @@ class GraphClient:
             run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
             return Run(run_attrs)
 
-    def add_feedback(self, run_id: str, feedback: dict[str, typing.Any]) -> None:
-        feedback_id = str(uuid.uuid4())
-        self.run_feedback_st.log(
-            {"run_id": run_id, "feedback_id": feedback_id, "feedback": feedback}
-        )
-
     def run_feedback(self, run_id: str) -> WeaveIter[dict[str, typing.Any]]:
         with context_state.lazy_execution():
             rows_node = self.run_feedback_st.rows()
@@ -118,3 +158,78 @@ class GraphClient:
             if feedback_attrs["feedback_id"] == None:
                 return None
             return feedback_attrs
+
+    def ref_is_own(self, ref: ref_base.Ref) -> bool:
+        return isinstance(ref, artifact_wandb.WandbArtifactRef)
+
+    ##### Write API
+
+    def save_object(
+        self, obj: typing.Any, name: str, branch_name: str
+    ) -> artifact_wandb.WandbArtifactRef:
+        from . import storage
+
+        return storage._direct_publish(
+            obj,
+            name=name,
+            wb_entity_name=self.entity_name,
+            wb_project_name=self.project_name,
+            branch_name=branch_name,
+        )
+
+    def create_run(
+        self,
+        op_name: str,
+        parent_id: typing.Optional[str],
+        inputs: typing.Dict[str, typing.Any],
+        input_refs: list[artifact_wandb.WandbArtifactRef],
+    ) -> Run:
+        inputs_digest = hash_inputs(inputs)
+        attrs = {"_inputs_digest": inputs_digest}
+        inputs = copy.copy(inputs)
+        inputs["_keys"] = list(inputs.keys())
+        for i, ref in enumerate(input_refs[:3]):
+            inputs["_ref%s" % i] = ref
+            inputs["_ref_digest%s" % i] = ref.digest
+        span = stream_data_interfaces.TraceSpanDict(
+            span_id=str(uuid.uuid4()),
+            parent_id=parent_id,
+            name=op_name,
+            status_code="UNSET",
+            start_time_s=time.time(),
+            inputs=inputs,
+            attributes=attrs,
+        )
+        return Run(span)
+
+    def fail_run(self, run: Run, exception: Exception) -> None:
+        span = copy.copy(run._attrs)
+        span["end_time_s"] = time.time()
+        span["status_code"] = "ERROR"
+        span["exception"] = str(exception)
+        self.runs_st.log(span)
+
+    def finish_run(
+        self,
+        run: Run,
+        output: typing.Any,
+        output_refs: list[artifact_wandb.WandbArtifactRef],
+    ) -> None:
+        span = copy.copy(run._attrs)
+        output = copy.copy(output)
+        if not isinstance(output, dict):
+            output = {"_result": output}
+        output["_keys"] = list(output.keys())
+        for i, ref in enumerate(output_refs[:3]):
+            output["_ref%s" % i] = ref
+            output["_ref_digest%s" % i] = ref.digest
+        span["end_time_s"] = time.time()
+        span["status_code"] = "SUCCESS"
+        span["output"] = output
+        self.runs_st.log(span)
+
+    def add_feedback(self, run_id: str, feedback: dict[str, typing.Any]) -> None:
+        feedback_id = str(uuid.uuid4())
+        self.run_feedback_st.log(
+            {"run_id": run_id, "feedback_id": feedback_id, "feedback": feedback}
+        )

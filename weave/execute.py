@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import contextlib
 import contextvars
@@ -9,7 +8,6 @@ import time
 import threading
 import typing
 import traceback
-import json
 
 # Configuration
 from . import wandb_api
@@ -38,6 +36,8 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
+from . import graph_client_context
+from . import run_context
 from . import storage
 from . import artifact_wandb
 from . import op_policy
@@ -472,13 +472,11 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
         types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
     ):
         return obj
-    from .api import publish
 
+    client = graph_client_context.require_graph_client()
     if not ref:
-        ref = publish(
-            obj,
-            f"{obj.__class__.__name__}",
-        )
+        ref = client.save_object(obj, f"{obj.__class__.__name}", "latest")
+
     output_refs.append(ref)
     return ref
 
@@ -492,6 +490,7 @@ def publish_graph(
     nodes: typing.List[graph.Node],
 ):
     """Publish all ops and ConstNodes found in graph"""
+    client = graph_client_context.require_graph_client()
 
     def _publish_node(node: graph.Node):
         if isinstance(node, graph.OutputNode):
@@ -500,13 +499,8 @@ def publish_graph(
                 # Only publish custom ops
                 return
             op_def_ref = storage._get_ref(op_def)
-            if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
-                from .api import publish
-
-                op_def_ref = publish(
-                    op_def,
-                    f"{op_def.name}",
-                )
+            if not client.ref_is_own(op_def_ref):
+                op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
         elif isinstance(node, graph.ConstNode) and not isinstance(
             node.type, types.Function
         ):
@@ -516,34 +510,7 @@ def publish_graph(
         graph.map_nodes_full(nodes, _publish_node)
 
 
-def hash_inputs(
-    op_name: str,
-    inputs: Mapping[str, typing.Any],
-) -> str:
-    hasher = hashlib.sha256()
-    for input in inputs:
-        hasher.update(f"Op Name: {op_name}".encode())
-        hasher.update(f"Input name: {input}".encode())
-
-        val = inputs[input]
-        if isinstance(val, ref_base.Ref):
-            hasher.update(str(val).encode())
-        else:
-            # The assumption here is that if we have a custom object,
-            # it has already been converted to a ref because we have
-            # already called auto_publish on it. That means if we reach
-            # this stage, anything left should be a JSONable primitive.
-            # This is all in principle though, so if it doesn't work, we may
-            # need to add a call to storage.to_python() here and possibly
-            # plumb through the input_types.
-
-            serialized = json.dumps(val).encode()
-            hasher.update(serialized)
-    return hasher.hexdigest()
-
-
 def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
-    mon = monitor.default_monitor()
     mon_span_inputs = {**inputs}
     if publish_enabled() and op_def.location:
         op_def_ref = storage._get_ref(op_def)
@@ -555,68 +522,30 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             )
         mon_span_inputs, refs = auto_publish(inputs)
 
-        input_hash = hash_inputs(
-            op_def.name,
-            mon_span_inputs,
-        )
+        client = graph_client_context.require_graph_client()
 
-        # with context_state.lazy_execution():
-        #     # There's a bug where we're not compile node-op expanding
-        #     # streamtable-rows.
-        #     maybe_span_node = mon.rows()
-        #     if maybe_span_node is None:
-        #         return None
+        found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
+        if found_run:
+            return found_run.output
 
-        #     span_node = maybe_span_node.filter(  # type: ignore
-        #         lambda x: x["attributes"]["input_hash"] == input_hash
-        #     )
-        #     iter: eager.WeaveIter[
-        #         stream_data_interfaces.TraceSpanDict
-        #     ] = eager.WeaveIter(span_node)
-        #     span_dict = iter[0]
-
-        #     if (
-        #         span_dict != None and span_dict is not None
-        #     ):  # this is needed for the type checker to be happy
-        #         output = span_dict.get("output")
-        #         if output != None and output is not None:
-        #             return output["_result"]
-
-        with mon.span(str(op_def_ref)) as span:
-            span.inputs = mon_span_inputs
-            span.inputs["_keys"] = list(inputs.keys())
-            span.attributes["input_hash"] = input_hash
-
-            for i, ref in enumerate(refs[:3]):
-                span.inputs["_ref%s" % i] = ref
-                span.inputs["_ref_digest%s" % i] = ref.digest
-            try:
+        parent_run = run_context.get_current_run()
+        run = client.create_run(str(op_def_ref), parent_run.id, mon_span_inputs, refs)
+        try:
+            with run_context.set_current_run(run):
                 res = op_def.resolve_fn(**inputs)
-            except Exception as e:
-                span.status_code = monitor.StatusCode.ERROR
-                span.exception = e
-                raise
+            res = op_def.resolve_fn(**inputs)
+        except Exception as e:
+            client.fail_run(run, e)
+            raise
+        if isinstance(res, box.BoxedNone):
+            res = None
+        output, output_refs = auto_publish(res)
 
-            # Note this unboxes, but doesn't move tags.
-            # We should not allow tagging in the standard user / eager path anyway
-            if isinstance(res, box.BoxedNone):
-                res = None
-            log_res = res
-            if not isinstance(log_res, dict):
-                log_res = {"_result": log_res}
-            span.output, refs = auto_publish(log_res)
-            for i, ref in enumerate(refs[:3]):
-                span.output["_ref%s" % i] = ref
-            span.output["_keys"] = list(log_res.keys())
+        client.finish_run(run, output, output_refs)
+
     else:
         res = op_def.resolve_fn(**inputs)
 
-    # TODO: not simple name
-    # TODO: capture publish time here?
-    # TODO: yeah we need to capture all engine overhead so prob want this
-    #    at a higher level... in the engine (execute_forward_node or higher)
-    # TODO: this needs to work with local object saving as well
-    # TODO: generalize "self" publishing above
     return res
 
 
