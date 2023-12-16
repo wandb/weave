@@ -43,4 +43,5 @@ class AnyscaleChatModel(chat_model.ChatModel):
             messages=messages,
         )
 
+        # TODO: return response when there is a weave type for ChatCompletion.
         return response.dict()

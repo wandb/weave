@@ -40,4 +40,6 @@ class OpenaiChatModel(chat_model.ChatModel):
             model=self.model_name,
             messages=messages,
         )
+
+        # TODO: return response when there is a weave type for ChatCompletion.
         return response.dict()
