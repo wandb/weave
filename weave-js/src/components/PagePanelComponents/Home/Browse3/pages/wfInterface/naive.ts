@@ -2,11 +2,10 @@ import {
   isObjectType,
   isSimpleTypeShape,
   isTypedDictLike,
-  opDict,
+  Node,
   Type,
   typedDictPropertyTypes,
 } from '../../../../../../core';
-import {Client as WeaveClient} from '../../../../../../core/client/types';
 import {Call} from '../../../Browse2/callTree';
 import {
   fnFeedbackNode,
@@ -44,15 +43,40 @@ type WFNaiveProjectState = {
   callsMap: Map<string, WFNaiveCallDictType>;
 };
 
+export const fnNaiveBootstrapObjects = (
+  entity: string,
+  project: string
+): Node => {
+  return fnAllWeaveObjects(entity, project);
+};
+export const fnNaiveBootstrapRuns = (entity: string, project: string): Node => {
+  return fnRunsNode(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    {}
+  );
+};
+export const fnNaiveBootstrapFeedback = (
+  entity: string,
+  project: string
+): Node => {
+  return fnFeedbackNode(entity, project);
+};
+
 export class WFNaiveProject implements WFProject {
-  private initialized: boolean = false;
-  private loading: boolean = false;
   private state: WFNaiveProjectState;
 
   constructor(
     entity: string,
     project: string,
-    private readonly weaveClient: WeaveClient
+    bootstrapData: {
+      objects?: ObjectVersionDictType[];
+      runs?: Call[];
+      feedback?: any[];
+    }
   ) {
     this.state = {
       entity,
@@ -65,22 +89,12 @@ export class WFNaiveProject implements WFProject {
       objectVersionsMap: new Map(),
       callsMap: new Map(),
     };
-  }
 
-  async init(): Promise<void> {
-    if (!this.initialized) {
-      await this.reload();
-    }
-    return Promise.resolve();
-  }
-
-  async reload(): Promise<void> {
-    if (!this.loading) {
-      this.loading = true;
-      await this.loadAll();
-      this.loading = false;
-    }
-    return Promise.resolve();
+    this.bootstrapFromData(
+      bootstrapData.objects,
+      bootstrapData.runs,
+      bootstrapData.feedback
+    );
   }
 
   entity(): string {
@@ -90,11 +104,12 @@ export class WFNaiveProject implements WFProject {
     return this.state.project;
   }
 
-  type(name: string): WFType {
+  type(name: string): WFType | null {
     if (!this.state.typesMap.has(name)) {
-      throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version with name: ${name} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveType(this.state, name);
   }
@@ -104,11 +119,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveType(this.state, typeName);
     });
   }
-  op(name: string): WFOp {
+  op(name: string): WFOp | null {
     if (!this.state.opsMap.has(name)) {
-      throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version with name: ${name} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveOp(this.state, name);
   }
@@ -117,11 +133,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveOp(this.state, opName);
     });
   }
-  object(name: string): WFObject {
+  object(name: string): WFObject | null {
     if (!this.state.objectsMap.has(name)) {
-      throw new Error(
-        `Cannot find version with name: ${name} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version with name: ${name} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveObject(this.state, name);
   }
@@ -130,11 +147,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveObject(this.state, opName);
     });
   }
-  typeVersion(name: string, version: string): WFTypeVersion {
+  typeVersion(name: string, version: string): WFTypeVersion | null {
     if (!this.state.typeVersionsMap.has(version)) {
-      throw new Error(
-        `Cannot find version: ${version} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version: ${version} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveTypeVersion(this.state, version);
   }
@@ -143,11 +161,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveTypeVersion(this.state, opName);
     });
   }
-  opVersion(name: string, version: string): WFOpVersion {
+  opVersion(name: string, version: string): WFOpVersion | null {
     if (!this.state.opVersionsMap.has(version)) {
-      throw new Error(
-        `Cannot find version: ${version} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version: ${version} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveOpVersion(this.state, version);
   }
@@ -156,11 +175,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveOpVersion(this.state, opName);
     });
   }
-  objectVersion(name: string, version: string): WFObjectVersion {
+  objectVersion(name: string, version: string): WFObjectVersion | null {
     if (!this.state.objectVersionsMap.has(version)) {
-      throw new Error(
-        `Cannot find version: ${version} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find version: ${version} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveObjectVersion(this.state, version);
   }
@@ -169,11 +189,12 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveObjectVersion(this.state, opName);
     });
   }
-  call(callID: string): any {
+  call(callID: string): WFCall | null {
     if (!this.state.callsMap.has(callID)) {
-      throw new Error(
-        `Cannot find call with callID: ${callID} in project: ${this.state.project}`
-      );
+      return null;
+      // throw new Error(
+      //   `Cannot find call with callID: ${callID} in project: ${this.state.project}`
+      // );
     }
     return new WFNaiveCall(this.state, callID);
   }
@@ -191,35 +212,11 @@ export class WFNaiveProject implements WFProject {
     return ['model', 'dataset'];
   }
 
-  private async loadAll(): Promise<void> {
-    const weaveObjectsNode = fnAllWeaveObjects(
-      this.state.entity,
-      this.state.project
-    );
-    const runsNode = fnRunsNode(
-      {
-        entityName: this.state.entity,
-        projectName: this.state.project,
-        streamName: 'stream',
-      },
-      {}
-    );
-    const feedbackNode = fnFeedbackNode(this.state.entity, this.state.project);
-    const targetNode = opDict({
-      weaveObjectsNode,
-      runsNode,
-      feedbackNode,
-    } as any);
-    await this.weaveClient.clearCacheForNode(targetNode);
-    const {
-      weaveObjectsNode: weaveObjectsValue,
-      runsNode: runsValue,
-      feedbackNode: feedbackValue,
-    } = (await this.weaveClient.query(targetNode as any)) as {
-      weaveObjectsNode?: ObjectVersionDictType[];
-      runsNode?: Call[];
-      feedbackNode?: any[];
-    };
+  private bootstrapFromData(
+    weaveObjectsValue?: ObjectVersionDictType[],
+    runsValue?: Call[],
+    feedbackValue?: any[]
+  ): void {
     const joinedCalls = joinRunsWithFeedback(
       runsValue ?? [],
       feedbackValue ?? []

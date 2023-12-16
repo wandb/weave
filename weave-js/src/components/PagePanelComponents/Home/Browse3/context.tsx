@@ -154,6 +154,12 @@ const browse2Context = {
       parsed.artifactVersion
     );
   },
+  boardsUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
+  tablesUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
 };
 
 const browse3ContextGen = (
@@ -325,6 +331,12 @@ const browse3ContextGen = (
         parsed.artifactVersion
       );
     },
+    boardsUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/boards`;
+    },
+    tablesUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/tables`;
+    },
   };
   return browse3Context;
 };
@@ -391,6 +403,16 @@ type RouteType = {
     entityName: string,
     projectName: string,
     filter?: WFHighLevelObjectVersionFilter
+  ) => string;
+  boardsUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
+  ) => string;
+  tablesUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
   ) => string;
   opPageUrl: (opUri: string) => string;
 };
