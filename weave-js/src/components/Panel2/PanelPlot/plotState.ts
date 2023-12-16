@@ -30,7 +30,7 @@ import {
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
-import {freeze, immerable, produce} from 'immer';
+import {current, freeze, immerable, produce} from 'immer';
 import _ from 'lodash';
 
 import * as TableState from '../PanelTable/tableState';
@@ -584,6 +584,7 @@ class WeaveExpressionDimension extends DimensionLike {
   }
 
   imputeOtherSeriesWithThisState(s: SeriesConfig): SeriesConfig {
+    console.log('imputing', current(s));
     return WeaveExpressionDimension.updateSeriesWithState(
       s,
       this.state(),
