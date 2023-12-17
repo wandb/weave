@@ -18,7 +18,8 @@ from . import ref_base
 from . import stream_data_interfaces
 from . import weave_types as types
 from .eager import WeaveIter, select_all
-from .run import Run
+from .run import RunKey
+from .run_streamtable_span import RunStreamTableSpan
 from . import stream_data_interfaces
 
 
@@ -62,10 +63,10 @@ class GraphClient:
 
     ##### Read API
 
-    def runs(self) -> WeaveIter[Run]:
-        return WeaveIter(self.runs_st.rows(), cls=Run)
+    def runs(self) -> WeaveIter[RunStreamTableSpan]:
+        return WeaveIter(self.runs_st.rows(), cls=RunStreamTableSpan)
 
-    def run(self, run_id: str) -> typing.Optional[Run]:
+    def run(self, run_id: str) -> typing.Optional[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["span_id"] == run_id)[0]  # type: ignore
@@ -75,11 +76,11 @@ class GraphClient:
             if run_attrs["span_id"] == None:
                 return None
             run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
-            return Run(run_attrs)
+            return RunStreamTableSpan(run_attrs)
 
     def find_op_run(
         self, op_name: str, inputs: dict[str, typing.Any]
-    ) -> typing.Optional[Run]:
+    ) -> typing.Optional[RunStreamTableSpan]:
         inputs_digest = hash_inputs(inputs)
         from . import compile
 
@@ -100,40 +101,42 @@ class GraphClient:
                 if run_attrs.get("span_id") == None:
                     return None
                 run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
-                return Run(run_attrs)
+                return RunStreamTableSpan(run_attrs)
 
-    def run_children(self, run_id: str) -> WeaveIter[Run]:
+    def run_children(self, run_id: str) -> WeaveIter[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["parent_id"] == run_id)  # type: ignore
-            return WeaveIter(filter_node, cls=Run)
+            return WeaveIter(filter_node, cls=RunStreamTableSpan)
 
     # Hmm... I want this to be a ref to an op I think?
-    def op_runs(self, op_def: op_def.OpDef) -> WeaveIter[Run]:
+    def op_runs(self, op_def: op_def.OpDef) -> WeaveIter[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(  # type: ignore
                 lambda row: row["name"] == str(op_def.location)
             )
-            return WeaveIter(filter_node, cls=Run)
+            return WeaveIter(filter_node, cls=RunStreamTableSpan)
 
-    def ref_input_to(self, ref: artifact_wandb.WandbArtifactRef) -> WeaveIter[Run]:
+    def ref_input_to(
+        self, ref: artifact_wandb.WandbArtifactRef
+    ) -> WeaveIter[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["inputs._ref0"] == ref)  # type: ignore
-            return WeaveIter(filter_node, cls=Run)
+            return WeaveIter(filter_node, cls=RunStreamTableSpan)
 
     def ref_value_input_to(
         self, ref: artifact_wandb.WandbArtifactRef
-    ) -> WeaveIter[Run]:
+    ) -> WeaveIter[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["inputs._ref_digest0"] == ref.digest)  # type: ignore
-            return WeaveIter(filter_node, cls=Run)
+            return WeaveIter(filter_node, cls=RunStreamTableSpan)
 
     def ref_output_of(
         self, ref: artifact_wandb.WandbArtifactRef
-    ) -> typing.Optional[Run]:
+    ) -> typing.Optional[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["outputs._ref0"] == ref)[0]  # type: ignore
@@ -143,7 +146,7 @@ class GraphClient:
             if run_attrs["span_id"] == None:
                 return None
             run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
-            return Run(run_attrs)
+            return RunStreamTableSpan(run_attrs)
 
     def run_feedback(self, run_id: str) -> WeaveIter[dict[str, typing.Any]]:
         with context_state.lazy_execution():
@@ -183,10 +186,10 @@ class GraphClient:
     def create_run(
         self,
         op_name: str,
-        parent: typing.Optional["Run"],
+        parent: typing.Optional["RunKey"],
         inputs: typing.Dict[str, typing.Any],
         input_refs: list[artifact_wandb.WandbArtifactRef],
-    ) -> Run:
+    ) -> RunStreamTableSpan:
         inputs_digest = hash_inputs(inputs)
         attrs = {"_inputs_digest": inputs_digest}
         inputs = copy.copy(inputs)
@@ -218,9 +221,9 @@ class GraphClient:
         )
         # Don't log create for now
         # self.runs_st.log(span)
-        return Run(span)
+        return RunStreamTableSpan(span)
 
-    def fail_run(self, run: Run, exception: Exception) -> None:
+    def fail_run(self, run: RunStreamTableSpan, exception: Exception) -> None:
         span = copy.copy(run._attrs)
         span["end_time_s"] = time.time()
         span["status_code"] = "ERROR"
@@ -230,7 +233,7 @@ class GraphClient:
 
     def finish_run(
         self,
-        run: Run,
+        run: RunStreamTableSpan,
         output: typing.Any,
         output_refs: list[artifact_wandb.WandbArtifactRef],
     ) -> None:
