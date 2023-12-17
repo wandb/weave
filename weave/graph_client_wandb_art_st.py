@@ -44,10 +44,13 @@ def hash_inputs(
     return hasher.hexdigest()
 
 
-@dataclasses.dataclass
 class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     entity_name: str
     project_name: str
+
+    def __init__(self, entity_name: str, project_name: str):
+        self.entity_name = entity_name
+        self.project_name = project_name
 
     @functools.cached_property
     def runs_st(self) -> monitoring.StreamTable:
