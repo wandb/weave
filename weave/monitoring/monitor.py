@@ -17,6 +17,7 @@ from .. import errors
 from .. import graph
 from .. import stream_data_interfaces
 from .. import graph_client_context
+from .. import graph_client_wandb_art_st
 from .. import run_context
 from .. import run_streamtable_span
 
@@ -217,7 +218,13 @@ class Monitor:
         # one.
         client = graph_client_context.get_graph_client()
         if client:
-            self._streamtable = client.runs_st
+            if isinstance(
+                client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+            ):
+                self._streamtable = client.runs_st
+            else:
+                # TODO: we need to refactor monitor to make use of graph_client
+                print("Low-level tracing only works with wandb client currently")
         return self._streamtable
 
     @contextlib.contextmanager

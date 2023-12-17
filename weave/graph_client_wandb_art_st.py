@@ -6,6 +6,7 @@ import uuid
 import time
 import json
 import typing
+from typing import Sequence
 
 from collections.abc import Mapping
 from .graph_client import GraphClient
@@ -16,22 +17,21 @@ from . import monitoring
 from . import artifact_wandb
 from . import op_def
 from . import ops_primitives
-from . import ref_base
+from .ref_base import Ref
 from . import stream_data_interfaces
-from . import weave_types as types
 from .eager import WeaveIter, select_all
-from .run import RunKey
+from .run import RunKey, Run
 from .run_streamtable_span import RunStreamTableSpan
 from . import stream_data_interfaces
 
 
 def refs_to_str(val: typing.Any) -> typing.Any:
-    if isinstance(val, ref_base.Ref):
+    if isinstance(val, Ref):
         return str(val)
     elif isinstance(val, dict):
-        return {k: refs_to_str(v) for k, v in val.items()}
+        return {k: refs_to_str(v) for k, v in val.items()}  # type: ignore
     elif isinstance(val, list):
-        return [refs_to_str(v) for v in val]
+        return [refs_to_str(v) for v in val]  # type: ignore
     else:
         return val
 
@@ -45,13 +45,9 @@ def hash_inputs(
 
 
 @dataclasses.dataclass
-class GraphClientWandbArtStreamTable(GraphClient):
+class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     entity_name: str
     project_name: str
-
-    @property
-    def entity_project(self) -> str:
-        return f"{self.entity_name}/{self.project_name}"
 
     @functools.cached_property
     def runs_st(self) -> monitoring.StreamTable:
@@ -120,25 +116,19 @@ class GraphClientWandbArtStreamTable(GraphClient):
             )
             return WeaveIter(filter_node, cls=RunStreamTableSpan)
 
-    def ref_input_to(
-        self, ref: artifact_wandb.WandbArtifactRef
-    ) -> WeaveIter[RunStreamTableSpan]:
+    def ref_input_to(self, ref: Ref) -> WeaveIter[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["inputs._ref0"] == ref)  # type: ignore
             return WeaveIter(filter_node, cls=RunStreamTableSpan)
 
-    def ref_value_input_to(
-        self, ref: artifact_wandb.WandbArtifactRef
-    ) -> WeaveIter[RunStreamTableSpan]:
+    def ref_value_input_to(self, ref: Ref) -> WeaveIter[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["inputs._ref_digest0"] == ref.digest)  # type: ignore
             return WeaveIter(filter_node, cls=RunStreamTableSpan)
 
-    def ref_output_of(
-        self, ref: artifact_wandb.WandbArtifactRef
-    ) -> typing.Optional[RunStreamTableSpan]:
+    def ref_output_of(self, ref: Ref) -> typing.Optional[RunStreamTableSpan]:
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(lambda row: row["outputs._ref0"] == ref)[0]  # type: ignore
@@ -169,10 +159,15 @@ class GraphClientWandbArtStreamTable(GraphClient):
 
     # Helpers
 
-    def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
+    def ref_is_own(self, ref: typing.Optional[Ref]) -> bool:
         return isinstance(ref, artifact_wandb.WandbArtifactRef)
 
-    def run_ui_url(self, run: RunStreamTableSpan) -> str:
+    def ref_uri(self, name: str, version: str) -> artifact_wandb.WeaveWBArtifactURI:
+        return artifact_wandb.WeaveWBArtifactURI(
+            name, version, self.entity_name, self.project_name
+        )
+
+    def run_ui_url(self, run: Run) -> str:
         return f"http://localhost:3000/{BROWSE3_PATH}/{self.entity_name}/{self.project_name}/calls/{run.id}"
 
     ##### Write API
@@ -195,7 +190,7 @@ class GraphClientWandbArtStreamTable(GraphClient):
         op_name: str,
         parent: typing.Optional["RunKey"],
         inputs: typing.Dict[str, typing.Any],
-        input_refs: list[artifact_wandb.WandbArtifactRef],
+        input_refs: Sequence[Ref],
     ) -> RunStreamTableSpan:
         inputs_digest = hash_inputs(inputs)
         attrs = {"_inputs_digest": inputs_digest}
@@ -242,7 +237,7 @@ class GraphClientWandbArtStreamTable(GraphClient):
         self,
         run: RunStreamTableSpan,
         output: typing.Any,
-        output_refs: list[artifact_wandb.WandbArtifactRef],
+        output_refs: Sequence[Ref],
     ) -> None:
         span = copy.copy(run._attrs)
         output = copy.copy(output)

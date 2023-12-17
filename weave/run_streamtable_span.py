@@ -1,4 +1,5 @@
 import typing
+from typing import Iterable
 
 from .urls import BROWSE3_PATH
 from .run import Run
@@ -87,7 +88,7 @@ class RunStreamTableSpan:
         client = graph_client_context.require_graph_client()
         client.add_feedback(self.id, feedback)
 
-    def feedback(self) -> WeaveIter[dict[str, typing.Any]]:
+    def feedback(self) -> Iterable[dict[str, typing.Any]]:
         client = graph_client_context.require_graph_client()
         return client.run_feedback(self.id)
 

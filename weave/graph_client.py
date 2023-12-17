@@ -1,8 +1,9 @@
-from typing import Protocol, Generic, Iterable, Sequence, TypeVar, Optional, Any
+from typing import Protocol, Generic, Sequence, TypeVar, Optional, Any
 from abc import abstractmethod
 
 from .op_def import OpDef
 from .ref_base import Ref
+from .uris import WeaveURI
 from .run import RunKey, Run
 
 R = TypeVar("R", bound=Run)
@@ -12,7 +13,7 @@ class GraphClient(Protocol, Generic[R]):
     ##### Read API
 
     @abstractmethod
-    def runs(self) -> Iterable[Run]:
+    def runs(self) -> Sequence[Run]:
         ...
 
     @abstractmethod
@@ -24,19 +25,19 @@ class GraphClient(Protocol, Generic[R]):
         ...
 
     @abstractmethod
-    def run_children(self, run_id: str) -> Iterable[Run]:
+    def run_children(self, run_id: str) -> Sequence[Run]:
         ...
 
     @abstractmethod
-    def op_runs(self, op_def: OpDef) -> Iterable[Run]:
+    def op_runs(self, op_def: OpDef) -> Sequence[Run]:
         ...
 
     @abstractmethod
-    def ref_input_to(self, ref: Ref) -> Iterable[Run]:
+    def ref_input_to(self, ref: Ref) -> Sequence[Run]:
         ...
 
     @abstractmethod
-    def ref_value_input_to(self, ref: Ref) -> Iterable[Run]:
+    def ref_value_input_to(self, ref: Ref) -> Sequence[Run]:
         ...
 
     @abstractmethod
@@ -44,7 +45,7 @@ class GraphClient(Protocol, Generic[R]):
         ...
 
     @abstractmethod
-    def run_feedback(self, run_id: str) -> Iterable[dict[str, Any]]:
+    def run_feedback(self, run_id: str) -> Sequence[dict[str, Any]]:
         ...
 
     @abstractmethod
@@ -55,6 +56,10 @@ class GraphClient(Protocol, Generic[R]):
 
     @abstractmethod
     def ref_is_own(self, ref: Optional[Ref]) -> bool:
+        ...
+
+    @abstractmethod
+    def ref_uri(self, name: str, version: str) -> WeaveURI:
         ...
 
     @abstractmethod

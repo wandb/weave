@@ -3,6 +3,7 @@ import copy
 import contextvars
 import contextlib
 import typing
+from typing import Iterable
 import inspect
 
 from weave.weavejs_fixes import fixup_node
@@ -606,7 +607,7 @@ class OpDef:
     def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
         return isinstance(self, AutoTagHandlingArrowOpDef)
 
-    def runs(self) -> eager.WeaveIter[Run]:
+    def runs(self) -> Iterable[Run]:
         client = graph_client_context.require_graph_client()
         return client.op_runs(self)
 

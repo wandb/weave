@@ -20,7 +20,7 @@ def test_digestrefs():
         ]
     )
 
-    ds0_ref = graph_client.save_object(ds, "digestrefs", "latest")
+    ds0_ref = weave.publish(ds, "digestrefs")
 
     ds0 = weave.ref(str(ds0_ref)).get()
 
@@ -41,7 +41,7 @@ def test_digestrefs():
     assert len(calls) == 1
 
     ds = ds + [{"id": 2, "val": -10}]
-    ds1_ref = graph_client.save_object(ds, "digestrefs", "latest")
+    ds1_ref = weave.publish(ds, "digestrefs")
 
     ds1 = weave.ref(str(ds1_ref)).get()
     ds1_row0 = ds1[0]

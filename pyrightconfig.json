@@ -92,9 +92,8 @@
     "weave/weave_pydantic.py",
     "weave/weavify.py"
   ],
-  "strict": [
-    "weave/ref_base.py",
-    "weave/graph_client.py",
-    "weave/graph_client_local.py"
-  ]
+  "reportFunctionMemberAccess": true,
+  "reportIncompatibleMethodOverride": true,
+  "reportIncompatibleVariableOverride": true,
+  "reportOverlappingOverload": true,
 }

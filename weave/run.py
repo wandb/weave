@@ -19,3 +19,7 @@ class Run(typing.Protocol):
     @property
     def trace_id(self) -> str:
         ...
+
+    @property
+    def ui_url(self) -> str:
+        ...

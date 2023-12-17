@@ -3,7 +3,7 @@ import hashlib
 import json
 import copy
 import typing
-from typing import Iterable, Sequence
+from typing import Sequence, Sequence
 
 from collections.abc import Mapping
 from .graph_client import GraphClient
@@ -49,7 +49,7 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
     ##### Read API
 
     # Implement the required members from the "GraphClient" protocol class
-    def runs(self) -> Iterable[Run]:
+    def runs(self) -> Sequence[Run]:
         raise NotImplementedError
 
     def run(self, run_id: str) -> typing.Optional[Run]:
@@ -61,13 +61,13 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         run_id = make_run_id(op_name, inputs)
         return storage.get(f"local-artifact:///run-{run_id}:latest/obj")
 
-    def run_children(self, run_id: str) -> Iterable[Run]:
+    def run_children(self, run_id: str) -> Sequence[Run]:
         raise NotImplementedError
 
-    def op_runs(self, op_def: OpDef) -> Iterable[Run]:
+    def op_runs(self, op_def: OpDef) -> Sequence[Run]:
         raise NotImplementedError
 
-    def ref_input_to(self, ref: Ref) -> Iterable[Run]:
+    def ref_input_to(self, ref: Ref) -> Sequence[Run]:
         runs = storage.objects(types.RunType())
         result: list[WeaveRunObj] = []
         for run_ref in runs:
@@ -89,7 +89,7 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
     def ref_output_of(self, ref: Ref) -> typing.Optional[Run]:
         raise NotImplementedError
 
-    def run_feedback(self, run_id: str) -> Iterable[dict[str, typing.Any]]:
+    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError
 
     def feedback(self, feedback_id: str) -> typing.Optional[dict[str, typing.Any]]:
@@ -99,6 +99,9 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
 
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         return isinstance(ref, artifact_local.LocalArtifactRef)
+
+    def ref_uri(self, name: str, version: str) -> artifact_local.WeaveLocalArtifactURI:
+        return artifact_local.WeaveLocalArtifactURI(name, version)
 
     def run_ui_url(self, run: Run) -> str:
         raise NotImplementedError

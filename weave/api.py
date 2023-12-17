@@ -73,7 +73,7 @@ def save(node_or_obj, name=None):
 
 def get(ref_str):
     obj = _storage.get(ref_str)
-    ref = _storage._get_ref(obj)
+    ref = typing.cast(_ref_base.Ref, _storage._get_ref(obj))
     return _weave_internal.make_const_node(ref.type, obj)
 
 
@@ -99,7 +99,7 @@ def versions(obj):
     elif isinstance(obj, _graph.OutputNode):
         obj = use(obj)
     ref = _get_ref(obj)
-    return ref.versions()
+    return ref.versions()  # type: ignore
 
 
 def expr(obj):
@@ -122,7 +122,7 @@ def from_pandas(df):
 #### Newer API below
 
 
-def init(project_name: str) -> _graph_client.GraphClient[_run.Run]:
+def init(project_name: str) -> _graph_client.GraphClient:
     from . import wandb_api
 
     fields = project_name.split("/")
@@ -161,16 +161,11 @@ def init_local_client() -> _graph_client.GraphClient:
     return client
 
 
-def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
-    if "/" not in name:
-        client = _graph_client_context.get_graph_client()
-        if not client:
-            raise ValueError(
-                "Call weave.init() first, or pass <project>/<name> for name"
-            )
-        name = f"{client.project_name}/{name}"
+def publish(obj: typing.Any, name: str) -> _ref_base.Ref:
+    client = _graph_client_context.require_graph_client()
 
-    ref = _storage.publish(obj, name)  # type: ignore
+    ref = client.save_object(obj, name, "latest")
+
     print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
 
     # Have to manually put the ref on the obj, this is supposed to happen at
@@ -187,10 +182,12 @@ def ref(uri: str) -> _ref_base.Ref:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
         if "/" in uri:
             raise ValueError("'/' not currently supported in short-form URI")
-        name_version = uri
-        if ":" not in name_version:
-            name_version = f"{name_version}:latest"
-        uri = f"wandb-artifact:///{client.entity_name}/{client.project_name}/{name_version}/obj"
+        if ":" not in uri:
+            name = uri
+            version = "latest"
+        else:
+            name, version = uri.split(":")
+        uri = str(client.ref_uri(name, version))
 
     return _ref_base.Ref.from_str(uri)
 
@@ -221,10 +218,14 @@ def serve(
     from .serve_fastapi import object_method_app
 
     client = _graph_client_context.require_graph_client()
+    if not isinstance(
+        client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+    ):
+        raise ValueError("serve currently only supports wandb client")
 
     print(f"Serving {model_ref}")
     print(f"Server docs at http://localhost:{port}/docs")
-    os.environ["PROJECT_NAME"] = client.entity_project
+    os.environ["PROJECT_NAME"] = f"{client.entity_name}/{client.project_name}"
     os.environ["MODEL_REF"] = str(model_ref)
 
     wandb_api_ctx = _wandb_api.get_wandb_api_context()

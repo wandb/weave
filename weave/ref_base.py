@@ -82,6 +82,10 @@ class Ref:
         return obj
 
     @property
+    def ui_url(self) -> str:
+        return "[no url for obj]"
+
+    @property
     def type(self) -> "types.Type":
         raise NotImplementedError
 
