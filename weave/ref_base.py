@@ -127,12 +127,6 @@ class Ref:
     def __str__(self) -> str:
         return str(self.uri)
 
-    def __eq__(self, other: object) -> bool:
-        return str(self) == str(other)
-
-    def __hash__(self) -> int:
-        return hash(str(self))
-
     def input_to(self) -> Iterable["run.Run"]:
         client = graph_client_context.require_graph_client()
         return client.ref_input_to(self)

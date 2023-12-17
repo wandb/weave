@@ -73,7 +73,7 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         for run_ref in runs:
             run = typing.cast(WeaveRunObj, run_ref.get())
             for v in run.inputs.values():
-                if ref == v:
+                if str(ref) == str(v):
                     result.append(run)
         return result
 
