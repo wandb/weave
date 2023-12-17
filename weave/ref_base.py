@@ -10,6 +10,8 @@ import functools
 from . import uris
 from . import box
 from . import errors
+from . import eager
+from . import graph_client_context
 from . import weave_types as types
 from . import object_context
 
@@ -18,6 +20,7 @@ REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
     from . import weave_types as types
+    from . import run
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
@@ -122,6 +125,21 @@ class Ref:
 
     def __str__(self) -> str:
         return str(self.uri)
+
+    def __eq__(self, other: object) -> bool:
+        return str(self) == str(other)
+
+    def input_to(self) -> eager.WeaveIter["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_input_to(self)
+
+    def value_input_to(self) -> eager.WeaveIter["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_value_input_to(self)
+
+    def output_of(self) -> typing.Optional["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_output_of(self)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:

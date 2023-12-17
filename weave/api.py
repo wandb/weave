@@ -18,6 +18,7 @@ from . import util as _util
 from . import context as _context
 from . import context_state as _context_state
 from . import graph_client as _graph_client
+from . import graph_client_local as _graph_client_local
 from . import graph_client_context as _graph_client_context
 from weave import monitoring as _monitoring
 from weave.monitoring import monitor as _monitor
@@ -121,7 +122,6 @@ def from_pandas(df):
 
 def init(project_name: str) -> _graph_client.GraphClient:
     from . import wandb_api
-    from . import monitoring
 
     fields = project_name.split("/")
     if len(fields) == 1:
@@ -150,6 +150,13 @@ def init(project_name: str) -> _graph_client.GraphClient:
     return client
 
 
+# This is currently an internal interface. We'll expose something like it though ("offline" mode)
+def init_local_client() -> _graph_client.GraphClient:
+    client = _graph_client_local.GraphClientLocal()
+    _graph_client_context._graph_client.set(client)
+    return client
+
+
 def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
     if "/" not in name:
         client = _graph_client_context.get_graph_client()
@@ -169,7 +176,7 @@ def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
     return ref
 
 
-def ref(uri: str) -> _artifact_wandb.WandbArtifactRef:
+def ref(uri: str) -> _ref_base.Ref:
     if not "://" in uri:
         client = _graph_client_context.get_graph_client()
         if not client:
@@ -181,11 +188,7 @@ def ref(uri: str) -> _artifact_wandb.WandbArtifactRef:
             name_version = f"{name_version}:latest"
         uri = f"wandb-artifact:///{client.entity_name}/{client.project_name}/{name_version}/obj"
 
-    ref = _ref_base.Ref.from_str(uri)
-    if not isinstance(ref, _artifact_wandb.WandbArtifactRef):
-        raise ValueError(f"Expected a wandb artifact ref, got {ref}")
-    ref.type
-    return ref
+    return _ref_base.Ref.from_str(uri)
 
 
 import contextlib

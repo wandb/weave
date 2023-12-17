@@ -14,6 +14,10 @@ class Run:
     inputs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
     output: typing.Any = dataclasses.field(default_factory=lambda: None)
 
+    @property
+    def ui_url(self):
+        return ""
+
 
 types.RunType.instance_classes = Run
 types.RunType.instance_class = Run
