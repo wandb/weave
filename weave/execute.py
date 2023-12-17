@@ -55,6 +55,9 @@ from . import language_nullability
 
 from . import parallelism
 
+if typing.TYPE_CHECKING:
+    from .graph_client import GraphClient
+
 TRACE_LOCAL = trace_local.TraceLocal()
 
 # Set this to true when debugging for costly, but detailed storyline of execution
@@ -479,7 +482,7 @@ def publish_graph(
     """Publish all ops and ConstNodes found in graph"""
     maybe_client = graph_client_context.get_graph_client()
     if maybe_client is not None and context_state.eager_mode():
-        client = typing.cast(graph_client_context.GraphClient, maybe_client)
+        client = typing.cast("GraphClient", maybe_client)
 
         def _publish_node(node: graph.Node):
             if isinstance(node, graph.OutputNode):
@@ -503,7 +506,7 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode() and op_def.location:
         op_def_ref = storage._get_ref(op_def)
-        if not isinstance(op_def_ref, artifact_wandb.WandbArtifactRef):
+        if not client.ref_is_own(op_def_ref):
             # This should have already been published by publish_graph if monitoring
             # is turned on.
             raise errors.WeaveInternalError(
