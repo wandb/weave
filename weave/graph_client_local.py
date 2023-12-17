@@ -3,23 +3,27 @@ import hashlib
 import json
 import copy
 import typing
+from typing import Iterable, Sequence
 
 from collections.abc import Mapping
+from .graph_client import GraphClient
+from .op_def import OpDef
+from .ref_base import Ref
 from . import artifact_local
 from . import storage
 from . import ref_base
 from . import weave_types as types
-from .eager import WeaveIter
-from .runs import Run
+from .run import RunKey, Run
+from .runs import Run as WeaveRunObj
 
 
 def refs_to_str(val: typing.Any) -> typing.Any:
     if isinstance(val, ref_base.Ref):
         return str(val)
     elif isinstance(val, dict):
-        return {k: refs_to_str(v) for k, v in val.items()}
+        return {k: refs_to_str(v) for k, v in val.items()}  # type: ignore
     elif isinstance(val, list):
-        return [refs_to_str(v) for v in val]
+        return [refs_to_str(v) for v in val]  # type: ignore
     else:
         return val
 
@@ -41,8 +45,15 @@ def make_run_id(op_name: str, inputs: dict[str, typing.Any]) -> str:
 
 
 @dataclasses.dataclass
-class GraphClientLocal:
+class GraphClientLocal(GraphClient[WeaveRunObj]):
     ##### Read API
+
+    # Implement the required members from the "GraphClient" protocol class
+    def runs(self) -> Iterable[Run]:
+        raise NotImplementedError
+
+    def run(self, run_id: str) -> typing.Optional[Run]:
+        raise NotImplementedError
 
     def find_op_run(
         self, op_name: str, inputs: dict[str, typing.Any]
@@ -50,27 +61,47 @@ class GraphClientLocal:
         run_id = make_run_id(op_name, inputs)
         return storage.get(f"local-artifact:///run-{run_id}:latest/obj")
 
-    def ref_input_to(self, ref: artifact_local.LocalArtifactRef) -> list[Run]:
+    def run_children(self, run_id: str) -> Iterable[Run]:
+        raise NotImplementedError
+
+    def op_runs(self, op_def: OpDef) -> Iterable[Run]:
+        raise NotImplementedError
+
+    def ref_input_to(self, ref: Ref) -> Iterable[Run]:
         runs = storage.objects(types.RunType())
-        result = []
+        result: list[WeaveRunObj] = []
         for run_ref in runs:
-            run = typing.cast(Run, run_ref.get())
-            for k, v in run.inputs.items():
+            run = typing.cast(WeaveRunObj, run_ref.get())
+            for v in run.inputs.values():
                 if ref == v:
                     result.append(run)
         return result
 
-    def ref_value_input_to(self, ref: artifact_local.LocalArtifactRef) -> list[Run]:
+    def ref_value_input_to(self, ref: Ref) -> list[Run]:
         runs = storage.objects(types.RunType())
-        result = []
+        result: list[Run] = []
         for run_ref in runs:
-            run = typing.cast(Run, run_ref.get())
+            run = typing.cast(WeaveRunObj, run_ref.get())
             if ref.digest in run.inputs.get("_digests", []):
                 result.append(run)
         return result
 
+    def ref_output_of(self, ref: Ref) -> typing.Optional[Run]:
+        raise NotImplementedError
+
+    def run_feedback(self, run_id: str) -> Iterable[dict[str, typing.Any]]:
+        raise NotImplementedError
+
+    def feedback(self, feedback_id: str) -> typing.Optional[dict[str, typing.Any]]:
+        raise NotImplementedError
+
+    # Helpers
+
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         return isinstance(ref, artifact_local.LocalArtifactRef)
+
+    def run_ui_url(self, run: Run) -> str:
+        raise NotImplementedError
 
     ##### Write API
 
@@ -79,7 +110,7 @@ class GraphClientLocal:
     ) -> artifact_local.LocalArtifactRef:
         from . import storage
 
-        return storage._direct_save(
+        return storage.direct_save(
             obj,
             name=name,
             branch_name=branch_name,
@@ -88,23 +119,26 @@ class GraphClientLocal:
     def create_run(
         self,
         op_name: str,
-        parent: typing.Optional["Run"],
+        parent: typing.Optional["RunKey"],
         inputs: typing.Dict[str, typing.Any],
-        input_refs: list[artifact_local.LocalArtifactRef],
-    ) -> Run:
+        input_refs: Sequence[Ref],
+    ) -> WeaveRunObj:
         run_id = make_run_id(op_name, inputs)
         with_digest_inputs = copy.copy(inputs)
         with_digest_inputs["_digests"] = [ref.digest for ref in input_refs]
-        return Run(run_id, op_name, inputs=with_digest_inputs)
+        return WeaveRunObj(run_id, op_name, inputs=with_digest_inputs)
 
     def fail_run(self, run: Run, exception: Exception) -> None:
         raise NotImplementedError
 
     def finish_run(
         self,
-        run: Run,
+        run: WeaveRunObj,
         output: typing.Any,
-        output_refs: list[artifact_local.LocalArtifactRef],
+        output_refs: Sequence[Ref],
     ) -> None:
         run.output = output
         self.save_object(run, f"run-{run.id}", "latest")
+
+    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
+        raise NotImplementedError

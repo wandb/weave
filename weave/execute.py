@@ -501,6 +501,7 @@ def publish_graph(
         graph.map_nodes_full(nodes, _publish_node)
 
 
+# bla
 def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     mon_span_inputs = {**inputs}
     client = graph_client_context.get_graph_client()

@@ -1,16 +1,13 @@
 import typing
+from typing import Iterable
 import weakref
 import hashlib
 import json
-import contextlib
-import contextvars
-import collections
 import functools
 
 from . import uris
 from . import box
 from . import errors
-from . import eager
 from . import graph_client_context
 from . import weave_types as types
 from . import object_context
@@ -25,9 +22,9 @@ if typing.TYPE_CHECKING:
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
     if isinstance(obj, dict):
-        return {k: _map_to_ref_strs(v) for k, v in obj.items()}
+        return {k: _map_to_ref_strs(v) for k, v in obj.items()}  # type: ignore
     if isinstance(obj, list):
-        return [_map_to_ref_strs(v) for v in obj]
+        return [_map_to_ref_strs(v) for v in obj]  # type: ignore
     ref = get_ref(obj)
     if ref is not None:
         return str(ref)
@@ -47,7 +44,7 @@ class Ref:
     ):
         self._type = type
         self.extra = extra
-        if obj is not None and type is not None and type.name != "tagged":
+        if obj is not None and type is not None and type.name != "tagged":  # type: ignore
             obj = box.box(obj)
             _put_ref(obj, self)
         self._obj = obj
@@ -75,7 +72,7 @@ class Ref:
         obj = self._get()
 
         obj = box.box(obj)
-        if self.type.name != "tagged":
+        if self.type.name != "tagged":  # type: ignore
             _put_ref(obj, self)
         self._obj = obj
 
@@ -129,11 +126,11 @@ class Ref:
     def __eq__(self, other: object) -> bool:
         return str(self) == str(other)
 
-    def input_to(self) -> eager.WeaveIter["run.Run"]:
+    def input_to(self) -> Iterable["run.Run"]:
         client = graph_client_context.require_graph_client()
         return client.ref_input_to(self)
 
-    def value_input_to(self) -> eager.WeaveIter["run.Run"]:
+    def value_input_to(self) -> Iterable["run.Run"]:
         client = graph_client_context.require_graph_client()
         return client.ref_value_input_to(self)
 
@@ -178,7 +175,7 @@ def clear_ref(obj: typing.Any) -> None:
         REFS.pop(id(obj))
 
 
-def deref(ref: Ref) -> typing.Any:
+def deref(ref: typing.Any) -> typing.Any:
     if isinstance(ref, Ref):
         return ref.get()
     return ref

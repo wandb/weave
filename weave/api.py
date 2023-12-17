@@ -17,8 +17,10 @@ from . import ops as _ops
 from . import util as _util
 from . import context as _context
 from . import context_state as _context_state
+from . import run as _run
 from . import graph_client as _graph_client
 from . import graph_client_local as _graph_client_local
+from . import graph_client_wandb_art_st as _graph_client_wandb_art_st
 from . import graph_client_context as _graph_client_context
 from weave import monitoring as _monitoring
 from weave.monitoring import monitor as _monitor
@@ -120,7 +122,7 @@ def from_pandas(df):
 #### Newer API below
 
 
-def init(project_name: str) -> _graph_client.GraphClient:
+def init(project_name: str) -> _graph_client.GraphClient[_run.Run]:
     from . import wandb_api
 
     fields = project_name.split("/")
@@ -141,7 +143,9 @@ def init(project_name: str) -> _graph_client.GraphClient:
         )
     if not entity_name:
         raise ValueError("entity_name must be non-empty")
-    client = _graph_client.GraphClient(entity_name, project_name)
+    client = _graph_client_wandb_art_st.GraphClientWandbArtStreamTable(
+        entity_name, project_name
+    )
     _graph_client_context._graph_client.set(client)
     print("Ensure you have the prototype UI running with `weave ui`")
     print(

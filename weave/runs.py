@@ -10,9 +10,13 @@ class Run:
     op_name: str
     state: str = dataclasses.field(default_factory=lambda: "pending")
     prints: list[str] = dataclasses.field(default_factory=list)
-    history: list[dict] = dataclasses.field(default_factory=list)
+    history: list[dict[str, typing.Any]] = dataclasses.field(default_factory=list)
     inputs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
     output: typing.Any = dataclasses.field(default_factory=lambda: None)
+
+    @property
+    def trace_id(self) -> str:
+        raise NotImplementedError
 
     @property
     def ui_url(self):
@@ -20,4 +24,3 @@ class Run:
 
 
 types.RunType.instance_classes = Run
-types.RunType.instance_class = Run
