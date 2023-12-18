@@ -2,6 +2,7 @@ import {Client} from '@wandb/weave/core';
 import _ from 'lodash';
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
+import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 import {WeaveApp} from './weave';
 
 export interface ClientState {
@@ -129,9 +130,15 @@ export const WeaveFeaturesContextProvider: FC<{features: WeaveFeatures}> =
     // in prevFeatures.
     const newFeatures = _.merge(prevFeatures, props.features);
 
+    // PanelInteractContext is placed here since it belongs at the root level
+    // of any component tree that renders Weave Panels. It is used most often
+    // by ChildPanel.
+
     return (
       <WeaveFeaturesContext.Provider value={newFeatures}>
-        {props.children}
+        <PanelInteractContextProvider>
+          {props.children}
+        </PanelInteractContextProvider>
       </WeaveFeaturesContext.Provider>
     );
   });

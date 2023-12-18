@@ -172,6 +172,8 @@ export const PanelNumber: React.FC<
 
 export const Spec: Panel2.PanelSpec = {
   id: 'number',
+  icon: 'number',
+  category: 'Primitive',
   Component: PanelNumber,
   ConfigComponent: PanelNumberConfig,
   inputType,

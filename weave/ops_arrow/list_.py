@@ -1184,9 +1184,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     # But you can still reference them, because you have to get that
                     # file through an op, and therefore we know the type?
                     ref._type = type_
+
                     if isinstance(type_, types.RefType):
+                        ref._type = type_.object_type
                         # if we actually have a ref, then don't deref, return the ref
                         return ref
+
                     return ref.get()
 
                 return self._artifact.get(v, type_)
@@ -1279,7 +1282,18 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             result_rows, self.object_type, self._artifact
         )
         if isinstance(index, int):
-            return awl.to_pylist_tagged()[0]
+            result = awl.to_pylist_tagged()[0]
+            ref = ref_base.get_ref(self)
+            from .. import artifact_base
+
+            # Ensure we associate a ref for the row we're returning,
+            # so if the user calls an op on the row, the op refers to a sub-row
+            # in this list
+            if isinstance(ref, artifact_base.ArtifactRef):
+                result = box.box(result)
+                new_ref = ref.with_extra(self.object_type, result, [str(index)])
+                ref_base._put_ref(result, new_ref)
+            return result
         return awl
 
     def __getitem__(
@@ -1430,6 +1444,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )
         return weave_internal.define_fn(vars, fn).val
 
+    # TODO: This should be .map!
     def apply(
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):
@@ -1603,3 +1618,20 @@ def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
     arrs = convert.unify_types(*arrs)
     zipped = arrow_zip(*[a._arrow_data for a in arrs])
     return ArrowWeaveList(zipped, types.List(arrs[0].object_type), None)
+
+
+# Converts timestamp columns to ms for serialization back to web client
+def convert_arrow_timestamp_to_epoch_ms(awl: ArrowWeaveList):
+    def convert(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
+        _, non_none_type = types.split_none(col.object_type)
+        if isinstance(non_none_type, types.Timestamp):
+            return ArrowWeaveList(
+                pc.milliseconds_between(
+                    pa.scalar(0, col._arrow_data.type), col._arrow_data
+                ),
+                types.optional(types.Int()),
+                awl._artifact,
+            )
+        return None
+
+    return awl.map_column(convert)

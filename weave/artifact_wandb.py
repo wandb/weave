@@ -12,6 +12,8 @@ from wandb import Artifact
 from wandb.apis import public as wb_public
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
+from .urls import BROWSE3_PATH
+
 
 from . import uris
 from . import util
@@ -33,7 +35,7 @@ from urllib import parse
 
 if typing.TYPE_CHECKING:
     from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
-    from . import run
+    from .run_streamtable_span import RunStreamTableSpan
 
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -826,17 +828,30 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             path=uri.path,
         )
 
-    def input_to(self) -> eager.WeaveIter["run.Run"]:
+    def input_to(self) -> eager.WeaveIter["RunStreamTableSpan"]:
         client = graph_client_context.require_graph_client()
         return client.ref_input_to(self)
 
-    def output_of(self) -> typing.Optional["run.Run"]:
+    def value_input_to(self) -> eager.WeaveIter["RunStreamTableSpan"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_value_input_to(self)
+
+    def output_of(self) -> typing.Optional["RunStreamTableSpan"]:
         client = graph_client_context.require_graph_client()
         return client.ref_output_of(self)
 
     @property
     def ui_url(self):
-        return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
+        root_type = self.type.root_type_class()
+        from .op_def_type import OpDefType
+
+        if issubclass(root_type, OpDefType):
+            return f"http://localhost:3000/{BROWSE3_PATH}/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/ops/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
+        else:
+            return f"http://localhost:3000/{BROWSE3_PATH}/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/objects/{self.artifact.uri_obj.name}/versions/{self.artifact.uri_obj.version}"
+
+        # Before Tim's Weaveflow changes
+        # return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
 
 
 types.WandbArtifactRefType.instance_class = WandbArtifactRef

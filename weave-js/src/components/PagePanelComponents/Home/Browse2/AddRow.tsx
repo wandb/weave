@@ -22,7 +22,7 @@ import {
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
 import {ProjectNamePicker} from './ProjectPicker';
-import {refPageUrl} from './url';
+import {useRefPageUrl} from './url';
 
 interface AddRowToPaneFormState {
   projectName?: string;
@@ -58,7 +58,6 @@ export const AddRowToTable: FC<{
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
   const [newUri, setNewUri] = useState<string | null>(null);
-
   const addRowToDataset = useCallback(async () => {
     if (projectName && datasetName) {
       setWorking('addingRow');
@@ -83,6 +82,11 @@ export const AddRowToTable: FC<{
         projectName,
         datasetName.name
       );
+
+      // if ((orm?.projectConnection as WFNaiveProject).reload) {
+      //   await (orm!.projectConnection as WFNaiveProject).reload();
+      // }
+
       setNewUri(finalRootUri);
       setWorking('done');
     }
@@ -91,6 +95,8 @@ export const AddRowToTable: FC<{
   const handleSubmit = useCallback(() => {
     addRowToDataset();
   }, [addRowToDataset]);
+
+  const refPageUrl = useRefPageUrl();
 
   return (
     <Dialog fullWidth maxWidth="sm" open={open} onClose={handleClose}>

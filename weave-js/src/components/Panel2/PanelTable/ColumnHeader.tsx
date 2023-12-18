@@ -6,14 +6,17 @@ import * as SemanticHacks from '@wandb/weave/common/util/semanticHacks';
 import {
   canGroupType,
   canSortType,
+  constFunction,
   EditingNode,
   isListLike,
   isVoidNode,
   listObjectType,
   Node,
   NodeOrVoidNode,
+  opCount,
   voidNode,
 } from '@wandb/weave/core';
+import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
@@ -122,6 +125,8 @@ export const ColumnHeader: React.FC<{
   panelContext: any;
   isPinned: boolean;
   simpleTable?: boolean;
+  countColumnId: string | null;
+  setCountColumnId: React.Dispatch<React.SetStateAction<string | null>>;
   updatePanelContext(newContext: any): void;
   updateTableState(newTableState: Table.TableState): void;
   setColumnPinState(pin: boolean): void;
@@ -141,6 +146,8 @@ export const ColumnHeader: React.FC<{
   isPinned,
   setColumnPinState,
   simpleTable,
+  countColumnId,
+  setCountColumnId,
 }) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
@@ -156,6 +163,7 @@ export const ColumnHeader: React.FC<{
     useState<any>(propsPanelConfig);
   const enableGroup = Table.enableGroupByCol;
   const disableGroup = Table.disableGroupByCol;
+  const isGroupCountColumn = colId === 'groupCount';
 
   const applyWorkingState = useCallback(() => {
     let newState = tableState;
@@ -242,8 +250,19 @@ export const ColumnHeader: React.FC<{
     ]
   );
   const doUngroup = useCallback(async () => {
-    const newTableState = await disableGroup(
-      tableState,
+    let newTableState: Table.TableState | null = null;
+    const countColumnExists = Object.keys(tableState.columnNames).includes(
+      'groupCount'
+    );
+    if (countColumnId && !countColumnExists) {
+      setCountColumnId(null);
+    }
+    if (countColumnId && countColumnExists && tableState.groupBy.length === 1) {
+      newTableState = Table.removeColumn(tableState, countColumnId);
+      setCountColumnId(null);
+    }
+    newTableState = await disableGroup(
+      newTableState ?? tableState,
       colId,
       inputArrayNode,
       weave,
@@ -252,6 +271,8 @@ export const ColumnHeader: React.FC<{
     recordEvent('UNGROUP');
     updateTableState(newTableState);
   }, [
+    countColumnId,
+    setCountColumnId,
     disableGroup,
     tableState,
     colId,
@@ -301,15 +322,39 @@ export const ColumnHeader: React.FC<{
       icon: 'configuration',
       onSelect: () => openColumnSettings(),
     });
-    if (!isGroupCol && canGroupType(columnTypeForGroupByChecks)) {
+    if (
+      !isGroupCol &&
+      !isGroupCountColumn &&
+      canGroupType(columnTypeForGroupByChecks)
+    ) {
       menuItems.push({
         value: 'group',
         name: 'Group by',
         icon: 'group-runs',
         onSelect: async () => {
           recordEvent('GROUP');
-          const newTableState = await enableGroup(
-            tableState,
+          let newTableState: Table.TableState | null = null;
+          if (countColumnId == null) {
+            const {table, columnId} = Table.addColumnToTable(
+              tableState,
+              constFunction(
+                {
+                  row: {
+                    type: 'list',
+                    objectType: 'any',
+                  },
+                },
+                ({row}) => {
+                  return opCount({arr: row});
+                }
+              ).val,
+              'groupCount'
+            );
+            newTableState = table;
+            setCountColumnId(columnId);
+          }
+          newTableState = await enableGroup(
+            newTableState ?? tableState,
             colId,
             inputArrayNode,
             weave,
@@ -411,6 +456,8 @@ export const ColumnHeader: React.FC<{
     }
     return menuItems;
   }, [
+    countColumnId,
+    setCountColumnId,
     isGroupCol,
     columnTypeForGroupByChecks,
     workingSelectFunction.type,
@@ -425,6 +472,7 @@ export const ColumnHeader: React.FC<{
     doUngroup,
     isPinned,
     setColumnPinState,
+    isGroupCountColumn,
   ]);
 
   const colIsSorted =

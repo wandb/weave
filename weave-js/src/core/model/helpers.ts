@@ -20,6 +20,7 @@ import {
   SimpleType,
   TableType,
   TaggedValueType,
+  TimestampType,
   Type,
   TypedDictType,
   Union,
@@ -1031,7 +1032,7 @@ export function isJoinedTable(t: Type): t is TableType {
   return !isSimpleTypeShape(t) && t?.type === 'joined-table';
 }
 
-export function isTimestamp(t: Type): t is ListType {
+export function isTimestamp(t: Type): t is TimestampType {
   return !isSimpleTypeShape(t) && t.type === 'timestamp';
 }
 

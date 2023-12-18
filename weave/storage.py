@@ -59,6 +59,13 @@ def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
     from weave.mappers_publisher import map_to_python_remote
+    from . import op_def
+
+    # Hack because of mappers_publisher recursion bug. Just don't do the recursion
+    # if we have an OpDef. Really we should skip if we don't have a composite object
+    # but there's no standard check for that.
+    if isinstance(obj, op_def.OpDef):
+        return obj
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)
@@ -128,6 +135,14 @@ def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
     return _pubish_target_project.get()
 
 
+# Keep a cache of published local ref -> wandb ref. This is used to ensure
+# we publish any needed op defs at the beginning of graph execution one time,
+# to avoid parallel publishing them many times later in mapped operations.
+PUBLISH_CACHE_BY_LOCAL_ART: dict[
+    artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef
+] = {}
+
+
 def _direct_publish(
     obj: typing.Any,
     name: typing.Optional[str] = None,
@@ -141,6 +156,15 @@ def _direct_publish(
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     _merge: typing.Optional[bool] = False,
 ) -> artifact_wandb.WandbArtifactRef:
+    _orig_ref = _get_ref(obj)
+    if isinstance(_orig_ref, artifact_wandb.WandbArtifactRef):
+        return _orig_ref
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        res = PUBLISH_CACHE_BY_LOCAL_ART.get(_orig_ref)
+        if res is not None:
+            ref_base._put_ref(obj, res)
+            return res
+
     weave_type = assume_weave_type or _get_weave_type(obj)
 
     target_project_from_context = get_publish_target_project()
@@ -182,6 +206,11 @@ def _direct_publish(
             artifact_collection_exists=bool(_merge),
             _lite_run=_lite_run,
         )
+
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        PUBLISH_CACHE_BY_LOCAL_ART[_orig_ref] = ref
+
+    ref_base._put_ref(obj, ref)
 
     return ref
 
@@ -433,7 +462,7 @@ def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     elif isinstance(obj, list):
         return [to_weavejs(item, artifact=artifact) for item in obj]
     elif isinstance(obj, arrow_list.ArrowWeaveList):
-        return convert_timestamps_to_epoch_ms(obj.to_pylist_notags())
+        return arrow_list.convert_arrow_timestamp_to_epoch_ms(obj).to_pylist_notags()
 
     wb_type = types.TypeRegistry.type_of(obj)
 

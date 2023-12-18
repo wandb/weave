@@ -1,8 +1,11 @@
 import typing
 import weakref
+import hashlib
+import json
 import contextlib
 import contextvars
 import collections
+import functools
 
 from . import uris
 from . import box
@@ -15,6 +18,17 @@ REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
     from . import weave_types as types
+
+
+def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, dict):
+        return {k: _map_to_ref_strs(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_map_to_ref_strs(v) for v in obj]
+    ref = get_ref(obj)
+    if ref is not None:
+        return str(ref)
+    return obj
 
 
 class Ref:
@@ -70,6 +84,19 @@ class Ref:
     @property
     def type(self) -> "types.Type":
         raise NotImplementedError
+
+    @functools.cached_property
+    def digest(self) -> str:
+        hash = hashlib.md5()
+        # This can encounter non-serialized objects, even though Ref
+        # must be a pointer to an object that can only contain serializable
+        # stuff and refs. But we recursively deserialize all sub-refs when
+        # fetching a ref. So we need to walk obj, converting objs back to
+        # refs where we can, before this json.dumps call.
+        # TODO: fix
+        with_refs = _map_to_ref_strs(self.obj)
+        hash.update(json.dumps(with_refs).encode())
+        return hash.hexdigest()
 
     @classmethod
     def from_str(cls, s: str) -> "Ref":

@@ -30,6 +30,9 @@ from .language_features.tagging import (
 )
 from . import language_autocall
 
+if typing.TYPE_CHECKING:
+    from .run_streamtable_span import RunStreamTableSpan
+
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_no_refine", default=False
@@ -350,7 +353,6 @@ class OpDef:
                 graph.expr_vars(arg_node) for arg_node in refine_params.values()
             )
         ):
-
             called_refine_output_type = _self.refine_output_type(**refine_params)
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
@@ -604,7 +606,8 @@ class OpDef:
     def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
         return isinstance(self, AutoTagHandlingArrowOpDef)
 
-    def runs(self) -> eager.WeaveIter[run.Run]:
+    # TODO: Should be generic Run protocol, but need to update graph_client type first.
+    def runs(self) -> eager.WeaveIter["RunStreamTableSpan"]:
         client = graph_client_context.require_graph_client()
         return client.op_runs(self)
 

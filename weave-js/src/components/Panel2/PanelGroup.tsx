@@ -1062,6 +1062,8 @@ export const PANEL_GROUP2_ID = 'Group';
 export const Spec: Panel2.PanelSpec = {
   hidden: true,
   id: PANEL_GROUP2_ID,
+  icon: 'group',
+  category: 'Organize',
   initialize: (weave, inputNode) => PANEL_GROUP_DEFAULT_CONFIG(),
   Component: PanelGroup,
   ConfigComponent: PanelGroupConfigComponent,

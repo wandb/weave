@@ -10,7 +10,7 @@ plotly>=5.13.0
 nbmake>=0.5
 bokeh==3.0.3 # pinning to help speed up CI
 soundfile>=0.11.0
-pytest-asyncio>=0.20.3
+pytest-asyncio>=0.20.3,<=0.21.1 # pin asyncio
 hypothesis>=6.68.3
 numpy<1.24  # shap uses np.bool which is removed in 1.24
 # Pinning for package resolution speed in CI

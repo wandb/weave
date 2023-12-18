@@ -16,7 +16,6 @@ import {Button} from '../../Button';
 import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 import {Tooltip} from '../../Tooltip';
-import * as ConfigPanel from '../ConfigPanel';
 import {
   IconAddNew,
   IconCheckmark,
@@ -27,6 +26,7 @@ import {
 } from '../Icons';
 import * as TableState from '../PanelTable/tableState';
 import {ConfigDimLabel} from './ConfigDimLabel';
+import {ConfigSelect} from './ConfigSelect';
 import * as PlotState from './plotState';
 import * as S from './styles';
 import {DimComponentInputType, DimOption, DimOptionOrSection} from './types';
@@ -435,13 +435,12 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         postfixComponent={postFixComponent}
         multiline={redesignedPlotConfigEnabled && multiline}
         redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
-        <ConfigPanel.ModifiedDropdownConfigField
-          selection
-          data-testid={`dropdown-${dimName}`}
+        <ConfigSelect
+          testId={`dropdown-${dimName}`}
           placeholder={dimension.defaultState().compareValue}
           value={dimension.state().value}
           options={dimension.options}
-          onChange={(e, {value}) => {
+          onChange={({value}) => {
             const newSeries = produce(config.series, draft => {
               draft.forEach(s => {
                 if (isShared || _.isEqual(s, dimension.series)) {

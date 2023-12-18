@@ -289,6 +289,13 @@ const PanelTableInner: React.FC<
     [tableIsPanelVariableVal]
   );
 
+  const countColumnExists = Object.keys(tableState.columnNames).includes(
+    'groupCount'
+  );
+  const [countColumnId, setCountColumnId] = useState<string | null>(
+    countColumnExists ? 'groupCount' : null
+  );
+
   const updateIndexOffset = useUpdateConfigKey('indexOffset', updateConfig);
   const updateTableState = useUpdateConfigKey('tableState', updateConfig);
   const setRowSize = useUpdateConfigKey('rowSize', updateConfig);
@@ -467,7 +474,11 @@ const PanelTableInner: React.FC<
     ? undefined
     : totalRowCountUse.result;
 
-  const orderedColumns = useOrderedColumns(tableState, config.pinnedColumns);
+  const orderedColumns = useOrderedColumns(
+    tableState,
+    config.pinnedColumns,
+    countColumnId
+  );
 
   // TODO: remove this constraint once plots work in smaller views
 
@@ -550,6 +561,8 @@ const PanelTableInner: React.FC<
             setColumnPinState(colId, pinned);
           }}
           simpleTable={props.config.simpleTable}
+          countColumnId={countColumnId}
+          setCountColumnId={setCountColumnId}
         />
       );
     },
@@ -564,6 +577,8 @@ const PanelTableInner: React.FC<
       updateTableState,
       config.pinnedColumns,
       setColumnPinState,
+      countColumnId,
+      setCountColumnId,
     ]
   );
 
@@ -1468,6 +1483,8 @@ const applyTableStateToRowsNode = (
 
 export const TableSpec: Panel2.PanelSpec = {
   id: 'table',
+  icon: 'table',
+  category: 'Data',
   initialize: async (weave, inputNode, stack) => {
     if (inputNode.nodeType === 'void') {
       // Can't happen, id was selected based on Node type

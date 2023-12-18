@@ -103,6 +103,13 @@ def import_ecosystem():
         pass
 
     if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
+        # try:
+        #     from weave.weaveflow import faiss
+
+        #     # Turn eager mode back off.
+        #     context_state._eager_mode.set(False)
+        # except (ImportError, OSError, wandb.Error):
+        #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
             from weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
@@ -342,14 +349,18 @@ def execute():
                     + urllib.parse.quote(profile_filename),
                 )
     if root_span is not None:
-        root_span.set_tag("request_size", len(req_bytes))
+        root_span.set_tag("request_size", len(req_bytes), len(req_bytes))
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
     response_payload = _value_or_errors_to_response(fixed_response)
 
     if root_span is not None:
-        root_span.set_metric("node_count", len(response_payload["data"]))
-        root_span.set_metric("error_count", len(response_payload["node_to_error"]))
+        root_span.set_metric("node_count", len(response_payload["data"]), True)
+        root_span.set_metric(
+            "error_count",
+            len(response_payload["node_to_error"]),
+            True,
+        )
 
     _log_errors(response_payload, response.nodes)
 

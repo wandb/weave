@@ -33,6 +33,7 @@ import {
 import {immerable, produce} from 'immer';
 import _ from 'lodash';
 
+import {IconName} from '../../Icon';
 import * as TableState from '../PanelTable/tableState';
 import {
   AnyPlotConfig,
@@ -314,11 +315,12 @@ class YDimensionWithConditionalY2 extends MultiFieldDimension {
   }
 }
 
-type DropdownOption = {
+export type DropdownOption = {
   key: string;
   value: any;
   text: string;
   representableAsExpression?: boolean;
+  icon?: IconName;
 };
 
 class DropDownDimension extends DimensionLike {
@@ -375,20 +377,47 @@ const lineStyleOptions = LINE_SHAPES.map(o => ({
   representableAsExpression: o !== 'series',
 }));
 
+const markShapeIcons: Record<string, IconName> = {
+  auto: 'magic-wand-stick',
+  point: 'chart-scatterplot',
+  bar: 'chart-vertical-bars',
+  boxplot: 'box-plot',
+  line: 'linear-scale',
+  area: 'area',
+};
+
 const markOptions = [
-  {key: 'auto' as const, value: null, text: 'auto' as const},
+  {
+    key: 'auto' as const,
+    value: null,
+    text: 'auto' as const,
+    icon: markShapeIcons.auto,
+  },
   ...MARK_OPTIONS.map(o => ({
     key: o,
     value: o,
     text: o,
+    icon: markShapeIcons[o],
   })),
 ];
+
+const pointShapeIcons: Record<string, IconName> = {
+  circle: 'circle',
+  square: 'square',
+  cross: 'cross',
+  diamond: 'diamond',
+  'triangle-up': 'triangle-up',
+  'triangle-down': 'triangle-down',
+  'triangle-right': 'triangle-right',
+  'triangle-left': 'triangle-left',
+};
 
 const pointShapeOptions = POINT_SHAPES.map(o => ({
   key: o,
   value: o,
   text: o === 'series' ? 'Encode from series' : o,
   representableAsExpression: o !== 'series',
+  icon: pointShapeIcons[o],
 }));
 
 export const dimensionTypeOptions = [
@@ -1041,37 +1070,26 @@ function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
   // If we have a list of dictionaries, try to make a good guess at filling in the dimensions
   if (isAssignableTo(exampleRow.type, typedDict({}))) {
     const propertyTypes = allObjPaths(nullableTaggableValue(exampleRow.type));
-    let xCandidate: string | null = null;
-    let yCandidate: string | null = null;
-    let labelCandidate: string | null = null;
-    let mediaCandidate: string | null = null;
-    // Assign the first two numeric columns to x an y if available
+    const columnTypes: Record<string, string[]> = {
+      timestamp: [],
+      number: [],
+      string: [],
+      media: [],
+    };
     for (const propertyKey of propertyTypes) {
+      const propertyKeyStr = propertyKey.path.join('.');
       if (
         isAssignableTo(propertyKey.type, {
           type: 'timestamp',
           unit: 'ms',
         })
       ) {
-        // always set xaxis to date if it exists
-        xCandidate = propertyKey.path.join('.');
-      }
-      if (isAssignableTo(propertyKey.type, maybe('number'))) {
-        if (xCandidate == null) {
-          xCandidate = propertyKey.path.join('.');
-        } else if (yCandidate == null) {
-          yCandidate = propertyKey.path.join('.');
-        }
+        columnTypes.timestamp.push(propertyKeyStr);
+      } else if (isAssignableTo(propertyKey.type, maybe('number'))) {
+        columnTypes.number.push(propertyKeyStr);
       } else if (isAssignableTo(propertyKey.type, maybe('string'))) {
-        // don't default to the run name field
-        if (
-          labelCandidate == null &&
-          propertyKey.path.indexOf('runname') === -1
-        ) {
-          labelCandidate = propertyKey.path.join('.');
-        }
+        columnTypes.string.push(propertyKeyStr);
       } else if (
-        mediaCandidate == null &&
         isAssignableTo(
           propertyKey.type,
           maybe(
@@ -1087,9 +1105,33 @@ function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
           )
         )
       ) {
-        mediaCandidate = propertyKey.path.join('.');
+        columnTypes.media.push(propertyKeyStr);
       }
     }
+
+    // Assign x and y. x prefers timestamp, then number, then string.
+    // y prefers number, then string.
+    // x and y can not be the same column.
+    const xCandidates = [
+      ...columnTypes.timestamp,
+      ...columnTypes.number,
+      ...columnTypes.string,
+    ];
+    const xCandidate = xCandidates.length > 0 ? xCandidates[0] : null;
+    const yCandidates = [...columnTypes.number, ...columnTypes.string].filter(
+      item => item !== xCandidate
+    );
+    const yCandidate = yCandidates.length > 0 ? yCandidates[0] : null;
+
+    // don't default to the run name field
+    const labelCandidates = columnTypes.string.filter(
+      item => item.split('.').indexOf('runname') === -1
+    );
+    const labelCandidate =
+      labelCandidates.length > 0 ? labelCandidates[0] : null;
+
+    const mediaCandidate =
+      columnTypes.media.length > 0 ? columnTypes.media[0] : null;
 
     if (xCandidate != null && yCandidate != null) {
       tableState = TableState.updateColumnSelect(

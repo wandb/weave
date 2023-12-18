@@ -258,6 +258,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'string',
+  icon: 'text-language-alt',
+  category: 'Primitive',
   canFullscreen: true,
   Component: PanelString,
   ConfigComponent: PanelStringConfig,

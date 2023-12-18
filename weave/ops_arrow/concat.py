@@ -593,3 +593,21 @@ def concatenate(
         result = _concatenate(self, other, depth)
     result.validate()
     return result
+
+
+def _merge_concat_split(
+    arr: list[ArrowWeaveList],
+) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
+    if len(arr) < 2:
+        raise ValueError("arr must have length of at least 2")
+    middle_index = len(arr) // 2
+    return arr[:middle_index], arr[middle_index:]
+
+
+def concatenate_all(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
+    if len(arr) == 0:
+        raise ValueError("arr must not be empty")
+    if len(arr) == 1:
+        return arr[0]
+    left, right = _merge_concat_split(arr)
+    return concatenate_all(left).concat(concatenate_all(right))
