@@ -35,7 +35,7 @@ from urllib import parse
 
 if typing.TYPE_CHECKING:
     from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
-    from . import run
+    from .run_streamtable_span import RunStreamTableSpan
 
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -828,15 +828,15 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             path=uri.path,
         )
 
-    def input_to(self) -> eager.WeaveIter["run.Run"]:
+    def input_to(self) -> eager.WeaveIter["RunStreamTableSpan"]:
         client = graph_client_context.require_graph_client()
         return client.ref_input_to(self)
 
-    def value_input_to(self) -> eager.WeaveIter["run.Run"]:
+    def value_input_to(self) -> eager.WeaveIter["RunStreamTableSpan"]:
         client = graph_client_context.require_graph_client()
         return client.ref_value_input_to(self)
 
-    def output_of(self) -> typing.Optional["run.Run"]:
+    def output_of(self) -> typing.Optional["RunStreamTableSpan"]:
         client = graph_client_context.require_graph_client()
         return client.ref_output_of(self)
 

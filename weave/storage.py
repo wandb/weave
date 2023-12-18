@@ -157,9 +157,12 @@ def _direct_publish(
     _merge: typing.Optional[bool] = False,
 ) -> artifact_wandb.WandbArtifactRef:
     _orig_ref = _get_ref(obj)
+    if isinstance(_orig_ref, artifact_wandb.WandbArtifactRef):
+        return _orig_ref
     if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
         res = PUBLISH_CACHE_BY_LOCAL_ART.get(_orig_ref)
         if res is not None:
+            ref_base._put_ref(obj, res)
             return res
 
     weave_type = assume_weave_type or _get_weave_type(obj)
@@ -206,6 +209,8 @@ def _direct_publish(
 
     if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
         PUBLISH_CACHE_BY_LOCAL_ART[_orig_ref] = ref
+
+    ref_base._put_ref(obj, ref)
 
     return ref
 
