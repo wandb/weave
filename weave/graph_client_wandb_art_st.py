@@ -10,7 +10,7 @@ from typing import Sequence
 
 from collections.abc import Mapping
 from .graph_client import GraphClient
-from .urls import BROWSE3_PATH
+from . import urls
 from . import context_state
 from . import weave_internal
 from . import monitoring
@@ -171,7 +171,7 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         )
 
     def run_ui_url(self, run: Run) -> str:
-        return f"http://localhost:3000/{BROWSE3_PATH}/{self.entity_name}/{self.project_name}/calls/{run.id}"
+        return urls.call_path(self.entity_name, self.project_name, run.id)
 
     ##### Write API
 
