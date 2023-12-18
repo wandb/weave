@@ -33,6 +33,7 @@ const Divider = styled.div`
   border: 0.5px solid ${MOON_250};
   width: 200%;
 `;
+Divider.displayName = 'S.Divider';
 
 export type OutlineItemPopupMenuProps = Pick<
   OutlinePanelProps,
