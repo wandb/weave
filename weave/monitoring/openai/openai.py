@@ -18,7 +18,7 @@ from weave.wandb_interface.wandb_stream_table import StreamTable
 from .models import *
 from .util import *
 
-from ..monitor import _global_monitor
+from ..monitor import _get_global_monitor
 
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
@@ -192,7 +192,7 @@ def patch(
     def _patch() -> None:
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
 
-        if _global_monitor is not None:
+        if _get_global_monitor() is not None:
             info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
             mon = default_monitor()
@@ -225,7 +225,7 @@ def patch(
 
 
 def unpatch() -> None:
-    if _global_monitor is not None:
+    if _get_global_monitor() is not None:
         info("Unpatching OpenAI completions")
         openai.resources.chat.completions.Completions.create = old_create
         openai.resources.chat.completions.AsyncCompletions.create = old_async_create

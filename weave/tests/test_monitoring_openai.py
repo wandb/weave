@@ -10,6 +10,7 @@ from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
 from openai.types.completion_usage import CompletionUsage
 
 import weave
+from weave.monitoring import init_monitor
 from weave.monitoring.openai import util
 from weave.monitoring.openai.models import *
 from weave.monitoring.openai.models import Context
@@ -485,9 +486,15 @@ def test_callback_ordering(mocked_streaming_create):
     assert expected == chat_completions.context.testing
 
 
-def test_patching(user_by_api_key_in_env):
+def test_patching(user_by_api_key_netrc):
     og_create = openai.resources.chat.completions.Completions.create
     og_acreate = openai.resources.chat.completions.AsyncCompletions.create
+
+    patch(callbacks=[])
+    assert openai.resources.chat.completions.Completions.create is og_create
+    assert openai.resources.chat.completions.AsyncCompletions.create is og_acreate
+
+    init_monitor(f"{user_by_api_key_netrc.username}/test_patching/test_patching_stream")
 
     patch(callbacks=[])
     assert openai.resources.chat.completions.Completions.create is not og_create
