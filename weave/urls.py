@@ -43,7 +43,7 @@ _project_root_url_fn: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
-def set_urls_to_local(key: typing.Optional[str] = None):
+def set_urls_to_local() -> typing.Iterator:
     token = _project_root_url_fn.set(local_project_root_url)
     try:
         yield
@@ -52,7 +52,7 @@ def set_urls_to_local(key: typing.Optional[str] = None):
 
 
 @contextlib.contextmanager
-def set_urls_to_remote(key: typing.Optional[str] = None):
+def set_urls_to_remote() -> typing.Iterator:
     token = _project_root_url_fn.set(local_project_root_url)
     try:
         yield
