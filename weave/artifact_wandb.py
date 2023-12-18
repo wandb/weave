@@ -828,18 +828,6 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             path=uri.path,
         )
 
-    def input_to(self) -> eager.WeaveIter["RunStreamTableSpan"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_input_to(self)
-
-    def value_input_to(self) -> eager.WeaveIter["RunStreamTableSpan"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_value_input_to(self)
-
-    def output_of(self) -> typing.Optional["RunStreamTableSpan"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_output_of(self)
-
     @property
     def ui_url(self):
         root_type = self.type.root_type_class()

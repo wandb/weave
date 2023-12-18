@@ -1,15 +1,14 @@
 import typing
+from typing import Iterable
 import weakref
 import hashlib
 import json
-import contextlib
-import contextvars
-import collections
 import functools
 
 from . import uris
 from . import box
 from . import errors
+from . import graph_client_context
 from . import weave_types as types
 from . import object_context
 
@@ -18,13 +17,14 @@ REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
     from . import weave_types as types
+    from . import run
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
     if isinstance(obj, dict):
-        return {k: _map_to_ref_strs(v) for k, v in obj.items()}
+        return {k: _map_to_ref_strs(v) for k, v in obj.items()}  # type: ignore
     if isinstance(obj, list):
-        return [_map_to_ref_strs(v) for v in obj]
+        return [_map_to_ref_strs(v) for v in obj]  # type: ignore
     ref = get_ref(obj)
     if ref is not None:
         return str(ref)
@@ -44,7 +44,7 @@ class Ref:
     ):
         self._type = type
         self.extra = extra
-        if obj is not None and type is not None and type.name != "tagged":
+        if obj is not None and type is not None and type.name != "tagged":  # type: ignore
             obj = box.box(obj)
             _put_ref(obj, self)
         self._obj = obj
@@ -72,7 +72,7 @@ class Ref:
         obj = self._get()
 
         obj = box.box(obj)
-        if self.type.name != "tagged":
+        if self.type.name != "tagged":  # type: ignore
             _put_ref(obj, self)
         self._obj = obj
 
@@ -80,6 +80,10 @@ class Ref:
             obj_ctx.add_ref(str(self.initial_uri), obj, self.type)
 
         return obj
+
+    @property
+    def ui_url(self) -> str:
+        return "[no url for obj]"
 
     @property
     def type(self) -> "types.Type":
@@ -123,6 +127,18 @@ class Ref:
     def __str__(self) -> str:
         return str(self.uri)
 
+    def input_to(self) -> Iterable["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_input_to(self)
+
+    def value_input_to(self) -> Iterable["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_value_input_to(self)
+
+    def output_of(self) -> typing.Optional["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_output_of(self)
+
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
     if isinstance(obj, Ref):
@@ -160,7 +176,7 @@ def clear_ref(obj: typing.Any) -> None:
         REFS.pop(id(obj))
 
 
-def deref(ref: Ref) -> typing.Any:
+def deref(ref: typing.Any) -> typing.Any:
     if isinstance(ref, Ref):
         return ref.get()
     return ref
