@@ -1,19 +1,19 @@
 import contextvars
-import contextlib
 import typing
+from wandb import util as wb_util
+
+from . import environment
 
 BROWSE3_PATH = "browse3"
-LOCAL_BASE_URL = "http://localhost:3000"
 WORKSPACE_SLUG = "weaveflow"
-REMOTE_BASE_URL = "https://wandb.ai"
 
 
 def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return f"{REMOTE_BASE_URL}/{entity_name}/{project_name}/{WORKSPACE_SLUG}"
+    return f"{wb_util.app_url(environment.wandb_base_url())}/{entity_name}/{project_name}/{WORKSPACE_SLUG}"
 
 
 def local_project_root_url(entity_name: str, project_name: str) -> str:
-    return f"{LOCAL_BASE_URL}/{BROWSE3_PATH}/{entity_name}/{project_name}"
+    return f"http://localhost:3000/{BROWSE3_PATH}/{entity_name}/{project_name}"
 
 
 def project_path(entity_name: str, project_name: str) -> str:
@@ -42,19 +42,9 @@ _project_root_url_fn: contextvars.ContextVar[
 ] = contextvars.ContextVar("project_root_url_fn", default=remote_project_root_url)
 
 
-@contextlib.contextmanager
-def set_urls_to_local() -> typing.Iterator:
-    token = _project_root_url_fn.set(local_project_root_url)
-    try:
-        yield
-    finally:
-        _project_root_url_fn.reset(token)
+def use_local_urls() -> None:
+    _project_root_url_fn.set(local_project_root_url)
 
 
-@contextlib.contextmanager
-def set_urls_to_remote() -> typing.Iterator:
-    token = _project_root_url_fn.set(local_project_root_url)
-    try:
-        yield
-    finally:
-        _project_root_url_fn.reset(token)
+def use_remote_urls() -> None:
+    _project_root_url_fn.set(local_project_root_url)
