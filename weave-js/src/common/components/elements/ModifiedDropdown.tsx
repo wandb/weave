@@ -61,6 +61,7 @@ export interface ModifiedDropdownExtraProps {
   itemLimit?: number;
   options: Option[];
   resultLimit?: number;
+  resultLimitMessage?: string;
   style?: CSSProperties;
 
   optionTransform?(option: Option): Option;
@@ -72,18 +73,24 @@ type ModifiedDropdownProps = Omit<StrictDropdownProps, 'options'> &
 const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
   (props: ModifiedDropdownProps) => {
     const {
-      allowAdditions,
       debounceTime,
-      enableReordering,
-      itemLimit,
       multiple,
       onChange,
       options: propsOptions,
-      optionTransform,
       search,
       value,
     } = props;
-    const resultLimit = props.resultLimit ?? 100;
+
+    const {
+      itemLimit,
+      optionTransform,
+      enableReordering,
+      allowAdditions,
+      resultLimit = 100,
+      resultLimitMessage = `Limited to ${resultLimit} items. Refine search to see other options.`,
+      ...passProps
+    } = props;
+
     const [searchQuery, setSearchQuery] = useState('');
     const [options, setOptions] = useState(propsOptions);
 
@@ -175,12 +182,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         if (options.length > resultLimit) {
           displayOpts.push({
             key: ITEM_LIMIT_VALUE,
-            text: (
-              <span className="hint-text">
-                Limited to {resultLimit} items. Refine search to see other
-                options.
-              </span>
-            ),
+            text: <span className="hint-text">{resultLimitMessage}</span>,
             value: ITEM_LIMIT_VALUE,
           });
         }
@@ -411,11 +413,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       ) : (
         <>{children}</>
       );
-
-    const passProps = {...props};
-    delete passProps.itemLimit;
-    delete passProps.optionTransform;
-    delete passProps.allowAdditions;
 
     return wrapWithDragDrop(
       <Dropdown
