@@ -63,49 +63,6 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
 )
 
 
-@weave.op(weavify=True, input_type={"grouped_row": types.TypedDict({})})  # type: ignore
-def compute_run_duration(grouped_row) -> float:  # type: ignore
-    timestamp_col_name = "timestamp"
-    duration = weave.ops.case(
-        [
-            {
-                "when": weave.ops.Boolean.bool_or(
-                    grouped_row["state"][-1] == "finished",
-                    weave.ops.Boolean.bool_or(
-                        grouped_row["state"][-1] == "crashed",
-                        grouped_row["state"][-1] == "failed",
-                    ),
-                ),
-                "then": weave.ops.timedelta_total_seconds(
-                    weave.ops.datetime_sub(
-                        grouped_row[timestamp_col_name].max(),
-                        grouped_row[timestamp_col_name].min(),
-                    )
-                ),
-            },
-            {
-                "when": weave.ops.Boolean.bool_not(
-                    weave.ops.Boolean.bool_or(
-                        grouped_row["state"][-1] == "finished",
-                        weave.ops.Boolean.bool_or(
-                            grouped_row["state"][-1] == "crashed",
-                            grouped_row["state"][-1] == "failed",
-                        ),
-                    )
-                ),
-                "then": weave.ops.timedelta_total_seconds(
-                    weave.ops.datetime_sub(
-                        weave.ops.from_number(weave.ops.datetime_now()),
-                        grouped_row[timestamp_col_name].min(),
-                    )
-                ),
-            },
-        ],
-    )
-
-    return duration
-
-
 @weave.op(  # type: ignore
     name="py_board-observability",
     hidden=False,
@@ -303,16 +260,6 @@ def observability(
         domain_x=user_zoom_range,
     )
 
-    selected_statuses = panels.Table(selected_data(state_transitions_plot))
-    selected_statuses.add_column(
-        lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc"
-    )
-    selected_statuses.add_column(lambda row: row["state"], "State")
-    selected_statuses.add_column(lambda row: row["job"], "Job")
-    selected_statuses.add_column(lambda row: row["entity_name"], "User")
-    selected_statuses.add_column(lambda row: row["project_name"], "Project")
-    selected_statuses.add_column(lambda row: row["error"], "Error")
-
     runs_grouped = weave.ops.List.groupby(queued_time_data, lambda row: row["trace_id"])
     runs_mapped = weave.ops.List.map(
         runs_grouped,
@@ -375,55 +322,6 @@ def observability(
         "start_stop_states",
         weave.ops.List.filter(filtered_window_data, is_start_stop_state),
         hidden=True,
-    )
-
-    start_stop_states_grouped = weave.ops.List.groupby(
-        start_stop_states, lambda row: row["trace_id"]
-    )
-    start_stop_states_mapped = weave.ops.List.map(
-        start_stop_states_grouped,
-        lambda row: weave.ops.dict_(
-            **{
-                "trace_id": row["trace_id"][0],
-                "entity_name": row["entity_name"][0],
-                "project_name": row["project_name"][0],
-                "run_id": row["run_id"][-1],
-                "job": row["job"][-1],
-                "duration (s)": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                        ),
-                    ),
-                    1000,
-                ),
-                "timestamps": row[timestamp_col_name],
-            }
-        ),
-    )
-
-    latest_runs_plot = panels.Plot(
-        start_stop_states_mapped,
-        x=lambda row: row["timestamps"],
-        x_title="Time",
-        y_title="Job",
-        y=lambda row: row["job"],
-        tooltip=lambda row: weave.ops.dict_(
-            **{
-                "job": row["job"],
-                "user": row["entity_name"],
-                "project": row["project_name"],
-                "run ID": row["run_id"],
-                "duration (s)": row["duration (s)"],
-            }
-        ),
-        label=lambda row: group_by_user(row),
-        groupby_dims=[],
-        color_title="User",
-        color=group_by_user.val,
-        mark="line",
-        no_legend=True,
-        domain_x=user_zoom_range,
     )
 
     latest_runs_plot = panels.Plot(
@@ -517,52 +415,52 @@ def observability(
     runs_table_data = weave.ops.List.groupby(
         filtered_window_data, lambda row: row["trace_id"]
     )
-    runs_table_data_mapped = weave.ops.List.map(
-        runs_table_data,
-        lambda row: weave.ops.dict_(
-            **{
-                "trace_id": row["trace_id"][0],
-                "user": row["entity_name"][0],
-                "run_ids": row["run_id"],
-                "states": row["state"],
-            }
+    runs_table_data_mapped = varbar.add(
+        "runs_table_data",
+        weave.ops.List.map(
+            runs_table_data,
+            lambda row: weave.ops.dict_(
+                **{
+                    "trace_id": row["trace_id"][0],
+                    "user": row["entity_name"][0],
+                    "run_ids": row["run_id"],
+                    "states": row["state"],
+                }
+            ),
         ),
+        hidden=True,
     )
     runs_table = panels.Table(runs_table_data_mapped)  # type: ignore
     runs_table.add_column(lambda row: row["user"], "User", groupby=True)
-    runs_table.add_column(lambda row: row["states"], "State")
-
-    runs_table = panels.Table(filtered_window_data)  # type: ignore
-    runs_table.add_column(lambda row: row["entity_name"], "User", groupby=True)
     runs_table.add_column(
-        lambda row: row.filter(lambda row: row["state"] == "pending").count(),
-        "Jobs enqueued",
+        lambda row: row.count(),
+        "Queued",
         sort_dir="desc",
     )
     runs_table.add_column(
-        lambda row: row.filter(lambda row: row["state"] == "failed rqi").count(),
-        "Failed to init",
+        lambda row: row.filter(lambda row: row["states"][-1] == "failed rqi").count(),
+        "Failed to start",
     )
     runs_table.add_column(
-        lambda row: row.filter(lambda row: row["state"] == "running").count(),
+        lambda row: row.filter(lambda row: row["states"][2] == "running").count(),
         "Started",
     )
     runs_table.add_column(
-        lambda row: row.filter(lambda row: row["state"] == "running").count(),
+        lambda row: row.filter(lambda row: row["states"][-1] == "running").count(),
         "Running",
     )
     runs_table.add_column(
-        lambda row: row.filter(lambda row: row["state"] == "finished").count(),
+        lambda row: row.filter(lambda row: row["states"][-1] == "finished").count(),
         "Finished",
     )
     runs_table.add_column(
         lambda row: row.filter(
             lambda row: weave.ops.Boolean.bool_or(
-                row["state"] == "crashed",
-                row["state"] == "failed",
+                row["states"][-1] == "crashed",
+                row["states"][-1] == "failed",
             ),
         ).count(),
-        "Failed",
+        "Crashed",
     )
 
     finished_runs = varbar.add(
@@ -728,11 +626,25 @@ def observability(
     errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
 
     # layout
-    dashboard.add(
+    job_status = dashboard.add(
         "Job_status",
         state_transitions_plot,
         layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
+
+    selected_statuses = panels.Table(
+        job_status.selected_rows(), columns=[lambda row: row]
+    )
+
+    # selected_statuses.add_column(
+    #     lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc"
+    # )
+    # selected_statuses.add_column(lambda row: row["state"], "State")
+    # selected_statuses.add_column(lambda row: row["job"], "Job")
+    # selected_statuses.add_column(lambda row: row["entity_name"], "User")
+    # selected_statuses.add_column(lambda row: row["project_name"], "Project")
+    # selected_statuses.add_column(lambda row: row["error"], "Error")
+
     dashboard.add(
         "Selected_statuses",
         selected_statuses,
@@ -756,7 +668,7 @@ def observability(
     dashboard.add(
         "Runs_by_user",
         runs_table,
-        layout=panels.GroupPanelLayout(x=12, y=30, w=12, h=8),
+        layout=panels.GroupPanelLayout(x=10, y=30, w=14, h=8),
     )
     dashboard.add(
         "Gpu_use_by_job",
@@ -771,7 +683,7 @@ def observability(
     dashboard.add(
         "Finished_runs_by_grouping",
         runs_user_and_grouping_plot,
-        layout=panels.GroupPanelLayout(x=0, y=30, w=12, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=30, w=10, h=8),
     )
     dashboard.add(
         "Errors",
