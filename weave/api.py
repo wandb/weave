@@ -144,9 +144,7 @@ def init(project_name: str) -> _graph_client.GraphClient:
     client = _graph_client.GraphClient(entity_name, project_name)
     _graph_client_context._graph_client.set(client)
     print("Ensure you have the prototype UI running with `weave ui`")
-    print(
-        f"View project at {urls.project_path(entity_name, project_name)}"
-    )
+    print(f"View project at {urls.project_path(entity_name, project_name)}")
     return client
 
 

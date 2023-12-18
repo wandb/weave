@@ -32,7 +32,7 @@ class RunStreamTableSpan:
     @property
     def ui_url(self) -> str:
         gc = graph_client_context.require_graph_client()
-        return urls.call_path(gc.entity_name,gc.project_name, self.id)
+        return urls.call_path(gc.entity_name, gc.project_name, self.id)
 
     @property
     def op_ref(self) -> typing.Optional[artifact_wandb.WandbArtifactRef]:

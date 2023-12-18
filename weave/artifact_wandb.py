@@ -844,9 +844,19 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
         from .op_def_type import OpDefType
 
         if issubclass(root_type, OpDefType):
-            return urls.op_version_path( self.artifact.uri_obj.entity_name,  self.artifact.uri_obj.project_name, self.artifact.uri_obj.name, self.artifact.uri_obj.version)
+            return urls.op_version_path(
+                self.artifact.uri_obj.entity_name,
+                self.artifact.uri_obj.project_name,
+                self.artifact.uri_obj.name,
+                self.artifact.uri_obj.version,
+            )
         else:
-            return urls.object_version_path( self.artifact.uri_obj.entity_name,  self.artifact.uri_obj.project_name, self.artifact.uri_obj.name, self.artifact.uri_obj.version)
+            return urls.object_version_path(
+                self.artifact.uri_obj.entity_name,
+                self.artifact.uri_obj.project_name,
+                self.artifact.uri_obj.name,
+                self.artifact.uri_obj.version,
+            )
 
         # Before Tim's Weaveflow changes
         # return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
