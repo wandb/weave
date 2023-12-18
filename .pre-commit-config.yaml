@@ -16,6 +16,10 @@ repos:
       - id: mypy
         additional_dependencies: [types-all, wandb>=0.15.5]
         exclude: .*pyi$
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.341
+    hooks:
+    - id: pyright
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output

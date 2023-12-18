@@ -1,6 +1,7 @@
 import typing
+from typing import Iterable
 
-from . import urls
+from .run import Run
 from . import uris
 from . import artifact_wandb
 from . import stream_data_interfaces
@@ -32,7 +33,7 @@ class RunStreamTableSpan:
     @property
     def ui_url(self) -> str:
         gc = graph_client_context.require_graph_client()
-        return urls.call_path(gc.entity_name, gc.project_name, self.id)
+        return gc.run_ui_url(self)
 
     @property
     def op_ref(self) -> typing.Optional[artifact_wandb.WandbArtifactRef]:
@@ -68,15 +69,15 @@ class RunStreamTableSpan:
     def output(self) -> typing.Any:
         if self.status_code != "SUCCESS":
             return None
-        output_dict = self._attrs.get("output")
-        if isinstance(output_dict, dict):
-            keys = output_dict.get("_keys")
+        out = self._attrs.get("output")
+        if isinstance(out, dict):
+            keys = out.get("_keys")
             if keys is None:
-                keys = [k for k in output_dict.keys() if output_dict[k] != None]
-            output = {k: output_dict.get(k) for k in keys}
+                keys = [k for k in out.keys() if out[k] != None]
+            output = {k: out.get(k) for k in keys}
             if "_result" in output:
                 return output["_result"]
-        return output
+        return out
 
     @property
     def parent_id(self) -> typing.Optional[str]:
@@ -86,11 +87,11 @@ class RunStreamTableSpan:
         client = graph_client_context.require_graph_client()
         client.add_feedback(self.id, feedback)
 
-    def feedback(self) -> WeaveIter[dict[str, typing.Any]]:
+    def feedback(self) -> Iterable[dict[str, typing.Any]]:
         client = graph_client_context.require_graph_client()
         return client.run_feedback(self.id)
 
-    def parent(self) -> typing.Optional["RunStreamTableSpan"]:
+    def parent(self) -> typing.Optional["Run"]:
         client = graph_client_context.require_graph_client()
         if self.parent_id is None:
             return None

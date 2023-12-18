@@ -354,6 +354,7 @@ def _merge(name) -> str:
         else to_uri.version
     )
 
+    ref: ref_base.Ref
     if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):
         ref = storage._direct_publish(
             obj=head_ref.get(),
@@ -369,7 +370,7 @@ def _merge(name) -> str:
                 "Cannot merge into artifact without version"
             )
 
-        ref = storage._direct_save(
+        ref = storage.direct_save(
             obj=head_ref.get(),
             name=to_uri.name,
             source_branch_name=shared_branch_name,
