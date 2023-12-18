@@ -1,12 +1,10 @@
 import weave
-from weave.panels.panel_plot import selected_rows
+from weave.panels.panel_plot import selected_data
 
 from .. import weave_types as types
 from ..panels import panel_board
 from .. import weave_internal
 from .generator_templates import template_registry
-
-from ..ops_primitives import list_
 
 
 panels = weave.panels
@@ -295,46 +293,7 @@ def observability(
             **{
                 "state": row["state"][0],
                 "count": row.count(),
-                "job (s)": weave.ops.cond(
-                    weave.ops.dict_(
-                        a=row["job"].unique().count() <= 3,
-                        b=row["job"].unique().count() > 3,
-                    ),
-                    weave.ops.dict_(
-                        a=weave.ops.join_to_str(row["job"].unique(), ","),
-                        # b=weave.ops.join_to_str(
-                        #     weave.ops.make_list(
-                        #         a=row["job"].unique(),
-                        #         b=weave.ops.make_list(
-                        #             a=weave_internal.make_const_node(
-                        #                 types.String(),
-                        #                 f"... ({row.count() - 3} more)",
-                        #             ),
-                        #         ),
-                        #     ).concat(),
-                        #     ",",
-                        # ),
-                        b=weave.ops.join_to_str(
-                            weave.ops.make_list(
-                                a=weave.ops.join_to_str(
-                                    weave.ops.make_list(
-                                        **{
-                                            i: job
-                                            for i, job in enumerate(row["job"].unique())
-                                        }
-                                    ),
-                                    ",",
-                                ),
-                                b=weave_internal.make_const_node(
-                                    types.String(),
-                                    f"... ({row.count() - 3} more)",
-                                ),
-                            ),
-                            ",",
-                        ),
-                        # b=weave.ops.join_to_str(row["job"].unique(), ","),
-                    ),
-                ),
+                "job (s)": weave.ops.join_to_str(row["job"].unique(), ","),
             }
         ),
         color_title="state",
@@ -344,7 +303,7 @@ def observability(
         domain_x=user_zoom_range,
     )
 
-    selected_statuses = panels.Table(selected_rows(state_transitions_plot))
+    selected_statuses = panels.Table(selected_data(state_transitions_plot))
     selected_statuses.add_column(
         lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc"
     )
@@ -647,14 +606,8 @@ def observability(
         y=lambda row: row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Run": weave.ops.join_to_str(
-                    weave.ops.make_list(
-                        a=row["entity_name"][0],
-                        b=row["project_name"][0],
-                        c=row["run_id"][0],
-                    ),
-                    "/",
-                ),
+                "Run ID": row["run_id"][0],
+                "Project": row["project_name"][0],
                 "Job": row["job"][0],
                 "Duration * (1 - gpu %)": weave.ops.Number.__mul__(
                     weave.ops.Number.__mul__(
@@ -708,14 +661,8 @@ def observability(
         y=lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Run": weave.ops.join_to_str(
-                    weave.ops.make_list(
-                        a=row["entity_name"][0],
-                        b=row["project_name"][0],
-                        c=row["run_id"][0],
-                    ),
-                    "/",
-                ),
+                "Run ID": row["run_id"][0],
+                "Project": row["project_name"][0],
                 "Job": row["job"][0],
                 "Duration * (1 - cpu %)": weave.ops.Number.__mul__(
                     weave.ops.Number.__mul__(
