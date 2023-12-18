@@ -106,6 +106,7 @@
     "react-resizable": "^3.0.5",
     "react-router-dom": "^5.1.2",
     "react-select": "^5.4.0",
+    "react-sortable-hoc": "^2.0.0",
     "react-syntax-highlighter": "^15.5.0",
     "react-table": "^6.8.6",
     "react-textarea-autosize": "8.3.4",
