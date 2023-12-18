@@ -486,7 +486,7 @@ def test_callback_ordering(mocked_streaming_create):
     assert expected == chat_completions.context.testing
 
 
-def test_patching(user_by_api_key_netrc):
+def test_patching(user_by_api_key_in_env):
     og_create = openai.resources.chat.completions.Completions.create
     og_acreate = openai.resources.chat.completions.AsyncCompletions.create
 
@@ -494,7 +494,9 @@ def test_patching(user_by_api_key_netrc):
     assert openai.resources.chat.completions.Completions.create is og_create
     assert openai.resources.chat.completions.AsyncCompletions.create is og_acreate
 
-    init_monitor(f"{user_by_api_key_netrc.username}/test_patching/test_patching_stream")
+    init_monitor(
+        f"{user_by_api_key_in_env.username}/test_patching/test_patching_stream"
+    )
 
     patch(callbacks=[])
     assert openai.resources.chat.completions.Completions.create is not og_create
