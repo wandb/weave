@@ -2,7 +2,6 @@ __all__ = ["ReassembleStream", "patch", "unpatch"]
 
 import asyncio
 import functools
-import sys
 from contextlib import contextmanager
 from typing import Callable, List, Union
 
@@ -19,13 +18,12 @@ from weave.wandb_interface.wandb_stream_table import StreamTable
 from .models import *
 from .util import *
 
+from ..monitor import _global_monitor
+
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 
 Callbacks = List[Callable]
-
-DEFAULT_STREAM_NAME = "monitoring"
-DEFAULT_PROJECT_NAME = "openai"
 
 
 class Callback:
@@ -188,30 +186,29 @@ class ChatCompletions:
 
 
 def patch(
-    stream: str = DEFAULT_STREAM_NAME,
-    project: str = DEFAULT_PROJECT_NAME,
-    entity: Optional[str] = None,
     *,
     callbacks: Optional[List[Callback]] = None,
 ) -> None:
     def _patch() -> None:
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
-        info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
-        streamtable = StreamTable(stream, project_name=project, entity_name=entity)
+        if _global_monitor is not None:
+            info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
-        hooks = ChatCompletions(
-            old_create, callbacks=callbacks, streamtable=streamtable
-        )
-        async_hooks = AsyncChatCompletions(
-            old_async_create, callbacks=callbacks, streamtable=streamtable
-        )
-        openai.resources.chat.completions.Completions.create = functools.partialmethod(
-            hooks.create
-        )
-        openai.resources.chat.completions.AsyncCompletions.create = (
-            functools.partialmethod(async_hooks.create)
-        )
+            mon = default_monitor()
+
+            hooks = ChatCompletions(
+                old_create, callbacks=callbacks, streamtable=mon.streamtable
+            )
+            async_hooks = AsyncChatCompletions(
+                old_async_create, callbacks=callbacks, streamtable=mon.streamtable
+            )
+            openai.resources.chat.completions.Completions.create = (
+                functools.partialmethod(hooks.create)
+            )
+            openai.resources.chat.completions.AsyncCompletions.create = (
+                functools.partialmethod(async_hooks.create)
+            )
 
     if version.parse(openai.__version__) < version.parse("1.0.0"):
         error(
@@ -228,9 +225,10 @@ def patch(
 
 
 def unpatch() -> None:
-    info("Unpatching OpenAI completions")
-    openai.resources.chat.completions.Completions.create = old_create
-    openai.resources.chat.completions.AsyncCompletions.create = old_async_create
+    if _global_monitor is not None:
+        info("Unpatching OpenAI completions")
+        openai.resources.chat.completions.Completions.create = old_create
+        openai.resources.chat.completions.AsyncCompletions.create = old_async_create
 
 
 def make_default_callbacks() -> List[Callback]:
