@@ -1,5 +1,3 @@
-import contextvars
-import typing
 from wandb import util as wb_util
 
 from . import environment

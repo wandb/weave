@@ -102,7 +102,7 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 _weave_client: contextvars.ContextVar[
-    typing.Optional[client_interface.ClientInterface]
+    typing.Optional["client_interface.ClientInterface"]
 ] = contextvars.ContextVar("weave_client", default=None)
 
 _monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -111,7 +111,7 @@ _monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 
 
 @contextlib.contextmanager
-def client(client: client_interface.ClientInterface):
+def client(client: "client_interface.ClientInterface"):
     client_token = _weave_client.set(client)
     try:
         yield client
@@ -119,21 +119,21 @@ def client(client: client_interface.ClientInterface):
         _weave_client.reset(client_token)
 
 
-def get_client() -> typing.Optional[client_interface.ClientInterface]:
+def get_client() -> typing.Optional["client_interface.ClientInterface"]:
     return _weave_client.get()
 
 
-def set_client(client: client_interface.ClientInterface):
+def set_client(client: "client_interface.ClientInterface"):
     _weave_client.set(client)
 
 
 _http_server: contextvars.ContextVar[
-    typing.Optional[server_interface.BaseServer]
+    typing.Optional["server_interface.BaseServer"]
 ] = contextvars.ContextVar("http_server", default=None)
 
 
 @contextlib.contextmanager
-def server(server: server_interface.BaseServer):
+def server(server: "server_interface.BaseServer"):
     server_token = _http_server.set(server)
     try:
         yield server
@@ -141,11 +141,11 @@ def server(server: server_interface.BaseServer):
         _http_server.reset(server_token)
 
 
-def get_server() -> typing.Optional[server_interface.BaseServer]:
+def get_server() -> typing.Optional["server_interface.BaseServer"]:
     return _http_server.get()
 
 
-def set_server(server: server_interface.BaseServer):
+def set_server(server: "server_interface.BaseServer"):
     _http_server.set(server)
 
 
