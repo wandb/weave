@@ -166,6 +166,12 @@ def cereal_csv():
 
 
 @pytest.fixture()
+def eager_mode():
+    with context_state.eager_execution():
+        yield
+
+
+@pytest.fixture()
 def fake_wandb():
     setup_response = fixture_fakewandb.setup()
     yield setup_response

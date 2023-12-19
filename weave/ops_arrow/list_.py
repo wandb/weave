@@ -1282,17 +1282,25 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             result_rows, self.object_type, self._artifact
         )
         if isinstance(index, int):
+            from .. import ref_base
+
             result = awl.to_pylist_tagged()[0]
+            # If we already have a ref, get it and return it immediately.
+            if isinstance(result, ref_base.Ref):
+                return result.get()
+
+            # Otherwise if self has a ref, return a ref to self/index
             ref = ref_base.get_ref(self)
-            from .. import artifact_base
 
             # Ensure we associate a ref for the row we're returning,
             # so if the user calls an op on the row, the op refers to a sub-row
             # in this list
-            if isinstance(ref, artifact_base.ArtifactRef):
+            if isinstance(ref, ref_base.Ref):
                 result = box.box(result)
                 new_ref = ref.with_extra(self.object_type, result, [str(index)])
                 ref_base._put_ref(result, new_ref)
+
+            # No item ref or self ref, just return the result
             return result
         return awl
 

@@ -2,6 +2,7 @@ import dataclasses
 import datetime
 import inspect
 import math
+import typing
 
 import pandas as pd
 
@@ -80,7 +81,6 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         # deserialize op methods separately
         op_methods = {}
         for k, serializer in self._property_serializers.items():
-
             if (
                 obj.get(k) is not None
                 and isinstance(serializer, DefaultFromPy)
@@ -273,7 +273,17 @@ class RefToPyRef(mappers_weave.RefMapper):
         super().__init__(type_, mapper, artifact, path)
         self._use_stable_refs = use_stable_refs
 
-    def apply(self, obj: ref_base.Ref):
+    def apply(self, obj: typing.Any):
+        if not isinstance(obj, ref_base.Ref):
+            # type_of_with_refs(obj) returns a Ref Type, so that we'll
+            # use this Ref mapper. We'll save the ref that points to the
+            # object instead of a copy of the object.
+            obj = ref_base.get_ref(obj)
+            if obj is None:
+                raise errors.WeaveSerializeError(
+                    "Ref mapper cannot serialize non-ref object %s" % obj
+                )
+
         try:
             if self._use_stable_refs:
                 return obj.uri

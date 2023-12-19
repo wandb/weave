@@ -1,12 +1,11 @@
 import pytest
 import weave
 
+from .. import ref_base
 
-@pytest.mark.skip("failing in CI for some reason")
-def test_digestrefs():
-    from weave import weaveflow
 
-    graph_client = weave.init_local_client()
+def test_digestrefs(eager_mode):
+    weave.init_local_client()
 
     ds = weave.WeaveList(
         [
@@ -31,8 +30,6 @@ def test_digestrefs():
 
     ds0_row0 = ds0[0]
 
-    from .. import ref_base
-
     ds0_row0_ref = ref_base.get_ref(ds0_row0)
     assert ds0_row0_ref != None
 
@@ -48,7 +45,66 @@ def test_digestrefs():
     ds1_row0 = ds1[0]
     ds1_row0_ref = ref_base.get_ref(ds1_row0)
 
+    assert ds1_row0_ref is not None
+
     assert ds0_row0_ref.digest == ds1_row0_ref.digest
 
     assert len(ds1_row0_ref.input_to()) == 0
     assert len(ds1_row0_ref.value_input_to()) == 1
+
+
+def test_output_of(eager_mode):
+    weave.init_local_client()
+
+    @weave.op()
+    def add_5(v: int) -> int:
+        return v + 5
+
+    result = add_5(10)
+
+    run = weave.output_of(result)
+    assert run is not None
+    assert "add_5" in run.op_name
+    assert run.inputs["v"] == 10
+
+    result2 = add_5(result)
+    run = weave.output_of(result2)
+    assert run is not None
+    assert "add_5" in run.op_name
+
+    # v_input is a ref here and we have to deref it
+    # TODO: this is not consistent. Shouldn't it already be
+    # dereffed recursively when we get it from weave.output_of() ?
+    v_input = run.inputs["v"].get()
+    assert v_input == 15
+
+    run = weave.output_of(v_input)
+    assert run is not None
+    assert "add_5" in run.op_name
+    assert run.inputs["v"] == 10
+
+
+def test_vectorrefs(eager_mode, cache_mode_minimal):
+    weave.init_local_client()
+    items = weave.WeaveList([1, 2])
+    items_ref = weave.publish(items, "vectorrefs")
+
+    @weave.op()
+    def add_5(v: int) -> int:
+        return v + 5
+
+    result = items.apply(lambda item: add_5(item))
+    # TODO: here.
+    # OK, result is now AWL of ref. Great! We need to deref
+    # refs upon index though.
+    result_row0 = result[0]
+    run = weave.output_of(result_row0)
+    assert run is not None
+    assert "add_5" in run.op_name
+    assert run.inputs["v"] == 1
+
+    result_row1 = result[1]
+    run = weave.output_of(result_row1)
+    assert run is not None
+    assert "add_5" in run.op_name
+    assert run.inputs["v"] == 2

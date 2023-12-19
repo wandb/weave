@@ -191,6 +191,20 @@ def ref(uri: str) -> _ref_base.Ref:
     return _ref_base.Ref.from_str(uri)
 
 
+def obj_ref(obj: typing.Any) -> typing.Optional[_ref_base.Ref]:
+    return _ref_base.get_ref(obj)
+
+
+def output_of(obj: typing.Any) -> typing.Optional[_run.Run]:
+    client = _graph_client_context.require_graph_client()
+
+    ref = obj_ref(obj)
+    if ref is None:
+        return ref
+
+    return client.ref_output_of(ref)
+
+
 import contextlib
 
 
