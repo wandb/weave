@@ -35,43 +35,57 @@ export const SelectSizes = {
   Small: 'small',
   Medium: 'medium',
   Large: 'large',
+  Variable: 'variable',
 } as const;
 export type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
-const HEIGHTS: Record<SelectSize, number> = {
+const HEIGHTS: Record<SelectSize, number | undefined> = {
   small: 24,
   medium: 32,
   large: 40,
+  variable: undefined,
 } as const;
 
-const LINE_HEIGHTS: Record<SelectSize, string> = {
+const MIN_HEIGHTS: Record<SelectSize, number | undefined> = {
+  small: undefined,
+  medium: undefined,
+  large: undefined,
+  variable: 40,
+} as const;
+
+const LINE_HEIGHTS: Record<SelectSize, string | undefined> = {
   small: '20px',
   medium: '24px',
   large: '24px',
+  variable: undefined,
 } as const;
 
 const FONT_SIZES: Record<SelectSize, string> = {
   small: '14px',
   medium: '16px',
   large: '16px',
+  variable: '14px',
 } as const;
 
 const PADDING: Record<SelectSize, string> = {
   small: '2px 8px',
   medium: '4px 12px',
   large: '8px 12px',
+  variable: '2px 8px',
 } as const;
 
 const OUTWARD_MARGINS: Record<SelectSize, string> = {
   small: '-8px',
   medium: '-12px',
   large: '-12px',
+  variable: '-8px',
 } as const;
 
 const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
   small: 2,
   medium: 6,
   large: 8,
+  variable: 2,
 } as const;
 
 type AdditionalProps = {
@@ -151,6 +165,7 @@ const getStyles = <
     clearIndicator: baseStyles => ({
       ...baseStyles,
       padding: CLEAR_INDICATOR_PADDING[size],
+      cursor: 'pointer',
     }),
     input: baseStyles => {
       return {
@@ -163,6 +178,17 @@ const getStyles = <
       const padding = PADDING[size];
       return {...baseStyles, padding};
     },
+    multiValueLabel: baseStyles => {
+      const fontSize = FONT_SIZES[size];
+      return {
+        ...baseStyles,
+        fontSize,
+      };
+    },
+    multiValueRemove: baseStyles => ({
+      ...baseStyles,
+      cursor: 'pointer',
+    }),
     dropdownIndicator: baseStyles => ({...baseStyles, padding: '0 8px 0 0'}),
     container: baseStyles => {
       const height = HEIGHTS[size];
@@ -178,12 +204,13 @@ const getStyles = <
         ? hexToRGB(RED_550, 0.64)
         : hexToRGB(TEAL_500, 0.64);
       const height = HEIGHTS[size];
+      const minHeight = MIN_HEIGHTS[size] ?? height;
       const lineHeight = LINE_HEIGHTS[size];
       const fontSize = FONT_SIZES[size];
       return {
         ...baseStyles,
         height,
-        minHeight: height,
+        minHeight,
         lineHeight,
         fontSize,
         border: 0,
