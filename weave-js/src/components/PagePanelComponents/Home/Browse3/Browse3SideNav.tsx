@@ -8,7 +8,6 @@ import {
   ModelTraining,
   NavigateBefore,
   NavigateNext,
-  Restore,
   Rule,
   Scoreboard,
   Segment,
@@ -19,12 +18,10 @@ import {
 } from '@mui/icons-material';
 import {
   Autocomplete,
-  BottomNavigationAction,
   Box,
   FormControl,
   IconButton,
   ListSubheader,
-  Stack,
   TextField,
 } from '@mui/material';
 import Divider from '@mui/material/Divider';
