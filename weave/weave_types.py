@@ -132,7 +132,7 @@ class TypeRegistry:
                 # type_of(<ref>) calls .type on the ref, which may try to read
                 # data to get the data. We already have the obj here, so we can
                 # compute its type directly.
-                RefTypeClass = instance_class_to_potential_type(obj_ref.__class__)[-1]
+                RefTypeClass = instance_class_to_potential_type(obj_ref.__class__)[-1]  # type: ignore
                 return RefTypeClass(type_of_without_refs(obj))
 
         obj_type = type_name_to_type("tagged").type_of(obj)
