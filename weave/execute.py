@@ -520,8 +520,8 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
         #     return found_run.output
 
         parent_run = run_context.get_current_run()
-        if not parent_run:
-            print("Running ", op_def.name)
+        # if not parent_run:
+        #     print("Running ", op_def.name)
         run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
         try:
             with run_context.current_run(run):
