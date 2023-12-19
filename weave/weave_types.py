@@ -126,7 +126,7 @@ class TypeRegistry:
         if _reffed_type_is_ref.get() and not isinstance(obj, ref_base.Ref):
             obj_ref = ref_base.get_ref(obj)
             if obj_ref is not None:
-                return type_of(obj_ref)
+                return type_of_without_refs(obj_ref)
         # use reversed instance_class_to_potential_type so our result
         # is the most specific type.
 
@@ -1865,6 +1865,14 @@ def type_of(obj: typing.Any) -> Type:
 # instead of copying.
 def type_of_with_refs(obj: typing.Any) -> Type:
     token = _reffed_type_is_ref.set(True)
+    try:
+        return TypeRegistry.type_of(obj)
+    finally:
+        _reffed_type_is_ref.reset(token)
+
+
+def type_of_without_refs(obj: typing.Any) -> Type:
+    token = _reffed_type_is_ref.set(False)
     try:
         return TypeRegistry.type_of(obj)
     finally:
