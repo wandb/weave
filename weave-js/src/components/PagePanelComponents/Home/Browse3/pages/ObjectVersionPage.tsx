@@ -1,3 +1,4 @@
+import {Box} from '@mui/material';
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
@@ -14,6 +15,7 @@ import {
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
+import {ObjectVersionPageDAG} from './ObjectVersionPageDag';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFObjectVersion} from './wfInterface/types';
 
@@ -163,15 +165,9 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'DAG',
           content: (
-            <UnderConstruction
-              title="Record DAG"
-              message={
-                <>
-                  This page will show a "Record" DAG of Objects and Calls
-                  centered at this particular Object Version.
-                </>
-              }
-            />
+            <Box sx={{width: '100%', height: '100%'}}>
+              <ObjectVersionPageDAG objectVersion={objectVersion} />
+            </Box>
           ),
         },
       ]}
