@@ -126,7 +126,13 @@ class TypeRegistry:
         if _reffed_type_is_ref.get() and not isinstance(obj, ref_base.Ref):
             obj_ref = ref_base.get_ref(obj)
             if obj_ref is not None:
-                return type_of_without_refs(obj_ref)
+                # Directly construct the RefTypeClass instead of doing
+                # type_of(obj_ref), since a) that would recurse and b)
+                # type_of(<ref>) calls .type on the ref, which may try to read
+                # data to get the data. We already have the obj here, so we can
+                # compute its type directly.
+                RefTypeClass = instance_class_to_potential_type(obj_ref.__class__)[-1]
+                return RefTypeClass(type_of_without_refs(obj))
         # use reversed instance_class_to_potential_type so our result
         # is the most specific type.
 
