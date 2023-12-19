@@ -365,6 +365,10 @@ def default_monitor() -> Monitor:
     return _global_monitor
 
 
+def _get_global_monitor() -> typing.Optional[Monitor]:
+    return _global_monitor
+
+
 def new_monitor(stream_key: str) -> Monitor:
     """Create a new Monitor"""
     return Monitor(_init_monitor_streamtable(stream_key))

@@ -67,6 +67,7 @@ import {
   useSelectedDocumentId,
   useSelectedPath,
   useSetInteractingChildPanel,
+  useSetInteractingPanel,
   useSetPanelInputExprIsHighlighted,
   useSetSelectedPanel,
 } from './PanelInteractContext';
@@ -74,7 +75,14 @@ import {getStackIdAndName} from './panellib/libpanel';
 import PanelNameEditor from './PanelNameEditor';
 import {usePanelPanelContext} from './PanelPanelContextProvider';
 import {TableState} from './PanelTable/tableState';
-import {getConfigForPath, isInsideMain, isMain} from './panelTree';
+import {
+  addChild,
+  getConfigForPath,
+  getPath,
+  isInsideMain,
+  isMain,
+  nextPanelName,
+} from './panelTree';
 import {SelectPanelType} from './SelectPanelType';
 
 // This could be rendered as a code block with assignments, like
@@ -214,6 +222,46 @@ export interface ChildPanelProps {
   updateInput?: (partialInput: PanelInput) => void;
   updateName?: (newName: string) => void;
 }
+
+// Create a plot panel from a table panel.
+const insertPlotPanel = (
+  panelPathTable: string[],
+  updateConfig2: any,
+  setInteractingPanel: any
+) => {
+  updateConfig2((oldConfig: any) => {
+    oldConfig = getFullChildPanel(oldConfig);
+    const tablePanel = getPath(oldConfig, panelPathTable);
+    // We need to find the layout parameters for the panel being
+    // duplicated inside its parent's grid config so we can insert
+    // the clone next to the original and with the same width and height.
+    const tableId = panelPathTable[panelPathTable.length - 1];
+    const parentPath = panelPathTable.slice(0, -1);
+    const parentPanel = getPath(oldConfig, parentPath);
+    const parentLayouts = parentPanel.config.gridConfig.panels;
+    const targetLayoutObject = _.find(parentLayouts, {
+      id: tableId,
+    });
+    const duplicateLayout = targetLayoutObject?.layout;
+    const plotPanelName = nextPanelName(Object.keys(parentPanel.config.items));
+    const plotPanelPath = [...parentPath, plotPanelName];
+    const plotPanel = {
+      id: 'plot',
+      input_node: tablePanel.input_node,
+      config: undefined,
+      vars: {},
+    };
+    const updatedConfig = addChild(
+      oldConfig,
+      parentPath,
+      plotPanel,
+      plotPanelName,
+      duplicateLayout
+    );
+    setInteractingPanel('config', plotPanelPath, 'input');
+    return updatedConfig;
+  });
+};
 
 const useChildPanelCommon = (props: ChildPanelProps) => {
   const {updateConfig} = props;
@@ -471,7 +519,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     [panelInputExpr.type]
   );
 
-  const setInteractingPanel = useSetInteractingChildPanel();
+  const setInteractingPanel = useSetInteractingPanel();
+  const setInteractingChildPanel = useSetInteractingChildPanel();
 
   return useMemo(
     () => ({
@@ -492,6 +541,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
       updatePanelConfig2,
       updatePanelInput,
       setInteractingPanel,
+      setInteractingChildPanel,
     }),
     [
       curPanelId,
@@ -511,6 +561,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
       updatePanelConfig2,
       updatePanelInput,
       setInteractingPanel,
+      setInteractingChildPanel,
     ]
   );
 };
@@ -539,6 +590,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     updatePanelConfig2,
     updatePanelInput,
     setInteractingPanel,
+    setInteractingChildPanel,
   } = useChildPanelCommon(props);
 
   const {frame} = usePanelContext();
@@ -573,6 +625,9 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     el => el != null && el !== ''
   );
 
+  // Store the last mouse down coordinates so we can distinguish click from drag.
+  const lastMouseDownCoordsRef = useRef({x: 0, y: 0});
+
   const selectedDocumentId = useSelectedDocumentId();
   const pathStr = useMemo(() => ['<root>', ...fullPath].join('.'), [fullPath]);
   const selectedPath = useSelectedPath();
@@ -605,10 +660,26 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   ) : (
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
+      onMouseDown={event => {
+        event.stopPropagation();
+        lastMouseDownCoordsRef.current = {
+          x: event.clientX,
+          y: event.clientY,
+        };
+      }}
       onClick={event => {
-        if (isMain(fullPath) || isInsideMain(fullPath, 1)) {
+        event.stopPropagation();
+        if (isInsideMain(fullPath, 1)) {
           setSelectedPanel(fullPath);
-          event.stopPropagation();
+        } else if (
+          isMain(fullPath) &&
+          event.clientX === lastMouseDownCoordsRef.current.x &&
+          event.clientY === lastMouseDownCoordsRef.current.y
+        ) {
+          // User has clicked on the background of the main panel
+          // and did not drag to a different position.
+          // i.e. We don't change the selected panel if the user is dragging to resize a panel.
+          setSelectedPanel(fullPath);
         }
       }}
       onMouseEnter={() => setIsHoverPanel(true)}
@@ -668,6 +739,22 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             {props.editable && (
               <EditorIcons visible={showEditControls || isMenuOpen}>
                 {props.prefixButtons}
+                {curPanelId === 'table' && (
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    icon="chart-scatterplot"
+                    tooltip="Create a plot from this table"
+                    onClick={(ev: React.MouseEvent) => {
+                      ev.stopPropagation();
+                      insertPlotPanel(
+                        fullPath,
+                        updateConfig2,
+                        setInteractingPanel
+                      );
+                    }}
+                  />
+                )}
                 <Tooltip
                   position="top center"
                   trigger={
@@ -677,7 +764,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       icon="pencil-edit"
                       data-testid="open-panel-editor"
                       onClick={() =>
-                        setInteractingPanel(
+                        setInteractingChildPanel(
                           'config',
                           props.pathEl ?? '',
                           documentId
