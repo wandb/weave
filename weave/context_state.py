@@ -56,7 +56,7 @@ if patch_context:
 # Set to the op uri if we're in the process of loading
 # an op from an artifact.
 _loading_op_location: contextvars.ContextVar[
-    typing.Optional[uris.WeaveURI]
+    typing.Optional["uris.WeaveURI"]
 ] = contextvars.ContextVar("loading_op_location", default=None)
 
 
