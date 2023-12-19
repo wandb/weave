@@ -3,9 +3,11 @@ import contextlib
 import typing
 import dataclasses
 
-from . import client_interface
-from . import server_interface
-from . import uris
+if typing.TYPE_CHECKING:
+    from . import client_interface
+    from . import server_interface
+    from . import uris
+    from .graph_client import GraphClient
 
 
 # colab currently runs ipykernel < 6.0.  This resets context on every
@@ -261,3 +263,13 @@ class WandbApiContext:
 _wandb_api_context: contextvars.ContextVar[
     typing.Optional[WandbApiContext]
 ] = contextvars.ContextVar("wandb_api_context", default=None)
+
+## urls.py Context
+_use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "use_local_urls", default=False
+)
+
+## graph_client_context.py Context
+_graph_client: contextvars.ContextVar[
+    typing.Optional["GraphClient"]
+] = contextvars.ContextVar("graph_client", default=None)

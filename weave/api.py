@@ -146,8 +146,9 @@ def init(project_name: str) -> _graph_client.GraphClient:
     client = _graph_client_wandb_art_st.GraphClientWandbArtStreamTable(
         entity_name, project_name
     )
-    _graph_client_context._graph_client.set(client)
-    print("Ensure you have the prototype UI running with `weave ui`")
+    _context_state._graph_client.set(client)
+    if _context_state._use_local_urls.get():
+        print("Ensure you have the prototype UI running with `weave ui`")
     print(f"View project at {urls.project_path(entity_name, project_name)}")
     return client
 
@@ -155,7 +156,7 @@ def init(project_name: str) -> _graph_client.GraphClient:
 # This is currently an internal interface. We'll expose something like it though ("offline" mode)
 def init_local_client() -> _graph_client.GraphClient:
     client = _graph_client_local.GraphClientLocal()
-    _graph_client_context._graph_client.set(client)
+    _context_state._graph_client.set(client)
     return client
 
 
