@@ -203,14 +203,12 @@ class ConstNode(Node):
         return cls(t, val)
 
     def to_json(self) -> dict:
-        val = storage.to_python(self.val)["_val"]  # type: ignore
-        # mapper = mappers_python.map_to_python(self.type, None)
-        # val = mapper.apply(self.val)
-
-        # val = self.val
-        # if isinstance(self.type, weave_types.Function):
-        #     val = val.to_json()
-        return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
+        pythoned_obj = storage.to_python(self.val)
+        return {
+            "nodeType": "const",
+            "type": pythoned_obj["_type"],
+            "val": pythoned_obj["_val"],
+        }
 
 
 class VoidNode(Node):
