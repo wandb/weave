@@ -3,7 +3,7 @@ import typing
 import os
 import dataclasses
 
-from .urls import BROWSE3_PATH
+from . import urls
 from . import graph as _graph
 from . import graph_mapper as _graph_mapper
 from . import storage as _storage
@@ -146,18 +146,17 @@ def init(project_name: str) -> _graph_client.GraphClient:
     client = _graph_client_wandb_art_st.GraphClientWandbArtStreamTable(
         entity_name, project_name
     )
-    _graph_client_context._graph_client.set(client)
-    print("Ensure you have the prototype UI running with `weave ui`")
-    print(
-        f"View project at http://localhost:3000/{BROWSE3_PATH}/{entity_name}/{project_name}"
-    )
+    _context_state._graph_client.set(client)
+    if _context_state._use_local_urls.get():
+        print("Ensure you have the prototype UI running with `weave ui`")
+    print(f"View project at {urls.project_path(entity_name, project_name)}")
     return client
 
 
 # This is currently an internal interface. We'll expose something like it though ("offline" mode)
 def init_local_client() -> _graph_client.GraphClient:
     client = _graph_client_local.GraphClientLocal()
-    _graph_client_context._graph_client.set(client)
+    _context_state._graph_client.set(client)
     return client
 
 

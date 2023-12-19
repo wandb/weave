@@ -1,7 +1,6 @@
 import typing
 from typing import Iterable
 
-from .urls import BROWSE3_PATH
 from .run import Run
 from . import uris
 from . import artifact_wandb

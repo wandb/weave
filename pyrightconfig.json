@@ -78,6 +78,7 @@
     "weave/types_numpy.py",
     "weave/usage_analytics.py",
     "weave/util.py",
+    "weave/urls.py",
     "weave/wandb_api.py",
     "weave/wandb_client_api.py",
     "weave/wandb_file_manager.py",

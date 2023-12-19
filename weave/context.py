@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 from weave.client_interface import ClientInterface
 
+from . import urls
 from . import util
 from . import client
 from . import server
@@ -51,6 +52,7 @@ def use_fixed_server_port():
 def use_frontend_devmode():
     """Talk to external server running on 9994"""
     use_fixed_server_port()
+    urls.use_local_urls()
 
     # point frontend to vite server
     context_state.set_frontend_url("http://localhost:3000")

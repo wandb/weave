@@ -3,9 +3,11 @@ import contextlib
 import typing
 import dataclasses
 
-from . import client_interface
-from . import server_interface
-from . import uris
+if typing.TYPE_CHECKING:
+    from . import client_interface
+    from . import server_interface
+    from . import uris
+    from .graph_client import GraphClient
 
 
 # colab currently runs ipykernel < 6.0.  This resets context on every
@@ -54,7 +56,7 @@ if patch_context:
 # Set to the op uri if we're in the process of loading
 # an op from an artifact.
 _loading_op_location: contextvars.ContextVar[
-    typing.Optional[uris.WeaveURI]
+    typing.Optional["uris.WeaveURI"]
 ] = contextvars.ContextVar("loading_op_location", default=None)
 
 
@@ -100,7 +102,7 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 _weave_client: contextvars.ContextVar[
-    typing.Optional[client_interface.ClientInterface]
+    typing.Optional["client_interface.ClientInterface"]
 ] = contextvars.ContextVar("weave_client", default=None)
 
 _monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -109,7 +111,7 @@ _monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 
 
 @contextlib.contextmanager
-def client(client: client_interface.ClientInterface):
+def client(client: "client_interface.ClientInterface"):
     client_token = _weave_client.set(client)
     try:
         yield client
@@ -117,21 +119,21 @@ def client(client: client_interface.ClientInterface):
         _weave_client.reset(client_token)
 
 
-def get_client() -> typing.Optional[client_interface.ClientInterface]:
+def get_client() -> typing.Optional["client_interface.ClientInterface"]:
     return _weave_client.get()
 
 
-def set_client(client: client_interface.ClientInterface):
+def set_client(client: "client_interface.ClientInterface"):
     _weave_client.set(client)
 
 
 _http_server: contextvars.ContextVar[
-    typing.Optional[server_interface.BaseServer]
+    typing.Optional["server_interface.BaseServer"]
 ] = contextvars.ContextVar("http_server", default=None)
 
 
 @contextlib.contextmanager
-def server(server: server_interface.BaseServer):
+def server(server: "server_interface.BaseServer"):
     server_token = _http_server.set(server)
     try:
         yield server
@@ -139,11 +141,11 @@ def server(server: server_interface.BaseServer):
         _http_server.reset(server_token)
 
 
-def get_server() -> typing.Optional[server_interface.BaseServer]:
+def get_server() -> typing.Optional["server_interface.BaseServer"]:
     return _http_server.get()
 
 
-def set_server(server: server_interface.BaseServer):
+def set_server(server: "server_interface.BaseServer"):
     _http_server.set(server)
 
 
@@ -261,3 +263,13 @@ class WandbApiContext:
 _wandb_api_context: contextvars.ContextVar[
     typing.Optional[WandbApiContext]
 ] = contextvars.ContextVar("wandb_api_context", default=None)
+
+## urls.py Context
+_use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "use_local_urls", default=False
+)
+
+## graph_client_context.py Context
+_graph_client: contextvars.ContextVar[
+    typing.Optional["GraphClient"]
+] = contextvars.ContextVar("graph_client", default=None)
