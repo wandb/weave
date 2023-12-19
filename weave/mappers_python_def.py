@@ -135,7 +135,7 @@ class ListToPyList(mappers_weave.ListMapper):
 
 class UnionToPyUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
-        obj_type = types.TypeRegistry.type_of(obj)
+        obj_type = types.type_of_with_refs(obj)
         for i, (member_type, member_mapper) in enumerate(
             zip(self.type.members, self._member_mappers)
         ):

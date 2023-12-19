@@ -94,9 +94,7 @@ def test_vectorrefs(eager_mode, cache_mode_minimal):
         return v + 5
 
     result = items.apply(lambda item: add_5(item))
-    # TODO: here.
-    # OK, result is now AWL of ref. Great! We need to deref
-    # refs upon index though.
+
     result_row0 = result[0]
     run = weave.output_of(result_row0)
     assert run is not None

@@ -354,11 +354,19 @@ def _merge(name) -> str:
         else to_uri.version
     )
 
+    obj = head_ref.get()
+    # Crucially, we must compute the weave type using type_of
+    # instead of allowing _direct_publish and direct_save to compute
+    # the weave type using type_of_with_refs. Merging is a special
+    # operation and should not try to do ref tracking.
+    weave_type = types.type_of(obj)
+
     ref: ref_base.Ref
     if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):
         ref = storage._direct_publish(
-            obj=head_ref.get(),
+            obj=obj,
             name=to_uri.name,
+            assume_weave_type=weave_type,
             wb_project_name=to_uri.project_name,
             wb_entity_name=to_uri.entity_name,
             branch_name=shared_branch_name,
@@ -375,6 +383,7 @@ def _merge(name) -> str:
             name=to_uri.name,
             source_branch_name=shared_branch_name,
             branch_name=shared_branch_name,
+            assume_weave_type=weave_type,
         )
     return ref.branch_uri
 
