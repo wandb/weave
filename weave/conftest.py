@@ -284,3 +284,9 @@ def io_server_factory():
 def consistent_table_col_ids():
     with table_state.use_consistent_col_ids():
         yield
+
+
+@pytest.fixture()
+def ref_tracking():
+    with context_state.ref_tracking(True):
+        yield

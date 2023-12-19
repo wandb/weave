@@ -3,14 +3,14 @@ from weave import storage
 from weave import weave_types as types
 
 
-def test_reffed_type():
+def test_reffed_type(ref_tracking):
     obj_ref = storage.save([1, 2, 3])
     obj = obj_ref.get()
     obj_type = types.type_of_with_refs(obj)
     assert obj_type == types.LocalArtifactRefType(types.List(types.Int()))
 
 
-def test_save_reffed_obj():
+def test_save_reffed_obj(ref_tracking):
     obj_ref = storage.save([1, 2, 3])
     obj = storage.get(str(obj_ref))
     obj_ref2 = storage.save(obj, "again")
@@ -18,7 +18,7 @@ def test_save_reffed_obj():
     assert str(obj_ref) == str(obj_ref2)
 
 
-def test_save_nested_reffed_obj():
+def test_save_nested_reffed_obj(ref_tracking):
     obj_ref = storage.save([1, 2, 3])
     obj = obj_ref.get()
     outer_obj = {"a": obj}
@@ -29,7 +29,7 @@ def test_save_nested_reffed_obj():
     assert str(obj_ref) == str(obj2_ref)
 
 
-def test_save_awl_refs():
+def test_save_awl_refs(ref_tracking):
     obj1 = {"a": 5}
     obj1_ref = storage.save(obj1)
     obj2 = {"a": 6}

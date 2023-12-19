@@ -10,6 +10,7 @@ from collections.abc import Iterable
 
 
 from . import box
+from . import context_state
 from . import errors
 from . import mappers_python
 from . import timestamp as weave_timestamp
@@ -119,7 +120,11 @@ class TypeRegistry:
     def type_of(obj: typing.Any) -> "Type":
         from . import ref_base
 
-        if _reffed_type_is_ref.get() and not isinstance(obj, ref_base.Ref):
+        if (
+            context_state.ref_tracking_enabled()
+            and _reffed_type_is_ref.get()
+            and not isinstance(obj, ref_base.Ref)
+        ):
             obj_ref = ref_base.get_ref(obj)
             if obj_ref is not None:
                 # Directly construct the RefTypeClass instead of doing
@@ -1871,7 +1876,7 @@ def type_of(obj: typing.Any) -> Type:
 # has a ref. This is used when serializing, so that we save refs
 # instead of copying.
 def type_of_with_refs(obj: typing.Any) -> Type:
-    token = _reffed_type_is_ref.set(False)
+    token = _reffed_type_is_ref.set(True)
     try:
         return TypeRegistry.type_of(obj)
     finally:

@@ -84,7 +84,7 @@ def test_output_of(eager_mode):
     assert run.inputs["v"] == 10
 
 
-def test_vectorrefs(eager_mode, cache_mode_minimal):
+def test_vectorrefs(eager_mode, cache_mode_minimal, ref_tracking):
     weave.init_local_client()
     items = weave.WeaveList([1, 2])
     items_ref = weave.publish(items, "vectorrefs")
