@@ -168,6 +168,7 @@ export const FilterableTable = <
       showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
       filterListItems={filterListItems}>
       <DataGridPro
+        sx={{border: 0}}
         rows={dataGridRowData}
         rowHeight={38}
         columns={dataGridColumns}
@@ -206,6 +207,7 @@ export const FilterLayoutTemplate: React.FC<{
           flexDirection: 'column',
           overflowY: 'auto',
           overflowX: 'hidden',
+          borderLeft: '1px solid #e0e0e0',
         }}>
         {isOpen ? (
           <>
@@ -213,7 +215,7 @@ export const FilterLayoutTemplate: React.FC<{
               sx={{
                 pl: 1,
                 pr: 1,
-                height: 57,
+                height: 56,
                 flex: '0 0 auto',
                 borderBottom: '1px solid #e0e0e0',
                 position: 'sticky',
@@ -254,7 +256,7 @@ export const FilterLayoutTemplate: React.FC<{
         ) : (
           <Box
             sx={{
-              height: 57,
+              height: 56,
               flex: '0 0 auto',
               borderBottom: '1px solid #e0e0e0',
               display: 'flex',

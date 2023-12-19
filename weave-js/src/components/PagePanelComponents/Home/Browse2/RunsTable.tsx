@@ -460,6 +460,7 @@ export const RunsTable: FC<{
   }, [apiRef, loading]);
   return (
     <DataGridPro
+      sx={{border: 0}}
       apiRef={apiRef}
       loading={loading}
       rows={tableData}
