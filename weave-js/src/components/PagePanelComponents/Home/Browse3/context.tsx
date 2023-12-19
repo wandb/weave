@@ -1,28 +1,12 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {createContext, useContext} from 'react';
+import React, {createContext, useCallback, useContext} from 'react';
+import {useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
-
-const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
-  if (!filter) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(filter).filter(
-      ([k, v]) =>
-        v != null &&
-        v !== undefined &&
-        v !== false &&
-        (_.isArray(v) ? v.length > 0 : true) &&
-        (typeof v === 'string' ? v.length > 0 : true)
-    )
-  );
-};
 
 export const useWeaveflowRouteContext = () => {
   const ctx = useContext(WeaveflowRouteContext);
@@ -41,6 +25,82 @@ export const Browse3WeaveflowRouteContextProvider = ({
       {children}
     </WeaveflowRouteContext.Provider>
   );
+};
+
+type RouteType = {
+  refUIUrl: (
+    rootTypeName: string,
+    objRef: ArtifactRef,
+    wfTable?: WFDBTableType
+  ) => string;
+  entityUrl: (entityName: string) => string;
+  projectUrl: (entityName: string, projectName: string) => string;
+  typeUIUrl: (
+    entityName: string,
+    projectName: string,
+    typeName: string
+  ) => string;
+  objectUIUrl: (
+    entityName: string,
+    projectName: string,
+    objectName: string
+  ) => string;
+  opUIUrl: (entityName: string, projectName: string, opName: string) => string;
+  typeVersionUIUrl: (
+    entityName: string,
+    projectName: string,
+    typeName: string,
+    typeVersionHash: string
+  ) => string;
+  typeVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelTypeVersionFilter
+  ) => string;
+  objectVersionUIUrl: (
+    entityName: string,
+    projectName: string,
+    objectName: string,
+    objectVersionHash: string
+  ) => string;
+  opVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelOpVersionFilter
+  ) => string;
+  opVersionUIUrl: (
+    entityName: string,
+    projectName: string,
+    opName: string,
+    opVersionHash: string
+  ) => string;
+  callUIUrl: (
+    entityName: string,
+    projectName: string,
+    traceId: string,
+    callId: string
+  ) => string;
+  callsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelCallFilter
+  ) => string;
+  objectVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelObjectVersionFilter
+  ) => string;
+  boardsUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
+  ) => string;
+  tablesUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
+  ) => string;
+  opPageUrl: (opUri: string) => string;
 };
 
 type WFDBTableType =
@@ -160,6 +220,23 @@ const browse2Context = {
   tablesUIUrl: (entityName: string, projectName: string) => {
     throw new Error('Not implemented');
   },
+};
+
+const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
+  if (!filter) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(filter).filter(
+      ([k, v]) =>
+        v != null &&
+        v !== undefined &&
+        v !== false &&
+        (_.isArray(v) ? v.length > 0 : true) &&
+        (typeof v === 'string' ? v.length > 0 : true)
+    )
+  );
 };
 
 const browse3ContextGen = (
@@ -341,79 +418,134 @@ const browse3ContextGen = (
   return browse3Context;
 };
 
-type RouteType = {
-  refUIUrl: (
-    rootTypeName: string,
-    objRef: ArtifactRef,
-    wfTable?: WFDBTableType
-  ) => string;
-  entityUrl: (entityName: string) => string;
-  projectUrl: (entityName: string, projectName: string) => string;
-  typeUIUrl: (
-    entityName: string,
-    projectName: string,
-    typeName: string
-  ) => string;
-  objectUIUrl: (
-    entityName: string,
-    projectName: string,
-    objectName: string
-  ) => string;
-  opUIUrl: (entityName: string, projectName: string, opName: string) => string;
-  typeVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    typeName: string,
-    typeVersionHash: string
-  ) => string;
-  typeVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelTypeVersionFilter
-  ) => string;
-  objectVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    objectName: string,
-    objectVersionHash: string
-  ) => string;
-  opVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelOpVersionFilter
-  ) => string;
-  opVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    opName: string,
-    opVersionHash: string
-  ) => string;
-  callUIUrl: (
-    entityName: string,
-    projectName: string,
-    traceId: string,
-    callId: string
-  ) => string;
-  callsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelCallFilter
-  ) => string;
-  objectVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelObjectVersionFilter
-  ) => string;
-  boardsUIUrl: (
-    entityName: string,
-    projectName: string
-    // TODO: Add filter when supported
-  ) => string;
-  tablesUIUrl: (
-    entityName: string,
-    projectName: string
-    // TODO: Add filter when supported
-  ) => string;
-  opPageUrl: (opUri: string) => string;
+const useSetSearchParam = () => {
+  const location = useLocation();
+  return useCallback(
+    (key: string, value: string | null) => {
+      const searchParams = new URLSearchParams(location.search);
+      if (value === null) {
+        searchParams.delete(key);
+      } else {
+        searchParams.set(key, value);
+      }
+      const newSearch = searchParams.toString();
+      const newUrl = `${location.pathname}?${newSearch}`;
+      return newUrl;
+    },
+    [location]
+  );
 };
+
+const PEAK_SEARCH_PARAM = 'peekPath';
+export const Browse3WeaveflowPeekRouteContextProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const setSearchParam = useSetSearchParam();
+
+  const baseContext = browse3ContextGen(
+    (entityName: string, projectName: string) => {
+      return `/${entityName}/${projectName}`;
+    }
+  );
+  const wrappedContext = {
+    refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.refUIUrl(...args));
+    },
+    entityUrl: (...args: Parameters<typeof baseContext.entityUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.entityUrl(...args));
+    },
+    projectUrl: (...args: Parameters<typeof baseContext.projectUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.projectUrl(...args));
+    },
+    typeUIUrl: (...args: Parameters<typeof baseContext.typeUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.typeUIUrl(...args));
+    },
+    objectUIUrl: (...args: Parameters<typeof baseContext.objectUIUrl>) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.objectUIUrl(...args)
+      );
+    },
+    opUIUrl: (...args: Parameters<typeof baseContext.opUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opUIUrl(...args));
+    },
+    typeVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.typeVersionUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.typeVersionUIUrl(...args)
+      );
+    },
+    typeVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.typeVersionsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.typeVersionsUIUrl(...args)
+      );
+    },
+    objectVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.objectVersionUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.objectVersionUIUrl(...args)
+      );
+    },
+    opVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.opVersionsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.opVersionsUIUrl(...args)
+      );
+    },
+    opVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.opVersionUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.opVersionUIUrl(...args)
+      );
+    },
+    callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callUIUrl(...args));
+    },
+    callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callsUIUrl(...args));
+    },
+    objectVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.objectVersionsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.objectVersionsUIUrl(...args)
+      );
+    },
+    opPageUrl: (...args: Parameters<typeof baseContext.opPageUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opPageUrl(...args));
+    },
+    boardsUIUrl: (...args: Parameters<typeof baseContext.boardsUIUrl>) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.boardsUIUrl(...args)
+      );
+    },
+    tablesUIUrl: (...args: Parameters<typeof baseContext.tablesUIUrl>) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.tablesUIUrl(...args)
+      );
+    },
+  };
+  return (
+    <WeaveflowRouteContext.Provider value={wrappedContext}>
+      {children}
+    </WeaveflowRouteContext.Provider>
+  );
+};
+
 const WeaveflowRouteContext = createContext<RouteType>(browse2Context);

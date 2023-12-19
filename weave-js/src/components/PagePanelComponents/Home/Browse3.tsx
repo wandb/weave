@@ -334,7 +334,7 @@ const Browse3ProjectRoot: FC = () => {
           <TypePageBinding />
         </Route>
         <Route path={`${projectRoot}/types`}>
-          <TypesPage entity={params.entity} project={params.project} />
+          <TypesPageBinding />
         </Route>
         <Route path={`${projectRoot}/type-versions`}>
           <TypeVersionsPageBinding />
@@ -348,7 +348,7 @@ const Browse3ProjectRoot: FC = () => {
           <ObjectPageBinding />
         </Route>
         <Route path={`${projectRoot}/objects`}>
-          <ObjectsPage entity={params.entity} project={params.project} />
+          <ObjectsPageBinding />
         </Route>
         <Route path={`${projectRoot}/object-versions`}>
           <ObjectVersionsPageBinding />
@@ -361,7 +361,7 @@ const Browse3ProjectRoot: FC = () => {
           <OpPageBinding />
         </Route>
         <Route path={`${projectRoot}/ops`}>
-          <OpsPage entity={params.entity} project={params.project} />
+          <OpsPageBinding />
         </Route>
         <Route path={`${projectRoot}/op-versions`}>
           <OpVersionsPageBinding />
@@ -383,14 +383,14 @@ const Browse3ProjectRoot: FC = () => {
           <BoardPageBinding />
         </Route>
         <Route path={`${projectRoot}/boards`}>
-          <BoardsPage entity={params.entity} project={params.project} />
+          <BoardsPageBinding />
         </Route>
         {/* TABLES */}
         <Route path={`${projectRoot}/tables/:tableId`}>
           <TablePage />
         </Route>
         <Route path={`${projectRoot}/tables`}>
-          <TablesPage entity={params.entity} project={params.project} />
+          <TablesPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -704,6 +704,36 @@ const TypePageBinding = () => {
       typeName={params.itemName}
     />
   );
+};
+
+const TypesPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <TypesPage entity={params.entity} project={params.project} />;
+};
+
+const OpsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <OpsPage entity={params.entity} project={params.project} />;
+};
+
+const ObjectsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <ObjectsPage entity={params.entity} project={params.project} />;
+};
+
+const BoardsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <BoardsPage entity={params.entity} project={params.project} />;
+};
+
+const TablesPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <TablesPage entity={params.entity} project={params.project} />;
 };
 
 const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
