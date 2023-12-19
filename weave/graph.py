@@ -206,7 +206,9 @@ class ConstNode(Node):
         pythoned_obj = storage.to_python(self.val)
         return {
             "nodeType": "const",
-            "type": pythoned_obj["_type"],
+            # TODO: to_dict here is means we don't respect RefType
+            # when using ref tracking.
+            "type": self.type.to_dict(),
             "val": pythoned_obj["_val"],
         }
 

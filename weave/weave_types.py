@@ -117,10 +117,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-        obj_type = type_name_to_type("tagged").type_of(obj)
-        if obj_type is not None:
-            return obj_type
-
         from . import ref_base
 
         if _reffed_type_is_ref.get() and not isinstance(obj, ref_base.Ref):
@@ -133,6 +129,11 @@ class TypeRegistry:
                 # compute its type directly.
                 RefTypeClass = instance_class_to_potential_type(obj_ref.__class__)[-1]
                 return RefTypeClass(type_of_without_refs(obj))
+
+        obj_type = type_name_to_type("tagged").type_of(obj)
+        if obj_type is not None:
+            return obj_type
+
         # use reversed instance_class_to_potential_type so our result
         # is the most specific type.
 
@@ -1870,7 +1871,7 @@ def type_of(obj: typing.Any) -> Type:
 # has a ref. This is used when serializing, so that we save refs
 # instead of copying.
 def type_of_with_refs(obj: typing.Any) -> Type:
-    token = _reffed_type_is_ref.set(True)
+    token = _reffed_type_is_ref.set(False)
     try:
         return TypeRegistry.type_of(obj)
     finally:
