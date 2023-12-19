@@ -625,6 +625,9 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     el => el != null && el !== ''
   );
 
+  // Store the last mouse down coordinates so we can distinguish click from drag.
+  const lastMouseDownCoordsRef = useRef({x: 0, y: 0});
+
   const selectedDocumentId = useSelectedDocumentId();
   const pathStr = useMemo(() => ['<root>', ...fullPath].join('.'), [fullPath]);
   const selectedPath = useSelectedPath();
@@ -657,10 +660,26 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   ) : (
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
+      onMouseDown={event => {
+        event.stopPropagation();
+        lastMouseDownCoordsRef.current = {
+          x: event.clientX,
+          y: event.clientY,
+        };
+      }}
       onClick={event => {
-        if (isMain(fullPath) || isInsideMain(fullPath, 1)) {
+        event.stopPropagation();
+        if (isInsideMain(fullPath, 1)) {
           setSelectedPanel(fullPath);
-          event.stopPropagation();
+        } else if (
+          isMain(fullPath) &&
+          event.clientX === lastMouseDownCoordsRef.current.x &&
+          event.clientY === lastMouseDownCoordsRef.current.y
+        ) {
+          // User has clicked on the background of the main panel
+          // and did not drag to a different position.
+          // i.e. We don't change the selected panel if the user is dragging to resize a panel.
+          setSelectedPanel(fullPath);
         }
       }}
       onMouseEnter={() => setIsHoverPanel(true)}
