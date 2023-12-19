@@ -250,7 +250,33 @@ def observability(
             **{
                 "state": row["state"][0],
                 "count": row.count(),
-                "job (s)": weave.ops.join_to_str(row["job"].unique(), ","),
+                "job (s)": weave.ops.cond(
+                    weave.ops.dict_(
+                        a=row["job"].unique().count() <= 3,
+                        b=row["job"].unique().count() > 3,
+                    ),
+                    weave.ops.dict_(
+                        a=weave.ops.join_to_str(row["job"].unique(), ","),
+                        b=weave.ops.join_to_str(
+                            weave.ops.make_list(
+                                a=weave.ops.join_to_str(
+                                    weave.ops.make_list(
+                                        **{
+                                            i: job
+                                            for i, job in enumerate(row["job"].unique())
+                                        }
+                                    ),
+                                    ",",
+                                ),
+                                b=weave_internal.make_const_node(
+                                    types.String(),
+                                    f"... ({row.count() - 3} more)",
+                                ),
+                            ),
+                            ",",
+                        ),
+                    ),
+                ),
             }
         ),
         color_title="state",
