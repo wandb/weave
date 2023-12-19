@@ -3,7 +3,7 @@ import typing
 import os
 import dataclasses
 
-from .urls import BROWSE3_PATH
+from . import urls
 from . import graph as _graph
 from . import graph_mapper as _graph_mapper
 from . import storage as _storage
@@ -17,7 +17,10 @@ from . import ops as _ops
 from . import util as _util
 from . import context as _context
 from . import context_state as _context_state
+from . import run as _run
 from . import graph_client as _graph_client
+from . import graph_client_local as _graph_client_local
+from . import graph_client_wandb_art_st as _graph_client_wandb_art_st
 from . import graph_client_context as _graph_client_context
 from weave import monitoring as _monitoring
 from weave.monitoring import monitor as _monitor
@@ -70,7 +73,7 @@ def save(node_or_obj, name=None):
 
 def get(ref_str):
     obj = _storage.get(ref_str)
-    ref = _storage._get_ref(obj)
+    ref = typing.cast(_ref_base.Ref, _storage._get_ref(obj))
     return _weave_internal.make_const_node(ref.type, obj)
 
 
@@ -96,7 +99,7 @@ def versions(obj):
     elif isinstance(obj, _graph.OutputNode):
         obj = use(obj)
     ref = _get_ref(obj)
-    return ref.versions()
+    return ref.versions()  # type: ignore
 
 
 def expr(obj):
@@ -121,7 +124,6 @@ def from_pandas(df):
 
 def init(project_name: str) -> _graph_client.GraphClient:
     from . import wandb_api
-    from . import monitoring
 
     fields = project_name.split("/")
     if len(fields) == 1:
@@ -141,25 +143,28 @@ def init(project_name: str) -> _graph_client.GraphClient:
         )
     if not entity_name:
         raise ValueError("entity_name must be non-empty")
-    client = _graph_client.GraphClient(entity_name, project_name)
-    _graph_client_context._graph_client.set(client)
-    print("Ensure you have the prototype UI running with `weave ui`")
-    print(
-        f"View project at http://localhost:3000/{BROWSE3_PATH}/{entity_name}/{project_name}"
+    client = _graph_client_wandb_art_st.GraphClientWandbArtStreamTable(
+        entity_name, project_name
     )
+    _context_state._graph_client.set(client)
+    if _context_state._use_local_urls.get():
+        print("Ensure you have the prototype UI running with `weave ui`")
+    print(f"View project at {urls.project_path(entity_name, project_name)}")
     return client
 
 
-def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
-    if "/" not in name:
-        client = _graph_client_context.get_graph_client()
-        if not client:
-            raise ValueError(
-                "Call weave.init() first, or pass <project>/<name> for name"
-            )
-        name = f"{client.project_name}/{name}"
+# This is currently an internal interface. We'll expose something like it though ("offline" mode)
+def init_local_client() -> _graph_client.GraphClient:
+    client = _graph_client_local.GraphClientLocal()
+    _context_state._graph_client.set(client)
+    return client
 
-    ref = _storage.publish(obj, name)  # type: ignore
+
+def publish(obj: typing.Any, name: str) -> _ref_base.Ref:
+    client = _graph_client_context.require_graph_client()
+
+    ref = client.save_object(obj, name, "latest")
+
     print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
 
     # Have to manually put the ref on the obj, this is supposed to happen at
@@ -169,23 +174,21 @@ def publish(obj: typing.Any, name: str) -> _artifact_wandb.WandbArtifactRef:
     return ref
 
 
-def ref(uri: str) -> _artifact_wandb.WandbArtifactRef:
+def ref(uri: str) -> _ref_base.Ref:
     if not "://" in uri:
         client = _graph_client_context.get_graph_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
         if "/" in uri:
             raise ValueError("'/' not currently supported in short-form URI")
-        name_version = uri
-        if ":" not in name_version:
-            name_version = f"{name_version}:latest"
-        uri = f"wandb-artifact:///{client.entity_name}/{client.project_name}/{name_version}/obj"
+        if ":" not in uri:
+            name = uri
+            version = "latest"
+        else:
+            name, version = uri.split(":")
+        uri = str(client.ref_uri(name, version))
 
-    ref = _ref_base.Ref.from_str(uri)
-    if not isinstance(ref, _artifact_wandb.WandbArtifactRef):
-        raise ValueError(f"Expected a wandb artifact ref, got {ref}")
-    ref.type
-    return ref
+    return _ref_base.Ref.from_str(uri)
 
 
 import contextlib
@@ -214,10 +217,14 @@ def serve(
     from .serve_fastapi import object_method_app
 
     client = _graph_client_context.require_graph_client()
+    if not isinstance(
+        client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+    ):
+        raise ValueError("serve currently only supports wandb client")
 
     print(f"Serving {model_ref}")
     print(f"Server docs at http://localhost:{port}/docs")
-    os.environ["PROJECT_NAME"] = client.entity_project
+    os.environ["PROJECT_NAME"] = f"{client.entity_name}/{client.project_name}"
     os.environ["MODEL_REF"] = str(model_ref)
 
     wandb_api_ctx = _wandb_api.get_wandb_api_context()

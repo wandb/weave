@@ -2,6 +2,7 @@ import {Typography} from '@mui/material';
 import React, {FC, useCallback, useMemo} from 'react';
 import {useHistory, useParams} from 'react-router-dom';
 
+import {URL_BROWSE3} from '../../../../urls';
 import * as query from '../query';
 import {PageEl, PageHeader, Paper} from './CommonLib';
 import {LinkTable} from './LinkTable';
@@ -25,7 +26,7 @@ export const Browse2EntityPage: FC = props => {
   const handleRowClick = useCallback(
     (row: any) => {
       const projectName = row.name;
-      history.push(`/${params.entity}/${projectName}`);
+      history.push(`/${URL_BROWSE3}/${params.entity}/${projectName}`);
     },
     [history, params.entity]
   );

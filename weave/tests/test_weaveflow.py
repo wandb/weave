@@ -1,13 +1,12 @@
 import pytest
 import weave
-import typing
 
 
-@pytest.mark.skip("weaveflow tests disabled since they require W&B for now")
+@pytest.mark.skip("failing in CI for some reason")
 def test_digestrefs():
     from weave import weaveflow
 
-    graph_client = weave.init("digestrefs3")
+    graph_client = weave.init_local_client()
 
     ds = weave.WeaveList(
         [

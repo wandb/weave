@@ -59,7 +59,7 @@ const browse2Context = {
     wfTable?: WFDBTableType
   ) => {
     if (!isWandbArtifactRef(objRef)) {
-      throw new Error('Not a wandb artifact ref');
+      throw new Error('Not a wandb artifact ref: ' + JSON.stringify(objRef));
     }
     return `/${objRef.entityName}/${objRef.projectName}/${rootTypeName}/${objRef.artifactName}/${objRef.artifactVersion}`;
   },
@@ -154,6 +154,12 @@ const browse2Context = {
       parsed.artifactVersion
     );
   },
+  boardsUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
+  tablesUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
 };
 
 const browse3ContextGen = (
@@ -166,7 +172,7 @@ const browse3ContextGen = (
       wfTable?: WFDBTableType
     ) => {
       if (!isWandbArtifactRef(objRef)) {
-        throw new Error('Not a wandb artifact ref');
+        throw new Error('Not a wandb artifact ref: ' + JSON.stringify(objRef));
       }
       if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
         return browse3Context.opVersionUIUrl(
@@ -325,6 +331,12 @@ const browse3ContextGen = (
         parsed.artifactVersion
       );
     },
+    boardsUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/boards`;
+    },
+    tablesUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/tables`;
+    },
   };
   return browse3Context;
 };
@@ -391,6 +403,16 @@ type RouteType = {
     entityName: string,
     projectName: string,
     filter?: WFHighLevelObjectVersionFilter
+  ) => string;
+  boardsUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
+  ) => string;
+  tablesUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
   ) => string;
   opPageUrl: (opUri: string) => string;
 };

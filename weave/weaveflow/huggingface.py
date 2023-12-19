@@ -1,7 +1,7 @@
 import typing
 
 import weave
-from ..artifact_wandb import WandbArtifactRef
+from ..ref_base import Ref
 from .dataset import Dataset
 
 
@@ -11,7 +11,7 @@ def publish_huggingface_dataset(
     split_name: str,
     sample_size: int,
     seed: int,
-) -> WandbArtifactRef:
+) -> Ref:
     import random
     from datasets import load_dataset
 

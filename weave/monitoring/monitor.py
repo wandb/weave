@@ -17,14 +17,13 @@ from .. import errors
 from .. import graph
 from .. import stream_data_interfaces
 from .. import graph_client_context
+from .. import graph_client_wandb_art_st
+from .. import run_context
+from .. import run_streamtable_span
 
 logger = logging.getLogger(__name__)
 
 _global_monitor: typing.Optional["Monitor"] = None
-
-_current_span: contextvars.ContextVar[typing.Optional["Span"]] = contextvars.ContextVar(
-    "_current_span", default=None
-)
 
 _attributes: contextvars.ContextVar[
     typing.Dict[str, typing.Any]
@@ -168,6 +167,31 @@ class Span:
             "summary": self.summary,
         }
 
+    def asdict_unsafe(self) -> stream_data_interfaces.TraceSpanDict:
+        start_time_s = self.start_time.timestamp()
+        end_time_s = None
+        if self.end_time is not None:
+            end_time_s = self.end_time.timestamp()
+            self.summary["latency_s"] = end_time_s - start_time_s
+        return {
+            "parent_id": self.parent_id,
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "name": self.name,
+            "status_code": self.status_code,
+            "start_time_s": start_time_s,
+            "end_time_s": end_time_s,  # type: ignore
+            "inputs": self.inputs,
+            "output": self.output,
+            "exception": (
+                f"{type(self.exception).__name__}: {str(self.exception)}"
+                if self.exception is not None
+                else None
+            ),
+            "attributes": self.attributes,
+            "summary": self.summary,
+        }
+
 
 # A type used to indicate that inputs is guaranteed to be set, for pre and post process callbacks.
 class SpanWithInputs(Span):
@@ -194,7 +218,13 @@ class Monitor:
         # one.
         client = graph_client_context.get_graph_client()
         if client:
-            self._streamtable = client.runs_st
+            if isinstance(
+                client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+            ):
+                self._streamtable = client.runs_st
+            else:
+                # TODO: we need to refactor monitor to make use of graph_client
+                print("Low-level tracing only works with wandb client currently")
         return self._streamtable
 
     @contextlib.contextmanager
@@ -205,20 +235,23 @@ class Monitor:
                 "WARNING: Not logging spans.  Call weave.monitor.init_monitor() to enable logging."
             )
 
-        parent_span = _current_span.get()
+        # A song and dance to switch between span/run semantics. Will be cleaned
+        # up as we switch entirely to the run interface.
+
+        parent_run = run_context.get_current_run()
         trace_id = None
-        if parent_span is not None:
-            parent_id = parent_span.span_id
-            trace_id = parent_span.trace_id
+        if parent_run is not None:
+            parent_id = parent_run.id
+            trace_id = parent_run.trace_id
         else:
             parent_id = None
         span = Span(name, self.streamtable, parent_id, trace_id, _attributes.get())
-        token = _current_span.set(span)
-        try:
-            yield span
-        finally:
-            span.autoclose()
-            _current_span.reset(token)
+        run = run_streamtable_span.RunStreamTableSpan(span.asdict_unsafe())
+        with run_context.current_run(run):
+            try:
+                yield span
+            finally:
+                span.autoclose()
 
     @contextlib.contextmanager
     def attributes(self, attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
@@ -329,6 +362,10 @@ def default_monitor() -> Monitor:
     global _global_monitor
     if _global_monitor is None:
         _global_monitor = Monitor(None)
+    return _global_monitor
+
+
+def _get_global_monitor() -> typing.Optional[Monitor]:
     return _global_monitor
 
 

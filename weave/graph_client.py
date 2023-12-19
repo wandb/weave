@@ -1,120 +1,95 @@
-import contextvars
-import contextlib
-import dataclasses
-import functools
-import uuid
-import typing
+from typing import Protocol, Generic, Sequence, TypeVar, Optional, Any
+from abc import abstractmethod
 
-from . import context_state
-from . import uris
-from . import weave_internal
-from . import monitoring
-from . import wandb_api
-from . import artifact_wandb
-from . import graph
-from . import op_def
-from . import stream_data_interfaces
-from . import weave_types as types
-from .eager import WeaveIter, select_all
-from .run import Run
+from .op_def import OpDef
+from .ref_base import Ref
+from .uris import WeaveURI
+from .run import RunKey, Run
+
+R = TypeVar("R", bound=Run)
 
 
-@dataclasses.dataclass
-class GraphClient:
-    entity_name: str
-    project_name: str
+class GraphClient(Protocol, Generic[R]):
+    ##### Read API
 
-    @property
-    def entity_project(self) -> str:
-        return f"{self.entity_name}/{self.project_name}"
+    @abstractmethod
+    def runs(self) -> Sequence[Run]:
+        ...
 
-    @functools.cached_property
-    def runs_st(self) -> monitoring.StreamTable:
-        return monitoring.StreamTable(f"{self.entity_name}/{self.project_name}/stream")
+    @abstractmethod
+    def run(self, run_id: str) -> Optional[Run]:
+        ...
 
-    @functools.cached_property
-    def run_feedback_st(self) -> monitoring.StreamTable:
-        return monitoring.StreamTable(
-            f"{self.entity_name}/{self.project_name}/run-feedback"
-        )
+    @abstractmethod
+    def find_op_run(self, op_name: str, inputs: dict[str, Any]) -> Optional[Run]:
+        ...
 
-    def runs(self) -> WeaveIter[Run]:
-        return WeaveIter(self.runs_st.rows(), cls=Run)
+    @abstractmethod
+    def run_children(self, run_id: str) -> Sequence[Run]:
+        ...
 
-    def run(self, run_id: str) -> typing.Optional[Run]:
-        with context_state.lazy_execution():
-            rows_node = self.runs_st.rows()
-            filter_node = rows_node.filter(lambda row: row["span_id"] == run_id)[0]  # type: ignore
-            run_attrs = weave_internal.use(select_all(filter_node))
-            if not isinstance(run_attrs, dict):
-                return None
-            if run_attrs["span_id"] == None:
-                return None
-            run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
-            return Run(run_attrs)
+    @abstractmethod
+    def op_runs(self, op_def: OpDef) -> Sequence[Run]:
+        ...
 
-    def run_children(self, run_id: str) -> WeaveIter[Run]:
-        with context_state.lazy_execution():
-            rows_node = self.runs_st.rows()
-            filter_node = rows_node.filter(lambda row: row["parent_id"] == run_id)  # type: ignore
-            return WeaveIter(filter_node, cls=Run)
+    @abstractmethod
+    def ref_input_to(self, ref: Ref) -> Sequence[Run]:
+        ...
 
-    # Hmm... I want this to be a ref to an op I think?
-    def op_runs(self, op_def: op_def.OpDef) -> WeaveIter[Run]:
-        with context_state.lazy_execution():
-            rows_node = self.runs_st.rows()
-            filter_node = rows_node.filter(  # type: ignore
-                lambda row: row["name"] == str(op_def.location)
-            )
-            return WeaveIter(filter_node, cls=Run)
+    @abstractmethod
+    def ref_value_input_to(self, ref: Ref) -> Sequence[Run]:
+        ...
 
-    def ref_input_to(self, ref: artifact_wandb.WandbArtifactRef) -> WeaveIter[Run]:
-        with context_state.lazy_execution():
-            rows_node = self.runs_st.rows()
-            filter_node = rows_node.filter(lambda row: row["inputs._ref0"] == ref)  # type: ignore
-            return WeaveIter(filter_node, cls=Run)
+    @abstractmethod
+    def ref_output_of(self, ref: Ref) -> Optional[Run]:
+        ...
 
-    def ref_value_input_to(
-        self, ref: artifact_wandb.WandbArtifactRef
-    ) -> WeaveIter[Run]:
-        with context_state.lazy_execution():
-            rows_node = self.runs_st.rows()
-            filter_node = rows_node.filter(lambda row: row["inputs._ref_digest0"] == ref.digest)  # type: ignore
-            return WeaveIter(filter_node, cls=Run)
+    @abstractmethod
+    def run_feedback(self, run_id: str) -> Sequence[dict[str, Any]]:
+        ...
 
-    def ref_output_of(
-        self, ref: artifact_wandb.WandbArtifactRef
-    ) -> typing.Optional[Run]:
-        with context_state.lazy_execution():
-            rows_node = self.runs_st.rows()
-            filter_node = rows_node.filter(lambda row: row["outputs._ref0"] == ref)[0]  # type: ignore
-            run_attrs = weave_internal.use(select_all(filter_node))
-            if not isinstance(run_attrs, dict):
-                return None
-            if run_attrs["span_id"] == None:
-                return None
-            run_attrs = typing.cast(stream_data_interfaces.TraceSpanDict, run_attrs)
-            return Run(run_attrs)
+    @abstractmethod
+    def feedback(self, feedback_id: str) -> Optional[dict[str, Any]]:
+        ...
 
-    def add_feedback(self, run_id: str, feedback: dict[str, typing.Any]) -> None:
-        feedback_id = str(uuid.uuid4())
-        self.run_feedback_st.log(
-            {"run_id": run_id, "feedback_id": feedback_id, "feedback": feedback}
-        )
+    ##### Helpers
 
-    def run_feedback(self, run_id: str) -> WeaveIter[dict[str, typing.Any]]:
-        with context_state.lazy_execution():
-            rows_node = self.run_feedback_st.rows()
-            filter_node = rows_node.filter(lambda row: row["run_id"] == run_id)  # type: ignore
-            return WeaveIter(filter_node)
+    @abstractmethod
+    def ref_is_own(self, ref: Optional[Ref]) -> bool:
+        ...
 
-    def feedback(self, feedback_id: str) -> typing.Optional[dict[str, typing.Any]]:
-        with context_state.lazy_execution():
-            rows_node = self.run_feedback_st.rows()
-            filter_node = rows_node.filter(lambda row: row["feedback_id"] == feedback_id)[0]  # type: ignore
-            feedback_attrs = weave_internal.use(select_all(filter_node))
-            if not isinstance(feedback_attrs, dict):
-                return None
-            if feedback_attrs["feedback_id"] == None:
-                return None
-            return feedback_attrs
+    @abstractmethod
+    def ref_uri(self, name: str, version: str) -> WeaveURI:
+        ...
+
+    @abstractmethod
+    def run_ui_url(self, run: Run) -> str:
+        ...
+
+    ##### Write API
+
+    @abstractmethod
+    def save_object(self, obj: Any, name: str, branch_name: str) -> Ref:
+        ...
+
+    @abstractmethod
+    def create_run(
+        self,
+        op_name: str,
+        parent: Optional["RunKey"],
+        inputs: dict[str, Any],
+        input_refs: Sequence[Ref],
+    ) -> R:
+        ...
+
+    @abstractmethod
+    def fail_run(self, run: R, exception: Exception) -> None:
+        ...
+
+    @abstractmethod
+    def finish_run(self, run: R, output: Any, output_refs: Sequence[Ref]) -> None:
+        ...
+
+    @abstractmethod
+    def add_feedback(self, run_id: str, feedback: dict[str, Any]) -> None:
+        ...

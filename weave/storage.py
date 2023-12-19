@@ -157,9 +157,12 @@ def _direct_publish(
     _merge: typing.Optional[bool] = False,
 ) -> artifact_wandb.WandbArtifactRef:
     _orig_ref = _get_ref(obj)
+    if isinstance(_orig_ref, artifact_wandb.WandbArtifactRef):
+        return _orig_ref
     if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
         res = PUBLISH_CACHE_BY_LOCAL_ART.get(_orig_ref)
         if res is not None:
+            ref_base._put_ref(obj, res)
             return res
 
     weave_type = assume_weave_type or _get_weave_type(obj)
@@ -207,17 +210,19 @@ def _direct_publish(
     if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
         PUBLISH_CACHE_BY_LOCAL_ART[_orig_ref] = ref
 
+    ref_base._put_ref(obj, ref)
+
     return ref
 
 
-def _direct_save(
+def direct_save(
     obj: typing.Any,
     name: typing.Optional[str] = None,
     branch_name: typing.Optional[str] = None,
     source_branch_name: typing.Optional[str] = None,
     assume_weave_type: typing.Optional[types.Type] = None,
     artifact: typing.Optional[artifact_local.LocalArtifact] = None,
-):
+) -> artifact_local.LocalArtifactRef:
     weave_type = assume_weave_type or _get_weave_type(obj)
     name = name or _get_name(weave_type, obj)
 
@@ -240,7 +245,7 @@ def _direct_save(
     if ref.artifact == artifact:
         artifact.save(branch=branch_name)
 
-    return ref
+    return ref  # type: ignore
 
 
 def publish(obj, name=None, type=None):
@@ -266,13 +271,13 @@ def save(
     artifact=None,
     branch=None,
 ) -> artifact_local.LocalArtifactRef:
-    # We would probably refactor this method to be more like _direct_save. This effectively
+    # We would probably refactor this method to be more like direct_save. This effectively
     # just a wrapper that let's the user specify source_branch name with a slash.
     source_branch = None
     if name is not None and ":" in name:
         name, source_branch = name.split(":", 1)
 
-    return _direct_save(
+    return direct_save(
         obj=obj,
         name=name,
         branch_name=branch,

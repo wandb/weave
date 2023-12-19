@@ -1,7 +1,8 @@
-import typing
 import dataclasses
+import typing
 
 import weave
+
 from . import chat_model
 
 
@@ -17,13 +18,28 @@ class OpenaiChatModel(chat_model.ChatModel):
     @weave.op()
     def complete(self, messages: typing.Any) -> typing.Any:
         import os
-        from weave.monitoring import openai
 
-        response = openai.ChatCompletion.create(
-            api_base=self.base_url,
-            api_key=os.environ[self.api_key_env_var],
+        from openai import OpenAI
+
+        api_key = os.environ[self.api_key_env_var]
+
+        base_url = self.base_url
+
+        client = OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            timeout=15,
+        )
+
+        from weave.monitoring.openai import patch
+
+        patch()
+
+        create = client.chat.completions.create
+        response = create(
             model=self.model_name,
             messages=messages,
-            request_timeout=15,
         )
-        return response
+
+        # TODO: return response when there is a weave type for ChatCompletion.
+        return response.dict()

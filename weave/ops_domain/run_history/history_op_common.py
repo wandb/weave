@@ -395,9 +395,9 @@ def process_history_awl_tables(tables: list[ArrowWeaveList]):
 
 
 def concat_awls(awls: list[ArrowWeaveList]):
-    list = make_list(**{str(i): table for i, table in enumerate(awls)})
-    with compile.disable_compile():
-        return use(concat(list))
+    from ...ops_arrow.concat import concatenate_all
+
+    return concatenate_all(awls)
 
 
 def awl_to_pa_table(awl: ArrowWeaveList):

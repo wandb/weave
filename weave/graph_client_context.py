@@ -1,28 +1,25 @@
 import contextlib
-import contextvars
 import typing
+
+from . import context_state
 
 if typing.TYPE_CHECKING:
     from .graph_client import GraphClient
-
-_graph_client: contextvars.ContextVar[
-    typing.Optional["GraphClient"]
-] = contextvars.ContextVar("graph_client", default=None)
 
 
 @contextlib.contextmanager
 def set_graph_client(
     client: typing.Optional["GraphClient"],
 ) -> typing.Iterator[typing.Optional["GraphClient"]]:
-    client_token = _graph_client.set(client)
+    client_token = context_state._graph_client.set(client)
     try:
         yield client
     finally:
-        _graph_client.reset(client_token)
+        context_state._graph_client.reset(client_token)
 
 
 def get_graph_client() -> typing.Optional["GraphClient"]:
-    return _graph_client.get()
+    return context_state._graph_client.get()
 
 
 def require_graph_client() -> "GraphClient":

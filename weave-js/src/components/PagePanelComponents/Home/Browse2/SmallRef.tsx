@@ -11,7 +11,13 @@ import {
   Node,
   Type,
 } from '@wandb/weave/core';
-import {ArtifactRef, parseRef, refUri, useNodeValue} from '@wandb/weave/react';
+import {
+  ArtifactRef,
+  isWandbArtifactRef,
+  parseRef,
+  refUri,
+  useNodeValue,
+} from '@wandb/weave/react';
 import React, {FC, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../Browse3/context';
@@ -70,6 +76,9 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   );
   if (refTypeQuery.loading) {
     return Item;
+  }
+  if (!isWandbArtifactRef(objRef)) {
+    return <div>[Error: non wandb ref]</div>;
   }
   return <Link to={refUIUrl(rootTypeName, objRef, wfTable)}>{Item}</Link>;
 };
