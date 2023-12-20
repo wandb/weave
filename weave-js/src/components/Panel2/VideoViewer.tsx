@@ -88,7 +88,7 @@ const VideoViewer = (props: VideoViewerProps) => {
     if (videoRef.current) {
       videoRef.current.muted = muted ?? true;
       if (autoPlay && videoRef.current.paused) {
-        videoRef.current.play().catch(err => {
+        videoRef.current.play().catch(() => {
           // Browsers have their own implementations of how to handle auto-play and m
           // many disallow it, for example: https://goo.gl/xX8pDD
         });
@@ -205,7 +205,7 @@ const VideoViewer = (props: VideoViewerProps) => {
                   const v = e.target as HTMLVideoElement;
                   if (v.paused) {
                     v.play()
-                      .catch(_err => {
+                      .catch(() => {
                         // Browsers have their own implementations of how to handle auto-play and m
                         // many disallow it, for example: https://goo.gl/xX8pDD
                       })
