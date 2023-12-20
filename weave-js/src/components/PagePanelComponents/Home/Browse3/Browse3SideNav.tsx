@@ -331,7 +331,6 @@ const SideBarNavItem: FC<{
         <ListItemIcon>{props.item.icon}</ListItemIcon>
         <ListItemText primary={props.item.title} />
       </ListItemButton>
-      {/* <BottomNavigationAction label="Recents" icon={<Restore />} /> */}
       {props.item.children && (
         <List disablePadding>
           {props.item.children.map((item, itemIndex) => {

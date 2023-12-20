@@ -26,6 +26,8 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
+  baseContext,
+  Browse3WeaveflowPeekRouteContextProvider,
   Browse3WeaveflowRouteContextProvider,
   useWeaveflowRouteContext,
 } from './Browse3/context';
@@ -157,6 +159,32 @@ const Browse3Mounted: FC<{
   navigateAwayFromProject?: () => void;
 }> = props => {
   const router = useWeaveflowRouteContext();
+  const params = useParams<Browse3Params>();
+  const projectRoot = router.projectUrl(':entity', ':project');
+  const baseProjectRoot = baseContext.projectUrl(':entity', ':project');
+  const query = useURLSearchParamsDict();
+  const peekLocation = useMemo(() => {
+    const peekPath = query.peekPath ?? undefined;
+    if (peekPath == null) {
+      return undefined;
+    }
+    const peekPathParts = peekPath.split('?');
+    const peekPathname = peekPathParts[0];
+    const peekSearch = peekPathParts[1] ?? '';
+    const peekSearchParts = peekSearch.split('#');
+    const peekSearchString = peekSearchParts[0];
+    const peekHash = peekSearchParts[1] ?? '';
+
+    return {
+      key: 'peekLoc',
+      pathname: peekPathname,
+      search: peekSearchString,
+      hash: peekHash,
+      state: {
+        '[userDefined]': true,
+      },
+    };
+  }, [query.peekPath]);
   return (
     <Box
       sx={{
@@ -197,6 +225,13 @@ const Browse3Mounted: FC<{
         </AppBar>
       )}
       <Switch>
+        <Route path={router.projectUrl(':entity', ':project')} exact>
+          <ProjectRedirect
+            to={router.callsUIUrl(params.entity ?? '', params.project ?? '', {
+              traceRootsOnly: true,
+            })}
+          />
+        </Route>
         <Route path={browse3Paths(router.projectUrl(':entity', ':project'))}>
           <Box
             component="main"
@@ -221,14 +256,54 @@ const Browse3Mounted: FC<{
                 display: 'flex',
                 flexDirection: 'column',
               }}>
-              <ErrorBoundary>
-                <Browse3ProjectRootORMProvider>
-                  <Browse3ProjectRoot />
-                </Browse3ProjectRootORMProvider>
-              </ErrorBoundary>
+              <Browse3WeaveflowPeekRouteContextProvider>
+                <ErrorBoundary>
+                  <Browse3ProjectRootORMProvider>
+                    <Box
+                      sx={{
+                        flex: '1 1 auto',
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        overflow: 'hidden',
+                        flexDirection: 'row',
+                        alignContent: 'stretch',
+                      }}>
+                      <Box
+                        sx={{
+                          flex: '1 1 40%',
+                          overflow: 'hidden',
+                          display: 'flex',
+                        }}>
+                        <Browse3ProjectRoot projectRoot={projectRoot} />
+                      </Box>
+
+                      <Box
+                        sx={{
+                          borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
+                          flex: peekLocation ? '1 1 60%' : '0 0 0px',
+                          transition: 'all 0.2s ease-in-out',
+                          boxShadow:
+                            'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          zIndex: 1,
+                        }}>
+                        {peekLocation && (
+                          <Browse3ProjectRoot
+                            customLocation={peekLocation}
+                            projectRoot={baseProjectRoot}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  </Browse3ProjectRootORMProvider>
+                </ErrorBoundary>
+              </Browse3WeaveflowPeekRouteContextProvider>
             </Box>
           </Box>
         </Route>
+
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
             <Switch>
@@ -298,26 +373,30 @@ const Browse3ProjectRootORMProvider: FC = props => {
   );
 };
 
-const Browse3ProjectRoot: FC = () => {
+const ProjectRedirect: FC<{to: string}> = ({to}) => {
   const history = useHistory();
   const params = useParams<Browse3ProjectMountedParams>();
   const router = useWeaveflowRouteContext();
-  const projectRoot = router.projectUrl(':entity', ':project');
 
   useEffect(() => {
     if (params.tab == null) {
-      history.replace(
-        router.callsUIUrl(params.entity, params.project, {
-          traceRootsOnly: true,
-        })
-      );
+      history.replace(to);
     }
-  }, [history, params.entity, params.project, params.tab, router]);
+  }, [history, params.entity, params.project, params.tab, router, to]);
 
-  if (params.tab == null) {
-    return <CenteredAnimatedLoader />;
-  }
+  return <CenteredAnimatedLoader />;
+};
 
+const Browse3ProjectRoot: FC<{
+  projectRoot: string;
+  customLocation?: {
+    key: string;
+    pathname: string;
+    search: string;
+    hash: string;
+    state: any;
+  };
+}> = ({projectRoot, customLocation}) => {
   return (
     <Box
       sx={{
@@ -325,7 +404,7 @@ const Browse3ProjectRoot: FC = () => {
         width: '100%',
         overflow: 'auto',
       }}>
-      <Switch>
+      <Switch location={customLocation}>
         {/* TYPES */}
         <Route path={`${projectRoot}/types/:itemName/versions/:version?`}>
           <TypeVersionRoutePageBinding />

@@ -437,6 +437,12 @@ const useSetSearchParam = () => {
 };
 
 const PEAK_SEARCH_PARAM = 'peekPath';
+export const baseContext = browse3ContextGen(
+  (entityName: string, projectName: string) => {
+    return `/${entityName}/${projectName}`;
+  }
+);
+
 export const Browse3WeaveflowPeekRouteContextProvider = ({
   children,
 }: {
@@ -444,11 +450,6 @@ export const Browse3WeaveflowPeekRouteContextProvider = ({
 }) => {
   const setSearchParam = useSetSearchParam();
 
-  const baseContext = browse3ContextGen(
-    (entityName: string, projectName: string) => {
-      return `/${entityName}/${projectName}`;
-    }
-  );
   const wrappedContext = {
     refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
       return setSearchParam(PEAK_SEARCH_PARAM, baseContext.refUIUrl(...args));
