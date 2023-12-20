@@ -89,7 +89,8 @@ const VideoViewer = (props: VideoViewerProps) => {
       videoRef.current.muted = muted ?? true;
       if (autoPlay && videoRef.current.paused) {
         videoRef.current.play().catch(err => {
-          // sometimes we can't because chrome disallows unmuted autoplay. see: https://goo.gl/xX8pDD
+          // Browsers have their own implementations of how to handle auto-play and m
+          // many disallow it, for example: https://goo.gl/xX8pDD
         });
       }
     }
@@ -205,7 +206,8 @@ const VideoViewer = (props: VideoViewerProps) => {
                   if (v.paused) {
                     v.play()
                       .catch(_err => {
-                        // sometimes we can't because chrome disallows unmuted autoplay. see: https://goo.gl/xX8pDD
+                        // Browsers have their own implementations of how to handle auto-play and m
+                        // many disallow it, for example: https://goo.gl/xX8pDD
                       })
                       .then(() => {
                         setPlayButtonVisibility(false);
