@@ -1,3 +1,5 @@
+import urllib
+import json
 from wandb import util as wb_util
 
 from . import environment
@@ -40,6 +42,10 @@ def object_version_path(
 
 def call_path(entity_name: str, project_name: str, call_id: str) -> str:
     return f"{project_root_url(entity_name, project_name)}/calls/{call_id}"
+
+
+def call_path_as_peek(entity_name: str, project_name: str, call_id: str) -> str:
+    return f"{call_path(entity_name, project_name, call_id)}?convertToPeek=true"
 
 
 def use_local_urls() -> None:

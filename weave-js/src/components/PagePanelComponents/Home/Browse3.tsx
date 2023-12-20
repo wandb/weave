@@ -26,6 +26,7 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
+  baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
   useWeaveflowPeekAwareRouteContext,
@@ -53,7 +54,10 @@ import {TypesPage} from './Browse3/pages/TypesPage';
 import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
-import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
+import {
+  useWeaveflowORMContext,
+  WeaveflowORMContextProvider,
+} from './Browse3/pages/wfInterface/context';
 import {
   fnNaiveBootstrapFeedback,
   fnNaiveBootstrapObjects,
@@ -638,8 +642,53 @@ const TypeVersionRoutePageBinding = () => {
   );
 };
 
+const useCallPeekRedirect = () => {
+  // This is a "hack" since the client doesn't have all the info
+  // needed to make a correct peek URL. This allows the client to request
+  // such a view and we can redirect to the correct URL.
+  const params = useParams<Browse3TabItemParams>();
+  const {baseRouter} = useWeaveflowRouteContext();
+  const history = useHistory();
+  const orm = useWeaveflowORMContext(params.entity, params.project);
+  const call = orm.projectConnection.call(params.itemName);
+  const query = useURLSearchParamsDict();
+  useEffect(() => {
+    if (call && query.convertToPeek) {
+      const opVersion = call.opVersion();
+      if (!opVersion) {
+        return;
+      }
+      const path = baseRouter.callsUIUrl(params.entity, params.project, {
+        opVersions: [opVersion.op().name() + ':' + opVersion.version()],
+      });
+      const searchParams = new URLSearchParams();
+      searchParams.set(
+        'peekPath',
+        baseContext.callUIUrl(
+          params.entity,
+          params.project,
+          params.itemName,
+          call.traceID()
+        )
+      );
+      const newSearch = searchParams.toString();
+      const newUrl = `${path}?${newSearch}`;
+      history.replace(newUrl);
+    }
+  }, [
+    baseRouter,
+    call,
+    history,
+    params.entity,
+    params.itemName,
+    params.project,
+    query.convertToPeek,
+  ]);
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
+  useCallPeekRedirect();
   const params = useParams<Browse3TabItemParams>();
 
   return (
