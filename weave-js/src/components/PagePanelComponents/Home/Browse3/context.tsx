@@ -8,6 +8,23 @@ import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
 
+const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
+  if (!filter) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(filter).filter(
+      ([k, v]) =>
+        v != null &&
+        v !== undefined &&
+        v !== false &&
+        (_.isArray(v) ? v.length > 0 : true) &&
+        (typeof v === 'string' ? v.length > 0 : true)
+    )
+  );
+};
+
 export const useWeaveflowRouteContext = () => {
   const ctx = useContext(WeaveflowRouteContext);
   return ctx;
@@ -27,82 +44,6 @@ export const Browse3WeaveflowRouteContextProvider = ({
       {children}
     </WeaveflowRouteContext.Provider>
   );
-};
-
-type RouteType = {
-  refUIUrl: (
-    rootTypeName: string,
-    objRef: ArtifactRef,
-    wfTable?: WFDBTableType
-  ) => string;
-  entityUrl: (entityName: string) => string;
-  projectUrl: (entityName: string, projectName: string) => string;
-  typeUIUrl: (
-    entityName: string,
-    projectName: string,
-    typeName: string
-  ) => string;
-  objectUIUrl: (
-    entityName: string,
-    projectName: string,
-    objectName: string
-  ) => string;
-  opUIUrl: (entityName: string, projectName: string, opName: string) => string;
-  typeVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    typeName: string,
-    typeVersionHash: string
-  ) => string;
-  typeVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelTypeVersionFilter
-  ) => string;
-  objectVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    objectName: string,
-    objectVersionHash: string
-  ) => string;
-  opVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelOpVersionFilter
-  ) => string;
-  opVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    opName: string,
-    opVersionHash: string
-  ) => string;
-  callUIUrl: (
-    entityName: string,
-    projectName: string,
-    traceId: string,
-    callId: string
-  ) => string;
-  callsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelCallFilter
-  ) => string;
-  objectVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelObjectVersionFilter
-  ) => string;
-  boardsUIUrl: (
-    entityName: string,
-    projectName: string
-    // TODO: Add filter when supported
-  ) => string;
-  tablesUIUrl: (
-    entityName: string,
-    projectName: string
-    // TODO: Add filter when supported
-  ) => string;
-  opPageUrl: (opUri: string) => string;
 };
 
 type WFDBTableType =
@@ -222,23 +163,6 @@ const browse2Context = {
   tablesUIUrl: (entityName: string, projectName: string) => {
     throw new Error('Not implemented');
   },
-};
-
-const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
-  if (!filter) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(filter).filter(
-      ([k, v]) =>
-        v != null &&
-        v !== undefined &&
-        v !== false &&
-        (_.isArray(v) ? v.length > 0 : true) &&
-        (typeof v === 'string' ? v.length > 0 : true)
-    )
-  );
 };
 
 const browse3ContextGen = (
@@ -418,6 +342,82 @@ const browse3ContextGen = (
     },
   };
   return browse3Context;
+};
+
+type RouteType = {
+  refUIUrl: (
+    rootTypeName: string,
+    objRef: ArtifactRef,
+    wfTable?: WFDBTableType
+  ) => string;
+  entityUrl: (entityName: string) => string;
+  projectUrl: (entityName: string, projectName: string) => string;
+  typeUIUrl: (
+    entityName: string,
+    projectName: string,
+    typeName: string
+  ) => string;
+  objectUIUrl: (
+    entityName: string,
+    projectName: string,
+    objectName: string
+  ) => string;
+  opUIUrl: (entityName: string, projectName: string, opName: string) => string;
+  typeVersionUIUrl: (
+    entityName: string,
+    projectName: string,
+    typeName: string,
+    typeVersionHash: string
+  ) => string;
+  typeVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelTypeVersionFilter
+  ) => string;
+  objectVersionUIUrl: (
+    entityName: string,
+    projectName: string,
+    objectName: string,
+    objectVersionHash: string
+  ) => string;
+  opVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelOpVersionFilter
+  ) => string;
+  opVersionUIUrl: (
+    entityName: string,
+    projectName: string,
+    opName: string,
+    opVersionHash: string
+  ) => string;
+  callUIUrl: (
+    entityName: string,
+    projectName: string,
+    traceId: string,
+    callId: string
+  ) => string;
+  callsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelCallFilter
+  ) => string;
+  objectVersionsUIUrl: (
+    entityName: string,
+    projectName: string,
+    filter?: WFHighLevelObjectVersionFilter
+  ) => string;
+  boardsUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
+  ) => string;
+  tablesUIUrl: (
+    entityName: string,
+    projectName: string
+    // TODO: Add filter when supported
+  ) => string;
+  opPageUrl: (opUri: string) => string;
 };
 
 const useSetSearchParam = () => {
