@@ -4,11 +4,13 @@ import typing
 import inspect
 import functools
 import keyword
+import contextvars
 import json
 from collections.abc import Iterable
 
 
 from . import box
+from . import context_state
 from . import errors
 from . import mappers_python
 from . import timestamp as weave_timestamp
@@ -96,6 +98,11 @@ def type_name_to_type(type_name):
     return mapping.get(js_to_py_typename(type_name))
 
 
+# Used to make a modified type_of function that returns RefType for any reffed
+# objects. See type_of_with_refs()
+_reffed_type_is_ref = contextvars.ContextVar("_reffed_type_is_ref", default=False)
+
+
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -111,6 +118,23 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
+        from . import ref_base
+
+        if (
+            context_state.ref_tracking_enabled()
+            and _reffed_type_is_ref.get()
+            and not isinstance(obj, ref_base.Ref)
+        ):
+            obj_ref = ref_base.get_ref(obj)
+            if obj_ref is not None:
+                # Directly construct the RefTypeClass instead of doing
+                # type_of(obj_ref), since a) that would recurse and b)
+                # type_of(<ref>) calls .type on the ref, which may try to read
+                # data to get the data. We already have the obj here, so we can
+                # compute its type directly.
+                RefTypeClass = instance_class_to_potential_type(obj_ref.__class__)[-1]  # type: ignore
+                return RefTypeClass(type_of_without_refs(obj))
+
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
             return obj_type
@@ -1265,6 +1289,16 @@ class RefType(Type):
             return other_type.assign_type(self.object_type)
         return None
 
+    def save_instance(self, obj, artifact, name):
+        from . import ref_base
+
+        obj_ref = ref_base.get_ref(obj)
+        if obj_ref is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when ref is None for type: %s" % self
+            )
+        return obj_ref
+
     # TODO: Address this comment. I'm sure this introduced the same type
     #     blowup as before again. Slows everything down. But in this PR
     #     I've put object_type back into RefType for now.
@@ -1832,3 +1866,26 @@ def split_none(t: Type) -> tuple[bool, Type]:
     if len(non_none_members) < len(t.members):
         return True, union(*non_none_members)
     return False, t
+
+
+def type_of(obj: typing.Any) -> Type:
+    return TypeRegistry.type_of(obj)
+
+
+# A modified type_of that returns RefType<O> for any object that
+# has a ref. This is used when serializing, so that we save refs
+# instead of copying.
+def type_of_with_refs(obj: typing.Any) -> Type:
+    token = _reffed_type_is_ref.set(True)
+    try:
+        return TypeRegistry.type_of(obj)
+    finally:
+        _reffed_type_is_ref.reset(token)
+
+
+def type_of_without_refs(obj: typing.Any) -> Type:
+    token = _reffed_type_is_ref.set(False)
+    try:
+        return TypeRegistry.type_of(obj)
+    finally:
+        _reffed_type_is_ref.reset(token)
