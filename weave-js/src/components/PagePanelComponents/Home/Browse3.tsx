@@ -667,12 +667,12 @@ const useCallPeekRedirect = () => {
         baseContext.callUIUrl(
           params.entity,
           params.project,
-          params.itemName,
-          call.traceID()
+          call.traceID(),
+          params.itemName
         )
       );
       const newSearch = searchParams.toString();
-      const newUrl = `${path}?${newSearch}`;
+      const newUrl = `${path}&${newSearch}`;
       history.replace(newUrl);
     }
   }, [
