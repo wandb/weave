@@ -1,4 +1,5 @@
 const { defineConfig } = require("cypress");
+const { plugin: replayPlugin } = require("@replayio/cypress")
 
 // Retrieve the port from the environment variable or set a default
 const FE_PORT = process.env.FE_PORT || '9994';
@@ -11,12 +12,13 @@ module.exports = defineConfig({
     baseUrl: BASE_URL,
     experimentalSessionAndOrigin: true,
     setupNodeEvents(on, config) {
-      // implement node event listeners here
-      // ❗ Must be declared at the top of the function to prevent conflicts
-      [on, config] = require('@deploysentinel/cypress-debugger/plugin')(
-        on,
-        config,
-      );
+      // 🙋‍♂️ Add this line to install the replay plugin
+      replayPlugin(on, config, {
+        upload: true,
+        apiKey: process.env.REPLAY_API_KEY,
+      });
+      // Make sure that setupNodeEvents returns config
+      return config;
     },
   },
 });

@@ -7,16 +7,16 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "FE_PORT=3000 cypress open"
   },
-  "dependencies": {   
-  "slate": "0.94.1",
-  "slate-history": "0.93.0",
-  "slate-react": "0.97.1",
-  "cypress-real-events": "1.10.3"
-},
+  "dependencies": {
+    "cypress-real-events": "1.10.3",
+    "slate": "0.94.1",
+    "slate-history": "0.93.0",
+    "slate-react": "0.97.1"
+  },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@deploysentinel/cypress-debugger": "0.8.5",
+    "@replayio/cypress": "^1.7.10",
     "cypress": "^10.11.0",
     "cypress-promise": "^1.1.0",
     "typescript": "^4.8.4"

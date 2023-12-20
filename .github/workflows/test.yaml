@@ -179,21 +179,17 @@ jobs:
         # Use the following to run just a single test
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
-        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx ds run --record --parallel --browser chrome
+        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx cypress run --record --parallel --browser chrome
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_testG
         #   record: true
         #   parallel: true
         env:
-          CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
-          # pass the Dashboard record key as an environment variable
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          # pass GitHub token to allow accurately detecting a build vs a re-run build
+          REPLAY_API_KEY: ${{ secrets.REPLAY_API_KEY }}
           GITHUB_TOKEN:
             ${{ secrets.GITHUB_TOKEN }}
             # - uses: actions/upload-artifact@v3
-          CYPRESS_DEPLOYSENTINEL_UPLOAD_ON_PASSES: true
       - name: Upload logs
         uses: actions/upload-artifact@v3
         if: failure()
