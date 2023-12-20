@@ -9,7 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useCallback, useEffect, useMemo} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -26,10 +26,9 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
-  baseContext,
-  Browse3WeaveflowPeekRouteContextProvider,
   Browse3WeaveflowRouteContextProvider,
   useWeaveflowRouteContext,
+  WeaveflowPeekContext,
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
@@ -154,19 +153,8 @@ export const Browse3: FC<{
   );
 };
 
-const Browse3Mounted: FC<{
-  hideHeader?: boolean;
-  headerOffset?: number;
-  navigateAwayFromProject?: () => void;
-}> = props => {
-  const history = useHistory();
-  const router = useWeaveflowRouteContext();
-  const params = useParams<Browse3Params>();
-  const projectRoot = router.projectUrl(':entity', ':project');
-  const baseProjectRoot = baseContext.projectUrl(':entity', ':project');
-  const query = useURLSearchParamsDict();
-  const peekLocation = useMemo(() => {
-    const peekPath = query.peekPath ?? undefined;
+const usePeekLocation = (peekPath?: string) => {
+  return useMemo(() => {
     if (peekPath == null) {
       return undefined;
     }
@@ -186,7 +174,21 @@ const Browse3Mounted: FC<{
         '[userDefined]': true,
       },
     };
-  }, [query.peekPath]);
+  }, [peekPath]);
+};
+
+const Browse3Mounted: FC<{
+  hideHeader?: boolean;
+  headerOffset?: number;
+  navigateAwayFromProject?: () => void;
+}> = props => {
+  const history = useHistory();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const params = useParams<Browse3Params>();
+  const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
+  const peekRouterProjectRoot = peekingRouter.projectUrl(':entity', ':project');
+  const query = useURLSearchParamsDict();
+  const peekLocation = usePeekLocation(query.peekPath ?? undefined);
   return (
     <Box
       sx={{
@@ -227,14 +229,11 @@ const Browse3Mounted: FC<{
         </AppBar>
       )}
       <Switch>
-        <Route path={router.projectUrl(':entity', ':project')} exact>
-          <ProjectRedirect
-            to={router.callsUIUrl(params.entity ?? '', params.project ?? '', {
-              traceRootsOnly: true,
-            })}
-          />
+        <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
+          <ProjectRedirect />
         </Route>
-        <Route path={browse3Paths(router.projectUrl(':entity', ':project'))}>
+        <Route
+          path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
           <Box
             component="main"
             sx={{
@@ -258,98 +257,94 @@ const Browse3Mounted: FC<{
                 display: 'flex',
                 flexDirection: 'column',
               }}>
-              <Browse3WeaveflowPeekRouteContextProvider>
-                <ErrorBoundary>
-                  <Browse3ProjectRootORMProvider>
+              <ErrorBoundary>
+                <Browse3ProjectRootORMProvider>
+                  <Box
+                    sx={{
+                      flex: '1 1 auto',
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      overflow: 'hidden',
+                      flexDirection: 'row',
+                      alignContent: 'stretch',
+                    }}>
                     <Box
                       sx={{
-                        flex: '1 1 auto',
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
+                        flex: '1 1 40%',
                         overflow: 'hidden',
-                        flexDirection: 'row',
-                        alignContent: 'stretch',
+                        display: 'flex',
                       }}>
-                      <Box
-                        sx={{
-                          flex: '1 1 40%',
-                          overflow: 'hidden',
-                          display: 'flex',
-                        }}>
-                        <Browse3ProjectRoot projectRoot={projectRoot} />
-                      </Box>
+                      <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
+                    </Box>
 
-                      <Box
-                        sx={{
-                          borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
-                          flex: peekLocation ? '1 1 60%' : '0 0 0px',
-                          transition: peekLocation
-                            ? 'all 0.2s ease-in-out'
-                            : '',
-                          boxShadow:
-                            'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
-                          overflow: 'hidden',
-                          display: 'flex',
-                          zIndex: 1,
-                        }}>
-                        {peekLocation && (
-                          <SimplePageLayoutContext.Provider
-                            value={{
-                              headerPrefix: (
-                                <>
-                                  <Box
-                                    sx={{
-                                      flex: '0 0 auto',
-                                      height: '47px',
+                    <Box
+                      sx={{
+                        borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
+                        flex: peekLocation ? '1 1 60%' : '0 0 0px',
+                        transition: peekLocation ? 'all 0.2s ease-in-out' : '',
+                        boxShadow:
+                          'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        zIndex: 1,
+                      }}>
+                      {peekLocation && (
+                        <SimplePageLayoutContext.Provider
+                          value={{
+                            headerPrefix: (
+                              <>
+                                <Box
+                                  sx={{
+                                    flex: '0 0 auto',
+                                    height: '47px',
+                                  }}>
+                                  <IconButton
+                                    onClick={() => {
+                                      history.push(history.location.pathname);
                                     }}>
-                                    <IconButton
-                                      onClick={() => {
-                                        history.push(history.location.pathname);
-                                      }}>
-                                      <Close />
-                                    </IconButton>
-                                  </Box>
-                                  <Box
-                                    sx={{
-                                      flex: '0 0 auto',
-                                      height: '47px',
-                                    }}>
-                                    <IconButton
-                                      onClick={() => {
-                                        const generalBase =
-                                          baseContext.projectUrl(
-                                            params.entity!,
-                                            params.project!
-                                          );
-                                        const targetBase = router.projectUrl(
+                                    <Close />
+                                  </IconButton>
+                                </Box>
+                                <Box
+                                  sx={{
+                                    flex: '0 0 auto',
+                                    height: '47px',
+                                  }}>
+                                  <IconButton
+                                    onClick={() => {
+                                      const generalBase =
+                                        peekingRouter.projectUrl(
                                           params.entity!,
                                           params.project!
                                         );
-                                        const targetPath =
-                                          query.peekPath!.replace(
-                                            generalBase,
-                                            targetBase
-                                          );
-                                        history.push(targetPath);
-                                      }}>
-                                      <Fullscreen />
-                                    </IconButton>
-                                  </Box>
-                                </>
-                              ),
-                            }}>
-                            <Browse3ProjectRoot
-                              customLocation={peekLocation}
-                              projectRoot={baseProjectRoot}
-                            />
-                          </SimplePageLayoutContext.Provider>
-                        )}
-                      </Box>
+                                      const targetBase = baseRouter.projectUrl(
+                                        params.entity!,
+                                        params.project!
+                                      );
+                                      const targetPath =
+                                        query.peekPath!.replace(
+                                          generalBase,
+                                          targetBase
+                                        );
+                                      history.push(targetPath);
+                                    }}>
+                                    <Fullscreen />
+                                  </IconButton>
+                                </Box>
+                              </>
+                            ),
+                          }}>
+                          <Browse3ProjectRoot
+                            customLocation={peekLocation}
+                            projectRoot={peekRouterProjectRoot}
+                          />
+                        </SimplePageLayoutContext.Provider>
+                      )}
                     </Box>
-                  </Browse3ProjectRootORMProvider>
-                </ErrorBoundary>
-              </Browse3WeaveflowPeekRouteContextProvider>
+                  </Box>
+                </Browse3ProjectRootORMProvider>
+              </ErrorBoundary>
             </Box>
           </Box>
         </Route>
@@ -423,16 +418,20 @@ const Browse3ProjectRootORMProvider: FC = props => {
   );
 };
 
-const ProjectRedirect: FC<{to: string}> = ({to}) => {
+const ProjectRedirect: FC = () => {
   const history = useHistory();
   const params = useParams<Browse3ProjectMountedParams>();
-  const router = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
 
   useEffect(() => {
     if (params.tab == null) {
-      history.replace(to);
+      history.replace(
+        baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
+          traceRootsOnly: true,
+        })
+      );
     }
-  }, [history, params.entity, params.project, params.tab, router, to]);
+  }, [baseRouter, history, params.entity, params.project, params.tab]);
 
   return <CenteredAnimatedLoader />;
 };
@@ -531,7 +530,9 @@ const ObjectVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = isPeeking ? peekingRouter : baseRouter;
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -569,7 +570,9 @@ const ObjectVersionRoutePageBinding = () => {
 const OpVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
   const history = useHistory();
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = isPeeking ? peekingRouter : baseRouter;
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -603,7 +606,9 @@ const TypeVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = isPeeking ? peekingRouter : baseRouter;
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -661,12 +666,16 @@ const CallsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = isPeeking ? peekingRouter : baseRouter;
   const onFilterUpdate = useCallback(
     filter => {
-      history.push(router.callsUIUrl(params.entity, params.project, filter));
+      history.push(
+        routerContext.callsUIUrl(params.entity, params.project, filter)
+      );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <CallsPage
@@ -695,14 +704,16 @@ const ObjectVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = isPeeking ? peekingRouter : baseRouter;
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
-        router.objectVersionsUIUrl(params.entity, params.project, filter)
+        routerContext.objectVersionsUIUrl(params.entity, params.project, filter)
       );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <ObjectVersionsPage
@@ -731,14 +742,16 @@ const TypeVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = isPeeking ? peekingRouter : baseRouter;
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
-        router.typeVersionsUIUrl(params.entity, params.project, filter)
+        routerContext.typeVersionsUIUrl(params.entity, params.project, filter)
       );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <TypeVersionsPage
@@ -767,14 +780,16 @@ const OpVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = isPeeking ? peekingRouter : baseRouter;
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
-        router.opVersionsUIUrl(params.entity, params.project, filter)
+        routerContext.opVersionsUIUrl(params.entity, params.project, filter)
       );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <OpVersionsPage

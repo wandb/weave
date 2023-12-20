@@ -19,18 +19,18 @@ export const Browse2TraceComponent: FC<{params: Browse2TracePageParams}> = ({
   params,
 }) => {
   const history = useHistory();
-  const routeContext = useWeaveflowRouteContext();
+  const {peekingRouter} = useWeaveflowRouteContext();
   const setSelectedSpanId = useCallback(
     (spanId: string) =>
       history.push(
-        routeContext.callUIUrl(
+        peekingRouter.callUIUrl(
           params.entity,
           params.project,
           params.traceId,
           spanId
         )
       ),
-    [history, params.entity, params.project, params.traceId, routeContext]
+    [history, params.entity, params.project, params.traceId, peekingRouter]
   );
   return (
     <Browse2Trace

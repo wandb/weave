@@ -20,8 +20,10 @@ export const Browse3WeaveflowRouteContextProvider = ({
   children: React.ReactNode;
   projectRoot(entityName: string, projectName: string): string;
 }) => {
+  const baseRouter = browse3ContextGen(projectRoot);
   return (
-    <WeaveflowRouteContext.Provider value={browse3ContextGen(projectRoot)}>
+    <WeaveflowRouteContext.Provider
+      value={{baseRouter, peekingRouter: useMakePeekingRouter()}}>
       {children}
     </WeaveflowRouteContext.Provider>
   );
@@ -443,24 +445,18 @@ export const baseContext = browse3ContextGen(
   }
 );
 
-export const Browse3WeaveflowPeekRouteContextProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+const useMakePeekingRouter = (): RouteType => {
   const setSearchParam = useSetSearchParam();
 
-  const wrappedContext = {
+  return {
     refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
       return setSearchParam(PEAK_SEARCH_PARAM, baseContext.refUIUrl(...args));
     },
     entityUrl: (...args: Parameters<typeof baseContext.entityUrl>) => {
-      // Purposely not a peek
-      return baseContext.entityUrl(...args);
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.entityUrl(...args));
     },
     projectUrl: (...args: Parameters<typeof baseContext.projectUrl>) => {
-      // Purposely not a peek
-      return baseContext.projectUrl(...args);
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.projectUrl(...args));
     },
     typeUIUrl: (...args: Parameters<typeof baseContext.typeUIUrl>) => {
       return setSearchParam(PEAK_SEARCH_PARAM, baseContext.typeUIUrl(...args));
@@ -544,11 +540,18 @@ export const Browse3WeaveflowPeekRouteContextProvider = ({
       );
     },
   };
-  return (
-    <WeaveflowRouteContext.Provider value={wrappedContext}>
-      {children}
-    </WeaveflowRouteContext.Provider>
-  );
 };
 
-const WeaveflowRouteContext = createContext<RouteType>(browse2Context);
+const WeaveflowRouteContext = createContext<{
+  baseRouter: RouteType;
+  peekingRouter: RouteType;
+}>({
+  baseRouter: browse2Context,
+  peekingRouter: browse2Context,
+});
+
+export const WeaveflowPeekContext = createContext<{
+  isPeeking?: boolean;
+}>({
+  isPeeking: false,
+});

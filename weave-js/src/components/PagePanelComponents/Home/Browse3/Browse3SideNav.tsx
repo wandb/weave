@@ -132,7 +132,7 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
     return filters[category];
   }, [filters]);
 
-  const router = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   if (!currentProject || !currentEntity) {
     return null;
   }
@@ -143,31 +143,33 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
       selectedCategory={selectedNavSection}
       filterCategory={filterCategory}
       navigateToProject={project => {
-        history.push(router.projectUrl(params.entity, project));
+        history.push(baseRouter.projectUrl(params.entity, project));
       }}
       navigateToObjectVersions={(filter?: WFHighLevelObjectVersionFilter) => {
         history.push(
-          router.objectVersionsUIUrl(params.entity, params.project, filter)
+          baseRouter.objectVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToCalls={(filter?: WFHighLevelCallFilter) => {
-        history.push(router.callsUIUrl(params.entity, params.project, filter));
+        history.push(
+          baseRouter.callsUIUrl(params.entity, params.project, filter)
+        );
       }}
       navigateToTypeVersions={(filter?: WFHighLevelTypeVersionFilter) => {
         history.push(
-          router.typeVersionsUIUrl(params.entity, params.project, filter)
+          baseRouter.typeVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToOpVersions={(filter?: WFHighLevelOpVersionFilter) => {
         history.push(
-          router.opVersionsUIUrl(params.entity, params.project, filter)
+          baseRouter.opVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToBoards={() => {
-        history.push(router.boardsUIUrl(params.entity, params.project));
+        history.push(baseRouter.boardsUIUrl(params.entity, params.project));
       }}
       navigateToTables={() => {
-        history.push(router.tablesUIUrl(params.entity, params.project));
+        history.push(baseRouter.tablesUIUrl(params.entity, params.project));
       }}
       navigateAwayFromProject={props.navigateAwayFromProject}
     />

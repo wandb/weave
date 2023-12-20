@@ -8,10 +8,11 @@ export const TypesPage: React.FC<{
   project: string;
 }> = props => {
   // TODO: Implement in due time if needed
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
+
   const history = useHistory();
   useEffect(() => {
-    history.push(routerContext.projectUrl(props.entity, props.project));
-  }, [history, props.entity, props.project, routerContext]);
+    history.push(baseRouter.projectUrl(props.entity, props.project));
+  }, [baseRouter, history, props.entity, props.project]);
   return <></>;
 };
