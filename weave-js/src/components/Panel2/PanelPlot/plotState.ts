@@ -30,7 +30,7 @@ import {
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
-import {immerable, produce} from 'immer';
+import {current, freeze, immerable, produce} from 'immer';
 import _ from 'lodash';
 
 import {IconName} from '../../Icon';
@@ -613,6 +613,7 @@ class WeaveExpressionDimension extends DimensionLike {
   }
 
   imputeOtherSeriesWithThisState(s: SeriesConfig): SeriesConfig {
+    console.log('imputing', current(s));
     return WeaveExpressionDimension.updateSeriesWithState(
       s,
       this.state(),
@@ -803,7 +804,10 @@ export function makeDimensionShared(
 ): PlotConfig {
   return config.series.length > 1
     ? produce(config, draft => {
-        const replacementDim = dimConstructors[dimName](series, weave);
+        const replacementDim = dimConstructors[dimName](
+          freeze(series, true),
+          weave
+        );
         draft.series = draft.series.map(s => {
           return replacementDim.imputeOtherSeriesWithThisState(s);
         });

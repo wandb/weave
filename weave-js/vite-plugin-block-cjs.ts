@@ -1,6 +1,7 @@
 import * as path from 'path';
 import pkg from 'lodash';
-import {visit} from 'ast-types';
+import acorn from 'acorn';
+import estraverse from 'estraverse';
 
 const {sortBy} = pkg;
 
@@ -289,38 +290,79 @@ type ImportersBySymbol = {
 const getExternalDefaultOrStarImports = (ast: any) => {
   const imports: ImportedPackage[] = [];
 
-  visit(ast, {
-    visitImportDefaultSpecifier(p) {
-      imports.push({
-        package: p.parentPath.node.source?.value,
-        default: true,
-      });
-      return false;
-    },
-    visitImportSpecifier(p) {
-      if (p.node.imported.name === 'default') {
-        imports.push({
-          package: p.parentPath.node.source?.value,
-          default: true,
-        });
+  estraverse.traverse(ast, {
+    enter: function (node) {
+      if (!node.type.includes('Import')) {
+        return;
       }
-      return false;
-    },
-    visitImportNamespaceSpecifier(p) {
-      imports.push({package: p.parentPath.node.source?.value, star: true});
-      return false;
-    },
-    visitImport(p) {
-      const arg = p.parentPath.node.arguments[0];
-
-      if (arg?.type === 'StringLiteral') {
-        imports.push({package: arg.value, dynamic: true});
+      console.log('node', node.type, JSON.stringify(node, undefined, 2));
+      switch (node.type) {
+        case 'ImportDeclaration':
+          node.specifiers.forEach(specifier => {
+            if (!node.source.value || typeof node.source.value !== 'string') {
+              throw new Error(
+                `Could not parse import declaration :${JSON.stringify(
+                  specifier,
+                  undefined,
+                  2
+                )}`
+              );
+            }
+            switch (specifier.type) {
+              case 'ImportDefaultSpecifier':
+                imports.push({
+                  package: node.source.value,
+                  default: true,
+                });
+                break;
+              case 'ImportSpecifier':
+                if (specifier.imported.name === 'default') {
+                  imports.push({
+                    package: node.source.value,
+                    default: true,
+                  });
+                }
+                break;
+              case 'ImportNamespaceSpecifier':
+                imports.push({
+                  package: node.source.value,
+                  star: true,
+                });
+                break;
+            }
+          });
+          break;
+        case 'CallExpression':
+          if (
+            node.callee.type === 'ImportExpression' &&
+            node.arguments.length > 0 &&
+            node.arguments[0].type === 'Literal'
+          ) {
+            if (
+              !node.arguments[0].value ||
+              typeof node.arguments[0].value !== 'string'
+            ) {
+              throw new Error(
+                `Could not parse import call expression :${JSON.stringify(
+                  node,
+                  undefined,
+                  2
+                )}`
+              );
+            }
+            imports.push({
+              package: node.arguments[0].value,
+              dynamic: true,
+            });
+          }
+          break;
       }
-      return false;
     },
   });
 
-  return imports.filter(i => !i.package.startsWith('.'));
+  throw new Error('imports: ' + JSON.stringify(imports, undefined, 2));
+
+  // return imports.filter(i => !i.package.startsWith('.'));
 };
 
 const isAllowedCJS = (pkg: string) => {
@@ -339,7 +381,7 @@ const isAllowedCJS = (pkg: string) => {
 
 const packageRegex = /\/(@.*?\/.*?|.*?)\//;
 const filePathToPackageName = (filePath: string) => {
-  let startsWithPrefix = null;
+  let startsWithPrefix: string | null = null;
   if (packageDepRoots.includes(filePath)) {
     return filePath;
   }
@@ -359,10 +401,13 @@ const filePathToPackageName = (filePath: string) => {
 
   const trimmed = filePath.slice(`${startsWithPrefix}`.length);
 
-  if (!trimmed.match(packageRegex)) {
+  const match = trimmed.match(packageRegex);
+  if (!match) {
     console.log('ERR', filePath, trimmed);
+    throw new Error('Could not parse package name');
   }
-  return trimmed.match(packageRegex)[1];
+
+  return match[1];
 };
 
 const cjsErrorMessage = (
