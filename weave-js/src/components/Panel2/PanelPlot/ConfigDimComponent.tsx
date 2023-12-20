@@ -1,12 +1,7 @@
 import {LegacyWBIcon} from '@wandb/weave/common/components/elements/LegacyWBIcon';
 import HighlightedIcon from '@wandb/weave/common/components/HighlightedIcon';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
-import {
-  ConstNode,
-  // constString,
-  isOutputNode,
-  isVoidNode,
-} from '@wandb/weave/core';
+import {ConstNode, isOutputNode, isVoidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
 import React, {ReactNode, useCallback, useMemo} from 'react';
@@ -29,7 +24,6 @@ import {
   IconMinimizeMode,
   IconWeave,
 } from '../Icons';
-// import * as TableState from '../PanelTable/tableState';
 import {getColumnsFromInput} from './columnHelpers';
 import {ColumnWithExpressionDimension} from './ColumnWithExpressionDimension';
 import {ConfigDimLabel} from './ConfigDimLabel';
@@ -51,14 +45,12 @@ IconBlank.displayName = 'S.IconBlank';
 // from a row.
 const isColumnPickValue = (node: any, k: string): boolean => {
   const {name, inputs} = node.fromOp;
-  // console.log('isColumnPickValue');
   const x =
     name === 'pick' &&
     inputs.key.nodeType === 'const' &&
     inputs.key.val === k &&
     inputs.obj.nodeType === 'var' &&
     inputs.obj.varName === 'row';
-  // console.log({name, inputs, x, node});
   return x;
 };
 
@@ -244,7 +236,6 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           active: dimension.mode() === 'dropdown',
           onClick: () => {
             clickHandler(dimension, (s, dim) => {
-              console.log(Object.keys(s.uiState));
               if (s.uiState[dim.name] !== 'dropdown') {
                 s.uiState[dim.name] = 'dropdown';
                 // const expressionValue = dim.expressionDim.state().value;
@@ -478,15 +469,6 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     weave,
   ]);
 
-  // console.log({
-  //   name: dimension.name,
-  //   dimension,
-  //   isDropdownWithExpression: PlotState.isDropdownWithExpression(dimension),
-  //   isGroup: PlotState.isGroup(dimension),
-  //   isDropdown: PlotState.isDropdown(dimension),
-  //   isWeaveExpression: PlotState.isWeaveExpression(dimension),
-  //   isColumnSelWithExpression: PlotState.isColumnSelWithExpression(dimension),
-  // });
   if (PlotState.isDropdownWithExpression(dimension)) {
     return (
       <ConfigDimComponent
@@ -562,43 +544,6 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       </ConfigDimLabel>
     );
   } else if (PlotState.isColumnSelWithExpression(dimension)) {
-    // console.log('col sel render');
-    // console.log({props});
-    // console.log({dimension});
-    // const postfix = <div>foo</div>;
-
-    // This worked for logged CIA table
-    // const availableColumns = Object.keys(
-    //   props.input.type.objectType.propertyTypes
-    // );
-    // type = tagged
-    // produce.input.type.
-    // console.log({props});
-    // getColumnsFromInput(props.input);
-    // const availableColumns: string[] = [];
-
-    // const value = nullableTaggableValue(props.input.type);
-    // const availableColumns = Object.keys(value.objectType.propertyTypes);
-    // const columnTypes = availableColumns.map(c => {
-    //   const unionMembers = value.objectType.propertyTypes[c].members;
-    //   console.log({c, unionMembers});
-    //   // return unionMembers[1]; // TODO: this ok
-    // });
-    // console.log({value, availableColumns, columnTypes});
-
-    // taggableValue
-
-    // dimension.series;
-    // const colId = this.series.dims[this.name];
-    // const selectFunction = this.series.table.columnSelectFunctions[colId];
-
-    // console.log({
-    //   availableColumns,
-    //   config,
-    //   updateConfig,
-    //   isShared,
-    //   mode: dimension.mode(),
-    // });
     return (
       <ConfigDimLabel
         {...props}

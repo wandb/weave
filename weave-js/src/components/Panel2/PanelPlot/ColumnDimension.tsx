@@ -1,19 +1,18 @@
+/**
+ * Allow the user to select one or multiple columns as the value.
+ */
 import {WeaveInterface} from '@wandb/weave/core';
 import produce from 'immer';
 
 import {DimensionLike} from './DimensionLike';
-import {
-  ColumnDimName,
-  // DropdownDimName,
-  DropdownOption,
-} from './plotState';
+import {ColumnDimName, DropdownOption} from './plotState';
 import {DimState} from './types';
 import {SeriesConfig} from './versions';
 
 export class ColumnDimension extends DimensionLike {
   public readonly options: DropdownOption[];
   public readonly name: ColumnDimName;
-  public readonly placeholder?: string;
+  // public readonly placeholder?: string;
   protected readonly defaultOptions: DropdownOption[];
 
   constructor(

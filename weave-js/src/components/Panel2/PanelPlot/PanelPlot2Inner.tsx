@@ -980,10 +980,12 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     return brushTypesResult;
   }, [listOfTableNodes, config.series, weave]);
 
-  const signalDomainX = concreteConfig.signals.domain.x;
   const xScaleAndDomain = useMemo(
-    () => (signalDomainX ? {scale: {domain: signalDomainX}} : {}),
-    [signalDomainX]
+    () =>
+      concreteConfig.signals.domain.x
+        ? {scale: {domain: concreteConfig.signals.domain.x}}
+        : {},
+    [concreteConfig.signals.domain.x]
   );
   const yScaleAndDomain = useMemo(
     () =>
@@ -1074,16 +1076,10 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             };
           }
         } else {
-          // If we haven't zoomed in, use the extent of the x values
-          const domain = signalDomainX ?? {
-            data: newSpec.data.name,
-            field: fixedXKey,
-          };
-          const scale = {domain};
           newSpec.encoding.x = {
             field: fixedXKey,
             type: xAxisType,
-            scale,
+            ...xScaleAndDomain,
           };
         }
         if (xAxisType === 'temporal' && xTimeUnit && isDashboard) {
@@ -1133,7 +1129,11 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         }
       }
 
-      if (colorAxisType != null && series.uiState.label === 'expression') {
+      if (
+        colorAxisType != null &&
+        (series.uiState.label === 'expression' ||
+          series.uiState.label === 'dropdown')
+      ) {
         newSpec.encoding.color = {
           field: fixKeyForVega(dims.color),
           type: colorAxisType,
@@ -1467,7 +1467,6 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     isDashboard,
     hasLine,
     brushableAxes,
-    signalDomainX,
     xScaleAndDomain,
     yScaleAndDomain,
     globalColorScales,

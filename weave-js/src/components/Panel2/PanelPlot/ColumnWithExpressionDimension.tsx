@@ -8,16 +8,15 @@ import {produce} from 'immer';
 import {ColumnDimension} from './ColumnDimension';
 import {DimensionLike} from './DimensionLike';
 import {
+  ColumnDimName,
   DropdownWithExpressionMode,
   WeaveExpressionDimension,
 } from './plotState';
 import {DimState} from './types';
 import {SeriesConfig} from './versions';
 
-type DimWithColumnAndExpressionName = 'x' | 'y' | 'tooltip';
-
 export class ColumnWithExpressionDimension extends DimensionLike {
-  public readonly name: DimWithColumnAndExpressionName;
+  public readonly name: ColumnDimName;
   readonly isMulti: boolean;
   readonly defaultMode: DropdownWithExpressionMode;
 
@@ -26,7 +25,7 @@ export class ColumnWithExpressionDimension extends DimensionLike {
   readonly expressionDim: WeaveExpressionDimension;
 
   constructor(
-    name: DimWithColumnAndExpressionName,
+    name: ColumnDimName,
     isMulti: boolean,
     series: SeriesConfig,
 
@@ -82,13 +81,11 @@ export class ColumnWithExpressionDimension extends DimensionLike {
     const dimWithDefaultMode = produce(this, draft => {
       draft.series.uiState[this.name] = defaultMode;
     });
-    // TODO: Having problems with impute dropdown when default value is null
-    return dimWithDefaultMode.expressionDim.imputeThisSeriesWithDefaultState();
-    // if (defaultMode === 'dropdown') {
-    //   return dimWithDefaultMode.dropdownDim.imputeThisSeriesWithDefaultState();
-    // } else {
-    //   return dimWithDefaultMode.expressionDim.imputeThisSeriesWithDefaultState();
-    // }
+    if (defaultMode === 'dropdown') {
+      return dimWithDefaultMode.dropdownDim.imputeThisSeriesWithDefaultState();
+    } else {
+      return dimWithDefaultMode.expressionDim.imputeThisSeriesWithDefaultState();
+    }
   }
 
   imputeOtherSeriesWithThisState(s: SeriesConfig): SeriesConfig {

@@ -31,10 +31,12 @@ import {
   voidNode,
 } from '../../../core';
 import {Select} from '../../Form/Select';
+import {arrayMove} from '../../Form/SelectMultiple';
 import {Icon, IconName} from '../../Icon';
 import * as TableState from '../PanelTable/tableState';
 import {Column, Columns} from './columnHelpers';
 import {ColumnWithExpressionDimension} from './ColumnWithExpressionDimension';
+import {DropdownOption} from './plotState';
 import {PanelPlotProps} from './types';
 import {PlotConfig, SeriesConfig} from './versions';
 
@@ -52,11 +54,11 @@ const SelectOptionLabelText = styled.span`
 `;
 SelectOptionLabelText.displayName = 'S.SelectOptionLabelText';
 
-const OptionLabel = (props: ColumnOption) => {
+const OptionLabel = (props: MyOption) => {
   return (
     <SelectOptionLabel>
-      <Icon name={props.icon} />
-      <SelectOptionLabelText>{props.label}</SelectOptionLabelText>
+      {props.icon && <Icon name={props.icon} />}
+      <SelectOptionLabelText>{props.text}</SelectOptionLabelText>
     </SelectOptionLabel>
   );
 };
@@ -71,9 +73,15 @@ type SelectColumnProps = {
 };
 export type ColumnOption = {
   value: string;
-  label: string;
+  text: string;
   columnType: string;
   icon: IconName;
+};
+
+type MyOption = ColumnOption | DropdownOption;
+
+const isColumnOption = (opt: MyOption): opt is ColumnOption => {
+  return 'columnType' in opt;
 };
 
 const TYPE_TO_ICON: Record<string, IconName> = {
@@ -85,28 +93,11 @@ const TYPE_TO_ICON: Record<string, IconName> = {
 };
 
 const getIconForType = (type: string): IconName => {
-  return TYPE_TO_ICON[type] ?? 'cube-container'; // TODO: Is there a better default icon?
+  return TYPE_TO_ICON[type] ?? 'cube-container';
 };
-// const OptionLabel = (props: JobOption) => {
-//   return (
-//     <S.SelectOptionLabel>
-//       <S.SelectOptionLabelText>{props.label}</S.SelectOptionLabelText>
-//     </S.SelectOptionLabel>
-//   );
-// };
-
-function arrayMove<T>(array: readonly T[], from: number, to: number) {
-  const slicedArray = array.slice();
-  slicedArray.splice(
-    to < 0 ? array.length + to : to,
-    0,
-    slicedArray.splice(from, 1)[0]
-  );
-  return slicedArray;
-}
 
 const SortableMultiValue = SortableElement(
-  (props: MultiValueProps<ColumnOption>) => {
+  (props: MultiValueProps<MyOption>) => {
     // this prevents the menu from being opened/closed when the user clicks
     // on a value to begin dragging it. ideally, detecting a click (instead of
     // a drag) would still focus the control and toggle the menu, but that
@@ -125,7 +116,7 @@ const SortableMultiValueLabel = SortableHandle(
 );
 
 const SortableSelect = SortableContainer(Select) as React.ComponentClass<
-  Props<ColumnOption, true> & SortableContainerProps
+  Props<MyOption, true> & SortableContainerProps
 >;
 
 const SelectColumnSingle = ({
@@ -136,19 +127,21 @@ const SelectColumnSingle = ({
   updateConfig,
   series,
 }: SelectColumnProps) => {
-  const options: ColumnOption[] = columns
+  const options: MyOption[] = columns
     .map((column: Column) => {
       const dotted = column.path.join('.');
       const columnType = column.type;
       // TODO: keep value as array of strings?
       return {
         value: dotted,
-        label: dotted,
+        text: dotted,
         columnType,
         icon: getIconForType(columnType),
       };
     })
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => a.text.localeCompare(b.text));
+
+  options.push(...dimension.dropdownDim.options);
 
   const ser = series[0];
   // const dimName = dimension.name === 'label' ? 'color' : dimension.name; // TODO
@@ -166,47 +159,20 @@ const SelectColumnSingle = ({
     selectedOpt = _.find(options, {value: selectedVal}) ?? null;
   }
 
-  const [selected, setSelected] = React.useState<ColumnOption | null>(
-    selectedOpt
-  );
+  const [selected, setSelected] = React.useState<MyOption | null>(selectedOpt);
 
   const seriesIndices = useMemo(
     () => series.map(s => config.series.indexOf(s)),
     [series, config.series]
   );
 
-  const onChange = (selectedOption: OnChangeValue<ColumnOption, false>) => {
+  const onChange = (selectedOption: OnChangeValue<MyOption, false>) => {
     setSelected(selectedOption);
     const exampleRow = TableState.getExampleRow(input);
     const newConfig = produce(config, draft => {
       seriesIndices.forEach(i => {
         const s = draft.series[i];
 
-        // draft.forEach(s => {
-        //     // if (sion.series)) {
-        //     //   // @ts-ignore
-        //     //   s.constants[dimName] = value;
-        //     // }
-        //     // const tooltip: any = {};
-        //     // selectedOptions.forEach((option: ColumnOption) => {
-        //     //   const colId = option.value; // e.g. gdp
-        //     //   const value = opPick({
-        //     //     obj: varNode(exampleRow.type, 'row'),
-        //     //     key: constString(colId),
-        //     //   });
-        //       // const value = constString('value');
-        //       // const colType = s.table.columnSelectFunctions[colId].type;
-        //       // console.log({colId, colType});
-        //       // console.log({colId});
-        //       // tooltip[option.value] = constString(option.value);
-        //       // tooltip[option.value] = value;
-        //     });
-        //     // const node = _.isEmpty(tooltip) ? voidNode() : opDict(tooltip);
-        //     // s.table = TableState.updateColumnSelect(
-        //     //   s.table,
-        //     //   s.dims['tooltip'], // fixme
-        //     //   node
-        //     // );
         const node = selectedOption
           ? opPick({
               obj: varNode(exampleRow.type, 'row'),
@@ -217,27 +183,15 @@ const SelectColumnSingle = ({
       });
     });
     updateConfig(newConfig);
-    // updateConfig({
-    //   series: newSeries,
-    // });
   };
 
-  //   const onChange = (newValue: MultiValue<ColumnOption>) => {
-  //     console.log('onChange');
-  //     console.log(newValue);
-  //     // if (option) {
-  //     //   onSelectJob(option);
-  //     // }
-  //   };
   return (
     <Select
       options={options}
       placeholder="Select a column..."
       onChange={onChange}
-      //   value={selectedJobId as any}
       formatOptionLabel={OptionLabel}
       value={selected}
-      //   onChange={onChange}
     />
   );
 };
@@ -250,26 +204,25 @@ const SelectColumnMultiple = ({
   updateConfig,
   series,
 }: SelectColumnProps) => {
-  const options: ColumnOption[] = columns
+  const options: MyOption[] = columns
     .map((column: Column) => {
       const dotted = column.path.join('.');
       const columnType = column.type;
       // TODO: keep value as array of strings?
       return {
         value: dotted,
-        label: dotted,
+        text: dotted,
         columnType,
         icon: getIconForType(columnType),
       };
     })
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => a.text.localeCompare(b.text));
 
   const ser = series[0];
-  // const dimName = dimension.name === 'label' ? 'color' : dimension.name; // TODO
   const dimName = dimension.name;
   const tableCol = ser.dims[dimName];
   const func = ser.table.columnSelectFunctions[tableCol];
-  let selectedOptions: ColumnOption[] = [];
+  let selectedOptions: MyOption[] = [];
   if (isOutputNode(func)) {
     if (func.fromOp.name === 'pick' && isConstNode(func.fromOp.inputs.key)) {
       // Handle case where expression is something like row["Image"]
@@ -287,28 +240,20 @@ const SelectColumnMultiple = ({
     }
   }
 
-  // console.log({columns, input, config, dimension});
-  // console.log({selectedVal, series, tableCol, func});
-
   const [selected, setSelected] =
-    React.useState<readonly ColumnOption[]>(selectedOptions);
+    React.useState<readonly MyOption[]>(selectedOptions);
 
   const seriesIndices = useMemo(
     () => series.map(s => config.series.indexOf(s)),
     [series, config.series]
   );
 
-  const onChange = (selectedOpts: OnChangeValue<ColumnOption, true>) => {
+  const onChange = (selectedOpts: OnChangeValue<MyOption, true>) => {
     setSelected(selectedOpts);
     const exampleRow = TableState.getExampleRow(input);
     const newConfig = produce(config, draft => {
       seriesIndices.forEach(i => {
         const s = draft.series[i];
-        // if (isShared || _.isEqual(s, dimension.series)) {
-        //   // @ts-ignore
-        //   s.constants[dimName] = value;
-        // }
-
         let node: NodeOrVoidNode = voidNode();
         if (selectedOpts.length > 0) {
           // TODO: Images don't render as values in dict tooltips.
@@ -317,6 +262,7 @@ const SelectColumnMultiple = ({
           //       For now, special case having a single image column selection
           if (
             selectedOpts.length === 1 &&
+            isColumnOption(selectedOpts[0]) &&
             selectedOpts[0].columnType === 'image'
           ) {
             node = opPick({
@@ -326,7 +272,7 @@ const SelectColumnMultiple = ({
           } else {
             // Keep the dict format since seems nice to have a label for value?
             const tooltip: any = {};
-            selectedOpts.forEach((option: ColumnOption) => {
+            selectedOpts.forEach((option: MyOption) => {
               const colId = option.value; // e.g. gdp
               const value = opPick({
                 obj: varNode(exampleRow.type, 'row'),
@@ -351,20 +297,9 @@ const SelectColumnMultiple = ({
   const onSortEnd: SortEndHandler = ({oldIndex, newIndex}) => {
     const newValue = arrayMove(selected, oldIndex, newIndex);
     setSelected(newValue);
-    // console.log(
-    //   'Values sorted:',
-    //   newValue.map(i => i.value)
-    // );
     onChange(newValue);
   };
 
-  //   const onChange = (newValue: MultiValue<ColumnOption>) => {
-  //     console.log('onChange');
-  //     console.log(newValue);
-  //     // if (option) {
-  //     //   onSelectJob(option);
-  //     // }
-  //   };
   return (
     <SortableSelect
       useDragHandle
@@ -379,10 +314,8 @@ const SelectColumnMultiple = ({
       isMulti
       placeholder="Select columns..."
       onChange={onChange}
-      //   value={selectedJobId as any}
       formatOptionLabel={OptionLabel}
       value={selected}
-      //   onChange={onChange}
       components={{
         // @ts-ignore We're failing to provide a required index prop to SortableElement
         MultiValue: SortableMultiValue,
