@@ -1,4 +1,4 @@
-import {Home} from '@mui/icons-material';
+import {Close, Fullscreen, Home} from '@mui/icons-material';
 import {
   AppBar,
   Box,
@@ -36,6 +36,7 @@ import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
+import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectsPage} from './Browse3/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
@@ -158,6 +159,7 @@ const Browse3Mounted: FC<{
   headerOffset?: number;
   navigateAwayFromProject?: () => void;
 }> = props => {
+  const history = useHistory();
   const router = useWeaveflowRouteContext();
   const params = useParams<Browse3Params>();
   const projectRoot = router.projectUrl(':entity', ':project');
@@ -282,7 +284,9 @@ const Browse3Mounted: FC<{
                         sx={{
                           borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
                           flex: peekLocation ? '1 1 60%' : '0 0 0px',
-                          transition: 'all 0.2s ease-in-out',
+                          transition: peekLocation
+                            ? 'all 0.2s ease-in-out'
+                            : '',
                           boxShadow:
                             'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
                           overflow: 'hidden',
@@ -290,10 +294,56 @@ const Browse3Mounted: FC<{
                           zIndex: 1,
                         }}>
                         {peekLocation && (
-                          <Browse3ProjectRoot
-                            customLocation={peekLocation}
-                            projectRoot={baseProjectRoot}
-                          />
+                          <SimplePageLayoutContext.Provider
+                            value={{
+                              headerPrefix: (
+                                <>
+                                  <Box
+                                    sx={{
+                                      flex: '0 0 auto',
+                                      height: '47px',
+                                    }}>
+                                    <IconButton
+                                      onClick={() => {
+                                        history.push(history.location.pathname);
+                                      }}>
+                                      <Close />
+                                    </IconButton>
+                                  </Box>
+                                  <Box
+                                    sx={{
+                                      flex: '0 0 auto',
+                                      height: '47px',
+                                    }}>
+                                    <IconButton
+                                      onClick={() => {
+                                        const generalBase =
+                                          baseContext.projectUrl(
+                                            params.entity!,
+                                            params.project!
+                                          );
+                                        const targetBase = router.projectUrl(
+                                          params.entity!,
+                                          params.project!
+                                        );
+                                        const targetPath =
+                                          query.peekPath!.replace(
+                                            generalBase,
+                                            targetBase
+                                          );
+                                        history.push(targetPath);
+                                      }}>
+                                      <Fullscreen />
+                                    </IconButton>
+                                  </Box>
+                                </>
+                              ),
+                            }}>
+                            <Browse3ProjectRoot
+                              customLocation={peekLocation}
+                              projectRoot={baseProjectRoot}
+                            />
+                          </SimplePageLayoutContext.Provider>
                         )}
                       </Box>
                     </Box>
