@@ -1,7 +1,7 @@
 import * as Panel2 from '../panel';
 import * as TableType from '../PanelTable/tableType';
-import {DimensionLike} from './plotState';
-import {AnyPlotConfig, PlotConfig} from './versions';
+import {DimensionLike} from './DimensionLike';
+import {AnyPlotConfig, PlotConfig, SeriesConfig} from './versions';
 
 export type AxisName = 'x' | 'y';
 
@@ -31,3 +31,32 @@ export type DimComponentInputType = {
   extraOptions?: DimOptionOrSection[];
   multiline?: boolean;
 };
+
+export const DIM_NAME_MAP: {
+  [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
+} = {
+  pointSize: 'Size',
+  pointShape: 'Shape',
+  x: 'X Dim',
+  y: 'Y Dim',
+  label: 'Color',
+  color: 'Color',
+  mark: 'Mark',
+  tooltip: 'Tooltip',
+  y2: 'Y2 Dim',
+  lineStyle: 'Style',
+};
+
+export type DimName = keyof typeof DIM_NAME_MAP;
+
+export type DimState = {
+  value: any;
+  compareValue: string;
+};
+
+// Controls the ways a dimension can be interacted with in the UI
+export type DimType =
+  | 'optionSelect'
+  | 'weaveExpression'
+  | 'group'
+  | 'dropdownWithExpression';

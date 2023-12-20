@@ -30,11 +30,13 @@ import {
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
-import {immerable, produce} from 'immer';
+import {produce} from 'immer';
 import _ from 'lodash';
 
 import {IconName} from '../../Icon';
 import * as TableState from '../PanelTable/tableState';
+import {DimensionLike} from './DimensionLike';
+import {DimName, DimState} from './types';
 import {
   AnyPlotConfig,
   AxisSelections,
@@ -71,33 +73,7 @@ export const DASHBOARD_DIM_NAME_MAP: {
   lineStyle: 'Style',
 };
 
-export const DIM_NAME_MAP: {
-  [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
-} = {
-  pointSize: 'Size',
-  pointShape: 'Shape',
-  x: 'X Dim',
-  y: 'Y Dim',
-  label: 'Color',
-  color: 'Color',
-  mark: 'Mark',
-  tooltip: 'Tooltip',
-  y2: 'Y2 Dim',
-  lineStyle: 'Style',
-};
-
-export type DimType =
-  | 'optionSelect'
-  | 'weaveExpression'
-  | 'group'
-  | 'dropdownWithExpression';
-export type DimName = keyof typeof DIM_NAME_MAP;
 export type DropdownWithExpressionMode = 'dropdown' | 'expression';
-
-interface DimState {
-  value: any;
-  compareValue: string;
-}
 
 export function isGroup(dim: DimensionLike): dim is MultiFieldDimension {
   return dim.type === 'group';
@@ -123,70 +99,6 @@ export function isDropdownWithExpression(
   dim: DimensionLike
 ): dim is DropdownWithExpressionDimension {
   return dim.type === 'dropdownWithExpression';
-}
-
-/* A DimensionLike object is as a container for the state of a single config panel UI component
- or group of related components for a single series. DimensionLike objects can be compared
- to other DimensionLike objects, and can perform immutable state updates on SeriesConfig
- objects.
- */
-export abstract class DimensionLike {
-  readonly type: DimType;
-  readonly name: DimName;
-  readonly series: SeriesConfig;
-
-  // lets us use produce() to create new instances of these classes via mutation
-  public [immerable] = true;
-
-  protected readonly weave: WeaveInterface;
-
-  protected constructor(
-    type: DimType,
-    name: DimName,
-    series: SeriesConfig,
-    weave: WeaveInterface
-  ) {
-    this.type = type;
-    this.name = name;
-    this.series = series;
-    this.weave = weave;
-  }
-
-  withSeries(series: SeriesConfig): DimensionLike {
-    return produce(this, draft => {
-      draft.series = series;
-    });
-  }
-
-  // abstract method to impute a series with the default value for this dimension, returning a new series
-  abstract imputeThisSeriesWithDefaultState(): SeriesConfig;
-
-  // given another series, return
-  abstract imputeOtherSeriesWithThisState(s: SeriesConfig): SeriesConfig;
-
-  isVoid(): boolean {
-    return _.isEqual(
-      this.state().compareValue,
-      this.defaultState().compareValue
-    );
-  }
-
-  // return true if two dimensions are the same type, have the same state, have the same name, and
-  // have equal children. optionally return true if at least one of the dimensions is in the void state
-  equals(other: DimensionLike, tolerateVoid: boolean = false): boolean {
-    return (
-      this.type === other.type &&
-      this.name === other.name &&
-      (_.isEqual(this.state().compareValue, other.state().compareValue) ||
-        (tolerateVoid && (this.isVoid() || other.isVoid())))
-    );
-  }
-
-  // default state of the dimension, e.g., mark setting = undefined for mark, null expression for weave
-  abstract defaultState(): DimState;
-
-  // current state of the dimension e.g., mark setting for mark, or table Select function for expression dim
-  abstract state(): DimState;
 }
 
 export type ExpressionDimName = keyof PlotConfig['series'][number]['dims'];
