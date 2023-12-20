@@ -29,6 +29,7 @@ import {
   Browse3WeaveflowRouteContextProvider,
   useWeaveflowPeekAwareRouteContext,
   useWeaveflowRouteContext,
+  WeaveflowPeekContext,
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
@@ -182,13 +183,8 @@ const Browse3Mounted: FC<{
   headerOffset?: number;
   navigateAwayFromProject?: () => void;
 }> = props => {
-  const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const params = useParams<Browse3Params>();
-  const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
-  const peekRouterProjectRoot = peekingRouter.projectUrl(':entity', ':project');
-  const query = useURLSearchParamsDict();
-  const peekLocation = usePeekLocation(query.peekPath ?? undefined);
+  const {baseRouter} = useWeaveflowRouteContext();
+
   return (
     <Box
       sx={{
@@ -259,90 +255,7 @@ const Browse3Mounted: FC<{
               }}>
               <ErrorBoundary>
                 <Browse3ProjectRootORMProvider>
-                  <Box
-                    sx={{
-                      flex: '1 1 auto',
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      overflow: 'hidden',
-                      flexDirection: 'row',
-                      alignContent: 'stretch',
-                    }}>
-                    <Box
-                      sx={{
-                        flex: '1 1 40%',
-                        overflow: 'hidden',
-                        display: 'flex',
-                      }}>
-                      <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
-                    </Box>
-
-                    <Box
-                      sx={{
-                        borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
-                        flex: peekLocation ? '1 1 60%' : '0 0 0px',
-                        transition: peekLocation ? 'all 0.2s ease-in-out' : '',
-                        boxShadow:
-                          'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        zIndex: 1,
-                      }}>
-                      {peekLocation && (
-                        <SimplePageLayoutContext.Provider
-                          value={{
-                            headerPrefix: (
-                              <>
-                                <Box
-                                  sx={{
-                                    flex: '0 0 auto',
-                                    height: '47px',
-                                  }}>
-                                  <IconButton
-                                    onClick={() => {
-                                      history.push(history.location.pathname);
-                                    }}>
-                                    <Close />
-                                  </IconButton>
-                                </Box>
-                                <Box
-                                  sx={{
-                                    flex: '0 0 auto',
-                                    height: '47px',
-                                  }}>
-                                  <IconButton
-                                    onClick={() => {
-                                      const generalBase =
-                                        peekingRouter.projectUrl(
-                                          params.entity!,
-                                          params.project!
-                                        );
-                                      const targetBase = baseRouter.projectUrl(
-                                        params.entity!,
-                                        params.project!
-                                      );
-                                      const targetPath =
-                                        query.peekPath!.replace(
-                                          generalBase,
-                                          targetBase
-                                        );
-                                      history.push(targetPath);
-                                    }}>
-                                    <Fullscreen />
-                                  </IconButton>
-                                </Box>
-                              </>
-                            ),
-                          }}>
-                          <Browse3ProjectRoot
-                            customLocation={peekLocation}
-                            projectRoot={peekRouterProjectRoot}
-                          />
-                        </SimplePageLayoutContext.Provider>
-                      )}
-                    </Box>
-                  </Box>
+                  <MainPeekingLayout />
                 </Browse3ProjectRootORMProvider>
               </ErrorBoundary>
             </Box>
@@ -362,6 +275,102 @@ const Browse3Mounted: FC<{
           </Box>
         </Route>
       </Switch>
+    </Box>
+  );
+};
+
+const MainPeekingLayout: FC = () => {
+  const history = useHistory();
+  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const params = useParams<Browse3Params>();
+  const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
+  const peekRouterProjectRoot = peekingRouter.projectUrl(':entity', ':project');
+  const query = useURLSearchParamsDict();
+  const peekLocation = usePeekLocation(query.peekPath ?? undefined);
+  return (
+    <Box
+      sx={{
+        flex: '1 1 auto',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        overflow: 'hidden',
+        flexDirection: 'row',
+        alignContent: 'stretch',
+      }}>
+      <Box
+        sx={{
+          flex: '1 1 40%',
+          overflow: 'hidden',
+          display: 'flex',
+        }}>
+        <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
+      </Box>
+
+      <Box
+        sx={{
+          borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
+          flex: peekLocation ? '1 1 60%' : '0 0 0px',
+          transition: peekLocation ? 'all 0.2s ease-in-out' : '',
+          boxShadow:
+            'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+          overflow: 'hidden',
+          display: 'flex',
+          zIndex: 1,
+        }}>
+        {peekLocation && (
+          <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+            <SimplePageLayoutContext.Provider
+              value={{
+                headerPrefix: (
+                  <>
+                    <Box
+                      sx={{
+                        flex: '0 0 auto',
+                        height: '47px',
+                      }}>
+                      <IconButton
+                        onClick={() => {
+                          history.push(history.location.pathname);
+                        }}>
+                        <Close />
+                      </IconButton>
+                    </Box>
+                    <Box
+                      sx={{
+                        flex: '0 0 auto',
+                        height: '47px',
+                      }}>
+                      <IconButton
+                        onClick={() => {
+                          const generalBase = peekingRouter.projectUrl(
+                            params.entity!,
+                            params.project!
+                          );
+                          const targetBase = baseRouter.projectUrl(
+                            params.entity!,
+                            params.project!
+                          );
+                          const targetPath = query.peekPath!.replace(
+                            generalBase,
+                            targetBase
+                          );
+                          history.push(targetPath);
+                        }}>
+                        <Fullscreen />
+                      </IconButton>
+                    </Box>
+                  </>
+                ),
+              }}>
+              <Browse3ProjectRoot
+                customLocation={peekLocation}
+                projectRoot={peekRouterProjectRoot}
+              />
+            </SimplePageLayoutContext.Provider>
+          </WeaveflowPeekContext.Provider>
+        )}
+      </Box>
     </Box>
   );
 };
