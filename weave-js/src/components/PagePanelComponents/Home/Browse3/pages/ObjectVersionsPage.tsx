@@ -487,6 +487,7 @@ const ObjectVersionsTable: React.FC<{
           sortModel: [{field: 'createdAt', sort: 'desc'}],
         },
       }}
+      sx={{border: 0}}
       rowHeight={38}
       columns={columns}
       experimentalFeatures={{columnGrouping: true}}

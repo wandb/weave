@@ -7,12 +7,14 @@ import {
   ManageHistory,
   ModelTraining,
   NavigateBefore,
+  NavigateNext,
   Rule,
   Scoreboard,
   Segment,
   TableChart,
   Tune,
   TypeSpecimen,
+  Undo,
 } from '@mui/icons-material';
 import {
   Autocomplete,
@@ -181,6 +183,10 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const wbSidebarWidth = 56;
   const wbSideBarSpeed = 0.2;
   const initialWidth = drawerWidth - wbSidebarWidth;
+  const [open, setOpen] = useState(true);
+  const adjustedDrawerWidth = useMemo(() => {
+    return open ? drawerWidth : wbSidebarWidth;
+  }, [open]);
   const [width, setWidth] = useState(initialWidth);
   const onNavigateAwayFromProject = useCallback(() => {
     if (!props.navigateAwayFromProject) {
@@ -193,10 +199,10 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   }, [props.navigateAwayFromProject]);
   useEffect(() => {
     const t = setTimeout(() => {
-      setWidth(drawerWidth);
+      setWidth(adjustedDrawerWidth);
     }, 0);
     return () => clearTimeout(t);
-  }, []);
+  }, [adjustedDrawerWidth]);
 
   return (
     <Drawer
@@ -226,34 +232,66 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'space-evenly',
           flexDirection: 'row',
           gap: 1,
         }}>
-        {props.navigateAwayFromProject && (
-          <IconButton
-            size="small"
+        <IconButton size="small" onClick={() => setOpen(o => !o)}>
+          {open ? <NavigateBefore /> : <NavigateNext />}
+        </IconButton>
+        {open && (
+          <FormControl fullWidth>
+            <Autocomplete
+              size={'small'}
+              disablePortal
+              disableClearable
+              options={projects}
+              value={props.project}
+              onChange={(event, newValue) => {
+                props.navigateToProject(newValue);
+              }}
+              renderInput={params => <TextField {...params} label="Project" />}
+            />
+          </FormControl>
+        )}
+      </Box>
+
+      <SideNav sections={sections} open={open} />
+
+      {props.navigateAwayFromProject && (
+        <Box
+          sx={{
+            height: 52,
+            borderTop: '1px solid #e0e0e0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexDirection: 'row',
+            // gap: 1,
+            flex: '0 0 auto',
+            overflow: 'hidden',
+          }}>
+          <ListItemButton
+            sx={{height: '100%', width: '100%'}}
             onClick={() => {
               onNavigateAwayFromProject();
             }}>
-            <NavigateBefore />
-          </IconButton>
-        )}
-        <FormControl fullWidth>
-          <Autocomplete
-            size={'small'}
-            disablePortal
-            disableClearable
-            options={projects}
-            value={props.project}
-            onChange={(event, newValue) => {
-              props.navigateToProject(newValue);
-            }}
-            renderInput={params => <TextField {...params} label="Project" />}
-          />
-        </FormControl>
-      </Box>
-      <SideNav sections={sections} />;
+            <ListItemIcon>
+              <Undo />
+            </ListItemIcon>
+            <ListItemText
+              sx={{
+                '&>span.MuiTypography-root': {
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                },
+              }}
+              primary="Back to Experiments"
+            />
+          </ListItemButton>
+        </Box>
+      )}
     </Drawer>
   );
 };
@@ -269,22 +307,41 @@ type ItemType = {
   onClick: () => void;
   children?: ItemType[];
 };
-const SideBarNavItem: FC<{item: ItemType; depth?: number}> = props => {
+const SideBarNavItem: FC<{
+  item: ItemType;
+  depth?: number;
+  open: boolean;
+}> = props => {
   const depth = props.depth ?? 0;
+  const show = props.open || depth === 0;
   return (
     <Fragment>
       <ListItemButton
-        sx={{pl: 2 + depth}}
+        sx={{
+          pl: 2 + depth,
+          height: !show ? 0 : 48,
+          opacity: !show ? 0 : undefined,
+          pt: !show ? 0 : undefined,
+          pb: !show ? 0 : undefined,
+          overflow: 'hidden',
+          transition: 'all 0.3s ease-in-out',
+        }}
         onClick={props.item.onClick}
         selected={props.item.selected}>
         <ListItemIcon>{props.item.icon}</ListItemIcon>
         <ListItemText primary={props.item.title} />
       </ListItemButton>
+      {/* <BottomNavigationAction label="Recents" icon={<Restore />} /> */}
       {props.item.children && (
         <List disablePadding>
           {props.item.children.map((item, itemIndex) => {
             return (
-              <SideBarNavItem item={item} depth={depth + 2} key={itemIndex} />
+              <SideBarNavItem
+                item={item}
+                depth={depth + 2}
+                key={itemIndex}
+                open={props.open}
+              />
             );
           })}
         </List>
@@ -293,25 +350,40 @@ const SideBarNavItem: FC<{item: ItemType; depth?: number}> = props => {
   );
 };
 const SideNav: FC<{
+  open: boolean;
   sections: SectionType[];
 }> = props => {
   return (
-    <Box sx={{overflow: 'auto'}}>
+    <Box sx={{overflow: 'auto', flex: '1 1 auto'}}>
       {props.sections.map((section, sectionIndex) => {
         return (
           <Fragment key={sectionIndex}>
             <ListSubheader
               id="nested-list-subheader"
               sx={{
-                pt: 1,
+                pt: !props.open ? 0 : 1,
+                height: !props.open ? 0 : 48,
+                opacity: !props.open ? 0 : undefined,
+                overflow: 'hidden',
+                transition: 'all 0.3s ease-in-out',
               }}>
               {/* {sectionIndex !== 0 && <Divider />} */}
               {section.title}
               <Divider />
             </ListSubheader>
-            <List>
+            <List
+              sx={{
+                p: !props.open ? 0 : undefined,
+                transition: 'all 0.3s ease-in-out',
+              }}>
               {section.items.map((item, itemIndex) => {
-                return <SideBarNavItem item={item} key={itemIndex} />;
+                return (
+                  <SideBarNavItem
+                    item={item}
+                    key={itemIndex}
+                    open={props.open}
+                  />
+                );
               })}
             </List>
           </Fragment>
