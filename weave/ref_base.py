@@ -1,5 +1,5 @@
 import typing
-from typing import Iterable
+from typing import Iterable, Sequence, Optional
 import weakref
 import hashlib
 import json
@@ -11,6 +11,7 @@ from . import errors
 from . import graph_client_context
 from . import weave_types as types
 from . import object_context
+from .language_features.tagging import tag_store
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
@@ -72,7 +73,16 @@ class Ref:
         obj = self._get()
 
         obj = box.box(obj)
-        if self.type.name != "tagged":  # type: ignore
+
+        # Don't put a ref if the object is tagged, it leads to failures in a couple
+        # of the test_arrow.py tests. I don't have the exact rationale, but it's something
+        # like we end up later loading the tagged object when we want the untagged one,
+        # of vice versa.
+        # this check was if self.type.name != 'tagged', however
+        # accesing self.type here is problematic, can cause a loop (as it does with tableref).
+        # Since we just loaded this object, it will be tagged if it was stored tagged,
+        # which I believe is the check we want.
+        if not tag_store.is_tagged(obj):
             _put_ref(obj, self)
         self._obj = obj
 
@@ -127,15 +137,15 @@ class Ref:
     def __str__(self) -> str:
         return str(self.uri)
 
-    def input_to(self) -> Iterable["run.Run"]:
+    def input_to(self) -> Sequence["run.Run"]:
         client = graph_client_context.require_graph_client()
         return client.ref_input_to(self)
 
-    def value_input_to(self) -> Iterable["run.Run"]:
+    def value_input_to(self) -> Sequence["run.Run"]:
         client = graph_client_context.require_graph_client()
         return client.ref_value_input_to(self)
 
-    def output_of(self) -> typing.Optional["run.Run"]:
+    def output_of(self) -> Optional["run.Run"]:
         client = graph_client_context.require_graph_client()
         return client.ref_output_of(self)
 
