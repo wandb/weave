@@ -26,6 +26,7 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
+  browse2Context,
   Browse3WeaveflowRouteContextProvider,
   useWeaveflowPeekAwareRouteContext,
   useWeaveflowRouteContext,
@@ -281,12 +282,17 @@ const Browse3Mounted: FC<{
 
 const MainPeekingLayout: FC = () => {
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   const params = useParams<Browse3Params>();
   const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
-  const peekRouterProjectRoot = peekingRouter.projectUrl(':entity', ':project');
+  const generalProjectRoot = browse2Context.projectUrl(':entity', ':project');
   const query = useURLSearchParamsDict();
   const peekLocation = usePeekLocation(query.peekPath ?? undefined);
+  const generalBase = browse2Context.projectUrl(
+    params.entity!,
+    params.project!
+  );
+  const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   return (
     <Box
       sx={{
@@ -343,14 +349,6 @@ const MainPeekingLayout: FC = () => {
                       }}>
                       <IconButton
                         onClick={() => {
-                          const generalBase = peekingRouter.projectUrl(
-                            params.entity!,
-                            params.project!
-                          );
-                          const targetBase = baseRouter.projectUrl(
-                            params.entity!,
-                            params.project!
-                          );
                           const targetPath = query.peekPath!.replace(
                             generalBase,
                             targetBase
@@ -365,7 +363,7 @@ const MainPeekingLayout: FC = () => {
               }}>
               <Browse3ProjectRoot
                 customLocation={peekLocation}
-                projectRoot={peekRouterProjectRoot}
+                projectRoot={generalProjectRoot}
               />
             </SimplePageLayoutContext.Provider>
           </WeaveflowPeekContext.Provider>

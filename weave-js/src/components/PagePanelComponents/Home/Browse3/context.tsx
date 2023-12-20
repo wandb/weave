@@ -61,7 +61,7 @@ type WFDBTableType =
   | 'Call'
   | 'Object'
   | 'ObjectVersion';
-const browse2Context = {
+export const browse2Context = {
   refUIUrl: (
     rootTypeName: string,
     objRef: ArtifactRef,
