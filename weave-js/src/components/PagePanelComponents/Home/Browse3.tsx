@@ -341,7 +341,15 @@ const MainPeekingLayout: FC = () => {
                       }}>
                       <IconButton
                         onClick={() => {
-                          history.push(history.location.pathname);
+                          const queryParams = new URLSearchParams(
+                            history.location.search
+                          );
+                          if (queryParams.has('peekPath')) {
+                            queryParams.delete('peekPath');
+                            history.replace({
+                              search: queryParams.toString(),
+                            });
+                          }
                         }}>
                         <Close />
                       </IconButton>
