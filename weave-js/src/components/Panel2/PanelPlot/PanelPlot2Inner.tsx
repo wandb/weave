@@ -1133,7 +1133,11 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         }
       }
 
-      if (colorAxisType != null && series.uiState.label === 'expression') {
+      if (
+        colorAxisType != null &&
+        (series.uiState.label === 'expression' ||
+          series.uiState.label === 'dropdown')
+      ) {
         newSpec.encoding.color = {
           field: fixKeyForVega(dims.color),
           type: colorAxisType,

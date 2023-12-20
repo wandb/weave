@@ -7,6 +7,7 @@ export type SeriesConfig = Omit<v11.SeriesConfig, 'uiState'> & {
     x: DropdownWithExpressionMode;
     y: DropdownWithExpressionMode;
     tooltip: DropdownWithExpressionMode;
+    label: DropdownWithExpressionMode;
   };
 };
 
@@ -34,6 +35,7 @@ export const migrate = (config: v15.PlotConfig): PlotConfig => {
         x: 'dropdown' as 'dropdown',
         y: 'dropdown' as 'dropdown',
         tooltip: 'dropdown' as 'dropdown',
+        label: 'dropdown' as 'dropdown',
       },
     })),
   };

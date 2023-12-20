@@ -115,7 +115,7 @@ export type DropdownDimName =
   | 'pointShape'
   | 'label';
 
-export type ColumnDimName = 'x' | 'y' | 'tooltip';
+export type ColumnDimName = 'x' | 'y' | 'label' | 'tooltip';
 
 export const EXPRESSION_DIM_NAMES: ExpressionDimName[] = [
   'x' as const,
@@ -648,21 +648,37 @@ export const dimConstructors: Record<
       series,
       weave
     );
-    const dropdownDimension = new DropDownDimension(
+    // const dropdownDimension = new DropDownDimension(
+    //   'label',
+    //   series,
+    //   weave,
+    //   labelOptions,
+    //   labelOptions[0]
+    // );
+    const dropdownDimension = new ColumnDimension(
       'label',
       series,
       weave,
-      labelOptions,
-      labelOptions[0]
+      [],
+      []
     );
-    return new DropdownWithExpressionDimension(
+    return new ColumnWithExpressionDimension(
       'label',
+      false,
       series,
       expressionDimension,
       dropdownDimension,
-      weave,
-      'dropdown'
+      weave
     );
+
+    // return new DropdownWithExpressionDimension(
+    //   'label',
+    //   series,
+    //   expressionDimension,
+    //   dropdownDimension,
+    //   weave,
+    //   'dropdown'
+    // );
     // return new ColumnWithExpressionDimension(
     //   'label',
     //   false,

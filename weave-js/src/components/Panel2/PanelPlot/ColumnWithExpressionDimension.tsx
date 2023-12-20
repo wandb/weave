@@ -8,16 +8,15 @@ import {produce} from 'immer';
 import {ColumnDimension} from './ColumnDimension';
 import {DimensionLike} from './DimensionLike';
 import {
+  ColumnDimName,
   DropdownWithExpressionMode,
   WeaveExpressionDimension,
 } from './plotState';
 import {DimState} from './types';
 import {SeriesConfig} from './versions';
 
-type DimWithColumnAndExpressionName = 'x' | 'y' | 'tooltip';
-
 export class ColumnWithExpressionDimension extends DimensionLike {
-  public readonly name: DimWithColumnAndExpressionName;
+  public readonly name: ColumnDimName;
   readonly isMulti: boolean;
   readonly defaultMode: DropdownWithExpressionMode;
 
@@ -26,7 +25,7 @@ export class ColumnWithExpressionDimension extends DimensionLike {
   readonly expressionDim: WeaveExpressionDimension;
 
   constructor(
-    name: DimWithColumnAndExpressionName,
+    name: ColumnDimName,
     isMulti: boolean,
     series: SeriesConfig,
 
