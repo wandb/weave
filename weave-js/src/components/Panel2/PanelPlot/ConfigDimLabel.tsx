@@ -2,8 +2,8 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import React from 'react';
 
 import * as ConfigPanel from '../ConfigPanel';
-import {DASHBOARD_DIM_NAME_MAP, DIM_NAME_MAP} from './plotState';
-import {DimComponentInputType} from './types';
+import {DASHBOARD_DIM_NAME_MAP} from './plotState';
+import {DIM_NAME_MAP, DimComponentInputType} from './types';
 
 export const ConfigDimLabel: React.FC<
   Omit<DimComponentInputType, 'extraOptions'> & {
