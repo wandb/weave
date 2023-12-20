@@ -34,7 +34,7 @@ const SelectOptionLabelText = styled.span`
 `;
 SelectOptionLabelText.displayName = 'S.SelectOptionLabelText';
 
-type ConfigSelectProps = {
+type SelectPanelTypeProps = {
   options: TypeOption[];
   value: string | undefined;
   onChange?: (option: TypeOption) => void;
@@ -53,7 +53,7 @@ export const SelectPanelType = ({
   options,
   value,
   onChange,
-}: ConfigSelectProps) => {
+}: SelectPanelTypeProps) => {
   const optionValue = options.find(x => x.value === value);
 
   const onReactSelectChange = onChange
