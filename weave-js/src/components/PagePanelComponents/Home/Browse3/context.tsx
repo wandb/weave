@@ -455,10 +455,12 @@ export const Browse3WeaveflowPeekRouteContextProvider = ({
       return setSearchParam(PEAK_SEARCH_PARAM, baseContext.refUIUrl(...args));
     },
     entityUrl: (...args: Parameters<typeof baseContext.entityUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.entityUrl(...args));
+      // Purposely not a peek
+      return baseContext.entityUrl(...args);
     },
     projectUrl: (...args: Parameters<typeof baseContext.projectUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.projectUrl(...args));
+      // Purposely not a peek
+      return baseContext.projectUrl(...args);
     },
     typeUIUrl: (...args: Parameters<typeof baseContext.typeUIUrl>) => {
       return setSearchParam(PEAK_SEARCH_PARAM, baseContext.typeUIUrl(...args));
