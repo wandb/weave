@@ -8,6 +8,7 @@ import queue
 import random
 import shutil
 import threading
+import traceback
 import typing
 import uuid
 
@@ -72,6 +73,10 @@ class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
 
     def __del__(self) -> None:
         self.cleanup()
+
+    @property
+    def metadata(self) -> dict:
+        return {}
 
     @contextlib.contextmanager
     def new_file(
@@ -196,7 +201,11 @@ class _StreamTableSync:
             row_or_rows = [row_or_rows]
 
         for row in row_or_rows:
-            self._log_row(row)
+            try:
+                self._log_row(row)
+            except Exception as e:
+                traceback.print_exc()
+                logging.warning(f"Error logging row: {e}")
 
     def rows(self) -> graph.Node:
         from ..ops_domain import stream_table_ops

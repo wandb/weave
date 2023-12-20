@@ -23,6 +23,7 @@ from .eager import WeaveIter, select_all
 from .run import RunKey, Run
 from .run_streamtable_span import RunStreamTableSpan
 from . import stream_data_interfaces
+from . import table_wandb
 
 
 def refs_to_str(val: typing.Any) -> typing.Any:
@@ -61,6 +62,10 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         return monitoring.StreamTable(
             f"{self.entity_name}/{self.project_name}/run-feedback"
         )
+
+    @functools.cached_property
+    def objects_table(self) -> table_wandb.WandbTable:
+        return table_wandb.WandbTable("objects", self.entity_name, self.project_name)
 
     ##### Read API
 
@@ -163,7 +168,7 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     # Helpers
 
     def ref_is_own(self, ref: typing.Optional[Ref]) -> bool:
-        return isinstance(ref, artifact_wandb.WandbArtifactRef)
+        return isinstance(ref, table_wandb.WandbTableRef)
 
     def ref_uri(
         self, name: str, version: str, path: str
@@ -181,9 +186,12 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
 
     ##### Write API
 
-    def save_object(
-        self, obj: typing.Any, name: str, branch_name: str
-    ) -> artifact_wandb.WandbArtifactRef:
+    def save_object(self, obj: typing.Any, name: str, branch_name: str) -> Ref:
+        result_ref = self.objects_table.add(obj, name)
+        from . import ref_base
+
+        ref_base._put_ref(obj, result_ref)
+        return result_ref
         from . import storage
 
         return storage._direct_publish(

@@ -21,5 +21,9 @@ class Run(typing.Protocol):
         ...
 
     @property
-    def ui_url(self) -> str:
+    def op_name(self) -> str:
+        ...
+
+    @property
+    def inputs(self) -> dict[str, typing.Any]:
         ...
