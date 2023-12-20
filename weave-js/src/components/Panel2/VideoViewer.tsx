@@ -88,11 +88,9 @@ const VideoViewer = (props: VideoViewerProps) => {
     if (videoRef.current) {
       videoRef.current.muted = muted ?? true;
       if (autoPlay && videoRef.current.paused) {
-        try {
-          videoRef.current.play();
-        } catch (err) {
+        videoRef.current.play().catch(err => {
           // sometimes we can't because chrome disallows unmuted autoplay. see: https://goo.gl/xX8pDD
-        }
+        });
       }
     }
   }, [muted, autoPlay]);
@@ -205,8 +203,13 @@ const VideoViewer = (props: VideoViewerProps) => {
                 onClick={e => {
                   const v = e.target as HTMLVideoElement;
                   if (v.paused) {
-                    v.play();
-                    setPlayButtonVisibility(false);
+                    v.play()
+                      .catch(_err => {
+                        // sometimes we can't because chrome disallows unmuted autoplay. see: https://goo.gl/xX8pDD
+                      })
+                      .then(() => {
+                        setPlayButtonVisibility(false);
+                      });
                   } else {
                     v.pause();
                     setPlayButtonVisibility(true);
