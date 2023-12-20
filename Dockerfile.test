@@ -35,9 +35,8 @@ COPY requirements.ecosystem.txt /root
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
     pip install -r requirements.ecosystem.txt"
 
-COPY integration_test/package.json /root/integration_test/package.json
-COPY integration_test/package-lock.json /root/integration_test/package-lock.json
-RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && npm install
+COPY integration_test/package.json integration_test/yarn.lock /root/integration_test/
+RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && yarn install --frozen-lockfile
 
 # TODO, currently builder doesn't support --link
 COPY --from=js_builder /root/weave-js/build /root/weave-js-build
