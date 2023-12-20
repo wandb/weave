@@ -9,7 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
+import React, {FC, useCallback, useEffect, useMemo} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -27,8 +27,8 @@ import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   Browse3WeaveflowRouteContextProvider,
+  useWeaveflowPeekAwareRouteContext,
   useWeaveflowRouteContext,
-  WeaveflowPeekContext,
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
@@ -530,9 +530,7 @@ const ObjectVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
-  const routerContext = isPeeking ? peekingRouter : baseRouter;
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -570,9 +568,7 @@ const ObjectVersionRoutePageBinding = () => {
 const OpVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
-  const routerContext = isPeeking ? peekingRouter : baseRouter;
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -606,9 +602,7 @@ const TypeVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
-  const routerContext = isPeeking ? peekingRouter : baseRouter;
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -666,9 +660,7 @@ const CallsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
-  const routerContext = isPeeking ? peekingRouter : baseRouter;
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -704,9 +696,7 @@ const ObjectVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
-  const routerContext = isPeeking ? peekingRouter : baseRouter;
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -742,9 +732,7 @@ const TypeVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
-  const routerContext = isPeeking ? peekingRouter : baseRouter;
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -780,9 +768,7 @@ const OpVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const {baseRouter, peekingRouter} = useWeaveflowRouteContext();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
-  const routerContext = isPeeking ? peekingRouter : baseRouter;
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(

@@ -30,6 +30,12 @@ export const useWeaveflowRouteContext = () => {
   return ctx;
 };
 
+export const useWeaveflowPeekAwareRouteContext = () => {
+  const ctx = useContext(WeaveflowRouteContext);
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  return isPeeking ? ctx.peekingRouter : ctx.baseRouter;
+};
+
 export const Browse3WeaveflowRouteContextProvider = ({
   projectRoot,
   children,
