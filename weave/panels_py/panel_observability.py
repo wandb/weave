@@ -638,7 +638,7 @@ def observability(
         latest_runs_plot,
         layout=panels.GroupPanelLayout(x=0, y=20, w=24, h=6),
     )
-    selected_jobs = panels.Table(latest_runs_plot_selector.selected_rows())
+    selected_jobs = panels.Table(latest_runs_plot_selector.selected_rows())  # type: ignore
     selected_jobs.add_column(
         lambda row: str_run_link(
             entity_name=row["c_4.team"],
