@@ -415,6 +415,21 @@ def link(run: wdt.Run) -> wdt.Link:
     )
 
 
+@op(
+    name="str-runlink",
+    input_type={
+        "entity_name": types.optional(types.String()),
+        "project_name": types.optional(types.String()),
+        "name": types.optional(types.String()),
+    },
+)
+def str_run_link(entity_name, project_name, name) -> wdt.Link:
+    return wdt.Link(
+        f"{entity_name}/{project_name}/{name}",
+        f"/{entity_name}/{project_name}/runs/{name}/overview",
+    )
+
+
 def run_logged_artifact_version_gql_plugin(inputs, inner):
     artifact_name = inputs.raw["artifactVersionName"]
     alias = _make_alias(artifact_name, prefix="artifact")
