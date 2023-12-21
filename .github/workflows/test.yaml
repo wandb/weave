@@ -187,9 +187,10 @@ jobs:
         #   parallel: true
         env:
           REPLAY_API_KEY: ${{ secrets.REPLAY_API_KEY }}
-          GITHUB_TOKEN:
-            ${{ secrets.GITHUB_TOKEN }}
-            # - uses: actions/upload-artifact@v3
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPLIT: ${{ strategy.job-total }}
+          SPLIT_INDEX: ${{ strategy.job-index }}
+          # - uses: actions/upload-artifact@v3
       - name: Upload logs
         uses: actions/upload-artifact@v3
         if: failure()
