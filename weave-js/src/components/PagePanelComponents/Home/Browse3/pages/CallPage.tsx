@@ -278,7 +278,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
     flex: 1,
     renderCell: params => <CustomGridTreeDataGroupingCell {...params} />,
   };
-
+  const callClass = `.callId-${call.callID()}`;
   return (
     <DataGridPro
       treeData
@@ -300,12 +300,20 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       isGroupExpandedByDefault={node =>
         expandKeys.has(node.groupingKey?.toString() ?? 'INVALID')
       }
+      getRowClassName={params => {
+        const call = params.row.call as WFCall;
+        return `callId-${call.callID()}`;
+      }}
       hideFooter
+      rowSelection={false}
       sx={{
         '&>.MuiDataGrid-main': {
           '& div div div div >.MuiDataGrid-cell': {
             borderBottom: 'none',
           },
+        },
+        [callClass]: {
+          backgroundColor: '#a9edf252',
         },
       }}
     />
@@ -436,7 +444,7 @@ function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
         sx={{
           ml: 1,
         }}>
-        {call.spanName()}
+        {call.spanName() + ': ' + truncateID(call.callID())}
       </Box>
       {opCategory && (
         <Box
