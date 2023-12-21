@@ -187,7 +187,7 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const projects = useMemo(() => {
     return [props.project, ...(entityProjectsValue.result ?? [])];
   }, [entityProjectsValue.result, props.project]);
-  const wbSidebarWidth = 56;
+  const wbSidebarWidth = 57;
   const wbSideBarSpeed = 0.2;
   const initialWidth = drawerWidth - wbSidebarWidth;
   const [userControlledOpen, setUserControlledOpen] = useState<
