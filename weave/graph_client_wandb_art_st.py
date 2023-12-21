@@ -171,7 +171,11 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         )
 
     def run_ui_url(self, run: Run) -> str:
-        return urls.call_path(self.entity_name, self.project_name, run.id)
+        return urls.call_path_as_peek(
+            self.entity_name,
+            self.project_name,
+            run.id,
+        )
 
     ##### Write API
 

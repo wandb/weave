@@ -4,9 +4,16 @@ import {Box, ListItemText, MenuList, Tab, Tabs} from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import React, {useMemo} from 'react';
+import React, {createContext, useContext, useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
+
+type SimplePageLayoutContextType = {
+  headerPrefix?: React.ReactNode;
+};
+
+export const SimplePageLayoutContext =
+  createContext<SimplePageLayoutContextType>({});
 
 export const SimplePageLayout: React.FC<{
   title: string;
@@ -19,6 +26,7 @@ export const SimplePageLayout: React.FC<{
     onClick: () => void;
   }>;
 }> = props => {
+  const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
   const [tabId, setTabId] = React.useState(0);
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabId(newValue);
@@ -42,8 +50,8 @@ export const SimplePageLayout: React.FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          pl: 3,
-          pr: 3,
+          pl: 2,
+          pr: 2,
           height: 65, // manual to match sidebar
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',
@@ -59,6 +67,7 @@ export const SimplePageLayout: React.FC<{
             alignItems: 'flex-end',
             gap: 1,
           }}>
+          {simplePageLayoutContextValue.headerPrefix}
           <Box
             sx={{
               pb: 2,

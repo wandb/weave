@@ -69,7 +69,7 @@ export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
 }> = ({loading, spans}) => {
-  const routeContext = useWeaveflowRouteContext();
+  const {peekingRouter} = useWeaveflowRouteContext();
   const showIO = useMemo(() => {
     return Array.from(new Set(spans.map(span => span.name))).length === 1;
   }, [spans]);
@@ -175,7 +175,7 @@ export const RunsTable: FC<{
         renderCell: rowParams => {
           return (
             <Link
-              to={routeContext.callUIUrl(
+              to={peekingRouter.callUIUrl(
                 params.entity,
                 params.project,
                 rowParams.row.trace_id,
@@ -443,7 +443,7 @@ export const RunsTable: FC<{
     }
 
     return {cols, colGroupingModel};
-  }, [orm, params.entity, params.project, routeContext, showIO, spans]);
+  }, [orm, params.entity, params.project, peekingRouter, showIO, spans]);
   const autosized = useRef(false);
   useEffect(() => {
     if (autosized.current) {
