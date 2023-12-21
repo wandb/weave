@@ -36,6 +36,7 @@ RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activat
     pip install -r requirements.ecosystem.txt"
 
 ENV RECORD_REPLAY_DIRECTORY=/github/home/.replay/
+RUN mkdir -p $RECORD_REPLAY_DIRECTORY
 COPY integration_test/package.json integration_test/yarn.lock /root/integration_test/
 RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && yarn install --frozen-lockfile && npx @replayio/cypress install
 
