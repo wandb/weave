@@ -1,9 +1,11 @@
 import React, {useMemo} from 'react';
 
 import {Browse2TraceComponent} from '../../Browse2/Browse2TracePage';
+import {CallPageTraceTab} from './CallPageTraceTab';
 import {CallsTable} from './CallsPage';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
 
@@ -37,7 +39,7 @@ const CallPageInner: React.FC<{
       spanId: callId,
     };
   }, [entityName, projectName, traceId, callId]);
-  const title = `${spanName}: ${callId}`;
+  const title = `${spanName}: ${truncateID(callId)}`;
   return (
     <SimplePageLayout
       title={title}
@@ -56,6 +58,10 @@ const CallPageInner: React.FC<{
         },
       ]}
       tabs={[
+        {
+          label: 'Trace2',
+          content: <CallPageTraceTab />,
+        },
         {
           label: 'Trace',
           content: <Browse2TraceComponent params={params} />,
