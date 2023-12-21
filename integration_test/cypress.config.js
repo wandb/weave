@@ -1,5 +1,6 @@
 const { defineConfig } = require("cypress");
 const { plugin: replayPlugin } = require("@replayio/cypress")
+const cypressSplit = require('cypress-split')
 
 // Retrieve the port from the environment variable or set a default
 const FE_PORT = process.env.FE_PORT || '9994';
@@ -12,6 +13,8 @@ module.exports = defineConfig({
     baseUrl: BASE_URL,
     experimentalSessionAndOrigin: true,
     setupNodeEvents(on, config) {
+      cypressSplit(on, config)
+
       // 🙋‍♂️ Add this line to install the replay plugin
       replayPlugin(on, config, {
         upload: true,
