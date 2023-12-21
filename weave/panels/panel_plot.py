@@ -812,6 +812,14 @@ def filter_node_to_selection(
             selection_max = selection[1]  # type: ignore
 
             if (
+                weave.types.TypedDict({"start": weave.types.Timestamp()}).assign_type(
+                    target.type
+                )
+                and isinstance(selection_min, (int, float))
+                and isinstance(selection_max, (int, float))
+            ):
+                target = target["start"].toNumber()
+            elif (
                 weave.types.Timestamp().assign_type(target.type)
                 and isinstance(selection_min, (int, float))
                 and isinstance(selection_max, (int, float))
