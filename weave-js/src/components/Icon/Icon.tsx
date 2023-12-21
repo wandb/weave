@@ -147,6 +147,7 @@ import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-redd
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
 import {ReactComponent as ImportRegex} from '../../assets/icons/icon-regex.svg';
 import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
+import {ReactComponent as ImportRemoveAlt} from '../../assets/icons/icon-remove-alt.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
@@ -670,6 +671,9 @@ export const IconRegex = (props: SVGIconProps) => (
 export const IconRemove = (props: SVGIconProps) => (
   <ImportRemove {...updateIconProps(props)} />
 );
+export const IconRemoveAlt = (props: SVGIconProps) => (
+  <ImportRemoveAlt {...updateIconProps(props)} />
+);
 export const IconReport = (props: SVGIconProps) => (
   <ImportReport {...updateIconProps(props)} />
 );
@@ -1023,6 +1027,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   redo: IconRedo,
   regex: IconRegex,
   remove: IconRemove,
+  'remove-alt': IconRemoveAlt,
   report: IconReport,
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
