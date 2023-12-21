@@ -315,7 +315,6 @@ def observability(
         color_title="Grouping",
         groupby_dims=[],
         mark="bar",
-        no_legend=True,
         domain_x=user_zoom_range,
     )
 
