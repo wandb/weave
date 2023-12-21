@@ -946,4 +946,7 @@ class WFNaiveCall implements WFCall {
   spanName(): string {
     return this.opVersion()?.op().name() ?? this.callDict.callSpan.name;
   }
+  rawCallSpan(): Call {
+    return this.callDict.callSpan;
+  }
 }

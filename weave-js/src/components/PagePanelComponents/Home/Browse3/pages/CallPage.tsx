@@ -35,6 +35,9 @@ import {UnderConstruction} from './common/UnderConstruction';
 import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
+import {SpanDetails} from '../../Browse2/SpanDetails';
+import {SmallRef} from '../../Browse2/SmallRef';
+import {parseRef} from '../../../../../react';
 
 export const CallPage: React.FC<{
   entity: string;
@@ -58,14 +61,14 @@ const CallPageInner: React.FC<{
   const callId = call.callID();
   const spanName = call.spanName();
 
-  const params = useMemo(() => {
-    return {
-      entity: entityName,
-      project: projectName,
-      traceId,
-      spanId: callId,
-    };
-  }, [entityName, projectName, traceId, callId]);
+  // const params = useMemo(() => {
+  //   return {
+  //     entity: entityName,
+  //     project: projectName,
+  //     traceId,
+  //     spanId: callId,
+  //   };
+  // }, [entityName, projectName, traceId, callId]);
   const title = `${spanName}: ${truncateID(callId)}`;
   const traceTitle = `Trace: ${truncateID(traceId)}`;
   return (
@@ -119,7 +122,18 @@ const CallPageInner: React.FC<{
                     tabs={[
                       {
                         label: 'Call',
-                        content: <>Call</>,
+                        content: (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              flex: '1 1 auto',
+                              overflow: 'auto',
+                              p: 8,
+                            }}>
+                            <SpanDetails call={call.rawCallSpan()} />
+                          </Box>
+                        ),
                       },
                       {
                         label: 'Child Calls',
@@ -247,27 +261,104 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
     // {field: 'callDuration', headerName: 'Duration'},
     {
       field: 'inputs',
-      headerName: 'Inputs',
+      headerName: 'Basic Inputs',
+      flex: 1,
       renderCell: ({row}) => {
         const call = row.call as WFCall;
-        return call.inputs().length;
+        return (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'row',
+            }}>
+            {call.rawCallSpan().inputs._keys?.map((k, i) => {
+              const v = call.rawCallSpan().inputs[k];
+              let value: React.ReactNode = '';
+
+              if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
+                value = <SmallRef objRef={parseRef(v)} />;
+                return null;
+              } else if (_.isArray(v)) {
+                value = `${v.length} items`;
+                return null;
+              } else if (_.isObject(v)) {
+                value = `${Object.keys(v).length} entries`;
+                return null;
+              } else {
+                value = v + '';
+              }
+
+              return (
+                <Box
+                  key={i}
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}>
+                  <Box>{k}</Box>
+                  <ArrowRight />
+                  <Box>{value}</Box>
+                </Box>
+              );
+            })}
+          </Box>
+        );
       },
     },
     {
       field: 'outputs',
-      headerName: 'Outputs',
+      flex: 1,
+      headerName: 'Basic Output',
       renderCell: ({row}) => {
         const call = row.call as WFCall;
-        return call.output().length;
+        return (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'row',
+            }}>
+            {call.rawCallSpan().output?._keys?.map((k, i) => {
+              const v = call.rawCallSpan().output![k];
+              let value: React.ReactNode = '';
+
+              if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
+                value = <SmallRef objRef={parseRef(v)} />;
+                return null;
+              } else if (_.isArray(v)) {
+                if (v.length === 1 && typeof v[0] === 'string') {
+                  value = v[0];
+                } else {
+                  value = `${v.length} items`;
+                  return null;
+                }
+              } else if (_.isObject(v)) {
+                value = `${Object.keys(v).length} entries`;
+                return null;
+              } else {
+                value = v + '';
+              }
+
+              return (
+                <Box
+                  key={i}
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}>
+                  {/* <Box>{k}</Box>
+                  <ArrowRight /> */}
+                  <Box>{value}</Box>
+                </Box>
+              );
+            })}
+          </Box>
+        );
       },
     },
-    // {field: 'jobTitle', headerName: 'Job Title', width: 200},
-    // {
-    //   field: 'recruitmentDate',
-    //   headerName: 'Recruitment Date',
-    //   type: 'date',
-    //   width: 150,
-    // },
   ];
 
   const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row =>
@@ -281,6 +372,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
   const callClass = `.callId-${call.callID()}`;
   return (
     <DataGridPro
+      rowHeight={38}
       treeData
       onRowClick={params => {
         const call = params.row.call as WFCall;
@@ -400,7 +492,7 @@ function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
                 width: '100%',
                 height: '100%',
                 borderRight:
-                  isLastChild && i == rowNode.depth - 1 ? '' : BORDER_STYLE,
+                  isLastChild && i === rowNode.depth - 1 ? '' : BORDER_STYLE,
               }}></Box>
           </Box>
         );
