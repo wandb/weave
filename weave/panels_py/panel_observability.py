@@ -1,4 +1,5 @@
 import weave
+from weave.ops_domain.run_ops import str_run_link
 from weave.panels.panel_plot import selected_data
 
 from .. import weave_types as types
@@ -250,33 +251,7 @@ def observability(
             **{
                 "state": row["state"][0],
                 "count": row.count(),
-                "job (s)": weave.ops.cond(
-                    weave.ops.dict_(
-                        a=row["job"].unique().count() <= 3,
-                        b=row["job"].unique().count() > 3,
-                    ),
-                    weave.ops.dict_(
-                        a=weave.ops.join_to_str(row["job"].unique(), ","),
-                        b=weave.ops.join_to_str(
-                            weave.ops.make_list(
-                                a=weave.ops.join_to_str(
-                                    weave.ops.make_list(
-                                        **{
-                                            i: job
-                                            for i, job in enumerate(row["job"].unique())
-                                        }
-                                    ),
-                                    ",",
-                                ),
-                                b=weave_internal.make_const_node(
-                                    types.String(),
-                                    f"... ({row.count() - 3} more)",
-                                ),
-                            ),
-                            ",",
-                        ),
-                    ),
-                ),
+                "job (s)": weave.ops.join_to_str(row["job"].unique(), ","),
             }
         ),
         color_title="state",
@@ -360,8 +335,10 @@ def observability(
             **{
                 "job": row["job"][0],
                 "user": row["entity_name"][0],
+                "team": row["queue_uri"][0].split(":").index(2),
                 "project": row["project_name"][0],
                 "run ID": row["run_id"][-1],
+                "status": row["state"][-1],
                 "duration (s)": weave.ops.Number.__mul__(
                     weave.ops.timedelta_total_seconds(
                         weave.ops.datetime_sub(
@@ -387,7 +364,11 @@ def observability(
         hidden=True,
     )
     jobs_table = panels.Table(jobs)  # type: ignore
-    jobs_table.add_column(lambda row: row["run_id"], "Run ID", groupby=True)
+    jobs_table.add_column(
+        lambda row: row["run_id"],
+        "Run ID",
+        groupby=True,
+    )
     jobs_table.add_column(lambda row: row["job"][0], "Job")
     jobs_table.add_column(lambda row: row["entity_name"][0], "User")
     jobs_table.add_column(
@@ -396,7 +377,6 @@ def observability(
     jobs_table.add_column(
         lambda row: row["state"][-1],
         "Current state",
-        panel_def=weave.panels.Color(12),
     )
     jobs_table.add_column(
         lambda row: weave.ops.cond(
@@ -635,86 +615,77 @@ def observability(
     )
     errors_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
     errors_table.add_column(lambda row: row["job"], "Job")
-    errors_table.add_column(
-        lambda row: weave.panels.WeaveLink(
-            row["run_id"],
-            vars={
-                "entity_name": row["entity_name"],
-                "project_name": row["project_name"],
-                "run_id": row["run_id"],
-            },
-            to=lambda input, vars: weave.ops.project(
-                vars["entity_name"], vars["project_name"]
-            ).run(vars["run_id"]),
-        ),
-        "Run",
-    )
     errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
 
     # layout
-    job_status = dashboard.add(
+    dashboard.add(
         "Job_status",
         state_transitions_plot,
         layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
-
-    selected_statuses = panels.Table(
-        job_status.selected_rows(), columns=[lambda row: row]
-    )
-
-    # selected_statuses.add_column(
-    #     lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc"
-    # )
-    # selected_statuses.add_column(lambda row: row["state"], "State")
-    # selected_statuses.add_column(lambda row: row["job"], "Job")
-    # selected_statuses.add_column(lambda row: row["entity_name"], "User")
-    # selected_statuses.add_column(lambda row: row["project_name"], "Project")
-    # selected_statuses.add_column(lambda row: row["error"], "Error")
-
     dashboard.add(
-        "Selected_statuses",
-        selected_statuses,
-        layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
+        "Job_table",
+        jobs_table,
+        layout=panels.GroupPanelLayout(x=0, y=6, w=24, h=8),
     )
     dashboard.add(
         "Queued_time",
         queued_time_plot,
-        layout=panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=14, w=24, h=6),
     )
-    dashboard.add(
+    latest_runs_plot_selector = dashboard.add(
         "Job_runs",
         latest_runs_plot,
-        layout=panels.GroupPanelLayout(x=0, y=12, w=24, h=6),
+        layout=panels.GroupPanelLayout(x=0, y=20, w=24, h=6),
     )
+    selected_jobs = panels.Table(latest_runs_plot_selector.selected_rows())
+    selected_jobs.add_column(
+        lambda row: str_run_link(
+            entity_name=row["c_4.team"],
+            project_name=row["c_4.project"],
+            name=row["c_4.run ID"],
+        ),
+        "Run",
+        panel_def="link",
+        groupby=True,
+    )
+    selected_jobs.add_column(lambda row: row["c_4.job"][0], "Job")
+    selected_jobs.add_column(lambda row: row["c_4.user"][0], "User")
+    selected_jobs.add_column(lambda row: row["c_4.project"][0], "Project")
+    selected_jobs.add_column(lambda row: row["c_4.status"][-1], "Status")
+    selected_jobs.add_column(lambda row: row["c_2"][0], "Start")
+    selected_jobs.add_column(lambda row: row["c_2"].max(), "Stop")
+    selected_jobs.add_column(lambda row: row["c_4.duration (s)"][0], "Duration (s)")
+
     dashboard.add(
-        "Job_table",
-        jobs_table,
-        layout=panels.GroupPanelLayout(x=0, y=18, w=24, h=12),
+        "Selected_jobs",
+        selected_jobs,
+        layout=panels.GroupPanelLayout(x=0, y=26, w=24, h=10),
     )
     dashboard.add(
         "Runs_by_user",
         runs_table,
-        layout=panels.GroupPanelLayout(x=10, y=30, w=14, h=8),
+        layout=panels.GroupPanelLayout(x=10, y=36, w=14, h=8),
     )
     dashboard.add(
         "Gpu_use_by_job",
         gpu_waste_by_user_plot,
-        layout=panels.GroupPanelLayout(x=0, y=38, w=12, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=44, w=12, h=8),
     )
     dashboard.add(
         "Cpu_use_by_job",
         cpu_waste_by_user_plot,
-        layout=panels.GroupPanelLayout(x=12, y=38, w=12, h=8),
+        layout=panels.GroupPanelLayout(x=12, y=44, w=12, h=8),
     )
     dashboard.add(
         "Finished_runs_by_grouping",
         runs_user_and_grouping_plot,
-        layout=panels.GroupPanelLayout(x=0, y=30, w=10, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=34, w=10, h=8),
     )
     dashboard.add(
         "Errors",
         errors_table,
-        layout=panels.GroupPanelLayout(x=0, y=46, w=24, h=8),
+        layout=panels.GroupPanelLayout(x=0, y=50, w=24, h=8),
     )
 
     return panels.Board(vars=varbar, panels=dashboard, editable=False)
