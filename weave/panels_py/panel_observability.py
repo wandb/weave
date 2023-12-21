@@ -1,6 +1,5 @@
 import weave
 from weave.ops_domain.run_ops import str_run_link
-from weave.panels.panel_plot import selected_data
 
 from .. import weave_types as types
 from ..panels import panel_board
