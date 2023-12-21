@@ -1,4 +1,4 @@
-import {Home} from '@mui/icons-material';
+import {Close, Fullscreen, Home} from '@mui/icons-material';
 import {
   AppBar,
   Box,
@@ -26,14 +26,19 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
+  baseContext,
+  browse2Context,
   Browse3WeaveflowRouteContextProvider,
+  useWeaveflowPeekAwareRouteContext,
   useWeaveflowRouteContext,
+  WeaveflowPeekContext,
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
+import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectsPage} from './Browse3/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
@@ -49,7 +54,10 @@ import {TypesPage} from './Browse3/pages/TypesPage';
 import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
-import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
+import {
+  useWeaveflowORMContext,
+  WeaveflowORMContextProvider,
+} from './Browse3/pages/wfInterface/context';
 import {
   fnNaiveBootstrapFeedback,
   fnNaiveBootstrapObjects,
@@ -151,12 +159,37 @@ export const Browse3: FC<{
   );
 };
 
+const usePeekLocation = (peekPath?: string) => {
+  return useMemo(() => {
+    if (peekPath == null) {
+      return undefined;
+    }
+    const peekPathParts = peekPath.split('?');
+    const peekPathname = peekPathParts[0];
+    const peekSearch = peekPathParts[1] ?? '';
+    const peekSearchParts = peekSearch.split('#');
+    const peekSearchString = peekSearchParts[0];
+    const peekHash = peekSearchParts[1] ?? '';
+
+    return {
+      key: 'peekLoc',
+      pathname: peekPathname,
+      search: peekSearchString,
+      hash: peekHash,
+      state: {
+        '[userDefined]': true,
+      },
+    };
+  }, [peekPath]);
+};
+
 const Browse3Mounted: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
   navigateAwayFromProject?: () => void;
 }> = props => {
-  const router = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
+
   return (
     <Box
       sx={{
@@ -197,7 +230,11 @@ const Browse3Mounted: FC<{
         </AppBar>
       )}
       <Switch>
-        <Route path={browse3Paths(router.projectUrl(':entity', ':project'))}>
+        <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
+          <ProjectRedirect />
+        </Route>
+        <Route
+          path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
           <Box
             component="main"
             sx={{
@@ -223,12 +260,13 @@ const Browse3Mounted: FC<{
               }}>
               <ErrorBoundary>
                 <Browse3ProjectRootORMProvider>
-                  <Browse3ProjectRoot />
+                  <MainPeekingLayout />
                 </Browse3ProjectRootORMProvider>
               </ErrorBoundary>
             </Box>
           </Box>
         </Route>
+
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
             <Switch>
@@ -242,6 +280,107 @@ const Browse3Mounted: FC<{
           </Box>
         </Route>
       </Switch>
+    </Box>
+  );
+};
+
+const MainPeekingLayout: FC = () => {
+  const history = useHistory();
+  const {baseRouter} = useWeaveflowRouteContext();
+  const params = useParams<Browse3Params>();
+  const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
+  const generalProjectRoot = browse2Context.projectUrl(':entity', ':project');
+  const query = useURLSearchParamsDict();
+  const peekLocation = usePeekLocation(query.peekPath ?? undefined);
+  const generalBase = browse2Context.projectUrl(
+    params.entity!,
+    params.project!
+  );
+  const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
+  return (
+    <Box
+      sx={{
+        flex: '1 1 auto',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        overflow: 'hidden',
+        flexDirection: 'row',
+        alignContent: 'stretch',
+      }}>
+      <Box
+        sx={{
+          flex: '1 1 40%',
+          overflow: 'hidden',
+          display: 'flex',
+        }}>
+        <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
+      </Box>
+
+      <Box
+        sx={{
+          borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
+          flex: peekLocation ? '1 1 60%' : '0 0 0px',
+          transition: peekLocation ? 'all 0.2s ease-in-out' : '',
+          boxShadow:
+            'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+          overflow: 'hidden',
+          display: 'flex',
+          zIndex: 1,
+        }}>
+        {peekLocation && (
+          <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+            <SimplePageLayoutContext.Provider
+              value={{
+                headerPrefix: (
+                  <>
+                    <Box
+                      sx={{
+                        flex: '0 0 auto',
+                        height: '47px',
+                      }}>
+                      <IconButton
+                        onClick={() => {
+                          const queryParams = new URLSearchParams(
+                            history.location.search
+                          );
+                          if (queryParams.has('peekPath')) {
+                            queryParams.delete('peekPath');
+                            history.replace({
+                              search: queryParams.toString(),
+                            });
+                          }
+                        }}>
+                        <Close />
+                      </IconButton>
+                    </Box>
+                    <Box
+                      sx={{
+                        flex: '0 0 auto',
+                        height: '47px',
+                      }}>
+                      <IconButton
+                        onClick={() => {
+                          const targetPath = query.peekPath!.replace(
+                            generalBase,
+                            targetBase
+                          );
+                          history.push(targetPath);
+                        }}>
+                        <Fullscreen />
+                      </IconButton>
+                    </Box>
+                  </>
+                ),
+              }}>
+              <Browse3ProjectRoot
+                customLocation={peekLocation}
+                projectRoot={generalProjectRoot}
+              />
+            </SimplePageLayoutContext.Provider>
+          </WeaveflowPeekContext.Provider>
+        )}
+      </Box>
     </Box>
   );
 };
@@ -298,26 +437,34 @@ const Browse3ProjectRootORMProvider: FC = props => {
   );
 };
 
-const Browse3ProjectRoot: FC = () => {
+const ProjectRedirect: FC = () => {
   const history = useHistory();
   const params = useParams<Browse3ProjectMountedParams>();
-  const router = useWeaveflowRouteContext();
-  const projectRoot = router.projectUrl(':entity', ':project');
+  const {baseRouter} = useWeaveflowRouteContext();
 
   useEffect(() => {
     if (params.tab == null) {
       history.replace(
-        router.callsUIUrl(params.entity, params.project, {
+        baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
           traceRootsOnly: true,
         })
       );
     }
-  }, [history, params.entity, params.project, params.tab, router]);
+  }, [baseRouter, history, params.entity, params.project, params.tab]);
 
-  if (params.tab == null) {
-    return <CenteredAnimatedLoader />;
-  }
+  return <CenteredAnimatedLoader />;
+};
 
+const Browse3ProjectRoot: FC<{
+  projectRoot: string;
+  customLocation?: {
+    key: string;
+    pathname: string;
+    search: string;
+    hash: string;
+    state: any;
+  };
+}> = ({projectRoot, customLocation}) => {
   return (
     <Box
       sx={{
@@ -325,7 +472,7 @@ const Browse3ProjectRoot: FC = () => {
         width: '100%',
         overflow: 'auto',
       }}>
-      <Switch>
+      <Switch location={customLocation}>
         {/* TYPES */}
         <Route path={`${projectRoot}/types/:itemName/versions/:version?`}>
           <TypeVersionRoutePageBinding />
@@ -334,7 +481,7 @@ const Browse3ProjectRoot: FC = () => {
           <TypePageBinding />
         </Route>
         <Route path={`${projectRoot}/types`}>
-          <TypesPage entity={params.entity} project={params.project} />
+          <TypesPageBinding />
         </Route>
         <Route path={`${projectRoot}/type-versions`}>
           <TypeVersionsPageBinding />
@@ -348,7 +495,7 @@ const Browse3ProjectRoot: FC = () => {
           <ObjectPageBinding />
         </Route>
         <Route path={`${projectRoot}/objects`}>
-          <ObjectsPage entity={params.entity} project={params.project} />
+          <ObjectsPageBinding />
         </Route>
         <Route path={`${projectRoot}/object-versions`}>
           <ObjectVersionsPageBinding />
@@ -361,7 +508,7 @@ const Browse3ProjectRoot: FC = () => {
           <OpPageBinding />
         </Route>
         <Route path={`${projectRoot}/ops`}>
-          <OpsPage entity={params.entity} project={params.project} />
+          <OpsPageBinding />
         </Route>
         <Route path={`${projectRoot}/op-versions`}>
           <OpVersionsPageBinding />
@@ -383,14 +530,14 @@ const Browse3ProjectRoot: FC = () => {
           <BoardPageBinding />
         </Route>
         <Route path={`${projectRoot}/boards`}>
-          <BoardsPage entity={params.entity} project={params.project} />
+          <BoardsPageBinding />
         </Route>
         {/* TABLES */}
         <Route path={`${projectRoot}/tables/:tableId`}>
           <TablePage />
         </Route>
         <Route path={`${projectRoot}/tables`}>
-          <TablesPage entity={params.entity} project={params.project} />
+          <TablesPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -402,7 +549,7 @@ const ObjectVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowRouteContext();
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -440,7 +587,7 @@ const ObjectVersionRoutePageBinding = () => {
 const OpVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
   const history = useHistory();
-  const routerContext = useWeaveflowRouteContext();
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -474,7 +621,7 @@ const TypeVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowRouteContext();
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -503,8 +650,53 @@ const TypeVersionRoutePageBinding = () => {
   );
 };
 
+const useCallPeekRedirect = () => {
+  // This is a "hack" since the client doesn't have all the info
+  // needed to make a correct peek URL. This allows the client to request
+  // such a view and we can redirect to the correct URL.
+  const params = useParams<Browse3TabItemParams>();
+  const {baseRouter} = useWeaveflowRouteContext();
+  const history = useHistory();
+  const orm = useWeaveflowORMContext(params.entity, params.project);
+  const call = orm.projectConnection.call(params.itemName);
+  const query = useURLSearchParamsDict();
+  useEffect(() => {
+    if (call && query.convertToPeek) {
+      const opVersion = call.opVersion();
+      if (!opVersion) {
+        return;
+      }
+      const path = baseRouter.callsUIUrl(params.entity, params.project, {
+        opVersions: [opVersion.op().name() + ':' + opVersion.version()],
+      });
+      const searchParams = new URLSearchParams();
+      searchParams.set(
+        'peekPath',
+        baseContext.callUIUrl(
+          params.entity,
+          params.project,
+          call.traceID(),
+          params.itemName
+        )
+      );
+      const newSearch = searchParams.toString();
+      const newUrl = `${path}&${newSearch}`;
+      history.replace(newUrl);
+    }
+  }, [
+    baseRouter,
+    call,
+    history,
+    params.entity,
+    params.itemName,
+    params.project,
+    query.convertToPeek,
+  ]);
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
+  useCallPeekRedirect();
   const params = useParams<Browse3TabItemParams>();
 
   return (
@@ -532,12 +724,14 @@ const CallsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
-      history.push(router.callsUIUrl(params.entity, params.project, filter));
+      history.push(
+        routerContext.callsUIUrl(params.entity, params.project, filter)
+      );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <CallsPage
@@ -566,14 +760,14 @@ const ObjectVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
-        router.objectVersionsUIUrl(params.entity, params.project, filter)
+        routerContext.objectVersionsUIUrl(params.entity, params.project, filter)
       );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <ObjectVersionsPage
@@ -602,14 +796,14 @@ const TypeVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
-        router.typeVersionsUIUrl(params.entity, params.project, filter)
+        routerContext.typeVersionsUIUrl(params.entity, params.project, filter)
       );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <TypeVersionsPage
@@ -638,14 +832,14 @@ const OpVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const router = useWeaveflowRouteContext();
+  const routerContext = useWeaveflowPeekAwareRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
-        router.opVersionsUIUrl(params.entity, params.project, filter)
+        routerContext.opVersionsUIUrl(params.entity, params.project, filter)
       );
     },
-    [history, params.entity, params.project, router]
+    [history, params.entity, params.project, routerContext]
   );
   return (
     <OpVersionsPage
@@ -704,6 +898,36 @@ const TypePageBinding = () => {
       typeName={params.itemName}
     />
   );
+};
+
+const TypesPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <TypesPage entity={params.entity} project={params.project} />;
+};
+
+const OpsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <OpsPage entity={params.entity} project={params.project} />;
+};
+
+const ObjectsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <ObjectsPage entity={params.entity} project={params.project} />;
+};
+
+const BoardsPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <BoardsPage entity={params.entity} project={params.project} />;
+};
+
+const TablesPageBinding = () => {
+  const params = useParams<Browse3TabItemParams>();
+
+  return <TablesPage entity={params.entity} project={params.project} />;
 };
 
 const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (

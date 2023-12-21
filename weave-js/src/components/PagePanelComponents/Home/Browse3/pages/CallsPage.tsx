@@ -57,7 +57,7 @@ export const CallsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const opVersionOptions = useMemo(() => {
     const versions = orm.projectConnection.opVersions();
@@ -166,7 +166,7 @@ export const CallsTable: React.FC<{
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
       showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
-      filterPopoutTargetUrl={routerContext.callsUIUrl(
+      filterPopoutTargetUrl={baseRouter.callsUIUrl(
         props.entity,
         props.project,
         effectiveFilter

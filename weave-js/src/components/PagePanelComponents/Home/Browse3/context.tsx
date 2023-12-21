@@ -1,6 +1,7 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {createContext, useContext} from 'react';
+import React, {createContext, useCallback, useContext} from 'react';
+import {useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
@@ -29,6 +30,12 @@ export const useWeaveflowRouteContext = () => {
   return ctx;
 };
 
+export const useWeaveflowPeekAwareRouteContext = () => {
+  const ctx = useContext(WeaveflowRouteContext);
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  return isPeeking ? ctx.peekingRouter : ctx.baseRouter;
+};
+
 export const Browse3WeaveflowRouteContextProvider = ({
   projectRoot,
   children,
@@ -36,8 +43,10 @@ export const Browse3WeaveflowRouteContextProvider = ({
   children: React.ReactNode;
   projectRoot(entityName: string, projectName: string): string;
 }) => {
+  const baseRouter = browse3ContextGen(projectRoot);
   return (
-    <WeaveflowRouteContext.Provider value={browse3ContextGen(projectRoot)}>
+    <WeaveflowRouteContext.Provider
+      value={{baseRouter, peekingRouter: useMakePeekingRouter()}}>
       {children}
     </WeaveflowRouteContext.Provider>
   );
@@ -52,7 +61,7 @@ type WFDBTableType =
   | 'Call'
   | 'Object'
   | 'ObjectVersion';
-const browse2Context = {
+export const browse2Context = {
   refUIUrl: (
     rootTypeName: string,
     objRef: ArtifactRef,
@@ -416,4 +425,139 @@ type RouteType = {
   ) => string;
   opPageUrl: (opUri: string) => string;
 };
-const WeaveflowRouteContext = createContext<RouteType>(browse2Context);
+
+const useSetSearchParam = () => {
+  const location = useLocation();
+  return useCallback(
+    (key: string, value: string | null) => {
+      const searchParams = new URLSearchParams(location.search);
+      if (value === null) {
+        searchParams.delete(key);
+      } else {
+        searchParams.set(key, value);
+      }
+      const newSearch = searchParams.toString();
+      const newUrl = `${location.pathname}?${newSearch}`;
+      return newUrl;
+    },
+    [location]
+  );
+};
+
+const PEAK_SEARCH_PARAM = 'peekPath';
+export const baseContext = browse3ContextGen(
+  (entityName: string, projectName: string) => {
+    return `/${entityName}/${projectName}`;
+  }
+);
+
+const useMakePeekingRouter = (): RouteType => {
+  const setSearchParam = useSetSearchParam();
+
+  return {
+    refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.refUIUrl(...args));
+    },
+    entityUrl: (...args: Parameters<typeof baseContext.entityUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.entityUrl(...args));
+    },
+    projectUrl: (...args: Parameters<typeof baseContext.projectUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.projectUrl(...args));
+    },
+    typeUIUrl: (...args: Parameters<typeof baseContext.typeUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.typeUIUrl(...args));
+    },
+    objectUIUrl: (...args: Parameters<typeof baseContext.objectUIUrl>) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.objectUIUrl(...args)
+      );
+    },
+    opUIUrl: (...args: Parameters<typeof baseContext.opUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opUIUrl(...args));
+    },
+    typeVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.typeVersionUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.typeVersionUIUrl(...args)
+      );
+    },
+    typeVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.typeVersionsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.typeVersionsUIUrl(...args)
+      );
+    },
+    objectVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.objectVersionUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.objectVersionUIUrl(...args)
+      );
+    },
+    opVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.opVersionsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.opVersionsUIUrl(...args)
+      );
+    },
+    opVersionUIUrl: (
+      ...args: Parameters<typeof baseContext.opVersionUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.opVersionUIUrl(...args)
+      );
+    },
+    callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callUIUrl(...args));
+    },
+    callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callsUIUrl(...args));
+    },
+    objectVersionsUIUrl: (
+      ...args: Parameters<typeof baseContext.objectVersionsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.objectVersionsUIUrl(...args)
+      );
+    },
+    opPageUrl: (...args: Parameters<typeof baseContext.opPageUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opPageUrl(...args));
+    },
+    boardsUIUrl: (...args: Parameters<typeof baseContext.boardsUIUrl>) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.boardsUIUrl(...args)
+      );
+    },
+    tablesUIUrl: (...args: Parameters<typeof baseContext.tablesUIUrl>) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.tablesUIUrl(...args)
+      );
+    },
+  };
+};
+
+const WeaveflowRouteContext = createContext<{
+  baseRouter: RouteType;
+  peekingRouter: RouteType;
+}>({
+  baseRouter: browse2Context,
+  peekingRouter: browse2Context,
+});
+
+export const WeaveflowPeekContext = createContext<{
+  isPeeking?: boolean;
+}>({
+  isPeeking: false,
+});

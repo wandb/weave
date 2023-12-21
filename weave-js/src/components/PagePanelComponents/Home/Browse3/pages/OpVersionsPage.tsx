@@ -67,7 +67,7 @@ export const FilterableOpVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
   const getInitialData = useCallback(
@@ -81,9 +81,9 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const getFilterPopoutTargetUrl = useCallback(
     (filter: WFHighLevelOpVersionFilter) => {
-      return routerContext.opVersionsUIUrl(props.entity, props.project, filter);
+      return baseRouter.opVersionsUIUrl(props.entity, props.project, filter);
     },
-    [props.entity, props.project, routerContext]
+    [props.entity, props.project, baseRouter]
   );
 
   const columns = useMemo(() => {
