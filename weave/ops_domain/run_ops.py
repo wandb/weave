@@ -416,7 +416,7 @@ def link(run: wdt.Run) -> wdt.Link:
 
 
 @op(
-    name="str-runlink",
+    name="constructor-wbRunLink",
     input_type={
         "entity_name": types.optional(types.String()),
         "project_name": types.optional(types.String()),

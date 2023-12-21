@@ -691,7 +691,8 @@ export const opRunRuntime = makeRunOp({
 });
 
 export const opStrRunlink = OpKinds.makeBasicOp({
-  name: 'str-runlink',
+  name: 'constructor-wbRunLink',
+  hidden: true,
   argTypes: {
     entity_name: {
       type: 'union' as const,
@@ -711,8 +712,6 @@ export const opStrRunlink = OpKinds.makeBasicOp({
   returnValueDescription: `The link to the ${docType('run')} overview`,
   returnType: inputTypes => 'link',
   resolver: ({entity_name, project_name, name}) => {
-    return (
-      '/' + entity_name + '/' + project_name + '/runs/' + name + '/overview'
-    );
+    throw new Error('Attempting to use python-only op in js');
   },
 });
