@@ -3,14 +3,14 @@ import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 
 export const useRefPageUrl = () => {
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   const refPageUrl = (objectType: string, refS: string) => {
     const ref = parseRef(refS);
     if (!isWandbArtifactRef(ref)) {
       throw new Error('Not a wandb artifact ref: ' + refS);
     }
 
-    return routerContext.refUIUrl(objectType, {
+    return baseRouter.refUIUrl(objectType, {
       entityName: ref.entityName,
       projectName: ref.projectName,
       artifactName: ref.artifactName,

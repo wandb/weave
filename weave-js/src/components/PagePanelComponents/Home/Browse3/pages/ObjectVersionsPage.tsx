@@ -75,7 +75,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
   const objectOptions = useMemo(() => {
@@ -186,7 +186,7 @@ export const FilterableObjectVersionsTable: React.FC<{
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
       showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
-      filterPopoutTargetUrl={routerContext.objectVersionsUIUrl(
+      filterPopoutTargetUrl={baseRouter.objectVersionsUIUrl(
         props.entity,
         props.project,
         effectiveFilter

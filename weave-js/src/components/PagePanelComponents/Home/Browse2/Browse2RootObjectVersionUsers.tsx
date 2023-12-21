@@ -10,7 +10,7 @@ import {LinkTable} from './LinkTable';
 
 export const Browse2RootObjectVersionUsers: FC<{uri: string}> = ({uri}) => {
   const params = useParams<Browse2RootObjectVersionItemParams>();
-  const routeContext = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   const calledOpCountsNode = useMemo(() => {
     const streamTableRowsNode = callsTableNode({
       entityName: params.entity,
@@ -37,12 +37,10 @@ export const Browse2RootObjectVersionUsers: FC<{uri: string}> = ({uri}) => {
   const handleRowClick = useCallback(
     (row: any) => {
       history.push(
-        `${routeContext.opPageUrl(row._name)}?inputUri=${encodeURIComponent(
-          uri
-        )}`
+        `${baseRouter.opPageUrl(row._name)}?inputUri=${encodeURIComponent(uri)}`
       );
     },
-    [history, routeContext, uri]
+    [history, baseRouter, uri]
   );
 
   return <LinkTable rows={rows} handleRowClick={handleRowClick} />;

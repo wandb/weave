@@ -47,7 +47,7 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   objRef,
   wfTable,
 }) => {
-  const {refUIUrl} = useWeaveflowRouteContext();
+  const {peekingRouter} = useWeaveflowRouteContext();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
     return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
@@ -80,7 +80,11 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   if (!isWandbArtifactRef(objRef)) {
     return <div>[Error: non wandb ref]</div>;
   }
-  return <Link to={refUIUrl(rootTypeName, objRef, wfTable)}>{Item}</Link>;
+  return (
+    <Link to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
+      {Item}
+    </Link>
+  );
 };
 
 export const parseRefMaybe = (s: string): ArtifactRef | null => {
