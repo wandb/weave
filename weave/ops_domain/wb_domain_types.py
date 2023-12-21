@@ -215,7 +215,7 @@ RunQueueType = typing.cast(PartialObjectTypeGeneratorType, RunQueueType)
 # Simple types (maybe should be put into primitives?)
 
 
-@weave_type("link", __is_simple=True)
+@weave_type("link", __is_simple=True)  # type: ignore
 class Link:
     name: str
     url: str
