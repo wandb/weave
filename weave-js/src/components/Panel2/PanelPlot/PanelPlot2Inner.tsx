@@ -726,8 +726,19 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                 ),
               });
             } else {
+              const unnestedRowType = listObjectType(
+                listOfTableNodes[row._seriesIndex].type
+              ) as TypedDictType;
+
+              const unnestedType =
+                unnestedRowType.propertyTypes[
+                  vegaCols[row._seriesIndex].tooltip
+                ]!;
+
               acc[key] = constNodeUnsafe(
-                isTaggedValue(type) ? taggedValueValueType(type) : type,
+                isTaggedValue(unnestedType)
+                  ? taggedValueValueType(unnestedType)
+                  : unnestedType,
                 row[vegaCols[row._seriesIndex].tooltip]
               );
             }
@@ -740,10 +751,11 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }, [
       concattedNonLineTable,
       concreteConfig.series,
-      vegaCols,
       vegaReadyTables,
+      vegaCols,
       flatResultNode,
       weave.client.opStore,
+      listOfTableNodes,
     ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
