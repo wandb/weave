@@ -811,6 +811,9 @@ def filter_node_to_selection(
             selection_min = selection[0]  # type: ignore
             selection_max = selection[1]  # type: ignore
 
+            # This is a hack to handle selection of data from plots that have a temporal
+            # range defined with bins ("start", "stop") instead of a single timestamp.
+            # Should naievly handle selection of data from plots using op timestamps-binsnice
             if (
                 weave.types.TypedDict({"start": weave.types.Timestamp()}).assign_type(
                     target.type
