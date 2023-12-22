@@ -506,12 +506,13 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode() and op_def.location:
         op_def_ref = storage._get_ref(op_def)
-        if not client.ref_is_own(op_def_ref):
-            # This should have already been published by publish_graph if monitoring
-            # is turned on.
-            raise errors.WeaveInternalError(
-                "Found unpublished custom OpDef with monitoring turned on", op_def
-            )
+        # Commenting out as this breaks basic op use cases as a result of ref pr
+        # if not client.ref_is_own(op_def_ref):
+        #     # This should have already been published by publish_graph if monitoring
+        #     # is turned on.
+        #     raise errors.WeaveInternalError(
+        #         "Found unpublished custom OpDef with monitoring turned on", op_def
+        #     )
         mon_span_inputs, refs = auto_publish(inputs)
 
         # Memoization disabled for now.
