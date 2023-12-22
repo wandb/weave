@@ -13,6 +13,8 @@ from .. import ref_base
 from .. import weave_types as types
 from .. import box
 from .. import weave_internal
+from .. import op_def_type
+from .. import op_def
 from ..ops_primitives import _dict_utils
 from .. import errors
 from .. import graph
@@ -487,6 +489,23 @@ def unsafe_awl_construction(reason: str):
 ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 
+def dict_of_columns_to_awl(d: dict[str, typing.Any]) -> "ArrowWeaveList":
+    from . import constructors
+
+    cols = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            cols[k] = dict_of_columns_to_awl(v)
+        elif isinstance(v, list):
+            cols[k] = ArrowWeaveList(v)
+        else:
+            cols[k] = v
+    res = constructors.vectorized_container_constructor_preprocessor(cols)
+    arrow_data = pa.StructArray.from_arrays(res.arrays, list(cols.keys()))
+    object_type = types.TypedDict(res.prop_types)
+    return ArrowWeaveList(arrow_data, object_type)
+
+
 class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     _arrow_data: pa.Array
     object_type: types.Type
@@ -494,15 +513,26 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     # TODO: Refactor to disable None artifact? (Only used in tests)
     def __init__(
         self,
-        arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array],
+        arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array, dict, list],
         object_type=None,
         artifact: typing.Optional[artifact_base.Artifact] = None,
         invalid_reason=None,
     ) -> None:
+        from . import constructors
+        from . import convert
+
         # Do not dictionary decode this array! That will break performance.
         # Note we combine chunks here, to make the internal interface easy
         # to use. In the future we could refactor to retain chunked form.
-        if isinstance(arrow_data, pa.Array):
+        if isinstance(arrow_data, dict):
+            awl = dict_of_columns_to_awl(arrow_data)
+            self._arrow_data = awl._arrow_data
+            object_type = awl.object_type
+        elif isinstance(arrow_data, list):
+            loaded = convert.to_arrow(arrow_data)
+            self._arrow_data = loaded._arrow_data
+            object_type = loaded.object_type
+        elif isinstance(arrow_data, pa.Array):
             self._arrow_data = arrow_data
         elif isinstance(arrow_data, pa.Table):
             self._arrow_data = pa.StructArray.from_arrays(
@@ -528,6 +558,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self._invalid_reason = invalid_reason
 
         self._validate()
+
+    def __add__(self, other) -> "ArrowWeaveList":
+        if isinstance(other, list):
+            other = ArrowWeaveList(other)
+        if not isinstance(other, ArrowWeaveList):
+            raise TypeError(f"Expected list or ArrowWeaveList, got {type(other)}")
+
+        from . import concat
+
+        return concat.concatenate(self, other)
 
     def _validate(self) -> None:
         if self._invalid_reason is None:
@@ -1086,12 +1126,32 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
 
         for path, obj_type in obj_type_paths.items():
-            # print("OBJ TYPE PATH", path)
+            non_op_def_keys = [
+                k
+                for k, t in obj_type.property_types().items()
+                if not t == op_def_type.OpDefType()
+            ]
+
+            def val_to_obj(v, y):
+                # We init the object with non-op-def (non-method) keys.
+                # This is not quite right, this code needs to do what we do
+                # in mappers_python, and also attach the methods to the object
+                # after construction.
+
+                # So we don't yet correctly deserialize lists of relocatable objects
+                # with different methods correctly.
+                # TODO: fix
+                return (
+                    None
+                    if v is None
+                    else obj_type.instance_class(**{k: v[k] for k in non_op_def_keys})
+                )
+
             set_path(
                 value_py,
                 value_awl._arrow_data,
                 (PathItemOuterList(),) + path,
-                lambda v, j: None if v is None else obj_type.instance_class(**v),
+                val_to_obj,
             )
         # Dictionary decode the value, and add the tags to the tag store,
         # in a single pass.
@@ -1110,6 +1170,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     return None
                 if isinstance(v, dict):
                     return type_.instance_from_dict(v)
+                if isinstance(v, op_def.OpDef):
+                    # I'm not sure how this is already an OpDef, but it is
+                    # so we can just return...
+                    return v
                 # else its a ref string
                 # TODO: this does not use self.artifact, can we just drop it?
                 # Do we need the type so we can load here? No...
@@ -1120,6 +1184,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     # But you can still reference them, because you have to get that
                     # file through an op, and therefore we know the type?
                     ref._type = type_
+
+                    if isinstance(type_, types.RefType):
+                        ref._type = type_.object_type
+                        # if we actually have a ref, then don't deref, return the ref
+                        return ref
+
                     return ref.get()
 
                 return self._artifact.get(v, type_)
@@ -1212,7 +1282,31 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             result_rows, self.object_type, self._artifact
         )
         if isinstance(index, int):
-            return awl.to_pylist_tagged()[0]
+            from .. import ref_base
+            from .. import artifact_base
+
+            result = awl.to_pylist_tagged()[0]
+            # If we already have a ref, get it and return it immediately.
+            if isinstance(result, ref_base.Ref):
+                return result.get()
+
+            # Otherwise if self has a ref, return a ref to self/index
+            ref = ref_base.get_ref(self)
+
+            # Ensure we associate a ref for the row we're returning,
+            # so if the user calls an op on the row, the op refers to a sub-row
+            # in this list
+            if isinstance(ref, ref_base.Ref):
+                if not isinstance(ref, artifact_base.ArtifactRef):
+                    raise ValueError(
+                        "Cannot index into a non-artifact ref: {}".format(ref)
+                    )
+                result = box.box(result)
+                new_ref = ref.with_extra(self.object_type, result, [str(index)])
+                ref_base._put_ref(result, new_ref)
+
+            # No item ref or self ref, just return the result
+            return result
         return awl
 
     def __getitem__(
@@ -1363,6 +1457,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )
         return weave_internal.define_fn(vars, fn).val
 
+    # TODO: This should be .map!
     def apply(
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):
@@ -1409,6 +1504,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             self._arrow_data, self.object_type, self._artifact, invalid_reason=None
         )
 
+    def to_pandas(self):
+        arrow_data = self._arrow_data
+        if isinstance(self.object_type, types.TypedDict):
+            arrow_data = pa.Table.from_arrays(
+                [arrow_data.field(i) for i in range(len(arrow_data.type))],
+                names=[f.name for f in arrow_data.type],
+            )
+        return arrow_data.to_pandas()
+
 
 ArrowWeaveListGenericType = typing.TypeVar(
     "ArrowWeaveListGenericType", bound=types.Type
@@ -1451,7 +1555,16 @@ def is_taggedvalue_arrowweavelist(
 def is_list_arrowweavelist(
     val: ArrowWeaveList,
 ) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.List]]:
-    return types.List().assign_type(val.object_type)
+    # Don't use assignability to List here! Because Ref<List> is assignable to List
+    return isinstance(val.object_type, types.List) or isinstance(
+        val.object_type, ArrowWeaveListType
+    )
+
+
+def is_ref_arrowweavelist(
+    val: ArrowWeaveList,
+) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.RefType]]:
+    return isinstance(val.object_type, types.RefType)
 
 
 def dataframe_to_arrow(df):
@@ -1518,3 +1631,20 @@ def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
     arrs = convert.unify_types(*arrs)
     zipped = arrow_zip(*[a._arrow_data for a in arrs])
     return ArrowWeaveList(zipped, types.List(arrs[0].object_type), None)
+
+
+# Converts timestamp columns to ms for serialization back to web client
+def convert_arrow_timestamp_to_epoch_ms(awl: ArrowWeaveList):
+    def convert(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
+        _, non_none_type = types.split_none(col.object_type)
+        if isinstance(non_none_type, types.Timestamp):
+            return ArrowWeaveList(
+                pc.milliseconds_between(
+                    pa.scalar(0, col._arrow_data.type), col._arrow_data
+                ),
+                types.optional(types.Int()),
+                awl._artifact,
+            )
+        return None
+
+    return awl.map_column(convert)

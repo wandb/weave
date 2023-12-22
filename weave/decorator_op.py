@@ -1,40 +1,55 @@
 import inspect
+import typing
+
 
 from . import registry_mem
 from . import op_def
 from . import op_args
 from . import derive_op
+from . import context_state
 from . import weave_types as types
 from . import pyfunc_type_util
 
+if typing.TYPE_CHECKING:
+    from weave.gql_op_plugin import GqlOpPlugin
+
 
 def op(
-    input_type=None,
-    output_type=None,
-    refine_output_type=None,
-    name=None,
-    setter=None,
-    render_info=None,
-    hidden=False,
-    pure=True,
-    _op_def_class=op_def.OpDef,
+    input_type: pyfunc_type_util.MaybeInputTypeType = None,
+    # input_type: pyfunc_type_util.MaybeInputTypeType = None,
+    output_type: pyfunc_type_util.MaybeOutputTypeType = None,
+    refine_output_type: typing.Optional[op_def.OpDef] = None,
+    name: typing.Optional[str] = None,
+    setter: typing.Optional[typing.Callable] = None,
+    render_info: typing.Optional[dict] = None,
+    hidden: bool = False,
+    pure: bool = True,
+    _op_def_class: type[op_def.OpDef] = op_def.OpDef,
     *,  # Marks the rest of the arguments as keyword-only.
-    plugins=None,
-    mutation=False,
+    plugins: typing.Optional[dict[str, "GqlOpPlugin"]] = None,
+    mutation: bool = False,
     # If True, the op will be weavified, ie it's resolver will be stored as a Weave
     # op graph. The compile node_ops pass will expand the node to the weavified
     # version, instead of executing the original python resolver body.
-    weavify=False,
-):
+    weavify: bool = False,
+) -> typing.Callable[[typing.Callable], op_def.OpDef]:
     """Decorator for declaring an op.
 
     Decorated functions must be typed, either with Python types or by declaring
     input_type, output_type as arguments to op (Python types preferred).
     """
 
+    # For builtins, enforce that parameter and return types must be declared.
+    # For user ops, allow missing types.
+    allow_unknowns = not context_state._loading_built_ins.get()
+
     def wrap(f):
-        weave_input_type = pyfunc_type_util.determine_input_type(f, input_type)
-        weave_output_type = pyfunc_type_util.determine_output_type(f, output_type)
+        weave_input_type = pyfunc_type_util.determine_input_type(
+            f, input_type, allow_unknowns=allow_unknowns
+        )
+        weave_output_type = pyfunc_type_util.determine_output_type(
+            f, output_type, allow_unknowns=allow_unknowns
+        )
 
         fq_op_name = name
         if fq_op_name is None:

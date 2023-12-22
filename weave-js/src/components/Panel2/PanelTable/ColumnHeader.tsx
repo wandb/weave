@@ -6,23 +6,27 @@ import * as SemanticHacks from '@wandb/weave/common/util/semanticHacks';
 import {
   canGroupType,
   canSortType,
+  constFunction,
   EditingNode,
   isListLike,
   isVoidNode,
   listObjectType,
   Node,
   NodeOrVoidNode,
+  opCount,
   voidNode,
 } from '@wandb/weave/core';
+import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
+import {Button} from '../../Button';
+import {Tooltip} from '../../Tooltip';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
-import {IconClose} from '../Icons';
 import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
@@ -122,6 +126,8 @@ export const ColumnHeader: React.FC<{
   panelContext: any;
   isPinned: boolean;
   simpleTable?: boolean;
+  countColumnId: string | null;
+  setCountColumnId: React.Dispatch<React.SetStateAction<string | null>>;
   updatePanelContext(newContext: any): void;
   updateTableState(newTableState: Table.TableState): void;
   setColumnPinState(pin: boolean): void;
@@ -141,6 +147,8 @@ export const ColumnHeader: React.FC<{
   isPinned,
   setColumnPinState,
   simpleTable,
+  countColumnId,
+  setCountColumnId,
 }) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
@@ -156,6 +164,7 @@ export const ColumnHeader: React.FC<{
     useState<any>(propsPanelConfig);
   const enableGroup = Table.enableGroupByCol;
   const disableGroup = Table.disableGroupByCol;
+  const isGroupCountColumn = colId === 'groupCount';
 
   const applyWorkingState = useCallback(() => {
     let newState = tableState;
@@ -242,8 +251,19 @@ export const ColumnHeader: React.FC<{
     ]
   );
   const doUngroup = useCallback(async () => {
-    const newTableState = await disableGroup(
-      tableState,
+    let newTableState: Table.TableState | null = null;
+    const countColumnExists = Object.keys(tableState.columnNames).includes(
+      'groupCount'
+    );
+    if (countColumnId && !countColumnExists) {
+      setCountColumnId(null);
+    }
+    if (countColumnId && countColumnExists && tableState.groupBy.length === 1) {
+      newTableState = Table.removeColumn(tableState, countColumnId);
+      setCountColumnId(null);
+    }
+    newTableState = await disableGroup(
+      newTableState ?? tableState,
       colId,
       inputArrayNode,
       weave,
@@ -252,6 +272,8 @@ export const ColumnHeader: React.FC<{
     recordEvent('UNGROUP');
     updateTableState(newTableState);
   }, [
+    countColumnId,
+    setCountColumnId,
     disableGroup,
     tableState,
     colId,
@@ -284,8 +306,8 @@ export const ColumnHeader: React.FC<{
 
   let columnTypeForGroupByChecks = stripTag(workingSelectFunction.type);
   if (!isGroupCol) {
-    /* 
-      Once one column is grouped, the other non-grouped columns are all typed as 
+    /*
+      Once one column is grouped, the other non-grouped columns are all typed as
       lists. So we need to figure out the inner types of the non-grouped columns.
       */
     columnTypeForGroupByChecks = isListLike(columnTypeForGroupByChecks)
@@ -301,15 +323,39 @@ export const ColumnHeader: React.FC<{
       icon: 'configuration',
       onSelect: () => openColumnSettings(),
     });
-    if (!isGroupCol && canGroupType(columnTypeForGroupByChecks)) {
+    if (
+      !isGroupCol &&
+      !isGroupCountColumn &&
+      canGroupType(columnTypeForGroupByChecks)
+    ) {
       menuItems.push({
         value: 'group',
         name: 'Group by',
         icon: 'group-runs',
         onSelect: async () => {
           recordEvent('GROUP');
-          const newTableState = await enableGroup(
-            tableState,
+          let newTableState: Table.TableState | null = null;
+          if (countColumnId == null) {
+            const {table, columnId} = Table.addColumnToTable(
+              tableState,
+              constFunction(
+                {
+                  row: {
+                    type: 'list',
+                    objectType: 'any',
+                  },
+                },
+                ({row}) => {
+                  return opCount({arr: row});
+                }
+              ).val,
+              'groupCount'
+            );
+            newTableState = table;
+            setCountColumnId(columnId);
+          }
+          newTableState = await enableGroup(
+            newTableState ?? tableState,
             colId,
             inputArrayNode,
             weave,
@@ -411,6 +457,8 @@ export const ColumnHeader: React.FC<{
     }
     return menuItems;
   }, [
+    countColumnId,
+    setCountColumnId,
     isGroupCol,
     columnTypeForGroupByChecks,
     workingSelectFunction.type,
@@ -425,6 +473,7 @@ export const ColumnHeader: React.FC<{
     doUngroup,
     isPinned,
     setColumnPinState,
+    isGroupCountColumn,
   ]);
 
   const colIsSorted =
@@ -490,12 +539,12 @@ export const ColumnHeader: React.FC<{
                 marginRight: `-${colControlsWidth}px`,
               }}
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
-              {workingColumnName !== '' ? (
-                <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
+              {propsColumnName !== '' ? (
+                <S.ColumnNameText>{propsColumnName}</S.ColumnNameText>
               ) : (
                 <ExpressionView.ExpressionView
                   frame={cellFrame}
-                  node={workingSelectFunction}
+                  node={propsSelectFunction}
                 />
               )}
             </S.ColumnName>
@@ -503,9 +552,19 @@ export const ColumnHeader: React.FC<{
           content={
             columnSettingsOpen && (
               <div>
-                <S.CloseIconButton onClick={() => setColumnSettingsOpen(false)}>
-                  <IconClose width={20} />
-                </S.CloseIconButton>
+                <Tooltip
+                  // Button's built-in tooltip attribute won't position properly with custom wrapper style.
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      icon="close"
+                      size="small"
+                      twWrapperStyles={{position: 'absolute', right: 8}}
+                      onClick={() => setColumnSettingsOpen(false)}
+                    />
+                  }
+                  content="Discard changes"
+                />
                 <S.ColumnEditorSection>
                   <S.ColumnEditorSectionLabel>
                     Cell expression

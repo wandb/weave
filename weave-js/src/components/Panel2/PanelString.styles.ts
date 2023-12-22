@@ -2,9 +2,9 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 
 export const StringContainer = styled.div<{
-  spacing?: boolean;
+  $spacing?: boolean;
 }>`
-  padding: ${p => (p.spacing ? '4px 1em' : '0 1em')};
+  padding: ${p => (p.$spacing ? '4px 1em' : '0 1em')};
   width: 100%;
   height: 100%;
   display: flex;
@@ -22,9 +22,9 @@ export const StringContainer = styled.div<{
 StringContainer.displayName = 'S.StringContainer';
 
 export const StringItem = styled.div<{
-  spacing?: boolean;
+  $spacing?: boolean;
 }>`
-  margin: ${p => (p.spacing ? '0' : 'auto')};
+  margin: ${p => (p.$spacing ? '0' : 'auto')};
   width: 100%;
   /* padding: 4px; */
   max-height: 100%;

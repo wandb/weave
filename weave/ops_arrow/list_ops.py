@@ -18,11 +18,17 @@ from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
 from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from .list_ import ArrowWeaveList, PathType, is_list_arrowweavelist
+from .list_ import (
+    ArrowWeaveList,
+    PathType,
+    is_list_arrowweavelist,
+    is_taggedvalue_arrowweavelist,
+)
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert
 from .convert import to_compare_safe
+from .concat import concatenate_all
 from .constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
@@ -707,25 +713,7 @@ def concat(arr):
 
     # We merge the lists mergesort-style, which is `O(n*log(n))`
     # DO NOT merge the lists reduce-style, which is `O(n^2)`
-    return merge_concat(tagged)
-
-
-def merge_concat(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
-    if len(arr) == 0:
-        raise ValueError("arr must not be empty")
-    if len(arr) == 1:
-        return arr[0]
-    left, right = merge_concat_split(arr)
-    return merge_concat(left).concat(merge_concat(right))
-
-
-def merge_concat_split(
-    arr: list[ArrowWeaveList],
-) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
-    if len(arr) < 2:
-        raise ValueError("arr must have length of at least 2")
-    middle_index = len(arr) // 2
-    return arr[:middle_index], arr[middle_index:]
+    return concatenate_all(tagged)
 
 
 # # Putting this here instead of in number b/c it is just a map function
@@ -933,7 +921,10 @@ def flatten(arr):
     #   - handle N levels instead of 1
 
     arrow_data = arr._arrow_data
-    if is_list_arrowweavelist(arr):
+    if is_list_arrowweavelist(arr) or (
+        is_taggedvalue_arrowweavelist(arr)
+        and is_list_arrowweavelist(arr.tagged_value_value())
+    ):
         # unwrap tags
 
         tags = None

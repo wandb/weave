@@ -15,6 +15,7 @@ from . import context_state
 from . import weave_types as types
 from . import registry_mem
 from . import errors
+from . import environment
 
 from . import infer_types
 
@@ -79,6 +80,21 @@ def get_code_deps(fn, decl_locals):
     return import_code
 
 
+def get_import_statements_for_annotations(func) -> list[str]:
+    """Ensures we have imports for all the types used in the function annotations."""
+    annotations = func.__annotations__
+    imports_needed = set()
+
+    for annotation in annotations.values():
+        if hasattr(annotation, "__module__") and hasattr(annotation, "__name__"):
+            module_name = annotation.__module__
+            class_name = annotation.__name__
+            if module_name != "builtins":
+                imports_needed.add(f"from {module_name} import {class_name}")
+
+    return list(imports_needed)
+
+
 class OpDefType(types.Type):
     instance_class = op_def.OpDef
     instance_classes = op_def.OpDef
@@ -90,9 +106,25 @@ class OpDefType(types.Type):
         else:
             code = "import typing\nimport weave\n"
 
+            # Get import statements for any annotations
+            code += (
+                "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
+                + "\n\n"
+            )
+
             # Try to figure out module imports from the function body
             # (in a real hacky way as a POC)
             code += get_code_deps(obj.raw_resolve_fn, obj._decl_locals)
+
+            # Note the above two stanzas are in the order they are to ensure
+            # this case works.
+            # from PIL import Image
+            # def sin_image(f: int) -> Image.Image:
+            #     pass
+            # The first stanza will create "from PIL.Image import Image"
+            # and the second will create "from PIL import Image". In this case
+            # we want the latter.
+            # This is a major hack to get a notebook working.
 
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.raw_resolve_fn.__annotations__
@@ -106,6 +138,13 @@ class OpDefType(types.Type):
                 f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
+        if environment.wandb_production():
+            # Returning None here instead of erroring allows the Weaveflow app
+            # to reference op defs without crashing.
+            return None
+            # raise errors.WeaveInternalError(
+            #     "Loading ops from artifacts is not supported in production mode."
+            # )
         try:
             with artifact.open(f"{name}.json") as f:
                 op_spec = json.load(f)
@@ -114,29 +153,74 @@ class OpDefType(types.Type):
         except FileNotFoundError:
             pass
 
-        path_with_ext = os.path.relpath(
-            artifact.path(f"{name}.py"), start=artifact_local.local_artifact_dir()
-        )
-        # remove the .py extension
-        path = os.path.splitext(path_with_ext)[0]
-        # convert filename into module path
-        parts = path.split("/")
-        module_path = ".".join(parts)
+        from . import artifact_wandb
 
-        sys.path.insert(0, artifact_local.local_artifact_dir())
-        with context_state.loading_op_location(artifact.uri_obj):
+        is_wandb_artifact = False
+        if isinstance(artifact, artifact_wandb.WandbArtifact):
+            is_wandb_artifact = True
+
+        file_name = f"{name}.py"
+        module_path = artifact.path(file_name)
+
+        if is_wandb_artifact:
+            module_dir = os.path.dirname(module_path)
+            import_name = os.path.splitext(os.path.basename(module_path))[0]
+        else:
+            # Python import caching means we can't just import "obj.py" here
+            # because serialized ops would be cached at the "obj" key. We include
+            # the version in the module name to avoid this. Since version names
+            # are content hashes, this is correct.
+            #
+            # module_path = {WEAVE_CACHE_DIR}/{USER}/local-artifacts/{ARTIFACT_NAME}/{ARTIFACT_VERSION}/{NAME_INCLUDING_SUB_PATHS}.py
+            art_and_version_dir = module_path[: -(1 + len(file_name))]
+            art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
+            module_dir = art_dir
+            import_name = (
+                version_subdir
+                + "."
+                + ".".join(os.path.splitext(file_name)[0].split("/"))
+            )
+
+        # path_with_ext = os.path.relpath(
+        #     artifact.path(f"{name}.py"), start=artifact_local.local_artifact_dir()
+        # )
+        # # remove the .py extension
+        # path = os.path.splitext(path_with_ext)[0]
+        # # convert filename into module path
+        # parts = path.split("/")
+        # module_path = ".".join(parts)
+
+        sys.path.insert(0, os.path.abspath(module_dir))
+        with context_state.loading_op_location(artifact.uri_obj.with_path(name)):
             # This has a side effect of registering the op
-            mod = __import__(module_path)
+            # PR: Return None if we can't load the op?
+            try:
+                # Weaveflow Merge: fromlist correctly imports submodules
+                mod = __import__(import_name, fromlist=[module_dir])
+            except Exception as e:
+                print("Op loading exception. This might be fine!")
+                import traceback
+
+                traceback.print_exc()
+                return None
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
+        # Weaveflow Merge: Commenting out, this does not look correct to me (tim), but
+        # leaving it here in case I'm wrong.
+        # if not is_wandb_artifact:
+        #     try:
+        #         mod = getattr(mod, "obj")
+        #     except:
+        #         raise errors.WeaveInternalError(f"{import_name=} {name=} {module_dir=}")
+
         # mod down to _obj.
-        for part in parts[1:]:
-            mod = getattr(mod, part)
+        # for part in parts[1:]:
+        #     mod = getattr(mod, part)
 
         op_defs = inspect.getmembers(mod, op_def.is_op_def)
         if len(op_defs) != 1:
             raise errors.WeaveInternalError(
-                "Unexpected Weave module saved in: %s" % path
+                f"Unexpected Weave module saved in: {module_path}. Found {len(op_defs)} op defs, expected 1. All members: {dir(mod)}. {module_dir=} {import_name=} t={type(mod.call)}"
             )
         _, od = op_defs[0]
         return od

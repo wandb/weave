@@ -1060,14 +1060,20 @@ def test_arrow_dict():
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
+# We have disabled auto-vectorization for all custom ops. Changing this test so that
+# it creates a built-in op instead also doesn't work. In that we automatically create
+# a mapped op. vectorizes determines that it can call the op (via the mapped op) in
+# "Part 1", so it doesn't try to weavify and vectorize. Since we're not relying on
+# auto-vectorization now, this test is disabled.
+@pytest.mark.skip("auto vectorize disabled for custom ops")
 def test_vectorize_works_recursively_on_weavifiable_op():
     # this op is weavifiable because it just calls add
     @weave.op()
-    def add_one(x: int) -> int:
+    def add_one124815(x: int) -> int:
         return x + 1
 
     weave_fn = weave_internal.define_fn(
-        {"x": weave.types.Int()}, lambda x: add_one(x)
+        {"x": weave.types.Int()}, lambda x: add_one124815(x)
     ).val
     vectorized = arrow.vectorize(weave_fn)
     expected = vectorized.to_json()
@@ -1408,3 +1414,45 @@ def test_duration():
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": awl_node})
     assert list(weave.use(called)) == [1, 2, 3]
+
+
+def test_date_add():
+    dt = datetime.datetime.now()
+
+    # TODO: remove ms truncation when we can store more precise datetimes in arrow
+    dt = dt.replace(microsecond=dt.microsecond // 1000 * 1000)
+    dt1 = dt + datetime.timedelta(days=1)
+
+    awl_node = weave.save(arrow.to_arrow([dt, dt1]))
+    fn = weave_internal.define_fn(
+        {"row": awl_node.type.object_type},
+        lambda row: date.datetime_add(row, datetime.timedelta(days=1)),
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    actual = list(weave.use(called))
+
+    # TODO: remove timezone addition when we have a better way of handling timezones in arrow
+    dt1utc = dt1.astimezone(datetime.timezone.utc)
+    expected = [dt1utc, dt1utc + datetime.timedelta(days=1)]
+    assert actual == expected
+
+
+def test_date_sub():
+    dt = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    # TODO: remove ms truncation when we can store more precise datetimes in arrow
+    dt = dt.replace(microsecond=dt.microsecond // 1000 * 1000)
+    dt1 = dt + datetime.timedelta(days=1)
+
+    awl_node = weave.save(arrow.to_arrow([dt, dt1]))
+    fn = weave_internal.define_fn(
+        {"row": awl_node.type.object_type},
+        lambda row: date.datetime_sub(row, dt),
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    actual = list(weave.use(called))
+
+    expected = [datetime.timedelta(0), datetime.timedelta(days=1)]
+    assert actual == expected

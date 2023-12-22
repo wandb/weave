@@ -24,7 +24,6 @@ import _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
 import {Stack} from '../../../core';
-import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
 import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
@@ -94,8 +93,10 @@ export const useAutomatedTableState = (
   currentTableState: Table.TableState | undefined,
   weave: WeaveInterface
 ) => {
-  let {stack} = usePanelContext();
-  ({node: input as any, stack} = useRefEqualExpr(input, stack));
+  const {stack} = usePanelContext();
+  // TODO: This was reversing stack and breaking stuff!
+  // TODO TODO TODO
+  // ({node: input as any, stack} = useRefEqualExpr(input, stack));
   const {table: autoTable} = useMemo(() => {
     const dereffedInput = dereferenceAllVars(input, stack).node as Node;
     return Table.initTableFromTableType(dereffedInput, weave);
@@ -234,17 +235,29 @@ export const useBaseTableColumnDefinitions = (
 
 export const useOrderedColumns = (
   tableState: Table.TableState,
-  pinnedColumns: string[]
+  pinnedColumns: string[],
+  countColumnId: string | null
 ) => {
   return useMemo(() => {
     const allColumns = Table.getColumnRenderOrder(tableState);
-    const normalColumns = allColumns.filter(s => !pinnedColumns.includes(s));
-    const actualPinnedColumns = allColumns.filter(s =>
-      pinnedColumns.includes(s)
-    );
+    let countColumn = countColumnId ?? '';
+    let groupCountColumn = [countColumn];
+    if (!allColumns.includes(countColumn)) {
+      countColumn = '';
+      groupCountColumn = [];
+    }
+    const normalColumns = allColumns
+      .filter(s => !pinnedColumns.includes(s))
+      .filter(s => s !== countColumn);
+    const actualPinnedColumns = allColumns
+      .filter(s => pinnedColumns.includes(s))
+      .filter(s => s !== countColumn);
 
-    return tableState.groupBy.concat(actualPinnedColumns).concat(normalColumns);
-  }, [tableState, pinnedColumns]);
+    return tableState.groupBy
+      .concat(groupCountColumn)
+      .concat(actualPinnedColumns)
+      .concat(normalColumns);
+  }, [tableState, pinnedColumns, countColumnId]);
 };
 
 export const getTableMeasurements = (args: {

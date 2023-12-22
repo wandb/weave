@@ -380,7 +380,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         if (xAxisType === 'nominal' || yAxisType === 'nominal') {
           node = opLimit({
             arr: node,
-            limit: constNumber(50),
+            limit: constNumber(500),
           });
         }
       }
@@ -669,16 +669,15 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const selectFn = table.columnSelectFunctions[colId];
           if (isVoidNode(selectFn)) {
             // use default tooltip
-            const nonNullDims: ExprDimNameType[] = [];
-
             const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
               (acc2: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
                 const colid = s.dims[dim];
 
-                if (!isVoidNode(table.columnSelectFunctions[colid])) {
-                  nonNullDims.push(dim);
+                if (
+                  !isVoidNode(table.columnSelectFunctions[colid]) &&
+                  !isConstNode(table.columnSelectFunctions[colid])
+                ) {
                   const colType = table.columnSelectFunctions[colid].type;
-
                   acc2[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
                     ? taggedValueValueType(colType)
                     : colType;

@@ -3,6 +3,7 @@ import copy
 import contextvars
 import contextlib
 import typing
+from typing import Iterable
 import inspect
 
 from weave.weavejs_fixes import fixup_node
@@ -18,6 +19,9 @@ from . import pyfunc_type_util
 from . import engine_trace
 from . import memo
 from . import weavify
+from . import eager
+from .run import Run
+from . import graph_client_context
 
 from .language_features.tagging import (
     opdef_util,
@@ -26,6 +30,9 @@ from .language_features.tagging import (
     tagged_value_type,
 )
 from . import language_autocall
+
+if typing.TYPE_CHECKING:
+    from .run_streamtable_span import RunStreamTableSpan
 
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -347,7 +354,6 @@ class OpDef:
                 graph.expr_vars(arg_node) for arg_node in refine_params.values()
             )
         ):
-
             called_refine_output_type = _self.refine_output_type(**refine_params)
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
@@ -375,11 +381,14 @@ class OpDef:
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
     def eager_call(_self, *args, **kwargs):
-        if _self.is_async:
-            output_node = _self.lazy_call(*args, **kwargs)
-            return weave_internal.use(output_node)
-        else:
-            return _self.resolve_fn(*args, **kwargs)
+        output_node = _self.lazy_call(*args, **kwargs)
+        if (
+            _self.name == "get"
+            or _self.name == "root-project"
+            or any(isinstance(n, graph.Node) for n in args)
+        ) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
+            return output_node
+        return weave_internal.use(output_node)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
@@ -597,6 +606,10 @@ class OpDef:
 
     def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
         return isinstance(self, AutoTagHandlingArrowOpDef)
+
+    def runs(self) -> Iterable[Run]:
+        client = graph_client_context.require_graph_client()
+        return client.op_runs(self)
 
 
 class AutoTagHandlingArrowOpDef(OpDef):

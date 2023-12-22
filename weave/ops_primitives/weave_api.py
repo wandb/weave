@@ -23,9 +23,29 @@ from .. import object_context
 
 @weave_class(weave_type=types.RefType)
 class RefNodeMethods:
+    @op()
+    def type(self) -> types.Type:
+        self_ref = storage._get_ref(self)
+        if self_ref is None:
+            raise errors.WeaveInternalError("Cannot get type of ref resolving to None")
+        return self_ref.type
+
     @op(output_type=lambda input_type: input_type["self"].object_type)
     def get(self):
         return storage.deref(self)
+
+    # Tim: I commented this out as part of Weaveflow merge. There is a duplicate
+    # definition below and i believe that will take precedence. Keeping here for
+    # now in case we need to revert.
+    # @op()
+    # def __eq__(self, other: str) -> bool:
+    #     return str(self) == uris.WeaveURI.parse(other).to_ref().uri
+
+    @op()
+    def __eq__(self, other: ref_base.Ref) -> bool:
+        # Have to get the ref because the engine already dereffed
+        other_ref = storage._get_ref(other)
+        return str(self) == str(other_ref)
 
 
 @op(
@@ -34,7 +54,6 @@ class RefNodeMethods:
     },
 )
 def created_by(self) -> typing.Optional[runs.Run]:
-    print("IN CREATED BY")
     # TODO: engine derefences blindly before passing in, but we expect ref! Hack
     # here by just getting ._ref
     return trace.get_obj_creator(self._ref)
@@ -55,7 +74,6 @@ def save(obj: typing.Any, name: typing.Optional[str]):
 # it completes a transaction
 @mutation
 def finish(obj: graph.Node[typing.Any], name: typing.Optional[str] = None) -> None:
-    print("SAVE", obj)
     nodes = graph.linearize(obj)
     if nodes is None:
         raise errors.WeaveInternalError("save must be called on a linear graph")
@@ -188,7 +206,10 @@ def local_artifacts() -> list[artifact_local.LocalArtifact]:
 
 def op_get_return_type(uri):
     ref = ref_base.Ref.from_str(uri)
-    return ref.type
+    try:
+        return ref.type
+    except errors.WeaveArtifactVersionNotFound:
+        return types.NoneType()
 
 
 def get_const_val(list_type_or_node):
@@ -333,10 +354,19 @@ def _merge(name) -> str:
         else to_uri.version
     )
 
+    obj = head_ref.get()
+    # Crucially, we must compute the weave type using type_of
+    # instead of allowing _direct_publish and direct_save to compute
+    # the weave type using type_of_with_refs. Merging is a special
+    # operation and should not try to do ref tracking.
+    weave_type = types.type_of(obj)
+
+    ref: ref_base.Ref
     if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):
         ref = storage._direct_publish(
-            obj=head_ref.get(),
+            obj=obj,
             name=to_uri.name,
+            assume_weave_type=weave_type,
             wb_project_name=to_uri.project_name,
             wb_entity_name=to_uri.entity_name,
             branch_name=shared_branch_name,
@@ -348,11 +378,12 @@ def _merge(name) -> str:
                 "Cannot merge into artifact without version"
             )
 
-        ref = storage._direct_save(
+        ref = storage.direct_save(
             obj=head_ref.get(),
             name=to_uri.name,
             source_branch_name=shared_branch_name,
             branch_name=shared_branch_name,
+            assume_weave_type=weave_type,
         )
     return ref.branch_uri
 
@@ -369,7 +400,53 @@ def get(uri):
     ref = ref_base.Ref.from_str(uri)
     # if not ref.is_saved:
     #     return None
-    res = ref.get()
+    try:
+        res = ref.get()
+    except errors.WeaveArtifactVersionNotFound:
+        return None
+    return res
+
+
+def _save_with_default(
+    get_uri,
+    default,
+    obj,
+    root_args,
+    make_new_type: typing.Callable[[types.Type], types.Type],
+    mutation_record: object_context.MutationRecord,
+):
+    return _save(get_uri, obj, root_args, make_new_type, mutation_record)
+
+
+@op(
+    name="withdefault-getReturnType",
+    input_type={"uri": types.String(), "default": types.Any()},
+    output_type=types.TypeType(),
+    hidden=True,
+    pure=False,
+)
+def get_withdefault_returntype(uri, default):
+    res = op_get_return_type(uri)
+    if res != types.NoneType():
+        return res
+    return types.TypeRegistry.type_of(default)
+
+
+@op(
+    pure=False,
+    setter=_save_with_default,
+    name="withdefault-get",
+    input_type={"uri": types.String(), "default": types.Any()},
+    output_type=types.Any(),
+    refine_output_type=get_withdefault_returntype,
+    render_info={"type": "function"},
+)
+def get_withdefault(uri, default):
+    ref = ref_base.Ref.from_str(uri)
+    try:
+        res = ref.get()
+    except errors.WeaveArtifactVersionNotFound:
+        return default
     return res
 
 
@@ -490,7 +567,9 @@ def mutate_op_body(
             # )
         args = list(inputs.values())
         args.append(res)
-        if i == 0 and node.from_op.name == "get":
+        if i == 0 and (
+            node.from_op.name == "get" or node.from_op.name == "withdefault-get"
+        ):
             # TODO hardcoded get to take root_args. Should just check if available on setter.
             args.append(root_args)
             args.append(make_new_type)
@@ -538,6 +617,26 @@ def append(
         lambda t: types.merge_types(t, types.List(types.TypeRegistry.type_of(val))),
         object_context.MutationRecord("op-append", [self, val, root_args]),
     )
+
+
+@op(mutation=True, name="stream_table-log")
+def stream_table_log(self: graph.Node, val: typing.Any) -> typing.Any:
+    st_obj = weave_internal.use(self)
+    from weave.monitoring import StreamTable
+
+    if not isinstance(st_obj, StreamTable):
+        raise errors.WeaveInternalError(
+            "stream_table-log op must be called on a stream table"
+        )
+
+    # Tim: as part of weaveflow merge, i added underscores here. Not sure
+    # how this ever worked before
+    st = StreamTable(
+        table_name=st_obj._table_name,
+        project_name=st_obj._project_name,
+        entity_name=st_obj._entity_name,
+    )
+    st.log(val)
 
 
 def _get_uri_from_node(node: graph.Node[typing.Any], op_title: str) -> str:

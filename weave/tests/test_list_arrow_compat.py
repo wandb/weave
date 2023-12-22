@@ -634,10 +634,16 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
     if use_arrow:
         list_node = arrow.ops.list_to_arrow(list_node)
 
+    from .. import context_state
+
+    _loading_builtins_token = context_state.set_loading_built_ins()
+
     row_tag_getter = make_tag_getter_op.make_tag_getter_op("row", types.Int())
     col_tag_getter = make_tag_getter_op.make_tag_getter_op("col", types.Int())
     list_tag_getter = make_tag_getter_op.make_tag_getter_op("list_tag", types.Int())
     top_tag_getter = make_tag_getter_op.make_tag_getter_op("top_tag", types.Int())
+
+    context_state.clear_loading_built_ins(_loading_builtins_token)
 
     inner_func = (
         lambda n: n

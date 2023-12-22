@@ -41,7 +41,10 @@ if len(bad_dirs) > 0:
         f"Unknown directories: {bad_dirs}, modify MANIFEST.in or build.py to include them."
     )
 
-subprocess.run(["bash", "weave/frontend/build.sh"], check=True)
+if os.getenv("WEAVE_SKIP_BUILD") == None:
+    subprocess.run(["bash", "weave/frontend/build.sh"], check=True)
+else:
+    print("!!! Skipping frontend build !!!")
 
 subprocess.run(["python", "-m", "build"], check=True)
 

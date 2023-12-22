@@ -1,6 +1,7 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {produce} from 'immer';
+import * as _ from 'lodash';
 import React, {memo, useCallback, useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -12,13 +13,17 @@ import {
   // IconRetry,
   IconSplit,
 } from '../Panel2/Icons';
-import {useSetInteractingPanel} from '../Panel2/PanelInteractContext';
+import {
+  useSelectedPath,
+  useSetInteractingPanel,
+} from '../Panel2/PanelInteractContext';
 import {
   addChild,
   getPath,
   isGroupNode,
   isInsideMain,
   makePanel,
+  nextPanelName,
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
@@ -28,6 +33,7 @@ const Divider = styled.div`
   border: 0.5px solid ${MOON_250};
   width: 200%;
 `;
+Divider.displayName = 'S.Divider';
 
 export type OutlineItemPopupMenuProps = Pick<
   OutlinePanelProps,
@@ -54,6 +60,9 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
 }) => {
   const setInteractingPanel = useSetInteractingPanel();
   const {isNumItemsLocked} = config.config;
+
+  const selectedPath = useSelectedPath();
+  const isDeletingSelected = _.isEqual(path, selectedPath);
 
   const handleDelete = useCallback(
     (ev: React.MouseEvent) => {
@@ -97,9 +106,11 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         })
       );
 
-      goBackToOutline?.();
+      if (isDeletingSelected) {
+        goBackToOutline?.();
+      }
     },
-    [path, config, updateConfig, goBackToOutline]
+    [path, config, updateConfig, goBackToOutline, isDeletingSelected]
   );
 
   // const handleUnnest = useCallback(
@@ -147,17 +158,39 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     },
     [updateConfig2, goBackToOutline]
   );
+
   const handleDuplicate = useCallback(
     (panelPath: string[]) => {
       updateConfig2(oldConfig => {
         oldConfig = getFullChildPanel(oldConfig);
         const targetPanel = getPath(oldConfig, panelPath);
-        return addChild(oldConfig, panelPath.slice(0, -1), targetPanel);
+        // We need to find the layout parameters for the panel being
+        // duplicated inside its parent's grid config so we can insert
+        // the clone next to the original and with the same width and height.
+        const targetId = panelPath[panelPath.length - 1];
+        const parentPath = panelPath.slice(0, -1);
+        const parentPanel = getPath(oldConfig, parentPath);
+        const parentLayouts = parentPanel.config.gridConfig.panels;
+        const targetLayoutObject = _.find(parentLayouts, {
+          id: targetId,
+        });
+        const duplicateLayout = targetLayoutObject?.layout;
+        const newPanelName = nextPanelName(
+          Object.keys(parentPanel.config.items)
+        );
+        const newPanelPath = [...parentPath, newPanelName];
+        const updatedConfig = addChild(
+          oldConfig,
+          parentPath,
+          targetPanel,
+          newPanelName,
+          duplicateLayout
+        );
+        setInteractingPanel('config', newPanelPath, 'input');
+        return updatedConfig;
       });
-
-      goBackToOutline?.();
     },
-    [updateConfig2, goBackToOutline]
+    [updateConfig2, setInteractingPanel]
   );
   const menuItems = useMemo(() => {
     const items = [];
@@ -176,7 +209,10 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         key: 'duplicate',
         content: 'Duplicate',
         icon: <IconCopy />,
-        onClick: () => handleDuplicate(path),
+        onClick: (ev: React.MouseEvent) => {
+          ev.stopPropagation();
+          handleDuplicate(path);
+        },
       });
     }
 

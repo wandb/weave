@@ -3,11 +3,14 @@ import datetime
 import typing
 import inspect
 import functools
+import keyword
+import contextvars
 import json
 from collections.abc import Iterable
 
 
 from . import box
+from . import context_state
 from . import errors
 from . import mappers_python
 from . import timestamp as weave_timestamp
@@ -95,6 +98,11 @@ def type_name_to_type(type_name):
     return mapping.get(js_to_py_typename(type_name))
 
 
+# Used to make a modified type_of function that returns RefType for any reffed
+# objects. See type_of_with_refs()
+_reffed_type_is_ref = contextvars.ContextVar("_reffed_type_is_ref", default=False)
+
+
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -110,6 +118,23 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
+        from . import ref_base
+
+        if (
+            context_state.ref_tracking_enabled()
+            and _reffed_type_is_ref.get()
+            and not isinstance(obj, ref_base.Ref)
+        ):
+            obj_ref = ref_base.get_ref(obj)
+            if obj_ref is not None:
+                # Directly construct the RefTypeClass instead of doing
+                # type_of(obj_ref), since a) that would recurse and b)
+                # type_of(<ref>) calls .type on the ref, which may try to read
+                # data to get the data. We already have the obj here, so we can
+                # compute its type directly.
+                RefTypeClass = instance_class_to_potential_type(obj_ref.__class__)[-1]  # type: ignore
+                return RefTypeClass(type_of_without_refs(obj))
+
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
             return obj_type
@@ -137,11 +162,26 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
+        if is_relocatable_object_type(d):
+            d = typing.cast(dict, d)
+            return deserialize_relocatable_object_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
+            # Normally, we should just raise the error. However, the core team
+            # used earlier versions of Weaveflow ( before
+            # dc48fa16263d49d5accaca37515ab4c80efef1b6) which serialized
+            # "relocatable" objects without the "_relocatable" flag was added.
+            # As a result, we will hit this branch in such cases. In order to
+            # maintain backwards compat for these situations, we perform a less
+            # constrained check here. We use `is_serialized_object_type` instead
+            # of `is_relocatable_object_type` since it explicitly does not
+            # require the `_relocatable` flag.  This can be removed if we are ok
+            # breaking these early versions
+            # if isinstance(d, dict) and is_serialized_object_type(d):
+            #     return deserialize_relocatable_object_type(d)
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
@@ -216,7 +256,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         return str(self)
 
     @classmethod
-    def _instance_classes(cls):
+    def _instance_classes(cls) -> typing.Sequence[type]:
         """Helper to get instance_classes as iterable."""
         if cls.instance_classes is None:
             return ()
@@ -245,6 +285,15 @@ class Type(metaclass=_TypeSubclassWatcher):
     @property
     def type_vars(self) -> dict[str, "Type"]:
         return dict(self.type_vars_tuple)
+
+    @classmethod
+    def root_type_class(cls) -> type["Type"]:
+        if cls._base_type is None:
+            return cls
+        base_type_class = cls._base_type.root_type_class()
+        if base_type_class.__name__ == "ObjectType":
+            return cls
+        return base_type_class
 
     @classmethod
     def is_instance(cls, obj):
@@ -302,7 +351,9 @@ class Type(metaclass=_TypeSubclassWatcher):
         # its bases.
         next_type_class = next_type.__class__
         while True:
-            if self.__class__ == next_type_class:
+            # __name__ based comparison instead of class equality, since we
+            # dynamically create ObjectType classes when deserializing
+            if self.__class__.__name__ == next_type_class.__name__:
                 break
             elif next_type_class._base_type is None:
                 # nothing left in base chain, no match
@@ -334,6 +385,10 @@ class Type(metaclass=_TypeSubclassWatcher):
         type_props = {}
         if self._base_type is not None:
             type_props["_base_type"] = {"type": self._base_type.name}
+            if self._base_type._base_type is not None:
+                type_props["_base_type"]["_base_type"] = {
+                    "type": self._base_type._base_type.name
+                }
         for field in fields:
             # TODO: I really don't like this change. Only needed because
             # FileType has optional fields... Remove?
@@ -955,6 +1010,11 @@ class Dict(Type):
 
 @dataclasses.dataclass(frozen=True)
 class ObjectType(Type):
+    # If True, object is relocatable, meaning it can be saved in one python runtime
+    # and loaded in another. (reloctable false means that we need the original
+    # object definition to load the object, ie it's a built-in)
+    _relocatable = False
+
     def __init__(self, **attr_types: Type):
         self.__dict__["attr_types"] = attr_types
         for k, v in attr_types.items():
@@ -970,6 +1030,17 @@ class ObjectType(Type):
     def property_types(self) -> dict[str, Type]:
         return self.type_vars
 
+    # TIM: Commenting this out from Weaveflow - it does not seem to align with
+    # all the uses of `attr_types` being dictionaries, not methods.
+    # def attr_types(self) -> dict[str, Type]:
+    #     from . import op_def_type
+
+    #     return {
+    #         k: t
+    #         for k, t in self.property_types().items()
+    #         if not isinstance(t, op_def_type.OpDefType)
+    #     }
+
     @classmethod
     def type_of_instance(cls, obj):
         variable_prop_types = {}
@@ -980,8 +1051,9 @@ class ObjectType(Type):
         return cls(**variable_prop_types)
 
     def _to_dict(self) -> dict:
-        d: dict = {"_is_object": True}
         d = self.class_to_dict()
+        if self._relocatable:
+            d["_relocatable"] = True
         # TODO: we don't need _is_object, now that we have base_type everywhere.
         # Remove the check for self._base_type.__class__ != ObjectType, and get
         # rid of _is_object (need to update frontend as well).
@@ -1002,6 +1074,98 @@ class ObjectType(Type):
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
+
+
+def is_serialized_object_type(t: dict) -> bool:
+    if "_base_type" not in t:
+        return False
+    if t["_base_type"]["type"] == "Object":
+        return True
+    return is_serialized_object_type(t["_base_type"])
+
+
+def is_relocatable_object_type(t: typing.Union[str, dict]) -> bool:
+    if not isinstance(t, dict):
+        return False
+    if not t.get("_relocatable"):
+        return False
+    return is_serialized_object_type(t)
+
+
+# We need to ensure we only create new classes for each new unique
+# type seen. Otherwise we get a class explosion, and for one thing, type_of
+# gets really slow.
+DESERIALIZED_OBJECT_TYPE_CLASSES: dict[str, type[ObjectType]] = {}
+
+
+def validate_kwarg_name(name: str) -> bool:
+    """Return True if name is a valid python kwarg name"""
+    if name in keyword.kwlist:
+        raise ValueError(
+            f"{name} is a Python keyword and cannot be used as a kwarg name"
+        )
+    if not name.isidentifier():
+        raise ValueError(
+            f"{name} is not a valid Python identifier and cannot be used as a kwarg name"
+        )
+    return True
+
+
+def deserialize_relocatable_object_type(t: dict) -> ObjectType:
+    key = json.dumps(t)
+    if key in DESERIALIZED_OBJECT_TYPE_CLASSES:
+        return DESERIALIZED_OBJECT_TYPE_CLASSES[key]()
+    object_class_name = t["type"]
+    type_class_name = object_class_name + "Type"
+
+    type_attr_types = {
+        k: TypeRegistry.type_from_dict(v)
+        for k, v in t.items()
+        if not k.startswith("_") and k != "type"
+    }
+    import textwrap
+
+    object_constructor_arg_names = [
+        k for k, t in type_attr_types.items() if t.name != "OpDef"
+    ]
+    # Sanitize
+    for k in object_constructor_arg_names:
+        if not validate_kwarg_name(k):
+            raise ValueError(f"Invalid kwarg name: {k}")
+
+    object_init_code = textwrap.dedent(
+        f"""
+        def loaded_object_init(self, {', '.join(object_constructor_arg_names)}):
+            for k, v in locals().items():
+                if k != 'self':
+                    setattr(self, k, v)
+        """
+    )
+    exec(object_init_code)
+
+    new_object_class = type(
+        object_class_name, (), {"__init__": locals()["loaded_object_init"]}
+    )
+
+    all_attr_types: dict[str, typing.Union[Type, type[Type]]] = {
+        **type_attr_types,
+        "instance_classes": new_object_class,
+    }
+    if "_base_type" in t:
+        all_attr_types["_base_type"] = deserialize_relocatable_object_type(
+            t["_base_type"]
+        )
+    new_type_class = type(type_class_name, (ObjectType,), all_attr_types)
+    setattr(new_type_class, "_relocatable", True)
+    setattr(new_type_class, "__annotations__", {})
+    for k, v in type_attr_types.items():
+        setattr(new_type_class, k, v)
+        new_type_class.__dict__["__annotations__"][k] = Type
+    new_type_dataclass: type[ObjectType] = dataclasses.dataclass(frozen=True)(
+        new_type_class
+    )
+    DESERIALIZED_OBJECT_TYPE_CLASSES[key] = new_type_dataclass
+    return new_type_dataclass()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1109,11 +1273,31 @@ class Function(Type):
 
 @dataclasses.dataclass(frozen=True)
 class RefType(Type):
-    object_type: Type = UnknownType()
+    object_type: Type = Any()
 
     @classmethod
     def type_of_instance(cls, obj):
         return cls(obj.type)
+
+    def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
+        # Use issubclass, we have RunLocalType defined as a subclass of RunType
+        if not issubclass(other_type.__class__, RefType):
+            if self.object_type == NoneType():
+                # If output is None, we don't want to be assignable to basically
+                # all ops (since ops are nullable)
+                return None
+            return other_type.assign_type(self.object_type)
+        return None
+
+    def save_instance(self, obj, artifact, name):
+        from . import ref_base
+
+        obj_ref = ref_base.get_ref(obj)
+        if obj_ref is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when ref is None for type: %s" % self
+            )
+        return obj_ref
 
     # TODO: Address this comment. I'm sure this introduced the same type
     #     blowup as before again. Slows everything down. But in this PR
@@ -1139,7 +1323,10 @@ class LocalArtifactRefType(FilesystemArtifactRefType):
 
 @dataclasses.dataclass(frozen=True)
 class WandbArtifactRefType(FilesystemArtifactRefType):
-    pass
+    def load_instance(self, artifact, name, extra=None):
+        from . import artifact_wandb
+
+        return artifact_wandb.WandbArtifactRef(artifact, name)
 
 
 class WBTable(Type):
@@ -1319,7 +1506,7 @@ def merge_types(a: Type, b: Type) -> Type:
             next_prop_types[key] = merge_types(self_prop_type, other_prop_type)
         return TypedDict(next_prop_types)
     if isinstance(a, ObjectType) and isinstance(b, ObjectType):
-        if a.name == b.name:
+        if a.name == b.name and not set(a.type_attrs()).difference(b.type_attrs()):
             next_type_attrs = {}
             for key in a.type_attrs():
                 next_type_attrs[key] = merge_types(getattr(a, key), getattr(b, key))
@@ -1327,6 +1514,9 @@ def merge_types(a: Type, b: Type) -> Type:
 
     if isinstance(a, List) and isinstance(b, List):
         return List(merge_types(a.object_type, b.object_type))
+
+    if isinstance(a, RefType) and isinstance(b, RefType) and a.__class__ == b.__class__:
+        return a.__class__(merge_types(a.object_type, b.object_type))
 
     if isinstance(a, UnknownType):
         return b
@@ -1570,6 +1760,11 @@ def type_is_variable(t: Type) -> bool:
         return True
     elif isinstance(t, UnionType):
         return True
+    elif isinstance(t, ObjectType):
+        return True
+    elif isinstance(t, Dict):
+        # Tim: This was `true` before weaveflow.
+        return type_is_variable(t.object_type)
     elif isinstance(t, TypedDict):
         # Should we just make type_vars for TypedDict be its property types?
         # That would simplify a lot.
@@ -1671,3 +1866,26 @@ def split_none(t: Type) -> tuple[bool, Type]:
     if len(non_none_members) < len(t.members):
         return True, union(*non_none_members)
     return False, t
+
+
+def type_of(obj: typing.Any) -> Type:
+    return TypeRegistry.type_of(obj)
+
+
+# A modified type_of that returns RefType<O> for any object that
+# has a ref. This is used when serializing, so that we save refs
+# instead of copying.
+def type_of_with_refs(obj: typing.Any) -> Type:
+    token = _reffed_type_is_ref.set(True)
+    try:
+        return TypeRegistry.type_of(obj)
+    finally:
+        _reffed_type_is_ref.reset(token)
+
+
+def type_of_without_refs(obj: typing.Any) -> Type:
+    token = _reffed_type_is_ref.set(False)
+    try:
+        return TypeRegistry.type_of(obj)
+    finally:
+        _reffed_type_is_ref.reset(token)

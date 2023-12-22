@@ -150,9 +150,17 @@ def flatten_typed_dicts(type_: types.TypedDict) -> list[str]:
     props = type_.property_types
     paths = []
     for key, val in props.items():
-        if types.optional(types.TypedDict({})).assign_type(
-            val
-        ) and not types.NoneType().assign_type(val):
+        _, non_none_val_type = types.split_none(val)
+        # The prior code did an assignment check like this:
+        #   if types.optional(types.TypedDict({})).assign_type(
+        #       val
+        #   ) and not types.NoneType().assign_type(val):
+        #   However that doesn't work because Ref<TypedDict<A>> is assignable
+        #   to TypedDict<A>
+        # Do we care about a Union of TypedDict? I don't think so, since we're
+        # operating on ArrowWeaveList here, which always does merge types and so can only
+        # have a union with a single TypedDict in it
+        if isinstance(non_none_val_type, types.TypedDict):
             subpaths = flatten_typed_dicts(typing.cast(types.TypedDict, val))
             paths += [f"{key}.{path}" for path in subpaths]
         else:
@@ -319,8 +327,8 @@ def _refine_history_type_inner(
             continue
 
         type_counts: list[TypeCount] = key_details["typeCounts"]
-        wt = types.union(
-            *[history_key_type_count_to_weave_type(tc) for tc in type_counts]
+        wt = types.merge_many_types(
+            [history_key_type_count_to_weave_type(tc) for tc in type_counts]
         )
 
         if wt == types.UnknownType():
@@ -387,9 +395,9 @@ def process_history_awl_tables(tables: list[ArrowWeaveList]):
 
 
 def concat_awls(awls: list[ArrowWeaveList]):
-    list = make_list(**{str(i): table for i, table in enumerate(awls)})
-    with compile.disable_compile():
-        return use(concat(list))
+    from ...ops_arrow.concat import concatenate_all
+
+    return concatenate_all(awls)
 
 
 def awl_to_pa_table(awl: ArrowWeaveList):

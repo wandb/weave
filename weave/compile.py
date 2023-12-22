@@ -12,6 +12,7 @@ from . import debug_compile
 
 
 from . import serialize
+from . import box
 from . import compile_domain
 from . import op_args
 from . import weave_types as types
@@ -29,6 +30,7 @@ from . import input_provider
 from . import partial_object
 from . import gql_to_weave
 from . import gql_op_plugin
+from .op_def import OpDef
 
 from .language_features.tagging import tagged_value_type_helpers
 
@@ -713,11 +715,19 @@ def compile_refine_and_propagate_gql(
     nodes: typing.List[graph.Node],
     on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
+    return _compile_refine_and_propagate_gql_inner(nodes, False, on_error)
+
+
+def _compile_refine_and_propagate_gql_inner(
+    nodes: typing.List[graph.Node],
+    skip_stitch: bool = False,
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
     # Stitch is needed for gql key propagation only. If we try to stitch
     # a graph that does not have gqlroot-wbgqlquery, it may fail completely.
     # So we only stitch if we have a gqlroot-wbgqlquery node.
 
-    use_stitch = (
+    use_stitch = not skip_stitch and (
         len(
             graph.filter_nodes_full(
                 nodes,
@@ -773,7 +783,10 @@ def compile_refine_and_propagate_gql(
                         )
                     }
 
-                res = op.lazy_call(**params)
+                fixed_params = _propagate_updated_types_through_lambdas(
+                    op, params, on_error
+                )
+                res = op.lazy_call(**fixed_params)
 
                 # The GQL key propagation logic needs to happen in the refine pass rather than the GQL
                 # compile pass. This is because the gql_op_output_types need refined input types or else
@@ -852,6 +865,80 @@ def compile_refine_and_propagate_gql(
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
+def _propagate_updated_types_through_lambdas(
+    op: OpDef, params: dict[str, graph.Node], on_error: graph.OnErrorFnType = None
+):
+    """
+    This method ensures that the lambda variables for a given op are correctly
+    typed. Since the lambda function's variable typing is dependent on: a) the
+    op; b) the prior params, we can only correctly determine the type after the
+    prior args are correctly typed. Moreover, we need the op itself to determine
+    the expected type of the lambda variables. This function updates the lambda
+    stub (type of the function itself) as well as the internal variable nodes
+    accordingly. It then refines the inner lambda function to ensure that the
+    updated variable types are correctly propagated through the lambda function.
+
+    Optimizations: 1) We call `_compile_refine_and_propagate_gql_inner` inside
+    of this function, which means we "compile" the inner part of the lambda twice.
+    If instead, we somehow propagated the updated var types before traversing into
+    them, we could do this in a single pass.
+    """
+
+    if not isinstance(op.input_type, op_args.OpNamedArgs):
+        return params
+
+    updated_params: dict[str, graph.Node] = {**params}
+
+    for k, target_node in params.items():
+        if not (
+            isinstance(target_node, graph.ConstNode)
+            and isinstance(target_node.type, types.Function)
+        ):
+            continue
+
+        input_arg_type = op.input_type.arg_types[k]
+
+        if not callable(input_arg_type):
+            continue
+
+        expected_type = input_arg_type({k: p.type for k, p in updated_params.items()})
+
+        if not isinstance(expected_type, types.Function):
+            continue
+
+        updated_input_types = {**target_node.type.input_types}
+        expected_input_types = expected_type.input_types
+        dirty_input_keys = set()
+        for (input_key, expected_input_type) in expected_input_types.items():
+            if input_key not in updated_input_types or expected_input_type.assign_type(
+                updated_input_types[input_key]
+            ):
+                continue
+            dirty_input_keys.add(input_key)
+            updated_input_types[input_key] = expected_input_types[input_key]
+
+        if len(dirty_input_keys) == 0:
+            continue
+
+        def _update_fn_vars(node: graph.Node) -> typing.Optional[graph.Node]:
+            if isinstance(node, graph.VarNode) and node.name in dirty_input_keys:
+                return graph.VarNode(updated_input_types[node.name], node.name)
+            return node
+
+        working_nodes = [target_node.val]
+        working_nodes = graph.map_nodes_top_level(
+            [target_node.val], _update_fn_vars, on_error
+        )
+        working_nodes = _compile_refine_and_propagate_gql_inner(
+            working_nodes, True, on_error
+        )
+        updated_params[k] = graph.ConstNode(
+            types.Function(updated_input_types, target_node.type.output_type),
+            working_nodes[0],
+        )
+    return updated_params
+
+
 def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     if not isinstance(node, graph.OutputNode):
         return None
@@ -875,6 +962,8 @@ def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
     ]:
         return None
     new_node = typing.cast(graph.Node, weave_internal.use(node))
+    if new_node is None or isinstance(new_node, box.BoxedNone):
+        return graph.ConstNode(types.NoneType(), None)
 
     # The result will typically contain expressions that were sent down as
     # part of panel configs within Const nodes. They haven't been handled

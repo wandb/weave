@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import contextlib
 import contextvars
@@ -9,7 +8,6 @@ import time
 import threading
 import typing
 import traceback
-
 
 # Configuration
 from . import wandb_api
@@ -38,17 +36,27 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
+from . import graph_client_context
+from . import run_context
+from . import storage
+from . import artifact_wandb
 from . import op_policy
 from . import trace_local
 from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
+from . import stream_data_interfaces
+from .monitoring import monitor
 
 # Language Features
+from . import eager
 from . import language_nullability
 
 from . import parallelism
+
+if typing.TYPE_CHECKING:
+    from .graph_client import GraphClient
 
 TRACE_LOCAL = trace_local.TraceLocal()
 
@@ -224,6 +232,9 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                             ),
                         )
                     )
+                    compiled_nodes = list(compile_results)
+                    publish_graph(compiled_nodes)
+
                     fg = forward_graph.ForwardGraph()
                     compile_results = compile_results.safe_apply(fg.add_node)
 
@@ -273,7 +284,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
         for op_name, group_iter in groups:
             group = list(group_iter)
             op_def = registry_mem.memory_registry.get_op(op_name)
-            if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
+            if (
+                parallel_budget != 1
+                and len(group) > 1
+                and op_policy.should_run_in_parallel(op_name)
+            ):
                 # Parallel threaded case
                 num_threads = min(len(group), parallel_budget)
                 remaining_budget_per_thread = (
@@ -379,7 +394,9 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
 
                     if span is not None:
                         span.set_tag(
-                            "bytes_read_to_arrow", report["bytes_read_to_arrow"]
+                            "bytes_read_to_arrow",
+                            report["bytes_read_to_arrow"],
+                            report["bytes_read_to_arrow"],
                         )
 
                     stats.add_node(
@@ -424,11 +441,107 @@ def execute_async_op(
     job.start()
 
 
-def execute_sync_op(
-    op_def: op_def.OpDef,
-    inputs: Mapping[str, typing.Any],
+def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
+    import numpy as np
+
+    ref = storage.get_ref(obj)
+    if ref:
+        output_refs.append(ref)
+        return ref
+
+    if isinstance(obj, dict):
+        return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_auto_publish(v, output_refs) for v in obj]
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    weave_type = types.TypeRegistry.type_of(obj)
+    if not (
+        types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
+    ):
+        return obj
+
+    client = graph_client_context.require_graph_client()
+    if not ref:
+        ref = client.save_object(obj, f"{obj.__class__.__name__}", "latest")
+
+    output_refs.append(ref)
+    return ref
+
+
+def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
+    refs: typing.List[ref_base.Ref] = []
+    return _auto_publish(obj, refs), refs
+
+
+def publish_graph(
+    nodes: typing.List[graph.Node],
 ):
-    return op_def.resolve_fn(**inputs)
+    """Publish all ops and ConstNodes found in graph"""
+    maybe_client = graph_client_context.get_graph_client()
+    if maybe_client is not None and context_state.eager_mode():
+        client = typing.cast("GraphClient", maybe_client)
+
+        def _publish_node(node: graph.Node):
+            if isinstance(node, graph.OutputNode):
+                op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+                if not op_def.location:
+                    # Only publish custom ops
+                    return
+                op_def_ref = storage._get_ref(op_def)
+                if not client.ref_is_own(op_def_ref):
+                    op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
+            elif isinstance(node, graph.ConstNode) and not isinstance(
+                node.type, types.Function
+            ):
+                auto_publish(node.val)
+
+        graph.map_nodes_full(nodes, _publish_node)
+
+
+def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
+    mon_span_inputs = {**inputs}
+    client = graph_client_context.get_graph_client()
+    if client is not None and context_state.eager_mode() and op_def.location:
+        op_def_ref = storage._get_ref(op_def)
+        if not client.ref_is_own(op_def_ref):
+            # This should have already been published by publish_graph if monitoring
+            # is turned on.
+            raise errors.WeaveInternalError(
+                "Found unpublished custom OpDef with monitoring turned on", op_def
+            )
+        mon_span_inputs, refs = auto_publish(inputs)
+
+        # Memoization disabled for now.
+        # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
+        # if found_run:
+        #     return found_run.output
+
+        parent_run = run_context.get_current_run()
+        # if not parent_run:
+        #     print("Running ", op_def.name)
+        run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
+        try:
+            with run_context.current_run(run):
+                res = op_def.resolve_fn(**inputs)
+        except Exception as e:
+            client.fail_run(run, e)
+            print("Error running ", op_def.name)
+            raise
+        if not parent_run:
+            print("View run:", run.ui_url)
+        if isinstance(res, box.BoxedNone):
+            res = None
+        output, output_refs = auto_publish(res)
+
+        client.finish_run(run, output, output_refs)
+
+    else:
+        res = op_def.resolve_fn(**inputs)
+
+    return res
 
 
 def is_run_op(op_call: graph.Op):

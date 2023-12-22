@@ -4,6 +4,8 @@ import typing
 import datetime
 import pathlib
 import functools
+import contextvars
+import contextlib
 
 from . import errors
 from . import ref_base
@@ -43,9 +45,9 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
     # return f"{wb_type.name}-{obj_names[-1]}"
 
 
-def _get_weave_type(obj: typing.Any):
+def _get_weave_type_with_refs(obj: typing.Any):
     try:
-        return types.TypeRegistry.type_of(obj)
+        return types.type_of_with_refs(obj)
     except errors.WeaveTypeError as e:
         raise errors.WeaveSerializeError(
             "weave type error during serialization for object: %s. %s"
@@ -57,6 +59,13 @@ def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
     from weave.mappers_publisher import map_to_python_remote
+    from . import op_def
+
+    # Hack because of mappers_publisher recursion bug. Just don't do the recursion
+    # if we have an OpDef. Really we should skip if we don't have a composite object
+    # but there's no standard check for that.
+    if isinstance(obj, op_def.OpDef):
+        return obj
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)
@@ -104,6 +113,36 @@ def _assert_valid_artifact_name(part: typing.Optional[str] = None):
         )
 
 
+class PublishTargetProject(typing.TypedDict):
+    # TODO: should include entity_name as well, but we defalt that right now...
+    # entity_name: str
+    project_name: str
+
+
+_pubish_target_project: contextvars.ContextVar[
+    typing.Optional[typing.Optional[PublishTargetProject]]
+] = contextvars.ContextVar("publish_target_project", default=None)
+
+
+@contextlib.contextmanager
+def publish_target_project(project: PublishTargetProject):
+    token = _pubish_target_project.set(project)
+    yield
+    _pubish_target_project.reset(token)
+
+
+def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
+    return _pubish_target_project.get()
+
+
+# Keep a cache of published local ref -> wandb ref. This is used to ensure
+# we publish any needed op defs at the beginning of graph execution one time,
+# to avoid parallel publishing them many times later in mapped operations.
+PUBLISH_CACHE_BY_LOCAL_ART: dict[
+    artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef
+] = {}
+
+
 def _direct_publish(
     obj: typing.Any,
     name: typing.Optional[str] = None,
@@ -116,12 +155,25 @@ def _direct_publish(
     *,
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     _merge: typing.Optional[bool] = False,
-):
-    weave_type = assume_weave_type or _get_weave_type(obj)
+) -> artifact_wandb.WandbArtifactRef:
+    _orig_ref = _get_ref(obj)
+    if isinstance(_orig_ref, artifact_wandb.WandbArtifactRef):
+        return _orig_ref
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        res = PUBLISH_CACHE_BY_LOCAL_ART.get(_orig_ref)
+        if res is not None:
+            ref_base._put_ref(obj, res)
+            return res
 
-    wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
+    weave_type = assume_weave_type or _get_weave_type_with_refs(obj)
+
+    target_project_from_context = get_publish_target_project()
+    if target_project_from_context is not None:
+        wb_project_name = target_project_from_context["project_name"]
+    else:
+        wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
     name = name or _get_name(weave_type, obj)
-    wb_artifact_type_name = wb_artifact_type_name or weave_type.name
+    wb_artifact_type_name = wb_artifact_type_name or weave_type.root_type_class().name
 
     _assert_valid_artifact_name(name)
     _assert_valid_project_name(wb_project_name)
@@ -133,9 +185,16 @@ def _direct_publish(
     obj = box.box(obj)
     artifact = artifact_wandb.WandbArtifact(name, type=wb_artifact_type_name)
     artifact.metadata.update(metadata or {})
-    obj = _ensure_object_components_are_published(obj, weave_type, artifact)
+
+    # Use context to ensure any recursively published objects go to the same project
+    with publish_target_project({"project_name": wb_project_name}):
+        obj = _ensure_object_components_are_published(obj, weave_type, artifact)
     artifact_fs.update_weave_meta(weave_type, artifact)
     ref = artifact.set("obj", weave_type, obj)
+    if not isinstance(ref, artifact_wandb.WandbArtifactRef):
+        raise errors.WeaveSerializeError(
+            "Expected a WandbArtifactRef, got %s" % type(ref)
+        )
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     # nothing new was created, so just return the existing ref.
@@ -148,18 +207,23 @@ def _direct_publish(
             _lite_run=_lite_run,
         )
 
+    if isinstance(_orig_ref, artifact_local.LocalArtifactRef):
+        PUBLISH_CACHE_BY_LOCAL_ART[_orig_ref] = ref
+
+    ref_base._put_ref(obj, ref)
+
     return ref
 
 
-def _direct_save(
+def direct_save(
     obj: typing.Any,
     name: typing.Optional[str] = None,
     branch_name: typing.Optional[str] = None,
     source_branch_name: typing.Optional[str] = None,
     assume_weave_type: typing.Optional[types.Type] = None,
     artifact: typing.Optional[artifact_local.LocalArtifact] = None,
-):
-    weave_type = assume_weave_type or _get_weave_type(obj)
+) -> artifact_local.LocalArtifactRef:
+    weave_type = assume_weave_type or _get_weave_type_with_refs(obj)
     name = name or _get_name(weave_type, obj)
 
     _assert_valid_name_part(name)
@@ -181,7 +245,7 @@ def _direct_save(
     if ref.artifact == artifact:
         artifact.save(branch=branch_name)
 
-    return ref
+    return ref  # type: ignore
 
 
 def publish(obj, name=None, type=None):
@@ -207,13 +271,13 @@ def save(
     artifact=None,
     branch=None,
 ) -> artifact_local.LocalArtifactRef:
-    # We would probably refactor this method to be more like _direct_save. This effectively
+    # We would probably refactor this method to be more like direct_save. This effectively
     # just a wrapper that let's the user specify source_branch name with a slash.
     source_branch = None
     if name is not None and ":" in name:
         name, source_branch = name.split(":", 1)
 
-    return _direct_save(
+    return direct_save(
         obj=obj,
         name=name,
         branch_name=branch,
@@ -335,7 +399,7 @@ def to_python(
     ] = _default_ref_persister_artifact,
 ) -> dict:
     if wb_type is None:
-        wb_type = types.TypeRegistry.type_of(obj)
+        wb_type = types.type_of_with_refs(obj)
 
     # First map the object using a MemArtifact to capture any custom object refs.
     art = artifact_mem.MemArtifact()
@@ -398,7 +462,7 @@ def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     elif isinstance(obj, list):
         return [to_weavejs(item, artifact=artifact) for item in obj]
     elif isinstance(obj, arrow_list.ArrowWeaveList):
-        return convert_timestamps_to_epoch_ms(obj.to_pylist_notags())
+        return arrow_list.convert_arrow_timestamp_to_epoch_ms(obj).to_pylist_notags()
 
     wb_type = types.TypeRegistry.type_of(obj)
 

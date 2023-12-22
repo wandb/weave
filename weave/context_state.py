@@ -3,9 +3,11 @@ import contextlib
 import typing
 import dataclasses
 
-from . import client_interface
-from . import server_interface
-from . import uris
+if typing.TYPE_CHECKING:
+    from . import client_interface
+    from . import server_interface
+    from . import uris
+    from .graph_client import GraphClient
 
 
 # colab currently runs ipykernel < 6.0.  This resets context on every
@@ -54,7 +56,7 @@ if patch_context:
 # Set to the op uri if we're in the process of loading
 # an op from an artifact.
 _loading_op_location: contextvars.ContextVar[
-    typing.Optional[uris.WeaveURI]
+    typing.Optional["uris.WeaveURI"]
 ] = contextvars.ContextVar("loading_op_location", default=None)
 
 
@@ -63,6 +65,13 @@ _loading_op_location: contextvars.ContextVar[
 _loading_built_ins: contextvars.ContextVar[
     typing.Optional[bool]
 ] = contextvars.ContextVar("loading_built_ins", default=False)
+
+
+@contextlib.contextmanager
+def loading_builtins(builtins):
+    token = _loading_built_ins.set(builtins)
+    yield _loading_built_ins.get()
+    _loading_built_ins.reset(token)
 
 
 @contextlib.contextmanager
@@ -93,12 +102,16 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 _weave_client: contextvars.ContextVar[
-    typing.Optional[client_interface.ClientInterface]
+    typing.Optional["client_interface.ClientInterface"]
 ] = contextvars.ContextVar("weave_client", default=None)
+
+_monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "monitor_disabled", default=False
+)
 
 
 @contextlib.contextmanager
-def client(client: client_interface.ClientInterface):
+def client(client: "client_interface.ClientInterface"):
     client_token = _weave_client.set(client)
     try:
         yield client
@@ -106,21 +119,21 @@ def client(client: client_interface.ClientInterface):
         _weave_client.reset(client_token)
 
 
-def get_client() -> typing.Optional[client_interface.ClientInterface]:
+def get_client() -> typing.Optional["client_interface.ClientInterface"]:
     return _weave_client.get()
 
 
-def set_client(client: client_interface.ClientInterface):
+def set_client(client: "client_interface.ClientInterface"):
     _weave_client.set(client)
 
 
 _http_server: contextvars.ContextVar[
-    typing.Optional[server_interface.BaseServer]
+    typing.Optional["server_interface.BaseServer"]
 ] = contextvars.ContextVar("http_server", default=None)
 
 
 @contextlib.contextmanager
-def server(server: server_interface.BaseServer):
+def server(server: "server_interface.BaseServer"):
     server_token = _http_server.set(server)
     try:
         yield server
@@ -128,17 +141,24 @@ def server(server: server_interface.BaseServer):
         _http_server.reset(server_token)
 
 
-def get_server() -> typing.Optional[server_interface.BaseServer]:
+def get_server() -> typing.Optional["server_interface.BaseServer"]:
     return _http_server.get()
 
 
-def set_server(server: server_interface.BaseServer):
+def set_server(server: "server_interface.BaseServer"):
     _http_server.set(server)
 
 
 _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
     "frontend_url", default=None
 )
+
+
+@contextlib.contextmanager
+def monitor_disabled():
+    token = _monitor_disabled.set(True)
+    yield
+    _monitor_disabled.reset(token)
 
 
 def get_frontend_url() -> typing.Optional[str]:
@@ -172,7 +192,16 @@ def lazy_execution():
         _eager_mode.reset(eager_token)
 
 
-def eager_mode():
+@contextlib.contextmanager
+def set_eager_mode(eager: bool):
+    eager_token = _eager_mode.set(eager)
+    try:
+        yield
+    finally:
+        _eager_mode.reset(eager_token)
+
+
+def eager_mode() -> bool:
     return _eager_mode.get()
 
 
@@ -234,3 +263,29 @@ class WandbApiContext:
 _wandb_api_context: contextvars.ContextVar[
     typing.Optional[WandbApiContext]
 ] = contextvars.ContextVar("wandb_api_context", default=None)
+
+## urls.py Context
+_use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "use_local_urls", default=False
+)
+
+## graph_client_context.py Context
+_graph_client: contextvars.ContextVar[
+    typing.Optional["GraphClient"]
+] = contextvars.ContextVar("graph_client", default=None)
+
+
+_ref_tracking_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "ref_tracking_enabled", default=False
+)
+
+
+def ref_tracking_enabled() -> bool:
+    return _ref_tracking_enabled.get()
+
+
+@contextlib.contextmanager
+def ref_tracking(enabled: bool):
+    token = _ref_tracking_enabled.set(enabled)
+    yield _ref_tracking_enabled.get()
+    _ref_tracking_enabled.reset(token)

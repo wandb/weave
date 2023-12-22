@@ -2,6 +2,7 @@ import dataclasses
 import datetime
 import inspect
 import math
+import typing
 
 import pandas as pd
 
@@ -53,6 +54,8 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
+        from .op_def_type import OpDefType
+
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
         # that we want to include in the serialized representation.
@@ -63,11 +66,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         instance_class = result_type._instance_classes()[0]
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
-            if k in constructor_sig.parameters:
+            if serializer.type != OpDefType() and k in constructor_sig.parameters:
                 # None haxxx
                 # TODO: remove
                 obj_val = obj.get(k)
-                if obj_val is not None:
+                if obj_val is not None or serializer.type == types.UnknownType():
                     v = serializer.apply(obj_val)
                     result[k] = v
 
@@ -75,10 +78,32 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
+        # deserialize op methods separately
+        op_methods = {}
+        for k, serializer in self._property_serializers.items():
+            if (
+                obj.get(k) is not None
+                and isinstance(serializer, DefaultFromPy)
+                and serializer.type == OpDefType()
+            ):
+                op_methods[k] = serializer.apply(obj.get(k))
+
         if "artifact" in constructor_sig.parameters and "artifact" not in result:
             result["artifact"] = self._artifact
         try:
-            return instance_class(**result)
+            # Construct a new class, inheriting from the original instance_class
+            # with overridden op methods. The op_methods are unbound on the class,
+            # and will bind self upon construction as usual.
+            if self.type._relocatable:
+                new_class = type(
+                    instance_class.__name__ + "WithLoadedMethods",
+                    (instance_class,),
+                    op_methods,
+                )
+
+                return new_class(**result)
+            else:
+                return instance_class(**result)
         except:
             err = errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)
@@ -110,7 +135,7 @@ class ListToPyList(mappers_weave.ListMapper):
 
 class UnionToPyUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
-        obj_type = types.TypeRegistry.type_of(obj)
+        obj_type = types.type_of_with_refs(obj)
         for i, (member_type, member_mapper) in enumerate(
             zip(self.type.members, self._member_mappers)
         ):
@@ -236,6 +261,8 @@ class UnknownToPyUnknown(mappers.Mapper):
     def apply(self, obj):
         # This should never be called. Unknown for the object type
         # of empty lists
+        # PR: return None instead of crash
+        return None
         raise Exception("invalid %s" % obj)
 
 
@@ -246,7 +273,17 @@ class RefToPyRef(mappers_weave.RefMapper):
         super().__init__(type_, mapper, artifact, path)
         self._use_stable_refs = use_stable_refs
 
-    def apply(self, obj: ref_base.Ref):
+    def apply(self, obj: typing.Any):
+        if not isinstance(obj, ref_base.Ref):
+            # type_of_with_refs(obj) returns a Ref Type, so that we'll
+            # use this Ref mapper. We'll save the ref that points to the
+            # object instead of a copy of the object.
+            obj = ref_base.get_ref(obj)
+            if obj is None:
+                raise errors.WeaveSerializeError(
+                    "Ref mapper cannot serialize non-ref object %s" % obj
+                )
+
         try:
             if self._use_stable_refs:
                 return obj.uri

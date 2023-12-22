@@ -130,6 +130,22 @@ export const opArtifactVersionTTLDurationSeconds = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.ttlDurationSeconds,
 });
 
+export const opArtifactVersionTTLIsInherited = makeArtifactVersionOp({
+  name: 'artifactVersion-ttlIsInherited',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns if the artifact TTL is inherited ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns if the artifact TTL is inherited ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.ttlIsInherited,
+});
+
 export const opArtifactVersionCreatedAt = makeArtifactVersionOp({
   name: 'artifactVersion-createdAt',
   argTypes: artifactVersionArgTypes,

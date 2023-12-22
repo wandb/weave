@@ -47,6 +47,13 @@ gql_prop_op(
     types.Boolean(),
 )
 
+gql_prop_op(
+    "entity-artifactTTLDurationSeconds",
+    wdt.EntityType,
+    "artifactTTLDurationSeconds",
+    types.Number(),
+)
+
 # Section 4/6: Direct Relationship Ops
 gql_direct_edge_op(
     "entity-org",
@@ -82,6 +89,7 @@ gql_connection_op(
     {},
     # lambda inputs: f"first: 100",
 )
+
 
 # Section 6/6: Non Standard Business Logic Ops
 @op(name="entity-link")

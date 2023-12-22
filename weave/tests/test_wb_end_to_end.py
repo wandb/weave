@@ -46,11 +46,10 @@ def test_basic_publish_user_by_api_key_netrc(user_by_api_key_netrc):
 
 
 def _test_basic_publish(user_fixture):
-    a = weave.publish([1, 2, 3], "weave/list")
+    ref = weave.storage.publish([1, 2, 3], "weave/list")
     # Getting the ref for `a` is not a final API. Expect
     # that changes to the publish flow will bread this test
     # and you might need to update how you get the ref.
-    ref = a.val._ref
     uri = ref.uri
     assert (
         uri
