@@ -1893,7 +1893,6 @@ def type_of_without_refs(obj: typing.Any) -> Type:
 
 
 class PydanticType(ObjectType):
-    _relocatable = True
 
     instance_classes = pydantic.BaseModel
 
@@ -1909,7 +1908,6 @@ class PydanticType(ObjectType):
         res._relocatable = True
         return res
 
-    def __repr__(self):
-        pt = self.attr_types  # type: ignore
-        reprs = [f"{key}={pt[key].__repr__()}" for key in pt]
-        return f'{self.__class__.__name__}({", ".join(reprs)})'
+    @property
+    def type_vars(self):
+        return self.attr_types
