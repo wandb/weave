@@ -1021,6 +1021,8 @@ class ObjectType(Type):
         for k, v in attr_types.items():
             self.__dict__[k] = v
 
+    instance_classes = pydantic.BaseModel
+
     @property
     def type_vars(self):
         if self.__class__ == ObjectType:
@@ -1051,8 +1053,7 @@ class ObjectType(Type):
             schema_type = weave_pydantic.json_schema_to_weave_type(schema)
             assert isinstance(schema_type, TypedDict), "Bad schema type"
 
-            res = cls(**schema_type.property_types)
-            res._relocatable = True
+            res = cls(**schema_type.property_types, _relocatable=True)
             return res
 
         variable_prop_types = {}
