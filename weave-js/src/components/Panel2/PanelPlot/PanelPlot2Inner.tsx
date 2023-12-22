@@ -37,6 +37,7 @@ import {
   TypedDictType,
   union,
   voidNode,
+  Weave,
   withFileTag,
   withoutTags,
 } from '@wandb/weave/core';
@@ -109,6 +110,33 @@ const PLOT_TEMPLATE: VisualizationSpec = {
     // },
   },
 };
+
+function tooltipNoCache(
+  row: any,
+  s: SeriesConfig,
+  flatResultNode: Node,
+  weave: Weave
+) {
+  return opPick({
+    obj: opIndex({
+      arr: opIndex({
+        arr: flatResultNode,
+        index: constNumber(row._seriesIndex),
+      }),
+      index: constNumber(row._rowIndex),
+    }),
+    key: constString(
+      escapeDots(
+        TableState.getTableColumnName(
+          s.table.columnNames,
+          s.table.columnSelectFunctions,
+          s.dims.tooltip,
+          weave.client.opStore
+        )
+      )
+    ),
+  });
+}
 
 const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
   config: {
@@ -667,12 +695,13 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const colId = s.dims.tooltip;
           const table = vegaReadyTables[row._seriesIndex];
           const selectFn = table.columnSelectFunctions[colId];
+
+          const unnestedRowType = listObjectType(
+            listOfTableNodes[row._seriesIndex].type
+          ) as TypedDictType;
+
           if (isVoidNode(selectFn)) {
             // use default tooltip
-
-            const unnestedRowType = listObjectType(
-              listOfTableNodes[row._seriesIndex].type
-            ) as TypedDictType;
 
             const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
               (acc2: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
@@ -682,11 +711,29 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   !isVoidNode(table.columnSelectFunctions[colid]) &&
                   !isConstNode(table.columnSelectFunctions[colid])
                 ) {
-                  const colName = vegaCols[row._seriesIndex][dim];
-                  const colType = unnestedRowType.propertyTypes[colName]!;
-                  acc2[colName] = isTaggedValue(colType)
-                    ? taggedValueValueType(colType)
-                    : colType;
+                  const colNameNotVegaEscaped = TableState.getTableColumnName(
+                    s.table.columnNames,
+                    s.table.columnSelectFunctions,
+                    s.dims[dim],
+                    weave.client.opStore
+                  );
+
+                  const colNameVegaEscaped = vegaCols[row._seriesIndex][dim];
+                  const colType =
+                    unnestedRowType.propertyTypes[colNameNotVegaEscaped];
+
+                  if (colType == null) {
+                    acc2[colNameVegaEscaped] = tooltipNoCache(
+                      row,
+                      s,
+                      flatResultNode,
+                      weave
+                    ).type;
+                  } else {
+                    acc2[colNameVegaEscaped] = isTaggedValue(colType)
+                      ? taggedValueValueType(colType)
+                      : colType;
+                  }
                 }
 
                 return acc2;
@@ -694,7 +741,6 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               {}
             );
             const type = typedDict(propertyTypes);
-
             acc[key] = constNodeUnsafe(type, row);
           } else {
             // use custom tooltip
@@ -712,41 +758,34 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
               // NOTE: The graph below represents the original (non-caching) tooltip behavior.
 
-              acc[key] = opPick({
-                obj: opIndex({
-                  arr: opIndex({
-                    arr: flatResultNode,
-                    index: constNumber(row._seriesIndex),
-                  }),
-                  index: constNumber(row._rowIndex),
-                }),
-                key: constString(
-                  escapeDots(
-                    TableState.getTableColumnName(
-                      s.table.columnNames,
-                      s.table.columnSelectFunctions,
-                      s.dims.tooltip,
-                      weave.client.opStore
-                    )
-                  )
-                ),
-              });
+              acc[key] = tooltipNoCache(row, s, flatResultNode, weave);
             } else {
+              const colNameNotVegaEscaped = TableState.getTableColumnName(
+                s.table.columnNames,
+                s.table.columnSelectFunctions,
+                s.dims.tooltip,
+                weave.client.opStore
+              );
+
+              const colNameVegaEscaped = vegaCols[row._seriesIndex].tooltip;
+
               const unnestedRowType = listObjectType(
                 listOfTableNodes[row._seriesIndex].type
               ) as TypedDictType;
 
               const unnestedType =
-                unnestedRowType.propertyTypes[
-                  vegaCols[row._seriesIndex].tooltip
-                ]!;
+                unnestedRowType.propertyTypes[colNameNotVegaEscaped];
 
-              acc[key] = constNodeUnsafe(
-                isTaggedValue(unnestedType)
-                  ? taggedValueValueType(unnestedType)
-                  : unnestedType,
-                row[vegaCols[row._seriesIndex].tooltip]
-              );
+              if (unnestedType == null) {
+                acc[key] = tooltipNoCache(row, s, flatResultNode, weave);
+              } else {
+                acc[key] = constNodeUnsafe(
+                  isTaggedValue(unnestedType)
+                    ? taggedValueValueType(unnestedType)
+                    : unnestedType,
+                  row[colNameVegaEscaped]
+                );
+              }
             }
           }
 
@@ -758,10 +797,10 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       concattedNonLineTable,
       concreteConfig.series,
       vegaReadyTables,
+      listOfTableNodes,
       vegaCols,
       flatResultNode,
-      weave.client.opStore,
-      listOfTableNodes,
+      weave,
     ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
