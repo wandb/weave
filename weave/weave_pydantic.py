@@ -58,12 +58,12 @@ def json_schema_to_weave_type(json_schema: JSONSchema) -> types.Type:
         return types.List(json_schema_to_weave_type(items_type))
     elif type == JSONType.OBJECT:
 
-        properties = json_schema.get("properties", {})
+        properties = json_schema.get("properties", {}) or {}
         weave_properties = {
             key: json_schema_to_weave_type(value) for key, value in properties.items()
         }
 
-        required_keys: set[str] = set(json_schema.get("required", []))
+        required_keys: set[str] = set(json_schema.get("required", []) or [])
         not_required = set(properties.keys()) - required_keys
 
         return types.TypedDict(weave_properties, not_required_keys=not_required)
