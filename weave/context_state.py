@@ -273,19 +273,3 @@ _use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
 _graph_client: contextvars.ContextVar[
     typing.Optional["GraphClient"]
 ] = contextvars.ContextVar("graph_client", default=None)
-
-
-_ref_tracking_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "ref_tracking_enabled", default=False
-)
-
-
-def ref_tracking_enabled() -> bool:
-    return _ref_tracking_enabled.get()
-
-
-@contextlib.contextmanager
-def ref_tracking(enabled: bool):
-    token = _ref_tracking_enabled.set(enabled)
-    yield _ref_tracking_enabled.get()
-    _ref_tracking_enabled.reset(token)

@@ -166,12 +166,6 @@ def cereal_csv():
 
 
 @pytest.fixture()
-def eager_mode():
-    with context_state.eager_execution():
-        yield
-
-
-@pytest.fixture()
 def fake_wandb():
     setup_response = fixture_fakewandb.setup()
     yield setup_response
@@ -283,10 +277,4 @@ def io_server_factory():
 @pytest.fixture()
 def consistent_table_col_ids():
     with table_state.use_consistent_col_ids():
-        yield
-
-
-@pytest.fixture()
-def ref_tracking():
-    with context_state.ref_tracking(True):
         yield

@@ -17,14 +17,11 @@ from . import artifact_local
 
 
 class RefToPyRef(mappers.Mapper):
-    def apply(self, obj: typing.Any):
-        ref = ref_base.get_ref(obj)
-        if ref is None:
-            raise errors.WeaveSerializeError(f"Ref mapper encountered non-ref: {obj}")
-        if _uri_is_local_artifact(ref.uri):
-            ref = _local_ref_to_published_ref(ref)
+    def apply(self, obj: ref_base.Ref):
+        if _uri_is_local_artifact(obj.uri):
+            obj = _local_ref_to_published_ref(obj)
 
-        return ref
+        return obj
 
 
 class FunctionToPyFunction(mappers.Mapper):
