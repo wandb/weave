@@ -1044,6 +1044,17 @@ class ObjectType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
+        if isinstance(obj, pydantic.BaseModel):
+            from . import weave_pydantic
+
+            schema = obj.schema()
+            schema_type = weave_pydantic.json_schema_to_weave_type(schema)
+            assert isinstance(schema_type, TypedDict), "Bad schema type"
+
+            res = cls(**schema_type.property_types)
+            res._relocatable = True
+            return res
+
         variable_prop_types = {}
         for prop_name in cls.type_attrs():
             prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
@@ -1890,24 +1901,3 @@ def type_of_without_refs(obj: typing.Any) -> Type:
         return TypeRegistry.type_of(obj)
     finally:
         _reffed_type_is_ref.reset(token)
-
-
-class PydanticType(ObjectType):
-
-    instance_classes = pydantic.BaseModel
-
-    @classmethod
-    def type_of_instance(cls, obj: pydantic.BaseModel):
-        from . import weave_pydantic
-
-        schema = obj.schema()
-        schema_type = weave_pydantic.json_schema_to_weave_type(schema)
-        assert isinstance(schema_type, TypedDict), "Bad schema type"
-
-        res = cls(**schema_type.property_types)
-        res._relocatable = True
-        return res
-
-    @property
-    def type_vars(self):
-        return self.attr_types

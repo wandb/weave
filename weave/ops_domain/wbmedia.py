@@ -11,9 +11,17 @@ from ..ops_primitives import html
 from ..ops_primitives import markdown
 
 
+class LegacyImageArtifactFileRef:
+    # Dummy class to make LegacyImageArtifactFileRefType not have
+    # pydantic.BaseModel as an instance class, which messes up type_of.
+    pass
+
+
 @dataclasses.dataclass(frozen=True)
 class LegacyImageArtifactFileRefType(types.ObjectType):
     name = "legacy-image-file"
+
+    instance_classes = LegacyImageArtifactFileRef
 
     def property_types(self) -> dict[str, types.Type]:
         raise errors.WeaveTypeError(
