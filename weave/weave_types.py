@@ -6,6 +6,7 @@ import functools
 import keyword
 import contextvars
 import json
+import pydantic
 from collections.abc import Iterable
 
 
@@ -1889,3 +1890,26 @@ def type_of_without_refs(obj: typing.Any) -> Type:
         return TypeRegistry.type_of(obj)
     finally:
         _reffed_type_is_ref.reset(token)
+
+
+class PydanticType(ObjectType):
+    _relocatable = True
+
+    instance_classes = pydantic.BaseModel
+
+    @classmethod
+    def type_of_instance(cls, obj: pydantic.BaseModel):
+        from . import weave_pydantic
+
+        schema = obj.schema()
+        schema_type = weave_pydantic.json_schema_to_weave_type(schema)
+        assert isinstance(schema_type, TypedDict), "Bad schema type"
+
+        res = cls(**schema_type.property_types)
+        res._relocatable = True
+        return res
+
+    def __repr__(self):
+        pt = self.attr_types  # type: ignore
+        reprs = [f"{key}={pt[key].__repr__()}" for key in pt]
+        return f'{self.__class__.__name__}({", ".join(reprs)})'
