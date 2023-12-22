@@ -161,7 +161,14 @@ def observability(
         hidden=True,
     )
 
-    user_zoom_range = varbar.add("user_zoom_range", None, hidden=True)
+    user_zoom_range = varbar.add(
+        "user_zoom_range",
+        weave.ops.make_list(
+            a=window_start,
+            b=window_end,
+        ),
+        hidden=True,
+    )
     varbar.add(
         "Time_range",
         panels.DateRange(user_zoom_range, domain=filtered_range),
