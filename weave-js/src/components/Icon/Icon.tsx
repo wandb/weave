@@ -34,6 +34,7 @@ import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-conte
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
+import {ReactComponent as ImportCrownPro} from '../../assets/icons/icon-crown-pro.svg';
 import {ReactComponent as ImportCubeContainer} from '../../assets/icons/icon-cube-container.svg';
 import {ReactComponent as ImportDashboardBlackboard} from '../../assets/icons/icon-dashboard-blackboard.svg';
 import {ReactComponent as ImportDate} from '../../assets/icons/icon-date.svg';
@@ -314,6 +315,9 @@ export const IconCopy = (props: SVGIconProps) => (
 );
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
+);
+export const IconCrownPro = (props: SVGIconProps) => (
+  <ImportCrownPro {...updateIconProps(props)} />
 );
 export const IconCubeContainer = (props: SVGIconProps) => (
   <ImportCubeContainer {...updateIconProps(props)} />
@@ -846,6 +850,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'contract-left': IconContractLeft,
   copy: IconCopy,
   'credit-card-payment': IconCreditCardPayment,
+  'crown-pro': IconCrownPro,
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   date: IconDate,

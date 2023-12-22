@@ -33,6 +33,7 @@ export const IconNames = {
   ContractLeft: 'contract-left',
   Copy: 'copy',
   CreditCardPayment: 'credit-card-payment',
+  CrownPro: 'crown-pro',
   CubeContainer: 'cube-container',
   DashboardBlackboard: 'dashboard-blackboard',
   Date: 'date',
