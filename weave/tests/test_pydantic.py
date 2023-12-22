@@ -1,3 +1,6 @@
+import pydantic
+
+import weave
 from weave import weave_types as types
 from weave.weave_pydantic import json_schema_to_weave_type
 
@@ -37,3 +40,26 @@ def test_jsonschema_to_weave_type():
         },
         not_required_keys={"b"},
     )
+
+
+def test_pydantic_type_inference():
+    class TestPydanticClass(pydantic.BaseModel):
+        a: int
+        b: str
+        c: float
+
+    obj = TestPydanticClass(a=1, b="2", c=3.0)
+    t = types.type_of(obj)
+    assert t == types.RelocatableObjectType(
+        a=types.Int(), b=types.String(), c=types.Number()
+    )
+
+
+def test_save_load_pydantic():
+    class TestPydanticClass(pydantic.BaseModel):
+        a: int
+
+    obj = TestPydanticClass(a=1)
+    n = weave.save(obj)
+    recovered = weave.use(n)
+    assert recovered.a == 1
