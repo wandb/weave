@@ -669,6 +669,11 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const selectFn = table.columnSelectFunctions[colId];
           if (isVoidNode(selectFn)) {
             // use default tooltip
+
+            const unnestedRowType = listObjectType(
+              listOfTableNodes[row._seriesIndex].type
+            ) as TypedDictType;
+
             const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
               (acc2: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
                 const colid = s.dims[dim];
@@ -677,8 +682,9 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   !isVoidNode(table.columnSelectFunctions[colid]) &&
                   !isConstNode(table.columnSelectFunctions[colid])
                 ) {
-                  const colType = table.columnSelectFunctions[colid].type;
-                  acc2[vegaCols[row._seriesIndex][dim]] = isTaggedValue(colType)
+                  const colName = vegaCols[row._seriesIndex][dim];
+                  const colType = unnestedRowType.propertyTypes[colName]!;
+                  acc2[colName] = isTaggedValue(colType)
                     ? taggedValueValueType(colType)
                     : colType;
                 }
