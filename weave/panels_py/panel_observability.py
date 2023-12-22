@@ -653,7 +653,9 @@ def observability(
             )
         )
     )
-    errors_table.add_column(lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc")
+    errors_table.add_column(
+        lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc"
+    )
     errors_table.add_column(lambda row: row["job"], "Job")
     errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
 
