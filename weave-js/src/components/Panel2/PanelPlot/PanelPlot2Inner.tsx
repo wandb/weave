@@ -712,8 +712,8 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   !isConstNode(table.columnSelectFunctions[colid])
                 ) {
                   const colNameNotVegaEscaped = TableState.getTableColumnName(
-                    s.table.columnNames,
-                    s.table.columnSelectFunctions,
+                    vegaReadyTables[row._seriesIndex].columnNames,
+                    vegaReadyTables[row._seriesIndex].columnSelectFunctions,
                     s.dims[dim],
                     weave.client.opStore
                   );
@@ -722,14 +722,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   const colType =
                     unnestedRowType.propertyTypes[colNameNotVegaEscaped];
 
-                  if (colType == null) {
-                    acc2[colNameVegaEscaped] = tooltipNoCache(
-                      row,
-                      s,
-                      flatResultNode,
-                      weave
-                    ).type;
-                  } else {
+                  if (colType != null) {
                     acc2[colNameVegaEscaped] = isTaggedValue(colType)
                       ? taggedValueValueType(colType)
                       : colType;
@@ -761,8 +754,8 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               acc[key] = tooltipNoCache(row, s, flatResultNode, weave);
             } else {
               const colNameNotVegaEscaped = TableState.getTableColumnName(
-                s.table.columnNames,
-                s.table.columnSelectFunctions,
+                vegaReadyTables[row._seriesIndex].columnNames,
+                vegaReadyTables[row._seriesIndex].columnSelectFunctions,
                 s.dims.tooltip,
                 weave.client.opStore
               );
