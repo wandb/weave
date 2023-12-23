@@ -762,10 +762,6 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
               const colNameVegaEscaped = vegaCols[row._seriesIndex].tooltip;
 
-              const unnestedRowType = listObjectType(
-                listOfTableNodes[row._seriesIndex].type
-              ) as TypedDictType;
-
               const unnestedType =
                 unnestedRowType.propertyTypes[colNameNotVegaEscaped];
 
