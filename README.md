@@ -72,6 +72,8 @@ Before you dive in, make sure you have the required software installed. You'll f
 
 After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./examples/README.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
 
+If you want to learn how to write your own Weave queries and get more from your data, check [this](https://wandb.ai/luis_team_test/weave_example_queries/reports/Weave-queries---Vmlldzo1NzIxOTY2?accessToken=bvzq5hwooare9zy790yfl3oitutbvno2i6c2s81gk91750m53m2hdclj0jvryhcr) report, which goes from the basic operations available in Weave to other advanced visualizations of your data.
+
 ---
 
 ## 🎁 Feature Statuses
