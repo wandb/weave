@@ -356,7 +356,7 @@ def to_arrow(
     if isinstance(obj, ArrowWeaveList):
         return obj
     if wb_type is None:
-        wb_type = types.type_of_with_refs(obj)
+        wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifact or artifact_mem.MemArtifact()
     outer_tags: typing.Optional[dict[str, typing.Any]] = None
     if isinstance(wb_type, tagged_value_type.TaggedValueType):
@@ -385,7 +385,7 @@ def to_arrow(
 
         return weave_obj
 
-    raise errors.WeaveInternalError("to_arrow not implemented for: %s" % wb_type)
+    raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
 
 
 def to_weave_arrow(v: typing.Any):
