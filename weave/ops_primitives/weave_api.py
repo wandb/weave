@@ -522,7 +522,7 @@ def mutate_op_body(
     results = []
     op_inputs = []
     arg0 = (
-        list(nodes[0].from_op.inputs.values())[0]
+        list(nodes[0].from_op.inputs.values())[0].val
         if len(nodes[0].from_op.inputs) > 0
         else None
     )
