@@ -115,7 +115,7 @@ function tooltipNoCache(
   row: any,
   s: SeriesConfig,
   flatResultNode: Node,
-  weave: Weave
+  opStore: OpStore
 ) {
   return opPick({
     obj: opIndex({
@@ -131,7 +131,7 @@ function tooltipNoCache(
           s.table.columnNames,
           s.table.columnSelectFunctions,
           s.dims.tooltip,
-          weave.client.opStore
+          opStore
         )
       )
     ),
@@ -751,7 +751,12 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
               // NOTE: The graph below represents the original (non-caching) tooltip behavior.
 
-              acc[key] = tooltipNoCache(row, s, flatResultNode, weave);
+              acc[key] = tooltipNoCache(
+                row,
+                s,
+                flatResultNode,
+                weave.client.opStore
+              );
             } else {
               const colNameNotVegaEscaped = TableState.getTableColumnName(
                 vegaReadyTables[row._seriesIndex].columnNames,
@@ -766,7 +771,12 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                 unnestedRowType.propertyTypes[colNameNotVegaEscaped];
 
               if (unnestedType == null) {
-                acc[key] = tooltipNoCache(row, s, flatResultNode, weave);
+                acc[key] = tooltipNoCache(
+                  row,
+                  s,
+                  flatResultNode,
+                  weave.client.opStore
+                );
               } else {
                 acc[key] = constNodeUnsafe(
                   isTaggedValue(unnestedType)
