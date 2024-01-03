@@ -521,22 +521,27 @@ def mutate_op_body(
     # Run through resolvers forward
     results = []
     op_inputs = []
-    arg0 = list(nodes[0].from_op.inputs.values())[0].val
+    arg0 = (
+        list(nodes[0].from_op.inputs.values())[0].val
+        if len(nodes[0].from_op.inputs) > 0
+        else None
+    )
     for node in nodes:
         inputs = {}
-        arg0_name = list(node.from_op.inputs.keys())[0]
-        inputs[arg0_name] = arg0
-        for name, input_node in list(node.from_op.inputs.items())[1:]:
-            if not isinstance(input_node, graph.ConstNode):
-                inputs[name] = storage.deref(weave_internal.use(input_node))
-                # TODO: I was raising here, but the way I'm handling
-                # default config in multi_distribution makes it necessary
-                # to handle this case. This solution is more general,
-                # but also more expensive. We should make use of the execution
-                # cache (mutations should probably be planned by the compiler)
-                # raise errors.WeaveInternalError("Set error")
-            else:
-                inputs[name] = input_node.val
+        if len(node.from_op.inputs) > 0:
+            arg0_name = list(node.from_op.inputs.keys())[0]
+            inputs[arg0_name] = arg0
+            for name, input_node in list(node.from_op.inputs.items())[1:]:
+                if not isinstance(input_node, graph.ConstNode):
+                    inputs[name] = storage.deref(weave_internal.use(input_node))
+                    # TODO: I was raising here, but the way I'm handling
+                    # default config in multi_distribution makes it necessary
+                    # to handle this case. This solution is more general,
+                    # but also more expensive. We should make use of the execution
+                    # cache (mutations should probably be planned by the compiler)
+                    # raise errors.WeaveInternalError("Set error")
+                else:
+                    inputs[name] = input_node.val
         op_inputs.append(inputs)
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         arg0 = op_def.resolve_fn(**inputs)
