@@ -174,23 +174,35 @@ def _concatenate_taggedvalues(
     )
 
 
+def convert_null_array_to_list(
+    array: typing.Union[pa.ListArray, pa.NullArray]
+) -> pa.ListArray:
+    if isinstance(array, pa.NullArray):
+        return pc.cast(array, pa.list_(pa.null()))
+    else:
+        return array
+
+
 def _concatenate_lists(
     l1: ArrowWeaveListGeneric[types.List],
     l2: ArrowWeaveListGeneric[types.List],
     depth: int = 0,
 ) -> ArrowWeaveList:
+    l1_arrow_data = convert_null_array_to_list(l1._arrow_data)
+    l2_arrow_data = convert_null_array_to_list(l2._arrow_data)
+
     self_values: ArrowWeaveList = ArrowWeaveList(
-        l1._arrow_data.flatten(), l1.object_type.object_type, l2._artifact
+        l1_arrow_data.flatten(), l1.object_type.object_type, l2._artifact
     )
     other_values: ArrowWeaveList = ArrowWeaveList(
-        l2._arrow_data.flatten(), l2.object_type.object_type, l2._artifact
+        l2_arrow_data.flatten(), l2.object_type.object_type, l2._artifact
     )
     concatted_values = _concatenate(self_values, other_values, depth=depth + 1)
     new_offsets = pa_concat_arrays(
         [
-            offsets_starting_at_zero(l1._arrow_data)[:-1],
+            offsets_starting_at_zero(l1_arrow_data)[:-1],
             pa.compute.add(
-                offsets_starting_at_zero(l2._arrow_data),
+                offsets_starting_at_zero(l2_arrow_data),
                 len(self_values),
             ).cast(pa.int32()),
         ]
@@ -201,8 +213,8 @@ def _concatenate_lists(
             concatted_values._arrow_data,
             mask=pa_concat_arrays(
                 [
-                    pa.compute.is_null(l1._arrow_data),
-                    pa.compute.is_null(l2._arrow_data),
+                    pa.compute.is_null(l1_arrow_data),
+                    pa.compute.is_null(l2_arrow_data),
                 ]
             ),
         ),

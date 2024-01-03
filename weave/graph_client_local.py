@@ -87,7 +87,12 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         return result
 
     def ref_output_of(self, ref: Ref) -> typing.Optional[Run]:
-        raise NotImplementedError
+        runs = storage.objects(types.RunType())
+        for run_ref in runs:
+            run = typing.cast(WeaveRunObj, run_ref.get())
+            if str(ref) == str(run.output):
+                return run
+        return None
 
     def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError
@@ -140,7 +145,8 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         output: typing.Any,
         output_refs: Sequence[Ref],
     ) -> None:
-        run.output = output
+        run.output = self.save_object(output, f"run-{run.id}-output", "latest")
+        ref_base._put_ref(output, run.output)
         self.save_object(run, f"run-{run.id}", "latest")
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:

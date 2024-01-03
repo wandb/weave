@@ -277,6 +277,10 @@ def reassembled_chat_completion_message():
         id="chatcmpl-blank",
         choices=[
             Choice(
+                # logprobs included here because latest versions of pydantic
+                # require optional fields without default values to be included
+                # in the constructor
+                logprobs=None,
                 finish_reason="stop",
                 index=0,
                 message=ChatCompletionMessage(

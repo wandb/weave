@@ -45,9 +45,9 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
     # return f"{wb_type.name}-{obj_names[-1]}"
 
 
-def _get_weave_type(obj: typing.Any):
+def _get_weave_type_with_refs(obj: typing.Any):
     try:
-        return types.TypeRegistry.type_of(obj)
+        return types.type_of_with_refs(obj)
     except errors.WeaveTypeError as e:
         raise errors.WeaveSerializeError(
             "weave type error during serialization for object: %s. %s"
@@ -59,13 +59,6 @@ def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
     from weave.mappers_publisher import map_to_python_remote
-    from . import op_def
-
-    # Hack because of mappers_publisher recursion bug. Just don't do the recursion
-    # if we have an OpDef. Really we should skip if we don't have a composite object
-    # but there's no standard check for that.
-    if isinstance(obj, op_def.OpDef):
-        return obj
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)
@@ -165,7 +158,7 @@ def _direct_publish(
             ref_base._put_ref(obj, res)
             return res
 
-    weave_type = assume_weave_type or _get_weave_type(obj)
+    weave_type = assume_weave_type or _get_weave_type_with_refs(obj)
 
     target_project_from_context = get_publish_target_project()
     if target_project_from_context is not None:
@@ -223,7 +216,7 @@ def direct_save(
     assume_weave_type: typing.Optional[types.Type] = None,
     artifact: typing.Optional[artifact_local.LocalArtifact] = None,
 ) -> artifact_local.LocalArtifactRef:
-    weave_type = assume_weave_type or _get_weave_type(obj)
+    weave_type = assume_weave_type or _get_weave_type_with_refs(obj)
     name = name or _get_name(weave_type, obj)
 
     _assert_valid_name_part(name)
@@ -399,7 +392,7 @@ def to_python(
     ] = _default_ref_persister_artifact,
 ) -> dict:
     if wb_type is None:
-        wb_type = types.TypeRegistry.type_of(obj)
+        wb_type = types.type_of_with_refs(obj)
 
     # First map the object using a MemArtifact to capture any custom object refs.
     art = artifact_mem.MemArtifact()

@@ -17,11 +17,14 @@ from . import artifact_local
 
 
 class RefToPyRef(mappers.Mapper):
-    def apply(self, obj: ref_base.Ref):
-        if _uri_is_local_artifact(obj.uri):
-            obj = _local_ref_to_published_ref(obj)
+    def apply(self, obj: typing.Any):
+        ref = ref_base.get_ref(obj)
+        if ref is None:
+            raise errors.WeaveSerializeError(f"Ref mapper encountered non-ref: {obj}")
+        if _uri_is_local_artifact(ref.uri):
+            ref = _local_ref_to_published_ref(ref)
 
-        return obj
+        return ref
 
 
 class FunctionToPyFunction(mappers.Mapper):
@@ -79,29 +82,7 @@ class TaggedValueToPy(tagged_value_type.TaggedValueToPy):
 
 
 class DefaultToPy(mappers.Mapper):
-    def apply(self, obj: typing.Any) -> dict:
-        existing_ref = storage._get_ref(obj)
-        if not existing_ref:
-            return obj
-
-        if not isinstance(existing_ref, artifact_local.LocalArtifactRef):
-            return obj
-
-        from . import op_def
-
-        # Recursively do a top-level publish for OpDef objects. This is a Weaveflow
-        # hack. Weaveflow publishes the entire available graph in the execute.py
-        # prior to executing it. There are often ops inside top-level Objects, like
-        # ChatModel. We want to not publish those later, so we maintain a mapping
-        # from local artifact ref to published ref in storage.py. If we don't do
-        # a top level publish here, these ops will be published inside of their
-        # artifact instead of a new top-level one, and we won't trigger the
-        # local->publish ref cache (since that happens in _direct_publish).
-        if isinstance(obj, op_def.OpDef):
-            from . import api
-
-            storage._direct_publish(obj, f"{obj.name}")
-
+    def apply(self, obj: typing.Any) -> typing.Any:
         return obj
 
 
