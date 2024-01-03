@@ -415,7 +415,6 @@ const CustomGridTreeDataGroupingCell: React.FC<
               height: '26px',
               width: '26px',
               minWidth: '26px',
-
               borderRadius: '50%',
             }}>
             {rowNode.childrenExpanded ? <ExpandMore /> : <KeyboardArrowRight />}
