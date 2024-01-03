@@ -108,3 +108,34 @@ def test_vectorrefs(cache_mode_minimal):
         assert run is not None
         assert "add_5" in run.op_name
         assert run.inputs["v"] == 2
+
+
+def test_weaveflow_op(user_by_api_key_in_env):
+    from weave import weaveflow
+
+    with weave.wandb_client("weaveflow_example"):
+
+        @weave.op()
+        def custom_adder(a: int, b: int) -> int:
+            return a + b
+
+        res = custom_adder(1, 2)
+        assert res == 3
+
+
+def test_weaveflow_object_with_opmethod(user_by_api_key_in_env):
+    from weave import weaveflow
+
+    with weave.wandb_client("weaveflow_example"):
+
+        @weave.type()
+        class ATestObj:
+            a: int
+
+            @weave.op()
+            def a_test_add(self, b: int) -> int:
+                return self.a + b
+
+        x = ATestObj(a=1)
+        res = x.a_test_add(2)
+        assert res == 3
