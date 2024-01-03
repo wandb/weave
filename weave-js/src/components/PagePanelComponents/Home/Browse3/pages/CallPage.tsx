@@ -30,6 +30,7 @@ import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
 
 const TRACE_PCT = 40;
+const SHOW_COMPLEX_IO = false;
 
 export const CallPage: React.FC<{
   entity: string;
@@ -472,8 +473,11 @@ const BasicInputOutputRenderer: React.FC<{
   return (
     <Box
       sx={{
+        height: '100%',
+        width: '100%',
+        overflow: 'auto',
         display: 'flex',
-        flexDirection: 'row',
+        flexDirection: 'column',
       }}>
       {ioData?._keys?.map((k, i) => {
         const v = ioData![k];
@@ -481,14 +485,23 @@ const BasicInputOutputRenderer: React.FC<{
 
         if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
           value = <SmallRef objRef={parseRef(v)} />;
+          if (!SHOW_COMPLEX_IO) {
+            return null;
+          }
         } else if (_.isArray(v)) {
           if (v.length === 1 && typeof v[0] === 'string') {
             value = v[0];
           } else {
             value = `List of ${v.length} items`;
+            if (!SHOW_COMPLEX_IO) {
+              return null;
+            }
           }
         } else if (_.isObject(v)) {
           value = `Object with ${Object.keys(v).length} entries`;
+          if (!SHOW_COMPLEX_IO) {
+            return null;
+          }
         } else {
           value = v + '';
         }
@@ -501,6 +514,8 @@ const BasicInputOutputRenderer: React.FC<{
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
+              height: '38px',
+              flex: '0 0 auto',
             }}>
             {k !== '_result' && (
               <>
