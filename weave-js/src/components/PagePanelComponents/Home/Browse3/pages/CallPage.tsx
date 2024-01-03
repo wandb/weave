@@ -481,17 +481,14 @@ const BasicInputOutputRenderer: React.FC<{
 
         if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
           value = <SmallRef objRef={parseRef(v)} />;
-          return null;
         } else if (_.isArray(v)) {
           if (v.length === 1 && typeof v[0] === 'string') {
             value = v[0];
           } else {
-            value = `${v.length} items`;
-            // return null;
+            value = `List of ${v.length} items`;
           }
         } else if (_.isObject(v)) {
-          value = `${Object.keys(v).length} entries`;
-          // return null;
+          value = `Object with ${Object.keys(v).length} entries`;
         } else {
           value = v + '';
         }
