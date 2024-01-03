@@ -49,17 +49,106 @@ export const CallPage: React.FC<{
   return <CallPageInnerHorizontal {...props} call={call} />;
 };
 
+const useCallTabs = (call: WFCall) => {
+  const entityName = call.entity();
+  const projectName = call.project();
+  const callId = call.callID();
+  return [
+    {
+      label: 'Call',
+      content: (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: '1 1 auto',
+            overflow: 'auto',
+            p: 8,
+          }}>
+          <SpanDetails call={call.rawCallSpan()} />
+        </Box>
+      ),
+    },
+    {
+      label: 'Child Calls',
+      content: (
+        <CallsTable
+          entity={entityName}
+          project={projectName}
+          frozenFilter={{
+            parentId: callId,
+          }}
+        />
+      ),
+    },
+    {
+      label: 'Feedback',
+      content: (
+        <UnderConstruction
+          title="Feedback"
+          message={
+            <>
+              Allows users to add key-value pairs to the Call. TODO: Bring over
+              from browse2.
+            </>
+          }
+        />
+      ),
+    },
+    {
+      label: 'Datasets',
+      content: (
+        <UnderConstruction
+          title="Datasets"
+          message={
+            <>Shows all the datasets which this Call has been added to</>
+          }
+        />
+      ),
+    },
+    {
+      label: 'DAG',
+      content: (
+        <UnderConstruction
+          title="Record DAG"
+          message={
+            <>
+              This page will show a "Record" DAG of Objects and Calls centered
+              at this particular Call.
+            </>
+          }
+        />
+      ),
+    },
+  ];
+};
+
+const callMenuItems = [
+  {
+    label: '(Under Construction) Open in Board',
+    onClick: () => {
+      console.log('TODO: Open in Board');
+    },
+  },
+  {
+    label: '(Under Construction) Compare',
+    onClick: () => {
+      console.log('TODO: Compare');
+    },
+  },
+];
+
 const CallPageInnerHorizontal: React.FC<{
   call: WFCall;
 }> = ({call}) => {
-  const entityName = call.entity();
-  const projectName = call.project();
   const traceId = call.traceID();
   const callId = call.callID();
   const spanName = call.spanName();
 
   const title = `${spanName}: ${truncateID(callId)}`;
   const traceTitle = `Trace: ${truncateID(traceId)}`;
+
+  const callTabs = useCallTabs(call);
   return (
     <SimplePageLayout
       title={traceTitle}
@@ -96,91 +185,8 @@ const CallPageInnerHorizontal: React.FC<{
                 <SimplePageLayoutContext.Provider value={{}}>
                   <SimplePageLayout
                     title={title}
-                    menuItems={[
-                      {
-                        label: '(Under Construction) Open in Board',
-                        onClick: () => {
-                          console.log('TODO: Open in Board');
-                        },
-                      },
-                      {
-                        label: '(Under Construction) Compare',
-                        onClick: () => {
-                          console.log('TODO: Compare');
-                        },
-                      },
-                    ]}
-                    tabs={[
-                      {
-                        label: 'Call',
-                        content: (
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              flex: '1 1 auto',
-                              overflow: 'auto',
-                              p: 8,
-                            }}>
-                            <SpanDetails call={call.rawCallSpan()} />
-                          </Box>
-                        ),
-                      },
-                      {
-                        label: 'Child Calls',
-                        content: (
-                          <CallsTable
-                            entity={entityName}
-                            project={projectName}
-                            frozenFilter={{
-                              parentId: callId,
-                            }}
-                          />
-                        ),
-                      },
-                      {
-                        label: 'Feedback',
-                        content: (
-                          <UnderConstruction
-                            title="Feedback"
-                            message={
-                              <>
-                                Allows users to add key-value pairs to the Call.
-                                TODO: Bring over from browse2.
-                              </>
-                            }
-                          />
-                        ),
-                      },
-                      {
-                        label: 'Datasets',
-                        content: (
-                          <UnderConstruction
-                            title="Datasets"
-                            message={
-                              <>
-                                Shows all the datasets which this Call has been
-                                added to
-                              </>
-                            }
-                          />
-                        ),
-                      },
-                      {
-                        label: 'DAG',
-                        content: (
-                          <UnderConstruction
-                            title="Record DAG"
-                            message={
-                              <>
-                                This page will show a "Record" DAG of Objects
-                                and Calls centered at this particular Call.
-                              </>
-                            }
-                          />
-                        ),
-                      },
-                    ]}
+                    menuItems={callMenuItems}
+                    tabs={callTabs}
                   />
                 </SimplePageLayoutContext.Provider>
               </Box>
@@ -195,143 +201,16 @@ const CallPageInnerHorizontal: React.FC<{
 const CallPageInnerVertical: React.FC<{
   call: WFCall;
 }> = ({call}) => {
-  const entityName = call.entity();
-  const projectName = call.project();
-  const traceId = call.traceID();
   const callId = call.callID();
   const spanName = call.spanName();
-
   const title = `${spanName}: ${truncateID(callId)}`;
-  const traceTitle = `Trace: ${truncateID(traceId)}`;
+  const callTabs = useCallTabs(call);
   return (
     <SimplePageLayout
-      title={traceTitle}
-      tabs={[
-        {
-          label: 'Trace',
-          content: (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'row',
-                flex: '1 1 auto',
-                overflow: 'hidden',
-              }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: `0 0 500px`,
-                  width: '500px',
-                  overflow: 'hidden',
-                }}>
-                <CallTraceView call={call} treeOnly />
-              </Box>
-              <Box
-                sx={{
-                  borderTop: '1px solid #e0e0e0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: '1 1 auto',
-                  // flex: `1 1 ${100 - TRACE_PCT}%`,
-                  // height: 100 - TRACE_PCT,
-                  overflow: 'hidden',
-                }}>
-                <SimplePageLayoutContext.Provider value={{}}>
-                  <SimplePageLayout
-                    title={title}
-                    menuItems={[
-                      {
-                        label: '(Under Construction) Open in Board',
-                        onClick: () => {
-                          console.log('TODO: Open in Board');
-                        },
-                      },
-                      {
-                        label: '(Under Construction) Compare',
-                        onClick: () => {
-                          console.log('TODO: Compare');
-                        },
-                      },
-                    ]}
-                    tabs={[
-                      {
-                        label: 'Call',
-                        content: (
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              flex: '1 1 auto',
-                              overflow: 'auto',
-                              p: 8,
-                            }}>
-                            <SpanDetails call={call.rawCallSpan()} />
-                          </Box>
-                        ),
-                      },
-                      {
-                        label: 'Child Calls',
-                        content: (
-                          <CallsTable
-                            entity={entityName}
-                            project={projectName}
-                            frozenFilter={{
-                              parentId: callId,
-                            }}
-                          />
-                        ),
-                      },
-                      {
-                        label: 'Feedback',
-                        content: (
-                          <UnderConstruction
-                            title="Feedback"
-                            message={
-                              <>
-                                Allows users to add key-value pairs to the Call.
-                                TODO: Bring over from browse2.
-                              </>
-                            }
-                          />
-                        ),
-                      },
-                      {
-                        label: 'Datasets',
-                        content: (
-                          <UnderConstruction
-                            title="Datasets"
-                            message={
-                              <>
-                                Shows all the datasets which this Call has been
-                                added to
-                              </>
-                            }
-                          />
-                        ),
-                      },
-                      {
-                        label: 'DAG',
-                        content: (
-                          <UnderConstruction
-                            title="Record DAG"
-                            message={
-                              <>
-                                This page will show a "Record" DAG of Objects
-                                and Calls centered at this particular Call.
-                              </>
-                            }
-                          />
-                        ),
-                      },
-                    ]}
-                  />
-                </SimplePageLayoutContext.Provider>
-              </Box>
-            </Box>
-          ),
-        },
-      ]}
+      title={title}
+      menuItems={callMenuItems}
+      leftSidebar={<CallTraceView call={call} treeOnly />}
+      tabs={callTabs}
     />
   );
 };
@@ -394,7 +273,8 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
   // the tree structure is rendered)
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
-      headerName: 'Call',
+      headerName: 'Call Tree',
+      headerAlign: 'center',
       flex: 1,
       renderCell: params => (
         <CustomGridTreeDataGroupingCell
@@ -544,6 +424,7 @@ const CustomGridTreeDataGroupingCell: React.FC<
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'left',
+        width: '100%',
       }}>
       {_.range(rowNode.depth).map(i => {
         return (
