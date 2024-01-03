@@ -9,7 +9,7 @@ import {
   useGridApiContext,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../react';
@@ -344,6 +344,9 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly: boolean}> = ({
   const currentRouter = useWeaveflowCurrentRouteContext();
   const {rows, expandKeys: forcedExpandKeys} = useCallFlattenedTraceTree(call);
   const [expandKeys, setExpandKeys] = React.useState(forcedExpandKeys);
+  useEffect(() => {
+    setExpandKeys(curr => new Set([...curr, ...forcedExpandKeys]));
+  }, [forcedExpandKeys]);
 
   const columns: GridColDef[] = [
     // probably want to add more details like the following in the future.
@@ -393,7 +396,22 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly: boolean}> = ({
     () => ({
       headerName: 'Call',
       flex: 1,
-      renderCell: params => <CustomGridTreeDataGroupingCell {...params} />,
+      renderCell: params => (
+        <CustomGridTreeDataGroupingCell
+          {...params}
+          onClick={event => {
+            if (expandKeys.has(params.row.id)) {
+              setExpandKeys(curr => {
+                const newSet = new Set(curr);
+                newSet.delete(params.row.id);
+                return newSet;
+              });
+            } else {
+              setExpandKeys(curr => new Set([...curr, params.row.id]));
+            }
+          }}
+        />
+      ),
     }),
     []
   );
@@ -404,7 +422,6 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly: boolean}> = ({
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
       const rowCall = params.row.call as WFCall;
-      const rowHierarchy = params.row.hierarchy as string[];
       history.push(
         currentRouter.callUIUrl(
           rowCall.entity(),
@@ -413,9 +430,8 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly: boolean}> = ({
           rowCall.callID()
         )
       );
-      setExpandKeys(new Set([...expandKeys, ...rowHierarchy]));
     },
-    [currentRouter, expandKeys, history]
+    [currentRouter, history]
   );
 
   // Informs DataGridPro which groups to expand by default. In this case,
@@ -482,7 +498,7 @@ const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
  * lines connecting the cells, expanding/collapsing the tree, etc).
  */
 const CustomGridTreeDataGroupingCell: React.FC<
-  GridRenderCellParams
+  GridRenderCellParams & {onClick?: (event: React.MouseEvent) => void}
 > = props => {
   const {id, field, rowNode, row} = props;
   const call = row.call as WFCall;
@@ -494,6 +510,11 @@ const CustomGridTreeDataGroupingCell: React.FC<
 
     apiRef.current.setRowChildrenExpansion(id, !rowNode.childrenExpanded);
     apiRef.current.setCellFocus(id, field);
+
+    if (props.onClick) {
+      props.onClick(event);
+    }
+
     event.stopPropagation();
   };
 
