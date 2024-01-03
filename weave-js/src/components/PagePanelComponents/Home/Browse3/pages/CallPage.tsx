@@ -82,7 +82,7 @@ const CallPageInnerHorizontal: React.FC<{
                   height: TRACE_PCT,
                   overflow: 'hidden',
                 }}>
-                <CallTraceView call={call} treeOnly />
+                <CallTraceView call={call} />
               </Box>
               <Box
                 sx={{
@@ -336,7 +336,7 @@ const CallPageInnerVertical: React.FC<{
   );
 };
 
-const CallTraceView: React.FC<{call: WFCall; treeOnly: boolean}> = ({
+const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
   call,
   treeOnly,
 }) => {
@@ -620,12 +620,16 @@ const CustomGridTreeDataGroupingCell: React.FC<
         )}
       </Box>
       <Box
-        sx={
-          {
-            // ml: 1,
-          }
-        }>
-        {call.spanName() + ': ' + truncateID(call.callID())}
+        sx={{
+          // ml: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          flex: '1 1 auto',
+          fontWeight: 'bold',
+        }}>
+        {/* {call.spanName() + ': ' + truncateID(call.callID())} */}
+        {call.spanName().split('-').slice(-1)[0]}
       </Box>
       {opCategory && (
         <Box
