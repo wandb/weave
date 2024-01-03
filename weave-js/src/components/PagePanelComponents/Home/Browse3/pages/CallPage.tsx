@@ -31,7 +31,6 @@ import {WFCall} from './wfInterface/types';
 
 const TRACE_PCT = 40;
 const SHOW_COMPLEX_IO = true;
-const USE_VERTICAL_TREE = true;
 
 export const CallPage: React.FC<{
   entity: string;
@@ -40,13 +39,26 @@ export const CallPage: React.FC<{
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const call = orm.projectConnection.call(props.callId);
+  const [verticalLayout, setVerticalLayout] = React.useState(true);
   if (!call) {
     return <CenteredAnimatedLoader />;
   }
-  if (USE_VERTICAL_TREE) {
-    return <CallPageInnerVertical {...props} call={call} />;
+  if (verticalLayout) {
+    return (
+      <CallPageInnerVertical
+        {...props}
+        setVerticalLayout={setVerticalLayout}
+        call={call}
+      />
+    );
   }
-  return <CallPageInnerHorizontal {...props} call={call} />;
+  return (
+    <CallPageInnerHorizontal
+      {...props}
+      setVerticalLayout={setVerticalLayout}
+      call={call}
+    />
+  );
 };
 
 const useCallTabs = (call: WFCall) => {
@@ -140,7 +152,8 @@ const callMenuItems = [
 
 const CallPageInnerHorizontal: React.FC<{
   call: WFCall;
-}> = ({call}) => {
+  setVerticalLayout: (vertical: boolean) => void;
+}> = ({call, setVerticalLayout}) => {
   const traceId = call.traceID();
   const callId = call.callID();
   const spanName = call.spanName();
@@ -149,9 +162,18 @@ const CallPageInnerHorizontal: React.FC<{
   const traceTitle = `Trace: ${truncateID(traceId)}`;
 
   const callTabs = useCallTabs(call);
+
   return (
     <SimplePageLayout
       title={traceTitle}
+      menuItems={[
+        {
+          label: 'View Vertical',
+          onClick: () => {
+            setVerticalLayout(true);
+          },
+        },
+      ]}
       tabs={[
         {
           label: 'Trace',
@@ -200,7 +222,8 @@ const CallPageInnerHorizontal: React.FC<{
 
 const CallPageInnerVertical: React.FC<{
   call: WFCall;
-}> = ({call}) => {
+  setVerticalLayout: (vertical: boolean) => void;
+}> = ({call, setVerticalLayout}) => {
   const callId = call.callID();
   const spanName = call.spanName();
   const title = `${spanName}: ${truncateID(callId)}`;
@@ -208,7 +231,15 @@ const CallPageInnerVertical: React.FC<{
   return (
     <SimplePageLayout
       title={title}
-      menuItems={callMenuItems}
+      menuItems={[
+        {
+          label: 'View Horizontal',
+          onClick: () => {
+            setVerticalLayout(false);
+          },
+        },
+        ...callMenuItems,
+      ]}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
