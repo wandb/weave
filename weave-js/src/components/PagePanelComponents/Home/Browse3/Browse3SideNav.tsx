@@ -64,6 +64,11 @@ type NavigationCallbacks = {
 type Browse3ProjectSideNavProps = {
   entity: string;
   project: string;
+  /**
+   * If true, the sidebar will be collapsed by default.
+   * If false, the sidebar will be expanded by default.
+   * If undefined, the sidebar will be expanded by default unless there is a peekPath.
+   */
   preferCollapsed?: boolean;
   selectedCategory?:
     | 'objects'
