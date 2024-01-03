@@ -286,11 +286,11 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
               return (
                 <Box
                   key={i}
+                  gridGap={4}
                   sx={{
                     display: 'flex',
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: '4px',
                   }}>
                   <Box>{k}</Box>
                   <ArrowRight />
@@ -338,11 +338,11 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
               return (
                 <Box
                   key={i}
+                  gridGap={4}
                   sx={{
                     display: 'flex',
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: '4px',
                   }}>
                   {/* <Box>{k}</Box>
                   <ArrowRight /> */}
