@@ -178,7 +178,7 @@ def ref(uri: str) -> _ref_base.Ref:
             version = "latest"
         else:
             name, version = uri.split(":")
-        uri = str(client.ref_uri(name, version))
+        uri = str(client.ref_uri(name, version, "obj"))
 
     return _ref_base.Ref.from_str(uri)
 

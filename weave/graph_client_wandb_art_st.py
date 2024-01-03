@@ -165,9 +165,11 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     def ref_is_own(self, ref: typing.Optional[Ref]) -> bool:
         return isinstance(ref, artifact_wandb.WandbArtifactRef)
 
-    def ref_uri(self, name: str, version: str) -> artifact_wandb.WeaveWBArtifactURI:
+    def ref_uri(
+        self, name: str, version: str, path: str
+    ) -> artifact_wandb.WeaveWBArtifactURI:
         return artifact_wandb.WeaveWBArtifactURI(
-            name, version, self.entity_name, self.project_name
+            name, version, self.entity_name, self.project_name, path=path
         )
 
     def run_ui_url(self, run: Run) -> str:
