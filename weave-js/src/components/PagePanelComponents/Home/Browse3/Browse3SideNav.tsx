@@ -108,7 +108,7 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
     }
   }, [query.filter]);
   const containsPeekPath = useMemo(() => {
-    return query.peekPath != null && query.peekPath != '';
+    return query.peekPath != null && query.peekPath !== '';
   }, [query.peekPath]);
   const selectedNavSection = useMemo(() => {
     if (params.tab === 'types' || params.tab === 'type-versions') {

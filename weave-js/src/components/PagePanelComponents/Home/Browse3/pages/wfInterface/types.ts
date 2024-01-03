@@ -1,5 +1,5 @@
 import {Type} from '../../../../../../core';
-import { Call } from '../../../Browse2/callTree';
+import {Call} from '../../../Browse2/callTree';
 
 export interface WFProject extends ProjectOwned {
   type: (name: string) => WFType | null;

@@ -13,7 +13,6 @@ import moment from 'moment';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {useParams} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../Browse3/context';
 import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {flattenObject} from './browse2Util';

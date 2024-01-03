@@ -217,21 +217,21 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
   const currentRouter = useWeaveflowCurrentRouteContext();
   const {rowsAcc: rows, expandKeys} = useMemo(() => {
     const rowsAcc: GridValidRowModel = [];
-    const expandKeys = new Set<string>();
+    const expandKeysInner = new Set<string>();
     // Ascend to the root
     let currentCall: WFCall | null = call;
     let lastCall: WFCall = call;
 
     while (currentCall != null) {
       lastCall = currentCall;
-      expandKeys.add(currentCall.callID());
+      expandKeysInner.add(currentCall.callID());
       currentCall = currentCall.parentCall();
     }
 
     // Descend to the leaves
     const queue: Array<{
       targetCall: WFCall;
-      parentHierarchy: Array<string>;
+      parentHierarchy: string[];
     }> = [{targetCall: lastCall, parentHierarchy: []}];
     while (queue.length > 0) {
       const {targetCall, parentHierarchy} = queue.shift()!;
@@ -246,7 +246,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       }
     }
 
-    return {rowsAcc, expandKeys};
+    return {rowsAcc, expandKeys: expandKeysInner};
   }, [call]);
 
   const columns: GridColDef[] = [
@@ -259,15 +259,15 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       headerName: 'Basic Inputs',
       flex: 1,
       renderCell: ({row}) => {
-        const call = row.call as WFCall;
+        const rowCall = row.call as WFCall;
         return (
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'row',
             }}>
-            {call.rawCallSpan().inputs._keys?.map((k, i) => {
-              const v = call.rawCallSpan().inputs[k];
+            {rowCall.rawCallSpan().inputs._keys?.map((k, i) => {
+              const v = rowCall.rawCallSpan().inputs[k];
               let value: React.ReactNode = '';
 
               if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
@@ -307,15 +307,15 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       flex: 1,
       headerName: 'Basic Output',
       renderCell: ({row}) => {
-        const call = row.call as WFCall;
+        const rowCall = row.call as WFCall;
         return (
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'row',
             }}>
-            {call.rawCallSpan().output?._keys?.map((k, i) => {
-              const v = call.rawCallSpan().output![k];
+            {rowCall.rawCallSpan().output?._keys?.map((k, i) => {
+              const v = rowCall.rawCallSpan().output![k];
               let value: React.ReactNode = '';
 
               if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
@@ -370,13 +370,13 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       rowHeight={38}
       treeData
       onRowClick={params => {
-        const call = params.row.call as WFCall;
+        const rowCall = params.row.call as WFCall;
         history.push(
           currentRouter.callUIUrl(
-            call.entity(),
-            call.project(),
+            rowCall.entity(),
+            rowCall.project(),
             '',
-            call.callID()
+            rowCall.callID()
           )
         );
       }}
@@ -388,8 +388,8 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
         expandKeys.has(node.groupingKey?.toString() ?? 'INVALID')
       }
       getRowClassName={params => {
-        const call = params.row.call as WFCall;
-        return `callId-${call.callID()}`;
+        const rowCall = params.row.call as WFCall;
+        return `callId-${rowCall.callID()}`;
       }}
       hideFooter
       rowSelection={false}
