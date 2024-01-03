@@ -354,11 +354,19 @@ def _merge(name) -> str:
         else to_uri.version
     )
 
+    obj = head_ref.get()
+    # Crucially, we must compute the weave type using type_of
+    # instead of allowing _direct_publish and direct_save to compute
+    # the weave type using type_of_with_refs. Merging is a special
+    # operation and should not try to do ref tracking.
+    weave_type = types.type_of(obj)
+
     ref: ref_base.Ref
     if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):
         ref = storage._direct_publish(
-            obj=head_ref.get(),
+            obj=obj,
             name=to_uri.name,
+            assume_weave_type=weave_type,
             wb_project_name=to_uri.project_name,
             wb_entity_name=to_uri.entity_name,
             branch_name=shared_branch_name,
@@ -375,6 +383,7 @@ def _merge(name) -> str:
             name=to_uri.name,
             source_branch_name=shared_branch_name,
             branch_name=shared_branch_name,
+            assume_weave_type=weave_type,
         )
     return ref.branch_uri
 
@@ -521,22 +530,27 @@ def mutate_op_body(
     # Run through resolvers forward
     results = []
     op_inputs = []
-    arg0 = list(nodes[0].from_op.inputs.values())[0].val
+    arg0 = (
+        list(nodes[0].from_op.inputs.values())[0].val
+        if len(nodes[0].from_op.inputs) > 0
+        else None
+    )
     for node in nodes:
         inputs = {}
-        arg0_name = list(node.from_op.inputs.keys())[0]
-        inputs[arg0_name] = arg0
-        for name, input_node in list(node.from_op.inputs.items())[1:]:
-            if not isinstance(input_node, graph.ConstNode):
-                inputs[name] = storage.deref(weave_internal.use(input_node))
-                # TODO: I was raising here, but the way I'm handling
-                # default config in multi_distribution makes it necessary
-                # to handle this case. This solution is more general,
-                # but also more expensive. We should make use of the execution
-                # cache (mutations should probably be planned by the compiler)
-                # raise errors.WeaveInternalError("Set error")
-            else:
-                inputs[name] = input_node.val
+        if len(node.from_op.inputs) > 0:
+            arg0_name = list(node.from_op.inputs.keys())[0]
+            inputs[arg0_name] = arg0
+            for name, input_node in list(node.from_op.inputs.items())[1:]:
+                if not isinstance(input_node, graph.ConstNode):
+                    inputs[name] = storage.deref(weave_internal.use(input_node))
+                    # TODO: I was raising here, but the way I'm handling
+                    # default config in multi_distribution makes it necessary
+                    # to handle this case. This solution is more general,
+                    # but also more expensive. We should make use of the execution
+                    # cache (mutations should probably be planned by the compiler)
+                    # raise errors.WeaveInternalError("Set error")
+                else:
+                    inputs[name] = input_node.val
         op_inputs.append(inputs)
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         arg0 = op_def.resolve_fn(**inputs)
