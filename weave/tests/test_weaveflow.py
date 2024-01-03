@@ -110,9 +110,7 @@ def test_vectorrefs(cache_mode_minimal):
         assert run.inputs["v"] == 2
 
 
-def test_weaveflow_op(user_by_api_key_in_env):
-    from weave import weaveflow
-
+def test_weaveflow_op_wandb(user_by_api_key_in_env):
     with weave.wandb_client("weaveflow_example"):
 
         @weave.op()
@@ -123,9 +121,18 @@ def test_weaveflow_op(user_by_api_key_in_env):
         assert res == 3
 
 
-def test_weaveflow_object_with_opmethod(user_by_api_key_in_env):
-    from weave import weaveflow
+def test_weaveflow_op_wandb_return_list(user_by_api_key_in_env):
+    with weave.wandb_client("weaveflow_example"):
 
+        @weave.op()
+        def custom_adder(a: int, b: int) -> list[int]:
+            return [a + b]
+
+        res = custom_adder(1, 2)
+        assert res == [3]
+
+
+def test_weaveflow_object_wandb_with_opmethod(user_by_api_key_in_env):
     with weave.wandb_client("weaveflow_example"):
 
         @weave.type()
