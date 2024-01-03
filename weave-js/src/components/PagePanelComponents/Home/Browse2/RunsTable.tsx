@@ -69,7 +69,6 @@ export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
 }> = ({loading, spans}) => {
-  const {peekingRouter} = useWeaveflowRouteContext();
   const showIO = useMemo(() => {
     return Array.from(new Set(spans.map(span => span.name))).length === 1;
   }, [spans]);
@@ -439,7 +438,7 @@ export const RunsTable: FC<{
     }
 
     return {cols, colGroupingModel};
-  }, [orm, params.entity, params.project, peekingRouter, showIO, spans]);
+  }, [orm, params.entity, params.project, showIO, spans]);
   const autosized = useRef(false);
   useEffect(() => {
     if (autosized.current) {
