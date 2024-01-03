@@ -158,8 +158,8 @@ export const FilterableTypeVersionsTable: React.FC<{
             renderCell: params => {
               return (
                 <TypeLink
-                  entityName={params.row.obj.project()}
-                  projectName={params.row.obj.entity()}
+                  entityName={params.row.obj.entity()}
+                  projectName={params.row.obj.project()}
                   typeName={params.row.obj.type().name()}
                 />
               );
