@@ -1032,7 +1032,7 @@ class ObjectType(Type):
             res = cls(**schema_type.property_types)
 
             # Hack to get around frozen dataclass
-            res.__dict__['_relocatable'] = True
+            res.__dict__["_relocatable"] = True
 
             return res
 
@@ -1088,6 +1088,9 @@ def is_relocatable_object_type(t: typing.Union[str, dict]) -> bool:
         return False
     if not t.get("_relocatable"):
         return False
+    if t.get("_relocatable") and t.get("_is_object"):
+        # relocatable base object case
+        return True
     return is_serialized_object_type(t)
 
 
@@ -1855,8 +1858,3 @@ def split_none(t: Type) -> tuple[bool, Type]:
     if len(non_none_members) < len(t.members):
         return True, union(*non_none_members)
     return False, t
-
-
-class RelocatableObjectType(ObjectType):
-
-    _relocatable = True

@@ -49,10 +49,8 @@ def test_pydantic_type_inference():
         c: float
 
     obj = TestPydanticClass(a=1, b="2", c=3.0)
-    t = types.type_of(obj)
-    assert t == types.RelocatableObjectType(
-        a=types.Int(), b=types.String(), c=types.Number()
-    )
+    t = types.TypeRegistry.type_of(obj)
+    assert t == types.ObjectType(a=types.Int(), b=types.String(), c=types.Number())
 
 
 def test_save_load_pydantic():
