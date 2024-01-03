@@ -400,15 +400,15 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
         <CustomGridTreeDataGroupingCell
           {...params}
           onClick={event => {
-            if (expandKeys.has(params.row.id)) {
-              setExpandKeys(curr => {
+            setExpandKeys(curr => {
+              if (curr.has(params.row.id)) {
                 const newSet = new Set(curr);
                 newSet.delete(params.row.id);
                 return newSet;
-              });
-            } else {
-              setExpandKeys(curr => new Set([...curr, params.row.id]));
-            }
+              } else {
+                return new Set([...curr, params.row.id]);
+              }
+            });
           }}
         />
       ),
