@@ -1,5 +1,5 @@
 import {Box, Button} from '@material-ui/core';
-import {ArrowRight, ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
+import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
   DataGridPro,
