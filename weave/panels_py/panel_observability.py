@@ -303,7 +303,7 @@ def observability(
         x_title="Time",
         y=lambda row: row["duration"],
         y_title="Time spent queued",
-        label=lambda row: row["entity_name"],
+        label=lambda row: grouping_fn(row),
         tooltip=lambda row: weave.ops.dict_(
             **{
                 "Job": row["job"],
@@ -313,7 +313,6 @@ def observability(
                 "Job": row["job"],
             }
         ),
-        color=group_by_user.val,
         color_title="Grouping",
         groupby_dims=[],
         mark="bar",
