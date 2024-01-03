@@ -1,9 +1,7 @@
 import time
 import typing
 import os
-import contextlib
 import dataclasses
-from typing import Any
 
 from . import urls
 from . import graph as _graph
@@ -20,7 +18,6 @@ from . import util as _util
 from . import context as _context
 from . import context_state as _context_state
 from . import run as _run
-from . import weave_init as _weave_init
 from . import graph_client as _graph_client
 from . import graph_client_local as _graph_client_local
 from . import graph_client_wandb_art_st as _graph_client_wandb_art_st
@@ -126,30 +123,41 @@ def from_pandas(df):
 
 
 def init(project_name: str) -> _graph_client.GraphClient:
-    return _weave_init.init_wandb(project_name).client
+    from . import wandb_api
 
-
-@contextlib.contextmanager
-def wandb_client(project_name: str) -> typing.Iterator[_graph_client.GraphClient]:
-    inited_client = _weave_init.init_wandb(project_name)
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
+    fields = project_name.split("/")
+    if len(fields) == 1:
+        api = wandb_api.get_wandb_api_sync()
+        try:
+            entity_name = api.default_entity_name()
+        except AttributeError:
+            raise errors.WeaveWandbAuthenticationException(
+                'weave init requires wandb. Run "wandb login"'
+            )
+        project_name = fields[0]
+    elif len(fields) == 2:
+        entity_name, project_name = fields
+    else:
+        raise ValueError(
+            'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
+        )
+    if not entity_name:
+        raise ValueError("entity_name must be non-empty")
+    client = _graph_client_wandb_art_st.GraphClientWandbArtStreamTable(
+        entity_name, project_name
+    )
+    _context_state._graph_client.set(client)
+    if _context_state._use_local_urls.get():
+        print("Ensure you have the prototype UI running with `weave ui`")
+    print(f"View project at {urls.project_path(entity_name, project_name)}")
+    return client
 
 
 # This is currently an internal interface. We'll expose something like it though ("offline" mode)
 def init_local_client() -> _graph_client.GraphClient:
-    return _weave_init.init_local().client
-
-
-@contextlib.contextmanager
-def local_client() -> typing.Iterator[_graph_client.GraphClient]:
-    inited_client = _weave_init.init_local()
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
+    client = _graph_client_local.GraphClientLocal()
+    _context_state._graph_client.set(client)
+    return client
 
 
 def publish(obj: typing.Any, name: str) -> _ref_base.Ref:
@@ -181,20 +189,6 @@ def ref(uri: str) -> _ref_base.Ref:
         uri = str(client.ref_uri(name, version))
 
     return _ref_base.Ref.from_str(uri)
-
-
-def obj_ref(obj: typing.Any) -> typing.Optional[_ref_base.Ref]:
-    return _ref_base.get_ref(obj)
-
-
-def output_of(obj: typing.Any) -> typing.Optional[_run.Run]:
-    client = _graph_client_context.require_graph_client()
-
-    ref = obj_ref(obj)
-    if ref is None:
-        return ref
-
-    return client.ref_output_of(ref)
 
 
 import contextlib

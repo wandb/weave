@@ -110,6 +110,33 @@ const PLOT_TEMPLATE: VisualizationSpec = {
   },
 };
 
+function tooltipNoCache(
+  row: any,
+  s: SeriesConfig,
+  flatResultNode: Node,
+  opStore: OpStore
+) {
+  return opPick({
+    obj: opIndex({
+      arr: opIndex({
+        arr: flatResultNode,
+        index: constNumber(row._seriesIndex),
+      }),
+      index: constNumber(row._rowIndex),
+    }),
+    key: constString(
+      escapeDots(
+        TableState.getTableColumnName(
+          s.table.columnNames,
+          s.table.columnSelectFunctions,
+          s.dims.tooltip,
+          opStore
+        )
+      )
+    ),
+  });
+}
+
 const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
   config: {
     legend: {
@@ -348,6 +375,8 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     );
   }, [vegaReadyTables, inputNode, weave]);
 
+  const {opStore} = weave.client;
+
   const flatResultNode = useMemo(() => {
     const arrayArg: {
       [key: number]: ReturnType<
@@ -369,7 +398,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               concreteConfig.signals.domain,
               series,
               axisName,
-              weave.client.opStore
+              opStore
             );
           });
         }
@@ -403,7 +432,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     config.series,
     concreteConfig.series,
     concreteConfig.signals.domain,
-    weave.client.opStore,
+    opStore,
   ]);
 
   const flatResultNodeRef = useRef(flatResultNode);
@@ -667,12 +696,13 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const colId = s.dims.tooltip;
           const table = vegaReadyTables[row._seriesIndex];
           const selectFn = table.columnSelectFunctions[colId];
+
+          const unnestedRowType = listObjectType(
+            listOfTableNodes[row._seriesIndex].type
+          ) as TypedDictType;
+
           if (isVoidNode(selectFn)) {
             // use default tooltip
-
-            const unnestedRowType = listObjectType(
-              listOfTableNodes[row._seriesIndex].type
-            ) as TypedDictType;
 
             const propertyTypes = PlotState.EXPRESSION_DIM_NAMES.reduce(
               (acc2: {[vegaColName: string]: Type}, dim: ExprDimNameType) => {
@@ -682,11 +712,22 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   !isVoidNode(table.columnSelectFunctions[colid]) &&
                   !isConstNode(table.columnSelectFunctions[colid])
                 ) {
-                  const colName = vegaCols[row._seriesIndex][dim];
-                  const colType = unnestedRowType.propertyTypes[colName]!;
-                  acc2[colName] = isTaggedValue(colType)
-                    ? taggedValueValueType(colType)
-                    : colType;
+                  const colNameNotVegaEscaped = TableState.getTableColumnName(
+                    vegaReadyTables[row._seriesIndex].columnNames,
+                    vegaReadyTables[row._seriesIndex].columnSelectFunctions,
+                    s.dims[dim],
+                    opStore
+                  );
+
+                  const colNameVegaEscaped = vegaCols[row._seriesIndex][dim];
+                  const colType =
+                    unnestedRowType.propertyTypes[colNameNotVegaEscaped];
+
+                  if (colType != null) {
+                    acc2[colNameVegaEscaped] = isTaggedValue(colType)
+                      ? taggedValueValueType(colType)
+                      : colType;
+                  }
                 }
 
                 return acc2;
@@ -694,7 +735,6 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               {}
             );
             const type = typedDict(propertyTypes);
-
             acc[key] = constNodeUnsafe(type, row);
           } else {
             // use custom tooltip
@@ -712,41 +752,30 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
               // NOTE: The graph below represents the original (non-caching) tooltip behavior.
 
-              acc[key] = opPick({
-                obj: opIndex({
-                  arr: opIndex({
-                    arr: flatResultNode,
-                    index: constNumber(row._seriesIndex),
-                  }),
-                  index: constNumber(row._rowIndex),
-                }),
-                key: constString(
-                  escapeDots(
-                    TableState.getTableColumnName(
-                      s.table.columnNames,
-                      s.table.columnSelectFunctions,
-                      s.dims.tooltip,
-                      weave.client.opStore
-                    )
-                  )
-                ),
-              });
+              acc[key] = tooltipNoCache(row, s, flatResultNode, opStore);
             } else {
-              const unnestedRowType = listObjectType(
-                listOfTableNodes[row._seriesIndex].type
-              ) as TypedDictType;
+              const colNameNotVegaEscaped = TableState.getTableColumnName(
+                vegaReadyTables[row._seriesIndex].columnNames,
+                vegaReadyTables[row._seriesIndex].columnSelectFunctions,
+                s.dims.tooltip,
+                opStore
+              );
+
+              const colNameVegaEscaped = vegaCols[row._seriesIndex].tooltip;
 
               const unnestedType =
-                unnestedRowType.propertyTypes[
-                  vegaCols[row._seriesIndex].tooltip
-                ]!;
+                unnestedRowType.propertyTypes[colNameNotVegaEscaped];
 
-              acc[key] = constNodeUnsafe(
-                isTaggedValue(unnestedType)
-                  ? taggedValueValueType(unnestedType)
-                  : unnestedType,
-                row[vegaCols[row._seriesIndex].tooltip]
-              );
+              if (unnestedType == null) {
+                acc[key] = tooltipNoCache(row, s, flatResultNode, opStore);
+              } else {
+                acc[key] = constNodeUnsafe(
+                  isTaggedValue(unnestedType)
+                    ? taggedValueValueType(unnestedType)
+                    : unnestedType,
+                  row[colNameVegaEscaped]
+                );
+              }
             }
           }
 
@@ -758,10 +787,10 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       concattedNonLineTable,
       concreteConfig.series,
       vegaReadyTables,
+      listOfTableNodes,
       vegaCols,
       flatResultNode,
-      weave.client.opStore,
-      listOfTableNodes,
+      opStore,
     ]);
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
@@ -1019,7 +1048,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       newSpec.transform = [];
 
       const fixKeyForVega = (key: string) =>
-        fixKeyForVegaTable(key, vegaReadyTable, weave.client.opStore);
+        fixKeyForVegaTable(key, vegaReadyTable, opStore);
 
       if (xAxisType != null) {
         const fixedXKey = fixKeyForVega(dims.x);
@@ -1259,7 +1288,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             vegaReadyTable.columnNames,
             vegaReadyTable.columnSelectFunctions,
             dims.tooltip ?? dims.y,
-            weave.client.opStore
+            opStore
           ),
         };
       }
@@ -1421,6 +1450,7 @@ export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     ];
   }, [
     weave,
+    opStore,
     lineStyleScale,
     flatPlotTables,
     vegaReadyTables,
