@@ -190,7 +190,8 @@ const CallPageInner: React.FC<{
 const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
-  const {rows, expandKeys} = useCallFlattenedTraceTree(call);
+  const {rows, expandKeys: forcedExpandKeys} = useCallFlattenedTraceTree(call);
+  const [expandKeys, setExpandKeys] = React.useState(forcedExpandKeys);
 
   const columns: GridColDef[] = [
     // probably want to add more details like the following in the future.
@@ -251,6 +252,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
       const rowCall = params.row.call as WFCall;
+      const rowHierarchy = params.row.hierarchy as string[];
       history.push(
         currentRouter.callUIUrl(
           rowCall.entity(),
@@ -259,8 +261,9 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
           rowCall.callID()
         )
       );
+      setExpandKeys(new Set([...expandKeys, ...rowHierarchy]));
     },
-    [currentRouter, history]
+    [currentRouter, expandKeys, history]
   );
 
   // Informs DataGridPro which groups to expand by default. In this case,
