@@ -55,6 +55,7 @@ export const SelectGroupBy = ({
       value={value}
       onChange={onChange}
       isSearchable={false}
+      isClearable={false}
       placeholder="Select dimensions..."
     />
   );

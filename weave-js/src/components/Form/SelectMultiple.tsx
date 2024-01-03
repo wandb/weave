@@ -1,5 +1,6 @@
 /**
  * Customized version of react-select for selecting multiple options.
+ * See https://react-select.com/advanced#sortable-multiselect
  */
 
 import React, {MouseEventHandler} from 'react';
@@ -11,7 +12,6 @@ import {
 } from 'react-select';
 import {
   SortableContainer,
-  SortableContainerProps,
   SortableElement,
   SortableHandle,
   SortEndHandler,
@@ -19,6 +19,7 @@ import {
 
 import {AdditionalProps, Select} from './Select';
 
+// Create a copy of the specified array, moving an item from one index to another.
 function arrayMove<T>(array: readonly T[], from: number, to: number) {
   const slicedArray = array.slice();
   slicedArray.splice(
@@ -35,32 +36,29 @@ const SortableMultiValueLabel = SortableHandle(
 
 type Props<Option> = ReactSelectProps<Option, true> & AdditionalProps;
 
-export const SelectMultipleSortable = <Option,>(props: Props<Option>) => {
-  const SortableMultiValue = SortableElement(
-    (smvprops: MultiValueProps<Option>) => {
-      // this prevents the menu from being opened/closed when the user clicks
-      // on a value to begin dragging it. ideally, detecting a click (instead of
-      // a drag) would still focus the control and toggle the menu, but that
-      // requires some magic with refs that are out of scope for this example
-      const onMouseDown: MouseEventHandler<HTMLDivElement> = e => {
-        e.preventDefault();
-        e.stopPropagation();
-      };
-      const innerProps = {...smvprops.innerProps, onMouseDown};
-      return (
-        <components.MultiValue
-          {...smvprops}
-          innerProps={innerProps}
-          isDisabled={true}
-        />
-      );
-    }
+const MultiValue = (smvprops: MultiValueProps) => {
+  // this prevents the menu from being opened/closed when the user clicks
+  // on a value to begin dragging it. ideally, detecting a click (instead of
+  // a drag) would still focus the control and toggle the menu, but that
+  // requires some magic with refs that are out of scope for this example
+  const onMouseDown: MouseEventHandler<HTMLDivElement> = e => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const innerProps = {...smvprops.innerProps, onMouseDown};
+  return (
+    <components.MultiValue
+      {...smvprops}
+      innerProps={innerProps}
+      isDisabled={true}
+    />
   );
+};
 
-  const SortableSelect = SortableContainer(Select) as React.ComponentClass<
-    Props<Option> & SortableContainerProps
-  >;
+const SortableMultiValue = SortableElement(MultiValue);
+const SortableSelect = SortableContainer(Select) as any;
 
+export const SelectMultipleSortable = <Option,>(props: Props<Option>) => {
   const [selected, setSelected] = React.useState<readonly Option[]>([]);
   const onSortEnd: SortEndHandler = ({oldIndex, newIndex}) => {
     const newValue = arrayMove(selected, oldIndex, newIndex);
@@ -76,7 +74,7 @@ export const SelectMultipleSortable = <Option,>(props: Props<Option>) => {
       onSortEnd={onSortEnd}
       distance={4}
       // small fix for https://github.com/clauderic/react-sortable-hoc/pull/352:
-      getHelperDimensions={({node}) => node.getBoundingClientRect()}
+      getHelperDimensions={({node}: any) => node.getBoundingClientRect()}
       size="variable"
       isMulti
       components={{
