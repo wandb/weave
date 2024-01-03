@@ -344,11 +344,11 @@ export const IconCopy = (props: SVGIconProps) => (
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
 );
-export const IconCrownPro = (props: SVGIconProps) => (
-  <ImportCrownPro {...updateIconProps(props)} />
-);
 export const IconCross = (props: SVGIconProps) => (
   <ImportCross {...updateIconProps(props)} />
+);
+export const IconCrownPro = (props: SVGIconProps) => (
+  <ImportCrownPro {...updateIconProps(props)} />
 );
 export const IconCubeContainer = (props: SVGIconProps) => (
   <ImportCubeContainer {...updateIconProps(props)} />
@@ -918,8 +918,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'contract-left': IconContractLeft,
   copy: IconCopy,
   'credit-card-payment': IconCreditCardPayment,
-  'crown-pro': IconCrownPro,
   cross: IconCross,
+  'crown-pro': IconCrownPro,
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   date: IconDate,
