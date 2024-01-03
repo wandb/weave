@@ -1,29 +1,23 @@
 import {Box, Button} from '@material-ui/core';
-import {
-  ArrowRight,
-  Expand,
-  ExpandLess,
-  ExpandMore,
-  KeyboardArrowRight,
-} from '@mui/icons-material';
+import {ArrowRight, ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
   DataGridPro,
   DataGridProProps,
   GridColDef,
-  gridFilteredDescendantCountLookupSelector,
   GridRenderCellParams,
   GridRowsProp,
   GridValidRowModel,
   useGridApiContext,
-  useGridSelector,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {Browse2TraceComponent} from '../../Browse2/Browse2TracePage';
-import {useWeaveflowRouteContext} from '../context';
+import {parseRef} from '../../../../../react';
+import {SmallRef} from '../../Browse2/SmallRef';
+import {SpanDetails} from '../../Browse2/SpanDetails';
+import {useWeaveflowCurrentRouteContext} from '../context';
 import {CallsTable} from './CallsPage';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
@@ -35,9 +29,8 @@ import {UnderConstruction} from './common/UnderConstruction';
 import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
-import {SpanDetails} from '../../Browse2/SpanDetails';
-import {SmallRef} from '../../Browse2/SmallRef';
-import {parseRef} from '../../../../../react';
+
+const TRACE_PCT = 40;
 
 export const CallPage: React.FC<{
   entity: string;
@@ -89,7 +82,8 @@ const CallPageInner: React.FC<{
                 sx={{
                   display: 'flex',
                   flexDirection: 'column',
-                  flex: '1 1 50px',
+                  flex: `1 1 ${TRACE_PCT}%`,
+                  height: TRACE_PCT,
                   overflow: 'hidden',
                 }}>
                 <CallTraceView call={call} />
@@ -99,7 +93,8 @@ const CallPageInner: React.FC<{
                   borderTop: '1px solid #e0e0e0',
                   display: 'flex',
                   flexDirection: 'column',
-                  flex: '1 1 50px',
+                  flex: `1 1 ${100 - TRACE_PCT}%`,
+                  height: 100 - TRACE_PCT,
                   overflow: 'hidden',
                 }}>
                 <SimplePageLayoutContext.Provider value={{}}>
@@ -219,7 +214,7 @@ const CallPageInner: React.FC<{
 
 const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
   const history = useHistory();
-  const {peekingRouter} = useWeaveflowRouteContext();
+  const currentRouter = useWeaveflowCurrentRouteContext();
   const {rowsAcc: rows, expandKeys} = useMemo(() => {
     const rowsAcc: GridValidRowModel = [];
     const expandKeys = new Set<string>();
@@ -377,7 +372,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       onRowClick={params => {
         const call = params.row.call as WFCall;
         history.push(
-          peekingRouter.callUIUrl(
+          currentRouter.callUIUrl(
             call.entity(),
             call.project(),
             '',
@@ -399,6 +394,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       hideFooter
       rowSelection={false}
       sx={{
+        border: 0,
         '&>.MuiDataGrid-main': {
           '& div div div div >.MuiDataGrid-cell': {
             borderBottom: 'none',
