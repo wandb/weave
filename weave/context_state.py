@@ -85,8 +85,8 @@ def get_loading_op_location():
     return _loading_op_location.get()
 
 
-def set_loading_built_ins() -> contextvars.Token:
-    return _loading_built_ins.set(True)
+def set_loading_built_ins(val=True) -> contextvars.Token:
+    return _loading_built_ins.set(val)
 
 
 def clear_loading_built_ins(token) -> None:
