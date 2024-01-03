@@ -18,6 +18,7 @@ import pprint
 from weave.language_features.tagging.tag_store import isolated_tagging_context
 from . import value_or_error
 
+from . import cache
 from . import execute
 from . import serialize
 from . import storage
@@ -82,8 +83,9 @@ def handle_request(
         with tracer.trace("request:execute"):
             with execute.top_level_stats() as stats:
                 with context.execution_client():
-                    with gql_json_cache.gql_json_cache_context():
-                        result = nodes.batch_map(execute.execute_nodes)
+                    with cache.time_interval_cache_prefix():
+                        with gql_json_cache.gql_json_cache_context():
+                            result = nodes.batch_map(execute.execute_nodes)
 
         with tracer.trace("request:deref"):
             if deref:

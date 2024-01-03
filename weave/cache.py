@@ -1,12 +1,32 @@
 import typing
 import datetime
+import contextlib
 
 from . import engine_trace
 from . import wandb_api
 from . import environment
 from . import errors
+from . import context_state
 
 statsd = engine_trace.statsd()  # type: ignore
+
+
+@contextlib.contextmanager
+def time_interval_cache_prefix() -> typing.Generator[None, None, None]:
+    # generate a cache prefix by chunking the current time into intervals. By default
+    # the intervals will be 1 week long. This can be configured by an environment variable in the future
+    # TODO: add support for parse the cache interval from env var
+    year, week, _ = datetime.datetime.now().isocalendar()
+    cache_prefix = f"{year}-{week}"
+    token = context_state._cache_prefix_context.set(cache_prefix)
+    try:
+        yield
+    finally:
+        context_state._cache_prefix_context.reset(token)
+
+
+def get_cache_prefix() -> typing.Optional[str]:
+    return context_state._cache_prefix_context.get()
 
 
 def get_user_cache_key() -> typing.Optional[str]:

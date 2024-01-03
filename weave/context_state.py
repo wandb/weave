@@ -274,6 +274,9 @@ _graph_client: contextvars.ContextVar[
     typing.Optional["GraphClient"]
 ] = contextvars.ContextVar("graph_client", default=None)
 
+_cache_prefix_context: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
+    "cache_prefix", default=None
+)
 
 _ref_tracking_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "ref_tracking_enabled", default=False
