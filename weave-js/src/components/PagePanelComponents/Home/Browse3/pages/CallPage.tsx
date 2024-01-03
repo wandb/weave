@@ -6,12 +6,10 @@ import {
   DataGridProProps,
   GridColDef,
   GridRenderCellParams,
-  GridRowsProp,
-  GridValidRowModel,
   useGridApiContext,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../react';
@@ -31,6 +29,8 @@ import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
 
 const TRACE_PCT = 40;
+const BORDER_STYLE = '1px solid rgb(34,34,34)';
+const INSET_SPACING = 60;
 
 export const CallPage: React.FC<{
   entity: string;
@@ -54,14 +54,6 @@ const CallPageInner: React.FC<{
   const callId = call.callID();
   const spanName = call.spanName();
 
-  // const params = useMemo(() => {
-  //   return {
-  //     entity: entityName,
-  //     project: projectName,
-  //     traceId,
-  //     spanId: callId,
-  //   };
-  // }, [entityName, projectName, traceId, callId]);
   const title = `${spanName}: ${truncateID(callId)}`;
   const traceTitle = `Trace: ${truncateID(traceId)}`;
   return (
@@ -191,22 +183,6 @@ const CallPageInner: React.FC<{
             </Box>
           ),
         },
-        // {
-        //   label: 'Trace',
-        //   content: <Browse2TraceComponent params={params} />,
-        // },
-        // {
-        //   label: 'Calls',
-        //   content: (
-        //     <CallsTable
-        //       entity={entityName}
-        //       project={projectName}
-        //       frozenFilter={{
-        //         parentId: callId,
-        //       }}
-        //     />
-        //   ),
-        // },
       ]}
     />
   );
@@ -215,41 +191,10 @@ const CallPageInner: React.FC<{
 const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
-  const {rowsAcc: rows, expandKeys} = useMemo(() => {
-    const rowsAcc: GridValidRowModel = [];
-    const expandKeysInner = new Set<string>();
-    // Ascend to the root
-    let currentCall: WFCall | null = call;
-    let lastCall: WFCall = call;
-
-    while (currentCall != null) {
-      lastCall = currentCall;
-      expandKeysInner.add(currentCall.callID());
-      currentCall = currentCall.parentCall();
-    }
-
-    // Descend to the leaves
-    const queue: Array<{
-      targetCall: WFCall;
-      parentHierarchy: string[];
-    }> = [{targetCall: lastCall, parentHierarchy: []}];
-    while (queue.length > 0) {
-      const {targetCall, parentHierarchy} = queue.shift()!;
-      const newHierarchy = [...parentHierarchy, targetCall.callID()];
-      rowsAcc.push({
-        id: targetCall.callID(),
-        call: targetCall,
-        hierarchy: newHierarchy,
-      });
-      for (const childCall of targetCall.childCalls()) {
-        queue.push({targetCall: childCall, parentHierarchy: newHierarchy});
-      }
-    }
-
-    return {rowsAcc, expandKeys: expandKeysInner};
-  }, [call]);
+  const {rows, expandKeys} = useCallFlattenedTraceTree(call);
 
   const columns: GridColDef[] = [
+    // probably want to add more details like the following in the future.
     // {field: 'opName', headerName: 'Op Name'},
     // {field: 'opVersion', headerName: 'Op Version'},
     // {field: 'opCategory', headerName: 'Op Category'},
@@ -356,72 +301,106 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
     },
   ];
 
-  const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row =>
-    row.hierarchy;
+  // Informs DataGridPro where to lookup the hierarchy of a given row.
+  const getTreeDataPath: DataGridProProps['getTreeDataPath'] = useCallback(
+    row => row.hierarchy,
+    []
+  );
 
-  const groupingColDef: DataGridProProps['groupingColDef'] = {
-    headerName: '',
-    flex: 1,
-    renderCell: params => <CustomGridTreeDataGroupingCell {...params} />,
-  };
+  // Informs DataGridPro how to render the grouping cell (this is where
+  // the tree structure is rendered)
+  const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
+    () => ({
+      headerName: '',
+      flex: 1,
+      renderCell: params => <CustomGridTreeDataGroupingCell {...params} />,
+    }),
+    []
+  );
+
+  // Informs DataGridPro what to do when a row is clicked - in this case
+  // use the current router to navigate to the call page for the clicked
+  // call. Effectively this looks like expanding the clicked call.
+  const onRowClick: DataGridProProps['onRowClick'] = useCallback(
+    params => {
+      const rowCall = params.row.call as WFCall;
+      history.push(
+        currentRouter.callUIUrl(
+          rowCall.entity(),
+          rowCall.project(),
+          '',
+          rowCall.callID()
+        )
+      );
+    },
+    [currentRouter, history]
+  );
+
+  // Informs DataGridPro which groups to expand by default. In this case,
+  // we expand the groups for the current call.
+  const isGroupExpandedByDefault: DataGridProProps['isGroupExpandedByDefault'] =
+    useCallback(
+      node => expandKeys.has(node.groupingKey?.toString() ?? 'INVALID'),
+      [expandKeys]
+    );
+
+  // Informs DataGridPro how to style the rows. In this case, we highlight
+  // the current call.
   const callClass = `.callId-${call.callID()}`;
+  const getRowClassName: DataGridProProps['getRowClassName'] = useCallback(
+    params => {
+      const rowCall = params.row.call as WFCall;
+      return `callId-${rowCall.callID()}`;
+    },
+    []
+  );
+
+  // Informs DataGridPro how to style the table. In this case, we remove
+  // the borders between the cells.
+  const sx: DataGridProProps['sx'] = useMemo(
+    () => ({
+      border: 0,
+      '&>.MuiDataGrid-main': {
+        '& div div div div >.MuiDataGrid-cell': {
+          borderBottom: 'none',
+        },
+      },
+      [callClass]: {
+        backgroundColor: '#a9edf252',
+      },
+    }),
+    [callClass]
+  );
+
   return (
     <DataGridPro
       rowHeight={38}
       treeData
-      onRowClick={params => {
-        const rowCall = params.row.call as WFCall;
-        history.push(
-          currentRouter.callUIUrl(
-            rowCall.entity(),
-            rowCall.project(),
-            '',
-            rowCall.callID()
-          )
-        );
-      }}
-      rows={rows as GridRowsProp}
+      onRowClick={onRowClick}
+      rows={rows}
       columns={columns}
       getTreeDataPath={getTreeDataPath}
       groupingColDef={groupingColDef}
-      isGroupExpandedByDefault={node =>
-        expandKeys.has(node.groupingKey?.toString() ?? 'INVALID')
-      }
-      getRowClassName={params => {
-        const rowCall = params.row.call as WFCall;
-        return `callId-${rowCall.callID()}`;
-      }}
+      isGroupExpandedByDefault={isGroupExpandedByDefault}
+      getRowClassName={getRowClassName}
       hideFooter
       rowSelection={false}
-      sx={{
-        border: 0,
-        '&>.MuiDataGrid-main': {
-          '& div div div div >.MuiDataGrid-cell': {
-            borderBottom: 'none',
-          },
-        },
-        [callClass]: {
-          backgroundColor: '#a9edf252',
-        },
-      }}
+      sx={sx}
     />
   );
 };
 
-const BORDER_STYLE = '1px solid rgb(34,34,34)';
-const INSET_SPACING = 60;
-function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
+/**
+ * Utility component to render the grouping cell for the trace tree.
+ * Most of the work here is to rendering the tree structure (i.e. the
+ * lines connecting the cells, expanding/collapsing the tree, etc).
+ */
+const CustomGridTreeDataGroupingCell: React.FC<
+  GridRenderCellParams
+> = props => {
   const {id, field, rowNode, row} = props;
   const call = row.call as WFCall;
   const apiRef = useGridApiContext();
-  // const filteredDescendantCountLookup = useGridSelector(
-  //   apiRef,
-  //   gridFilteredDescendantCountLookupSelector
-  // );
-
-  // const filteredDescendantCount =
-  //   filteredDescendantCountLookup[rowNode.id] ?? 0;
-
   const handleClick: ButtonProps['onClick'] = event => {
     if (rowNode.type !== 'group') {
       return;
@@ -453,12 +432,10 @@ function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
   return (
     <Box
       sx={{
-        // ml: rowNode.depth * INSET_SPACING,
         height: '100%',
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'center',
-        // gap: '8px',
         justifyContent: 'left',
       }}>
       {_.range(rowNode.depth).map(i => {
@@ -466,7 +443,6 @@ function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
           <Box
             key={i}
             sx={{
-              // ml: `${INSET_SPACING / 2}px`,
               flex: `0 0 ${INSET_SPACING / 2}px`,
               width: `${INSET_SPACING / 2}px`,
               height: '100%',
@@ -474,13 +450,11 @@ function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              // borderRight: BORDER_STYLE,
             }}>
             <Box
               sx={{
                 width: '100%',
                 height: '100%',
-                // borderBottom: BORDER_STYLE,
                 borderRight: BORDER_STYLE,
               }}></Box>
             <Box
@@ -495,7 +469,6 @@ function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
       })}
       <Box
         sx={{
-          // ml: `${INSET_SPACING / 2}px`,
           flex: `0 0 ${INSET_SPACING}px`,
           width: `${INSET_SPACING}px`,
           height: '100%',
@@ -544,4 +517,62 @@ function CustomGridTreeDataGroupingCell(props: GridRenderCellParams) {
       )}
     </Box>
   );
-}
+};
+
+/**
+ * Returns the flattened trace tree for a given call. Specifically,
+ * it will find the trace root for a call, then find all the ancestors
+ * of the root. The flattened order is depth-first, so that when listed
+ * in a a table, the children of each call will be listed immediately
+ * after the parent call. The structure of the returned rows conforms to
+ * `GridValidRowModel`, but is specifically:
+ * {
+ *  id: string;
+ *  call: WFCall;
+ *  hierarchy: string[];
+ * }
+ * where `hierarchy` is the list of call IDs from the root to the current.
+ *
+ * Furthermore, the `expandKeys` set contains the call IDs of all the calls
+ * from the root to the current call, so that the tree can be expanded to
+ * show the current call.
+ */
+const useCallFlattenedTraceTree = (call: WFCall) => {
+  return useMemo(() => {
+    const rows: Array<{
+      id: string;
+      call: WFCall;
+      hierarchy: string[];
+    }> = [];
+    const expandKeys = new Set<string>();
+    // Ascend to the root
+    let currentCall: WFCall | null = call;
+    let lastCall: WFCall = call;
+
+    while (currentCall != null) {
+      lastCall = currentCall;
+      expandKeys.add(currentCall.callID());
+      currentCall = currentCall.parentCall();
+    }
+
+    // Descend to the leaves
+    const queue: Array<{
+      targetCall: WFCall;
+      parentHierarchy: string[];
+    }> = [{targetCall: lastCall, parentHierarchy: []}];
+    while (queue.length > 0) {
+      const {targetCall, parentHierarchy} = queue.shift()!;
+      const newHierarchy = [...parentHierarchy, targetCall.callID()];
+      rows.push({
+        id: targetCall.callID(),
+        call: targetCall,
+        hierarchy: newHierarchy,
+      });
+      for (const childCall of targetCall.childCalls()) {
+        queue.push({targetCall: childCall, parentHierarchy: newHierarchy});
+      }
+    }
+
+    return {rows, expandKeys};
+  }, [call]);
+};
