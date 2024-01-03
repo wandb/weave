@@ -30,8 +30,6 @@ import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
 
 const TRACE_PCT = 40;
-const BORDER_STYLE = '1px solid rgb(34,34,34)';
-const INSET_SPACING = 60;
 
 export const CallPage: React.FC<{
   entity: string;
@@ -205,7 +203,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
     // Feel free to remove this if it's not useful.
     {
       field: 'inputs',
-      headerName: 'Basic Inputs',
+      headerName: 'Inputs',
       flex: 1,
       renderCell: ({row}) => {
         const rowCall = row.call as WFCall;
@@ -220,7 +218,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
     {
       field: 'outputs',
       flex: 1,
-      headerName: 'Basic Output',
+      headerName: 'Output',
       renderCell: ({row}) => {
         const rowCall = row.call as WFCall;
         return (
@@ -319,6 +317,10 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
   );
 };
 
+const INSET_SPACING = 54;
+const TREE_COLOR = '#aaaeb2';
+const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
+
 /**
  * Utility component to render the grouping cell for the trace tree.
  * Most of the work here is to rendering the tree structure (i.e. the
@@ -416,11 +418,21 @@ const CustomGridTreeDataGroupingCell: React.FC<
               width: '26px',
               minWidth: '26px',
               borderRadius: '50%',
+              color: TREE_COLOR,
             }}>
             {rowNode.childrenExpanded ? <ExpandMore /> : <KeyboardArrowRight />}
           </Button>
         ) : (
-          <>
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              pr: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
             <Box
               sx={{
                 width: '100%',
@@ -428,13 +440,15 @@ const CustomGridTreeDataGroupingCell: React.FC<
                 borderBottom: BORDER_STYLE,
               }}></Box>
             <Box sx={{width: '100%', height: '100%'}}></Box>
-          </>
+          </Box>
         )}
       </Box>
       <Box
-        sx={{
-          ml: 1,
-        }}>
+        sx={
+          {
+            // ml: 1,
+          }
+        }>
         {call.spanName() + ': ' + truncateID(call.callID())}
       </Box>
       {opCategory && (
@@ -470,11 +484,11 @@ const BasicInputOutputRenderer: React.FC<{
             value = v[0];
           } else {
             value = `${v.length} items`;
-            return null;
+            // return null;
           }
         } else if (_.isObject(v)) {
           value = `${Object.keys(v).length} entries`;
-          return null;
+          // return null;
         } else {
           value = v + '';
         }
