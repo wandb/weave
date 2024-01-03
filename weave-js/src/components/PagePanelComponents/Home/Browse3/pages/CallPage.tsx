@@ -13,6 +13,7 @@ import React, {useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../react';
+import {Call} from '../../Browse2/callTree';
 import {SmallRef} from '../../Browse2/SmallRef';
 import {SpanDetails} from '../../Browse2/SpanDetails';
 import {useWeaveflowCurrentRouteContext} from '../context';
@@ -199,6 +200,9 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
     // {field: 'opVersion', headerName: 'Op Version'},
     // {field: 'opCategory', headerName: 'Op Category'},
     // {field: 'callDuration', headerName: 'Duration'},
+
+    // Somewhat experimental field designed to show the primitive inputs
+    // Feel free to remove this if it's not useful.
     {
       field: 'inputs',
       headerName: 'Basic Inputs',
@@ -206,47 +210,13 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       renderCell: ({row}) => {
         const rowCall = row.call as WFCall;
         return (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'row',
-            }}>
-            {rowCall.rawCallSpan().inputs._keys?.map((k, i) => {
-              const v = rowCall.rawCallSpan().inputs[k];
-              let value: React.ReactNode = '';
-
-              if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
-                value = <SmallRef objRef={parseRef(v)} />;
-                return null;
-              } else if (_.isArray(v)) {
-                value = `${v.length} items`;
-                return null;
-              } else if (_.isObject(v)) {
-                value = `${Object.keys(v).length} entries`;
-                return null;
-              } else {
-                value = v + '';
-              }
-
-              return (
-                <Box
-                  key={i}
-                  gridGap={4}
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}>
-                  <Box>{k}</Box>
-                  <ArrowRight />
-                  <Box>{value}</Box>
-                </Box>
-              );
-            })}
-          </Box>
+          <BasicInputOutputRenderer ioData={rowCall.rawCallSpan().inputs} />
         );
       },
     },
+
+    // Somewhat experimental field designed to show the primitive outputs
+    // Feel free to remove this if it's not useful.
     {
       field: 'outputs',
       flex: 1,
@@ -254,48 +224,7 @@ const CallTraceView: React.FC<{call: WFCall}> = ({call}) => {
       renderCell: ({row}) => {
         const rowCall = row.call as WFCall;
         return (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'row',
-            }}>
-            {rowCall.rawCallSpan().output?._keys?.map((k, i) => {
-              const v = rowCall.rawCallSpan().output![k];
-              let value: React.ReactNode = '';
-
-              if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
-                value = <SmallRef objRef={parseRef(v)} />;
-                return null;
-              } else if (_.isArray(v)) {
-                if (v.length === 1 && typeof v[0] === 'string') {
-                  value = v[0];
-                } else {
-                  value = `${v.length} items`;
-                  return null;
-                }
-              } else if (_.isObject(v)) {
-                value = `${Object.keys(v).length} entries`;
-                return null;
-              } else {
-                value = v + '';
-              }
-
-              return (
-                <Box
-                  key={i}
-                  gridGap={4}
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}>
-                  {/* <Box>{k}</Box>
-                  <ArrowRight /> */}
-                  <Box>{value}</Box>
-                </Box>
-              );
-            })}
-          </Box>
+          <BasicInputOutputRenderer ioData={rowCall.rawCallSpan().output} />
         );
       },
     },
@@ -485,6 +414,8 @@ const CustomGridTreeDataGroupingCell: React.FC<
             style={{
               height: '26px',
               width: '26px',
+              minWidth: '26px',
+
               borderRadius: '50%',
             }}>
             {rowNode.childrenExpanded ? <ExpandMore /> : <KeyboardArrowRight />}
@@ -515,6 +446,64 @@ const CustomGridTreeDataGroupingCell: React.FC<
           <OpVersionCategoryChip opCategory={opCategory} />
         </Box>
       )}
+    </Box>
+  );
+};
+
+const BasicInputOutputRenderer: React.FC<{
+  ioData: Call['inputs'] | Call['output'];
+}> = ({ioData}) => {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+      }}>
+      {ioData?._keys?.map((k, i) => {
+        const v = ioData![k];
+        let value: React.ReactNode = '';
+
+        if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
+          value = <SmallRef objRef={parseRef(v)} />;
+          return null;
+        } else if (_.isArray(v)) {
+          if (v.length === 1 && typeof v[0] === 'string') {
+            value = v[0];
+          } else {
+            value = `${v.length} items`;
+            return null;
+          }
+        } else if (_.isObject(v)) {
+          value = `${Object.keys(v).length} entries`;
+          return null;
+        } else {
+          value = v + '';
+        }
+
+        return (
+          <Box
+            key={i}
+            gridGap={4}
+            sx={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+            {k !== '_result' && (
+              <>
+                <Box
+                  sx={{
+                    fontWeight: 'bold',
+                  }}>
+                  {k}
+                </Box>
+                <span>:</span>
+              </>
+            )}
+            <Box>{value}</Box>
+          </Box>
+        );
+      })}
     </Box>
   );
 };
