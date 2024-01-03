@@ -110,6 +110,7 @@ def test_vectorrefs(cache_mode_minimal):
         assert run.inputs["v"] == 2
 
 
+@pytest.mark.skip("causes other tests to fail in ci")
 def test_weaveflow_op(user_by_api_key_in_env):
     from weave import weaveflow
 
@@ -123,6 +124,7 @@ def test_weaveflow_op(user_by_api_key_in_env):
         assert res == 3
 
 
+@pytest.mark.skip("causes other tests to fail in ci")
 def test_weaveflow_object_with_opmethod(user_by_api_key_in_env):
     from weave import weaveflow
 
