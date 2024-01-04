@@ -25,6 +25,7 @@ export const SimplePageLayout: React.FC<{
     label: string;
     onClick: () => void;
   }>;
+  leftSidebar?: React.ReactNode;
 }> = props => {
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
   const [tabId, setTabId] = React.useState(0);
@@ -99,14 +100,35 @@ export const SimplePageLayout: React.FC<{
         </Tabs>
       </Box>
       <Box
-        component="main"
         sx={{
           overflow: 'hidden',
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: 'row',
           flex: '1 1 auto',
         }}>
-        <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
+        {props.leftSidebar && (
+          <Box
+            sx={{
+              width: '30%',
+              flex: '0 0 30%',
+              overflow: 'hidden',
+              height: '100%',
+              maxHeight: '100%',
+              borderRight: '1px solid #e0e0e0',
+            }}>
+            {props.leftSidebar}
+          </Box>
+        )}
+        <Box
+          component="main"
+          sx={{
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: '1 1 auto',
+          }}>
+          <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
+        </Box>
       </Box>
     </Box>
   );

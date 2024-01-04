@@ -1,4 +1,5 @@
 import {Type} from '../../../../../../core';
+import {Call} from '../../../Browse2/callTree';
 
 export interface WFProject extends ProjectOwned {
   type: (name: string) => WFType | null;
@@ -105,4 +106,5 @@ export interface WFCall extends ProjectOwned {
   parentCall: () => WFCall | null;
   childCalls: () => WFCall[];
   spanName: () => string; // not technically part of data model since it is derived from the span details
+  rawCallSpan: () => Call; // add on
 }
