@@ -7,7 +7,7 @@ import {
   isAssignableTo,
   isSimpleTypeShape,
   isTimestamp,
-  isUnion,
+  nonNullable,
   nullableTaggableValue,
   Type,
 } from '@wandb/weave/core';
@@ -25,20 +25,15 @@ export type Column = {
 export type Columns = Column[];
 
 const getColumnTypeForPropertyType = (propertyType: Type): string => {
-  if (isUnion(propertyType)) {
-    const nonNone = propertyType.members.filter(m => m !== 'none');
-    if (nonNone.length > 0) {
-      const nonNoneType = nonNone[0];
-      if (isTimestamp(nonNoneType)) {
-        return 'timestamp';
-      } else if (isSimpleTypeShape(nonNoneType)) {
-        return nonNoneType.toString();
-      } else if (isAssignableTo(nonNoneType, {type: 'image-file'})) {
-        return 'image';
-      } else if (isAssignableTo(nonNoneType, {type: 'audio-file'})) {
-        return 'audio';
-      }
-    }
+  const nonNullableType = nonNullable(propertyType);
+  if (isTimestamp(nonNullableType)) {
+    return 'timestamp';
+  } else if (isSimpleTypeShape(nonNullableType)) {
+    return nonNullableType.toString();
+  } else if (isAssignableTo(nonNullableType, {type: 'image-file'})) {
+    return 'image';
+  } else if (isAssignableTo(nonNullableType, {type: 'audio-file'})) {
+    return 'audio';
   }
   return 'other';
 };
