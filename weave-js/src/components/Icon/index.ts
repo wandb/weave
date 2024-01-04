@@ -39,6 +39,7 @@ export {
   IconCopy,
   IconCreditCardPayment,
   IconCross,
+  IconCrownPro,
   IconCubeContainer,
   IconDashboardBlackboard,
   IconDate,
