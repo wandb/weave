@@ -197,7 +197,9 @@ def _ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
 def _local_ref_to_published_ref(ref: artifact_local.LocalArtifactRef) -> ref_base.Ref:
     obj = ref.get()
     name = ref.name
-    version = ref.version
+    version = None
+    if not likely_commit_hash(ref.version):
+        version = ref.version
     return storage._direct_publish(
         obj, name, branch_name=version, assume_weave_type=ref.type
     )
