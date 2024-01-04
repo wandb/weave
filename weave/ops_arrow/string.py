@@ -213,6 +213,14 @@ def prepend(self, other):
 )
 def split(self, pattern):
     if isinstance(pattern, str):
+        if isinstance(self._arrow_data, pa.DictionaryArray):
+            # If we have a dictionary array, we need to split the dictionary and
+            # then re-encode it as a dictionary array.
+            return ArrowWeaveList(
+                pc.split_pattern(self._arrow_data.dictionary, pattern),
+                types.optional(types.List(types.String())),
+                self._artifact,
+            )
         return ArrowWeaveList(
             pc.split_pattern(self._arrow_data, pattern),
             types.optional(types.List(types.String())),
