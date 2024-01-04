@@ -29,7 +29,10 @@ import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
 
+// % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
+
+// Whether to show complex inputs/outputs in the table
 const SHOW_COMPLEX_IO = true;
 
 export const CallPage: React.FC<{
