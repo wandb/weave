@@ -30,7 +30,7 @@ export const useWeaveflowRouteContext = () => {
   return ctx;
 };
 
-export const useWeaveflowPeekAwareRouteContext = () => {
+export const useWeaveflowCurrentRouteContext = () => {
   const ctx = useContext(WeaveflowRouteContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   return isPeeking ? ctx.peekingRouter : ctx.baseRouter;

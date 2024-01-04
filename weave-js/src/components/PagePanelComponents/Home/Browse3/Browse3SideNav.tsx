@@ -64,6 +64,12 @@ type NavigationCallbacks = {
 type Browse3ProjectSideNavProps = {
   entity: string;
   project: string;
+  /**
+   * If true, the sidebar will be collapsed by default.
+   * If false, the sidebar will be expanded by default.
+   * If undefined, the sidebar will be expanded by default unless there is a peekPath.
+   */
+  preferCollapsed?: boolean;
   selectedCategory?:
     | 'objects'
     | 'calls'
@@ -106,6 +112,9 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
       return {};
     }
   }, [query.filter]);
+  const containsPeekPath = useMemo(() => {
+    return query.peekPath != null && query.peekPath !== '';
+  }, [query.peekPath]);
   const selectedNavSection = useMemo(() => {
     if (params.tab === 'types' || params.tab === 'type-versions') {
       return 'types';
@@ -142,6 +151,7 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
       project={currentProject}
       selectedCategory={selectedNavSection}
       filterCategory={filterCategory}
+      preferCollapsed={containsPeekPath}
       navigateToProject={project => {
         history.push(baseRouter.projectUrl(params.entity, project));
       }}
@@ -182,10 +192,18 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const projects = useMemo(() => {
     return [props.project, ...(entityProjectsValue.result ?? [])];
   }, [entityProjectsValue.result, props.project]);
-  const wbSidebarWidth = 56;
+  const wbSidebarWidth = 57;
   const wbSideBarSpeed = 0.2;
   const initialWidth = drawerWidth - wbSidebarWidth;
-  const [open, setOpen] = useState(true);
+  const [userControlledOpen, setUserControlledOpen] = useState<
+    boolean | undefined
+  >(undefined);
+  const open = useMemo(() => {
+    if (userControlledOpen !== undefined) {
+      return userControlledOpen;
+    }
+    return !props.preferCollapsed;
+  }, [props.preferCollapsed, userControlledOpen]);
   const adjustedDrawerWidth = useMemo(() => {
     return open ? drawerWidth : wbSidebarWidth;
   }, [open]);
@@ -238,7 +256,7 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           flexDirection: 'row',
           gap: 1,
         }}>
-        <IconButton size="small" onClick={() => setOpen(o => !o)}>
+        <IconButton size="small" onClick={() => setUserControlledOpen(o => !o)}>
           {open ? <NavigateBefore /> : <NavigateNext />}
         </IconButton>
         {open && (
