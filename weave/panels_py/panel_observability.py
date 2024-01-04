@@ -586,7 +586,7 @@ def observability(
             1000,
         ),
         x_title="Run duration",
-        y_title="Cpu usage (%)",
+        y_title="Gpu memory (%)",
         y=lambda row: row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
         tooltip=lambda row: weave.ops.dict_(
             **{
