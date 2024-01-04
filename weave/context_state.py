@@ -79,8 +79,10 @@ def loading_builtins(builtins):
 @contextlib.contextmanager
 def loading_op_location(location):
     token = _loading_op_location.set(location)
-    yield _loading_op_location.get()
-    _loading_op_location.reset(token)
+    try:
+        yield _loading_op_location.get()
+    finally:
+        _loading_op_location.reset(token)
 
 
 def get_loading_op_location():
