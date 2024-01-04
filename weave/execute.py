@@ -47,7 +47,8 @@ from . import object_context
 from . import memo
 from . import context_state
 from . import stream_data_interfaces
-from .monitoring import monitor
+
+# from .monitoring import monitor
 
 # Language Features
 from . import eager
@@ -527,16 +528,21 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             with run_context.current_run(run):
                 res = op_def.resolve_fn(**inputs)
         except Exception as e:
-            client.fail_run(run, e)
             print("Error running ", op_def.name)
+            import traceback
+
+            traceback.print_exc()
+            client.fail_run(run, e)
             raise
         if not parent_run:
             print("View run:", run.ui_url)
         if isinstance(res, box.BoxedNone):
             res = None
         output, output_refs = auto_publish(res)
+        output = box.box(output)
 
         client.finish_run(run, output, output_refs)
+        res = output
 
     else:
         res = op_def.resolve_fn(**inputs)

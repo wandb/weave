@@ -13,7 +13,7 @@ import {
   Weave,
 } from '@wandb/weave/core';
 
-const weaveConst = (val: any): ConstNode => {
+export const weaveConst = (val: any): ConstNode => {
   return constNodeUnsafe(toWeaveType(val), val);
 };
 

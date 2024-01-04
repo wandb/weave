@@ -137,6 +137,7 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         return WeaveRunObj(run_id, op_name, inputs=with_digest_inputs)
 
     def fail_run(self, run: Run, exception: Exception) -> None:
+        print("EXC", exception)
         raise NotImplementedError
 
     def finish_run(

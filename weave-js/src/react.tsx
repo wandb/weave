@@ -512,9 +512,10 @@ export const parseRef = (ref: string): ArtifactRef => {
   }
 
   const [artifactName, artifactPath] = splitUri;
+  const [artifactNamePart, artifactVersion] = artifactName.split(':', 2);
   return {
-    artifactName,
-    artifactVersion: 'latest',
+    artifactName: artifactNamePart,
+    artifactVersion,
     artifactPath,
   };
 };

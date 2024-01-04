@@ -28,7 +28,7 @@ class OpenaiChatModel(chat_model.ChatModel):
         client = OpenAI(
             base_url=base_url,
             api_key=api_key,
-            timeout=15,
+            # timeout=15,
         )
 
         from weave.monitoring.openai import patch
@@ -42,4 +42,4 @@ class OpenaiChatModel(chat_model.ChatModel):
         )
 
         # TODO: return response when there is a weave type for ChatCompletion.
-        return response.dict()
+        return response.model_dump(exclude_none=True)

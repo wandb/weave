@@ -1072,9 +1072,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return np.asarray(pylist)
 
     def __iter__(self):
-        pylist = self.to_pylist_tagged()
-        for x in pylist:
-            yield x
+        for i in range(len(self)):
+            yield self[i]
 
     def __repr__(self):
         return f"<ArrowWeaveList: {self.object_type}>"

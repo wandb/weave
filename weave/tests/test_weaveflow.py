@@ -1,5 +1,6 @@
 import pytest
 import weave
+from weave import weaveflow
 import typing
 
 from .. import ref_base
@@ -85,8 +86,7 @@ def test_output_of():
         assert run.inputs["v"] == 10
 
 
-@pytest.mark.skip("failing in ci")
-def test_vectorrefs(cache_mode_minimal):
+def test_vectorrefs_int(cache_mode_minimal):
     with weave.local_client():
         items = weave.WeaveList([1, 2])
         items_ref = weave.publish(items, "vectorrefs")
@@ -96,15 +96,84 @@ def test_vectorrefs(cache_mode_minimal):
             return v + 5
 
         result = items.apply(lambda item: add_5(item))
+        breakpoint()
 
         result_row0 = result[0]
         run = weave.output_of(result_row0)
         assert run is not None
         assert "add_5" in run.op_name
-        assert run.inputs["v"] == 1
+        assert run.inputs["v"].get() == 1
 
         result_row1 = result[1]
         run = weave.output_of(result_row1)
         assert run is not None
         assert "add_5" in run.op_name
-        assert run.inputs["v"] == 2
+        assert run.inputs["v"].get() == 2
+
+
+def test_vectorrefs_dict_output(cache_mode_minimal):
+    with weave.local_client():
+        items = weave.WeaveList([1, 2])
+        items_ref = weave.publish(items, "vectorrefs")
+
+        @weave.op()
+        def add_5(v: int):
+            return {"out": v + 5}
+
+        result = items.apply(lambda item: add_5(item))
+
+        result_row0 = result[0]
+        run = weave.output_of(result_row0)
+        breakpoint()
+        pass
+        # assert run is not None
+        # assert "add_5" in run.op_name
+        # assert run.inputs["v"].get() == 1
+
+        # result_row1 = result[1]
+        # run = weave.output_of(result_row1)
+        # assert run is not None
+        # assert "add_5" in run.op_name
+        # assert run.inputs["v"].get() == 2
+
+
+def test_evaluate(cache_mode_minimal):
+    from weave import weaveflow
+
+    # An eval example:
+
+    with weave.local_client():
+        dataset = weave.publish(
+            weaveflow.Dataset(
+                [
+                    {"id": "0", "x": 0, "y": 0, "out": 0},
+                    {"id": "0", "x": 1, "y": 1, "out": 1},
+                    {"id": "0", "x": 2, "y": 1, "out": 2},
+                ]
+            ),
+            "datasets",
+        )
+
+        @weave.type()
+        class AddModel(weaveflow.Model):
+            @weave.op()
+            def predict(self, ex):
+                return ex["x"] + ex["y"]
+
+        @weave.type()
+        class MultModel(weaveflow.Model):
+            @weave.op()
+            def predict(ex):
+                return ex["x"]
+
+        @weave.op()
+        def extract_output(ex):
+            return ex["out"]
+
+        eval = weaveflow.ScoreExactMatch(extract_output)
+        add_model = AddModel()
+        result = weaveflow.evaluate2(eval, dataset, add_model)
+
+
+# eval = Eval()
+# eval.add_record(

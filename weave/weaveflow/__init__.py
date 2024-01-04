@@ -13,6 +13,7 @@ from .chat_model import *
 from .structured_output import *
 
 from .evaluate import *
+from .evaluate2 import *
 from .model_eval import *
 
 from .openai import *

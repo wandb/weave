@@ -30,11 +30,13 @@ import {
   URL_BROWSE,
   URL_BROWSE2,
   URL_BROWSE3,
+  URL_EVAL_DEMO,
   URL_LOCAL,
   URL_RECENT,
   URL_TEMPLATES,
   URL_WANDB,
 } from './urls';
+import {EvalDemo} from './components/PagePanelComponents/Home/EvalDemo';
 
 class ErrorBoundary extends React.Component<{}, {hasError: boolean}> {
   static getDerivedStateFromError(error: Error) {
@@ -191,6 +193,11 @@ ReactDOM.render(
                 return `/${URL_BROWSE3}/${entityName}/${projectName}`;
               }}
             />
+          </BrowseWrapper>
+        </Route>
+        <Route path={`/${URL_EVAL_DEMO}`}>
+          <BrowseWrapper>
+            <EvalDemo basename={`/${URL_EVAL_DEMO}`} />
           </BrowseWrapper>
         </Route>
         <Route path="/">
