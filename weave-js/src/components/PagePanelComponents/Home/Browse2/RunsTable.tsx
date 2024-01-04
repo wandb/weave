@@ -11,10 +11,9 @@ import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
 import moment from 'moment';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
-import {Link, useParams} from 'react-router-dom';
+import {useParams} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../Browse3/context';
-import {OpVersionLink} from '../Browse3/pages/common/Links';
+import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
@@ -69,7 +68,6 @@ export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
 }> = ({loading, spans}) => {
-  const {peekingRouter} = useWeaveflowRouteContext();
   const showIO = useMemo(() => {
     return Array.from(new Set(spans.map(span => span.name))).length === 1;
   }, [spans]);
@@ -174,15 +172,11 @@ export const RunsTable: FC<{
         headerName: 'Call',
         renderCell: rowParams => {
           return (
-            <Link
-              to={peekingRouter.callUIUrl(
-                params.entity,
-                params.project,
-                rowParams.row.trace_id,
-                rowParams.row.id
-              )}>
-              {rowParams.row.id}
-            </Link>
+            <CallLink
+              entityName={params.entity}
+              projectName={params.project}
+              callId={rowParams.row.id}
+            />
           );
         },
       },
@@ -443,7 +437,7 @@ export const RunsTable: FC<{
     }
 
     return {cols, colGroupingModel};
-  }, [orm, params.entity, params.project, peekingRouter, showIO, spans]);
+  }, [orm, params.entity, params.project, showIO, spans]);
   const autosized = useRef(false);
   useEffect(() => {
     if (autosized.current) {

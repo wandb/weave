@@ -70,15 +70,19 @@ _loading_built_ins: contextvars.ContextVar[
 @contextlib.contextmanager
 def loading_builtins(builtins):
     token = _loading_built_ins.set(builtins)
-    yield _loading_built_ins.get()
-    _loading_built_ins.reset(token)
+    try:
+        yield _loading_built_ins.get()
+    finally:
+        _loading_built_ins.reset(token)
 
 
 @contextlib.contextmanager
 def loading_op_location(location):
     token = _loading_op_location.set(location)
-    yield _loading_op_location.get()
-    _loading_op_location.reset(token)
+    try:
+        yield _loading_op_location.get()
+    finally:
+        _loading_op_location.reset(token)
 
 
 def get_loading_op_location():
