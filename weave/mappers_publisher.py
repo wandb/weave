@@ -183,9 +183,10 @@ def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
     return new_node
 
 
-def _local_ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
-    node = ref_to_node(ref)
-
-    if node is None:
-        raise errors.WeaveSerializeError(f"Failed to serialize {ref} to published ref")
-    return _local_op_get_to_pub_ref(node)
+def _local_ref_to_published_ref(ref: artifact_local.LocalArtifactRef) -> ref_base.Ref:
+    obj = ref.get()
+    name = ref.name
+    version = ref.version
+    return storage._direct_publish(
+        obj, name, branch_name=version, assume_weave_type=ref.type
+    )
