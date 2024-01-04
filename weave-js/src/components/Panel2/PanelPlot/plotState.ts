@@ -35,6 +35,8 @@ import _ from 'lodash';
 
 import {IconName} from '../../Icon';
 import * as TableState from '../PanelTable/tableState';
+import {ColumnDimension} from './ColumnDimension';
+import {ColumnWithExpressionDimension} from './ColumnWithExpressionDimension';
 import {DimensionLike} from './DimensionLike';
 import {DimName, DimState} from './types';
 import {
@@ -101,11 +103,19 @@ export function isDropdownWithExpression(
   return dim.type === 'dropdownWithExpression';
 }
 
+export function isColumnSelWithExpression(
+  dim: DimensionLike
+): dim is ColumnWithExpressionDimension {
+  return dim.type === 'columnSelWithExpression';
+}
+
 export type ExpressionDimName = keyof PlotConfig['series'][number]['dims'];
 export type DropdownDimName =
   | Exclude<DimName, ExpressionDimName>
   | 'pointShape'
   | 'label';
+
+export type ColumnDimName = 'x' | 'y' | 'tooltip';
 
 export const EXPRESSION_DIM_NAMES: ExpressionDimName[] = [
   'x' as const,
@@ -195,37 +205,37 @@ abstract class MultiFieldDimension extends DimensionLike {
   }
 }
 
-class YDimensionWithConditionalY2 extends MultiFieldDimension {
-  public dimensions: {y: DimensionLike; y2: DimensionLike};
-  private markDimension: DropDownDimension;
+// class YDimensionWithConditionalY2 extends MultiFieldDimension {
+//   public dimensions: {y: DimensionLike; y2: DimensionLike};
+//   private markDimension: DropDownDimension;
 
-  constructor(
-    series: SeriesConfig,
-    weave: WeaveInterface,
-    markDimension: DropDownDimension // used to determine if y2 is active
-  ) {
-    const yDimension = new WeaveExpressionDimension('y', series, weave);
+//   constructor(
+//     series: SeriesConfig,
+//     weave: WeaveInterface,
+//     markDimension: DropDownDimension // used to determine if y2 is active
+//   ) {
+//     const yDimension = new WeaveExpressionDimension('y', series, weave);
 
-    const y2Dimension = new WeaveExpressionDimension('y2', series, weave);
+//     const y2Dimension = new WeaveExpressionDimension('y2', series, weave);
 
-    const dimensions = {
-      y: yDimension,
-      y2: y2Dimension,
-    };
+//     const dimensions = {
+//       y: yDimension,
+//       y2: y2Dimension,
+//     };
 
-    super('y', series, weave, dimensions);
-    this.markDimension = markDimension;
-    this.dimensions = dimensions;
-  }
+//     super('y', series, weave, dimensions);
+//     this.markDimension = markDimension;
+//     this.dimensions = dimensions;
+//   }
 
-  activeDimensions(): DimensionLike[] {
-    const dims = [this.dimensions.y]; // y is always active
-    if (this.markDimension.state().value === 'area') {
-      dims.push(this.dimensions.y2);
-    }
-    return dims;
-  }
-}
+//   activeDimensions(): DimensionLike[] {
+//     const dims = [this.dimensions.y]; // y is always active
+//     if (this.markDimension.state().value === 'area') {
+//       dims.push(this.dimensions.y2);
+//     }
+//     return dims;
+//   }
+// }
 
 export type DropdownOption = {
   key: string;
@@ -235,7 +245,7 @@ export type DropdownOption = {
   icon?: IconName;
 };
 
-class DropDownDimension extends DimensionLike {
+export class DropDownDimension extends DimensionLike {
   public readonly options: DropdownOption[];
   public readonly name: DropdownDimName;
   public readonly placeholder?: string;
@@ -489,7 +499,7 @@ class MarkDimensionGroup extends MultiFieldDimension {
   }
 }
 
-class WeaveExpressionDimension extends DimensionLike {
+export class WeaveExpressionDimension extends DimensionLike {
   private static updateSeriesWithState(
     series: SeriesConfig,
     state: DimState,
@@ -550,14 +560,88 @@ export const dimConstructors: Record<
   (typeof PLOT_DIMS_UI)[number],
   (series: SeriesConfig, weave: WeaveInterface) => DimensionLike
 > = {
-  x: (series: SeriesConfig, weave: WeaveInterface) =>
-    new WeaveExpressionDimension('x', series, weave),
-  y: (series: SeriesConfig, weave: WeaveInterface) => {
-    const markDimension = topLevelMarkDimensionConstructor(series, weave);
-    return new YDimensionWithConditionalY2(series, weave, markDimension);
+  x: (series: SeriesConfig, weave: WeaveInterface) => {
+    // return new WeaveExpressionDimension('x', series, weave);
+    const dropdownDimension = new ColumnDimension('x', series, weave, [], []);
+
+    const expressionDimension = new WeaveExpressionDimension(
+      'x',
+      series,
+      weave
+    );
+    return new ColumnWithExpressionDimension(
+      'x',
+      false,
+      series,
+      expressionDimension,
+      dropdownDimension,
+      weave
+    );
+    // return new WeaveExpressionDimension('x', series, weave);
   },
-  tooltip: (series: SeriesConfig, weave: WeaveInterface) =>
-    new WeaveExpressionDimension('tooltip', series, weave),
+  y: (series: SeriesConfig, weave: WeaveInterface) => {
+    // return new WeaveExpressionDimension('x', series, weave);
+    const dropdownDimension = new ColumnDimension('y', series, weave, [], []);
+
+    const expressionDimension = new WeaveExpressionDimension(
+      'y',
+      series,
+      weave
+    );
+    return new ColumnWithExpressionDimension(
+      'y',
+      false,
+      series,
+      expressionDimension,
+      dropdownDimension,
+      weave
+    );
+  },
+  // y: (series: SeriesConfig, weave: WeaveInterface) => {
+  //   const markDimension = topLevelMarkDimensionConstructor(series, weave);
+  //   return new YDimensionWithConditionalY2(series, weave, markDimension);
+  // },
+  tooltip: (series: SeriesConfig, weave: WeaveInterface) => {
+    const dropdownDimension = new ColumnDimension(
+      'tooltip',
+      series,
+      weave,
+      [],
+      []
+    );
+
+    const expressionDimension = new WeaveExpressionDimension(
+      'tooltip',
+      series,
+      weave
+    );
+    return new ColumnWithExpressionDimension(
+      'tooltip',
+      true,
+      series,
+      expressionDimension,
+      dropdownDimension,
+      weave
+    );
+  },
+  // new WeaveExpressionDimension('tooltip', series, weave),
+  // tooltip: (series: SeriesConfig, weave: WeaveInterface) => {
+  //   const dropdownDimension = new DropDownDimension(
+  //     'tooltip',
+  //     series,
+  //     weave,
+  //     labelOptions,
+  //     labelOptions[0]
+  //   );
+  //   return new DropdownWithExpressionDimension(
+  //     'tooltip',
+  //     series,
+  //     expressionDimension,
+  //     dropdownDimension,
+  //     weave,
+  //     'dropdown'
+  //   );
+  // },
   label: (series: SeriesConfig, weave: WeaveInterface) => {
     const expressionDimension = new WeaveExpressionDimension(
       'label',
@@ -579,6 +663,14 @@ export const dimConstructors: Record<
       weave,
       'dropdown'
     );
+    // return new ColumnWithExpressionDimension(
+    //   'label',
+    //   false,
+    //   series,
+    //   expressionDimension,
+    //   dropdownDimension,
+    //   weave
+    // );
   },
   mark: (series: SeriesConfig, weave: WeaveInterface) =>
     new MarkDimensionGroup(series, weave),
