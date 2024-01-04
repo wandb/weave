@@ -6,6 +6,7 @@ import functools
 import keyword
 import contextvars
 import json
+import pydantic
 from collections.abc import Iterable
 
 
@@ -1014,6 +1015,7 @@ class ObjectType(Type):
     # and loaded in another. (reloctable false means that we need the original
     # object definition to load the object, ie it's a built-in)
     _relocatable = False
+    instance_classes = pydantic.BaseModel
 
     def __init__(self, **attr_types: Type):
         self.__dict__["attr_types"] = attr_types
@@ -1043,6 +1045,21 @@ class ObjectType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
+
+        if isinstance(obj, pydantic.BaseModel):
+            from . import weave_pydantic
+
+            schema = obj.schema()
+            schema_type = weave_pydantic.json_schema_to_weave_type(schema)
+            assert isinstance(schema_type, TypedDict), "Bad schema type"
+
+            res = cls(**schema_type.property_types)
+
+            # Hack to get around frozen dataclass
+            res.__dict__["_relocatable"] = True
+
+            return res
+
         variable_prop_types = {}
         for prop_name in cls.type_attrs():
             prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
@@ -1075,6 +1092,12 @@ class ObjectType(Type):
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
+    def __eq__(self, other) -> bool:
+        return (
+            type(self) == type(other)
+            and self.property_types() == other.property_types()
+        )
+
 
 def is_serialized_object_type(t: dict) -> bool:
     if "_base_type" not in t:
@@ -1089,6 +1112,9 @@ def is_relocatable_object_type(t: typing.Union[str, dict]) -> bool:
         return False
     if not t.get("_relocatable"):
         return False
+    if t.get("_relocatable") and t.get("_is_object"):
+        # relocatable base object case
+        return True
     return is_serialized_object_type(t)
 
 
