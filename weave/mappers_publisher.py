@@ -13,6 +13,7 @@ from .language_features.tagging import tagged_value_type
 import dataclasses
 from weave import weave_internal, context, storage
 from .ops_primitives import weave_api
+from . import artifact_local
 
 
 class RefToPyRef(mappers.Mapper):
@@ -24,23 +25,35 @@ class RefToPyRef(mappers.Mapper):
 
 
 class FunctionToPyFunction(mappers.Mapper):
+    def __init__(self, type_, mapper, artifact_, path):
+        super().__init__(type_, mapper, artifact_, path)
+        self.artifact = artifact_
+
     def apply(self, obj):
         res = graph.map_nodes_full([obj], _node_publish_mapper)[0]
+
+        # Find any op gets and add cross-artifact dependencies.
+        # We want to do this after we have recursively published any
+        # local artifacts above.
+        def _node_dep_mapper(node: graph.Node) -> graph.Node:
+            if _node_is_op_get(node):
+                node = typing.cast(graph.OutputNode, node)
+                uri = _uri_of_get_node(node)
+                self.artifact.add_artifact_reference(uri)
+            return node
+
+        graph.map_nodes_full([res], _node_dep_mapper)
         return res
 
 
 class ObjectToPyDict(mappers_python_def.ObjectToPyDict):
     def apply(self, obj):
-        try:
-            res = super().apply(obj)
-            copy_obj = dataclasses.copy.copy(obj)
-            for prop_name, prop_serializer in self._property_serializers.items():
-                if prop_serializer is not None:
-                    setattr(copy_obj, prop_name, res[prop_name])
-            obj = copy_obj
-        except Exception as e:
-            print(e)
-            pass
+        res = super().apply(obj)
+        copy_obj = dataclasses.copy.copy(obj)
+        for prop_name, prop_serializer in self._property_serializers.items():
+            if prop_serializer is not None:
+                setattr(copy_obj, prop_name, res[prop_name])
+        obj = copy_obj
         return obj
 
 
@@ -65,8 +78,42 @@ class TaggedValueToPy(tagged_value_type.TaggedValueToPy):
         return value
 
 
+class DefaultToPy(mappers.Mapper):
+    def apply(self, obj: typing.Any) -> dict:
+        existing_ref = storage._get_ref(obj)
+        if not existing_ref:
+            return obj
+
+        if not isinstance(existing_ref, artifact_local.LocalArtifactRef):
+            return obj
+
+        from . import op_def
+
+        # Recursively do a top-level publish for OpDef objects. This is a Weaveflow
+        # hack. Weaveflow publishes the entire available graph in the execute.py
+        # prior to executing it. There are often ops inside top-level Objects, like
+        # ChatModel. We want to not publish those later, so we maintain a mapping
+        # from local artifact ref to published ref in storage.py. If we don't do
+        # a top level publish here, these ops will be published inside of their
+        # artifact instead of a new top-level one, and we won't trigger the
+        # local->publish ref cache (since that happens in _direct_publish).
+        if isinstance(obj, op_def.OpDef):
+            from . import api
+
+            storage._direct_publish(obj, f"{obj.name}")
+
+        return obj
+
+
+class Identity(mappers.Mapper):
+    def apply(self, obj: typing.Any) -> typing.Any:
+        return obj
+
+
 def map_to_python_remote_(type, mapper, artifact, path=[], mapper_options=None):
-    if isinstance(type, types.Function):
+    if isinstance(type, types.TypeType):
+        return Identity(type, mapper, artifact, path)
+    elif isinstance(type, types.Function):
         return FunctionToPyFunction(type, mapper, artifact, path)
     elif isinstance(type, types.RefType):
         return RefToPyRef(type, mapper, artifact, path)
@@ -85,8 +132,7 @@ def map_to_python_remote_(type, mapper, artifact, path=[], mapper_options=None):
         return TaggedValueToPy(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return mappers_python_def.ConstToPyConst(type, mapper, artifact, path)
-
-    return mappers.Mapper(type, mapper, artifact, path)
+    return DefaultToPy(type, mapper, artifact, path)
 
 
 map_to_python_remote = mappers.make_mapper(map_to_python_remote_)

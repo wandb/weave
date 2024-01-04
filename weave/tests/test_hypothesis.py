@@ -11,9 +11,27 @@
 #   in arrow sometimes, which truncates them.
 # - We don't test float & int together in join2 because the Python
 #   and arrow implementations differ in how they handle them.
-# - We don't try to save and load arrow values in the concat test
-#   because of some real bugs in that code path that hypothesis
-#   finds.
+#
+# To debug and fix failing tests here:
+# hypothesis will print output like this:
+#   ValueError: ArrowWeaveList validation err: <UnknownType()>, null
+#     Non-zero length array with UnknownType
+#   Falsifying example: test_join2(
+#       weave_no_cache=None,
+#       list_lambda1=([0], lambda x: x),
+#       list_lambda2=([], lambda x: x),
+#       leftOuter=True,
+#       rightOuter=False,
+#   )
+# This means that the test failed with the given inputs.
+# You can force that specific example to run by adding
+#   @example(
+#       list_lambda1=([0], lambda x: x),
+#       list_lambda2=([], lambda x: x),
+#       leftOuter=True,
+#       rightOuter=False,
+#   )
+# above the test function.
 
 import weave
 import dataclasses
@@ -154,8 +172,8 @@ def fix_for_compare(x1):
 
 
 @given(l1=st.lists(obj_strategy()))
-@settings(max_examples=EXAMPLES_PER_TEST)
-def test_to_fromarrow(l1):
+@settings(max_examples=EXAMPLES_PER_TEST, deadline=None)
+def test_to_from_arrow(l1):
     a1 = ops_arrow.to_arrow(l1)
     l1_result = a1.to_pylist_tagged()
     compare_py(l1_result, l1)
@@ -222,6 +240,10 @@ def test_to_compare_safe(l1):
     safe2 = convert.to_compare_safe(a2)
     safe1_arr = safe1._arrow_data
     safe2_arr = safe2._arrow_data
+    # print("l1", l1)
+    # print("l2", l2)
+    # print("safe1_arr", safe1_arr)
+    # print("safe2_arr", safe2_arr)
     if len(safe1_arr):
         # comparing to self is true!
         assert pa_equal_with_null(safe1_arr, safe1_arr).to_pylist() == [True] * len(
@@ -238,28 +260,26 @@ def test_to_compare_safe(l1):
         )
 
 
+@given(l=st.lists(obj_strategy()))
+@settings(max_examples=EXAMPLES_PER_TEST, deadline=None)
+# @example(l=[None, {"foo": 0}, 0, {"foo": ""}])
+@example(l=[None, {"foo": 15}, {"foo": "a"}])
+def test_saveload(l, weave_no_cache):
+    a = ops_arrow.to_arrow(l)
+    a_ref = storage.save(a)
+    a_again = storage.get(str(a_ref))
+    assert a.object_type == a_again.object_type
+    assert a._arrow_data == a_again._arrow_data
+
+
 @given(l1=st.lists(obj_strategy()), l2=st.lists(obj_strategy()))
-@settings(max_examples=EXAMPLES_PER_TEST)
+@settings(max_examples=EXAMPLES_PER_TEST, deadline=None)
 def test_concat(l1, l2, weave_no_cache):
     a1 = ops_arrow.to_arrow(l1)
     l1_result = a1.to_pylist_tagged()
     compare_py(l1_result, l1)
     a1 = ops_arrow.to_arrow(l1)
-
-    # There are bugs here that hypothesis finds! Commenting out for now.
-    # a1_ref = storage.save(a1)
-    # a1_again = storage.get(str(a1_ref))
-    # assert a1.object_type == a1_again.object_type
-    # assert a1._arrow_data == a1_again._arrow_data
-    # a1 = a1_again
-
     a2 = ops_arrow.to_arrow(l2)
-
-    # a2_ref = storage.save(a2)
-    # a2_again = storage.get(str(a2_ref))
-    # assert a2.object_type == a2_again.object_type
-    # assert a2._arrow_data == a2_again._arrow_data
-    # a2 = a2_again
 
     result = a1.concat(a2)
     expected = ops_arrow.to_arrow(l1 + l2)
@@ -270,14 +290,14 @@ def test_concat(l1, l2, weave_no_cache):
     )
 
 
-@pytest.mark.flaky(reruns=3)
+# @pytest.mark.flaky(reruns=3)
 @given(
     list_lambda1=list_lambda_strategy(include_float=False),
     list_lambda2=list_lambda_strategy(include_float=False),
     leftOuter=st.booleans(),
     rightOuter=st.booleans(),
 )
-@settings(max_examples=EXAMPLES_PER_TEST, database=None)
+@settings(max_examples=EXAMPLES_PER_TEST, deadline=None)
 def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache):
     l1, join1Fn = list_lambda1
     l2, join2Fn = list_lambda2
@@ -289,10 +309,10 @@ def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache
             l1, l2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter
         )
     )
-    # print("L1", l1)
-    # print("L2", l2)
-    # print("LEFT OUTER", leftOuter)
-    # print("RIGHT OUTER", rightOuter)
+    print("L1", l1)
+    print("L2", l2)
+    print("LEFT OUTER", leftOuter)
+    print("RIGHT OUTER", rightOuter)
     a1 = ops_arrow.to_arrow(l1)
     a2 = ops_arrow.to_arrow(l2)
     arr_result = a1.join2(
@@ -313,7 +333,7 @@ def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache
     # print("L_RESULT", sorted_l_result_safe)
     # print("ARR_RESULT", sorted_arr_result)
     with tag_store.new_tagging_context():
-        assert sorted_l_result_safe == sorted_arr_result
+        compare_py(sorted_arr_result, sorted_l_result_safe)
 
     # # Add your assertions here
     # # For example, you can test the length of the result array

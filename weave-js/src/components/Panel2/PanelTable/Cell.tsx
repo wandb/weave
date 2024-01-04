@@ -13,6 +13,7 @@ import {usePanelStacksForType} from '../availablePanels';
 import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
+import {CellWrapper} from '../PanelTable.styles';
 import * as TH from './hooks';
 import * as Table from './tableState';
 
@@ -65,6 +66,7 @@ export const Cell: React.FC<{
     {
       excludeTable: true,
       excludePlot: true,
+      disallowedPanels: ['Group', 'Expression'],
     }
   );
 
@@ -117,10 +119,9 @@ export const Cell: React.FC<{
     };
   }, [selectFunction, inputNode, rowNode, weave]);
   return (
-    <div
+    <CellWrapper
       ref={domRef}
       data-test-should-render={shouldRender}
-      style={{width: '100%', height: '100%'}}
       // style={{
       //   ...getPanelStackDims(handler, selectedNode.type, config),
       // }}>
@@ -168,7 +169,7 @@ export const Cell: React.FC<{
           </PanelContextProvider>
         )
       )}
-    </div>
+    </CellWrapper>
   );
 };
 
@@ -198,6 +199,7 @@ export const Value: React.FC<{
   const {handler, curPanelId} = usePanelStacksForType(valueNode.type, '', {
     excludeTable: true,
     excludePlot: true,
+    disallowedPanels: ['Group', 'Expression'],
   });
 
   return (

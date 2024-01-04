@@ -1,3 +1,5 @@
+default_stages: [pre-push]
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.0.275
@@ -14,11 +16,14 @@ repos:
       - id: mypy
         additional_dependencies: [types-all, wandb>=0.15.5]
         exclude: .*pyi$
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.341
+    hooks:
+    - id: pyright
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output
         name: jupyter-nb-clear-output
         files: ^examples/.*\.ipynb$
-        stages: [commit]
         language: system
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace

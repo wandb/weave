@@ -5,7 +5,7 @@
     "tslint-config-prettier"
   ],
   "linterOptions": {
-    "exclude": ["**/*.js", "**/*.jsx", "**/*.json"]
+    "exclude": ["**/generated/*.ts", "**/*.js", "**/*.jsx", "**/*.json"]
   },
   "rules": {
     "interface-name": false,

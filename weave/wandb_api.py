@@ -16,6 +16,7 @@ from requests.auth import HTTPBasicAuth
 from . import engine_trace
 from . import environment as weave_env
 from . import wandb_client_api
+from . import errors
 
 # Importing at the top-level namespace so other files can import from here.
 from .context_state import WandbApiContext, _wandb_api_context
@@ -69,9 +70,15 @@ def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
 
 def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
     cookie = weave_env.weave_wandb_cookie()
+    headers = weave_env.weave_wandb_gql_headers()
     if cookie:
+        # This is a special case for testing. It should never be used in production.
         cookies = {"wandb": cookie}
-        headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
+        headers = {
+            "use-admin-privileges": "true",
+            "x-origin": "https://app.wandb.test",
+            **headers,
+        }
         return set_wandb_api_context("admin", None, headers, cookies)
     api_key = weave_env.weave_wandb_api_key()
     if api_key:
@@ -105,6 +112,10 @@ class WandbApiAsync:
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
                 auth = aiohttp.BasicAuth("api", wandb_context.api_key)
+        # TODO: This is currently used by our FastAPI auth helper, there's probably a better way.
+        api_key_override = kwargs.pop("api_key", None)
+        if api_key_override:
+            auth = aiohttp.BasicAuth("api", api_key_override)
         url_base = weave_env.wandb_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
@@ -124,7 +135,10 @@ class WandbApiAsync:
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = await client.connect_async(reconnecting=False)  # type: ignore
-        return await session.execute(query, kwargs)
+        result = await session.execute(query, kwargs)
+        # Manually reset the connection, bypassing the SSL bug, avoiding ERROR:asyncio:Unclosed client session
+        await transport.session.close()
+        return result
 
     SERVER_INFO_QUERY = gql.gql(
         """
@@ -185,6 +199,51 @@ class WandbApiAsync:
         if file is None:
             return None
         return file["directUrl"]
+
+    VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
+        """
+        query DefaultEntity {
+            viewer {
+                defaultEntity {
+                    name
+                }
+            }
+        }        
+        """
+    )
+
+    async def default_entity_name(self) -> typing.Optional[str]:
+        try:
+            result = await self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        try:
+            return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+        except AttributeError:
+            return None
+
+    ENTITY_ACCESS_QUERY = gql.gql(
+        """
+        query Entity($entityName: String!) {
+            viewer { username }
+            entity(name: $entityName) { readOnly }
+        }
+        """
+    )
+
+    async def can_access_entity(
+        self, entity: str, api_key: typing.Optional[str]
+    ) -> bool:
+        try:
+            result = await self.query(
+                self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key
+            )
+        except gql.transport.exceptions.TransportQueryError as e:
+            return False
+        return (
+            result.get("viewer")
+            and result.get("entity", {}).get("readOnly", True) == False
+        )
 
 
 class WandbApi:
@@ -271,6 +330,25 @@ class WandbApi:
         if file is None:
             return None
         return file["directUrl"]
+
+    VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
+        """
+        query DefaultEntity {
+            viewer {
+                defaultEntity {
+                    name
+                }
+            }
+        }        
+        """
+    )
+
+    def default_entity_name(self) -> typing.Optional[str]:
+        try:
+            result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
 
 
 async def get_wandb_api() -> WandbApiAsync:

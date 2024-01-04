@@ -1,3 +1,9 @@
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {
+  IconCategoryMultimodal,
+  IconDocumentation,
+} from '@wandb/weave/components/Icon';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import React, {
   FC,
   memo,
@@ -6,8 +12,23 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-
+import {Redirect, useHistory, useParams} from 'react-router-dom';
 import styled from 'styled-components';
+
+import getConfig from '../../../config';
+import {
+  URL_BROWSE,
+  URL_LOCAL,
+  URL_RECENT,
+  URL_WANDB,
+  urlEntity,
+  urlLocalBoards,
+  urlRecentBoards,
+  urlRecentTables,
+  urlTemplates,
+} from '../../../urls';
+import {useLocalStorage} from '../../../util/useLocalStorage';
+import {ErrorBoundary} from '../../ErrorBoundary';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
 import {
   IconDashboardBlackboard,
@@ -17,15 +38,15 @@ import {
   IconUsersTeam,
   IconWeaveLogo,
 } from '../../Panel2/Icons';
-import * as query from './query';
-import * as LayoutElements from './LayoutElements';
+import {isServedLocally} from '../util';
+import {NavigateToExpressionType} from './common';
 import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
+import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
+import {HomeCenterTemplates} from './HomeCenterTemplates';
 import {LeftNav} from './HomeLeftNav';
 import {HomeTopBar} from './HomeTopBar';
-import {NavigateToExpressionType} from './common';
-import {isServedLocally, useIsAuthenticated} from '../util';
-import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import * as LayoutElements from './LayoutElements';
+import * as query from './query';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid ${MOON_250};
@@ -37,13 +58,37 @@ const CenterSpace = styled(LayoutElements.VSpace)`
 type HomeProps = {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   inJupyter: boolean;
+  browserType: string | undefined;
 };
 
 // Home Page TODO: Enable browsing recent assets
 const RECENTS_SUPPORTED = false;
 
+export type HomeParams = {
+  entity: string | undefined;
+  project: string | undefined;
+  assetType: string | undefined;
+  preview: string | undefined;
+};
+
 const HomeComp: FC<HomeProps> = props => {
-  const [previewNode, setPreviewNode] = useState<React.ReactNode>();
+  const history = useHistory();
+  const params = useParams<HomeParams>();
+  const [previewNode, setPreviewNodeRaw] = useState<{
+    node: React.ReactNode;
+    requestedWidth?: string;
+  }>();
+
+  const setPreviewNode = useCallback(
+    (node: React.ReactNode, requestedWidth?: string) => {
+      if (node == null) {
+        setPreviewNodeRaw(undefined);
+      } else {
+        setPreviewNodeRaw({node, requestedWidth});
+      }
+    },
+    []
+  );
   const navigateToExpression: NavigateToExpressionType = useCallback(
     newDashExpr => {
       setPreviewNode(undefined);
@@ -54,19 +99,12 @@ const HomeComp: FC<HomeProps> = props => {
         config: undefined,
       });
     },
-    [props]
+    [props, setPreviewNode]
   );
   const isLocallyServed = isServedLocally();
   const isAuthenticated = useIsAuthenticated();
   const userEntities = query.useUserEntities(isAuthenticated);
   const userName = query.useUserName(isAuthenticated);
-  const [activeBrowserRoot, setActiveBrowserRoot] = useState<
-    | undefined
-    | {
-        browserType: 'recent' | 'wandb' | 'drafts';
-        rootId: string;
-      }
-  >(undefined);
   const recentSection = useMemo(() => {
     if (RECENTS_SUPPORTED) {
       return [
@@ -77,28 +115,22 @@ const HomeComp: FC<HomeProps> = props => {
               icon: IconDashboardBlackboard,
               label: `Boards`,
               active:
-                activeBrowserRoot?.browserType === 'recent' &&
-                activeBrowserRoot?.rootId === 'boards',
+                props.browserType === 'recent' && params.assetType === 'board',
+              to: urlRecentBoards(),
               onClick: () => {
-                setActiveBrowserRoot({
-                  browserType: 'recent',
-                  rootId: 'boards',
-                });
                 setPreviewNode(undefined);
+                history.push(urlRecentBoards());
               },
             },
             {
               icon: IconTable,
               label: `Tables`,
               active:
-                activeBrowserRoot?.browserType === 'recent' &&
-                activeBrowserRoot?.rootId === 'tables',
+                props.browserType === 'recent' && params.assetType === 'table',
+              to: urlRecentTables(),
               onClick: () => {
-                setActiveBrowserRoot({
-                  browserType: 'recent',
-                  rootId: 'tables',
-                });
                 setPreviewNode(undefined);
+                history.push(urlRecentTables());
               },
             },
           ],
@@ -107,8 +139,28 @@ const HomeComp: FC<HomeProps> = props => {
     } else {
       return [];
     }
-  }, [activeBrowserRoot?.browserType, activeBrowserRoot?.rootId]);
-  // }, []);
+  }, [props.browserType, params.assetType, setPreviewNode, history]);
+
+  const getStartedSection = useMemo(() => {
+    return [
+      {
+        title: 'Get Started',
+        items: [
+          {
+            icon: IconCategoryMultimodal,
+            label: 'Board templates',
+            active: props.browserType === 'templates',
+            to: urlTemplates(),
+          },
+          {
+            icon: IconDocumentation,
+            label: 'Documentation',
+            to: 'https://docs.wandb.ai/guides/weave',
+          },
+        ],
+      },
+    ];
+  }, [props.browserType]);
 
   const wandbSection = useMemo(() => {
     return userEntities.result.length === 0
@@ -139,32 +191,31 @@ const HomeComp: FC<HomeProps> = props => {
                     : IconUsersTeam,
                 label: entity,
                 active:
-                  activeBrowserRoot?.browserType === 'wandb' &&
-                  activeBrowserRoot?.rootId === entity,
+                  props.browserType === 'wandb' && params.entity === entity,
+                to: urlEntity(entity),
                 onClick: () => {
-                  setActiveBrowserRoot({
-                    browserType: 'wandb',
-                    rootId: entity,
-                  });
                   setPreviewNode(undefined);
+                  history.push(urlEntity(entity));
                 },
               })),
           },
         ];
   }, [
-    activeBrowserRoot?.browserType,
-    activeBrowserRoot?.rootId,
     userEntities.result,
     userName.result,
+    props.browserType,
+    params.entity,
+    setPreviewNode,
+    history,
   ]);
 
-  const draftsSection = useMemo(() => {
+  const localSection = useMemo(() => {
     if (!isLocallyServed) {
       return [];
     }
     return [
       {
-        title: `Drafts`,
+        title: `Local`,
         items: [
           // Home Page TODO: Enable browsing assets in draft state on remote server
           // {
@@ -183,73 +234,91 @@ const HomeComp: FC<HomeProps> = props => {
           {
             icon: IconLaptopLocalComputer,
             label: `On this machine`,
-            active:
-              activeBrowserRoot?.browserType === 'drafts' &&
-              activeBrowserRoot?.rootId === 'local',
+            active: props.browserType === 'local',
+            to: urlLocalBoards(),
             onClick: () => {
-              setActiveBrowserRoot({
-                browserType: 'drafts',
-                rootId: 'local',
-              });
               setPreviewNode(undefined);
+              history.push(urlLocalBoards());
             },
           },
         ],
       },
     ];
-  }, [
-    activeBrowserRoot?.browserType,
-    activeBrowserRoot?.rootId,
-    isLocallyServed,
-  ]);
+  }, [isLocallyServed, props.browserType, setPreviewNode, history]);
 
   const navSections = useMemo(() => {
-    return [...recentSection, ...wandbSection, ...draftsSection];
-  }, [draftsSection, recentSection, wandbSection]);
+    return [
+      ...recentSection,
+      ...getStartedSection,
+      ...wandbSection,
+      ...localSection,
+    ];
+  }, [localSection, recentSection, getStartedSection, wandbSection]);
 
   const loading = userName.loading || isAuthenticated === undefined;
+  const REDIRECT_RECENTS = [
+    `/${URL_BROWSE}/${URL_RECENT}`,
+    `/${URL_BROWSE}/${URL_RECENT}/`,
+  ];
+  const REDIRECT_WANDB = [
+    `/${URL_BROWSE}/${URL_WANDB}`,
+    `/${URL_BROWSE}/${URL_WANDB}/`,
+  ];
+  const REDIRECT_LOCAL = [
+    `/${URL_BROWSE}/${URL_LOCAL}`,
+    `/${URL_BROWSE}/${URL_LOCAL}/`,
+  ];
+  if (RECENTS_SUPPORTED) {
+    REDIRECT_RECENTS.push('/', `/${URL_BROWSE}`, `/${URL_BROWSE}/`);
+  } else {
+    REDIRECT_WANDB.push('/', `/${URL_BROWSE}`, `/${URL_BROWSE}/`);
+  }
+  const REDIRECT_ANY = [
+    ...REDIRECT_RECENTS,
+    ...REDIRECT_WANDB,
+    ...REDIRECT_LOCAL,
+  ];
+  let {pathname} = window.location;
+  const basename = getConfig().PREFIX;
+  pathname = pathname.substring(basename.length);
+
+  const [lastVisited, setLastVisited] = useLocalStorage<string>(
+    'lastVisited',
+    '/browse/templates'
+  );
   useEffect(() => {
-    // Create default root.
-    if (!loading && activeBrowserRoot == null) {
-      // If we have Recent enabled, go for that!
-      if (RECENTS_SUPPORTED) {
-        setActiveBrowserRoot({
-          browserType: 'recent',
-          rootId: 'boards',
-        });
-        // Next, if we are authenticated (we are always authed in the cloud)
-      } else if (isAuthenticated && userName.result != null) {
-        // It would be super cool to go straight to the first project that has weave objects
-        setActiveBrowserRoot({
-          browserType: 'wandb',
-          rootId: userName.result,
-        });
-      } else if (isLocallyServed) {
-        setActiveBrowserRoot({
-          browserType: 'drafts',
-          rootId: 'local',
-        });
-      } else {
-        // This should never happen
-        console.warn('Unable to determine root');
-      }
+    if (pathname === '/') {
+      history.push(lastVisited);
+    } else {
+      setLastVisited(pathname);
     }
-  }, [
-    activeBrowserRoot,
-    isAuthenticated,
-    isLocallyServed,
-    loading,
-    userName.loading,
-    userName.result,
-  ]);
+  }, [history, lastVisited, setLastVisited, pathname]);
+
+  if (!loading && REDIRECT_ANY.includes(pathname)) {
+    // If we have Recent enabled, go for that!
+    if (REDIRECT_RECENTS.includes(pathname)) {
+      return <Redirect to={urlRecentBoards()} />;
+    }
+    // Next, if we are authenticated (we are always authed in the cloud)
+    if (
+      isAuthenticated &&
+      userName.result != null &&
+      REDIRECT_WANDB.includes(pathname)
+    ) {
+      // It would be super cool to go straight to the first project that has weave objects
+      return <Redirect to={urlEntity(userName.result)} />;
+    }
+    if (isLocallyServed && REDIRECT_LOCAL.includes(pathname)) {
+      return <Redirect to={urlLocalBoards()} />;
+    }
+    // This should never happen
+    console.warn('Unable to determine root');
+  }
 
   return (
     <LayoutElements.VStack>
       <LayoutElements.Block>
-        <HomeTopBar
-          inJupyter={props.inJupyter}
-          navigateToExpression={navigateToExpression}
-        />
+        <HomeTopBar />
       </LayoutElements.Block>
       {/* Main Region */}
       <LayoutElements.HSpace
@@ -257,21 +326,27 @@ const HomeComp: FC<HomeProps> = props => {
           gap: '12px',
         }}>
         {/* Left Bar */}
-        <LeftNav sections={navSections} />
+        <LeftNav
+          sections={navSections}
+          inJupyter={props.inJupyter}
+          navigateToExpression={navigateToExpression}
+        />
         {/* Center Content */}
         {!loading && (
           <CenterSpace>
-            {activeBrowserRoot?.browserType === 'recent' ? (
-              // This should never come up
-              <Placeholder />
-            ) : activeBrowserRoot?.browserType === 'wandb' ? (
-              <CenterEntityBrowser
-                navigateToExpression={navigateToExpression}
-                setPreviewNode={setPreviewNode}
-                entityName={activeBrowserRoot?.rootId}
-              />
-            ) : activeBrowserRoot?.browserType === 'drafts' ? (
-              activeBrowserRoot?.rootId === 'local' ? (
+            <ErrorBoundary key={pathname}>
+              {props.browserType === 'recent' ? (
+                // This should never come up
+                <Placeholder />
+              ) : props.browserType === 'templates' ? (
+                <HomeCenterTemplates setPreviewNode={setPreviewNode} />
+              ) : props.browserType === 'wandb' ? (
+                <CenterEntityBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                  entityName={params.entity ?? ''}
+                />
+              ) : props.browserType === 'local' ? (
                 <CenterLocalBrowser
                   navigateToExpression={navigateToExpression}
                   setPreviewNode={setPreviewNode}
@@ -279,19 +354,19 @@ const HomeComp: FC<HomeProps> = props => {
               ) : (
                 // This should never come up
                 <Placeholder />
-              )
-            ) : (
-              // This should never come up
-              <Placeholder />
-            )}
+              )}
+            </ErrorBoundary>
           </CenterSpace>
         )}
         {/* Right Bar */}
         <LayoutElements.Block
           style={{
-            width: previewNode != null ? '450px' : '0px',
+            width:
+              previewNode != null
+                ? previewNode.requestedWidth ?? '400px'
+                : '0px',
           }}>
-          {previewNode}
+          {previewNode?.node}
         </LayoutElements.Block>
       </LayoutElements.HSpace>
     </LayoutElements.VStack>

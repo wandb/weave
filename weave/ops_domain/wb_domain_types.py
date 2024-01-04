@@ -1,8 +1,11 @@
-import json
-from dataclasses import field, dataclass
 import typing
-from ..decorator_type import type as weave_type
 from .. import weave_types as types
+from ..decorator_type import type as weave_type
+from ..partial_object import (
+    PartialObject,
+    PartialObjectTypeGeneratorType,
+)
+
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -31,224 +34,188 @@ There are two main concepts to grasp:
 TODO: Decide if the nested fragments are really necessary. If not, it will
 require changing a few of the ops to fetch such info as well
       as updating the mocked tests.
-
-TODO: Refactor how the opaque dict works - I think we can remove it and make
-each type feel/look like a a json blob.
 """
 
 
-@weave_type("UntypedOpaqueDict", True)
-class UntypedOpaqueDict:
-    """
-    UntypedOpaqueDict is a Weave Type that is used to store arbitrary JSON data.
-    Unlike `Dict` or `TypedDict`, this Type does not need to define the keys/fields.
-    This is useful in particular for storing GQL responses where the response schema
-    may change over time. Usage:
+def gql_type(
+    name: str,
+) -> typing.Callable[[typing.Type["GQLBase"]], typing.Type[PartialObject]]:
+    """Decorator that emits a Weave Type for the decorated GQL instance type. Classes decorated
+    with this decorator also emit a keyless weavetype. E.g.,
 
-    # From JSON String
-    d = UntypedOpaqueDict(json_str='{"a": 1, "b": 2}')
-    d["a"]  # 1
+    @gql_type("project")
+    class Project(GQLBase):
+        ...
 
-    # From Dictionary
-    d = UntypedOpaqueDict.from_dict({"a": 1, "b": 2})
-    d["a"]  # 1
-
-    Importantly, this will serialize the data as a JSON string, so it can be stored and
-    loaded using the Weave Type system.
+    will emit a Weave Type for projectType(). Instances of projectType() have a method called
+    with_keys() that allows them to generate instances of projectTypeWithKeys({...}).
     """
 
-    json_str: str = field(default="{}")
+    def _gql_weave_type(
+        _instance_class: typing.Type["GQLBase"],
+    ) -> typing.Type[PartialObject]:
+        decorator = weave_type(
+            name,
+            True,
+            None,
+            [PartialObjectTypeGeneratorType],
+        )
+        return decorator(_instance_class)
 
-    @classmethod
-    def from_json_dict(cls, json_dict: dict):
-        inst = cls(json_str=json.dumps(json_dict, separators=(",", ":")))
-        inst._json_dict = json_dict
-        return inst
-
-    def get(self, key, default=None):
-        return self.json_dict.get(key, default)
-
-    def __eq__(self, other):
-        return self.json_dict == other.json_dict
-
-    def __getitem__(self, key):
-        return self.json_dict[key]
-
-    def __setitem__(self, key, value):
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
-
-    def __delitem__(self, key):
-        raise NotImplementedError("UntypedOpaqueDict is immutable")
-
-    def __iter__(self):
-        return iter(self.json_dict)
-
-    def __len__(self):
-        return len(self.json_dict)
-
-    @property
-    def json_dict(self):
-        if not hasattr(self, "_json_dict"):
-            self._json_dict = json.loads(self.json_str)
-        return self._json_dict
+    return _gql_weave_type
 
 
-@dataclass
-class GQLTypeMixin:
-    gql: UntypedOpaqueDict = field(default_factory=UntypedOpaqueDict)
-
-    @classmethod
-    def from_gql(cls, gql_dict: dict):
-        return cls(UntypedOpaqueDict.from_json_dict(gql_dict))
+class GQLBase(PartialObject):
+    REQUIRED_FRAGMENT: str
 
 
-@weave_type("org", True)
-class Org(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("org")
+class Org(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
         name
     """
 
 
 OrgType = Org.WeaveType()  # type: ignore
-OrgType = typing.cast(types.Type, OrgType)
+OrgType = typing.cast(PartialObjectTypeGeneratorType, OrgType)
 
 
-@weave_type("entity", True)
-class Entity(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("entity")
+class Entity(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
         name
     """
 
 
 EntityType = Entity.WeaveType()  # type: ignore
-EntityType = typing.cast(types.Type, EntityType)
+EntityType = typing.cast(PartialObjectTypeGeneratorType, EntityType)
 
 
-@weave_type("user", True)
-class User(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("user")
+class User(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
         name
     """
 
 
 UserType = User.WeaveType()  # type: ignore
-UserType = typing.cast(types.Type, UserType)
+UserType = typing.cast(PartialObjectTypeGeneratorType, UserType)
 
 
-@weave_type("project", True)
-class Project(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("project")
+class Project(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
         name
     """
 
 
 ProjectType = Project.WeaveType()  # type: ignore
-ProjectType = typing.cast(types.Type, ProjectType)
+ProjectType = typing.cast(PartialObjectTypeGeneratorType, ProjectType)
 
 
-@weave_type("run", True)
-class Run(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("run")
+class Run(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
         name
     """
 
 
 RunType = Run.WeaveType()  # type: ignore
-RunType = typing.cast(types.Type, RunType)
+RunType = typing.cast(PartialObjectTypeGeneratorType, RunType)
 
 
-@weave_type("artifactType", True)
-class ArtifactType(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("artifactType")
+class ArtifactType(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
         name
     """
 
 
 ArtifactTypeType = ArtifactType.WeaveType()  # type: ignore
-ArtifactTypeType = typing.cast(types.Type, ArtifactTypeType)
+ArtifactTypeType = typing.cast(PartialObjectTypeGeneratorType, ArtifactTypeType)
 
 
-@weave_type("artifact", True)  # Name and Class mismatch intention due to weave0
-class ArtifactCollection(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("artifact")  # Name and Class mismatch intention due to weave0
+class ArtifactCollection(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
         name
     """
 
 
 ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
-ArtifactCollectionType = typing.cast(types.Type, ArtifactCollectionType)
+ArtifactCollectionType = typing.cast(
+    PartialObjectTypeGeneratorType, ArtifactCollectionType
+)
 
 
-@weave_type("artifactVersion", True)
-class ArtifactVersion(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("artifactVersion")
+class ArtifactVersion(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
     """
 
 
 ArtifactVersionType = ArtifactVersion.WeaveType()  # type: ignore
-ArtifactVersionType = typing.cast(types.Type, ArtifactVersionType)
+ArtifactVersionType = typing.cast(PartialObjectTypeGeneratorType, ArtifactVersionType)
 
 
-@weave_type(
-    "artifactMembership", True
-)  # Name and Class mismatch intention due to weave0
-class ArtifactCollectionMembership(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("artifactMembership")  # Name and Class mismatch intention due to weave0
+class ArtifactCollectionMembership(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
     """
 
 
 ArtifactCollectionMembershipType = ArtifactCollectionMembership.WeaveType()  # type: ignore
 ArtifactCollectionMembershipType = typing.cast(
-    types.Type, ArtifactCollectionMembershipType
+    PartialObjectTypeGeneratorType, ArtifactCollectionMembershipType
 )
 
 
-@weave_type("artifactAlias", True)
-class ArtifactAlias(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("artifactAlias")
+class ArtifactAlias(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
     """
 
 
 ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
-ArtifactAliasType = typing.cast(types.Type, ArtifactAliasType)
+ArtifactAliasType = typing.cast(PartialObjectTypeGeneratorType, ArtifactAliasType)
 
 
-@weave_type("report", True)
-class Report(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("report")
+class Report(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
     """
 
 
 ReportType = Report.WeaveType()  # type: ignore
-ReportType = typing.cast(types.Type, ReportType)
+ReportType = typing.cast(PartialObjectTypeGeneratorType, ReportType)
 
 
-@weave_type("runQueue", True)
-class RunQueue(GQLTypeMixin):
-    REQUIRED_FRAGMENT = f"""
+@gql_type("runQueue")
+class RunQueue(GQLBase):
+    REQUIRED_FRAGMENT = """
         id
     """
 
 
 RunQueueType = RunQueue.WeaveType()  # type: ignore
-RunQueueType = typing.cast(types.Type, RunQueueType)
+RunQueueType = typing.cast(PartialObjectTypeGeneratorType, RunQueueType)
 
 
 # Simple types (maybe should be put into primitives?)
 
 
-@weave_type("link", True)
+@weave_type("link", __is_simple=True)  # type: ignore
 class Link:
     name: str
     url: str

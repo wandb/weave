@@ -1,9 +1,9 @@
 import {constStringList, Node} from '@wandb/weave/core';
 import React, {useMemo, useState} from 'react';
-
-import * as CGReact from '../../react';
 import styled, {css} from 'styled-components';
+
 import {GRAY_350, GRAY_500, TEAL} from '../../common/css/globals.styles';
+import * as CGReact from '../../react';
 
 export const Tabs: React.FC<{
   input: Node;
@@ -53,11 +53,13 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
 `;
+Container.displayName = 'S.Container';
 
 const Content = styled.div`
   flex: 1 1 auto;
   overflow: hidden;
 `;
+Content.displayName = 'S.Content';
 
 const TabsContainer = styled.div`
   position: relative;
@@ -77,6 +79,7 @@ const TabsContainer = styled.div`
     background-color: ${GRAY_350};
   }
 `;
+TabsContainer.displayName = 'S.TabsContainer';
 
 const Tab = styled.div<{active: boolean}>`
   position: relative;
@@ -116,3 +119,4 @@ const Tab = styled.div<{active: boolean}>`
           }
         `}
 `;
+Tab.displayName = 'S.Tab';

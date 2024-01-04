@@ -5,8 +5,9 @@ import typing
 import pyarrow as pa
 
 
+from ... import artifact_fs
 from .context import get_error_on_non_vectorized_history_transform
-from ...compile_domain import wb_gql_op_plugin
+from ...gql_op_plugin import wb_gql_op_plugin
 from ...api import op
 from ... import weave_types as types
 from .. import trace_tree, wb_domain_types as wdt
@@ -20,11 +21,10 @@ from ...wandb_interface import wandb_stream_table
 from . import history_op_common
 from ... import artifact_base, io_service
 from .. import wbmedia
-from ...ops_arrow.list_ import (
-    PathItemType,
-    PathType,
-    weave_arrow_type_check,
-)
+from ...ops_domain.table import _patch_legacy_image_file_types
+from ...ops_arrow.list_ import weave_arrow_type_check, PathType, PathItemType
+from ... import gql_json_cache
+
 
 tracer = engine_trace.tracer()
 
@@ -115,7 +115,6 @@ def _get_history3(run: wdt.Run, columns=None):
 
     # 1. Get the flattened Weave-Type given HistoryKeys
     flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
-    _verify_supported_types(flattened_object_type)
     final_type = _unflatten_history_object_type(flattened_object_type)
 
     # 2. Read in the live set
@@ -137,9 +136,9 @@ def _get_history3(run: wdt.Run, columns=None):
     ]
 
     run_path = wb_util.RunPath(
-        run.gql["project"]["entity"]["name"],
-        run.gql["project"]["name"],
-        run.gql["name"],
+        run["project"]["entity"]["name"],
+        run["project"]["name"],
+        run["name"],
     )
     (
         live_columns,
@@ -257,6 +256,31 @@ def _construct_live_data_awl(
     )
 
 
+def _pa_table_has_column(pa_table: pa.Table, col_name: str) -> bool:
+    return col_name in pa_table.column_names
+
+
+def _create_empty_column(
+    table: pa.Table, col_type: types.Type, artifact: artifact_base.Artifact
+) -> pa.Array:
+    return convert.to_arrow(
+        [None] * len(table), types.List(col_type), artifact=artifact
+    )._arrow_data
+
+
+def _update_pa_table_column(
+    table: pa.Table, col_name: str, arrow_col: pa.Array
+) -> pa.Table:
+    fields = [field.name for field in table.schema]
+    return table.set_column(fields.index(col_name), col_name, arrow_col)
+
+
+def _new_pa_table_column(
+    table: pa.Table, col_name: str, arrow_col: pa.Array
+) -> pa.Table:
+    return table.append_column(col_name, arrow_col)
+
+
 def _process_all_columns(
     flattened_object_type: types.TypedDict,
     raw_live_data: list[dict],
@@ -271,6 +295,23 @@ def _process_all_columns(
     for col_name, col_type in flattened_object_type.property_types.items():
         raw_live_column = _extract_column_from_live_data(raw_live_data, col_name)
         processed_live_column = None
+        if _column_contains_legacy_media_image(col_type):
+            # If the column contains an image-file type, then we need to figure
+            # out a more specific type for the column based on the first few
+            # rows. This is an unfortunate side-effect of the fact that we don't
+            # store image annotation metadata in the type system. See
+            # `_patch_legacy_image_file_types` for more details on how we handle
+            # this for older tables. This operation must be done on the liveset
+            # and the history parquet tables, and the underlying type must be
+            # updated accordingly. Not only that, but mask & box data are
+            # variadic in type and sometimes require reading more files from
+            # disk to understand the type. This is basically a dead end here -
+            # unless we want to literally read the entire history parquet file
+            # into memory, and then download all the image annotation data... We
+            # have to then propagate back all the type changes... This is
+            # horribly inefficient and we should probably just move on from
+            # legacy image files
+            pass
         if _column_type_requires_in_memory_transformation(col_type):
             _non_vectorized_warning(
                 f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
@@ -279,13 +320,19 @@ def _process_all_columns(
             live_columns[col_name] = processed_live_column
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
-                fields = [field.name for field in table.schema]
-                new_col = _process_history_column_in_memory(
-                    table[col_name], col_type, run_path, artifact
-                )
-                processed_history_pa_tables[table_ndx] = table.set_column(
-                    fields.index(col_name), col_name, new_col
-                )
+                if not _pa_table_has_column(table, col_name):
+                    new_table = _new_pa_table_column(
+                        table, col_name, _create_empty_column(table, col_type, artifact)
+                    )
+                else:
+                    new_table = _update_pa_table_column(
+                        table,
+                        col_name,
+                        _process_history_column_in_memory(
+                            table[col_name], col_type, run_path, artifact
+                        ),
+                    )
+                processed_history_pa_tables[table_ndx] = new_table
 
         elif _is_directly_convertible_type(col_type):
             live_columns_already_mapped[col_name] = raw_live_column
@@ -296,52 +343,27 @@ def _process_all_columns(
             live_columns_already_mapped[col_name] = processed_live_column
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
-                fields = [field.name for field in table.schema]
-                new_col = _drop_types_from_encoded_types(
-                    ArrowWeaveList(
-                        table[col_name],
-                        None,
-                        artifact=artifact,
+                if not _pa_table_has_column(table, col_name):
+                    new_table = _new_pa_table_column(
+                        table, col_name, _create_empty_column(table, col_type, artifact)
                     )
-                )
-                arrow_col = new_col._arrow_data
-                if types.Timestamp().assign_type(types.non_none(col_type)):
-                    arrow_col = arrow_col.cast("int64").cast(
-                        pa.timestamp("ms", tz="UTC")
+                else:
+                    new_col = _drop_types_from_encoded_types(
+                        ArrowWeaveList(
+                            table[col_name],
+                            None,
+                            artifact=artifact,
+                        )
                     )
-                processed_history_pa_tables[table_ndx] = table.set_column(
-                    fields.index(col_name), col_name, arrow_col
-                )
+                    arrow_col = new_col._arrow_data
+                    if types.Timestamp().assign_type(types.non_none(col_type)):
+                        arrow_col = arrow_col.cast("int64").cast(
+                            pa.timestamp("ms", tz="UTC")
+                        )
+                    new_table = _update_pa_table_column(table, col_name, arrow_col)
+                processed_history_pa_tables[table_ndx] = new_table
 
     return live_columns, live_columns_already_mapped, processed_history_pa_tables
-
-
-unsupported_types = (
-    wbmedia.ImageArtifactFileRefType,  # type: ignore
-    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
-    wbmedia.LegacyTableNDArrayType,
-    wb_util.WbHistogram,
-)
-
-
-def _verify_supported_type_mapper(type_: types.Type) -> types.Type:
-    from .. import artifact_fs
-
-    type_ = types.non_none(type_)
-    if isinstance(type_, unsupported_types + (artifact_fs.FilesystemArtifactFileType,)):
-        raise errors.WeaveWBHistoryTranslationError(
-            f"Unsupported type in history3: {type_}"
-        )
-    return type_
-
-
-def _verify_supported_types(type_: types.Type) -> None:
-    map_type(type_, _verify_supported_type_mapper)
 
 
 def _non_vectorized_warning(message: str):
@@ -438,6 +460,16 @@ def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
     offset_array = pa.nulls(num_rows, type=pa.int32())
     arrays = []
     for col_ndx, column_data in enumerate(columns):
+        if col_ndx == 0:
+            # We always take the entire first column, then replace with mask
+            # each subsequent column. This approach ensures that rows which have
+            # nulls for every single column can be properly represented (ie. by the
+            # first column)
+            new_data = column_data
+            arrays.append(new_data)
+            type_array = pa.array([col_ndx] * len(new_data), type=pa.int8())
+            offset_array = pa.array(list(range(len(new_data))), type=pa.int32())
+            continue
         is_usable = pa.compute.invert(_is_null(column_data))
         new_data = column_data.filter(is_usable)
         arrays.append(new_data)
@@ -452,9 +484,16 @@ def _union_from_column_data(num_rows: int, columns: list[pa.Array]) -> pa.Array:
             pa.array(list(range(len(new_data))), type=pa.int32()),
         )
 
-    arrays.append(pa.nulls(1, type=pa.int8()))
-    type_array = pa.compute.fill_null(type_array, len(arrays) - 1)
-    offset_array = pa.compute.fill_null(offset_array, 0)
+    # TODO: This code tries to add a null we can use, but it makes the
+    # union invalid against the weave type. Instead we can just use the first
+    # array in the union.
+    # TODO: Need to fix this code, it is not correct now, just hacked in the branch
+    # arrays.append(pa.nulls(1, type=pa.int8()))
+    #
+    # Following lines are from weaveflow merge, but i believe this is already fixed
+    #
+    # type_array = pa.compute.fill_null(type_array, len(arrays) - 1)
+    # offset_array = pa.compute.fill_null(offset_array, 0)
 
     return pa.UnionArray.from_dense(type_array, offset_array, arrays)
 
@@ -498,11 +537,14 @@ def _drop_types_from_encoded_types(awl: ArrowWeaveList) -> ArrowWeaveList:
 
 
 def _get_live_data_from_run(run: wdt.Run, columns=None):
-    raw_live_data = run.gql["sampledParquetHistory"]["liveData"]
+    raw_live_data = run["sampledParquetHistory"]["liveData"]
     if columns is None:
         return raw_live_data
     column_set = set(columns)
-    return [{k: v for k, v in row.items() if k in column_set} for row in raw_live_data]
+    return [
+        {k: v for k, v in row.items() if k in column_set}
+        for row in gql_json_cache.use_json(raw_live_data)
+    ]
 
 
 def _extract_column_from_live_data(live_data: list[dict], column_name: str):
@@ -553,14 +595,14 @@ def _read_raw_history_awl_tables(
 ) -> list[ArrowWeaveList]:
     io = io_service.get_sync_client()
     tables = []
-    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+    for url in run["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
             awl = history_op_common.awl_from_local_parquet_path(
                 path, None, columns=columns, artifact=artifact
             )
-            awl.map_column(_parse_bytes_mapper)
+            awl = awl.map_column(_parse_bytes_mapper)
             tables.append(awl)
     return tables
 
@@ -602,22 +644,31 @@ def _column_type_requires_in_memory_transformation(col_type: types.Type):
     return _column_type_requires_in_memory_transformation_recursive(col_type)
 
 
+def _column_contains_legacy_media_image(col_type: types.Type):
+    return _column_contains_legacy_media_image_recursive(col_type)
+
+
 def _is_directly_convertible_type(col_type: types.Type):
     return _is_directly_convertible_type_recursive(col_type)
 
 
 _weave_types_requiring_in_memory_transformation = (
-    # wbmedia.ImageArtifactFileRefType,  # type: ignore
-    # wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
-    # wbmedia.LegacyTableNDArrayType,
-    # wb_util.WbHistogram,
+    # TODO: We should be able to move some (or all?) of these to
+    # a vectorized approach. At a minimum we should be able to do
+    # this for ImageArtifactFileRefType - similar to how we do it
+    # in history2.
+    wbmedia.ImageArtifactFileRefType,  # type: ignore
+    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.LegacyTableNDArrayType,
+    wb_util.WbHistogram,
     trace_tree.WBTraceTree.WeaveType,  # type: ignore
     types.UnknownType,
+    artifact_fs.FilesystemArtifactFileType,  # Tables
 )
 
 
@@ -628,6 +679,27 @@ def _column_type_requires_in_memory_transformation_recursive(col_type: types.Typ
     if isinstance(non_none_type, types.UnionType):
         return True
     elif isinstance(non_none_type, _weave_types_requiring_in_memory_transformation):
+        return True
+    elif isinstance(non_none_type, types.List):
+        return _column_type_requires_in_memory_transformation_recursive(
+            non_none_type.object_type
+        )
+    elif isinstance(non_none_type, types.TypedDict):
+        for k, v in non_none_type.property_types.items():
+            if _column_type_requires_in_memory_transformation_recursive(v):
+                return True
+        return False
+    else:
+        return False
+
+
+def _column_contains_legacy_media_image_recursive(col_type: types.Type):
+    if types.NoneType().assign_type(col_type):
+        return False
+    non_none_type = types.non_none(col_type)
+    if isinstance(non_none_type, types.UnionType):
+        return True
+    elif isinstance(non_none_type, wbmedia.ImageArtifactFileRefType):
         return True
     elif isinstance(non_none_type, types.List):
         return _column_type_requires_in_memory_transformation_recursive(

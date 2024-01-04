@@ -2,6 +2,7 @@ import {
   isAssignableTo,
   isTaggedValueLike,
   isUnion,
+  Node,
   nonNullableDeep,
   taggedValue,
   taggedValueTagType,
@@ -61,7 +62,6 @@ class NullResultErrorBoundary extends React.Component<
     if (this.state.isNullValue) {
       return (
         <div
-          data-test-weave-id="number"
           style={{
             width: '100%',
             height: '100%',
@@ -144,6 +144,7 @@ const PanelMaybe: React.FC<PanelMaybeProps> = props => {
 
   return (
     <MaybeWrapper
+      node={nodeWithConvertedType}
       deps={[
         nodeWithConvertedType,
         props.child,
@@ -170,7 +171,7 @@ const PanelMaybe: React.FC<PanelMaybeProps> = props => {
   );
 };
 
-export const MaybeWrapper: React.FC<{deps?: any[]}> = props => {
+export const MaybeWrapper: React.FC<{node: Node; deps?: any[]}> = props => {
   // We always render our child, so that its useNodeValue calls can be merged
   // with other active components. Ie, we don't want to waterfall here.
 
@@ -183,7 +184,7 @@ export const MaybeWrapper: React.FC<{deps?: any[]}> = props => {
   );
 
   return (
-    <PanelContextProvider inPanelMaybe={true}>
+    <PanelContextProvider panelMaybeNode={props.node}>
       <NullResultErrorBoundary key={boundaryKey} onErrorCapture={openLatch}>
         {props.children}
       </NullResultErrorBoundary>

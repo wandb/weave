@@ -6,6 +6,7 @@ import {
   list,
   listObjectType,
   nullableTaggableValue,
+  Stack,
   Type,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
@@ -15,6 +16,7 @@ import {useDeepMemo} from '../../hookUtils';
 import * as Panel from './panel';
 import * as PanelLib from './panellib/libpanel';
 import * as LibTypes from './panellib/libtypes';
+import {getStackInfo, StackInfo} from './panellib/stackinfo';
 import * as PanelRegistry from './PanelRegistry';
 import {Spec as PanelTableMergeSpec} from './PanelTableMerge';
 
@@ -170,6 +172,12 @@ function scoreHandlerStack(type: Type, hs: PanelStack) {
   ) {
     scoreHs -= 50;
   }
+
+  // Until combined 2d projection performance is addressed, bump it down in the recommendation list (i.e. don't auto recommend it)
+  if (sidAndName.id.includes('projection.plot')) {
+    scoreHs -= 100;
+  }
+
   return scoreHs;
 }
 
@@ -193,9 +201,11 @@ export interface GetPanelStacksForTypeOpts {
   excludePlot?: boolean;
   excludeMultiTable?: boolean;
   excludeBarChart?: boolean;
+  excludePanelPanel?: boolean;
   showDebug?: boolean;
   stackIdFilter?: (stackId: string) => boolean;
   allowedPanels?: string[];
+  disallowedPanels?: string[];
 }
 export function getPanelStacksForType(
   type: Type,
@@ -203,7 +213,7 @@ export function getPanelStacksForType(
   opts: GetPanelStacksForTypeOpts = {}
 ): {
   curPanelId: string | undefined;
-  stackIds: Array<{id: string; displayName: string}>;
+  stackIds: StackInfo[];
   handler: PanelStack | undefined;
 } {
   let handlerStacks = getTypeHandlerStacks(type);
@@ -247,6 +257,12 @@ export function getPanelStacksForType(
       );
     }
 
+    if (opts.excludePanelPanel) {
+      handlerStacks = handlerStacks.filter(
+        hs => !(PanelLib.getStackIdAndName(hs).id === 'panel')
+      );
+    }
+
     if (!opts.showDebug) {
       handlerStacks = handlerStacks.filter(
         hs => PanelLib.getStackIdAndName(hs).id.indexOf('debug') === -1
@@ -269,7 +285,19 @@ export function getPanelStacksForType(
     });
   }
 
-  const stackIds = handlerStacks.map(PanelLib.getStackIdAndName);
+  if (opts.disallowedPanels != null) {
+    handlerStacks = handlerStacks.filter(
+      hs => !opts.disallowedPanels!.includes(PanelLib.getStackIdAndName(hs).id)
+    );
+  }
+
+  if (handlerStacks.length > 1) {
+    handlerStacks = handlerStacks.filter(
+      hs => !PanelLib.getStackIdAndName(hs).id.endsWith('raw')
+    );
+  }
+
+  const stackIds = handlerStacks.map(getStackInfo);
   const configuredStackIndex = stackIds.findIndex(si => si.id === panelId);
   let backupConfiguredStackIndex = -1;
   // If there is not an exact match...
@@ -401,3 +429,7 @@ export function getTransformPanel(panelId: string) {
 export function panelSpecById(panelId: string) {
   return PanelRegistry.PanelSpecs().find(p => p.id === panelId);
 }
+
+// PanelPanel is currently not able to be nested within other childpanel
+// based on stack, exclude panelpanel if nested
+export const excludePanelPanel = (stack: Stack) => stack.length > 0;

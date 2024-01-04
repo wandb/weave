@@ -1,11 +1,14 @@
 import typing
+from typing import Iterable
 import weakref
-import contextlib
-import contextvars
-import collections
+import hashlib
+import json
+import functools
 
 from . import uris
 from . import box
+from . import errors
+from . import graph_client_context
 from . import weave_types as types
 from . import object_context
 
@@ -14,6 +17,18 @@ REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
     from . import weave_types as types
+    from . import run
+
+
+def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, dict):
+        return {k: _map_to_ref_strs(v) for k, v in obj.items()}  # type: ignore
+    if isinstance(obj, list):
+        return [_map_to_ref_strs(v) for v in obj]  # type: ignore
+    ref = get_ref(obj)
+    if ref is not None:
+        return str(ref)
+    return obj
 
 
 class Ref:
@@ -29,7 +44,7 @@ class Ref:
     ):
         self._type = type
         self.extra = extra
-        if obj is not None and type is not None and type.name != "tagged":
+        if obj is not None and type is not None and type.name != "tagged":  # type: ignore
             obj = box.box(obj)
             _put_ref(obj, self)
         self._obj = obj
@@ -46,12 +61,18 @@ class Ref:
             return self._obj
 
         if not self.is_saved:
+            # PR TODO: this path needs to happen in FSArtifact, as you can
+            # always get the value of a MemArtifact
+            # PR: I changed this back to None to get tests passing. What breaks
+            # now? My guess is mutations from the UI? Or maybe creating brand
+            # new objects from the UI (datasets)
             return None
+            raise errors.WeaveArtifactVersionNotFound
 
         obj = self._get()
 
         obj = box.box(obj)
-        if self.type.name != "tagged":
+        if self.type.name != "tagged":  # type: ignore
             _put_ref(obj, self)
         self._obj = obj
 
@@ -61,8 +82,25 @@ class Ref:
         return obj
 
     @property
+    def ui_url(self) -> str:
+        return "[no url for obj]"
+
+    @property
     def type(self) -> "types.Type":
         raise NotImplementedError
+
+    @functools.cached_property
+    def digest(self) -> str:
+        hash = hashlib.md5()
+        # This can encounter non-serialized objects, even though Ref
+        # must be a pointer to an object that can only contain serializable
+        # stuff and refs. But we recursively deserialize all sub-refs when
+        # fetching a ref. So we need to walk obj, converting objs back to
+        # refs where we can, before this json.dumps call.
+        # TODO: fix
+        with_refs = _map_to_ref_strs(self.obj)
+        hash.update(json.dumps(with_refs).encode())
+        return hash.hexdigest()
 
     @classmethod
     def from_str(cls, s: str) -> "Ref":
@@ -88,6 +126,18 @@ class Ref:
 
     def __str__(self) -> str:
         return str(self.uri)
+
+    def input_to(self) -> Iterable["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_input_to(self)
+
+    def value_input_to(self) -> Iterable["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_value_input_to(self)
+
+    def output_of(self) -> typing.Optional["run.Run"]:
+        client = graph_client_context.require_graph_client()
+        return client.ref_output_of(self)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
@@ -126,7 +176,7 @@ def clear_ref(obj: typing.Any) -> None:
         REFS.pop(id(obj))
 
 
-def deref(ref: Ref) -> typing.Any:
+def deref(ref: typing.Any) -> typing.Any:
     if isinstance(ref, Ref):
         return ref.get()
     return ref

@@ -26,6 +26,19 @@ const makeReportResolver =
   (inputs: OpResolverInputTypes<typeof reportArgTypes>) =>
     mappableNullableTaggableVal(inputs.report, v => applyFn(v));
 
+export const opReportInternalId = makeOp({
+  hidden: true,
+  name: 'report-internalId',
+  argTypes: reportArgTypes,
+  description: `Returns the internalId of the ${docType('report')}`,
+  argDescriptions: {
+    entity: reportArgDescription,
+  },
+  returnValueDescription: `The internalId of the ${docType('report')}`,
+  returnType: makeReportReturnType('string'),
+  resolver: makeReportResolver(report => report.id),
+});
+
 export const opReportName = makeOp({
   hidden: true,
   name: 'report-name',
@@ -82,6 +95,19 @@ export const opReportCreatedAt = makeOp({
     report: reportArgDescription,
   },
   returnValueDescription: `The creation time of the ${docType('report')}`,
+  returnType: makeReportReturnType('date'),
+  resolver: makeReportResolver(report => new Date(report.createdAt + 'Z')),
+});
+
+export const opReportUpdatedAt = makeOp({
+  hidden: true,
+  name: 'report-updatedAt',
+  argTypes: reportArgTypes,
+  description: `Returns the updated time of the ${docType('report')}`,
+  argDescriptions: {
+    report: reportArgDescription,
+  },
+  returnValueDescription: `The updated time of the ${docType('report')}`,
   returnType: makeReportReturnType('date'),
   resolver: makeReportResolver(report => new Date(report.createdAt + 'Z')),
 });

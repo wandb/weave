@@ -128,6 +128,7 @@ export function toWeaveType(o: any): any {
       type: curPanelId,
       id: 'string',
       _is_object: true,
+      _base_type: {type: 'Panel'},
       vars: {
         type: 'typedDict',
         propertyTypes: _.mapValues(o.vars, toWeaveType),
@@ -152,8 +153,13 @@ export function toWeaveType(o: any): any {
     };
   } else if (_.isObject(o)) {
     if ('_type' in o) {
+      // Conditioned as as part of weaveflow merge
+      let oType = (o as {_type: any})._type;
+      if (_.isString(oType)) {
+        oType = {type: oType};
+      }
       return {
-        type: (o as {_type: any})._type,
+        ...oType,
         ..._.mapValues(_.omit(o, ['_type']), toWeaveType),
       };
     }

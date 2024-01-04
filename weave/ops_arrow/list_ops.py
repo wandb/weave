@@ -18,11 +18,17 @@ from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
 from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from .list_ import ArrowWeaveList, PathType, is_list_arrowweavelist
+from .list_ import (
+    ArrowWeaveList,
+    PathType,
+    is_list_arrowweavelist,
+    is_taggedvalue_arrowweavelist,
+)
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert
 from .convert import to_compare_safe
+from .concat import concatenate_all
 from .constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
@@ -511,6 +517,60 @@ def limit(self: ArrowWeaveList, limit: int):
     return self._limit(limit)
 
 
+def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
+    other_columns = list(table.schema.names)
+
+    flattened_list_columns: dict[str, pa.ChunkedArray] = {}
+
+    if len(list_columns) == 0:
+        return table
+
+    first_column = list_columns[0]
+    value_lengths_0 = table[first_column].combine_chunks().value_lengths()
+
+    # only need to calculate this once since all the list columns should have the same shape
+    # if they don't, then we raise an error below
+    indices: typing.Optional[pa.Array] = None
+
+    for column in list_columns:
+        value_lengths = table[column].combine_chunks().value_lengths()
+        if not pc.equal(value_lengths, value_lengths_0):
+            raise ValueError(
+                f"Cannot explode table with list columns of different shapes: {value_lengths} != {value_lengths_0}"
+            )
+        if pc.any(pc.is_null(table[column])).as_py():
+            # Occurs if we have an optional<list> column. Due to the way flatten works, any rows where the
+            # list is null will be dropped. So we need to put the null inside a list, which causes flatten
+            # to keep it around. This doesn't always work for tables where the list item type is
+            # intricate (e.g., struct of dictionary encoded structs), but these are rare cases.
+            null_filled = pc.fill_null(table[column], [None])
+        else:
+            null_filled = table[column]
+
+        flattened = pc.list_flatten(null_filled)
+        other_columns.remove(column)
+        flattened_list_columns[column] = flattened
+
+        if indices is None:
+            indices = pc.list_parent_indices(null_filled)
+
+    if len(other_columns) == 0:
+        return pa.table(flattened_list_columns)
+
+    if indices is None:
+        raise ValueError("Cannot explode table with no list columns")
+
+    result = table.select(other_columns).take(indices)
+
+    for column in list_columns:
+        result = result.append_column(
+            pa.field(column, table.schema.field(column).type.value_type),
+            flattened_list_columns[column],
+        )
+
+    return result
+
+
 @op(
     name="ArrowWeaveList-unnest",
     input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
@@ -565,18 +625,7 @@ def unnest(self):
             arrow_obj = arrow_obj.append_column(tag_col_name, col_tags)
             arrow_obj = arrow_obj.append_column(col, col_values)
 
-    # todo: make this more efficient. we shouldn't have to convert back and forth
-    # from the arrow in-memory representation to pandas just to call the explode
-    # function. but there is no native pyarrow implementation of this
-
-    # This can replace int64 with float64! I believe it happens when we have nullable
-    # int. pandas represents nullability using nan.
-    # This requires us a hack in our AWL.validate function to allow float64 when
-    # the weave type is int.
-    # TODO: write an arrow based implementation, and remove the hack in validate.
-    exploded_table = pa.Table.from_pandas(
-        df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
-    )
+    exploded_table = explode_table(arrow_obj, list_cols)
 
     # Reconstruct the tagged list columns
     for col in exploded_table.column_names:
@@ -664,25 +713,7 @@ def concat(arr):
 
     # We merge the lists mergesort-style, which is `O(n*log(n))`
     # DO NOT merge the lists reduce-style, which is `O(n^2)`
-    return merge_concat(tagged)
-
-
-def merge_concat(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
-    if len(arr) == 0:
-        raise ValueError("arr must not be empty")
-    if len(arr) == 1:
-        return arr[0]
-    left, right = merge_concat_split(arr)
-    return merge_concat(left).concat(merge_concat(right))
-
-
-def merge_concat_split(
-    arr: list[ArrowWeaveList],
-) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
-    if len(arr) < 2:
-        raise ValueError("arr must have length of at least 2")
-    middle_index = len(arr) // 2
-    return arr[:middle_index], arr[middle_index:]
+    return concatenate_all(tagged)
 
 
 # # Putting this here instead of in number b/c it is just a map function
@@ -888,12 +919,60 @@ def flatten_return_type(input_types):
 def flatten(arr):
     # TODO:
     #   - handle N levels instead of 1
-    #   - handle tags
+
     arrow_data = arr._arrow_data
-    if is_list_arrowweavelist(arr):
-        arrow_data = arrow_data.flatten()
+    if is_list_arrowweavelist(arr) or (
+        is_taggedvalue_arrowweavelist(arr)
+        and is_list_arrowweavelist(arr.tagged_value_value())
+    ):
+        # unwrap tags
+
+        tags = None
+        if isinstance(arr.object_type, tagged_value_type.TaggedValueType):
+            value_awl, tags_awl = (
+                arr.tagged_value_value(),
+                arr.tagged_value_tag(),
+            )
+
+            values = value_awl._arrow_data
+            tags = tags_awl._arrow_data
+
+        else:
+            values = arrow_data
+
+        assert isinstance(values, pa.ListArray)
+        flattened_values = values.flatten()
+
+        if tags is not None:
+            list_parent_indices = pc.list_parent_indices(values)
+            flattened_tags = tags.take(list_parent_indices)
+            flattened_values = arrow_tags.direct_add_arrow_tags(
+                flattened_values, flattened_tags
+            )
+
+        arrow_data = flattened_values
+
     return ArrowWeaveList(
         arrow_data,
         flatten_return_object_type(arr.object_type),
         arr._artifact,
     )
+
+
+def _drop_tags_output_type(input_type):
+    from ..op_def import map_type
+
+    return map_type(
+        input_type["arr"],
+        lambda t: isinstance(t, tagged_value_type.TaggedValueType) and t.value or t,
+    )
+
+
+@op(
+    name="ArrowWeaveList-dropTags",
+    input_type={"arr": ArrowWeaveListType()},
+    output_type=_drop_tags_output_type,
+    hidden=True,
+)
+def drop_tags(arr):
+    return arr.without_tags()

@@ -29,6 +29,7 @@ from . import wandb_api
 from . import util
 from . import graph
 from .language_features.tagging import tag_store
+from . import gql_json_cache
 
 
 # A function to monkeypatch the request post method
@@ -67,21 +68,30 @@ def handle_request(
 ) -> HandleRequestResponse:
     start_time = time.time()
     tracer = engine_trace.tracer()
-    # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
-    with tracer.trace("request:deserialize"):
-        nodes = serialize.deserialize(request["graphs"])
+    # Need to add wandb_api.from_environment, which sets up the wandb api
+    # The existing code only did this within the execute() function. But now
+    # I'm hitting the need for this in deserialize, because node_id in deserialize
+    # may try to access ref.type, which may try to access the wandb api.
+    # That may not really be desirable, I didn't go deeper to figure out if
+    # we should maybe stop that. But this fixes the problem for now.
+    with wandb_api.from_environment():
+        # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
+        with tracer.trace("request:deserialize"):
+            nodes = serialize.deserialize(request["graphs"])
 
-    with tracer.trace("request:execute"):
-        with execute.top_level_stats() as stats:
-            with context.execution_client():
-                result = nodes.batch_map(execute.execute_nodes)
-    with tracer.trace("request:deref"):
-        if deref:
-            result = result.zip(nodes).safe_map(
-                lambda t: t[0]
-                if isinstance(t[1].type, weave_types.RefType)
-                else storage.deref(t[0])
-            )
+        with tracer.trace("request:execute"):
+            with execute.top_level_stats() as stats:
+                with context.execution_client():
+                    with gql_json_cache.gql_json_cache_context():
+                        result = nodes.batch_map(execute.execute_nodes)
+
+        with tracer.trace("request:deref"):
+            if deref:
+                result = result.zip(nodes).safe_map(
+                    lambda t: t[0]
+                    if isinstance(t[1].type, weave_types.RefType)
+                    else storage.deref(t[0])
+                )
 
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))

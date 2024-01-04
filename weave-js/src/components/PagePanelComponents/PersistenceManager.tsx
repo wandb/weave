@@ -1,17 +1,31 @@
+import {useMutation as useApolloMutation} from '@apollo/client';
+import {Popover} from '@material-ui/core';
 import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isMac} from '@wandb/weave/common/util/browser';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {
-  NodeOrVoidNode,
-  OutputNode,
+  constString,
   isConstNode,
   isOutputNode,
   mapNodes,
+  NodeOrVoidNode,
+  opGet,
+  opProjectArtifact,
+  opRootProject,
+  OutputNode,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
+import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 import {useMutation, useNodeWithServerType} from '@wandb/weave/react';
+import {useNodeValue} from '@wandb/weave/react';
+import {urlProjectAssets} from '@wandb/weave/urls';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import _ from 'lodash';
+import moment from 'moment';
 import React, {
   Dispatch,
   SetStateAction,
@@ -21,10 +35,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import {useHistory} from 'react-router-dom';
 import {Button, Input, Modal} from 'semantic-ui-react';
-
-import {Popover} from '@material-ui/core';
 import styled, {css} from 'styled-components';
+
+import {getFullChildPanel} from '../Panel2/ChildPanel';
 import {
   IconAddNew,
   IconBack,
@@ -38,44 +53,40 @@ import {
   IconUp as IconUpUnstyled,
   IconWeaveLogo,
 } from '../Panel2/Icons';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
+import {
+  useNewDashFromItems,
+  useNewPanelFromRootQueryCallback,
+} from '../Panel2/PanelRootBrowser/util';
+import {mapPanels} from '../Panel2/panelTree';
+import {DeleteActionModal} from './DeleteActionModal';
+import {UPDATE_ARTIFACT_COLLECTION} from './graphql';
+import {DELETE_ARTIFACT_SEQUENCE} from './graphql';
 import {
   useBranchPointFromURIString,
   usePreviousVersionFromURIString,
 } from './hooks';
 import {
+  getAvailableActions,
   PersistenceAction,
   PersistenceDeleteActionType,
   PersistenceRenameActionType,
   PersistenceState,
   PersistenceStoreActionType,
   TakeActionType,
-  getAvailableActions,
   useStateMachine,
 } from './persistenceStateMachine';
+import {PublishModal} from './PublishModal';
 import {
-  BranchPointType,
   branchPointIsRemote,
+  BranchPointType,
   determineURIIdentifier,
   determineURISource,
   isLocalURI,
   uriFromNode,
-  useIsAuthenticated,
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './util';
-import moment from 'moment';
-import {
-  useNewDashFromItems,
-  useNewPanelFromRootQueryCallback,
-} from '../Panel2/PanelRootBrowser/util';
-import {PanelGroupConfig} from '../Panel2/PanelGroup';
-import {getFullChildPanel} from '../Panel2/ChildPanel';
-import {useNodeValue} from '@wandb/weave/react';
-import _ from 'lodash';
-import {mapPanels} from '../Panel2/panelTree';
-import {DeleteActionModal} from './DeleteActionModal';
-import {PublishModal} from './PublishModal';
-import {opWeaveServerVersion} from '@wandb/weave/core/ops/primitives/server';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -214,7 +225,9 @@ const HeaderLeftControls = styled.div`
   flex: 1 1 30px;
 `;
 
-const WeaveLogo = styled(IconWeaveLogo)<{open: boolean}>`
+const WeaveLogo = styled(IconWeaveLogo).attrs({
+  className: 'night-aware',
+})<{open: boolean}>`
   width: 32px;
   height: 32px;
   transform: rotate(${props => (props.open ? 180 : 0)}deg);
@@ -305,6 +318,7 @@ const persistenceActionToLabel: {[action in PersistenceAction]: string} = {
   save: 'Make object',
   commit: 'Publish changes',
   rename_local: 'Rename',
+  commit_rename: 'Rename & publish',
   publish_as: 'Publish As',
   publish_new: 'Publish board',
   rename_remote: 'Rename',
@@ -337,6 +351,9 @@ const HeaderPersistenceControls: React.FC<{
                 setIsPublishModalOpen(true);
               } else {
                 takeAction(storeAction);
+              }
+              if (storeAction === 'commit') {
+                trackPublishBoardClicked('commit-changes', 'board-toolbar');
               }
             }}>
             {persistenceActionToLabel[storeAction]}
@@ -372,10 +389,17 @@ const HeaderFileControls: React.FC<{
   takeAction,
   updateNode,
 }) => {
+  const history = useHistory();
   const [actionRenameOpen, setActionRenameOpen] = useState(false);
   const [actionDeleteOpen, setActionDeleteOpen] = useState(false);
   const [acting, setActing] = useState(false);
+  const [deleteArtifactCollection] = useApolloMutation(
+    DELETE_ARTIFACT_SEQUENCE
+  );
   const isLocal = maybeURI != null && isLocalURI(maybeURI);
+  const [updateArtifactCollection] = useApolloMutation(
+    UPDATE_ARTIFACT_COLLECTION
+  );
   const entityProjectName = determineURISource(maybeURI, branchPoint);
   const {name: currName, version: currentVersion} =
     determineURIIdentifier(maybeURI);
@@ -395,6 +419,87 @@ const HeaderFileControls: React.FC<{
 
   const inputType = useNodeWithServerType(inputNode).result?.type;
   const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
+
+  const entityName = useMemo(
+    () => entityProjectName?.entity ?? '',
+    [entityProjectName]
+  );
+
+  const projectName = useMemo(
+    () => entityProjectName?.project ?? '',
+    [entityProjectName]
+  );
+
+  const artifactNode = useMemo(() => {
+    return opProjectArtifact({
+      project: opRootProject({
+        entityName: constString(entityName),
+        projectName: constString(projectName),
+      }),
+      artifactName: constString(currName ?? ''),
+    } as any);
+  }, [entityName, projectName, currName]);
+
+  const artifactNodeValue = useNodeValue(artifactNode, {
+    skip: entityName === '' || projectName === '',
+  });
+
+  const artifactSequenceID = useMemo(() => {
+    return !artifactNodeValue.loading && artifactNodeValue.result
+      ? (artifactNodeValue.result.id as any)
+      : '';
+  }, [artifactNodeValue.result, artifactNodeValue.loading]);
+
+  const renameRemoteBoard = useCallback(
+    async (newName: string) => {
+      try {
+        await updateArtifactCollection({
+          variables: {
+            artifactSequenceID,
+            name: newName,
+          },
+        });
+        // Refresh the board
+        const uri = `wandb-artifact:///${entityName}/${projectName}/${newName}:latest/obj`;
+        updateNode(opGet({uri: constString(uri)}));
+        setActing(false);
+        setActionRenameOpen(false);
+      } catch (e) {
+        console.error('Failed to rename artifact collection.');
+        toast('Something went wrong while trying to rename this board.');
+      }
+    },
+    [
+      entityName,
+      projectName,
+      updateNode,
+      artifactSequenceID,
+      updateArtifactCollection,
+    ]
+  );
+
+  const resetAfterDeletion = useCallback(() => {
+    setActing(false);
+    setActionDeleteOpen(false);
+    if (entityName && projectName) {
+      history.push(urlProjectAssets(entityName, projectName, 'board'));
+    } else {
+      goHome?.();
+    }
+  }, [entityName, projectName, history, goHome]);
+
+  const deleteRemoteBoard = useCallback(async () => {
+    try {
+      await deleteArtifactCollection({
+        variables: {
+          artifactSequenceID,
+        },
+      });
+    } catch (e) {
+      console.error('Failed to delete artifact collection.');
+      toast('Something went wrong while trying to delete this board.');
+    }
+  }, [deleteArtifactCollection, artifactSequenceID]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -439,13 +544,13 @@ const HeaderFileControls: React.FC<{
 
   return (
     <>
-      <HeaderCenterControls>
+      <HeaderCenterControls data-testid="header-center-controls">
         {entityProjectName && (
           <HeaderCenterControlsSecondary
             onClick={() => {
               setAnchorFileEl(headerEl);
             }}>
-            {entityProjectName.entity}/{entityProjectName.project}/
+            {entityName}/{projectName}/
           </HeaderCenterControlsSecondary>
         )}
         <HeaderCenterControlsPrimary
@@ -548,6 +653,7 @@ const HeaderFileControls: React.FC<{
           <MenuDivider /> */}
 
           <MenuItem
+            data-testid="new-board-button"
             onClick={() => {
               setAnchorFileEl(null);
               newDashboard();
@@ -593,12 +699,19 @@ const HeaderFileControls: React.FC<{
           actionName={renameAction}
           open={actionRenameOpen}
           onClose={() => setActionRenameOpen(false)}
-          onRename={newName => {
-            setActing(true);
-            takeAction(renameAction, {name: newName}, () => {
-              setActing(false);
-              setActionRenameOpen(false);
-            });
+          onRename={async newName => {
+            if (renameAction === 'rename_remote') {
+              renameRemoteBoard(newName);
+            } else if (renameAction === 'commit_rename') {
+              setActing(true);
+              takeAction('commit', {name: newName}, () => {
+                renameRemoteBoard(newName).then(() => {
+                  // console.log("Board renamed successfully.")
+                });
+              });
+            } else {
+              takeAction(renameAction, {name: newName});
+            }
           }}
         />
       )}
@@ -607,13 +720,14 @@ const HeaderFileControls: React.FC<{
           open={actionDeleteOpen}
           onClose={() => setActionDeleteOpen(false)}
           acting={acting}
-          onDelete={() => {
+          onDelete={async () => {
             setActing(true);
-            takeAction(deleteAction, {}, () => {
-              setActing(false);
-              setActionRenameOpen(false);
-              goHome?.();
-            });
+            if (deleteAction === 'delete_remote') {
+              await deleteRemoteBoard();
+              resetAfterDeletion();
+            } else {
+              takeAction(deleteAction, {}, resetAfterDeletion);
+            }
           }}
         />
       )}
@@ -630,6 +744,47 @@ const HeaderLogoControls: React.FC<{
 }> = ({inputNode, headerEl, goHome, updateNode, inputConfig}) => {
   const [anchorHomeEl, setAnchorHomeEl] = useState<HTMLElement | null>(null);
   const expandedHomeControls = Boolean(anchorHomeEl);
+
+  return (
+    <>
+      <HeaderLeftControls
+        onClick={e => {
+          setAnchorHomeEl(headerEl);
+        }}>
+        <WeaveLogo open={anchorHomeEl != null} />
+        {expandedHomeControls ? <IconUp /> : <IconDown />}
+      </HeaderLeftControls>
+      <CustomPopover
+        open={expandedHomeControls}
+        anchorEl={anchorHomeEl}
+        onClose={() => setAnchorHomeEl(null)}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}>
+        <HeaderLogoPopoverContent
+          inputNode={inputNode}
+          inputConfig={inputConfig}
+          updateNode={updateNode}
+          goHome={goHome}
+          onClose={() => setAnchorHomeEl(null)}
+        />
+      </CustomPopover>
+    </>
+  );
+};
+
+const HeaderLogoPopoverContent: React.FC<{
+  inputNode: NodeOrVoidNode;
+  inputConfig: any;
+  updateNode: (node: NodeOrVoidNode) => void;
+  goHome?: () => void;
+  onClose: () => void;
+}> = ({inputNode, goHome, updateNode, inputConfig, onClose}) => {
   const inputType = useNodeWithServerType(inputNode).result?.type;
   const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
   const isGroup = weaveTypeIsPanelGroup(inputType);
@@ -721,70 +876,48 @@ const HeaderLogoControls: React.FC<{
   const versionValue = useNodeValue(versionNode);
 
   return (
-    <>
-      <HeaderLeftControls
-        onClick={e => {
-          setAnchorHomeEl(headerEl);
+    <CustomMenu>
+      {seedItems != null && (
+        <MenuItem
+          onClick={() => {
+            onClose();
+            newDashboard();
+          }}>
+          <MenuIcon>
+            <IconAddNew />
+          </MenuIcon>
+          <MenuText>Seed new board</MenuText>
+        </MenuItem>
+      )}
+      <MenuItem
+        onClick={() => {
+          onClose();
+          goHome?.();
         }}>
-        <WeaveLogo open={anchorHomeEl != null} />
-        {expandedHomeControls ? <IconUp /> : <IconDown />}
-      </HeaderLeftControls>
-      <CustomPopover
-        open={expandedHomeControls}
-        anchorEl={anchorHomeEl}
-        onClose={() => setAnchorHomeEl(null)}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'center',
+        <MenuIcon>
+          <IconBack />
+        </MenuIcon>
+        <MenuText>Back to home</MenuText>
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          onClose();
+          window.open('https://github.com/wandb/weave', '_blank');
         }}>
-        <CustomMenu>
-          {seedItems != null && (
-            <MenuItem
-              onClick={() => {
-                setAnchorHomeEl(null);
-                newDashboard();
-              }}>
-              <MenuIcon>
-                <IconAddNew />
-              </MenuIcon>
-              <MenuText>Seed new board</MenuText>
-            </MenuItem>
-          )}
-          <MenuItem
-            onClick={() => {
-              setAnchorHomeEl(null);
-              goHome?.();
-            }}>
-            <MenuIcon>
-              <IconBack />
-            </MenuIcon>
-            <MenuText>Back to home</MenuText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setAnchorHomeEl(null);
-              window.open('https://github.com/wandb/weave', '_blank');
-            }}>
-            <MenuIcon>
-              <IconDocs />
-            </MenuIcon>
-            <MenuText>Weave documentation</MenuText>
-          </MenuItem>
-          <MenuDivider />
-          <MenuItem disabled>
-            <MenuText>
-              Weave {versionValue.result}
-              <br />
-              by Weights & Biases
-            </MenuText>
-          </MenuItem>
-        </CustomMenu>
-      </CustomPopover>
-    </>
+        <MenuIcon>
+          <IconDocs />
+        </MenuIcon>
+        <MenuText>Weave documentation</MenuText>
+      </MenuItem>
+      <MenuDivider />
+      <MenuItem disabled>
+        <MenuText>
+          Weave {versionValue.result}
+          <br />
+          by Weights & Biases
+        </MenuText>
+      </MenuItem>
+    </CustomMenu>
   );
 };
 

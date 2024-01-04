@@ -2,6 +2,7 @@
 
 import React, {useCallback, useContext, useState} from 'react';
 
+import {ChildPanelProps} from './ChildPanel';
 import {usePanelContext} from './PanelContext';
 
 interface PanelInteractState {
@@ -10,9 +11,24 @@ interface PanelInteractState {
   highlightInputExpr?: boolean;
 }
 
+type PanelInteractMode = 'config' | 'export-report' | null;
+
 export interface PanelInteractContextState {
   // State is stored by panel path. panel path is managed by PanelContext.
-  editorSidebarOpen: boolean;
+  panelInteractMode: PanelInteractMode;
+  /**
+   * A registry of root panel documents that the user can interact with
+   * inside this context. Contains all required props to render each
+   * document as a `ChildPanel`.
+   */
+  documents: {
+    [documentId: string]: ChildPanelProps;
+  };
+  /**
+   * Unique ID of the selected root panel. Required if
+   * multiple root panels share one interact drawer.
+   */
+  selectedDocumentId?: string;
   selectedPath: string[];
   panelState: {[pathString: string]: PanelInteractState};
 }
@@ -33,8 +49,9 @@ PanelInteractContext.displayName = 'PanelInteractContext';
 export const PanelInteractContextProvider: React.FC<{}> = React.memo(
   ({children}) => {
     const [state, setState] = useState<PanelInteractContextState>({
+      documents: {},
       selectedPath: [],
-      editorSidebarOpen: false,
+      panelInteractMode: null,
       panelState: {},
     });
 
@@ -157,13 +174,12 @@ export const useSetPanelIsHoveredInOutline = () => {
   );
 };
 
-export const useSetInspectingPanel = () => {
+export const useSetSelectedPanel = () => {
   const {setState} = usePanelInteractContext();
   return useCallback(
     (path: string[]) => {
       setState(prevState => ({
         ...prevState,
-        editorSidebarOpen: true,
         selectedPath: path,
       }));
     },
@@ -171,30 +187,103 @@ export const useSetInspectingPanel = () => {
   );
 };
 
-export const useSetInspectingChildPanel = () => {
-  const setInspectingPanel = useSetInspectingPanel();
-  const {path} = usePanelContext();
+export const useSetInteractingPanel = () => {
+  const {setState} = usePanelInteractContext();
   return useCallback(
-    (childPath: string) => {
-      setInspectingPanel(path.concat([childPath]));
+    (mode: PanelInteractMode, path: string[], documentId?: string) => {
+      setState(prevState => ({
+        ...prevState,
+        panelInteractMode: mode,
+        selectedPath: path,
+        selectedDocumentId: documentId,
+      }));
     },
-    [path, setInspectingPanel]
+    [setState]
   );
 };
 
-export const useCloseEditor = () => {
+export const useSetInteractingChildPanel = () => {
+  const setInteractingPanel = useSetInteractingPanel();
+  const {path} = usePanelContext();
+  return useCallback(
+    (mode: PanelInteractMode, childPath: string, documentId?: string) => {
+      setInteractingPanel(mode, path.concat([childPath]), documentId);
+    },
+    [path, setInteractingPanel]
+  );
+};
+
+export const useCloseDrawer = () => {
   const {setState} = usePanelInteractContext();
   return useCallback(() => {
     setState(prevState => ({
       ...prevState,
-      editorSidebarOpen: false,
+      panelInteractMode: null,
+      selectedDocumentId: undefined,
+      selectedPath: [],
     }));
   }, [setState]);
 };
 
-export const useEditorIsOpen = () => {
+/**
+ * If multiple root panel documents share an interact drawer,
+ * each document must be registered in this context. If a document
+ * is removed from the page (e.g. on unmount), the document should
+ * be unregistered from the context.
+ *
+ * @returns functions to register and unregister root panel documents
+ */
+export const useRegisterDocument = () => {
+  const {state, setState} = usePanelInteractContext();
+  const closeDrawer = useCloseDrawer();
+
+  const register = useCallback(
+    (documentId: string, props: ChildPanelProps) => {
+      setState(prevState => ({
+        ...prevState,
+        documents: {
+          ...prevState.documents,
+          [documentId]: props,
+        },
+      }));
+    },
+    [setState]
+  );
+
+  const unregister = useCallback(
+    (documentId: string) => {
+      setState(prevState => {
+        const newDocuments = {...prevState.documents};
+        delete newDocuments[documentId];
+        return {
+          ...prevState,
+          documents: newDocuments,
+        };
+      });
+      if (documentId === state.selectedDocumentId) {
+        closeDrawer();
+      }
+    },
+    [closeDrawer, setState, state.selectedDocumentId]
+  );
+
+  return {register, unregister};
+};
+
+export const usePanelInteractMode = () => {
   const {state} = usePanelInteractContext();
-  return state.editorSidebarOpen;
+  return state.panelInteractMode;
+};
+
+export const useSelectedDocumentId = () => {
+  const {state} = usePanelInteractContext();
+  return state.selectedDocumentId;
+};
+
+export const useSelectedDocument = () => {
+  const {state} = usePanelInteractContext();
+  const {documents, selectedDocumentId} = state;
+  return selectedDocumentId ? documents[selectedDocumentId] : undefined;
 };
 
 export const useSelectedPath = () => {

@@ -2,12 +2,16 @@ import pytest
 import wandb
 
 import weave
+from weave.dispatch import RuntimeOutputNode
+from weave.ops_arrow.vectorize import raise_on_python_bailout
 from weave.weave_internal import define_fn, make_const_node, const
+from weave.wandb_interface.wandb_stream_table import StreamTable
 from ..api import use
 from .. import graph
 from .. import weave_types as types
 from .. import async_demo
 from .. import compile
+from ..ops_arrow import to_arrow
 
 
 def test_automatic_await_compile():
@@ -164,17 +168,6 @@ def test_optimize_merge_empty_dict():
     )
 
 
-def count_nodes(node: graph.Node) -> int:
-    counter = 0
-
-    def inc(n: graph.Node):
-        nonlocal counter
-        counter += 1
-
-    weave.graph.map_nodes_full([node], inc)
-    return counter
-
-
 def test_compile_lambda_uniqueness():
     list_node_1 = weave.ops.make_list(a=make_const_node(weave.types.Number(), 1))
     list_node_2 = weave.ops.make_list(a=make_const_node(weave.types.Number(), 2))
@@ -190,29 +183,33 @@ def test_compile_lambda_uniqueness():
     # combined node contains 1 node, x1 = 1
     # concat node contains 1 node, x1 = 1
     # total = 12
-    assert count_nodes(concatted) == 12
+    assert graph.count(concatted) == 12
 
     # However, after lambda compilation, we should get
-    # 3 more nodes (new row, add, and fn), creating
-    # a total of 15 nodes
+    # 3 more nodes (new row, add, and fn), the const 1
+    # is not deduped because in one case (inside the lambda function),
+    # it is an int and in the other, it is a number
     compiled = compile.compile([concatted])[0]
-    assert count_nodes(compiled) == 15
+
+    assert graph.count(compiled) == 15
 
 
-def test_compile_through_execution(user_by_api_key_in_env):
-    run = wandb.init(project="project_exists")
-    for i in range(10):
-        run.log({"val": i, "cat": i % 2})
-    run.finish()
+# We actually don't want this to work because it would require
+# mutating a static lambda function!
+# def test_compile_through_execution(user_by_api_key_in_env):
+#     run = wandb.init(project="project_exists")
+#     for i in range(10):
+#         run.log({"val": i, "cat": i % 2})
+#     run.finish()
 
-    """
-    This test demonstrates successful execution when there is an explicit
-    const function instead of a direct node (resulting in an intermediate execution op)
-    """
-    history_node = weave.ops.project(run.entity, run.project).run(run.id).history2()
-    pick = const(history_node).pick("val")
-    res = weave.use(pick)
-    assert res.to_pylist_notags() == list(range(10))
+#     """
+#     This test demonstrates successful execution when there is an explicit
+#     const function instead of a direct node (resulting in an intermediate execution op)
+#     """
+#     history_node = weave.ops.project(run.entity, run.project).run(run.id).history2()
+#     pick = const(history_node).pick("val")
+#     res = weave.use(pick)
+#     assert res.to_pylist_notags() == list(range(10))
 
 
 def test_compile_through_function_call(user_by_api_key_in_env):
@@ -235,3 +232,86 @@ def test_compile_through_function_call(user_by_api_key_in_env):
     pick = called_node.pick("val")
     res = weave.use(pick)
     assert res.to_pylist_notags() == list(range(10))
+
+
+def test_compile_list_flatten_to_awl_concat():
+    # 4 cases: list of lists, list of awls, awl of lists, awl of awls
+    # When the outer list-structure is a list, we want to dispatch to concat, preferably AWL-concat
+    # when the outer list-structure is an AWL, we want to dispatch ensure that we use AWL ops
+    # list of lists
+    list_list_node = weave.ops.make_list(a=[1], b=[2])
+    list_list_node_concat = list_list_node.concat()
+    list_list_node_flatten = list_list_node.flatten()
+    list_list_node_concat_compiled = compile.compile([list_list_node_concat])[0]
+    list_list_node_flatten_compiled = compile.compile([list_list_node_flatten])[0]
+    assert list_list_node_concat_compiled.from_op.name == "concat"
+    assert list_list_node_flatten_compiled.from_op.name == "flatten"
+    # list of awls
+    list_awl_node = weave.ops.make_list(a=to_arrow([1]), b=to_arrow([2]))
+    list_awl_node_concat = list_awl_node.concat()
+    list_awl_node_flatten = list_awl_node.flatten()
+    list_awl_node_concat_compiled = compile.compile([list_awl_node_concat])[0]
+    list_awl_node_flatten_compiled = compile.compile([list_awl_node_flatten])[0]
+    assert list_awl_node_concat_compiled.from_op.name == "ArrowWeaveList-concat"
+    # **THIS IS THE SPECIAL CASE 1**: the flatten operation is transformed into a concat!
+    assert list_awl_node_flatten_compiled.from_op.name == "ArrowWeaveList-concat"
+    # awl of lists
+    awl_list_node = weave.save(to_arrow([[1], [2]]))
+    awl_list_node_concat = awl_list_node.concat()
+    awl_list_node_flatten = awl_list_node.flatten()
+    awl_list_node_concat_compiled = compile.compile([awl_list_node_concat])[0]
+    awl_list_node_flatten_compiled = compile.compile([awl_list_node_flatten])[0]
+    # **THIS IS THE SPECIAL CASE 2**: the concat operation is transformed into a flatten!
+    assert awl_list_node_concat_compiled.from_op.name == "ArrowWeaveList-flatten"
+    assert awl_list_node_flatten_compiled.from_op.name == "ArrowWeaveList-flatten"
+    # awl of awls
+    awl_awl_node = weave.save(to_arrow([to_arrow([1]), to_arrow([2])]))
+    awl_awl_node_concat = awl_awl_node.concat()
+    awl_awl_node_flatten = awl_awl_node.flatten()
+    awl_awl_node_concat_compiled = compile.compile([awl_awl_node_concat])[0]
+    awl_awl_node_flatten_compiled = compile.compile([awl_awl_node_flatten])[0]
+    assert awl_awl_node_concat_compiled.from_op.name == "ArrowWeaveList-concat"
+    assert awl_awl_node_flatten_compiled.from_op.name == "ArrowWeaveList-flatten"
+
+    results = weave.use(
+        [
+            list_list_node_concat,
+            list_list_node_flatten,
+            list_awl_node_concat,
+            list_awl_node_flatten,
+            awl_list_node_concat,
+            awl_list_node_flatten,
+            awl_awl_node_concat,
+            awl_awl_node_flatten,
+        ]
+    )
+
+    for result in results[:2]:
+        assert result == [1, 2]
+    for result in results[2:]:
+        assert result.to_pylist_notags() == [1, 2]
+
+
+def test_compile_lambda_on_refineable(user_by_api_key_in_env):
+    st = StreamTable(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+        _disable_async_file_stream=True,
+    )
+
+    for i in range(10):
+        st.log({"num": i, "str": str(i)})
+
+    st.finish()
+
+    rows_node = st.rows()
+    rows_node_copy = RuntimeOutputNode(
+        types.List(types.TypedDict({})),
+        rows_node.from_op.name,
+        rows_node.from_op.inputs,
+    )
+    mapped_node = rows_node_copy.map(lambda row: row["num"] + 1)
+    with raise_on_python_bailout():
+        val = use(mapped_node)
+    assert val.to_pylist_raw() == list(range(1, 11))

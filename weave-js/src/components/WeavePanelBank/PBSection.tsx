@@ -8,58 +8,44 @@ import {
 } from '@wandb/weave/common/containers/DragDropContainer';
 import {produce} from 'immer';
 import * as _ from 'lodash';
-import React, {useRef, useState} from 'react';
+import React, {useState} from 'react';
 import Measure from 'react-measure';
-
-import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
-import {PanelBankFlowSection} from './PanelBankFlowSection';
-import {getNewGridItemLayout} from './panelbankGrid';
-import {PanelBankGridSection} from './PanelBankGridSection';
 import styled, {css} from 'styled-components';
+
 import {
   BORDER_COLOR_FOCUSED,
-  GRAY_25,
   GRAY_350,
   GRAY_400,
-  GRAY_500,
   PANEL_HOVERED_SHADOW,
   SCROLLBAR_STYLES,
   WHITE,
 } from '../../common/css/globals.styles';
-import {
-  IconAddNew as IconAddNewUnstyled,
-  IconPencilEdit,
-} from '../Panel2/Icons';
-import {inJupyterCell} from '../PagePanelComponents/util';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
-import {Tooltip} from '../Tooltip';
-import {IconButton} from '../IconButton';
-import {WBButton} from '../../common/components/elements/WBButtonNew';
+import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {
   useGetPanelIsHoveredByGroupPath,
   useGetPanelIsHoveredInOutlineByGroupPath,
   useSelectedPath,
-  useSetInspectingPanel,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
+import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
+import {PanelBankFlowSection} from './PanelBankFlowSection';
+import {getNewGridItemLayout} from './panelbankGrid';
+import {PanelBankGridSection} from './PanelBankGridSection';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
   config: PanelBankSectionConfig;
   groupPath?: string[];
-  enableAddPanel?: boolean;
   updateConfig2: (
     fn: (config: PanelBankSectionConfig) => PanelBankSectionConfig
   ) => void;
   renderPanel: (panelRef: IdObj) => React.ReactNode;
-  handleAddPanel?: () => void;
 }
 
 export const PBSection: React.FC<PBSectionProps> = props => {
-  const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
-    props;
+  const {config, groupPath, updateConfig2} = props;
   const selectedPath = useSelectedPath();
-  const setInspectingPanel = useSetInspectingPanel();
   const getPanelIsHovered = useGetPanelIsHoveredByGroupPath(groupPath ?? []);
   const getPanelIsHoveredInOutline = useGetPanelIsHoveredInOutlineByGroupPath(
     groupPath ?? []
@@ -69,14 +55,13 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const [panelBankHeight, setPanelBankHeight] = useState(0);
   const PanelBankSectionComponent =
     props.mode === 'grid' ? PanelBankGridSection : PanelBankFlowSection;
-  const inJupyter = inJupyterCell();
   const {
     visible: sectionsScrollbarVisible,
     onScroll: onSectionsScroll,
     onMouseMove: onSectionsMouseMove,
   } = useScrollbarVisibility();
-  const actionBarRef = useRef<HTMLDivElement | null>(null);
-  const addPanelBarRef = useRef<HTMLDivElement | null>(null);
+  // On add panel, scroll to the new panel
+
   return (
     <DragDropProvider>
       <div className="panel-bank" style={{height: '100%'}}>
@@ -90,9 +75,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
             );
             setPanelBankHeight(
               contentRect.bounds
-                ? contentRect.bounds.height -
-                    (actionBarRef.current?.offsetHeight ?? 0) -
-                    (addPanelBarRef.current?.offsetHeight ?? 0)
+                ? contentRect.bounds.height - PANEL_BANK_PADDING * 2
                 : 0
             );
           }}>
@@ -104,26 +87,6 @@ export const PBSection: React.FC<PBSectionProps> = props => {
               onScroll={onSectionsScroll}
               onMouseMove={onSectionsMouseMove}>
               <div className="panel-bank__section">
-                {!inJupyter && groupPath != null && handleAddPanel != null && (
-                  <ActionBar ref={actionBarRef}>
-                    <Tooltip
-                      position="bottom right"
-                      trigger={
-                        <IconButton
-                          onClick={() => setInspectingPanel(groupPath)}>
-                          <IconPencilEdit />
-                        </IconButton>
-                      }>
-                      Open panel editor
-                    </Tooltip>
-                    {enableAddPanel && (
-                      <WBButton onClick={handleAddPanel}>
-                        <IconAddNew $marginRight={6} />
-                        New panel
-                      </WBButton>
-                    )}
-                  </ActionBar>
-                )}
                 <PanelBankSectionComponent
                   panelBankWidth={panelBankWidth}
                   panelBankHeight={panelBankHeight}
@@ -178,14 +141,6 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                     console.log('MOVE BETWEEN SECTIONS');
                   }}
                 />
-                {handleAddPanel != null && !inJupyter && (
-                  <AddPanelBarContainer ref={addPanelBarRef}>
-                    <AddPanelBar onClick={handleAddPanel}>
-                      <IconAddNew />
-                      New panel
-                    </AddPanelBar>
-                  </AddPanelBarContainer>
-                )}
               </div>
             </Sections>
           )}
@@ -223,10 +178,7 @@ export const getSectionConfig = (
       }
       draft.panels.push({
         id: name,
-        layout: getNewGridItemLayout(
-          draft.panels.map(p => p.layout),
-          false
-        ),
+        layout: getNewGridItemLayout(draft.panels.map(p => p.layout)),
       });
     });
   });
@@ -235,6 +187,7 @@ export const getSectionConfig = (
 const Sections = styled.div`
   ${SCROLLBAR_STYLES}
 `;
+Sections.displayName = 'S.Sections';
 
 const ActionBar = styled.div`
   height: 48px;
@@ -243,33 +196,14 @@ const ActionBar = styled.div`
   justify-content: flex-end;
   align-items: center;
 `;
-
-const AddPanelBar = styled.div`
-  height: 48px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  border-radius: 6px;
-  background-color: ${GRAY_25};
-  font-weight: 600;
-  color: ${GRAY_500};
-`;
-
-const AddPanelBarContainer = styled.div`
-  padding: 8px 32px 16px;
-
-  transition: opacity 0.3s;
-  &:not(:hover) {
-    opacity: 0;
-  }
-`;
+ActionBar.displayName = 'S.ActionBar';
 
 const IconAddNew = styled(IconAddNewUnstyled)<{$marginRight?: number}>`
   width: 18px;
   height: 18px;
   margin-right: ${p => p.$marginRight ?? 8}px;
 `;
+IconAddNew.displayName = 'S.IconAddNew';
 
 const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
   &&&&& {
@@ -294,3 +228,4 @@ const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
       `}
   }
 `;
+EditablePanel.displayName = 'S.EditablePanel';

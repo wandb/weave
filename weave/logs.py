@@ -209,7 +209,7 @@ def enable_stream_logging(
             logger.addHandler(handler)
 
     if server_logfile_settings is not None:
-        log_filename = get_logfile_path(f"server.log")
+        log_filename = get_logfile_path("server.log")
         if log_filename:
             handler = logging.FileHandler(log_filename, mode="w")
             setup_handler(handler, server_logfile_settings)

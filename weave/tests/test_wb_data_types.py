@@ -1,3 +1,4 @@
+import time
 import pytest
 import wandb
 from wandb import data_types as wb_data_types
@@ -5,6 +6,7 @@ import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.wandb_client_api import wandb_gql_query
 
 from ..ops_primitives import file
 from ..ops_domain.wbmedia import ImageArtifactFileRefType
@@ -52,11 +54,12 @@ def make_bokeh():
     return wb_data_types.Bokeh(p)
 
 
-def make_video():
+def make_video(clean_up=True):
     with open("video.mp4", "w") as f:
         f.write("00000")
     vid = wandb.Video("video.mp4")
-    os.remove("video.mp4")
+    if clean_up:
+        os.remove("video.mp4")
     return vid
 
 
@@ -73,11 +76,12 @@ def make_object3d():
     )
 
 
-def make_molecule():
+def make_molecule(clean_up=True):
     with open("test_mol.pdb", "w") as f:
         f.write("00000")
     mol = wandb.Molecule("test_mol.pdb")
-    os.remove("test_mol.pdb")
+    if clean_up:
+        os.remove("test_mol.pdb")
     return mol
 
 
@@ -168,91 +172,94 @@ def test_image(sdk_obj, expected_type, fake_wandb):
     assert weave0_type_json_to_weave1_type(obj_json) == expected_type
 
 
+def peak(v, m):
+    return 1 - ((abs((2 * v) - m + 1) % m) / m)
+
+
+def make_np_image(dim=128):
+    return np.array(
+        [
+            [(peak(col, dim) * peak(row, dim)) ** 0.5 for col in range(dim)]
+            for row in range(dim)
+        ]
+    )
+
+
+def make_wb_image(use_middle=False, use_pixels=False):
+    if use_pixels:
+        position = (
+            {
+                "middle": [50, 50],
+                "height": 10,
+                "width": 20,
+            }
+            if use_middle
+            else {
+                "minX": 40,
+                "maxX": 100,
+                "minY": 30,
+                "maxY": 50,
+            }
+        )
+        domain = "pixel"
+    else:
+        position = (
+            {
+                "middle": [0.5, 0.5],
+                "height": 0.5,
+                "width": 0.25,
+            }
+            if use_middle
+            else {
+                "minX": 0.4,
+                "maxX": 0.6,
+                "minY": 0.3,
+                "maxY": 0.7,
+            }
+        )
+        domain = None
+    return wandb.Image(
+        make_np_image(),
+        boxes={
+            "box_set_1": {
+                "box_data": [
+                    {
+                        "position": position,
+                        "domain": domain,
+                        "class_id": 0,
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                        "box_caption": "a",
+                    },
+                ],
+            },
+            "box_set_2": {
+                "box_data": [
+                    {
+                        "position": position,
+                        "domain": domain,
+                        "class_id": 2,
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    },
+                ],
+            },
+        },
+        masks={
+            "mask_set_1": {
+                "mask_data": np.array(
+                    [[row % 4 for col in range(128)] for row in range(128)]
+                )
+            }
+        },
+        classes=[
+            {"id": 0, "name": "c_zero"},
+            {"id": 1, "name": "c_one"},
+            {"id": 2, "name": "c_two"},
+            {"id": 3, "name": "c_three"},
+        ],
+    )
+
+
 def make_table():
-    def peak(v, m):
-        return 1 - ((abs((2 * v) - m + 1) % m) / m)
-
-    def make_np_image(dim=128):
-        return np.array(
-            [
-                [(peak(col, dim) * peak(row, dim)) ** 0.5 for col in range(dim)]
-                for row in range(dim)
-            ]
-        )
-
-    def make_wb_image(use_middle=False, use_pixels=False):
-        if use_pixels:
-            position = (
-                {
-                    "middle": [50, 50],
-                    "height": 10,
-                    "width": 20,
-                }
-                if use_middle
-                else {
-                    "minX": 40,
-                    "maxX": 100,
-                    "minY": 30,
-                    "maxY": 50,
-                }
-            )
-            domain = "pixel"
-        else:
-            position = (
-                {
-                    "middle": [0.5, 0.5],
-                    "height": 0.5,
-                    "width": 0.25,
-                }
-                if use_middle
-                else {
-                    "minX": 0.4,
-                    "maxX": 0.6,
-                    "minY": 0.3,
-                    "maxY": 0.7,
-                }
-            )
-            domain = None
-        return wandb.Image(
-            make_np_image(),
-            boxes={
-                "box_set_1": {
-                    "box_data": [
-                        {
-                            "position": position,
-                            "domain": domain,
-                            "class_id": 0,
-                            "scores": {"loss": 0.3, "gain": 0.7},
-                            "box_caption": "a",
-                        },
-                    ],
-                },
-                "box_set_2": {
-                    "box_data": [
-                        {
-                            "position": position,
-                            "domain": domain,
-                            "class_id": 2,
-                            "scores": {"loss": 0.3, "gain": 0.7},
-                        },
-                    ],
-                },
-            },
-            masks={
-                "mask_set_1": {
-                    "mask_data": np.array(
-                        [[row % 4 for col in range(128)] for row in range(128)]
-                    )
-                }
-            },
-            classes=[
-                {"id": 0, "name": "c_zero"},
-                {"id": 1, "name": "c_one"},
-                {"id": 2, "name": "c_two"},
-                {"id": 3, "name": "c_three"},
-            ],
-        )
-
     return wandb.Table(
         columns=["label", "image"],
         data=[
@@ -808,3 +815,123 @@ def test_html_encoding_decoding(fake_wandb):
     contents = file.file_contents(file_node)
     result = weave.use(contents)
     assert HTML_STRING in result
+
+
+def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
+    # TODO: Make this test exercise both the parquet and liveset
+    # paths. Also test for values.
+    log_dict = {
+        "image": make_image(),  # make_wb_image(),
+        "audio": make_audio(),
+        "html": make_html(),
+        "bokeh": make_bokeh(),
+        "video": make_video(False),
+        "object3d": make_object3d(),
+        "molecule": make_molecule(False),
+        "table": make_table(),
+        "simple_image_table": make_simple_image_table(),
+        "all_types_list": [
+            make_image(),  # make_wb_image(),
+            make_audio(),
+            make_html(),
+            make_bokeh(),
+            make_video(False),
+            make_object3d(),
+            make_molecule(False),
+            make_table(),
+            make_simple_image_table(),
+        ],
+    }
+    run = wandb.init(project="test_media_logging_to_history")
+    run.log(log_dict)
+    run.finish()
+
+    # wait for history to be uploaded
+    def wait_for():
+        history = get_raw_gorilla_history(run.entity, run.project, run.id)
+        return (
+            len(history["parquetHistory"]["parquetUrls"]) > 0
+            or len(history["parquetHistory"]["liveData"]) > 0
+        )
+
+    wait_for_x_times(wait_for)
+
+    run_node = weave.ops.project(run.entity, run.project).run(run.id)
+
+    for history_op_name in ["history3", "history"]:
+        history_node = run_node._get_op(history_op_name)()
+        mapped_node = history_node.map(
+            lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()})
+        )
+
+        history = weave.use(mapped_node)
+        if history_op_name == "history3":
+            history = history.to_pylist_notags()
+
+        assert len(history) == 1
+
+        # Test image annotations
+        # This will not work in W1 See comment in
+        # run_history_v3_parquet_stream_optimized.py
+        #
+        # image_node = history_node["image"]
+        # image_use = weave.use(image_node)
+        # if history_op_name == "history3":
+        #     image_use = image_use.to_pylist_notags()
+        #     masks = image_use[0]["masks"]
+        #     boxes = image_use[0]["boxes"]
+        # else:
+        #     masks = image_use[0].masks
+        #     boxes = image_use[0].boxes
+        # assert len(masks.keys()) > 0
+        # assert len(boxes.keys()) > 0
+
+        # Test file path access
+        audio_node = history_node["audio"]
+        audio_use = weave.use(audio_node)
+        if history_op_name == "history3":
+            audio_use = audio_use.to_pylist_notags()
+            path = audio_use[0]["path"]
+        else:
+            path = audio_use[0].path
+        file_node = audio_node[0].artifactVersion().file(path)
+        file_use = weave.use(file_node)
+        assert file_use != None
+
+        # Table is a special case because it has a rowsType
+        table_type_node = history_node["table"].table().rowsType()
+        table_use = weave.use(table_type_node)
+        assert table_use != None
+
+    os.remove("video.mp4")
+    os.remove("test_mol.pdb")
+
+
+def get_raw_gorilla_history(entity_name, project_name, run_name):
+    query = """query WeavePythonCG($entityName: String!, $projectName: String!, $runName: String! ) {
+            project(name: $projectName, entityName: $entityName) {
+                run(name: $runName) {
+                    historyKeys
+                    parquetHistory(liveKeys: ["_timestamp"]) {
+                        liveData
+                        parquetUrls
+                    }
+                }
+            }
+    }"""
+    variables = {
+        "entityName": entity_name,
+        "projectName": project_name,
+        "runName": run_name,
+    }
+    res = wandb_gql_query(query, variables)
+    return res.get("project", {}).get("run", {})
+
+
+def wait_for_x_times(for_fn, times=10, wait=1):
+    done = False
+    while times > 0 and not done:
+        times -= 1
+        done = for_fn()
+        time.sleep(wait)
+    assert times > 0

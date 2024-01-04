@@ -17,6 +17,7 @@ from . import val_const
 from . import artifact_fs
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
+from .partial_object import PartialObjectType, PartialObject
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -52,6 +53,8 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
+        from .op_def_type import OpDefType
+
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
         # that we want to include in the serialized representation.
@@ -62,11 +65,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         instance_class = result_type._instance_classes()[0]
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
-            if k in constructor_sig.parameters:
+            if serializer.type != OpDefType() and k in constructor_sig.parameters:
                 # None haxxx
                 # TODO: remove
                 obj_val = obj.get(k)
-                if obj_val is not None:
+                if obj_val is not None or serializer.type == types.UnknownType():
                     v = serializer.apply(obj_val)
                     result[k] = v
 
@@ -74,14 +77,55 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
+        # deserialize op methods separately
+        op_methods = {}
+        for k, serializer in self._property_serializers.items():
+
+            if (
+                obj.get(k) is not None
+                and isinstance(serializer, DefaultFromPy)
+                and serializer.type == OpDefType()
+            ):
+                op_methods[k] = serializer.apply(obj.get(k))
+
         if "artifact" in constructor_sig.parameters and "artifact" not in result:
             result["artifact"] = self._artifact
         try:
-            return instance_class(**result)
+            # Construct a new class, inheriting from the original instance_class
+            # with overridden op methods. The op_methods are unbound on the class,
+            # and will bind self upon construction as usual.
+            if self.type._relocatable:
+                new_class = type(
+                    instance_class.__name__ + "WithLoadedMethods",
+                    (instance_class,),
+                    op_methods,
+                )
+
+                return new_class(**result)
+            else:
+                return instance_class(**result)
         except:
-            raise errors.WeaveSerializeError(
+            err = errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)
             )
+            err.fingerprint = ["failed-to-construct", instance_class, result]
+            raise err
+
+
+class GQLClassWithKeysToPyDict(mappers_weave.GQLMapper):
+    def apply(self, obj: PartialObject):
+        result = {}
+        for k, prop_serializer in self._property_serializers.items():
+            result[k] = prop_serializer.apply(obj.get(k, None))
+        return result
+
+
+class PyDictToGQLClassWithKeys(mappers_weave.GQLMapper):
+    def apply(self, obj: dict) -> PartialObject:
+        deserialized_obj = {}
+        for k, prop_serializer in self._property_serializers.items():
+            deserialized_obj[k] = prop_serializer.apply(obj.get(k, None))
+        return self.type.keyless_weave_type_class.instance_class(deserialized_obj)
 
 
 class ListToPyList(mappers_weave.ListMapper):
@@ -217,6 +261,8 @@ class UnknownToPyUnknown(mappers.Mapper):
     def apply(self, obj):
         # This should never be called. Unknown for the object type
         # of empty lists
+        # PR: return None instead of crash
+        return None
         raise Exception("invalid %s" % obj)
 
 
@@ -355,6 +401,8 @@ def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return TypeToPyType(type, mapper, artifact, path)
+    elif isinstance(type, PartialObjectType):
+        return GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
         return TypedDictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.Dict):
@@ -400,6 +448,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
+    elif isinstance(type, PartialObjectType):
+        return PyDictToGQLClassWithKeys(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):

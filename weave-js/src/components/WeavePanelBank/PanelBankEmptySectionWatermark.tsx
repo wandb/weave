@@ -1,5 +1,7 @@
 import React from 'react';
 
+import {Alert} from '../Alert';
+
 // This is a merge of 4 files from app.
 
 export function scrollIntoBounds(
@@ -103,7 +105,11 @@ interface EmptyVisualizationsProps {
 
 export const EmptyVisualizations = (props: EmptyVisualizationsProps) => {
   return (
-    <div>EMPTY</div>
+    <div style={{padding: '8px 32px'}}>
+      <Alert severity="info">
+        Click the "New panel" button to start building a board.
+      </Alert>
+    </div>
     // <EmptyWatermark
     //   className="empty-watermark-visualizations"
     //   // imageSource={emptyImg}

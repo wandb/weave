@@ -11,22 +11,27 @@ import {
   dict,
   filePathToType,
   isConstType,
+  isListLike,
   isSimpleTypeShape,
   isTaggedValue,
   isTypedDict,
+  isTypedDictLike,
   isUnion,
   list,
+  listObjectType,
   nonNullable,
   taggedValue,
   Type,
   typedDict,
+  typedDictPropertyTypes,
   union,
   unionObjectTypeAttrTypes,
 } from '../../model';
 import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
+import {makeBasicOp, makeEqualOp, makeStandardOp} from '../opKinds';
 import {opIndex} from '../primitives';
-import {makeStandardOp} from '../opKinds';
+import {splitEscapedString} from '../primitives/splitEscapedString';
 
 // import * as TypeHelpers from '../model/typeHelpers';
 // import * as Types from '../model/types';
@@ -368,7 +373,7 @@ export const opArtifactVersionFileType = makeOp({
   },
 });
 
-export const opRefGet = makeOp({
+export const opRefGet = makeBasicOp({
   hidden: false,
   name: 'Ref-get',
   description: 'hello',
@@ -387,13 +392,13 @@ export const opRefGet = makeOp({
     },
   },
   returnType: inputTypes => {
-    const selfType = inputTypes.self.type;
+    const selfType = inputTypes.self;
     if (isUnion(selfType)) {
-      return union(selfType.members.map(m => m.objectType));
+      return union(selfType.members.map(m => m.objectType as Type));
     }
-    return (inputTypes.self.type as any).objectType;
+    return (selfType as any).objectType;
   },
-  resolver: ({path}) => {
+  resolver: ({self}) => {
     throw new Error('not implemented');
   },
 });
@@ -463,8 +468,13 @@ export const opGeoSelected = makeOp({
 });
 
 export const opFacetSelected = makeOp({
-  hidden: true,
+  hidden: false,
   name: 'Facet-selected',
+  description: 'Show selected rows of a Facet panel',
+  argDescriptions: {
+    self: 'The facet panel',
+  },
+  returnValueDescription: 'selected rows',
   argTypes: {
     self: {type: 'Facet'} as any,
   },
@@ -697,6 +707,87 @@ export const opCrossProduct = makeOp({
   },
 });
 
+const withColumnType = (
+  curType: Type | undefined,
+  key: string,
+  newColType: Type
+): Type => {
+  if (curType == null || !isTypedDictLike(curType)) {
+    curType = typedDict({});
+  }
+  const path = splitEscapedString(key);
+  const propertyTypes = {...typedDictPropertyTypes(curType)} as {
+    [key: string]: Type;
+  };
+  if (path.length > 1) {
+    return withColumnType(
+      curType,
+      path[0],
+      withColumnType(
+        propertyTypes[path[0]],
+        path.slice(1).join('.'),
+        newColType
+      )
+    );
+  }
+  let colNames = Object.keys(propertyTypes);
+  const colIndex = colNames.findIndex(colName => colName === key);
+  if (colIndex !== -1) {
+    delete propertyTypes[key];
+    colNames = colNames.splice(colIndex, 1);
+  }
+  propertyTypes[key] = newColType;
+  return typedDict(propertyTypes);
+};
+
+const withColumnsOutputType = (selfType: ListType, colsType: Type) => {
+  if (!isTypedDict(colsType)) {
+    throw new Error('invalid');
+  }
+
+  let objType = selfType.objectType;
+  for (const [k, v] of Object.entries(colsType.propertyTypes)) {
+    if (v == null || !isListLike(v)) {
+      throw new Error('invalid ');
+    }
+    objType = withColumnType(objType, k, listObjectType(v));
+  }
+  return {
+    type: 'ArrowWeaveList',
+    objectType: objType,
+    _base_type: {type: 'list'},
+  } as Type;
+};
+
+export const opWithColumns = makeBasicOp({
+  name: 'ArrowWeaveListTypedDict-with_columns',
+  renderInfo: {
+    type: 'function',
+  },
+  description: 'hello',
+  argDescriptions: {},
+  returnValueDescription: 'hello',
+  argTypes: {
+    self: {
+      type: 'list',
+      objectType: {
+        type: 'typedDict',
+        propertyTypes: {},
+      },
+    },
+    cols: {
+      type: 'dict',
+      objectType: {type: 'list', objectType: 'any'},
+    },
+  },
+  returnType: inputTypes => {
+    return withColumnsOutputType(inputTypes.self, inputTypes.cols);
+  },
+  resolver: inputs => {
+    throw new Error('cant resolve op-chain-run in js');
+  },
+});
+
 export const opChainRun = makeStandardOp({
   name: 'Chain-run',
   description: 'hello',
@@ -730,4 +821,10 @@ export const opChainRun = makeStandardOp({
   resolver: inputs => {
     throw new Error('cant resolve op-chain-run in js');
   },
+});
+
+export const opRefEqual = makeEqualOp({
+  hidden: true,
+  name: 'Ref-__eq__',
+  argType: {type: 'Ref'},
 });

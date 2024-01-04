@@ -10,9 +10,8 @@ export interface GenericObject {
 export type Omit<T, K> = Pick<T, Exclude<keyof T, K>>;
 // Type T minus all keys in K
 export type Subtract<T, K> = Omit<T, keyof K>;
-
-// Union T type with all types in U removed
-type Exclude<T, U> = T extends U ? never : T;
+// Type T minus null and undefined
+export type ExcludeNullish<T> = Exclude<T, null | undefined>;
 
 // Get type contained in array
 // tslint:disable-next-line

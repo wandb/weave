@@ -498,6 +498,7 @@ algos = [
 ]
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.parametrize(
     "li, algo, options",
     [
@@ -599,8 +600,8 @@ def test_flatten_and_tags(use_arrow):
     item_tag_res = weave.use(item_tag_getter(flattened[0]))
     list_tag_res = weave.use(list_tag_getter(flattened[0]))
 
-    # if use_arrow:
-    #     data_res = data_res
+    if use_arrow:
+        data_res = data_res.to_pylist_notags()
 
     assert data_res == [
         "item_1_1",
@@ -633,10 +634,16 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
     if use_arrow:
         list_node = arrow.ops.list_to_arrow(list_node)
 
+    from .. import context_state
+
+    _loading_builtins_token = context_state.set_loading_built_ins()
+
     row_tag_getter = make_tag_getter_op.make_tag_getter_op("row", types.Int())
     col_tag_getter = make_tag_getter_op.make_tag_getter_op("col", types.Int())
     list_tag_getter = make_tag_getter_op.make_tag_getter_op("list_tag", types.Int())
     top_tag_getter = make_tag_getter_op.make_tag_getter_op("top_tag", types.Int())
+
+    context_state.clear_loading_built_ins(_loading_builtins_token)
 
     inner_func = (
         lambda n: n

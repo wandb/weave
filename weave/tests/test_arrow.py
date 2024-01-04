@@ -25,6 +25,9 @@ from ..ops_primitives import list_
 from .. import mappers_arrow
 from ..op_def import map_type
 
+from ..ops_arrow import constructors
+
+
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
 
@@ -392,7 +395,7 @@ def test_custom_groupby_intermediate_save():
     saved_node = weave.save(node, "test_custom_groupby_intermediate_save:latest")
     weave.use(saved_node)
     loaded_node = ops.get(
-        f"local-artifact:///test_custom_groupby_intermediate_save:latest/obj"
+        "local-artifact:///test_custom_groupby_intermediate_save:latest/obj"
     )
     assert weave.use(loaded_node.pick("im").offset(0)[0].width_()) == 256
 
@@ -503,9 +506,7 @@ def test_arrow_list_of_ref_to_item_in_list():
     l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
     l_node = weave.save(l, "my-l")
 
-    list_dict_with_ref = arrow.to_weave_arrow(
-        [{"c": l_node[0]["a"]}, {"c": l_node[1]["a"]}]
-    )
+    list_dict_with_ref = arrow.to_arrow([{"c": l_node[0]["a"]}, {"c": l_node[1]["a"]}])
     d_node = weave.save(list_dict_with_ref, "my-dict_with_ref")
 
     assert weave.use(d_node[0]["c"] == 5) == True
@@ -625,6 +626,36 @@ def test_arrow_unnest():
         {"a": 4, "b": "d"},
         {"a": 5, "b": "d"},
         {"a": 6, "b": "d"},
+    ]
+
+
+def test_arrow_unnest_two_list_cols():
+    data = arrow.to_arrow(
+        [
+            {"a": [1, 2, 3], "b": "c", "c": ["a", "b", "c"]},
+            {"a": [4, 5, 6], "b": "d", "c": ["d", "e", "f"]},
+        ]
+    )
+    assert weave.type_of(data) == arrow.ArrowWeaveListType(
+        types.TypedDict(
+            {
+                "a": types.List(types.Int()),
+                "b": types.String(),
+                "c": types.List(types.String()),
+            }
+        )
+    )
+    unnest_node = weave.weave(data).unnest()
+    assert unnest_node.type == arrow.ArrowWeaveListType(
+        types.TypedDict({"a": types.Int(), "b": types.String(), "c": types.String()})
+    )
+    assert weave.use(weave.weave(data).unnest()).to_pylist_raw() == [
+        {"a": 1, "b": "c", "c": "a"},
+        {"a": 2, "b": "c", "c": "b"},
+        {"a": 3, "b": "c", "c": "c"},
+        {"a": 4, "b": "d", "c": "d"},
+        {"a": 5, "b": "d", "c": "e"},
+        {"a": 6, "b": "d", "c": "f"},
     ]
 
 
@@ -1026,7 +1057,12 @@ def test_arrow_concat_degenerate_types():
 @pytest.mark.parametrize("li", lath.ListInterfaces)
 def test_arrow_timestamp_conversion(li):
     dates = [
-        datetime.datetime(2020, 1, 2, 3, 4, 5),
+        # Ensure these two are actually different date times! The timezone is utc in
+        # our ci environment, so serializing these results in the same thing if the
+        # timestamps match. We use the serialized representation for graph deduplication,
+        # meaning we end up with the same node for both of these, which breaks the test
+        # (but not the actual behavior of the code).
+        datetime.datetime(2020, 1, 2, 3, 4, 6),
         datetime.datetime(2020, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
     ]
     utc_dates = [d.astimezone(datetime.timezone.utc) for d in dates]
@@ -1560,7 +1596,7 @@ def test_encode_decode_list_of_dictionary_encoded_strings():
 
 
 def test_pushdown_of_gql_tags_on_awls(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([1, 2, 3])
@@ -1600,13 +1636,16 @@ def test_groupby_concat():
 
     # now concat all the groups together
     concatted_2 = arrow.ops.concat(dropped)
+    selected = concatted_2.map(
+        lambda row: ops.dict_(time=row.groupkey()["time"], model_type=row["model_type"])
+    )
 
-    result = weave.use(concatted_2).to_pylist_notags()
+    result = weave.use(selected).to_pylist_notags()
     assert result == ([data[0]] * 4) + ([data[1]] * 4)
 
 
 def test_conversion_of_domain_types_to_awl_values(fake_wandb):
-    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([project] * 3)
@@ -1654,218 +1693,109 @@ def test_save_nested_custom_objs():
     assert weave.use(tables[1]).to_pylist_raw() == [{"a": 9}]
 
 
-base_types: list[types.Type] = [
-    types.Int(),
-    types.String(),
-    types.NoneType(),
-    # Commenting out a few types since they don't enhance the coverage, but they
-    # unnecessarily create far more permutations than is needed. Moreover, the
-    # "jumble_type" function assumes no type is a "boolean" type in order to
-    # guarantee a non overlapping new type.
-    # types.Float(),
-    # types.Boolean(),
-    # types.Timestamp(),
-]
-
-
-def make_optional_variants(seed_types: list[types.Type]) -> list[types.Type]:
-    return [types.optional(t) for t in seed_types]
-
-
-def make_union_variants(seed_types: list[types.Type]) -> list[types.Type]:
-    # Arrow does not support mixed types:
-    # `pyarrow.lib.ArrowInvalid: cannot mix list and non-list, non-null values`
-
-    non_union_seeds = [t for t in seed_types if not isinstance(t, types.UnionType)]
-    list_seeds = [t for t in non_union_seeds if isinstance(t, types.List)]
-    dict_seeds = [t for t in non_union_seeds if isinstance(t, types.TypedDict)]
-    non_list_non_dict_seeds = [
-        t
-        for t in non_union_seeds
-        if not isinstance(t, types.List) and not isinstance(t, types.TypedDict)
-    ]
-
-    return [
-        types.union(*non_list_non_dict_seeds),
-        types.union(*list_seeds),
-        types.union(*dict_seeds),
-    ]
-
-
-def make_list_variants(seed_types: list[types.Type]) -> list[types.Type]:
-    return [types.List(t) for t in seed_types]
-
-
-def make_dict_variants(seed_types: list[types.Type]) -> list[types.Type]:
-    # We explicitly exclude NoneType here because arrow segfaults when there is
-    # a union of dicts with a NoneType key. Perhaps we should work to fix this
-    # in the future?
-
-    # TODO: Make it so that sometimes different types land on the same key!
-    return [
-        types.TypedDict({f"t_{ndx}": t})
-        for ndx, t in enumerate(seed_types)
-        if not isinstance(t, types.NoneType)
-    ]
-
-
-def make_tagging_variant(seed_types: list[types.Type]) -> list[types.Type]:
-    return [
-        tagged_value_type.TaggedValueType(
-            types.TypedDict(
-                {
-                    "common_tag": types.String(),
-                    f"unique_tag_{seed_ndx}": types.String(),
-                }
-            ),
-            seed_type,
-        )
-        for seed_ndx, seed_type in enumerate(seed_types)
-    ]
-
-
-def create_new_types_from_variants(seed_types: list[types.Type]) -> list[types.Type]:
-    new_types = []
-    new_types.extend(make_optional_variants(seed_types))
-    new_types.extend(make_union_variants(seed_types))
-    new_types.extend(make_list_variants(seed_types))
-    new_types.extend(make_dict_variants(seed_types))
-    # TODO: Uncomment this and address any issues
-    # new_types.extend(make_tagging_variant(seed_types))
-
-    return new_types
-
-
-def create_new_types_of_depth(
-    seed_types: list[types.Type], depth: int = 3
-) -> list[types.Type]:
-    new_types = seed_types
-    type_batch = new_types
-    for _ in range(depth):
-        type_batch = create_new_types_from_variants(type_batch)
-        new_types.extend(type_batch)
-    return new_types
-
-
-all_types = create_new_types_of_depth(base_types, 3)
-
-
-def jumble_type(t: types.Type) -> types.Type:
-    """
-    Walk the type tree and replace very basic type with an optional boolean type (since boolean
-    is not included in the basic types for sanity) This means we get the same overall shape, but
-    with a different type at each node.
-    """
-    if isinstance(t, (types.Int, types.String)):
-        return types.optional(types.Boolean())
-    elif isinstance(t, types.List):
-        return types.List(jumble_type(t.object_type))
-    elif isinstance(t, types.TypedDict):
-        return types.TypedDict({k: jumble_type(v) for k, v in t.property_types.items()})
-    elif isinstance(t, types.UnionType):
-        return types.union(*[jumble_type(t) for t in t.members])
-    elif isinstance(t, tagged_value_type.TaggedValueType):
-        return tagged_value_type.TaggedValueType(
-            # type ignore here because mypy doesn't know that jumpy_type will return
-            # the typed dict for the tag
-            jumble_type(t.tag),  # type: ignore
-            jumble_type(t.value),
-        )
-    return t
-
-
-def contains_unknown(t: types.Type) -> bool:
-    result = {"val": False}
-
-    def _is_unknown(t: types.Type) -> types.Type:
-        if isinstance(t, types.UnknownType):
-            result["val"] = True
-        return t
-
-    map_type(t, _is_unknown)
-    return result["val"]
-
-
-def make_identity_permutations(
-    all_types: list[types.Type],
-) -> tuple[list[str], list[tuple[types.Type, list, types.Type, list]]]:
-    res_with_data: list[tuple[str, types.Type, list]] = []
-    for type_ndx, type_example in enumerate(all_types):
-        res_with_data.append((f"{str(type_ndx).zfill(3)}_empty", type_example, []))
-        if type_example.assign_type(types.NoneType()) and not contains_unknown(
-            type_example
-        ):
-            res_with_data.append(
-                (f"{str(type_ndx).zfill(3)}_null", type_example, [None])
-            )
-
-    res_with_concat: list[tuple[types.Type, list, types.Type, list]] = []
-    names: list[str] = []
-    for data_example in res_with_data:
-        names.append(f"{str(len(names)).zfill(3)}-t_{data_example[0]}_concat_none")
-        res_with_concat.append(
-            (data_example[1], data_example[2], types.NoneType(), [None])
-        )
-        if not contains_unknown(data_example[1]):
-            names.append(
-                f"{str(len(names)).zfill(3)}-t_{data_example[0]}_concat_jumbled"
-            )
-            res_with_concat.append(
-                (data_example[1], data_example[2], jumble_type(data_example[1]), [None])
-            )
-
-    return names, res_with_concat
-
-
-names, cases = make_identity_permutations(all_types)
-
-# This test hits the list<dense union> issue described in `safe_replace_with_mask`.
-# We don;t believe this is possible to hit in practice today, so skipping for now.
-skip_indicies = [280, 281]
-# skip_indicies = []
-
-cases = [c for ndx, c in enumerate(cases) if ndx not in skip_indicies]
-names = [n for ndx, n in enumerate(names) if ndx not in skip_indicies]
-
-
-@pytest.mark.parametrize(
-    "assumed_weave_type, data, concat_with_weave_type, concat_with_data",
-    cases,
-    ids=names,
-)
-def test_identity_awl_operations_3(
-    assumed_weave_type, data, concat_with_weave_type, concat_with_data
-):
-    # ArrowWeaveList doesn't allow mergeable unions in its
-    # ObjectType anymore, so we need to merge them here.
-    if isinstance(assumed_weave_type, types.UnionType):
-        assumed_weave_type = types.merge_many_types(assumed_weave_type.members)
-    if isinstance(concat_with_weave_type, types.UnionType):
-        concat_with_weave_type = types.merge_many_types(concat_with_weave_type.members)
-
-    print("ASSUMED WEAVE TYPE", assumed_weave_type)
-    print("DATA", data)
-    print("CONCAT WITH WEAVE TYPE", concat_with_weave_type)
-    print("CONCAT WITH DATA", concat_with_data)
-    # Assert basic in-memory identity
-    raw_awl = arrow.to_arrow(data, types.List(assumed_weave_type))
-    assert raw_awl.to_pylist_raw() == data
-
-    # Assert save/load identity
-    awl_node = weave.save(raw_awl)
-    assert weave.use(awl_node).to_pylist_raw() == data
-
-    # Assert concat-ability
-    raw_concat_awl = arrow.to_arrow(
-        concat_with_data, types.List(concat_with_weave_type)
-    )
-    concat_awl = weave.save(raw_concat_awl)
-    concatted = ops.make_list(a=awl_node, b=concat_awl).concat()
-    assert weave.use(concatted).to_pylist_raw() == data + concat_with_data
-
-
 def test_to_compare_safe():
     l = [[], "a", 5]
     a = arrow.to_arrow(l)
     safe = arrow.to_compare_safe(a)
     assert safe.to_pylist_notags() == ["__t_13-__list_-", "__t_13-a", "__t_9-5"]
+
+
+def test_empty_dict():
+    data = [{}]
+    awl = arrow.to_arrow(data)
+    ref = storage.save(awl)
+    awl2 = storage.get(str(ref))
+    assert len(awl2) == 1
+    assert awl._arrow_data == awl2._arrow_data
+
+
+def test_arrow_op_decorator_handles_optional_tagged_type():
+    obj = [None, 1, 2, None]
+    obj[1] = box.box(obj[1])
+    obj[2] = box.box(obj[2])
+    tag_store.add_tags(obj[1], {"mytag": "a"})
+    tag_store.add_tags(obj[2], {"mytag": "b"})
+    awl = arrow.to_arrow(obj)
+    assert awl.object_type == types.optional(
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"mytag": types.String()}), types.Int()
+        )
+    )
+
+    node = weave.save(awl)
+    toTimestamp = node.toTimestamp()
+
+    expected = [
+        None,
+        datetime.datetime(1970, 1, 1, 0, 0, 0, 1000, tzinfo=datetime.timezone.utc),
+        datetime.datetime(1970, 1, 1, 0, 0, 0, 2000, tzinfo=datetime.timezone.utc),
+        None,
+    ]
+
+    expected[1] = box.box(expected[1])
+    expected[2] = box.box(expected[2])
+
+    tag_store.add_tags(expected[1], {"mytag": "a"})
+    tag_store.add_tags(expected[2], {"mytag": "b"})
+
+    expected = arrow.to_arrow(expected)
+    actual = weave.use(toTimestamp)
+
+    assert actual.to_pylist_raw() == expected.to_pylist_raw()
+
+
+def test_flatten_handles_tagged_lists():
+    data = [[1], [2, 3], [4, 5, 6]]
+    for i in range(len(data)):
+        data[i] = box.box(data[i])
+        tag_store.add_tags(data[i], {"outer": "outer"})
+        for j in range(len(data[i])):
+            data[i][j] = box.box(data[i][j])
+            tag_store.add_tags(data[i][j], {"inner": "inner"})
+
+    awl = arrow.to_arrow(data)
+    node = weave.save(awl)
+    flattened = node.flatten()
+
+    assert flattened.type == arrow.ArrowWeaveListType(
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"outer": types.String(), "inner": types.String()}),
+            types.Int(),
+        )
+    )
+
+    expected = [1, 2, 3, 4, 5, 6]
+    assert weave.use(flattened).to_pylist_notags() == expected
+    assert weave.use(flattened).to_pylist_raw() == [
+        {
+            "_tag": {
+                "outer": "outer",
+                "inner": "inner",
+            },
+            "_value": i,
+        }
+        for i in expected
+    ]
+
+
+def test_keys_ops():
+    awl = arrow.to_arrow([{"a": 1}, {"a": 1, "b": 2, "c": 2}, {"c": 3}])
+    node = weave.save(awl)
+    keys_node = node.keys()
+    # Unfortunately, we lose specific info about key presence in AWL.
+    assert weave.use(keys_node).to_pylist_raw() == [
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+    ]
+
+    all_keys_node = keys_node.flatten().unique()
+
+    assert weave.use(all_keys_node).to_pylist_raw() == ["a", "b", "c"]
+
+
+def test_repeat_0():
+    data = {"a": 1}
+    repeated = constructors.repeat(data, 0)
+    assert len(repeated) == 0
+    assert repeated.type == pa.struct({"a": pa.int64()})

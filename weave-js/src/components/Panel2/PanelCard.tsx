@@ -41,25 +41,30 @@ const Card = styled.div`
   display: flex;
   height: 100%;
 `;
+Card.displayName = 'S.Card';
 
 const CardHeader = styled.div`
   min-width: 200px;
   padding: 16px;
   border-right: 1px solid ${globals.border};
 `;
+CardHeader.displayName = 'S.CardHeader';
 
 const CardTitle = styled.div`
   font-size: 22px;
   font-weight: bold;
   margin-bottom: 16px;
 `;
+CardTitle.displayName = 'S.CardTitle';
 
 const CardSubtitle = styled.div`
   font-size: 16px;
   font-weight: normal;
 `;
+CardSubtitle.displayName = 'S.CardSubtitle';
 
 const CardTabs = styled.div``;
+CardTabs.displayName = 'S.CardTabs';
 
 const CardTab = styled.div<{active?: boolean}>`
   cursor: pointer;
@@ -73,12 +78,14 @@ const CardTab = styled.div<{active?: boolean}>`
       margin-right: -16px;
     `}
 `;
+CardTab.displayName = 'S.CardTab';
 
 const CardContent = styled.div`
   overflow: auto;
   flex-grow: 1;
   padding: 16px;
 `;
+CardContent.displayName = 'S.CardContent';
 
 export const PanelCardConfigEditor: React.FC<PanelCardProps> = props => {
   const config = props.config ?? PANEL_CARD_DEFAULT_CONFIG;

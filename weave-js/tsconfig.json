@@ -20,6 +20,7 @@
     ],
     "module": "commonjs",
     "moduleResolution": "node",
+    "noEmit": true,
     "noErrorTruncation": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
@@ -33,8 +34,8 @@
     "sourceMap": true,
     "strict": true,
     "target": "es2021",
-    "noEmit": true
+    "types": ["@testing-library/jest-dom"]
   },
   "include": ["src/**/*", "./*.d.ts"],
-  "exclude": ["**/*.test.ts", "node_modules/"]
+  "exclude": ["node_modules/"]
 }

@@ -1,6 +1,8 @@
+import _ from 'lodash';
 import Observable from 'zen-observable';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
+import {LocalStorageBackedLRU} from '../cache/localStorageBackedLRU';
 import {Hasher, MemoizedHasher} from '../model/graph/editing/hash';
 import * as GraphTypes from '../model/graph/types';
 import * as Model from '../model/types';
@@ -8,8 +10,8 @@ import {OpStore} from '../opStore/types';
 import {RemoteHttpServer} from '../server';
 import {Server} from '../server/types';
 import {ID} from '../util/id';
+import {defaultCachePolicy} from './cachePolicy';
 import {Client} from './types';
-import _ from 'lodash';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
@@ -18,6 +20,7 @@ interface ObservableNode<T extends Model.Type = Model.Type> {
   observers: Set<ZenObservable.SubscriptionObserver<T>>;
   hasResult: boolean;
   lastResult: any;
+  inFlight: boolean;
 }
 
 type ResetRequestType = {
@@ -47,10 +50,13 @@ export class BasicClient implements Client {
   private shouldPoll: boolean = false;
   private pollingListeners: Array<(poll: boolean) => void> = [];
   private readonly hasher: Hasher;
+  private isRemoteServer: boolean = false;
+  private readonly localStorageLRU: LocalStorageBackedLRU;
 
   public constructor(private readonly server: Server) {
     this.hasher = new MemoizedHasher();
-    if (server instanceof RemoteHttpServer) {
+    this.isRemoteServer = server instanceof RemoteHttpServer;
+    if (this.isRemoteServer) {
       // only works for weave execution engines that do not depend on apollo
       // initial issue: https://weightsandbiases.slack.com/archives/C01T8BLDHKP/p1649955797252749
       // resolution: https://weightsandbiases.slack.com/archives/C04UJFUUSSW/p1679341328969859
@@ -59,6 +65,7 @@ export class BasicClient implements Client {
       setTimeout(this.pollIteration.bind(this), POLL_INTERVAL);
     }
     this.opStore = server.opStore;
+    this.localStorageLRU = new LocalStorageBackedLRU();
   }
 
   public setPolling(polling: boolean) {
@@ -86,6 +93,7 @@ export class BasicClient implements Client {
   public subscribe<T extends Model.Type>(
     node: GraphTypes.Node<T>
   ): Observable<any> {
+    const shouldCache = defaultCachePolicy(node);
     GlobalCGEventTracker.basicClientSubscriptions++;
     const observableId = this.hasher.typedNodeId(node);
     if (this.observables.has(observableId)) {
@@ -102,9 +110,14 @@ export class BasicClient implements Client {
         return;
       }
       obs.observers.add(observer);
-      if (obs.hasResult) {
+      if (shouldCache && (obs.hasResult || obs.lastResult !== undefined)) {
         observer.next(obs.lastResult);
       } else {
+        // If this node is not intended to be cached, then we should
+        // mark it as not having a result, so that we can re-request
+        // the value on the next batch.
+        obs.hasResult = false;
+        this.scheduleRequest();
         this.setIsLoading(true);
       }
       return () => {
@@ -117,13 +130,22 @@ export class BasicClient implements Client {
         }
       };
     });
+
+    let lastResult;
+    if (this.isRemoteServer && shouldCache) {
+      const hasCacheResult = this.localStorageLRU.has(observableId);
+      if (hasCacheResult) {
+        lastResult = this.localStorageLRU.get(observableId);
+      }
+    }
     this.observables.set(observableId, {
       id: observableId,
       observable,
       observers: new Set(),
       node,
       hasResult: false,
-      lastResult: undefined,
+      inFlight: false,
+      lastResult,
     });
     this.scheduleRequest();
     return observable;
@@ -154,7 +176,7 @@ export class BasicClient implements Client {
   public action<T extends Model.Type>(node: GraphTypes.Node<T>): Promise<any> {
     return new Promise((resolve, reject) => {
       this.server
-        .query([node])
+        .query([node], undefined, true)
         .then(response => resolve(response[0]))
         .catch(reject);
     });
@@ -187,6 +209,20 @@ export class BasicClient implements Client {
     };
   }
 
+  public clearCacheForNode(node: GraphTypes.Node<any>): Promise<void> {
+    const observableId = this.hasher.typedNodeId(node);
+    if (this.observables.has(observableId)) {
+      const obs = this.observables.get(observableId);
+      if (obs == null) {
+        throw new Error('This should never happen');
+      }
+      obs.hasResult = false;
+      obs.lastResult = undefined;
+    }
+    this.localStorageLRU.del(observableId);
+    return Promise.resolve();
+  }
+
   private scheduleRequest() {
     if (this.nextRequestTimer != null) {
       clearTimeout(this.nextRequestTimer);
@@ -206,6 +242,14 @@ export class BasicClient implements Client {
   }
 
   private async requestBatch() {
+    if (this.isRemoteServer) {
+      return this.requestBatchParallel();
+    } else {
+      return this.requestBatchSequential();
+    }
+  }
+
+  private async requestBatchSequential() {
     this.nextRequestTimer = undefined;
     if (this.requestInFlight) {
       this.makeRequestWhenDone = true;
@@ -220,10 +264,18 @@ export class BasicClient implements Client {
     }
   }
 
+  private async requestBatchParallel() {
+    await this.doRequestBatch();
+  }
+
   private async doRequestBatch() {
+    const resolveRefreshRequest = this.resolveRefreshRequest;
+    this.resolveRefreshRequest = undefined;
+
     const notDoneObservables = Array.from(this.observables.values()).filter(
-      l => !l.hasResult || this.resolveRefreshRequest != null
+      l => !l.inFlight && (!l.hasResult || resolveRefreshRequest != null)
     );
+    notDoneObservables.map(o => (o.inFlight = true));
     if (notDoneObservables.length > 0) {
       // console.log(
       //   'CLIENT BATCH START',
@@ -233,9 +285,13 @@ export class BasicClient implements Client {
 
       const rejectObservable = (observable: ObservableNode<any>, e: any) => {
         observable.hasResult = true;
+        if (this.isRemoteServer) {
+          this.localStorageLRU.del(observable.id);
+        }
         for (const observer of observable.observers) {
           observer.error(e);
         }
+        observable.inFlight = false;
       };
 
       const resolveObservable = (
@@ -244,9 +300,16 @@ export class BasicClient implements Client {
       ) => {
         observable.hasResult = true;
         observable.lastResult = result;
+        if (this.isRemoteServer) {
+          if (result !== undefined) {
+            // Skip caching undefined for now
+            this.localStorageLRU.setAsync(observable.id, result);
+          }
+        }
         for (const observer of observable.observers) {
           observer.next(result);
         }
+        observable.inFlight = false;
       };
 
       const handleCompleteError = (e: any) => {
@@ -257,12 +320,13 @@ export class BasicClient implements Client {
       };
 
       // console.time('graph execute');
-      if (this.server instanceof RemoteHttpServer) {
+      if (this.isRemoteServer) {
         // Modern - Weave1 Server
-        let eachResults: Array<PromiseSettledResult<any>> = [];
+        let eachResults: Array<Promise<any>> = [];
         try {
-          eachResults = await this.server.queryEach(
-            notDoneObservables.map(o => o.node)
+          eachResults = (this.server as RemoteHttpServer).queryEach(
+            notDoneObservables.map(o => o.node),
+            resolveRefreshRequest != null
           );
         } catch (e) {
           handleCompleteError(e);
@@ -275,19 +339,18 @@ export class BasicClient implements Client {
             // ERROR HERE?
             continue;
           }
-          if (result.status === 'rejected') {
-            rejectObservable(observable, result.reason);
-          } else {
-            resolveObservable(observable, result.value);
-          }
+          result
+            .then(value => resolveObservable(observable, value))
+            .catch(e => rejectObservable(observable, e));
         }
+        await Promise.allSettled(eachResults);
       } else {
         let results: any[] = [];
         try {
           // Legacy - in-memory server
           results = await this.executeForwardListeners(
             notDoneObservables.map(o => o.node),
-            this.resolveRefreshRequest != null
+            resolveRefreshRequest != null
           );
         } catch (e) {
           handleCompleteError(e);
@@ -302,9 +365,8 @@ export class BasicClient implements Client {
       this.setIsLoading(false);
     }
 
-    if (this.resolveRefreshRequest != null) {
-      const res = this.resolveRefreshRequest.resolve;
-      this.resolveRefreshRequest = undefined;
+    if (resolveRefreshRequest != null) {
+      const res = resolveRefreshRequest.resolve;
       res();
     }
   }

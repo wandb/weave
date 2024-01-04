@@ -1,64 +1,248 @@
-import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
-import {produce} from 'immer';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
-
+import {Client, constNodeUnsafe, NodeOrVoidNode} from '@wandb/weave/core';
+import produce from 'immer';
 import _ from 'lodash';
+import React, {
+  Dispatch,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+// Import from reinspect instead of react. This is the same as the react useReducer
+// but it hooks us up to redux devtools.
+import {useReducer} from 'reinspect';
+
 import {useWeaveContext} from '../../context';
+import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
 import {consoleLog} from '../../util';
-import {Outline} from '../Sidebar/Outline';
+import {Button} from '../Button';
+import * as SidebarConfig from '../Sidebar/Config';
+import {Outline, shouldDisablePanelDelete} from '../Sidebar/Outline';
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {
+  CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
   ChildPanelConfig,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
 } from './ChildPanel';
-import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
 import {Panel2Loader, useUpdateConfig2} from './PanelComp';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {fixChildData} from './PanelGroup';
-import {toWeaveType} from './toWeaveType';
 import {
-  useCloseEditor,
+  useCloseDrawer,
   useSelectedPath,
-  useSetInspectingPanel,
+  useSetInteractingPanel,
 } from './PanelInteractContext';
-import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
-import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
-import {getConfigForPath} from './panelTree';
-import {IconButton} from '../IconButton';
-import * as SidebarConfig from '../Sidebar/Config';
-import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {PanelPanelContextProvider} from './PanelPanelContextProvider';
+import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
+import {
+  getConfigForPath,
+  refineAllExpressions,
+  refineForUpdate,
+  updateExpressionVarNamesFromConfig,
+  updateExpressionVarTypes,
+} from './panelTree';
+import {toWeaveType} from './toWeaveType';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
   typeof inputType,
-  ChildPanelFullConfig
+  {
+    /**
+     * Unique identifier for a PanelPanel. Required if multiple
+     * PanelPanels are rendered in a single PanelRootContext.
+     */
+    documentId?: string;
+  }
 >;
 
-export const useUpdateConfigForPanelNode = (
+// There is a single reducer, stored in a single global context.
+interface PanelRootsState {
+  // Each loaded panel root is stored under an id in panelRoots.
+  panelRoots: {
+    [id: string]: PanelRootState;
+  };
+  dispatch: React.Dispatch<ActionWithId>;
+}
+
+interface PanelRootState {
+  client: Client;
+  persist: (root: ChildPanelFullConfig) => void;
+  root: ChildPanelFullConfig;
+  inFlight: boolean;
+  nextActions: ActionWithId[];
+}
+interface ActionInit {
+  type: 'init';
+  client: Client;
+  persist: (root: ChildPanelFullConfig) => void;
+  root: ChildPanelFullConfig;
+}
+
+interface ActionSetConfig {
+  type: 'setConfig';
+  newConfig: ChildPanelFullConfig;
+}
+
+interface ActionFinishUpdateConfig {
+  type: 'finishUpdateConfig';
+  newConfig: ChildPanelFullConfig;
+}
+
+interface ActionUpdateConfig {
+  type: 'updateConfig';
+  newConfig: ChildPanelFullConfig;
+}
+
+interface ActionUpdateConfig2 {
+  type: 'updateConfig2';
+  change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig;
+}
+
+type Action =
+  | ActionInit
+  | ActionSetConfig
+  | ActionUpdateConfig
+  | ActionUpdateConfig2
+  | ActionFinishUpdateConfig;
+
+type ActionWithId = Action & {id: string};
+
+const doUpdate = async (
+  dispatch: Dispatch<ActionWithId>,
+  client: Client,
+  id: string,
+  priorConfig: any,
+  newConfig: any
+) => {
+  const refined = await refineForUpdate(client, priorConfig, newConfig);
+  dispatch({type: 'finishUpdateConfig', newConfig: refined, id});
+};
+
+const panelRootReducer = (
+  state: PanelRootsState,
+  action: ActionWithId
+): PanelRootsState => {
+  if (action.type === 'init') {
+    return produce(state, draft => {
+      draft.panelRoots[action.id] = {
+        client: action.client,
+        root: action.root,
+        persist: action.persist,
+        inFlight: false,
+        nextActions: [],
+      };
+    });
+  }
+  const panelRoot = state.panelRoots[action.id];
+  if (panelRoot == null) {
+    throw new Error(
+      'Must initialize with init action, before any other action'
+    );
+  }
+  switch (action.type) {
+    case 'setConfig':
+      // Note: we don't persist here. This is used after our initial async refining
+      // at load time. We don't want to persist until the user makes a change for now
+      // as it causes extra churn. We could detect if anything meaningful changed
+      // and only persist if so.
+      return produce(state, draft => {
+        const draftPanelRoot = draft.panelRoots[action.id];
+        draftPanelRoot.root = action.newConfig;
+        draftPanelRoot.inFlight = false;
+      });
+
+    // Both updateConfig actions trigger an async flow, where we may refine
+    // some expressions. While this is happening, we queue up new update
+    // actions instead of firing them immediately.
+
+    // Note, this doesn't actually work! Why? Because panels we do not receive
+    // delta updates from updateConfig calls, we receive the whole config. Since
+    // we don't immediately update the config, if a user makes a second change
+    // while one is in flight, the second completion will restore the first change.
+    // Accept this more now until we switch to delta updates.
+    case 'updateConfig':
+      const renamedConfig = updateExpressionVarNamesFromConfig(
+        panelRoot.root,
+        action.newConfig
+      );
+      const newAction = {
+        ...action,
+        newConfig: renamedConfig,
+      };
+      if (state.panelRoots[newAction.id].inFlight) {
+        return produce(state, draft => {
+          draft.panelRoots[newAction.id].nextActions.push(newAction);
+        });
+      }
+      doUpdate(
+        state.dispatch,
+        panelRoot.client,
+        newAction.id,
+        panelRoot.root,
+        newAction.newConfig
+      );
+      return produce(state, draft => {
+        const panelRootForId = draft.panelRoots[newAction.id];
+        panelRootForId.inFlight = true;
+        panelRootForId.root = newAction.newConfig;
+      });
+    case 'updateConfig2':
+      if (panelRoot.inFlight) {
+        return produce(state, draft => {
+          draft.panelRoots[action.id].nextActions.push(action);
+        });
+      }
+      const configChanges = action.change(panelRoot.root);
+      const newConfig = produce(panelRoot.root, draft => {
+        for (const key of Object.keys(configChanges)) {
+          (draft as any)[key] = (configChanges as any)[key];
+        }
+      });
+      doUpdate(
+        state.dispatch,
+        panelRoot.client,
+        action.id,
+        panelRoot.root,
+        newConfig
+      );
+      return produce(state, draft => {
+        const panelRootForId = draft.panelRoots[action.id];
+        panelRootForId.inFlight = true;
+        panelRootForId.root = newConfig;
+      });
+    // This is the end of the async update config flow. We set the new config
+    // and dispatch the next queued action if there is one.
+    case 'finishUpdateConfig':
+      const nextActions = [...panelRoot.nextActions];
+      if (nextActions.length > 0) {
+        const nextAction = nextActions.splice(0, 1)[0];
+        state.dispatch(nextAction);
+      } else {
+        panelRoot.persist(action.newConfig);
+      }
+      return produce(state, draft => {
+        const draftPanelRoot = draft.panelRoots[action.id];
+        draftPanelRoot.root = action.newConfig;
+        draftPanelRoot.inFlight = false;
+        draftPanelRoot.nextActions = nextActions;
+      });
+  }
+  throw new Error('should not arrive here');
+};
+
+export const useUpdateServerPanel = (
   input: NodeOrVoidNode,
   updateInput?: (newInput: NodeOrVoidNode) => void
 ) => {
-  const weave = useWeaveContext();
-  const handleRootUpdate = useCallback(
-    (newVal: Node) => {
-      consoleLog('PANEL PANEL HANDLE ROOT UPDATE', newVal);
-      if (
-        weave.expToString(input) !== weave.expToString(newVal) &&
-        updateInput
-      ) {
-        updateInput(newVal as any);
-      }
-    },
-    [input, updateInput, weave]
-  );
-
-  const setServerPanelConfig = useMutation(input, 'set', handleRootUpdate);
+  const setServerPanelConfig = useMutation(input, 'set');
 
   const updateConfigForPanelNode = useCallback(
     (newConfig: any) => {
@@ -74,68 +258,69 @@ export const useUpdateConfigForPanelNode = (
   return updateConfigForPanelNode;
 };
 
+interface PanelRootContextState {
+  state: PanelRootsState;
+  dispatch: React.Dispatch<ActionWithId>;
+}
+
+const PanelRootContext = React.createContext<PanelRootContextState | null>(
+  null
+);
+PanelRootContext.displayName = 'PanelRootContext';
+
+export const PanelRootContextProvider: React.FC<{}> = props => {
+  // We hack the dispatch function into the state so the reducer can call it.
+  const rootState = {panelRoots: {}, dispatch: () => {}} as any;
+  const [state, dispatch] = useReducer(
+    panelRootReducer,
+    rootState,
+    () => rootState,
+    'PanelRoots'
+  );
+  rootState.dispatch = (innerAction: ActionWithId) => {
+    // Ensure this is async so it happens after the reducer runs!
+    setTimeout(() => {
+      dispatch(innerAction);
+    }, 1);
+  };
+  return <PanelRootContext.Provider value={{state, dispatch}} {...props} />;
+};
+
+export function usePanelRootContext(id: string) {
+  const ctx = useContext(PanelRootContext);
+  if (ctx == null) {
+    throw new Error(
+      'usePanelRootContext must be used within a PanelRootContextProvider'
+    );
+  }
+  const {state: rootState, dispatch: rootDispatch} = ctx;
+
+  const state = rootState.panelRoots[id] ?? null;
+  const dispatch = useCallback(
+    (action: Action) => {
+      rootDispatch({...action, id} as any);
+    },
+    [id, rootDispatch]
+  );
+  return {state, dispatch};
+}
+
 const usePanelPanelCommon = (props: PanelPanelProps) => {
   const weave = useWeaveContext();
-  const {updateInput} = props;
-  const updateConfig2 = useUpdateConfig2(props);
-  const panelQuery = CGReact.useNodeValue(props.input);
   const selectedPanel = useSelectedPath();
-  const setSelectedPanel = useSetInspectingPanel();
-  const panelConfig = props.config;
-  const initialLoading = panelConfig == null;
-  const {stack} = usePanelContext();
+  const setInteractingPanel = useSetInteractingPanel();
+  // const panelConfig = props.config;
 
-  const setPanelConfig = updateConfig2;
+  // TODO: props.input is not the right default ID to use!!! The expression string changes when the panel
+  // is renamed or published. Need to figure out how to get an ID shared across the Render
+  // and Config components here... this probably something simple to do.
+  // The path through the React tree... could work. Then panel path? Idk
+  const documentId = props.config?.documentId ?? weave.expToString(props.input);
 
-  useEffect(() => {
-    if (initialLoading && !panelQuery.loading) {
-      const doLoad = async () => {
-        const loadedPanel = getFullChildPanel(panelQuery.result);
+  const {state, dispatch} = usePanelRootContext(documentId);
+  const initialLoading = state == null;
+  const panelConfig = state?.root;
 
-        // Hydration is not totally correct yet and results in invalid states.
-        // Turning it off for now. This means the UI can be consistent in other
-        // ways: panels which expect to always have a config may have undefined.
-        // Python may mass us unitialized panels (panels that don't have
-        // configs, or even just expressions). We walk through and initialize
-        // them here to make sure our panel state is valid.
-        // let hydratedPanel: ChildPanelFullConfig;
-        // try {
-        //   hydratedPanel = await mapPanels(
-        //     loadedPanel,
-        //     stack,
-        //     async (panel: ChildPanelFullConfig, childStack: Stack) => {
-        //       if (panel.config != null) {
-        //         return panel;
-        //       }
-        //       const {id, config} = await initPanel(
-        //         weave,
-        //         panel.input_node,
-        //         panel.id,
-        //         undefined,
-        //         childStack
-        //       );
-        //       return {...panel, id, config};
-        //     }
-        //   );
-        // } catch (e) {
-        //   console.error('Error hydrating panel', e);
-        //   return;
-        // }
-
-        const hydratedPanel = loadedPanel;
-        setPanelConfig(() => hydratedPanel);
-      };
-      doLoad();
-      return;
-    }
-  }, [
-    initialLoading,
-    panelQuery.loading,
-    panelQuery.result,
-    setPanelConfig,
-    stack,
-    weave,
-  ]);
   // useTraceUpdate('panelQuery', {
   //   loading: panelQuery.loading,
   //   result: panelQuery.result,
@@ -143,47 +328,28 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
 
   useSetPanelRenderedConfig(panelConfig);
 
-  const updateConfigForPanelNode = useUpdateConfigForPanelNode(
-    props.input,
-    updateInput as any
-  );
-
   const panelUpdateConfig = useCallback(
     (newConfig: any) => {
-      consoleLog('PANEL PANEL CONFIG UPDATE', newConfig);
-      consoleLog('PANEL PANEL CONFIG UPDATE TYPE', toWeaveType(newConfig));
-      setPanelConfig(origConfig => ({...origConfig, ...newConfig}));
-      // Uncomment to enable panel state saving
-      updateConfigForPanelNode(newConfig);
+      dispatch({type: 'updateConfig', newConfig});
     },
-    [setPanelConfig, updateConfigForPanelNode]
+    [dispatch]
   );
+  // TODO: Not yet handling refinement in panelUpdateConfig2
   const panelUpdateConfig2 = useCallback(
     (change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig) => {
-      setPanelConfig((currentConfig: ChildPanelFullConfig) => {
-        if (currentConfig == null) {
-          throw new Error('Cannot update config before it is loaded');
-        }
-        const configChanges = change(currentConfig);
-        const newConfig = produce(currentConfig, (draft: any) => {
-          for (const key of Object.keys(configChanges)) {
-            (draft as any)[key] = (configChanges as any)[key];
-          }
-        });
-        consoleLog('PANEL PANEL CONFIG UPDATE2', newConfig);
-        updateConfigForPanelNode(newConfig);
-        return newConfig;
-      });
+      dispatch({type: 'updateConfig2', change});
     },
-    [setPanelConfig, updateConfigForPanelNode]
+    [dispatch]
   );
   consoleLog('PANEL PANEL RENDER CONFIG', panelConfig);
 
   return {
+    dispatch,
     loading: initialLoading,
+    documentId,
     panelConfig,
     selectedPanel,
-    setSelectedPanel,
+    setInteractingPanel,
     panelUpdateConfig,
     panelUpdateConfig2,
   };
@@ -192,35 +358,39 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
 export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   const {
     loading,
+    documentId,
     panelConfig,
     selectedPanel,
-    setSelectedPanel,
+    setInteractingPanel,
     panelUpdateConfig,
     panelUpdateConfig2,
   } = usePanelPanelCommon(props);
 
-  const closeEditor = useCloseEditor();
+  const closeDrawer = useCloseDrawer();
   const {
     visible: bodyScrollbarVisible,
     onScroll: onBodyScroll,
     onMouseMove: onBodyMouseMove,
   } = useScrollbarVisibility();
 
-  const [inspectingRoot, setInspectingRoot] = useState(false);
   const [isOutlineMenuOpen, setIsOutlineMenuOpen] = useState(false);
   const selectedIsRoot = useMemo(
     () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
   );
-  const showOutline = useMemo(
-    () => selectedIsRoot && !inspectingRoot,
-    [selectedIsRoot, inspectingRoot]
+
+  const localConfig = getConfigForPath(
+    panelConfig || CHILD_PANEL_DEFAULT_CONFIG,
+    selectedPanel
+  );
+  const shouldShowOutline = shouldDisablePanelDelete(
+    localConfig,
+    selectedPanel
   );
 
   const goBackToOutline = useCallback(() => {
-    setSelectedPanel([``]);
-    setInspectingRoot(false);
-  }, [setSelectedPanel]);
+    setInteractingPanel('config', [''], documentId);
+  }, [documentId, setInteractingPanel]);
 
   if (loading) {
     return <Panel2Loader />;
@@ -229,7 +399,8 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     throw new Error('Panel config is null after loading');
   }
 
-  if (showOutline) {
+  // show outline instead of config panel if root, main, or varbar
+  if (selectedIsRoot || shouldShowOutline) {
     return (
       <SidebarConfig.Container>
         <SidebarConfig.Header>
@@ -238,20 +409,26 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
               <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
             </SidebarConfig.HeaderTopLeft>
             <SidebarConfig.HeaderTopRight>
-              <IconButton onClick={closeEditor}>
-                <IconClose />
-              </IconButton>
+              <Button
+                icon="close"
+                variant="ghost"
+                size="small"
+                onClick={closeDrawer}
+              />
             </SidebarConfig.HeaderTopRight>
           </SidebarConfig.HeaderTop>
         </SidebarConfig.Header>
-        <Outline
-          config={panelConfig}
-          updateConfig={panelUpdateConfig}
-          updateConfig2={panelUpdateConfig2}
-          setSelected={setSelectedPanel}
-          selected={selectedPanel}
-          setInspectingRoot={setInspectingRoot}
-        />
+        <SidebarConfig.Body>
+          <Outline
+            config={panelConfig}
+            updateConfig={panelUpdateConfig}
+            updateConfig2={panelUpdateConfig2}
+            setSelected={path =>
+              setInteractingPanel('config', path, documentId)
+            }
+            selected={selectedPanel}
+          />
+        </SidebarConfig.Body>
       </SidebarConfig.Container>
     );
   }
@@ -260,34 +437,41 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     <SidebarConfig.Container>
       <SidebarConfig.Header>
         <SidebarConfig.HeaderTop lessLeftPad>
-          <SidebarConfig.HeaderTopLeft canGoBack onClick={goBackToOutline}>
-            <IconButton>
-              <IconBack />
-            </IconButton>
-            <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
-          </SidebarConfig.HeaderTopLeft>
+          <Button
+            variant="ghost"
+            size="small"
+            icon="back"
+            onClick={goBackToOutline}>
+            Outline
+          </Button>
           <SidebarConfig.HeaderTopRight>
-            {!selectedIsRoot && (
+            {!selectedIsRoot && !shouldShowOutline && (
               <OutlineItemPopupMenu
                 config={panelConfig}
-                localConfig={getConfigForPath(panelConfig, selectedPanel)}
+                localConfig={localConfig}
                 path={selectedPanel}
                 updateConfig={panelUpdateConfig}
                 updateConfig2={panelUpdateConfig2}
                 goBackToOutline={goBackToOutline}
                 trigger={
-                  <IconButton>
-                    <IconOverflowHorizontal />
-                  </IconButton>
+                  <Button
+                    icon="overflow-horizontal"
+                    variant="ghost"
+                    size="small"
+                  />
                 }
                 isOpen={isOutlineMenuOpen}
                 onOpen={() => setIsOutlineMenuOpen(true)}
                 onClose={() => setIsOutlineMenuOpen(false)}
               />
             )}
-            <IconButton onClick={closeEditor}>
-              <IconClose />
-            </IconButton>
+            <Button
+              icon="close"
+              data-testid="close-panel-panel-config"
+              variant="ghost"
+              size="small"
+              onClick={closeDrawer}
+            />
           </SidebarConfig.HeaderTopRight>
         </SidebarConfig.HeaderTop>
         {!selectedIsRoot && (
@@ -313,8 +497,85 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
 };
 
 export const PanelPanel: React.FC<PanelPanelProps> = props => {
-  const {loading, panelConfig, panelUpdateConfig, panelUpdateConfig2} =
-    usePanelPanelCommon(props);
+  const {
+    loading,
+    documentId,
+    panelConfig,
+    panelUpdateConfig,
+    panelUpdateConfig2,
+    dispatch,
+  } = usePanelPanelCommon(props);
+
+  const weave = useWeaveContext();
+  const updateConfig2 = useUpdateConfig2(props);
+  const {stack} = usePanelContext();
+  const setPanelConfig = updateConfig2;
+  const loaded = useRef(false);
+  const panelQuery = CGReact.useNodeValue(props.input);
+  const {updateInput} = props;
+  const updateServerPanel = useUpdateServerPanel(
+    props.input,
+    updateInput as any
+  );
+
+  useEffect(() => {
+    if (!panelQuery.loading) {
+      const doLoad = async () => {
+        // Always ensure vars have correct types first. This is syncrhonoous.
+        const loadedPanel = updateExpressionVarTypes(panelQuery.result, stack);
+
+        // Immediately render the document
+        dispatch({
+          type: 'init',
+          client: weave.client,
+          root: loadedPanel,
+          persist: (newRoot: ChildPanelFullConfig) =>
+            updateServerPanel(newRoot),
+        });
+
+        // Asynchronously refine all the expressions in the document.
+        const refined = await refineAllExpressions(
+          weave.client,
+          loadedPanel,
+          stack
+        );
+
+        // Set the newly refined document. This is usually a no-op,
+        // unless:
+        // - the document was not correctly refined already (
+        //   e.g. if Python code is buggy and doesn't refine everything
+        //   when constructing panels)
+        // - the type of a data node changed, for example a new column
+        //   was added to a table.
+        // In the case where this does make changes, we may make some
+        // new queries and rerender, causing a flash.
+        //
+        // TODO: store the newly refined state in the persisted document
+        //   if there are changes, so that we don't have to do this again
+        //   on reload.
+
+        // Use the following logging to debug flashing and unexpected
+        // post refinement changes.
+        // console.log('ORIG', loadedPanel);
+        // console.log('REFINED', refined);
+        // console.log('DIFF', difference(loadedPanel, refined));
+        dispatch({type: 'setConfig', newConfig: refined});
+      };
+      if (!loaded.current) {
+        loaded.current = true;
+        doLoad();
+      }
+      return;
+    }
+  }, [
+    dispatch,
+    panelQuery.loading,
+    panelQuery.result,
+    setPanelConfig,
+    stack,
+    updateServerPanel,
+    weave,
+  ]);
 
   if (loading) {
     return <Panel2Loader />;
@@ -337,6 +598,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
         justifyContent: 'space-around',
       }}>
       <PanelPanelContextProvider
+        documentId={documentId}
         config={panelConfig}
         updateConfig={panelUpdateConfig}
         updateConfig2={panelUpdateConfig2}>

@@ -1,5 +1,7 @@
 import pyarrow as pa
+import pyarrow.compute as pc
 import typing
+
 
 from .. import artifact_base
 from .. import weave_types as types
@@ -11,7 +13,10 @@ from .. import errors
 from .. import arrow_util
 from .. import api
 
-from .arrow import ArrowWeaveListType
+
+from .arrow import (
+    ArrowWeaveListType,
+)
 from .list_ import ArrowWeaveList, PathType, unsafe_awl_construction
 
 
@@ -74,11 +79,15 @@ def recursively_merge_union_types_if_they_are_unions_of_structs(
 
 def recursively_build_pyarrow_array(
     py_objs: list[typing.Any],
-    pyarrow_type: pa.DataType,
+    pyarrow_type: typing.Union[pa.DataType, arrow_util.ArrowTypeWithFieldInfo],
     mapper,
     py_objs_already_mapped: bool = False,
 ) -> pa.Array:
     arrays: list[pa.Array] = []
+
+    if isinstance(pyarrow_type, arrow_util.ArrowTypeWithFieldInfo):
+        pyarrow_type = arrow_util.arrow_type(pyarrow_type)
+    pyarrow_type = typing.cast(pa.DataType, pyarrow_type)
 
     def none_unboxer(iterator: typing.Iterable):
         for obj in iterator:
@@ -104,6 +113,7 @@ def recursively_build_pyarrow_array(
             none_unboxer(py_objs),
             type=pyarrow_type,
         )
+
     elif pa.types.is_struct(pyarrow_type):
         keys: list[str] = []
         # keeps track of null values so that we can null entries at the struct level
@@ -115,91 +125,138 @@ def recursively_build_pyarrow_array(
                 mappers_arrow.TypedDictToArrowStruct,
                 mappers_arrow.TaggedValueToArrowStruct,
                 mappers_arrow.ObjectToArrowStruct,
+                mappers_arrow.GQLHasKeysToArrowStruct,
             ),
         )
 
-        # handle empty struct case - the case where the struct has no fields
-        if len(pyarrow_type) == 0:
-            return pa.array(py_objs, type=pyarrow_type)
-
-        for i, field in enumerate(pyarrow_type):
-            data: list[typing.Any] = []
-            if isinstance(
-                mapper,
-                mappers_arrow.TypedDictToArrowStruct,
-            ):
-                for py_obj in py_objs:
-                    if py_obj is None:
-                        data.append(None)
-                    else:
-                        data.append(py_obj.get(field.name, None))
-                    if i == 0:
-                        mask.append(py_obj is None)
-
-                array = recursively_build_pyarrow_array(
-                    data,
-                    field.type,
-                    mapper._property_serializers[field.name],
-                    py_objs_already_mapped,
-                )
-            if isinstance(
-                mapper,
-                mappers_arrow.ObjectToArrowStruct,
-            ):
-                for py_obj in py_objs:
-                    if py_obj is None:
-                        data.append(None)
-                    elif py_objs_already_mapped:
-                        data.append(py_obj.get(field.name, None))
-                    else:
-                        data.append(getattr(py_obj, field.name, None))
-                    if i == 0:
-                        mask.append(py_obj is None)
-
-                array = recursively_build_pyarrow_array(
-                    data,
-                    field.type,
-                    mapper._property_serializers[field.name],
-                    py_objs_already_mapped,
-                )
-
-            elif isinstance(mapper, mappers_arrow.TaggedValueToArrowStruct):
-                if field.name == "_tag":
-                    for py_obj in py_objs:
-                        if py_obj is None:
-                            data.append(None)
-                        else:
-                            data.append(tag_store.get_tags(py_obj))
-                        if i == 0:
-                            mask.append(py_obj is None)
-
-                    array = recursively_build_pyarrow_array(
-                        data,
-                        field.type,
-                        mapper._tag_serializer,
-                        py_objs_already_mapped,
-                    )
+        if isinstance(mapper, mappers_arrow.GQLHasKeysToArrowStruct):
+            _dictionary: dict[typing.Optional[str], typing.Tuple[int, typing.Any]] = {}
+            indices: list[typing.Optional[int]] = []
+            for py_obj in py_objs:
+                id = py_obj["id"] if py_obj is not None else None
+                if id in _dictionary:
+                    indices.append(_dictionary[id][0])
                 else:
+                    new_index = len(_dictionary)
+                    _dictionary[id] = (new_index, py_obj)
+                    indices.append(new_index)
+
+            dictionary = [
+                mapper.apply(v[1]) if v[1] is not None else None
+                for v in _dictionary.values()
+            ]
+            array = recursively_build_pyarrow_array(
+                dictionary,
+                pyarrow_type,
+                mapper.as_typeddict_mapper(),
+                True,
+            )
+
+            indices = pa.array(indices, type=pa.int32())
+            return pa.DictionaryArray.from_arrays(indices, array)
+
+        else:
+            # handle empty struct case - the case where the struct has no fields
+            if len(pyarrow_type) == 0:
+                return pa.array(py_objs, type=pyarrow_type)
+
+            for i, field in enumerate(pyarrow_type):
+                data: list[typing.Any] = []
+                if isinstance(
+                    mapper,
+                    mappers_arrow.TypedDictToArrowStruct,
+                ):
                     for py_obj in py_objs:
                         if py_obj is None:
                             data.append(None)
                         else:
-                            data.append(box.unbox(py_obj))
+                            data.append(py_obj.get(field.name, None))
                         if i == 0:
                             mask.append(py_obj is None)
 
                     array = recursively_build_pyarrow_array(
                         data,
                         field.type,
-                        mapper._value_serializer,
+                        mapper._property_serializers[field.name],
+                        py_objs_already_mapped,
+                    )
+                elif isinstance(
+                    mapper,
+                    mappers_arrow.ObjectToArrowStruct,
+                ):
+                    for py_obj in py_objs:
+                        if py_obj is None:
+                            data.append(None)
+                        elif py_objs_already_mapped:
+                            data.append(py_obj.get(field.name, None))
+                        else:
+                            data.append(getattr(py_obj, field.name, None))
+                        if i == 0:
+                            mask.append(py_obj is None)
+
+                    array = recursively_build_pyarrow_array(
+                        data,
+                        field.type,
+                        mapper._property_serializers[field.name],
                         py_objs_already_mapped,
                     )
 
-            arrays.append(array)
-            keys.append(field.name)
-        return pa.StructArray.from_arrays(
-            arrays, keys, mask=pa.array(mask, type=pa.bool_())
-        )
+                elif isinstance(mapper, mappers_arrow.TaggedValueToArrowStruct):
+                    if field.name == "_tag":
+                        for py_obj in py_objs:
+                            if py_obj is None:
+                                data.append(None)
+                            else:
+                                data.append(tag_store.get_tags(py_obj))
+                            if i == 0:
+                                mask.append(py_obj is None)
+
+                        array = recursively_build_pyarrow_array(
+                            data,
+                            field.type,
+                            mapper._tag_serializer,
+                            py_objs_already_mapped,
+                        )
+                    else:
+                        for py_obj in py_objs:
+                            if py_obj is None:
+                                data.append(None)
+                            else:
+                                data.append(box.unbox(py_obj))
+                            if i == 0:
+                                mask.append(py_obj is None)
+
+                        array = recursively_build_pyarrow_array(
+                            data,
+                            field.type,
+                            mapper._value_serializer,
+                            py_objs_already_mapped,
+                        )
+                else:
+                    assert isinstance(
+                        mapper,
+                        mappers_arrow.GQLHasKeysToArrowStruct,
+                    )
+                    for py_obj in py_objs:
+                        if py_obj is None:
+                            data.append(None)
+                        else:
+                            data.append(mapper.apply(py_obj))
+                        if i == 0:
+                            mask.append(py_obj is None)
+
+                    array = recursively_build_pyarrow_array(
+                        data,
+                        field.type,
+                        mapper._property_serializers[field.name],
+                        False,
+                    )
+
+                arrays.append(array)
+                keys.append(field.name)
+            return pa.StructArray.from_arrays(
+                arrays, keys, mask=pa.array(mask, type=pa.bool_())
+            )
     elif pa.types.is_union(pyarrow_type):
         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
         type_codes: list[int] = [
@@ -468,9 +525,16 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                     "Unexpected dictionary type for non-string type"
                 )
             return ArrowWeaveList(col._arrow_data, types.String(), None)
-        elif pa.types.is_floating(col._arrow_data.type) or pa.types.is_integer(
-            col._arrow_data.type
-        ):
+        elif pa.types.is_floating(col._arrow_data.type):
+            # Ensure that -0.0 is 0. If we end up converting to a string
+            # later (which happens if we have non-numeric types within a union)
+            # then -0.0 will be converted to "-0.0" which is not equal to "0.0"
+            return ArrowWeaveList(
+                pc.choose(pc.equal(col._arrow_data, 0), col._arrow_data, 0),
+                types.Number(),
+                None,
+            )
+        elif pa.types.is_integer(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Number(), None)
         elif pa.types.is_timestamp(col._arrow_data.type):
             # Cast to int64 and then string. Leaving this as timestamp

@@ -3,7 +3,7 @@
 # TODO: Notebook Walkthrough
 
 from ..wandb_interface.wandb_stream_table import StreamTable
-from .monitor_decorator import monitor
+from . import openai
+from .monitor import default_monitor, deinit_monitor, init_monitor
 
-
-__all__ = ["StreamTable", "monitor"]
+__all__ = ["StreamTable", "monitor", "openai"]

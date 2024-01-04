@@ -1,15 +1,9 @@
 import Markdown from '@wandb/weave/common/components/Markdown';
 import * as globalStyles from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';
-import {
-  constString,
-  maybe,
-  Node,
-  NodeOrVoidNode,
-  opArray,
-} from '@wandb/weave/core';
+import {constString, maybe, Node, NodeOrVoidNode} from '@wandb/weave/core';
 import * as Diff from 'diff';
-import React from 'react';
+import React, {useContext} from 'react';
 
 import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
@@ -18,6 +12,7 @@ import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import * as S from './PanelString.styles';
 import {TooltipTrigger} from './Tooltip';
+import {WeaveFormatContext} from './WeaveFormatContext';
 
 const inputType = {
   type: 'union' as const,
@@ -27,6 +22,7 @@ const inputType = {
     'number' as const,
     'boolean' as const,
     'id' as const,
+    {type: 'WandbArtifactRef' as const},
   ],
 };
 
@@ -146,14 +142,14 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
 
 export const PanelString: React.FC<PanelStringProps> = props => {
   const config = props.config ?? defaultConfig();
-  const arrNode = opArray({
-    0: props.input,
-    1: config.diffComparand ?? props.input,
-  } as any);
+  const inputValue = CGReact.useNodeValue(props.input as Node<'string'>);
+  const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
+  const loading = inputValue.loading || compValue.loading;
+  const {stringFormat} = useContext(WeaveFormatContext);
+  const {spacing} = stringFormat;
 
-  const nodeValueQuery = CGReact.useNodeValue(arrNode);
-  const fullStr = String(nodeValueQuery?.result?.[0] ?? '-');
-  const comparandStr = String(nodeValueQuery?.result?.[1] ?? ''); // Default comparand is empty string
+  const fullStr = String(inputValue?.result ?? '-');
+  const comparandStr = String(compValue?.result ?? ''); // Default comparand is empty string
 
   const [contentHeight, setContentHeight] = React.useState(0);
 
@@ -167,8 +163,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         />
       );
       return (
-        <S.StringContainer>
-          <S.StringItem>
+        <S.StringContainer $spacing={spacing}>
+          <S.StringItem $spacing={spacing}>
             <TooltipTrigger
               copyableContent={fullStr}
               content={contentMarkdown}
@@ -208,8 +204,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
 
       return (
-        <S.StringContainer>
-          <S.StringItem>
+        <S.StringContainer $spacing={spacing}>
+          <S.StringItem $spacing={spacing}>
             <TooltipTrigger copyableContent={fullStr} content={contentDiff}>
               {contentDiff}
             </TooltipTrigger>
@@ -226,19 +222,26 @@ export const PanelString: React.FC<PanelStringProps> = props => {
 
     // plaintext
     return (
-      <S.StringContainer data-test-weave-id="string">
-        <S.StringItem>
+      <S.StringContainer data-test-weave-id="string" $spacing={spacing}>
+        <S.StringItem $spacing={spacing}>
           <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
             {contentPlaintext}
           </TooltipTrigger>
         </S.StringItem>
       </S.StringContainer>
     );
-  }, [comparandStr, config.diffMode, config.mode, contentHeight, fullStr]);
+  }, [
+    comparandStr,
+    config.diffMode,
+    config.mode,
+    contentHeight,
+    fullStr,
+    spacing,
+  ]);
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);
 
-  if (nodeValueQuery.loading) {
+  if (loading) {
     return <Panel2Loader />;
   }
 
@@ -255,6 +258,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'string',
+  icon: 'text-language-alt',
+  category: 'Primitive',
   canFullscreen: true,
   Component: PanelString,
   ConfigComponent: PanelStringConfig,

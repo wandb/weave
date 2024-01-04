@@ -5,6 +5,7 @@ import type {
   BaseNode,
   ConstNode,
   InputTypes,
+  Node,
   NodeOrVoidNode,
   OutputNode,
   OutputTypeAsNode,
@@ -49,6 +50,12 @@ export function isVoidNode(maybeNode: any): maybeNode is VoidNode {
   );
 }
 
+export function isNonVoidNode(maybeNode: any): maybeNode is Node {
+  return (
+    isOutputNode(maybeNode) || isVarNode(maybeNode) || isConstNode(maybeNode)
+  );
+}
+
 export function isNodeOrVoidNode(maybeNode: any): maybeNode is NodeOrVoidNode {
   return (
     isOutputNode(maybeNode) ||
@@ -63,6 +70,16 @@ export function isConstNodeWithType<T extends Type>(
   type: T
 ): constNode is ConstNode<T> {
   return isAssignableTo(constNode.type, type);
+}
+
+export function isConstNodeWithObjectType(
+  maybeNode: any
+): maybeNode is ConstNode<Type> {
+  return (
+    isConstNode(maybeNode) &&
+    has('_is_object', maybeNode.type) &&
+    maybeNode.type._is_object === true
+  );
 }
 
 export const outputTypeIsType = (

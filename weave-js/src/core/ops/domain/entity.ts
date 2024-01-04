@@ -49,6 +49,7 @@ export const opEntityIsTeam = makeEntityOp({
     return entity.isTeam;
   },
 });
+
 export const opEntityLink = makeEntityOp({
   name: 'entity-link',
   argTypes: entityArgTypes,
@@ -83,6 +84,23 @@ export const opEntityProjects = makeEntityOp({
   resolver: ({entity}) => connectionToNodes(entity.projects),
 });
 
+export const opEntityReports = makeEntityOp({
+  hidden: true,
+  name: 'entity-reports',
+  argTypes: entityArgTypes,
+  description: `Returns the ${
+    (docType('report'), {plural: true})
+  } of the ${docType('entity')}`,
+  argDescriptions: {
+    entity: entityArgDescription,
+  },
+  returnValueDescription: `The ${
+    (docType('report'), {plural: true})
+  } of the ${docType('entity')}`,
+  returnType: inputTypes => list('report'),
+  resolver: ({entity}) => connectionToNodes(entity.views),
+});
+
 export const opEntityArtifactPortfolios = makeEntityOp({
   hidden: true,
   name: 'entity-portfolios',
@@ -106,4 +124,14 @@ export const opEntityOrg = makeEntityOp({
   argTypes: entityArgTypes,
   returnType: inputTypes => maybe('org'),
   resolver: ({entity}) => entity.organization,
+});
+
+export const opEntityArtifactTTLDurationSeconds = makeEntityOp({
+  hidden: true,
+  name: 'entity-artifactTTLDurationSeconds',
+  argTypes: entityArgTypes,
+  returnType: inputTypes => 'number',
+  resolver: ({entity}) => {
+    return entity.artifactTTLDurationSeconds;
+  },
 });

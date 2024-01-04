@@ -1,12 +1,21 @@
-import React, {useMemo, useState} from 'react';
-
-import styled from 'styled-components';
-import {IconOverflowHorizontal, IconWeaveLogoGray} from '../../Panel2/Icons';
-import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
-import * as LayoutElements from './LayoutElements';
+import {
+  MOON_100,
+  MOON_250,
+  MOON_350,
+} from '@wandb/weave/common/css/color.styles';
+import {constString, opGet} from '@wandb/weave/core';
+import {useMakeMutation} from '@wandb/weave/react';
 import _ from 'lodash';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
+import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
+import styled from 'styled-components';
+
+import {IconOverflowHorizontal, IconWeaveLogoGray} from '../../Panel2/Icons';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {DeleteActionModal} from '../DeleteActionModal';
+import {SetPreviewNodeType} from './common';
+import * as LayoutElements from './LayoutElements';
 
 const TableRow = styled.tr<{$highlighted?: boolean}>`
   background-color: ${props => (props.$highlighted ? '#f8f9fa' : '')};
@@ -19,6 +28,7 @@ const CenterTable = styled.table`
   border-collapse: collapse;
 
   td {
+    padding: 0px 15px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -83,16 +93,19 @@ const CenterTable = styled.table`
 `;
 CenterTable.displayName = 'S.CenterTable';
 
-const CenterTableActionCellAction = styled(LayoutElements.HBlock)`
+const CenterTableActionCellAction = styled(LayoutElements.HBlock)<{
+  isDisabled?: boolean;
+}>`
   padding: 0px 12px;
   border-radius: 4px;
   height: 36px;
   align-items: center;
   gap: 8px;
   font-size: 16px;
-  cursor: pointer;
+  cursor: ${props => (props.isDisabled ? 'default' : 'pointer')};
+  color: ${props => (props.isDisabled ? MOON_350 : 'inherit')};
   &:hover {
-    background-color: #f5f6f7;
+    background-color: ${props => (props.isDisabled ? 'inherit' : MOON_100)};
   }
 `;
 CenterTableActionCellAction.displayName = 'S.CenterTableActionCellAction';
@@ -140,7 +153,9 @@ const CenterSpaceHeader = styled(LayoutElements.VBlock)`
 `;
 CenterSpaceHeader.displayName = 'S.CenterSpaceHeader';
 
-type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
+export type CenterBrowserDataType<
+  E extends {[key: string]: string | number} = {}
+> = {
   _id: string;
 } & E;
 
@@ -149,6 +164,7 @@ export type CenterBrowserActionSingularType<RT extends CenterBrowserDataType> =
     icon: React.FC;
     label: string;
     onClick: (row: RT, index: number) => void;
+    disabled?: (row: RT) => boolean;
   };
 
 export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<
@@ -159,6 +175,9 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
   data: RT[];
   selectedRowId?: string;
+  setSelectedRowId?: Dispatch<SetStateAction<string | undefined>>;
+  setPreviewNode?: SetPreviewNodeType;
+
   noDataCTA?: string;
   breadcrumbs?: Array<{
     key: string;
@@ -174,11 +193,20 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
       placeholder: string;
     };
   };
+
+  // id of an artifact that is pending deletion
+  deletingId?: string;
+  setDeletingId?: Dispatch<SetStateAction<string | undefined>>;
+
+  isModalActing?: boolean;
+  setIsModalActing?: Dispatch<SetStateAction<boolean>>;
+  deleteTypeString?: string;
 };
 
 export const CenterBrowser = <RT extends CenterBrowserDataType>(
   props: CenterBrowserProps<RT>
 ) => {
+  const history = useHistory();
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<{
     [key: string]: string | null | undefined;
@@ -246,8 +274,33 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
     return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
   }, [props.columns, props.data]);
   const hasOverflowActions = allActions.length > 1;
+
+  const makeMutation = useMakeMutation();
+
   return (
     <>
+      <DeleteActionModal
+        open={props.deletingId != null}
+        onClose={() => props.setDeletingId?.(undefined)}
+        acting={props.isModalActing ?? false}
+        onDelete={async () => {
+          props.setIsModalActing?.(true);
+          const artifactNode = opGet({
+            uri: constString(props.deletingId!),
+          });
+          await makeMutation(artifactNode, 'delete_artifact', {});
+          props.setDeletingId?.(undefined);
+          props.setIsModalActing?.(false);
+          // If the user is deleting the selected row, navigate up a level
+          if (
+            props.deletingId?.endsWith(`/${props.selectedRowId}:latest/obj`)
+          ) {
+            history.push('.');
+          }
+        }}
+        deleteTypeString={props.deleteTypeString}
+      />
+
       <CenterSpaceHeader>
         <CenterSpaceTitle>
           <span
@@ -392,10 +445,14 @@ export const ActionCell = <RT extends CenterBrowserDataType>(props: {
                 <CenterTableActionCellAction
                   key={'' + j + '_' + k}
                   onClick={e => {
+                    if (a.disabled != null && a.disabled(props.row)) {
+                      return;
+                    }
                     setPopupOpen(false);
                     e.stopPropagation();
                     a.onClick(props.row, j);
-                  }}>
+                  }}
+                  isDisabled={a.disabled != null && a.disabled(props.row)}>
                   <a.icon />
                   {a.label}
                 </CenterTableActionCellAction>

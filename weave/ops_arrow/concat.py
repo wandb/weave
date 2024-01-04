@@ -9,6 +9,7 @@ import typing
 import dataclasses
 import numpy as np
 import pyarrow as pa
+from pyarrow import compute as pc
 
 from .. import weave_types as types
 from ..language_features.tagging import tagged_value_type
@@ -21,12 +22,17 @@ from .list_ import (
     is_object_arrowweavelist,
     is_taggedvalue_arrowweavelist,
     is_list_arrowweavelist,
+    is_ref_arrowweavelist,
     unsafe_awl_construction,
     offsets_starting_at_zero,
     make_vec_none,
 )
 
 DEBUG = False
+
+from .. import engine_trace
+
+tracer = engine_trace.tracer()
 
 
 @dataclasses.dataclass
@@ -43,7 +49,27 @@ def indent_print(indent: int = 0, *args) -> None:
 
 def pa_concat_arrays(arrays: list[typing.Union[pa.Array, pa.ChunkedArray]]) -> pa.Array:
     arrays = [a if isinstance(a, pa.Array) else a.combine_chunks() for a in arrays]
-    return pa.concat_arrays(arrays)
+
+    with tracer.trace("pa_concat_arrays"):
+        try:
+            return pa.concat_arrays(arrays)
+        except pa.lib.ArrowNotImplementedError as e:
+            # pyarrow doesn't support concatenating all dictionaries, so we have to do it ourselves.
+            if all(isinstance(a, pa.DictionaryArray) for a in arrays):
+                # We can concatenate dictionaries by concatenating the indices and the dictionary
+                # values separately.
+
+                index_offset = 0
+                indices = []
+                for a in arrays:
+                    indices.append(pc.add(a.indices, index_offset).cast(pa.int32()))
+                    index_offset += len(a.dictionary)
+
+                indices = pa_concat_arrays(indices)
+                dictionary = pa_concat_arrays([a.dictionary for a in arrays])
+                return pa.DictionaryArray.from_arrays(indices, dictionary)
+            else:
+                raise
 
 
 def _concatenate_typeddicts(
@@ -246,8 +272,16 @@ def _concatenate_non_unions(
         return ArrowWeaveList(
             data, new_weave_type, self._artifact, invalid_reason="Possibly nullable"
         )
-    elif self.object_type == other.object_type:
+    elif (
         # Types exactly equal case
+        self.object_type == other.object_type
+        or (
+            # Types are refs, so arrow type is string
+            is_ref_arrowweavelist(self)
+            and is_ref_arrowweavelist(other)
+            and self.object_type.__class__ == other.object_type.__class__
+        )
+    ):
         indent_print(depth, "Extend case equal", self.object_type, other.object_type)
         if len(self) == 0:
             data = other._arrow_data
@@ -256,7 +290,10 @@ def _concatenate_non_unions(
         else:
             data = pa_concat_arrays([self._arrow_data, other._arrow_data])
         return ArrowWeaveList(
-            data, self.object_type, self._artifact, invalid_reason="Possibly nullable"
+            data,
+            types.merge_types(self.object_type, other.object_type),
+            self._artifact,
+            invalid_reason="Possibly nullable",
         )
     return None
 
@@ -389,8 +426,7 @@ def _concatenate(
         for other_i in remaining_other_indexes:
             other_member_type = other_field_types[other_i]
             other_field = other_fields[other_i]
-            merged_type = types.merge_types(self_member_type, other_member_type)
-            if not isinstance(merged_type, types.UnionType):
+            if types.types_are_mergeable(self_member_type, other_member_type):
                 indent_print(
                     depth,
                     "SELF OTHER FIELD merge",
@@ -557,3 +593,21 @@ def concatenate(
         result = _concatenate(self, other, depth)
     result.validate()
     return result
+
+
+def _merge_concat_split(
+    arr: list[ArrowWeaveList],
+) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
+    if len(arr) < 2:
+        raise ValueError("arr must have length of at least 2")
+    middle_index = len(arr) // 2
+    return arr[:middle_index], arr[middle_index:]
+
+
+def concatenate_all(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
+    if len(arr) == 0:
+        raise ValueError("arr must not be empty")
+    if len(arr) == 1:
+        return arr[0]
+    left, right = _merge_concat_split(arr)
+    return concatenate_all(left).concat(concatenate_all(right))

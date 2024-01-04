@@ -7,14 +7,26 @@ from .. import api as weave
 from .. import ops
 from .. import weave_types as types
 from .. import weave_internal
-from ..ops_primitives import dict_, list_
+from ..ops_primitives import dict_, list_, date
+from .. import errors
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
 from .. import ops_arrow as arrow
 from ..ops_arrow import arraylist_ops
 from ..ops_arrow import convert_ops
+from ..ops_arrow import util
 
+from ..ops_domain import wb_domain_types as wdt
+
+from ..ops_domain import run_ops
+
+
+import datetime
+
+import pyarrow as pa
+
+from pyarrow import compute as pc
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),
@@ -571,6 +583,46 @@ def test_arrow_typeddict_nullable_merge(
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
+@pytest.mark.parametrize(
+    "name,input_data_vec,weave_func,expected_output",
+    [
+        (
+            "merge-scalar-vec",
+            [{"b": "c"}, {"b": "q"}],
+            lambda x: weave.RuntimeConstNode(
+                types.TypedDict({"c": types.Int()}), {"c": 4}
+            ).merge(x),
+            [{"b": "c", "c": 4}, {"b": "q", "c": 4}],
+        ),
+        (
+            "merge-vec-scalar",
+            [{"b": "c"}, None, {"b": "q"}],
+            lambda x: x.merge({"c": 4}),
+            [{"b": "c", "c": 4}, None, {"b": "q", "c": 4}],
+        ),
+    ],
+)
+def test_arrow_typeddict_nullable_scalar_vector_merge(
+    input_data_vec, name, weave_func, expected_output
+):
+    data = weave.save(arrow.to_arrow(input_data_vec))
+
+    fn = weave_internal.define_fn(
+        {
+            "x": weave.type_of(input_data_vec).object_type,
+        },
+        weave_func,
+    ).val
+    vec_fn = arrow.vectorize(fn, strict=True)
+    called = weave_internal.call_fn(vec_fn, {"x": data})
+    awl = weave.use(called)
+    assert awl.to_pylist_raw() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+    assert awl.object_type == weave.type_of(expected_output).object_type
+
+
 nullable_pick_cases = [
     (
         "pick",
@@ -1008,14 +1060,20 @@ def test_arrow_dict():
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
+# We have disabled auto-vectorization for all custom ops. Changing this test so that
+# it creates a built-in op instead also doesn't work. In that we automatically create
+# a mapped op. vectorizes determines that it can call the op (via the mapped op) in
+# "Part 1", so it doesn't try to weavify and vectorize. Since we're not relying on
+# auto-vectorization now, this test is disabled.
+@pytest.mark.skip("auto vectorize disabled for custom ops")
 def test_vectorize_works_recursively_on_weavifiable_op():
     # this op is weavifiable because it just calls add
     @weave.op()
-    def add_one(x: int) -> int:
+    def add_one124815(x: int) -> int:
         return x + 1
 
     weave_fn = weave_internal.define_fn(
-        {"x": weave.types.Int()}, lambda x: add_one(x)
+        {"x": weave.types.Int()}, lambda x: add_one124815(x)
     ).val
     vectorized = arrow.vectorize(weave_fn)
     expected = vectorized.to_json()
@@ -1285,3 +1343,116 @@ def test_list_numbers_equal_notequal():
     assert weave.use(l4 == l5).to_pylist_notags() == [False, True, True]
     assert weave.use(l6 == l2).to_pylist_notags() == [True, False, True]
     assert weave.use(l6 == l7).to_pylist_notags() == [False, True, True]
+
+
+def test_vectorized_prop_op_gql_pick():
+    runs = [
+        wdt.Run({"id": "A", "key2": 1}),
+        wdt.Run({"id": "B", "key2": 1}),
+        wdt.Run({"id": "C", "key2": 1}),
+    ]
+    for run in runs:
+        tag_store.add_tags(run, {"mytag": "test" + run["id"]})
+    awl = arrow.to_arrow(runs)
+    l = weave.save(awl)
+
+    fn = weave_internal.define_fn(
+        {"x": awl.object_type}, lambda x: run_ops.run_id(x)
+    ).val
+    vec_fn = arrow.vectorize(fn, strict=True)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == ["A", "B", "C"]
+    assert weave.use(called).to_pylist_raw() == [
+        {"_tag": {"mytag": "testA"}, "_value": "A"},
+        {"_tag": {"mytag": "testB"}, "_value": "B"},
+        {"_tag": {"mytag": "testC"}, "_value": "C"},
+    ]
+
+
+def test_vectorize_run_runtime():
+    runs = [
+        wdt.Run({"id": "A", "computeSeconds": 1}),
+        wdt.Run({"id": "B", "computeSeconds": 2}),
+        wdt.Run({"id": "C", "computeSeconds": 3}),
+    ]
+
+    awl = arrow.to_arrow(runs)
+    l = weave.save(awl)
+
+    fn = weave_internal.define_fn(
+        {"x": awl.object_type}, lambda x: run_ops.runtime(x)
+    ).val
+
+    vec_fn = arrow.vectorize(fn, strict=True)
+
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == [1, 2, 3]
+
+    # it finds an AWL op
+    assert "ArrowWeaveList" in vec_fn.from_op.name
+    assert "mapped" not in vec_fn.from_op.name
+
+
+def test_boxed_null_in_array_equal():
+    lhs = pa.array([1, None, 3])
+    rhs = box.box(None)
+    assert util.equal(lhs, rhs).to_pylist() == [False, True, False]
+    assert util.not_equal(lhs, rhs).to_pylist() == [True, False, True]
+
+
+def test_duration():
+    dt1 = datetime.timedelta(seconds=1)
+    dt2 = datetime.timedelta(seconds=2)
+    dt3 = datetime.timedelta(seconds=3)
+
+    awl_node = weave.save(arrow.to_arrow([dt1, dt2, dt3]))
+
+    fn = weave_internal.define_fn(
+        {"row": awl_node.type.object_type},
+        lambda row: date.timedelta_total_seconds(row),
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    assert list(weave.use(called)) == [1, 2, 3]
+
+
+def test_date_add():
+    dt = datetime.datetime.now()
+
+    # TODO: remove ms truncation when we can store more precise datetimes in arrow
+    dt = dt.replace(microsecond=dt.microsecond // 1000 * 1000)
+    dt1 = dt + datetime.timedelta(days=1)
+
+    awl_node = weave.save(arrow.to_arrow([dt, dt1]))
+    fn = weave_internal.define_fn(
+        {"row": awl_node.type.object_type},
+        lambda row: date.datetime_add(row, datetime.timedelta(days=1)),
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    actual = list(weave.use(called))
+
+    # TODO: remove timezone addition when we have a better way of handling timezones in arrow
+    dt1utc = dt1.astimezone(datetime.timezone.utc)
+    expected = [dt1utc, dt1utc + datetime.timedelta(days=1)]
+    assert actual == expected
+
+
+def test_date_sub():
+    dt = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    # TODO: remove ms truncation when we can store more precise datetimes in arrow
+    dt = dt.replace(microsecond=dt.microsecond // 1000 * 1000)
+    dt1 = dt + datetime.timedelta(days=1)
+
+    awl_node = weave.save(arrow.to_arrow([dt, dt1]))
+    fn = weave_internal.define_fn(
+        {"row": awl_node.type.object_type},
+        lambda row: date.datetime_sub(row, dt),
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    actual = list(weave.use(called))
+
+    expected = [datetime.timedelta(0), datetime.timedelta(days=1)]
+    assert actual == expected

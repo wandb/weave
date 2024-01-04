@@ -6,9 +6,11 @@ import {GlobalCGEventTracker} from '../analytics/tracker';
 import {Node, serialize, serializeMulti} from '../model';
 import type {OpStore} from '../opStore';
 import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
+import {uuidv4} from '../util/id';
 import type {Server} from './types';
 
 const BATCH_INTERVAL_MS = () => batchIntervalOverride() ?? 50;
+const WEAVE_1_SERVER_TIMEOUT_MS = 1000 * 60 * 2; // 2 minutes
 
 // from https://www.jpwilliams.dev/how-to-unpack-the-return-type-of-a-promise-in-typescript
 // when all of our apps are on TS 4.x we can use Awaited<> instead
@@ -44,6 +46,9 @@ export interface RemoteWeaveOptions {
   // Enable so a single HTTP request cannot contain more than one disjoint graph
   contiguousBatchesOnly: boolean;
 
+  // If true, will merge inexpensive batches into a single request
+  mergeInexpensiveBatches: boolean;
+
   // Maximum number of concurrent requests to the server
   maxConcurrentRequests: number;
 
@@ -66,8 +71,10 @@ const defaultOpts: RemoteWeaveOptions = {
   tokenFunc: () => Promise.resolve(''),
   useAdminPrivileges: false,
   isShadow: false,
-  contiguousBatchesOnly: false,
-  maxConcurrentRequests: 1,
+  contiguousBatchesOnly: true,
+  mergeInexpensiveBatches: true,
+  // Let's start with 2 concurrent requests, and see how it goes
+  maxConcurrentRequests: 2,
   maxBatchSize: Infinity,
   maxRetries: 5,
   backoffBase: 500,
@@ -89,10 +96,19 @@ interface NodeEntry {
 // TODO: currently deprecated, but works in all browsers
 declare function btoa(s: string): string;
 
+const createClientCacheKey = (windowSizeMs: number = 15000) => {
+  // Returning undefined for now since caching is now handled higher
+  // up in the stack - this is quite redundant with the cache key. Keeping
+  // the code here for now in case we want to use it again in the future.
+  return undefined;
+  // return Math.floor(Date.now() / windowSizeMs).toString();
+};
+
 // Handles (de)serialization to send to a remote CG server
 export class RemoteHttpServer implements Server {
+  public clientCacheKey: string | undefined = createClientCacheKey();
   private readonly opts: RemoteWeaveOptions;
-  private readonly flushInterval: NodeJS.Timer;
+  private readonly flushInterval: NodeJS.Timeout;
   private pendingNodes: Map<Node, NodeEntry> = new Map();
   private pendingRequests: Set<Promise<any>> = new Set();
   private nextFlushTime = 0;
@@ -127,12 +143,19 @@ export class RemoteHttpServer implements Server {
     clearInterval(this.flushInterval);
   }
 
+  public refreshBackendCacheKey(windowSizeMs: number = 15000) {
+    this.clientCacheKey = createClientCacheKey(windowSizeMs);
+  }
+
   public async query(
-    nodes: Node[]
-    // withBackendCacheReset?: boolean
+    nodes: Node[],
+    stripTags?: boolean,
+    withBackendCacheReset?: boolean
   ): Promise<any[]> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
-    // TODO: pass withBackendCacheReset across the network
+    if (withBackendCacheReset) {
+      this.refreshBackendCacheKey(1);
+    }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
     return await Promise.all(
@@ -151,27 +174,28 @@ export class RemoteHttpServer implements Server {
     );
   }
 
-  public async queryEach(
-    nodes: Node[]
-    // withBackendCacheReset?: boolean
-  ): Promise<Array<PromiseSettledResult<any>>> {
+  public queryEach(
+    nodes: Node[],
+    withBackendCacheReset?: boolean
+  ): Array<Promise<any>> {
     GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
-    // TODO: pass withBackendCacheReset across the network
+    if (withBackendCacheReset) {
+      this.refreshBackendCacheKey(1);
+    }
 
     this.trace(`Enqueue ${nodes.length} nodes`);
-    return await Promise.allSettled(
-      nodes.map(
-        node =>
-          new Promise((resolve, reject) => {
-            this.pendingNodes.set(node, {
-              node,
-              resolve,
-              reject,
-              state: 'waiting',
-              retries: 0,
-            });
-          })
-      )
+
+    return nodes.map(
+      node =>
+        new Promise((resolve, reject) => {
+          this.pendingNodes.set(node, {
+            node,
+            resolve,
+            reject,
+            state: 'waiting',
+            retries: 0,
+          });
+        })
     );
   }
 
@@ -251,7 +275,7 @@ export class RemoteHttpServer implements Server {
 
     const nodes = nodeEntries.map(e => e.node);
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
-      ? serializeMulti(nodes)
+      ? serializeMulti(nodes, this.opts.mergeInexpensiveBatches)
       : [[serialize(nodes)], [_.range(nodes.length)]];
 
     for (
@@ -270,14 +294,17 @@ export class RemoteHttpServer implements Server {
           const entry = nodeEntries[i];
           if (entry.retries >= this.opts.maxRetries) {
             this.trace(`Cancelling node after ${entry.retries} retries`);
-            this.resolveNode(entry.node, null);
+            this.rejectNode(entry.node, {
+              message: `Weave request failed after ${entry.retries} retries`,
+              traceback: [],
+            });
           } else {
             entry.state = 'waiting';
             entry.retries++;
           }
         });
 
-      const rejectAll = (e: any) =>
+      const rejectAll = (e: {message: string; traceback: string[]}) =>
         indexes.forEach(i => this.rejectNode(nodeEntries[i].node, e));
 
       const resolveOrReject = (response: {
@@ -322,10 +349,17 @@ export class RemoteHttpServer implements Server {
           additionalHeaders['weave-shadow'] = 'false';
         }
 
+        if (this.clientCacheKey != null) {
+          additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
+        }
+
+        additionalHeaders['x-request-id'] = uuidv4();
+
         let respJson: any = {
           data: new Array(nodes.length).fill(null),
         };
         let fetchResponse: any = null;
+        const startTime = performance.now();
         try {
           fetchResponse = await this.opts.fetch(this.opts.weaveUrl, {
             credentials: 'include',
@@ -340,7 +374,17 @@ export class RemoteHttpServer implements Server {
           // network error, always retry these, does not count against max retries
           this.trace(`fetch failed: ${(err as Error).message}`, err);
           this.backoff();
-          setState('waiting');
+          // if we've been waiting for more than the timeout, we know it's a timeout and not a network error
+          const totalWaitTime = performance.now() - startTime;
+          if (totalWaitTime >= WEAVE_1_SERVER_TIMEOUT_MS - 1000) {
+            // This is a timeout, not a network error
+            rejectAll({
+              message: `Weave request failed - backend timeout after ${totalWaitTime} milliseconds.`,
+              traceback: [],
+            });
+          } else {
+            setState('waiting');
+          }
         }
 
         if (!this.opts.isShadow && fetchResponse != null) {
@@ -397,7 +441,10 @@ export class RemoteHttpServer implements Server {
               this.backoff(10);
               setRetryOrFail();
             } else {
-              rejectAll('Weave request failed: ' + fetchResponse.status);
+              rejectAll({
+                message: 'Weave request failed: ' + fetchResponse.status,
+                traceback: [],
+              });
             }
           }
         }

@@ -1,14 +1,16 @@
-from ..compile_domain import wb_gql_op_plugin
+import typing
+
+from ..gql_op_plugin import wb_gql_op_plugin
 from ..api import op
-from .. import weave_types as types
 from . import wb_domain_types as wdt
-from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
+from .. import weave_types as types
+
 from .wandb_domain_gql import (
-    _make_alias,
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
     gql_root_op,
+    _make_alias,
 )
 
 # Section 1/6: Tag Getters
@@ -17,12 +19,13 @@ from .wandb_domain_gql import (
 # Section 2/6: Root Ops
 # None
 
+
 # Section 3/6: Attribute Getters
 # op_artifact_type_name is written in the plain style
 # because the attribute is part of the required fragment
 @op(name="artifactType-name")
 def op_artifact_type_name(artifactType: wdt.ArtifactType) -> str:
-    return artifactType.gql["name"]
+    return artifactType["name"]
 
 
 # Section 4/6: Direct Relationship Ops
@@ -35,7 +38,7 @@ gql_connection_op(
     "artifactCollections",
     wdt.ArtifactCollectionType,
     {},
-    lambda inputs: f"first: 100",
+    lambda inputs: "first: 100",
 )
 
 # Section 6/6: Non Standard Business Logic Ops
@@ -61,18 +64,25 @@ first_100_artifacts_alias = _make_alias("first: 100", prefix="artifacts")
                 }}
             }}
         }}
-    }}"""
+    }}""",
+        gql_op_output_type=lambda inputs, input_type: types.List(
+            wdt.ArtifactVersionType.with_keys(
+                typing.cast(typing.Any, input_type)
+                .keys[first_100_collections_alias]["edges"]
+                .object_type["node"][first_100_artifacts_alias]["edges"]
+                .object_type["node"]
+                .property_types
+            )
+        ),
     ),
 )
 def artifact_versions(
     artifactType: wdt.ArtifactType,
 ) -> list[wdt.ArtifactVersion]:
     res = []
-    for artifactCollectionEdge in artifactType.gql[first_100_collections_alias][
-        "edges"
-    ]:
+    for artifactCollectionEdge in artifactType[first_100_collections_alias]["edges"]:
         for artifactEdge in artifactCollectionEdge["node"][first_100_artifacts_alias][
             "edges"
         ]:
-            res.append(wdt.ArtifactVersion.from_gql(artifactEdge["node"]))
+            res.append(wdt.ArtifactVersion.from_keys(artifactEdge["node"]))
     return res

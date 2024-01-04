@@ -14,8 +14,10 @@ from . import errors
 from . import node_ref
 from . import artifact_base
 from .language_features.tagging import tagged_value_type
-from .ops_domain import wbmedia
 import contextvars
+
+from . import partial_object
+
 
 _in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
 
@@ -46,6 +48,16 @@ class ObjectToArrowStruct(mappers_python.ObjectToPyDict):
                 prop_result_type = property_serializer.result_type()
                 fields.append(arrow_util.arrow_field(property_key, prop_result_type))
         return pa.struct(fields)
+
+
+class TimeDeltaToArrowTimeDelta(mappers.Mapper):
+    def result_type(self):
+        return pa.duration("us")
+
+
+class ArrowTimeDeltaToTimeDelta(mappers.Mapper):
+    def apply(self, obj):
+        return obj.as_py()
 
 
 class StringToArrow(mappers_python.StringToPyString):
@@ -212,11 +224,6 @@ class ArrowStringToString(mappers.Mapper):
         return obj
 
 
-class StringToArrowString(mappers_python.StringToPyString):
-    def result_type(self):
-        return pa.string()
-
-
 class FunctionToArrowFunction(mappers.Mapper):
     def result_type(self):
         return pa.string()
@@ -288,6 +295,9 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             or self.type.name == "ArrowTable"
             or self.type.name == "FilesystemArtifact"
             or self.type.name == "file"
+            or self.type.name == "WandbArtifactRef"
+            or self.type.name == "LocalArtifactRef"
+            or self.type.name == "OpDef"
         ):
             # Ref type
             return pa.string()
@@ -333,6 +343,22 @@ class ArrowToArrowWeaveListOrPylist(mappers_python.ListToPyList):
         return super().apply(obj)
 
 
+class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
+    def result_type(self):
+        return pa.struct(
+            [
+                pa.field(key, self._property_serializers[key].result_type())
+                for key in self.type.keys
+            ]
+        )
+
+    def as_typeddict_mapper(self):
+        typed_dict_type = types.TypedDict(self.type.keys)
+        return TypedDictToArrowStruct(
+            typed_dict_type, self.mapper, self._artifact, self.path
+        )
+
+
 def map_to_arrow_(
     type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
 ):
@@ -346,6 +372,8 @@ def map_to_arrow_(
         return ListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return UnionToArrowUnion(type, mapper, artifact, path)
+    elif isinstance(type, partial_object.PartialObjectType):
+        return GQLHasKeysToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):
@@ -366,6 +394,8 @@ def map_to_arrow_(
         return NoneToArrowNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
         return UnknownToArrowNone(type, mapper, artifact, path)
+    elif isinstance(type, types.TimeDelta):
+        return TimeDeltaToArrowTimeDelta(type, mapper, artifact, path)
     else:
         return DefaultToArrow(type, mapper, artifact, path)
 
@@ -379,6 +409,8 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
         return ArrowToArrowWeaveListOrPylist(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return ArrowUnionToUnion(type, mapper, artifact, path)
+    elif isinstance(type, partial_object.PartialObjectType):
+        return mappers_python.GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return mappers_python.ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):
@@ -399,6 +431,8 @@ def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
         return mappers_python.NoneToPyNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
         return UnknownToArrowNone(type, mapper, artifact, path)
+    elif isinstance(type, types.TimeDelta):
+        return ArrowTimeDeltaToTimeDelta(type, mapper, artifact, path)
     else:
         return DefaultFromArrow(type, mapper, artifact, path)
 

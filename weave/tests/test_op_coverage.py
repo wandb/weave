@@ -91,7 +91,6 @@ js_op_exceptions = set(
         "number-roundHundredth",
         "op-non_none",
         "org-members",
-        "org-teams",
         "project-reports",
         "project-run",  # This is used in the demo compute graph... surprised nowhere else
         "report-name",
@@ -436,6 +435,7 @@ hidden_js_ops = set(
         "runQueue-id",
         "user-id",
         "user-name",
+        "user-email",
         "user-link",
         "user-runs",
         "user-entities",

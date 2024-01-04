@@ -2,6 +2,7 @@ import os
 import random
 import numpy as np
 
+import pathlib
 import typing
 import pytest
 import shutil
@@ -9,7 +10,6 @@ import tempfile
 
 from weave.panels import table_state
 from . import context_state
-from . import weave_server
 from .tests import fixture_fakewandb
 from . import serialize
 from . import client
@@ -17,6 +17,7 @@ from .language_features.tagging.tag_store import isolated_tagging_context
 from . import logs
 from . import io_service
 from . import logs
+from . import environment
 import logging
 
 from flask.testing import FlaskClient
@@ -26,6 +27,13 @@ from .tests.wandb_system_tests_conftest import *
 from _pytest.config import Config
 from _pytest.reports import TestReport
 from typing import Tuple, Optional
+
+logs.configure_logger()
+
+# Lazy mode was the default for a long time. Eager is now the default for the user API.
+# A lot of tests are written to expect lazy mode, so just make lazy mode the default for
+# tests.
+context_state._eager_mode.set(False)
 
 
 def pytest_report_teststatus(
@@ -93,6 +101,22 @@ def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
+def pytest_collection_modifyitems(config, items):
+    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
+    job_num = config.getoption("--job-num", default=None)
+    if job_num is None:
+        return
+
+    job_num = int(job_num)
+
+    selected_items = []
+    for index, item in enumerate(items):
+        if index % 2 == job_num:
+            selected_items.append(item)
+
+    items[:] = selected_items
+
+
 @pytest.fixture(autouse=True)
 def pre_post_each_test(test_artifact_dir, caplog):
     # TODO: can't get this to work. I was trying to setup pytest log capture
@@ -100,6 +124,9 @@ def pre_post_each_test(test_artifact_dir, caplog):
     caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
+        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
+    )
     try:
         shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):
@@ -146,6 +173,16 @@ def fake_wandb():
 
 
 @pytest.fixture()
+def use_server_gql_schema():
+    old_schema_path = environment.gql_schema_path()
+    if old_schema_path is not None:
+        del os.environ["WEAVE_GQL_SCHEMA_PATH"]
+    yield
+    if old_schema_path is not None:
+        os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path
+
+
+@pytest.fixture()
 def fixed_random_seed():
     random.seed(8675309)
     np.random.seed(8675309)
@@ -156,6 +193,8 @@ def fixed_random_seed():
 
 @pytest.fixture()
 def app():
+    from . import weave_server
+
     app = weave_server.make_app()
     app.config.update(
         {
@@ -198,6 +237,8 @@ class HttpServerTestClient:
 
 @pytest.fixture()
 def http_server_test_client(app):
+    from . import weave_server
+
     app = weave_server.make_app()
     flask_client = app.test_client()
     return HttpServerTestClient(flask_client)

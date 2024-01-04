@@ -3,33 +3,52 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
-import getConfig from '../config';
 
+import {getCookie} from '../common/util/cookie';
+import getConfig from '../config';
 import {useWeaveContext} from '../context';
+import {
+  useIsAuthenticated,
+  useIsSignupRequired,
+  useWeaveViewer,
+} from '../context/WeaveViewerContext';
+import {
+  datadogSetUserInfo,
+  DDUserInfoType,
+} from '../integrations/analytics/datadog';
 import {useNodeWithServerType} from '../react';
 import {consoleLog} from '../util';
+import {trackPage} from '../util/events';
+import {urlWandbFrontend} from '../util/urls';
+import {useWeaveAutomation} from './automation';
+import {BetaIndicator} from './PagePanelComponents/BetaIndicator';
+import {HelpCTA} from './PagePanelComponents/HelpCTA';
 import {Home} from './PagePanelComponents/Home/Home';
-import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
+import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {
   inJupyterCell,
   isServedLocally,
   uriFromNode,
-  useIsAuthenticated,
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
+import {
+  PagePanelControlContextProvider,
+  usePagePanelControlRequestedActions,
+} from './PagePanelContext';
 import {
   CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
 } from './Panel2/ChildPanel';
+import {ChildPanelExportReport} from './Panel2/ChildPanelExportReport/ChildPanelExportReport';
 import {themes} from './Panel2/Editor.styles';
 import {
-  IconAddNew,
   IconClose,
   IconHome,
   IconOpenNewTab,
@@ -37,19 +56,13 @@ import {
 } from './Panel2/Icons';
 import * as Styles from './Panel2/PanelExpression/styles';
 import {
-  PANEL_GROUP_DEFAULT_CONFIG,
-  addPanelToGroupConfig,
-} from './Panel2/PanelGroup';
-import {
   PanelInteractContextProvider,
-  useCloseEditor,
-  useEditorIsOpen,
-  useSetInspectingPanel,
+  useCloseDrawer,
+  usePanelInteractMode,
+  useSetInteractingPanel,
 } from './Panel2/PanelInteractContext';
-import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
-import Inspector from './Sidebar/Inspector';
-import {useWeaveAutomation} from './automation';
+import PanelInteractDrawer from './Sidebar/PanelInteractDrawer';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -71,6 +84,7 @@ const JupyterControlsHelpText = styled.div<{active: boolean}>`
   opacity: ${props => (props.active ? 0.8 : 0)};
   transition: visibility 0s, opacity 0.3s ease-in-out;
 `;
+JupyterControlsHelpText.displayName = 'S.JupyterControlsHelpText';
 
 const JupyterControlsMain = styled.div<{reveal?: boolean}>`
   position: absolute;
@@ -92,6 +106,7 @@ const JupyterControlsMain = styled.div<{reveal?: boolean}>`
   padding: 8px 0px;
   z-index: 100;
 `;
+JupyterControlsMain.displayName = 'S.JupyterControlsMain';
 
 const JupyterControlsIcon = styled.div`
   width: 25px;
@@ -108,6 +123,76 @@ const JupyterControlsIcon = styled.div`
     color: #0096ad;
   }
 `;
+JupyterControlsIcon.displayName = 'S.JupyterControlsIcon';
+
+const HOST_SESSION_ID_COOKIE = `host_session_id`;
+
+function useEnablePageAnalytics() {
+  const history = useHistory();
+  const pathRef = useRef('');
+  const {urlPrefixed, backendWeaveViewerUrl} = getConfig();
+  const weaveViewer = useWeaveViewer();
+
+  const trackOnPathDiff = useCallback(
+    (location: any, options: any) => {
+      const currentPath = `${location.pathname}${location.search}`;
+      const fullURL = `${window.location.protocol}//${window.location.host}${location.pathname}${location.search}${location.hash}`;
+      if (pathRef.current !== currentPath) {
+        let pageCategory = '';
+        if (location.search.includes('exp=get')) {
+          pageCategory = 'WeaveGetExpression';
+        } else if (location.pathname.includes('/browse')) {
+          pageCategory = 'WeaveBrowser';
+        }
+        trackPage({url: fullURL, pageCategory}, options);
+        pathRef.current = currentPath;
+      }
+    },
+    [pathRef]
+  );
+
+  // fetch user
+  useEffect(() => {
+    if (!weaveViewer.loading) {
+      const injector = (window as any).WBAnalyticsInjector;
+      if (injector) {
+        const authenticated = !!weaveViewer.data.authenticated;
+        // In Weave, we only want to inject analytics if the user is authenticated.
+        // This means we don't have to muck with the consent banner.
+        if (authenticated) {
+          try {
+            injector.initializeTrackingScripts(authenticated).finally(() => {
+              (window.analytics as any)?.identify(
+                weaveViewer.data.user_id ?? ''
+              );
+            });
+          } catch (e) {
+            // console.error('Failed to inject analytics', e);
+          }
+        }
+      }
+    }
+  }, [urlPrefixed, backendWeaveViewerUrl, weaveViewer]);
+
+  useEffect(() => {
+    const options = {
+      context: {
+        hostSessionID: getCookie(HOST_SESSION_ID_COOKIE),
+      },
+    };
+
+    const unlisten = history.listen(location => {
+      trackOnPathDiff(location, options);
+    });
+
+    // Track initial page view
+    trackOnPathDiff(history.location, options);
+
+    return () => {
+      unlisten();
+    };
+  }, [history, trackOnPathDiff]);
+}
 
 // Simple function that forces rerender when URL changes.
 const usePoorMansLocation = () => {
@@ -127,9 +212,31 @@ const usePoorMansLocation = () => {
   return window.location;
 };
 
-const PagePanel: React.FC = props => {
+const useInitializeDataDog = () => {
+  const weaveViewer = useWeaveViewer();
+
+  useEffect(() => {
+    if (weaveViewer.loading) {
+      return;
+    }
+    const userInfo: DDUserInfoType = {};
+    if (weaveViewer.data.authenticated && weaveViewer.data.user_id) {
+      userInfo.username = weaveViewer.data.user_id;
+    }
+    datadogSetUserInfo(userInfo);
+  }, [weaveViewer]);
+};
+
+type PagePanelProps = {
+  browserType: string | undefined;
+};
+
+const PagePanel = ({browserType}: PagePanelProps) => {
+  useEnablePageAnalytics();
+  useInitializeDataDog();
   const weave = useWeaveContext();
   const location = usePoorMansLocation();
+  const history = useHistory();
   const urlParams = new URLSearchParams(location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
@@ -145,7 +252,9 @@ const PagePanel: React.FC = props => {
   }
   const inJupyter = inJupyterCell();
   const authed = useIsAuthenticated();
+  const signupRequired = useIsSignupRequired();
   const isLocal = isServedLocally();
+  const transparentlyMountExpString = useRef('');
 
   const setUrlExp = useCallback(
     (exp: NodeOrVoidNode) => {
@@ -156,31 +265,33 @@ const PagePanel: React.FC = props => {
 
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
+      const pathname = inJupyterCell() ? window.location.pathname : '/';
 
-      if (newExpStr.startsWith('get') && expString?.startsWith('get')) {
-        // In the specific case that we are updating a get with another get
-        // which happens when we transition between published and local states,
-        // then don't retain the history. We used to always do a replace and
-        // it was super confusing
-        window.history.replaceState(
-          null,
-          '',
-          `${window.location.pathname}?${searchParams}`
-        );
-      } else {
-        window.history.pushState(
-          null,
-          '',
-          `${window.location.pathname}?${searchParams}`
-        );
+      if (
+        newExpStr.startsWith('get') &&
+        expString?.startsWith('get') &&
+        newExpStr.includes('local-artifact') &&
+        expString.includes('wandb-artifact')
+      ) {
+        transparentlyMountExpString.current = newExpStr;
       }
+      history.push(`${pathname}?${searchParams}`);
     },
-    [expString, weave]
+    [expString, history, weave]
   );
 
   const [config, setConfig] = useState<ChildPanelFullConfig>(
     CHILD_PANEL_DEFAULT_CONFIG
   );
+
+  // If the exp string has gone away, perhaps by back button navigation,
+  // reset the config.
+  useEffect(() => {
+    if (!expString) {
+      setConfig(CHILD_PANEL_DEFAULT_CONFIG);
+    }
+  }, [expString]);
+
   const updateConfig = useCallback(
     (newConfig: Partial<ChildPanelFullConfig>) => {
       setConfig(currentConfig => ({...currentConfig, ...newConfig}));
@@ -230,15 +341,23 @@ const PagePanel: React.FC = props => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    consoleLog('PAGE PANEL MOUNT');
-    setLoading(true);
+    consoleLog('PAGE PANEL MOUNT', window.location.href);
+    const doTransparently =
+      expString != null && transparentlyMountExpString.current === expString;
+    setLoading(!doTransparently);
     if (expString != null) {
       weave.expression(expString, []).then(res => {
-        updateConfig({
-          input_node: res.expr as any,
-          id: panelId,
-          config: panelConfig,
-        } as any);
+        if (doTransparently) {
+          updateConfig({
+            input_node: res.expr as any,
+          });
+        } else {
+          updateConfig({
+            input_node: res.expr as any,
+            id: panelId,
+            config: panelConfig,
+          } as any);
+        }
         setLoading(false);
       });
     } else if (expNode != null) {
@@ -249,11 +368,6 @@ const PagePanel: React.FC = props => {
       } as any);
       setLoading(false);
     } else {
-      updateConfig({
-        input_node: voidNode(),
-        id: panelId,
-        config: panelConfig,
-      } as any);
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -285,15 +399,22 @@ const PagePanel: React.FC = props => {
 
   const needsLogin = authed === false && isLocal === false;
   useEffect(() => {
+    if (signupRequired) {
+      const newOrigin = urlWandbFrontend();
+      const newUrl = `${newOrigin}/signup`;
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      window.location.replace(newUrl);
+      return;
+    }
     if (needsLogin) {
-      const newOrigin = window.location.origin.replace('//weave.', '//api.');
+      const newOrigin = window.WEAVE_CONFIG.WANDB_BASE_URL;
       const newUrl = `${newOrigin}/oidc/login?${new URLSearchParams({
         redirect_to: window.location.href,
       }).toString()}`;
       // eslint-disable-next-line wandb/no-unprefixed-urls
       window.location.replace(newUrl);
     }
-  }, [authed, isLocal, needsLogin]);
+  }, [authed, isLocal, needsLogin, signupRequired]);
 
   if (loading || authed === undefined) {
     return <Loader name="page-panel-loader" />;
@@ -309,7 +430,11 @@ const PagePanel: React.FC = props => {
         <PanelInteractContextProvider>
           <WeaveRoot className="weave-root" fullScreen={fullScreen}>
             {config.input_node.nodeType === 'void' ? (
-              <Home updateConfig={updateConfig} inJupyter={inJupyter} />
+              <Home
+                updateConfig={updateConfig}
+                inJupyter={inJupyter}
+                browserType={browserType}
+              />
             ) : (
               <div
                 style={{
@@ -346,6 +471,8 @@ const PagePanel: React.FC = props => {
               </div>
             )}
             {/* <ArtifactManager /> */}
+            {!inJupyter && <HelpCTA />}
+            {!inJupyter && <BetaIndicator />}
           </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>
@@ -366,7 +493,7 @@ type PageContentProps = {
 export const PageContent: FC<PageContentProps> = props => {
   const {config, updateConfig, updateConfig2, goHome} = props;
   const weave = useWeaveContext();
-  const editorIsOpen = useEditorIsOpen();
+  const panelInteractMode = usePanelInteractMode();
   const inJupyter = inJupyterCell();
   const {urlPrefixed} = getConfig();
 
@@ -413,73 +540,68 @@ export const PageContent: FC<PageContentProps> = props => {
   }, [config.input_node, urlPrefixed, weave]);
 
   return (
-    <PageContentContainer
-      ref={pageRef}
-      onMouseLeave={e => setShowJupyterControls(false)}
-      onMouseMove={onMouseMove}>
-      <div
-        style={{
-          flex: '1 1 auto',
-          overflow: 'hidden',
-        }}>
-        <ChildPanel
-          controlBar={!isPanel && !props.previewMode ? 'editable' : 'off'}
-          prefixHeader={
-            inJupyter ? (
-              <Icon
-                style={{cursor: 'pointer', color: '#555'}}
-                name="home"
-                onClick={goHome}
-              />
-            ) : (
-              <></>
-            )
-          }
-          prefixButtons={
-            <>
-              {inJupyter && (
-                <>
-                  <Styles.BarButton onClick={openNewTab}>
-                    <Icon name="external square alternate" />
-                  </Styles.BarButton>
-                  {maybeUri && (
-                    <Styles.BarButton
-                      onClick={() => {
-                        onCopy();
-                      }}>
-                      <Icon name="copy" />
+    <PagePanelControlContextProvider>
+      <PageContentContainer
+        ref={pageRef}
+        onMouseLeave={e => setShowJupyterControls(false)}
+        onMouseMove={onMouseMove}>
+        <div
+          style={{
+            flex: '1 1 auto',
+            overflow: 'hidden',
+          }}>
+          <ChildPanel
+            controlBar={!isPanel && !props.previewMode ? 'editable' : 'off'}
+            prefixButtons={
+              <>
+                {inJupyter && (
+                  <>
+                    <Styles.BarButton onClick={openNewTab}>
+                      <Icon name="external square alternate" />
                     </Styles.BarButton>
-                  )}
-                </>
-              )}
-            </>
-          }
-          config={config}
-          updateConfig={updateConfig}
-          updateConfig2={updateConfig2}
-        />
-      </div>
-      <Inspector active={editorIsOpen}>
-        <ChildPanelConfigComp
-          // pathEl={CHILD_NAME}
-          config={config}
-          updateConfig={updateConfig}
-          updateConfig2={updateConfig2}
-        />
-      </Inspector>
-      {inJupyter && (
-        <JupyterPageControls
-          {...props}
-          reveal={showJupyterControls && !editorIsOpen}
-          goHome={goHome}
-          openNewTab={openNewTab}
-          maybeUri={maybeUri}
-          isGroup={isGroup}
-          isPanel={isPanel}
-          updateConfig2={updateConfig2}
-        />
-      )}
-    </PageContentContainer>
+                    {maybeUri && (
+                      <Styles.BarButton
+                        onClick={() => {
+                          onCopy();
+                        }}>
+                        <Icon name="copy" />
+                      </Styles.BarButton>
+                    )}
+                  </>
+                )}
+              </>
+            }
+            config={config}
+            updateConfig={updateConfig}
+            updateConfig2={updateConfig2}
+          />
+        </div>
+        <PanelInteractDrawer active={panelInteractMode !== null}>
+          {panelInteractMode === 'config' && (
+            <ChildPanelConfigComp
+              config={config}
+              updateConfig={updateConfig}
+              updateConfig2={updateConfig2}
+            />
+          )}
+          {panelInteractMode === 'export-report' && (
+            <ChildPanelExportReport rootConfig={config} />
+          )}
+        </PanelInteractDrawer>
+        {inJupyter && (
+          <JupyterPageControls
+            {...props}
+            reveal={showJupyterControls && panelInteractMode === null}
+            goHome={goHome}
+            openNewTab={openNewTab}
+            maybeUri={maybeUri}
+            isGroup={isGroup}
+            isPanel={isPanel}
+            updateConfig2={updateConfig2}
+          />
+        )}
+      </PageContentContainer>
+    </PagePanelControlContextProvider>
   );
 };
 
@@ -497,68 +619,10 @@ const JupyterPageControls: React.FC<
   const [hoverText, setHoverText] = useState('');
   // TODO(fix): Hiding code export temporarily as it is partially broken
   // const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
-  const setInspectingPanel = useSetInspectingPanel();
-  const closeEditor = useCloseEditor();
-  const editorIsOpen = useEditorIsOpen();
-  const updateInput = useCallback(
-    (newInput: NodeOrVoidNode) => {
-      props.updateConfig2(oldConfig => {
-        return {
-          ...oldConfig,
-          input_node: newInput,
-        };
-      });
-    },
-    [props]
-  );
-  const updateConfigForPanelNode = useUpdateConfigForPanelNode(
-    props.config.input_node,
-    updateInput
-  );
-  const addPanelToPanel = useCallback(() => {
-    if (props.isPanel) {
-      props.updateConfig2(oldConfig => {
-        // props.updateConfig2(oldConfig => {
-        let newInnerPanelConfig: ChildPanelFullConfig;
-        if (props.isGroup) {
-          newInnerPanelConfig = {
-            ...oldConfig.config,
-            config: addPanelToGroupConfig(
-              oldConfig.config.config,
-              [''],
-              'panel'
-            ),
-          };
-        } else {
-          newInnerPanelConfig = {
-            config: addPanelToGroupConfig(
-              addPanelToGroupConfig(
-                PANEL_GROUP_DEFAULT_CONFIG(),
-                undefined,
-                'panel',
-                oldConfig.config
-              ),
-              [''],
-              'panel'
-            ),
-            id: 'Group',
-            input_node: {
-              nodeType: 'void',
-              type: 'invalid',
-            },
-            vars: {},
-          };
-        }
-
-        updateConfigForPanelNode(newInnerPanelConfig);
-
-        return {
-          ...oldConfig,
-          config: newInnerPanelConfig,
-        };
-      });
-    }
-  }, [props, updateConfigForPanelNode]);
+  const setInteractingPanel = useSetInteractingPanel();
+  const closeDrawer = useCloseDrawer();
+  const panelInteractMode = usePanelInteractMode();
+  const requestedActions = usePagePanelControlRequestedActions();
 
   return (
     <JupyterControlsMain
@@ -570,23 +634,26 @@ const JupyterPageControls: React.FC<
         {hoverText}
       </JupyterControlsHelpText>
 
-      {props.isPanel && (
-        <JupyterControlsIcon
-          onClick={addPanelToPanel}
-          onMouseEnter={e => {
-            setHoverText('Add new panel');
-          }}
-          onMouseLeave={e => {
-            setHoverText('');
-          }}>
-          <IconAddNew />
-        </JupyterControlsIcon>
-      )}
+      {Object.entries(requestedActions).map(([key, val]) => {
+        return (
+          <JupyterControlsIcon
+            key={key}
+            onClick={val.onClick}
+            onMouseEnter={e => {
+              setHoverText(val.label);
+            }}
+            onMouseLeave={e => {
+              setHoverText('');
+            }}>
+            {val.Icon}
+          </JupyterControlsIcon>
+        );
+      })}
 
-      {editorIsOpen ? (
+      {panelInteractMode !== null ? (
         <JupyterControlsIcon
           onClick={() => {
-            closeEditor();
+            closeDrawer();
             setHoverText('Edit configuration');
           }}
           onMouseEnter={e => {
@@ -600,7 +667,7 @@ const JupyterPageControls: React.FC<
       ) : (
         <JupyterControlsIcon
           onClick={() => {
-            setInspectingPanel(['']);
+            setInteractingPanel('config', ['']);
             setHoverText('Close configuration editor');
           }}
           onMouseEnter={e => {
@@ -662,9 +729,11 @@ const WeaveRoot = styled.div<{fullScreen: boolean}>`
   background-color: ${globals.WHITE};
   color: ${globals.TEXT_PRIMARY_COLOR};
 `;
+WeaveRoot.displayName = 'S.WeaveRoot';
 
 const PageContentContainer = styled.div`
   flex: 1 1 300px;
   overflow: hidden;
   display: flex;
 `;
+PageContentContainer.displayName = 'S.PageContentContainer';

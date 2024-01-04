@@ -1,5 +1,6 @@
 import {
   constNumber,
+  dereferenceAllVars,
   isList,
   isListLike,
   isTaggedValue,
@@ -10,6 +11,7 @@ import {
   Node,
   NodeOrVoidNode,
   nonNullableDeep,
+  nullableTaggableStrip,
   opIndex,
   opIndexCheckpoint,
   OpStore,
@@ -19,12 +21,32 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
-import {useRefEqualExpr} from '../../../react';
+import {Stack} from '../../../core';
 import {usePanelContext} from '../PanelContext';
+import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';
+
+// Formatting for PanelNumbers and PanelStrings inside Tables
+export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
+  const t = nullableTaggableStrip(colType);
+  const numberFormat =
+    t === 'number'
+      ? {
+          textAlign: 'right' as const,
+          justifyContent: 'normal',
+          alignContent: 'normal',
+          padding: '4px 8px 0 0',
+        }
+      : {};
+  const stringFormat = {spacing: t === 'string'};
+  return {
+    numberFormat,
+    stringFormat,
+  };
+};
 
 export const stripTag = (type: Type): Type => {
   return isTaggedValue(type) ? taggedValueValueType(type) : type;
@@ -66,28 +88,19 @@ export const nodeIsValidList = (
   return isListLike(nonMaybeType) && listObjectType(nonMaybeType) !== 'invalid';
 };
 
-// useLoadOnce returns true only for the first loading state, and false thereafter
-function useLoadOnce(isLoading: boolean) {
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
-  useEffect(() => {
-    if (isLoading && !hasLoadedOnce) {
-      setHasLoadedOnce(true);
-    }
-  }, [hasLoadedOnce, isLoading]);
-
-  return {hasLoadedOnce};
-}
-
 export const useAutomatedTableState = (
   input: Node,
   currentTableState: Table.TableState | undefined,
   weave: WeaveInterface
 ) => {
-  const {table: autoTable} = useMemo(
-    () => Table.initTableFromTableType(input, weave),
-    [input, weave]
-  );
+  const {stack} = usePanelContext();
+  // TODO: This was reversing stack and breaking stuff!
+  // TODO TODO TODO
+  // ({node: input as any, stack} = useRefEqualExpr(input, stack));
+  const {table: autoTable} = useMemo(() => {
+    const dereffedInput = dereferenceAllVars(input, stack).node as Node;
+    return Table.initTableFromTableType(dereffedInput, weave);
+  }, [input, stack, weave]);
 
   const colDiff = Table.tableColumnsDiff(weave, autoTable, currentTableState);
   const isDiff = colDiff.addedCols.length > 0 || colDiff.removedCols.length > 0;
@@ -97,16 +110,11 @@ export const useAutomatedTableState = (
       ? autoTable
       : currentTableState;
 
-  let {stack} = usePanelContext();
-  ({node: input as any, stack} = useRefEqualExpr(input, stack));
-  const {loading, result: state} = useTableStateWithRefinedExpressions(
-    tableState,
-    input,
-    stack,
-    weave
-  );
-
-  const {hasLoadedOnce} = useLoadOnce(loading);
+  const {
+    initialLoading,
+    loading,
+    result: state,
+  } = useTableStateWithRefinedExpressions(tableState, input, stack, weave);
 
   const tableIsDefault = useMemo(() => {
     return (
@@ -118,12 +126,12 @@ export const useAutomatedTableState = (
   return React.useMemo(
     () => ({
       loading,
-      hasLoadedOnce,
+      hasLoadedOnce: !initialLoading,
       tableState: state,
       autoTable,
       tableIsDefault,
     }),
-    [loading, hasLoadedOnce, state, autoTable, tableIsDefault]
+    [loading, initialLoading, state, autoTable, tableIsDefault]
   );
 };
 
@@ -227,17 +235,29 @@ export const useBaseTableColumnDefinitions = (
 
 export const useOrderedColumns = (
   tableState: Table.TableState,
-  pinnedColumns: string[]
+  pinnedColumns: string[],
+  countColumnId: string | null
 ) => {
   return useMemo(() => {
     const allColumns = Table.getColumnRenderOrder(tableState);
-    const normalColumns = allColumns.filter(s => !pinnedColumns.includes(s));
-    const actualPinnedColumns = allColumns.filter(s =>
-      pinnedColumns.includes(s)
-    );
+    let countColumn = countColumnId ?? '';
+    let groupCountColumn = [countColumn];
+    if (!allColumns.includes(countColumn)) {
+      countColumn = '';
+      groupCountColumn = [];
+    }
+    const normalColumns = allColumns
+      .filter(s => !pinnedColumns.includes(s))
+      .filter(s => s !== countColumn);
+    const actualPinnedColumns = allColumns
+      .filter(s => pinnedColumns.includes(s))
+      .filter(s => s !== countColumn);
 
-    return tableState.groupBy.concat(actualPinnedColumns).concat(normalColumns);
-  }, [tableState, pinnedColumns]);
+    return tableState.groupBy
+      .concat(groupCountColumn)
+      .concat(actualPinnedColumns)
+      .concat(normalColumns);
+  }, [tableState, pinnedColumns, countColumnId]);
 };
 
 export const getTableMeasurements = (args: {
@@ -382,4 +402,11 @@ export const useBaseTableData = (
   }, [unfilteredRowsNode, adjustedPinnedRows]);
 
   return {unpinnedData, pinnedData};
+};
+
+// This is used to determine if a PanelTable is a ChildPanel
+// We do not want to render row selection styles if the activeData of the PanelTable cannot be used
+// If PanelTable is a ChildPanel, there will exist a variable in the stack that is an input
+export const tableIsPanelVariable = (stack: Stack) => {
+  return stack && stack.find(node => node.name === 'input') !== undefined;
 };

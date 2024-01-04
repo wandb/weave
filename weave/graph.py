@@ -7,6 +7,10 @@ from . import weave_types
 from . import uris
 from . import storage
 
+if typing.TYPE_CHECKING:
+    from . import weave_inspector
+
+
 T = typing.TypeVar("T")
 
 
@@ -33,6 +37,13 @@ class Node(typing.Generic[T]):
 
     def to_json(self) -> dict:
         raise NotImplementedError
+
+    def _inspect(self) -> "weave_inspector.NodeInspector":
+        """Only intended to be used by developers to help debug the graph."""
+        # Circular import, so we do it here.
+        from . import weave_inspector
+
+        return weave_inspector.NodeInspector(self)
 
     def __hash__(self) -> int:
         # We store nodes in a memoize cache in execute.py. They need to be
@@ -152,6 +163,11 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
 class VarNode(Node):
     name: str
 
+    # This is used to store the value node that the var is pointing at.
+    # Used when constructing panels to track var values so we can correctly
+    # perform refinement.
+    _var_val: typing.Optional["Node"] = None
+
     def __init__(self, type: weave_types.Type, name: str) -> None:
         self.type = type
         self.name = name
@@ -183,6 +199,7 @@ class ConstNode(Node):
         t = weave_types.TypeRegistry.type_from_dict(obj["type"])
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
+
         return cls(t, val)
 
     def to_json(self) -> dict:
@@ -224,10 +241,19 @@ def op_full_name(op: Op) -> str:
 
 
 def node_expr_str(node: Node) -> str:
+    from . import partial_object
+
     if isinstance(node, OutputNode):
         param_names = list(node.from_op.inputs.keys())
         if node.from_op.name == "dict":
             return "{%s}" % ", ".join(
+                (
+                    '"%s": %s' % (k, node_expr_str(n))
+                    for k, n in node.from_op.inputs.items()
+                )
+            )
+        elif node.from_op.name == "list":
+            return "[%s]" % ", ".join(
                 (
                     '"%s": %s' % (k, node_expr_str(n))
                     for k, n in node.from_op.inputs.items()
@@ -250,6 +276,24 @@ def node_expr_str(node: Node) -> str:
         elif node.from_op.name == "gqlroot-wbgqlquery":
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
             return f"{node.from_op.friendly_name}({query_hash})"
+        elif node.from_op.name == "gqlroot-querytoobj":
+            const = node.from_op.inputs[param_names[2]]
+            try:
+                assert isinstance(const, ConstNode)
+                narrow_type = const.val
+                assert isinstance(narrow_type, partial_object.PartialObjectType)
+            except AssertionError:
+                return (
+                    f"{node_expr_str(node.from_op.inputs[param_names[0]])}."
+                    f"querytoobj({node_expr_str(node.from_op.inputs[param_names[1]])}, ?)"
+                )
+            else:
+                return (
+                    f"{node_expr_str(node.from_op.inputs[param_names[0]])}."
+                    f"querytoobj({node_expr_str(node.from_op.inputs[param_names[1]])},"
+                    f" {narrow_type.keyless_weave_type_class()})"
+                )
+
         elif all([not isinstance(n, OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
                 node.from_op.friendly_name,
@@ -288,7 +332,7 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
-    # This is an iterative implemenation, to avoid blowing the stack and
+    # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
     to_consider = [node]
     while to_consider:
@@ -315,11 +359,15 @@ def _map_nodes(
             and isinstance(curr_node, ConstNode)
             and isinstance(curr_node.type, weave_types.Function)
         ):
-            if curr_node.val not in already_mapped:
-                to_consider.append(curr_node.val)
-                continue
-            if curr_node.val is not already_mapped[curr_node.val]:
-                result_node = ConstNode(curr_node.type, already_mapped[curr_node.val])
+            is_static_lambda = len(curr_node.type.input_types) == 0
+            if not is_static_lambda:
+                if curr_node.val not in already_mapped:
+                    to_consider.append(curr_node.val)
+                    continue
+                if curr_node.val is not already_mapped[curr_node.val]:
+                    result_node = ConstNode(
+                        curr_node.type, already_mapped[curr_node.val]
+                    )
 
         to_consider.pop()
         mapped_node = map_fn(result_node)
@@ -414,22 +462,32 @@ def expr_vars(node: Node) -> list[VarNode]:
     )
 
 
+def resolve_vars(node: Node) -> Node:
+    """Replace all VarNodes with the value they point to."""
+
+    def _replace_var_with_val(n: Node) -> typing.Optional[Node]:
+        if isinstance(n, VarNode) and hasattr(n, "_var_val") and n._var_val is not None:
+            # Recursively replace vars in the value node.
+            return resolve_vars(n._var_val)
+        return None
+
+    return map_nodes_full([node], _replace_var_with_val)[0]
+
+
 def is_open(node: Node) -> bool:
     """A Node is 'open' (as in open function) if there are one or more VarNodes"""
     return len(filter_nodes_top_level([node], lambda n: isinstance(n, VarNode))) > 0
 
 
-def _all_nodes(node: Node) -> set[Node]:
-    if not isinstance(node, OutputNode):
-        return set((node,))
-    res: set[Node] = set((node,))
-    for input in node.from_op.inputs.values():
-        res.update(_all_nodes(input))
-    return res
-
-
 def count(node: Node) -> int:
-    return len(_all_nodes(node))
+    counter = 0
+
+    def inc(n: Node) -> None:
+        nonlocal counter
+        counter += 1
+
+    map_nodes_full([node], inc)
+    return counter
 
 
 def _linearize(node: OutputNode) -> list[OutputNode]:

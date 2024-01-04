@@ -3,6 +3,7 @@ import * as _ from 'lodash';
 import * as Urls from '../../_external/util/urls';
 import * as callFunction from '../../callers';
 import {Client, EngineClient} from '../../client';
+import {Engine} from '../../engine';
 import {refineNode} from '../../hl';
 import {nullableTaggableStrip} from '../../model';
 import {constNode, constNumber} from '../../model/graph/construction';
@@ -16,7 +17,6 @@ import * as Obj from '../../util/obj';
 import * as String from '../../util/string';
 import * as OpKinds from '../opKinds';
 import {connectionToNodes} from './util';
-import {Engine} from '../../engine';
 
 const makeRunOp = OpKinds.makeTaggingStandardOp;
 
@@ -128,6 +128,17 @@ export const opRunCreatedAt = makeRunOp({
   returnValueDescription: `The created at datetime of the ${docType('run')}`,
   returnType: inputTypes => 'date',
   resolver: ({run}) => new Date(run.createdAt + 'Z'),
+});
+
+export const opRunUpdatedAt = makeRunOp({
+  name: 'run-updatedAt',
+  hidden: true,
+  argTypes: runArgTypes,
+  description: `Returns the updated at datetime of the ${docType('run')}`,
+  argDescriptions: {run: runArgDescriptions},
+  returnValueDescription: `The updated at datetime of the ${docType('run')}`,
+  returnType: inputTypes => 'date',
+  resolver: ({run}) => new Date(run.updatedAt + 'Z'),
 });
 
 export const opRunHeartbeatAt = makeRunOp({
@@ -436,10 +447,33 @@ export const opRunHistoryType2 = OpKinds.makeBasicOp({
   ) => opRunHistoryTypeResolver(run, engine),
 });
 
+export const opRunHistoryType3 = OpKinds.makeBasicOp({
+  hidden: true,
+  name: 'refine_history3_type',
+  argTypes: {
+    run: TypeHelpers.nullableOneOrMany('run'),
+  },
+  description: `Returns the type of a ${docType('run')} history.`,
+  argDescriptions: {
+    run: `A ${docType('run')}`,
+  },
+  returnValueDescription: `The type of the ${docType('run')} history`,
+  returnType: inputs => 'type',
+  resolver: async (
+    {run},
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context,
+    engine
+  ) => opRunHistoryTypeResolver(run, engine),
+});
+
 const opRunHistoryResolveOutputType = async (
   executableNode: GraphTypes.OutputNode<Types.Type>,
   client: Client,
-  historyVersion: 1 | 2
+  historyVersion: 1 | 2 | 3
 ) => {
   // See opRunSummary for comment
 
@@ -475,7 +509,9 @@ const opRunHistoryResolveOutputType = async (
   let result = nullableTaggableStrip(
     historyVersion === 1
       ? await client.query(opRunHistoryType({run}))
-      : await client.query(opRunHistoryType2({run}))
+      : historyVersion === 2
+      ? await client.query(opRunHistoryType2({run}))
+      : await client.query(opRunHistoryType3({run}))
   );
 
   if (TypeHelpers.isListLike(refinedRunNode.type)) {
@@ -527,6 +563,21 @@ export const opRunHistory2 = makeRunOp({
 
   resolveOutputType: async (inputTypes, node, executableNode, client) => {
     return opRunHistoryResolveOutputType(executableNode, client, 2);
+  },
+});
+
+// This is just here so we can type history3 in the EE outside of weave.wandb.ai for testing
+export const opRunHistory3 = makeRunOp({
+  name: 'run-history3',
+  argTypes: runArgTypes,
+  description: `Returns the log history of the ${docType('run')}`,
+  argDescriptions: {run: runArgDescriptions},
+  returnValueDescription: `The log history of the ${docType('run')}`,
+  returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
+  hidden: true,
+  resolver: ({run}) => opRunHistoryResolver(run),
+  resolveOutputType: async (inputTypes, node, executableNode, client) => {
+    return opRunHistoryResolveOutputType(executableNode, client, 3);
   },
 });
 
@@ -636,5 +687,31 @@ export const opRunRuntime = makeRunOp({
   returnType: inputTypes => 'number',
   resolver: ({run}) => {
     return run.computeSeconds;
+  },
+});
+
+export const opStrRunlink = OpKinds.makeBasicOp({
+  name: 'constructor-wbRunLink',
+  hidden: true,
+  argTypes: {
+    entity_name: {
+      type: 'union' as const,
+      members: ['none' as const, 'string' as const],
+    },
+    project_name: {
+      type: 'union' as const,
+      members: ['none' as const, 'string' as const],
+    },
+    name: {
+      type: 'union' as const,
+      members: ['none' as const, 'string' as const],
+    },
+  },
+  description: `Returns a link to the ${docType('run')} overview`,
+  argDescriptions: {run: runArgDescriptions},
+  returnValueDescription: `The link to the ${docType('run')} overview`,
+  returnType: inputTypes => 'link',
+  resolver: ({entity_name, project_name, name}) => {
+    throw new Error('Attempting to use python-only op in js');
   },
 });

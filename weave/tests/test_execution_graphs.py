@@ -3,6 +3,7 @@ from weave.server import handle_request
 import base64
 import zlib
 import json
+import os
 
 
 def test_graph_playback():
@@ -11,7 +12,7 @@ def test_graph_playback():
         res.results.unwrap()
 
 
-def test_zlib_playback():
+def test_zlib_playback(dev_only_admin_env_override, use_server_gql_schema):
     if zlib_str == "":
         return
     req_bytes = zlib.decompress(base64.b64decode(zlib_str.encode("ascii")))
@@ -44,8 +45,15 @@ def test_zlib_playback():
 # paste the stringified error node here and we will only execute that node.
 filter_node = ""
 
-# Paste zlib below (from DD)
 zlib_str = ""
+# Paste zlib into zlib.txt (from DD)
+zlib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zlib.txt")
+if os.path.exists(zlib_path):
+    with open(zlib_path, "r") as f:
+        zlib_str = f.read()
+    prefix = "Execute request (zlib): "
+    if zlib_str.startswith(prefix):
+        zlib_str = zlib_str[len(prefix) :]
 
 # Paste graphs below (from DD or Network tab to test)
 execute_payloads: list[dict] = []

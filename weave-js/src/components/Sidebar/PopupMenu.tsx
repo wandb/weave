@@ -1,8 +1,8 @@
 import _ from 'lodash';
 import React, {memo, useMemo} from 'react';
 import {
-  MenuItemProps,
   Menu as SemanticMenu,
+  MenuItemProps,
   Popup as SemanticPopup,
   StrictMenuItemProps,
   StrictMenuProps,
@@ -63,6 +63,7 @@ const PopupMenuComp: React.FC<PopupMenuProps> = ({
   );
 };
 
+/** @deprecated use `@wandb/components/DropdownMenu` instead */
 export const PopupMenu = memo(PopupMenuComp);
 
 const Popup = styled(SemanticPopup)`

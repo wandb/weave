@@ -4,7 +4,12 @@ from weave.artifact_fs import FilesystemArtifactFileType
 from weave.ops_domain.wb_domain_types import ProjectType, RunType, Run
 from weave.ops_domain.run_ops import run_tag_getter_op
 from weave.ops_primitives import dict as dict_ops, list_ as list_ops
-from ..language_features.tagging import make_tag_getter_op, tagged_value_type, tag_store
+from ..language_features.tagging import (
+    make_tag_getter_op,
+    tagged_value_type,
+    tag_store,
+    tagged_value_type_helpers,
+)
 from .. import weave_types as types
 from .. import box
 
@@ -22,6 +27,10 @@ def test_tagged_types():
     class _TestNumber:
         inner: int
 
+    from .. import context_state
+
+    _loading_builtins_token = context_state.set_loading_built_ins()
+
     @weave.op()
     def add_tester(a: _TestNumber, b: _TestNumber) -> _TestNumber:
         return _TestNumber(a.inner + b.inner)
@@ -32,6 +41,8 @@ def test_tagged_types():
 
     get_a_tag = make_tag_getter_op.make_tag_getter_op("a", _TestNumber.WeaveType())
     get_d_tag = make_tag_getter_op.make_tag_getter_op("d", _TestNumber.WeaveType())
+
+    context_state.clear_loading_built_ins(_loading_builtins_token)
 
     # 1: Assert that that the tester works
     three = add_tester(_TestNumber(1), _TestNumber(2))
@@ -249,7 +260,6 @@ def test_nested_deserialization_of_weave0_tags():
 
 
 def test_keytypes_tagged():
-
     object = box.box({"b": 1, "c": "a"})
     tag_store.add_tags(object, {"run": Run()})
     object_node = weave.save(object)
@@ -260,7 +270,7 @@ def test_keytypes_tagged():
         {"key": "c", "type": types.String()},
     ]
     assert kt_node.type == tagged_value_type.TaggedValueType(
-        types.TypedDict({"run": RunType}),
+        types.TypedDict({"run": RunType.with_keys({})}),
         types.List(
             object_type=types.TypedDict(
                 property_types={
@@ -286,7 +296,7 @@ def test_keytypes_tagged():
 )
 def test_list_tags_accessible_to_map_elements(list_data):
     run = Run()
-    tag_type = types.TypedDict({"run": RunType})
+    tag_type = types.TypedDict({"run": RunType.with_keys({})})
     tagged = tag_store.add_tags(list_data(), {"run": run})
     saved_node = weave.save(tagged)
     map_fn = lambda row: run_tag_getter_op(row)
@@ -295,3 +305,59 @@ def test_list_tags_accessible_to_map_elements(list_data):
     )
     mapped = list_ops.List.map(saved_node, fn)
     assert weave.use(mapped) == [run, run, run]
+
+
+def test_unwrap_rewrap_tags():
+    t1 = tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Int()}), types.Int()
+    )
+
+    unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t1)
+    assert unwrapped == types.Int()
+    assert rewrap(unwrapped) == t1
+
+    t2 = tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Int()}), types.TypedDict({"b": types.Int()})
+    )
+
+    unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t2)
+    assert unwrapped == types.TypedDict({"b": types.Int()})
+    assert rewrap(unwrapped) == t2
+
+    t3 = tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Int()}),
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"c": types.TypeType()}),
+            types.TypedDict({"b": types.Int()}),
+        ),
+    )
+
+    unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t3)
+    assert unwrapped == types.TypedDict({"b": types.Int()})
+    assert rewrap(unwrapped) == t3
+
+    t4 = types.TypedDict({"d": types.Int()})
+    assert rewrap(t4) == tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Int()}),
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"c": types.TypeType()}),
+            types.TypedDict({"d": types.Int()}),
+        ),
+    )
+
+    t5 = tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Int()}),
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"c": types.TypeType()}),
+            types.TypedDict({"d": types.List(types.String())}),
+        ),
+    )
+
+    unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t5)
+    assert unwrapped == types.TypedDict({"d": types.List(types.String())})
+    assert rewrap(unwrapped) == t5
+
+    t6 = types.Int()
+    unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t6)
+    assert unwrapped == t6
+    assert rewrap(unwrapped) == t6

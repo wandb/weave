@@ -6,6 +6,9 @@ from weave.wandb_interface.wandb_stream_table import StreamTable
 import numpy as np
 from PIL import Image
 
+from weave import execute, context, gql_json_cache
+from weave import wandb_api
+
 
 def make_stream_table(*args, **kwargs):
     # Unit test backend does not support async logging
@@ -43,6 +46,31 @@ def test_stream_logging(user_by_api_key_in_env):
     ]
 
 
+def test_bytes_read_from_arrow_reporting(user_by_api_key_in_env):
+    st = make_stream_table(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
+    for i in range(10):
+        st.log({"hello": f"world_{i}", "index": i, "nested": {"a": [i]}})
+    st.finish()
+
+    hist_node = (
+        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+        .run("test_table")
+        .history3()
+    )
+
+    with execute.top_level_stats() as stats:
+        with context.execution_client():
+            with gql_json_cache.gql_json_cache_context():
+                execute.execute_nodes([hist_node["hello"]])
+
+    # all data is the live set at this point, so it is all counted
+    assert stats.summary()["bytes_read_to_arrow"] == 190
+
+
 def test_stream_logging_image(user_by_api_key_in_env):
     def image():
         imarray = np.random.rand(100, 100, 3) * 255
@@ -72,6 +100,15 @@ def test_stream_logging_image(user_by_api_key_in_env):
     assert len(images) == 3
     assert (np.array(images[0]) != np.array(images[1])).any()
     assert isinstance(images[0], Image.Image)
+
+
+def test_stream_table_entity_inference(user_by_api_key_in_env):
+    st = make_stream_table("stream-tables/test_table-entity-inference")
+    for i in range(3):
+        st.log({"image": [1, 2, 3]})
+    st.finish()
+
+    assert st._entity_name == wandb_api.get_wandb_api_sync().default_entity_name()
 
 
 def test_multi_writers_sequential(user_by_api_key_in_env):
@@ -172,3 +209,16 @@ def test_stream_authed(user_by_api_key_in_env):
 
     a = weave.use(st.rows()["hello"]).to_pylist_tagged()
     assert a == ["world"]
+
+
+def test_stream_templates(user_by_api_key_in_env):
+    st = make_stream_table(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
+    st.log({"hello": "world"})
+    st.finish()
+
+    a = weave.use(st.rows().get_board_templates_for_node())
+    assert len(a) > 0

@@ -1,6 +1,6 @@
+import {list, Type} from '../../core';
 import * as AvailablePanels from './availablePanels';
 import {Spec as ArraySpec} from './PanelRow';
-import {list, Type} from '../../core';
 
 describe('availablePanels', () => {
   it('type image[]', () => {
@@ -277,5 +277,97 @@ describe('panel chaining', () => {
         sid => sid.id
       )
     ).toContain('row.row.image-file');
+  });
+
+  it('maybe file case', () => {
+    const type = {
+      type: 'tagged',
+      tag: {
+        type: 'tagged',
+        tag: {
+          type: 'tagged',
+          tag: {
+            type: 'tagged',
+            tag: {
+              type: 'tagged',
+              tag: {
+                type: 'typedDict',
+                propertyTypes: {
+                  entityName: 'string',
+                  projectName: 'string',
+                },
+              },
+              value: {
+                type: 'typedDict',
+                propertyTypes: {
+                  project: 'project',
+                  filter: 'string',
+                  order: 'string',
+                },
+              },
+            },
+            value: {
+              type: 'typedDict',
+              propertyTypes: {
+                entityName: 'string',
+                projectName: 'string',
+              },
+            },
+          },
+          value: {
+            type: 'typedDict',
+            propertyTypes: {
+              project: 'project',
+              filter: 'string',
+              order: 'string',
+            },
+          },
+        },
+        value: {
+          type: 'typedDict',
+          propertyTypes: {
+            run: 'run',
+          },
+        },
+      },
+      value: {
+        type: 'union',
+        members: [
+          'none',
+          {
+            type: 'file',
+            _base_type: {
+              type: 'FileBase',
+            },
+            extension: 'json',
+            wbObjectType: {
+              type: 'table',
+              _base_type: {
+                type: 'Object',
+              },
+              _is_object: true,
+              _rows: {
+                type: 'ArrowWeaveList',
+                _base_type: {
+                  type: 'list',
+                },
+                objectType: {
+                  type: 'typedDict',
+                  propertyTypes: {},
+                },
+              },
+            },
+          },
+        ],
+      },
+    } as Type;
+
+    const stacks = AvailablePanels.getPanelStacksForType(type, undefined, {
+      excludeTable: true,
+      excludeMultiTable: true,
+      excludePlot: true,
+    }).stackIds.map(s => s.id);
+
+    expect(stacks).toEqual(['maybe.object-file.object']);
   });
 });

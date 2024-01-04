@@ -1,5 +1,6 @@
 import weave
 import wandb
+from weave import compile
 
 
 # Example of end to end integration test
@@ -45,11 +46,10 @@ def test_basic_publish_user_by_api_key_netrc(user_by_api_key_netrc):
 
 
 def _test_basic_publish(user_fixture):
-    a = weave.publish([1, 2, 3], "weave/list")
+    ref = weave.storage.publish([1, 2, 3], "weave/list")
     # Getting the ref for `a` is not a final API. Expect
     # that changes to the publish flow will bread this test
     # and you might need to update how you get the ref.
-    ref = a.val._ref
     uri = ref.uri
     assert (
         uri
@@ -75,3 +75,22 @@ def test_run_histories(user_by_api_key_in_env):
 
     # Runs return in reverse chronological order
     assert history == [2, 1]
+
+
+# Example of end to end integration test
+def test_run_history_count(user_by_api_key_in_env):
+    run = wandb.init(project="project_exists")
+    run.log({"a": 1})
+    run.log({"a": 2})
+    run.finish()
+
+    run_node = weave.ops.project(run.entity, run.project).run(run.id)
+    h_count_node = run_node.history().count()
+    history_count = weave.use(h_count_node)
+    assert history_count == 2
+
+    compiled = compile.compile([h_count_node])
+    assert compiled[0].from_op.name == "run-historyLineCount"
+
+    run_history_lines = weave.use(run_node.historyLineCount())
+    assert run_history_lines == 2

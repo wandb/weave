@@ -20,6 +20,7 @@ import {
   SimpleType,
   TableType,
   TaggedValueType,
+  TimestampType,
   Type,
   TypedDictType,
   Union,
@@ -33,6 +34,13 @@ import {
 
 export function isSimpleTypeShape(t: Type): t is SimpleType {
   return typeof t === 'string';
+}
+
+export function getTypeName(t: Type): string {
+  if (isSimpleTypeShape(t)) {
+    return t;
+  }
+  return t.type;
 }
 
 // Returns a list of all paths for the object.
@@ -488,7 +496,9 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
           (type.type as string) === 'tablePanel' &&
           (toType.type as string) === 'tablePanel') ||
         ((type.type as string) === 'Query' &&
-          (toType.type as string) === 'Query')
+          (toType.type as string) === 'Query') ||
+        ((type.type as string) === 'tracePanel' &&
+          (toType.type as string) === 'tracePanel')
       ) {
         return true;
       }
@@ -983,7 +993,10 @@ export function isFile(t: Type): t is File {
 }
 
 export function isFileLike(t: Type): t is File {
-  t = nullableTaggableValue(t);
+  if (isTaggedValue(t)) {
+    t = taggedValueValueType(t);
+  }
+
   return isFile(t);
 }
 
@@ -1019,7 +1032,7 @@ export function isJoinedTable(t: Type): t is TableType {
   return !isSimpleTypeShape(t) && t?.type === 'joined-table';
 }
 
-export function isTimestamp(t: Type): t is ListType {
+export function isTimestamp(t: Type): t is TimestampType {
   return !isSimpleTypeShape(t) && t.type === 'timestamp';
 }
 

@@ -55,9 +55,10 @@ def listindex(self, index):
     end_indexes = a.offsets[1:]
     if isinstance(index, int) and index < 0:
         take_indexes = pa.compute.add(end_indexes, index)
+        oob = pa.compute.less(take_indexes, start_indexes)
     else:
         take_indexes = pa.compute.add(start_indexes, index)
-    oob = pa.compute.greater_equal(take_indexes, end_indexes)
+        oob = pa.compute.greater_equal(take_indexes, end_indexes)
     take_indexes = pa.compute.if_else(oob, None, take_indexes)
     result = a.flatten().take(take_indexes)
     return ArrowWeaveList(
@@ -69,23 +70,34 @@ def listindex(self, index):
 
 def _list_op_output_object_type(input_types):
     self_type = input_types["self"]
-    object_type = typing.cast(types.List, self_type.object_type)
-    inner_object_type = object_type.object_type
-    # TODO: union
-    if isinstance(inner_object_type, tagged_value_type.TaggedValueType):
-        return inner_object_type.value
-    return inner_object_type
+    from .. import op_def
+
+    def _remove_tags(t):
+        if isinstance(t, tagged_value_type.TaggedValueType):
+            return t.value
+        return t
+
+    self_type_without_tags = op_def.map_type(self_type, _remove_tags)
+    return self_type_without_tags.object_type.object_type
 
 
 def list_dim_downresolver(
     self: ArrowWeaveList, arrow_operation_name: str, output_object_type=None
 ):
-    a = arrow_as_array(self._arrow_data)
-    values = a.flatten()
+    without_tags = self.without_tags()
+    a = arrow_as_array(without_tags._arrow_data)
 
-    object_type = typing.cast(types.List, self.object_type)
-    if isinstance(object_type.object_type, tagged_value_type.TaggedValueType):
-        values = values.field("_value")
+    if output_object_type == None:
+        output_object_type = without_tags.object_type.object_type  # type: ignore
+
+    if isinstance(a, pa.NullArray):
+        return ArrowWeaveList(
+            a,
+            output_object_type,
+            self._artifact,
+        )
+
+    values = a.flatten()
 
     start_indexes = a.offsets[:-1]
     end_indexes = a.offsets[1:]
@@ -99,10 +111,7 @@ def list_dim_downresolver(
     result = pa.compute.replace_with_mask(
         nulls, non_0len, non_0len_agged.combine_chunks()
     )
-    if output_object_type == None:
-        output_object_type = _list_op_output_object_type(
-            {"self": ArrowWeaveListType(self.object_type)}
-        )
+
     return ArrowWeaveList(
         result,
         output_object_type,

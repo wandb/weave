@@ -2,11 +2,9 @@ import * as markdown from '@wandb/weave/common/util/markdown';
 import {opDisplayName} from '@wandb/weave/core';
 import React from 'react';
 
+import {Button} from '../../components/Button';
 import {useWeaveContext} from '../../context';
-
 import * as S from './OpDoc.styles';
-import {IconClose} from '../../components/Panel2/Icons';
-import {IconButton} from '../../components/IconButton';
 
 export interface OpDocProps {
   opName: string;
@@ -77,10 +75,13 @@ const OpDoc: React.FC<OpDocProps> = ({
           <S.Code>{displayName}</S.Code>
         </S.OpName>
         {onClose && (
-          <S.OpClose>
-            <IconButton onClick={onClose}>
-              <IconClose />
-            </IconButton>
+          <S.OpClose data-mode="dark">
+            <Button
+              variant="ghost"
+              size="small"
+              icon="close"
+              onClick={onClose}
+            />
           </S.OpClose>
         )}
       </S.OpNameRow>

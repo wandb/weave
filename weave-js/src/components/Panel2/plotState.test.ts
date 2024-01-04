@@ -1,3 +1,17 @@
+import {produce} from 'immer';
+import * as _ from 'lodash';
+
+import {
+  constNode,
+  constNumber,
+  constString,
+  Node,
+  NodeOrVoidNode,
+  opNumberAdd,
+  opPick,
+  varNode,
+  voidNode,
+} from '../../core';
 import {
   addSeriesFromSeries,
   condensePlotConfig,
@@ -13,20 +27,6 @@ import {
 } from './PanelPlot/versions';
 import * as v1 from './PanelPlot/versions/v1';
 import * as TableState from './PanelTable/tableState';
-import {
-  constNode,
-  constNumber,
-  constString,
-  Node,
-  NodeOrVoidNode,
-  opNumberAdd,
-  opPick,
-  varNode,
-  voidNode,
-} from '../../core';
-import {produce} from 'immer';
-import * as _ from 'lodash';
-
 import {
   getTableRowsNode,
   testWeave,
@@ -132,13 +132,20 @@ describe('test multiple series', () => {
     const y2colName =
       migrated.series[0].table.order[migrated.series[0].table.order.length - 1];
     const expectedResult: PlotConfig = {
-      configVersion: 14,
+      configVersion: 15,
       axisSettings: {
         ...basicConfig.axisSettings,
         color: {},
       },
       vegaOverlay: basicConfig.vegaOverlay,
-      legendSettings: basicConfig.legendSettings,
+      legendSettings: {
+        ...basicConfig.legendSettings,
+        x: {noLegend: false},
+        y: {noLegend: false},
+        pointShape: {noLegend: false},
+        pointSize: {noLegend: false},
+        lineStyle: {noLegend: false},
+      },
       configOptionsExpanded: PLOT_DIMS_UI.reduce((acc, val) => {
         acc[val] = false;
         return acc;

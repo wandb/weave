@@ -25,6 +25,7 @@ const LIMIT_PROJECT_RUNS = 100;
 const LIMIT_REPORT_STARGAZERS = 100;
 const LIMIT_USER_RUNS = 100;
 const LIMIT_USER_TEAMS = 100;
+const LIMIT_RUN_HISTORY_KEYS = 100;
 
 const gqlBasicField = (name: string, args?: Vega3.QueryArg[]) => {
   const field: Vega3.QueryField = {
@@ -448,6 +449,8 @@ export const toGqlField = (
     return gqlBasicField('name');
   } else if (forwardOp.op.name === 'entity-isTeam') {
     return gqlBasicField('isTeam');
+  } else if (forwardGraph.getOp.name === 'entity-internalId') {
+    return gqlBasicField('id');
   } else if (forwardOp.op.name === 'entity-portfolios') {
     return [
       {
@@ -478,8 +481,26 @@ export const toGqlField = (
         ],
       },
     ];
+  } else if (forwardOp.op.name === 'entity-reports') {
+    return [
+      {
+        name: 'views',
+        // TODO: hardcoding for perf during dev
+        args: gqlArgs({
+          first: childLimitWithDefault(LIMIT_ORG_REPORTS),
+        }),
+        fields: [
+          {
+            name: 'edges',
+            fields: [gqlObjectField(forwardGraph, forwardOp, 'node')],
+          },
+        ],
+      },
+    ];
   } else if (forwardOp.op.name === 'entity-org') {
     return [gqlObjectField(forwardGraph, forwardOp, 'organization')];
+  } else if (forwardOp.op.name === 'entity-artifactTTLDurationSeconds') {
+    return gqlBasicField('artifactTTLDurationSeconds');
   } else if (forwardOp.op.name === 'project-id') {
     return gqlBasicField('id');
   } else if (forwardOp.op.name === 'project-entity') {
@@ -664,6 +685,8 @@ export const toGqlField = (
     return gqlBasicField('name');
   } else if (forwardOp.op.name === 'org-teams') {
     return [gqlObjectField(forwardGraph, forwardOp, 'teams')];
+  } else if (forwardOp.op.name === 'report-internalId') {
+    return gqlBasicField('id');
   } else if (forwardOp.op.name === 'report-name') {
     return gqlBasicField('displayName');
   } else if (forwardOp.op.name === 'report-link') {
@@ -680,6 +703,8 @@ export const toGqlField = (
     return gqlBasicField('description');
   } else if (forwardOp.op.name === 'report-createdAt') {
     return gqlBasicField('createdAt');
+  } else if (forwardOp.op.name === 'report-updatedAt') {
+    return gqlBasicField('updatedAt');
   } else if (forwardOp.op.name === 'report-project') {
     return [gqlObjectField(forwardGraph, forwardOp, 'project')];
   } else if (forwardOp.op.name === 'report-creator') {
@@ -773,6 +798,8 @@ export const toGqlField = (
     return gqlBasicField('username');
   } else if (forwardOp.op.name === 'user-name') {
     return gqlBasicField('name');
+  } else if (forwardOp.op.name === 'user-email') {
+    return gqlBasicField('email');
   } else if (forwardOp.op.name === 'user-link') {
     return gqlBasicField('name').concat(gqlBasicField('username'));
   } else if (forwardOp.op.name === 'artifact-type') {
@@ -1081,6 +1108,10 @@ export const toGqlField = (
     return gqlBasicField('historyStep');
   } else if (forwardOp.op.name === 'artifactVersion-metadata') {
     return gqlBasicField('metadata');
+  } else if (forwardOp.op.name === 'artifactVersion-ttlDurationSeconds') {
+    return gqlBasicField('ttlDurationSeconds');
+  } else if (forwardOp.op.name === 'artifactVersion-ttlIsInherited') {
+    return gqlBasicField('ttlIsInherited');
   } else if (forwardOp.op.name === 'artifactVersion-artifactType') {
     return [gqlObjectField(forwardGraph, forwardOp, 'artifactType')];
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {
@@ -1245,6 +1276,8 @@ export const toGqlField = (
     return [gqlObjectField(forwardGraph, forwardOp, 'user')];
   } else if (forwardOp.op.name === 'run-createdAt') {
     return gqlBasicField('createdAt');
+  } else if (forwardOp.op.name === 'run-updatedAt') {
+    return gqlBasicField('updatedAt');
   } else if (forwardOp.op.name === 'run-heartbeatAt') {
     return gqlBasicField('heartbeatAt');
   } else if (forwardOp.op.name === 'run-project') {
@@ -1332,6 +1365,7 @@ export const toGqlField = (
         args: gqlArgs({
           minStep,
           maxStep,
+          maxKeyLimit: LIMIT_RUN_HISTORY_KEYS,
         }),
         fields: [],
         alias: `historyAsOf_${opInputs.asOfStep}`,

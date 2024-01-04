@@ -50,10 +50,13 @@ import {
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
-import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
+import {
+  ClientContext,
+  useWeaveClientEvalInUseNodeValueEnabled,
+  useWeaveContext,
+  useWeaveRefinementInReactHooksDisabled,
+} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
-import {useDeepMemo} from './hookUtils';
-import {consoleLog} from './util';
 import {
   callResolverSimple,
   clientSet,
@@ -61,6 +64,9 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
+import {UseNodeValueServerExecutionError} from './errors';
+import {useDeepMemo} from './hookUtils';
+import {consoleLog} from './util';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**
@@ -239,14 +245,16 @@ export const useNodeValue = <T extends Type>(
   const memoCacheId = options?.memoCacheId ?? 0;
   const callSite = options?.callSite;
   const skip = options?.skip;
-  const dashUiEnabled = useWeaveDashUiEnable();
+  const enableClientEval = useWeaveClientEvalInUseNodeValueEnabled();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
   const context = useClientContext();
   const client = context.client;
-  const {stack, inPanelMaybe} = usePanelContext();
+  const {stack, panelMaybeNode} = usePanelContext();
 
   // consoleLog('USE NODE VALUE PRE CLIENT EVAL', weave.expToString(node), stack);
+
+  const origNode = node;
 
   node = useMemo(() => {
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
@@ -255,8 +263,8 @@ export const useNodeValue = <T extends Type>(
   node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
 
   node = useMemo(
-    () => (dashUiEnabled ? clientEval(node, stack) : node),
-    [dashUiEnabled, node, stack]
+    () => (enableClientEval ? clientEval(node, stack) : node),
+    [enableClientEval, node, stack]
   ) as NodeOrVoidNode<T>;
 
   GlobalCGReactTracker.useNodeValue++;
@@ -290,7 +298,11 @@ export const useNodeValue = <T extends Type>(
     }
     if (isConstNode(node)) {
       // See the "Mixing functions and expression" comment above.
-      setResult({node, value: node.val});
+      if (isFunction(node.type)) {
+        setResult({node, value: node});
+      } else {
+        setResult({node, value: node.val});
+      }
       return;
     }
 
@@ -308,15 +320,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
-      if (callSite != null) {
-        // console.log('useNodeValue subscribe', callSite, node);
-      }
+      // if (callSite != null) {
+      //   console.log('useNodeValue subscribe', callSite, node);
+      // }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
-          if (callSite != null) {
-            // console.log('useNodeValue resolve', callSite, node);
-          }
+          // if (callSite != null) {
+          //   console.log('useNodeValue resolve', callSite, node);
+          // }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -334,18 +346,22 @@ export const useNodeValue = <T extends Type>(
   //   memoCacheId,
   //   callSite,
   // });
-
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
     if (error != null) {
       const message =
         'Node execution failed (useNodeValue): ' + errorToText(error);
-      console.error(message);
-      throw new Error(message);
+      // console.error(message);
+
+      throw new UseNodeValueServerExecutionError(message);
     }
     if (isConstNode(node)) {
-      return {loading: false, result: node.val};
+      if (isFunction(node.type)) {
+        return {loading: false, result: node};
+      } else {
+        return {loading: false, result: node.val};
+      }
     }
     const loading = result.node.nodeType === 'void' || node !== result.node;
     return {
@@ -353,7 +369,11 @@ export const useNodeValue = <T extends Type>(
       result: result.value,
     };
   }, [error, node, result.node, result.value]);
-  if (!finalResult.loading && inPanelMaybe && finalResult.result == null) {
+  if (
+    !finalResult.loading &&
+    panelMaybeNode === origNode &&
+    finalResult.result == null
+  ) {
     // Throw NullResult for PanelMaybe to catch.
     throw new NullResult(result.node);
   }
@@ -436,13 +456,29 @@ export const useValue = <T extends Type>(
   );
 };
 
-interface ArtifactURI {
+interface LocalArtifactRef {
   artifactName: string;
   artifactVersion: string;
   artifactPath: string;
 }
 
-export const parseRef = (ref: string): ArtifactURI => {
+export interface WandbArtifactRef {
+  entityName: string;
+  projectName: string;
+  artifactName: string;
+  artifactVersion: string;
+  artifactPath: string;
+}
+
+export type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
+
+export const isWandbArtifactRef = (
+  ref: ArtifactRef
+): ref is WandbArtifactRef => {
+  return 'entityName' in ref;
+};
+
+export const parseRef = (ref: string): ArtifactRef => {
   const url = new URL(ref);
   let splitLimit: number;
 
@@ -463,14 +499,36 @@ export const parseRef = (ref: string): ArtifactURI => {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
-  const path = isWandbArtifact ? splitUri.slice(2) : splitUri;
-  const [artifactId, artifactPath] = path;
-  const [artifactName, artifactVersion] = artifactId.split(':', 2);
+  if (isWandbArtifact) {
+    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
+    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    return {
+      entityName,
+      projectName,
+      artifactName: artifactNamePart,
+      artifactVersion,
+      artifactPath: artifactPathPart,
+    };
+  }
+
+  const [artifactName, artifactPath] = splitUri;
   return {
     artifactName,
-    artifactVersion,
+    artifactVersion: 'latest',
     artifactPath,
   };
+};
+
+export const refUri = (ref: ArtifactRef): string => {
+  if (isWandbArtifactRef(ref)) {
+    let uri = `wandb-artifact:///${ref.entityName}/${ref.projectName}/${ref.artifactName}:${ref.artifactVersion}`;
+    if (ref.artifactPath) {
+      uri = `${uri}/${ref.artifactPath}`;
+    }
+    return uri;
+  } else {
+    return `local-artifact:///${ref.artifactName}/${ref.artifactPath}`;
+  }
 };
 
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
@@ -526,7 +584,15 @@ export const makeCallAction = (
         // pass
       } else if (mutationStyle === 'clientRef') {
         consoleLog('clientRef useAction result', final);
-        let newRootNode: Node = constNodeUnsafe(toWeaveType(final), final);
+        let newRootNode: Node;
+        if (isNodeOrVoidNode(final)) {
+          if (final.nodeType !== 'const') {
+            throw new Error('Unexpected mutation result');
+          }
+          newRootNode = final;
+        } else {
+          newRootNode = constNodeUnsafe(toWeaveType(final), final);
+        }
 
         // This is a gnarly hack. final is a json value, we don't know its True
         // Weave type. This generally works for basic json types, but in particular
@@ -601,7 +667,15 @@ export const makeCallAction = (
       }
 
       // refreshAll so that queries rerun.
-      refreshAll();
+      //
+      // Actually, don't do this! UI changes should already by in the DOM,
+      // mutations just persist them back to the original object.
+      //
+      // If we find we need something like this, it needs to be more selective.
+      // It should definitely not happen when we use a mutation to update a panel
+      // document.
+      //
+      // refreshAll();
 
       // We actually get the mutated object back right now.
       // But don't send this to the user! For one reason, we shouldn't
@@ -889,7 +963,11 @@ export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
   return useDeepMemo(node, compareNodesWithoutTypes);
 };
 
-export const useNodeWithServerType = (
+// This is exported because we need it in one place: PagePanel
+// needs to load the type of it's input expression before it can render
+// a child. We can remove that callsite too once we ensure PagePanel
+// always has the initial type information it needs to continue loading.
+export const useNodeWithServerTypeDoNotCallMeDirectly = (
   node: NodeOrVoidNode,
   paramFrame?: Frame
 ): {loading: boolean; result: NodeOrVoidNode} => {
@@ -944,7 +1022,7 @@ export const useNodeWithServerType = (
       // rethrow in render thread
       const message =
         'Node execution failed (useNodeWithServerType): ' + errorToText(error);
-      console.error(message);
+      // console.error(message);
       throw new Error(message);
     }
     return {
@@ -954,6 +1032,28 @@ export const useNodeWithServerType = (
   }, [result, node, error]);
   return finalResult;
 };
+
+// Non-dashUI Weave use this during the render cycle in some panels, to get
+// up to date type information. That is a problem because it blocks loading
+// and causes sequences of data loading requests instead of rolling them all up into
+// one shot. In dashUi, we refine as needed upon panel construction or user action
+// instead of during rendering.
+export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirectly =
+  (node, paramFrame) => {
+    const disableRefinement = useWeaveRefinementInReactHooksDisabled();
+    // In dashUI, no-op. We manage document refinement in panelTree
+    if (disableRefinement) {
+      return {
+        initialLoading: false,
+        loading: false,
+        result: node,
+      };
+    }
+
+    // We can ignore this, dashUi is a feature flag that doesn't change during a session
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useNodeWithServerTypeDoNotCallMeDirectly(node, paramFrame);
+  };
 
 export const useExpandedNode = (
   node: NodeOrVoidNode

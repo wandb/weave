@@ -15,9 +15,9 @@ from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
 from wandb.sdk.lib.ipython import _get_python_type
 
-
 from .wandb_lite_run import InMemoryLazyLiteRun
 
+from .. import wandb_api
 from .. import runfiles_wandb
 from .. import storage
 from .. import weave_types
@@ -27,8 +27,6 @@ from .. import file_util
 from .. import graph
 from .. import errors
 from ..core_types.stream_table_type import StreamTableType
-from ..ops_domain import stream_table_ops
-from ..ops_primitives import weave_api
 
 if typing.TYPE_CHECKING:
     from wandb.sdk.internal.file_pusher import FilePusher
@@ -46,7 +44,7 @@ TRUST_GORILLA_FOR_NESTED_STRUCTURES = True
 ENCODE_ENTIRE_TYPE = True
 TYPE_ENCODE_PREFIX = "_wt_::"
 
-ROW_TYPE = typing.Union[dict, list[dict]]
+ROW_TYPE = typing.Union[typing.Mapping, list[typing.Mapping]]
 
 
 class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
@@ -132,15 +130,20 @@ class _StreamTableSync:
             project_name = splits[1]
             table_name = splits[2]
 
-        # For now, we force the user to specify the entity and project
-        # technically, we could infer the entity from the API key, but
-        # that tends to confuse users.
         if entity_name is None or entity_name == "":
-            raise ValueError(f"Must specify entity_name")
-        elif project_name is None or project_name == "":
-            raise ValueError(f"Must specify project_name")
+            # Use user's default entity
+            api = wandb_api.get_wandb_api_sync()
+            entity_name = api.default_entity_name()
+            # get default entity
+            if entity_name is None or entity_name == "":
+                raise ValueError(
+                    "Entity not specified and no default entity found. Please specify entity_name or set default entity with `wandb login --entity <entity_name>`"
+                )
+
+        if project_name is None or project_name == "":
+            raise ValueError("Must specify project_name")
         elif table_name is None or table_name == "":
-            raise ValueError(f"Must specify table_name")
+            raise ValueError("Must specify table_name")
 
         self._lite_run = InMemoryLazyLiteRun(
             entity_name,
@@ -183,9 +186,9 @@ class _StreamTableSync:
             self._artifact.set_file_pusher(self._lite_run.pusher)
         if print_url:
             base_url = environment.weave_server_url()
-            url = f"{base_url}/?exp=get%28%0A++++%22wandb-artifact%3A%2F%2F%2F{self._entity_name}%2F{self._project_name}%2F{self._table_name}%3Alatest%2Fobj%22%29%0A++.rows"
+            url = f"{base_url}/browse/wandb/{self._entity_name}/{self._project_name}/table/{self._table_name}"
             printer = get_printer(_get_python_type() != "python")
-            printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
+            # printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
 
     def log(self, row_or_rows: ROW_TYPE) -> None:
@@ -196,6 +199,9 @@ class _StreamTableSync:
             self._log_row(row)
 
     def rows(self) -> graph.Node:
+        from ..ops_domain import stream_table_ops
+        from ..ops_primitives import weave_api
+
         if self._weave_stream_table_ref is None:
             raise errors.WeaveInternalError("ref is None after ensure")
         return stream_table_ops.rows(
@@ -207,7 +213,7 @@ class _StreamTableSync:
 
         return show(self.rows())
 
-    def _log_row(self, row: dict) -> None:
+    def _log_row(self, row: typing.Mapping) -> None:
         row_copy = {**row}
         row_copy["_client_id"] = self._client_id
         if "timestamp" not in row_copy:
@@ -216,10 +222,10 @@ class _StreamTableSync:
         self._lite_run.log(payload)
 
     def finish(self) -> None:
-        if self._artifact:
-            self._artifact.cleanup()
         if self._lite_run:
             self._lite_run.finish()
+        if self._artifact:
+            self._artifact.cleanup()
 
     def __del__(self) -> None:
         self.finish()
@@ -255,6 +261,7 @@ class StreamTable(_StreamTableSync):
         self._thread.start()
 
     def log(self, row_or_rows: ROW_TYPE) -> None:
+        # weave_types.TypeRegistry.type_of(row_or_rows)
         self.queue.put(row_or_rows)
 
     def _flush(self) -> None:
@@ -292,7 +299,12 @@ class StreamTable(_StreamTableSync):
 def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_types.Type]:
     if tc_type.startswith(TYPE_ENCODE_PREFIX):
         w_type = json.loads(tc_type[len(TYPE_ENCODE_PREFIX) :])
-        return weave_types.TypeRegistry.type_from_dict(w_type)
+        try:
+            return weave_types.TypeRegistry.type_from_dict(w_type)
+        except Exception as e:
+            logging.warning(
+                f"StreamTable Type Error: Found type for {tc_type}, but blind construction failed: {e}",
+            )
     else:
         possible_type = weave_types.type_name_to_type(tc_type)
         if possible_type is not None:

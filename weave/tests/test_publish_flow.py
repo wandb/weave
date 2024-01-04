@@ -17,8 +17,8 @@ from weave.uris import WeaveURI
 
 def test_publish_values(user_by_api_key_in_env):
     data = ["a", "b", "c"]
-    res = weave.publish(data, "weave/list")
-    assert weave.use(res) == data
+    ref = storage.publish(data, "weave/list")
+    assert ref.get() == data
 
 
 def test_publish_panel(user_by_api_key_in_env):
@@ -36,8 +36,8 @@ def test_publish_panel(user_by_api_key_in_env):
             lambda row: row["c"],
         ],
     )
-    res = weave.publish(table_obj, "weave/table")
-    assert isinstance(res, weave.graph.Node)
+    ref = storage.publish(table_obj, "weave/table")
+    assert isinstance(ref, WandbArtifactRef)
 
 
 def test_publish_table(user_by_api_key_in_env):
@@ -55,8 +55,10 @@ def test_publish_table(user_by_api_key_in_env):
             lambda row: row["c"],
         ],
     )
-    res = weave.publish(table_obj)
-    assert res.val.input_node.from_op.inputs["uri"].val.startswith("wandb-artifact://")
+    ref = storage.publish(table_obj, "weave/table")
+    assert (
+        ref.get().input_node.from_op.inputs["uri"].val.startswith("wandb-artifact://")
+    )
 
 
 def test_publish_group(user_by_api_key_in_env):
@@ -85,7 +87,7 @@ def test_publish_group(user_by_api_key_in_env):
         }
     )
 
-    res = weave.publish(group)
+    res = storage.publish(group, "weave/group")
 
 
 """
@@ -122,6 +124,7 @@ In summary, there will be 22 tests:
 * 2 * 6 `Merge` tests (2 types of branchpoints, and 6 branch location types.)
    * -2 cases that are not possible
 """
+
 
 # Persist tests
 def test_persist_to_remote_with_commit_hash(user_by_api_key_in_env):
@@ -186,7 +189,7 @@ def test_persist_to_local_with_commit_hash(user_by_api_key_in_env):
     expected_commit_hash = "b11179315e19b4207282"
     branch_name = None
 
-    p_ref = storage._direct_save(
+    p_ref = storage.direct_save(
         obj=data,
         name=target_artifact_name,
         branch_name=branch_name,
@@ -213,7 +216,7 @@ def test_persist_to_local_with_branch(user_by_api_key_in_env):
     expected_commit_hash = "b11179315e19b4207282"
     branch_name = "my_branch"
 
-    p_ref = storage._direct_save(
+    p_ref = storage.direct_save(
         obj=data,
         name=target_artifact_name,
         branch_name=branch_name,
@@ -239,14 +242,14 @@ def test_persist_to_local_with_branch_and_branchpoint(user_by_api_key_in_env):
     source_commit_hash = "741eb73e40d3b38b046b"
 
     # First, save a local artifact with a branch
-    p_ref = storage._direct_save(
+    p_ref = storage.direct_save(
         obj=["initial_data"],
         name=target_artifact_name,
         branch_name=source_branch_name,
     )
 
     # Then, save a new local artifact with a branchpoint
-    new_p_ref = storage._direct_save(
+    new_p_ref = storage.direct_save(
         obj=data,
         name=target_artifact_name,
         branch_name=branch_name,
@@ -444,7 +447,7 @@ def test_mutate_local_with_commit_hash(user_by_api_key_in_env, new_branch_name=N
     new_data = ["test_data_2"]
     new_commit_hash = "61f78c8877df22942d23"
 
-    p_ref = storage._direct_save(
+    p_ref = storage.direct_save(
         obj=data,
         name=target_artifact_name,
         branch_name=branch_name,
@@ -554,7 +557,7 @@ def test_mutate_local_with_branch(user_by_api_key_in_env, new_branch_name=None):
     new_data = ["test_data_2"]
     new_commit_hash = "61f78c8877df22942d23"
 
-    p_ref = storage._direct_save(
+    p_ref = storage.direct_save(
         obj=data,
         name=target_artifact_name,
         branch_name=branch_name,

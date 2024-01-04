@@ -5,12 +5,14 @@ import os
 import functools
 import tempfile
 import typing
+import requests
+import logging
 
 from wandb import Artifact
 from wandb.apis import public as wb_public
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
-
+from . import urls
 from . import uris
 from . import util
 from . import errors
@@ -21,12 +23,17 @@ from . import file_util
 from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
+from . import memo
+from . import eager
+from . import graph_client_context
 from .wandb_interface import wandb_artifact_pusher
+from . import engine_trace
 
 from urllib import parse
 
 if typing.TYPE_CHECKING:
     from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+    from .run_streamtable_span import RunStreamTableSpan
 
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -89,8 +96,16 @@ class WandbArtifactManifest:
 
 # TODO: Get rid of this, we have the new wandb api service! But this
 # is still used in a couple places.
+@memo.memo  # Per-request memo reduces duplicate calls to the API
 def get_wandb_read_artifact(path: str):
-    return wandb_client_api.wandb_public_api().artifact(path)
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_artifact"):
+        try:
+            return wandb_client_api.wandb_public_api().artifact(path)
+        except wandb_client_api.WandbCommError:
+            raise errors.WeaveArtifactVersionNotFound(
+                f"Could not find artifact with path {path} in W&B"
+            )
 
 
 def is_valid_version_index(version_index: str) -> bool:
@@ -98,13 +113,15 @@ def is_valid_version_index(version_index: str) -> bool:
 
 
 def get_wandb_read_artifact_uri(path: str):
-    art = get_wandb_read_artifact(path)
-    return WeaveWBArtifactURI(
-        art.name.split(":", 1)[0],
-        art.commit_hash,
-        art.entity,
-        art.project,
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_artifact_uri"):
+        art = get_wandb_read_artifact(path)
+        return WeaveWBArtifactURI(
+            art.name.split(":", 1)[0],
+            art.commit_hash,
+            art.entity,
+            art.project,
+        )
 
 
 def wandb_artifact_dir():
@@ -138,12 +155,14 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
         }
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
-        query,
-        variable_values={
-            "clientID": art_id,
-        },
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("_convert_client_id_to_server_id.execute"):
+        res = wandb_client_api.wandb_public_api().client.execute(
+            query,
+            variable_values={
+                "clientID": art_id,
+            },
+        )
     return b64_to_hex_id(res["clientIDMapping"]["serverID"])
 
 
@@ -151,8 +170,7 @@ def _collection_and_alias_id_mapping_to_uri(
     client_collection_id: str, alias_name: str
 ) -> ReadClientArtifactURIResult:
     is_deleted = False
-    query = wb_public.gql(
-        """
+    query = """
     query ArtifactVersionFromIdAlias(
         $id: ID!,
         $aliasName: String!
@@ -174,6 +192,15 @@ def _collection_and_alias_id_mapping_to_uri(
                 versionIndex
                 commitHash
             }
+            artifactMemberships(first: 1) {
+                edges {
+                    node {
+                        id
+                        versionIndex
+                        commitHash
+                    }
+                }
+            }
             defaultArtifactType {
                 id
                 name
@@ -181,19 +208,36 @@ def _collection_and_alias_id_mapping_to_uri(
         }
     }
     """
-    )
-    res = wandb_client_api.wandb_public_api().client.execute(
-        query,
-        variable_values={
-            "id": client_collection_id,
-            "aliasName": alias_name,
-        },
-    )
-    collection = res["artifactCollection"]
+
+    try:
+        tracer = engine_trace.tracer()
+        with tracer.trace("_collection_and_alias_id_mapping_to_uri.execute"):
+            res = wandb_client_api.query_with_retry(
+                query,
+                variables={
+                    "id": client_collection_id,
+                    "aliasName": alias_name,
+                },
+                num_timeout_retries=1,
+            )
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 400:
+            # This is a special case: the client id corresponds to an artifact that was
+            # never uploaded, so the client id doesn't exist in the W&B server.
+
+            collection = None
+            logging.warn(
+                f"Artifact collection with client id {client_collection_id} not present in W&B server."
+            )
+
+        else:
+            raise e
+    else:
+        collection = res["artifactCollection"]
 
     if collection is None:
         # Note: deleted collections are still returned by the API (with state=DELETED)
-        # So a missing collection is a real error.
+        # So a missing collection is a real error (unless it was never uploaded)
         raise errors.WeaveArtifactCollectionNotFound(
             f"Could not find artifact collection with client id {client_collection_id}"
         )
@@ -204,12 +248,31 @@ def _collection_and_alias_id_mapping_to_uri(
     artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
     artifact_membership = res["artifactCollection"]["artifactMembership"]
     if artifact_membership is None:
-        is_deleted = True
-        # If the membership is deleted, then we will not be able to get the commit hash.
-        # Here, we can simply use the alias name as the commit hash. If the collection
-        # is ever un-deleted or the alias is re-assigned, then the next call will result
-        # in a "true" commit hash, ensuring we don't hit a stale cache.
-        commit_hash = alias_name
+        # Here we account for a special case: when the alias is `latest`. It is
+        # exceedingly common and expected to reference the latest alias of a
+        # collection. This is particularly common when logging tables (but used
+        # in many other places as well). Occasionally the user deletes the
+        # `latest` alias which is a super easy thing to do in the UI. However,
+        # this results in the data not being found. We solved this similarly in
+        # the typescript implementation by getting the most recent version in
+        # such cases. At one point we had an extended discussion about making
+        # `latest` a "calculated" alias, which would solve this issue on
+        # gorilla's side, but were unable to reach an actionable conclusion.
+        # This is a simple workaround that solves for these cases.
+        if (
+            alias_name == "latest"
+            and len(res["artifactCollection"]["artifactMemberships"]["edges"]) > 0
+        ):
+            commit_hash = res["artifactCollection"]["artifactMemberships"]["edges"][0][
+                "node"
+            ]["commitHash"]
+        else:
+            is_deleted = True
+            # If the membership is deleted, then we will not be able to get the commit hash.
+            # Here, we can simply use the alias name as the commit hash. If the collection
+            # is ever un-deleted or the alias is re-assigned, then the next call will result
+            # in a "true" commit hash, ensuring we don't hit a stale cache.
+            commit_hash = alias_name
     else:
         commit_hash = artifact_membership["commitHash"]
     entity_name = collection["project"]["entity"]["name"]
@@ -259,10 +322,12 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
     }
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
-        query,
-        variable_values={"id": hex_to_b64_id(server_id)},
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("_version_server_id_to_uri.execute"):
+        res = wandb_client_api.wandb_public_api().client.execute(
+            query,
+            variable_values={"id": hex_to_b64_id(server_id)},
+        )
 
     artifact = res["artifact"]
     if artifact is None:
@@ -308,24 +373,30 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
 
 def get_wandb_read_client_artifact_uri(art_id: str) -> ReadClientArtifactURIResult:
     """art_id may be client_id, seq:alias, or server_id"""
-    if _art_id_is_client_version_id_mapping(art_id):
-        server_id = _convert_client_id_to_server_id(art_id)
-        return _version_server_id_to_uri(server_id)
-    elif _art_id_is_client_collection_and_alias_id_mapping(art_id):
-        client_collection_id, alias_name = art_id.split(":")
-        return _collection_and_alias_id_mapping_to_uri(client_collection_id, alias_name)
-    else:
-        return _version_server_id_to_uri(art_id)
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_client_artifact_uri"):
+        if _art_id_is_client_version_id_mapping(art_id):
+            server_id = _convert_client_id_to_server_id(art_id)
+            return _version_server_id_to_uri(server_id)
+        elif _art_id_is_client_collection_and_alias_id_mapping(art_id):
+            client_collection_id, alias_name = art_id.split(":")
+            return _collection_and_alias_id_mapping_to_uri(
+                client_collection_id, alias_name
+            )
+        else:
+            return _version_server_id_to_uri(art_id)
 
 
 def get_wandb_read_client_artifact(art_id: str) -> typing.Optional["WandbArtifact"]:
     """art_id may be client_id, seq:alias, or server_id"""
-    res = get_wandb_read_client_artifact_uri(art_id)
-    if res.is_deleted:
-        return None
-    return WandbArtifact(
-        res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
-    )
+    tracer = engine_trace.tracer()
+    with tracer.trace("get_wandb_read_client_artifact"):
+        res = get_wandb_read_client_artifact_uri(art_id)
+        if res.is_deleted:
+            return None
+        return WandbArtifact(
+            res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
+        )
 
 
 class WandbArtifactType(artifact_fs.FilesystemArtifactType):
@@ -427,6 +498,31 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def delete(self) -> None:
         self._saved_artifact.delete(delete_aliases=True)
 
+    def add_artifact_reference(self, uri: str) -> None:
+        # The URI for a get node might look like: wandb-artifact:///<entity>/<project>/test8:latest/obj
+        # but the SDK add_reference call requires something like:
+        # wandb-artifact://41727469666163743a353432353830303535/obj.object.json
+        assert uri.startswith("wandb-artifact:///")
+        uri_parts = WeaveWBArtifactURI.parse(uri)
+        uri_path = f"{uri_parts.entity_name}/{uri_parts.project_name}/{uri_parts.name}:{uri_parts.version}"
+        ref_artifact = get_wandb_read_artifact(uri_path)
+
+        # A reference needs to point to a specific existing file in the other artifact.
+        # For stream tables obj.object.json should exist. For logged tables, the filename
+        # can vary, so we just pick the first file we find.
+        filename = "obj.object.json"
+        try:
+            ref_url = ref_artifact.get_path(filename).ref_url()
+        except KeyError:
+            for ref_file in ref_artifact.files(None, per_page=1):
+                ref_url = ref_artifact.get_path(ref_file.name).ref_url()
+                break
+
+        # We have a name collision problem. E.g. A board and a stream table will both have
+        # a file named obj.object.json. Add a prefix to distinguish them.
+        ref_name = f"{ref_artifact.id}__{filename}"
+        self._writeable_artifact.add_reference(ref_url, ref_name)
+
     @property
     def commit_hash(self) -> str:
         if not self.is_saved:
@@ -483,7 +579,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
-            raise FileNotFoundError("Path not in artifact")
+            raise FileNotFoundError("Path not in artifact %s %s" % (self, name))
         return self.io_service.fs.path(fs_path)
 
     def size(self, path: str) -> int:
@@ -525,6 +621,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             yield f
 
     @contextlib.contextmanager
+    def writeable_file_path(self, path):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            full_path = os.path.join(tmpdir, path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            yield full_path
+            self._writeable_artifact.add_file(full_path, path)
+
+    @contextlib.contextmanager
     def new_dir(self, path):
         if not self._writeable_artifact:
             raise errors.WeaveInternalError("cannot add new file to readonly artifact")
@@ -557,6 +661,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         project: str = DEFAULT_WEAVE_OBJ_PROJECT,
         entity_name: typing.Optional[str] = None,
         branch: typing.Optional[str] = None,
+        artifact_collection_exists: bool = False,
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
@@ -566,6 +671,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             project,
             entity_name,
             additional_aliases,
+            artifact_collection_exists=artifact_collection_exists,
             _lite_run=_lite_run,
         )
         version = res.version_str if branch is None else branch
@@ -719,6 +825,29 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             WandbArtifact(uri.name, uri=uri),
             path=uri.path,
         )
+
+    @property
+    def ui_url(self):
+        root_type = self.type.root_type_class()
+        from .op_def_type import OpDefType
+
+        if issubclass(root_type, OpDefType):
+            return urls.op_version_path(
+                self.artifact.uri_obj.entity_name,
+                self.artifact.uri_obj.project_name,
+                self.artifact.uri_obj.name,
+                self.artifact.uri_obj.version,
+            )
+        else:
+            return urls.object_version_path(
+                self.artifact.uri_obj.entity_name,
+                self.artifact.uri_obj.project_name,
+                self.artifact.uri_obj.name,
+                self.artifact.uri_obj.version,
+            )
+
+        # Before Tim's Weaveflow changes
+        # return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
 
 
 types.WandbArtifactRefType.instance_class = WandbArtifactRef

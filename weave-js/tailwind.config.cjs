@@ -1,3 +1,6 @@
+/**
+ * KEEP THIS FILE IN SYNC WITH THE ONE IN CORE APP
+ */
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
@@ -8,6 +11,11 @@ module.exports = {
      * Inherited by padding, margin, width, height, maxHeight, gap,
      * inset, space, translate, scrollMargin, and scrollPadding
      */
+    boxShadow: {
+      none: 'none',
+      md: '0px 12px 24px 0px #15181F29',
+      lg: '0px 24px 48px 0px #15181F29',
+    },
     spacing: {
       0: '0rem',
       px: '0.063rem',
@@ -43,6 +51,9 @@ module.exports = {
       72: '4.5rem',
       80: '5rem',
       96: '6rem',
+      // Breakpoints
+      768: '48rem',
+      1024: '64rem',
     },
     /**
      * Keep these colors in sync with what is in color.styles.ts
@@ -175,7 +186,11 @@ module.exports = {
         700: '#193C80',
       },
     },
-    extend: {},
+    extend: {
+      opacity: {
+        35: '.35',
+      },
+    },
   },
   plugins: [require('tailwindcss-radix')],
   corePlugins: {

@@ -66,7 +66,7 @@ interface ObjectTypeAttrs {
 }
 interface ObjectTypeBase {
   type: string;
-  is_object: true;
+  _is_object: true;
   _base_type: Type;
 }
 export type ObjectType = ObjectTypeBase & ObjectTypeAttrs;
@@ -191,6 +191,7 @@ export const SORTABLE_TYPES: Type[] = [
   'number',
   'boolean',
   'none',
+  {type: 'timestamp', unit: 'ms'},
 ];
 
 export const TYPES_WITH_DIGEST: Type[] = [
@@ -411,6 +412,31 @@ export interface NewRun {
   _state: {_val: string};
   _prints: string[];
 }
+
+export interface OpDefType {
+  type: 'OpDef';
+}
+
+export interface RefType {
+  type: 'Ref';
+}
+
+export interface WandbArtifactRef {
+  type: 'WandbArtifactRef';
+}
+
+export interface FilesystemArtifact {
+  type: 'FilesystemArtifact';
+}
+
+export interface FilesystemArtifactRef {
+  type: 'FilesystemArtifactRef';
+}
+
+export interface StreamTable {
+  type: 'stream_table';
+}
+
 // End Weave Python additions
 
 export type ComplexType =
@@ -422,6 +448,9 @@ export type ComplexType =
   | PanelType
   | PanelSubType
   | NewImage
+  | FilesystemArtifact
+  | FilesystemArtifactRef
+  | StreamTable
   // End Weave Python additions
   | HistogramType
   | TypedDictType
@@ -440,7 +469,10 @@ export type ComplexType =
   | FunctionType
   | Union
   | NDArrayType
-  | TimestampType;
+  | TimestampType
+  | OpDefType
+  | RefType
+  | WandbArtifactRef;
 export type Type = ComplexType | SimpleType;
 
 export type TypeID = ComplexType['type'] | SimpleType;

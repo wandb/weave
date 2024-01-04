@@ -2,8 +2,10 @@ import dataclasses
 import typing
 import weave
 from .. import panel
+from .. import panel_util
 from . import table_state
 
+from .. import weave_types as types
 from .. import graph
 from .. import weave_internal
 
@@ -73,12 +75,19 @@ class Facet(panel.Panel):
             self.set_y(options["y"])
             self.config.table.enable_groupby(self.config.dims.x)
             self.config.table.enable_groupby(self.config.dims.y)
+            self.config.table.enable_sort(self.config.dims.x)
+            self.config.table.enable_sort(self.config.dims.y)
             if "select" in options:
                 self.set_select(options["select"])
             if "detail" in options:
                 self.set_detail(options["detail"])
             if "cell_size" in options:
                 self.set_cell_size(*options["cell_size"])
+            # x_title and y_title to match plot
+            if "x_title" in options:
+                self.config.xAxisLabel = panel_util.make_node(options["x_title"])
+            if "y_title" in options:
+                self.config.yAxisLabel = panel_util.make_node(options["y_title"])
 
     def debug_dim_select_functions(self):
         for dim in ["x", "y", "select", "detail"]:
@@ -109,7 +118,9 @@ class Facet(panel.Panel):
         if self.config.selectedCell == None:
             from ..ops_arrow import list_
 
-            return list_.make_vec_none(0)
+            return weave_internal.make_const_node(
+                list_.ArrowWeaveListType(types.NoneType()), list_.make_vec_none(0)
+            )
         x_fn = self.config.table.columnSelectFunctions[self.config.dims.x]
         y_fn = self.config.table.columnSelectFunctions[self.config.dims.y]
         filtered = weave.ops.List.filter(
@@ -125,4 +136,5 @@ class Facet(panel.Panel):
                 ),
             ),
         )
-        return weave_internal.use(filtered)
+
+        return filtered

@@ -30,7 +30,7 @@ const PanelDate: React.FC<PanelDateProps> = props => {
     // TODO: when other units are supported, need to do conversion.
     date = moment(date as number).toDate();
   }
-  let dateS = [moment(date).format('yyyy-MM-D HH:mm:ss')].join(' ');
+  let dateS = [moment(date).format('yyyy-MM-DD HH:mm:ss')].join(' ');
 
   if (props.config?.format != null) {
     dateS = moment(date).format(props.config.format);

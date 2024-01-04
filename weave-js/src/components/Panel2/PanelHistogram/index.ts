@@ -5,6 +5,8 @@ import ConfigComponent from './ConfigComponent';
 
 export const Spec: Panel2.PanelSpec = {
   id: 'histogram',
+  icon: 'chart-vertical-bars',
+  category: 'Data',
   ConfigComponent,
   Component,
   inputType,

@@ -1,4 +1,5 @@
 import {ConstNode, isOutputNode} from '@wandb/weave/core';
+import _ from 'lodash';
 import * as React from 'react';
 import {createPortal} from 'react-dom';
 
@@ -8,9 +9,9 @@ import {
   useSuggestionVisualState,
 } from './hooks';
 import * as S from './styles';
+import {SuggestionRow} from './SuggestionRow';
 import type {SuggestionProps} from './types';
 import {trace} from './util';
-import {SuggestionRow} from './SuggestionRow';
 
 export const Suggestions = (props: SuggestionProps) => {
   const weave = useWeaveContext();
@@ -69,24 +70,35 @@ export const Suggestions = (props: SuggestionProps) => {
       }
     : undefined;
 
+  const items = _.groupBy(props.items, 'category');
+  let itemIndex = 0;
+
   return createPortal(
     <S.SuggestionContainer ref={paneRef}>
       <S.SuggestionPane data-test="suggestion-pane" isBusy={props.isBusy}>
         {showType ? <div className="type-display">{props.typeStr}</div> : null}
         <ul className="items-list">
-          {props.items.map((s: any, idx: number) => (
-            <SuggestionRow
-              key={idx}
-              idx={idx}
-              suggestion={s}
-              takeSuggestion={takeSuggestion}
-              suggestionIndex={props.suggestionIndex}
-              setSuggestionIndex={props.setSuggestionIndex}
-              hasInfo={activeOpName != null}
-              setIsOverInfo={setIsOverInfo}
-              isOpenInfo={isOpenInfo}
-              setIsOpenInfo={setIsOpenInfo}
-            />
+          {Object.keys(items).map(suggestionCategory => (
+            <React.Fragment key={suggestionCategory}>
+              <S.SuggestionCategory>{suggestionCategory}</S.SuggestionCategory>
+              {items[suggestionCategory].map((s: any) => {
+                itemIndex++;
+                return (
+                  <SuggestionRow
+                    key={itemIndex}
+                    idx={itemIndex}
+                    suggestion={s}
+                    takeSuggestion={takeSuggestion}
+                    suggestionIndex={props.suggestionIndex}
+                    setSuggestionIndex={props.setSuggestionIndex}
+                    hasInfo={activeOpName != null}
+                    setIsOverInfo={setIsOverInfo}
+                    isOpenInfo={isOpenInfo}
+                    setIsOpenInfo={setIsOpenInfo}
+                  />
+                );
+              })}
+            </React.Fragment>
           ))}
         </ul>
       </S.SuggestionPane>

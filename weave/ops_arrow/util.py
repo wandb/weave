@@ -36,6 +36,7 @@ def _eq_null_consumer_helper(
     lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]
 ) -> typing.Tuple[pa.Array, pa.Array]:
     # consume nulls
+
     self_is_null = pc.is_null(lhs)
     other_is_null = pc.is_null(rhs)
     one_null = pc.xor(self_is_null, other_is_null)
@@ -45,6 +46,13 @@ def _eq_null_consumer_helper(
 
 
 def not_equal(lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]) -> pa.Array:
+    # this unboxes the null scalar if it is boxed
+    if rhs == None:
+        rhs = None
+
+    if isinstance(lhs, pa.NullArray) and (isinstance(rhs, pa.NullArray) or not rhs):
+        return pc.fill_null(pc.cast(lhs, pa.bool_()), False)
+
     one_null, both_null = _eq_null_consumer_helper(lhs, rhs)
     result = pc.not_equal(lhs, rhs)
     result = pc.replace_with_mask(result, both_null, False)
@@ -53,6 +61,10 @@ def not_equal(lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]) -> pa.Array
 
 
 def equal(lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]) -> pa.Array:
+    # this unboxes the null scalar if it is boxed
+    if rhs == None:
+        rhs = None
+
     one_null, both_null = _eq_null_consumer_helper(lhs, rhs)
     result = pc.equal(lhs, rhs)
     result = pc.replace_with_mask(result, both_null, True)

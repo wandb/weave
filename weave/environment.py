@@ -5,15 +5,30 @@
 import configparser
 import enum
 import os
-import pathlib
+import json
 import typing
 from . import util
 from . import errors
 from urllib.parse import urlparse
 import netrc
+from distutils.util import strtobool
 
 if typing.TYPE_CHECKING:
     from . import logs
+
+WANDB_ERROR_REPORTING = "WANDB_ERROR_REPORTING"
+WEAVE_USAGE_ANALYTICS = "WEAVE_USAGE_ANALYTICS"
+WEAVE_GQL_SCHEMA_PATH = "WEAVE_GQL_SCHEMA_PATH"
+
+
+def _env_as_bool(var: str, default: typing.Optional[str] = None) -> bool:
+    env = os.environ
+    val = env.get(var, default)
+    try:
+        val = bool(strtobool(val))  # type: ignore
+    except (AttributeError, ValueError):
+        pass
+    return val if isinstance(val, bool) else False
 
 
 class Settings:
@@ -82,6 +97,27 @@ def weave_log_format(default: "logs.LogFormat") -> "logs.LogFormat":
     return LogFormat(os.getenv("WEAVE_LOG_FORMAT", default))
 
 
+def weave_link_prefix() -> str:
+    """When running in server we mount index under /weave"""
+    if os.getenv("GORILLA_ONPREM") == "true":
+        return "/weave"
+    return ""
+
+
+def weave_onprem() -> bool:
+    return os.getenv("GORILLA_ONPREM") == "true"
+
+
+def weave_backend_host() -> str:
+    return os.getenv("WEAVE_BACKEND_HOST", "/__weave")
+
+
+def analytics_disabled() -> bool:
+    if os.getenv("WEAVE_DISABLE_ANALYTICS") == "true":
+        return True
+    return False
+
+
 def weave_server_url() -> str:
     base_url = wandb_base_url()
     default = "https://weave.wandb.ai"
@@ -115,6 +151,19 @@ def sigterm_sighandler_enabled() -> bool:
     return util.parse_boolean_env_var("WEAVE_ENABLE_SIGTERM_SIGHANDLER")
 
 
+def weave_wandb_gql_headers() -> typing.Dict[str, str]:
+    # expects a json string
+    raw = os.environ.get("WEAVE_WANDB_GQL_HEADERS")
+    if raw:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            raise errors.WeaveConfigurationError(
+                "WEAVE_WANDB_GQL_HEADERS should be a json string"
+            )
+    return {}
+
+
 def weave_wandb_cookie() -> typing.Optional[str]:
     cookie = os.environ.get("WEAVE_WANDB_COOKIE")
     if cookie:
@@ -122,10 +171,11 @@ def weave_wandb_cookie() -> typing.Optional[str]:
             raise errors.WeaveConfigurationError(
                 "WEAVE_WANDB_COOKIE should not be set in public mode."
             )
-        if os.path.exists(os.path.expanduser("~/.netrc")):
-            raise errors.WeaveConfigurationError(
-                "Please delete ~/.netrc while using WEAVE_WANDB_COOKIE to avoid using your credentials"
-            )
+        for netrc_file in ("~/.netrc", "~/_netrc"):
+            if os.path.exists(os.path.expanduser(netrc_file)):
+                raise errors.WeaveConfigurationError(
+                    f"Please delete {netrc_file} while using WEAVE_WANDB_COOKIE to avoid using your credentials"
+                )
     return cookie
 
 
@@ -170,3 +220,28 @@ def weave_wandb_api_key() -> typing.Optional[str]:
 
 def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
     return util.parse_number_env_var("WEAVE_PROJECTION_TIMEOUT_SEC")
+
+
+def num_gql_timeout_retries() -> int:
+    raw = util.parse_number_env_var("WEAVE_WANDB_GQL_NUM_TIMEOUT_RETRIES")
+    if raw is None:
+        return 0
+    return int(raw)
+
+
+def usage_analytics_enabled() -> bool:
+    return _env_as_bool(WANDB_ERROR_REPORTING, default="True") and _env_as_bool(
+        WEAVE_USAGE_ANALYTICS, default="True"
+    )
+
+
+def gql_schema_path() -> typing.Optional[str]:
+    return os.environ.get(WEAVE_GQL_SCHEMA_PATH) or None
+
+
+def dd_env() -> str:
+    return os.getenv("DD_ENV", "")
+
+
+def env_is_ci() -> bool:
+    return util.parse_boolean_env_var("WEAVE_CI")
