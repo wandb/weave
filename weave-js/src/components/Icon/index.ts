@@ -148,6 +148,7 @@ export {
   IconRedo,
   IconRegex,
   IconRemove,
+  IconRemoveAlt,
   IconReport,
   IconRetry,
   IconRobotServiceMember,

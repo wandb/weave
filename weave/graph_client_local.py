@@ -105,8 +105,10 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         return isinstance(ref, artifact_local.LocalArtifactRef)
 
-    def ref_uri(self, name: str, version: str) -> artifact_local.WeaveLocalArtifactURI:
-        return artifact_local.WeaveLocalArtifactURI(name, version)
+    def ref_uri(
+        self, name: str, version: str, path: str
+    ) -> artifact_local.WeaveLocalArtifactURI:
+        return artifact_local.WeaveLocalArtifactURI(name, version, path=path)
 
     def run_ui_url(self, run: Run) -> str:
         raise NotImplementedError

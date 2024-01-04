@@ -59,13 +59,6 @@ def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
     from weave.mappers_publisher import map_to_python_remote
-    from . import op_def
-
-    # Hack because of mappers_publisher recursion bug. Just don't do the recursion
-    # if we have an OpDef. Really we should skip if we don't have a composite object
-    # but there's no standard check for that.
-    if isinstance(obj, op_def.OpDef):
-        return obj
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)

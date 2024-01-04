@@ -49,6 +49,10 @@ def reconstruct_completion(
     # Construct ChatCompletionChoice objects
     combined_choices = [
         Choice(
+            # logprobs included here because latest versions of pydantic require
+            # optional fields without default values to be included in the
+            # constructor
+            logprobs=None,
             finish_reason=result.finish_reason,
             index=index,
             message=ChatCompletionMessage(

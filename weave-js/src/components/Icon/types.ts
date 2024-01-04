@@ -147,6 +147,7 @@ export const IconNames = {
   Redo: 'redo',
   Regex: 'regex',
   Remove: 'remove',
+  RemoveAlt: 'remove-alt',
   Report: 'report',
   Retry: 'retry',
   RobotServiceMember: 'robot-service-member',

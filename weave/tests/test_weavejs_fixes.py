@@ -5,6 +5,7 @@ from .. import weavejs_fixes
 
 from .. import ops
 from .. import api
+from .. import context_state
 
 from .. import mappers_python
 
@@ -12,9 +13,16 @@ from .. import weave_internal
 
 
 def test_clean_opcall_str():
-    @api.op(input_type={"x": types.Number()}, output_type=types.Number())
-    def test_inc(x):
-        return x + 1
+    _loading_builtins_token = context_state.set_loading_built_ins(False)
+
+    try:
+
+        @api.op(input_type={"x": types.Number()}, output_type=types.Number())
+        def test_inc(x):
+            return x + 1
+
+    finally:
+        context_state.clear_loading_built_ins(_loading_builtins_token)
 
     n = test_inc(5)
     assert "local-artifact://" in n.from_op.name
