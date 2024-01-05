@@ -146,3 +146,18 @@ def test_weaveflow_object_wandb_with_opmethod(user_by_api_key_in_env):
         x = ATestObj(a=1)
         res = x.a_test_add(2)
         assert res == 3
+
+
+def test_weaveflow_nested_op(user_by_api_key_in_env):
+    with weave.wandb_client("weaveflow_example"):
+
+        @weave.op()
+        def adder(a: int, b: int) -> int:
+            return a + b
+
+        @weave.op()
+        def double_adder(a: int, b: int) -> int:
+            return adder(a, a) + adder(b, b)
+
+        res = double_adder(1, 2)
+        assert res == 6
