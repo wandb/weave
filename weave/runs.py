@@ -13,6 +13,7 @@ class Run:
     history: list[dict[str, typing.Any]] = dataclasses.field(default_factory=list)
     inputs: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
     output: typing.Any = dataclasses.field(default_factory=lambda: None)
+    _trace_id: typing.Union[str, None] = dataclasses.field(default_factory=lambda: None)
 
     @property
     def trace_id(self) -> str:
