@@ -149,6 +149,7 @@ def _direct_publish(
     _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     _merge: typing.Optional[bool] = False,
 ) -> artifact_wandb.WandbArtifactRef:
+    _orig_obj = obj
     _orig_ref = _get_ref(obj)
     if isinstance(_orig_ref, artifact_wandb.WandbArtifactRef):
         return _orig_ref
@@ -204,6 +205,7 @@ def _direct_publish(
         PUBLISH_CACHE_BY_LOCAL_ART[_orig_ref] = ref
 
     ref_base._put_ref(obj, ref)
+    ref_base._put_ref(_orig_obj, ref)
 
     return ref
 

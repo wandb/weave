@@ -161,3 +161,26 @@ def test_weaveflow_nested_op(user_by_api_key_in_env):
 
         res = double_adder(1, 2)
         assert res == 6
+
+
+def test_async_ops(cache_mode_minimal):
+    with weave.local_client():
+
+        @weave.op()
+        async def async_op_add1(v: int) -> int:
+            return v + 1
+
+        @weave.op()
+        async def async_op_add5(v: int) -> int:
+            for i in range(5):
+                v = await async_op_add1(v)
+            return v
+
+        called = async_op_add5(10)
+        import asyncio
+
+        result = asyncio.run(called)
+        assert result == 15
+
+        assert len(async_op_add5.runs()) == 1
+        assert len(async_op_add1.runs()) == 5
