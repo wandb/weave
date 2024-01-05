@@ -186,13 +186,14 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     ) -> artifact_wandb.WandbArtifactRef:
         from . import storage
 
-        return storage._direct_publish(
+        res = storage._direct_publish(
             obj,
             name=name,
             wb_entity_name=self.entity_name,
             wb_project_name=self.project_name,
             branch_name=branch_name,
         )
+        return res
 
     def create_run(
         self,

@@ -8,6 +8,7 @@ import time
 import threading
 import typing
 import traceback
+import asyncio
 
 # Configuration
 from . import wandb_api
@@ -530,13 +531,31 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             client.fail_run(run, e)
             print("Error running ", op_def.name)
             raise
-        if not parent_run:
-            print("View run:", run.ui_url)
         if isinstance(res, box.BoxedNone):
             res = None
-        output, output_refs = auto_publish(res)
 
-        client.finish_run(run, output, output_refs)
+        if asyncio.iscoroutine(res):
+
+            async def _run_async():
+                try:
+                    with run_context.current_run(run):
+                        output = await res
+                    output, output_refs = auto_publish(output)
+                    client.finish_run(run, output, output_refs)
+                    if not parent_run:
+                        print("🍩 View run:", run.ui_url)
+                    return output
+                except Exception as e:
+                    client.fail_run(run, e)
+                    raise
+
+            return _run_async()
+        else:
+            output, output_refs = auto_publish(res)
+
+            client.finish_run(run, output, output_refs)
+            if not parent_run:
+                print("🍩 View run:", run.ui_url)
 
     else:
         res = op_def.resolve_fn(**inputs)
