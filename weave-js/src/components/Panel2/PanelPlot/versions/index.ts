@@ -13,6 +13,7 @@ import * as v12 from './v12';
 import * as v13 from './v13';
 import * as v14 from './v14';
 import * as v15 from './v15';
+import * as v16 from './v16';
 
 export type {Signals} from './v12';
 export type {Scale, ScaleType} from './v14';
@@ -41,7 +42,8 @@ export const {migrate} = migrator
   .add(v12.migrate)
   .add(v13.migrate)
   .add(v14.migrate)
-  .add(v15.migrate);
+  .add(v15.migrate)
+  .add(v16.migrate);
 
 export type AnyPlotConfig = Parameters<typeof migrate>[number];
 export type PlotConfig = ReturnType<typeof migrate>;
@@ -56,5 +58,5 @@ export type ContinuousSelection = v11.ContinuousSelection;
 export type DiscreteSelection = v11.DiscreteSelection;
 export type AxisSelections = v11.AxisSelections;
 
-export type ConcretePlotConfig = v15.ConcretePlotConfig;
+export type ConcretePlotConfig = v16.ConcretePlotConfig;
 export type ConcreteSeriesConfig = ConcretePlotConfig['series'][number];
