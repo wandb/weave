@@ -309,6 +309,7 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
     () => ({
       headerName: 'Call Tree',
       headerAlign: 'center',
+      resizable: !treeOnly,
       flex: 1,
       renderCell: params => (
         <CustomGridTreeDataGroupingCell
