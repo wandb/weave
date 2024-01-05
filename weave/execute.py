@@ -393,10 +393,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                             span.finish()
 
                     if span is not None:
-                        span.set_tag(
+                        span.set_metric(
                             "bytes_read_to_arrow",
                             report["bytes_read_to_arrow"],
-                            report["bytes_read_to_arrow"],
+                            True,
                         )
 
                     stats.add_node(
