@@ -1,8 +1,16 @@
 import * as v15 from './v15';
 
-export type PlotConfig = v15.PlotConfig;
-export type ConcretePlotConfig = v15.ConcretePlotConfig;
+type Diff = {
+  configVersion: 16;
+};
+
+type OmitKeys = 'configVersion';
+export type PlotConfig = Omit<v15.PlotConfig, OmitKeys> & Diff;
+export type ConcretePlotConfig = Omit<v15.ConcretePlotConfig, OmitKeys> & Diff;
 
 export const migrate = (config: v15.PlotConfig): PlotConfig => {
-  return config;
+  return {
+    ...config,
+    configVersion: 16,
+  };
 };

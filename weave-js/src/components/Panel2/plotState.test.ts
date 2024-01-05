@@ -132,7 +132,7 @@ describe('test multiple series', () => {
     const y2colName =
       migrated.series[0].table.order[migrated.series[0].table.order.length - 1];
     const expectedResult: PlotConfig = {
-      configVersion: 15,
+      configVersion: 16,
       axisSettings: {
         ...basicConfig.axisSettings,
         color: {},
