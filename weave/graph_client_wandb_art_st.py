@@ -51,6 +51,7 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     def __init__(self, entity_name: str, project_name: str):
         self.entity_name = entity_name
         self.project_name = project_name
+        self.saved_objs = {}
 
     @functools.cached_property
     def runs_st(self) -> monitoring.StreamTable:
@@ -184,15 +185,21 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     def save_object(
         self, obj: typing.Any, name: str, branch_name: str
     ) -> artifact_wandb.WandbArtifactRef:
+        saved = self.saved_objs.get(id(obj))
+        if saved:
+            return saved
+
         from . import storage
 
-        return storage._direct_publish(
+        res = storage._direct_publish(
             obj,
             name=name,
             wb_entity_name=self.entity_name,
             wb_project_name=self.project_name,
             branch_name=branch_name,
         )
+        self.saved_objs[id(obj)] = res
+        return res
 
     def create_run(
         self,

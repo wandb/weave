@@ -12,11 +12,15 @@ class InitializedClient:
         self.graph_client_token = context_state._graph_client.set(client)
         self.ref_tracking_token = context_state._ref_tracking_enabled.set(True)
         self.eager_mode_token = context_state._eager_mode.set(True)
+        self.serverless_io_service_token = context_state._serverless_io_service.set(
+            True
+        )
 
     def reset(self) -> None:
         context_state._graph_client.reset(self.graph_client_token)
         context_state._ref_tracking_enabled.reset(self.ref_tracking_token)
         context_state._eager_mode.reset(self.eager_mode_token)
+        context_state._serverless_io_service.reset(self.serverless_io_service_token)
 
 
 def init_wandb(project_name: str) -> InitializedClient:

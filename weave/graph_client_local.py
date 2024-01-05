@@ -65,7 +65,13 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         raise NotImplementedError
 
     def op_runs(self, op_def: OpDef) -> Sequence[Run]:
-        raise NotImplementedError
+        runs = storage.objects(types.RunType())
+        result: list[WeaveRunObj] = []
+        for run_ref in runs:
+            run = typing.cast(WeaveRunObj, run_ref.get())
+            if run.op_name == str(op_def.location):
+                result.append(run)
+        return result
 
     def ref_input_to(self, ref: Ref) -> Sequence[Run]:
         runs = storage.objects(types.RunType())

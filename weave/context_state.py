@@ -293,3 +293,12 @@ def ref_tracking(enabled: bool):
     token = _ref_tracking_enabled.set(enabled)
     yield _ref_tracking_enabled.get()
     _ref_tracking_enabled.reset(token)
+
+
+_serverless_io_service: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_serverless_io_service", default=False
+)
+
+
+def serverless_io_service() -> bool:
+    return _serverless_io_service.get()

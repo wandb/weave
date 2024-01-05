@@ -253,7 +253,6 @@ class StreamTable(_StreamTableSync):
         )
 
         self.queue: queue.Queue = queue.Queue()
-        atexit.register(self._at_exit)
         self._lock = threading.Lock()
         self._join_event = threading.Event()
         self._thread = threading.Thread(target=self._thread_body)
