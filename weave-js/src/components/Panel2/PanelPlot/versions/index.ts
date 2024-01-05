@@ -56,5 +56,5 @@ export type ContinuousSelection = v11.ContinuousSelection;
 export type DiscreteSelection = v11.DiscreteSelection;
 export type AxisSelections = v11.AxisSelections;
 
-export type ConcretePlotConfig = v14.ConcretePlotConfig;
+export type ConcretePlotConfig = v15.ConcretePlotConfig;
 export type ConcreteSeriesConfig = ConcretePlotConfig['series'][number];
