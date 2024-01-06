@@ -28,19 +28,9 @@ const Editor = (
   props: Omit<EditorProps, 'onChange' | 'defaultLanguage'> & {
     onChange: OnChangeStringOnly;
     language: EditorProps['defaultLanguage'];
-    wordWrap?: boolean;
   }
 ) => {
-  const {
-    onChange,
-    height,
-    onMount,
-    options,
-    theme,
-    language,
-    wordWrap,
-    ...rest
-  } = props;
+  const {onChange, height, onMount, options, theme, language, ...rest} = props;
 
   const [value, setValue] = useState(props.value || '');
   useEffect(() => {
@@ -73,7 +63,7 @@ const Editor = (
               lineNumbersMinChars: 4,
               minimap: {enabled: false},
               scrollBeyondLastLine: false,
-              wordWrap: wordWrap ?? 'on',
+              wordWrap: 'on',
             },
             options || {}
           )}
