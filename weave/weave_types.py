@@ -1045,7 +1045,6 @@ class ObjectType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-
         if isinstance(obj, pydantic.BaseModel):
             from . import weave_pydantic
 
@@ -1169,8 +1168,26 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     )
     exec(object_init_code)
 
+    # Weave objects must auto-dereference refs when they are accessed.
+    def object_getattribute(self, name):
+        attribute = object.__getattribute__(self, name)
+        attr_type = type_attr_types.get(name)
+        if attr_type is None:
+            return attribute
+        from . import ref_base
+
+        if isinstance(attribute, ref_base.Ref):
+            # TODO: This should put a new ref as well, for ref-tracking
+            return attribute.get()
+        return attribute
+
     new_object_class = type(
-        object_class_name, (), {"__init__": locals()["loaded_object_init"]}
+        object_class_name,
+        (),
+        {
+            "__init__": locals()["loaded_object_init"],
+            "__getattribute__": object_getattribute,
+        },
     )
 
     all_attr_types: dict[str, typing.Union[Type, type[Type]]] = {

@@ -42,3 +42,21 @@ def test_save_awl_refs(ref_tracking):
     assert str(weave.obj_ref(wl2[0])) == str(obj1_ref)
     assert wl2[1] == obj2
     assert str(weave.obj_ref(wl2[1])) == str(obj2_ref)
+
+
+def test_nested_object_deref(ref_tracking):
+    @weave.type()
+    class TestTypeA:
+        val: int
+
+    @weave.type()
+    class TestTypeB:
+        val: int
+        a: TestTypeA
+
+    a_ref = storage.save(TestTypeA(5))
+    b_ref = storage.save(TestTypeB(6, a_ref))
+
+    b = storage.get(str(b_ref))
+    assert b.val == 6
+    assert b.a.val == 5
