@@ -1,5 +1,6 @@
 import typing
 import datetime
+import time
 import contextlib
 
 from . import engine_trace
@@ -11,11 +12,36 @@ from . import context_state
 statsd = engine_trace.statsd()  # type: ignore
 
 
+"""
+Returns a timestamp bucketed by interval days that is calculated from epoch time. For example, if we want
+a bucket interval of 1 day, the anytime this function is called between 0 and 86399 seconds during the first
+day of unix time (Jan 1 1970), it will return Jan 2 1970. This function returns the END time of the bucket
+so it is easier for the caller to know when a cache interval will no longer be used. 
+
+For another example, if we want a bucket interval of 7 days, then here are some example values:
+system time             bucketed time
+11:22 Jan 1 1970       00:00 Jan 8 1970
+23:59 Jan 7 1970       00:00 Jan 8 1970
+00:00 Jan 8 1970       00:00 Jan 15 1970
+16:00 Jan 12 1970      00:00 Jan 15 1970
+12:00 Jan 3 2024       00:00 Jan 4 2024
+"""
+def bucket_timestamp(interval_days: int) -> datetime.datetime:
+    now = time.time()
+    interval_seconds = interval_days * 24 * 60 * 60
+    num_intervals = int(now / interval_seconds)
+    # use the bucket end time because this makes it easy to know when a cache interval will no longer be used
+    bucket_end_time = (num_intervals + 1) * interval_seconds
+    return datetime.datetime.fromtimestamp(bucket_end_time, datetime.timezone.utc)
+
 @contextlib.contextmanager
 def time_interval_cache_prefix() -> typing.Generator[None, None, None]:
     # generate a cache prefix by chunking the current time into intervals. By default
     # the intervals will be 1 week long. This can be configured by an environment variable in the future
     # TODO: add support for parse the cache interval from env var
+    duration = environment.cache_duration_days()
+    if duration == 0:
+        return
     year, week, _ = datetime.datetime.now().isocalendar()
     cache_prefix = f"{year}-{week}"
     token = context_state._cache_prefix_context.set(cache_prefix)
