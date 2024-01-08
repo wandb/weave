@@ -35,6 +35,8 @@ import _ from 'lodash';
 
 import {IconName} from '../../Icon';
 import * as TableState from '../PanelTable/tableState';
+import {ColumnDimension} from './ColumnDimension';
+import {ColumnWithExpressionDimension} from './ColumnWithExpressionDimension';
 import {DimensionLike} from './DimensionLike';
 import {DimName, DimState} from './types';
 import {
@@ -101,11 +103,19 @@ export function isDropdownWithExpression(
   return dim.type === 'dropdownWithExpression';
 }
 
+export function isColumnSelWithExpression(
+  dim: DimensionLike
+): dim is ColumnWithExpressionDimension {
+  return dim.type === 'columnSelWithExpression';
+}
+
 export type ExpressionDimName = keyof PlotConfig['series'][number]['dims'];
 export type DropdownDimName =
   | Exclude<DimName, ExpressionDimName>
   | 'pointShape'
   | 'label';
+
+export type ColumnDimName = 'x' | 'y';
 
 export const EXPRESSION_DIM_NAMES: ExpressionDimName[] = [
   'x' as const,
@@ -204,7 +214,21 @@ class YDimensionWithConditionalY2 extends MultiFieldDimension {
     weave: WeaveInterface,
     markDimension: DropDownDimension // used to determine if y2 is active
   ) {
-    const yDimension = new WeaveExpressionDimension('y', series, weave);
+    const dropdownDimension = new ColumnDimension('y', series, weave, [], []);
+    const yExpressionDimension = new WeaveExpressionDimension(
+      'y',
+      series,
+      weave
+    );
+
+    const yDimension = new ColumnWithExpressionDimension(
+      'y',
+      false,
+      series,
+      yExpressionDimension,
+      dropdownDimension,
+      weave
+    );
 
     const y2Dimension = new WeaveExpressionDimension('y2', series, weave);
 
@@ -489,7 +513,7 @@ class MarkDimensionGroup extends MultiFieldDimension {
   }
 }
 
-class WeaveExpressionDimension extends DimensionLike {
+export class WeaveExpressionDimension extends DimensionLike {
   private static updateSeriesWithState(
     series: SeriesConfig,
     state: DimState,
@@ -550,8 +574,32 @@ export const dimConstructors: Record<
   (typeof PLOT_DIMS_UI)[number],
   (series: SeriesConfig, weave: WeaveInterface) => DimensionLike
 > = {
-  x: (series: SeriesConfig, weave: WeaveInterface) =>
-    new WeaveExpressionDimension('x', series, weave),
+  x: (series: SeriesConfig, weave: WeaveInterface) => {
+    const dropdownDimension = new ColumnDimension('x', series, weave, [], []);
+    // const dropdownDimension = new DropDownDimension(
+    //   'x',
+    //   series,
+    //   weave,
+    //   labelOptions,
+    //   labelOptions[0]
+    // );
+
+    const expressionDimension = new WeaveExpressionDimension(
+      'x',
+      series,
+      weave
+    );
+    return new ColumnWithExpressionDimension(
+      'x',
+      false,
+      series,
+      expressionDimension,
+      dropdownDimension,
+      weave
+    );
+  },
+  // x: (series: SeriesConfig, weave: WeaveInterface) =>
+  //   new WeaveExpressionDimension('x', series, weave),
   y: (series: SeriesConfig, weave: WeaveInterface) => {
     const markDimension = topLevelMarkDimensionConstructor(series, weave);
     return new YDimensionWithConditionalY2(series, weave, markDimension);
@@ -1270,6 +1318,8 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
   const migrated = migrate(v1config);
   return produce(migrated, draft => {
     draft.series.forEach((s, i) => {
+      // Change the default plot to use dropdowns - this is something migrate doesn't do
+      s.uiState.label = 'dropdown';
       s.uiState.pointShape = 'dropdown';
     });
   });
