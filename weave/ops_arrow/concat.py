@@ -345,7 +345,9 @@ def _concatenate(
         other.object_type, types.NoneType
     ):
         return make_vec_none(len(self) + len(other))
-    elif isinstance(self.object_type, types.NoneType):
+    elif isinstance(self.object_type, types.NoneType) or isinstance(
+        self._arrow_data, pa.NullArray
+    ):
         indent_print(depth, "Extend case self None")
         if len(self) == 0:
             return other
@@ -355,7 +357,9 @@ def _concatenate(
         other_data = other._arrow_data
         data = pa_concat_arrays([self_data, other_data])
         return ArrowWeaveList(data, types.optional(other.object_type), other._artifact)
-    elif isinstance(other.object_type, types.NoneType):
+    elif isinstance(other.object_type, types.NoneType) or isinstance(
+        other._arrow_data, pa.NullArray
+    ):
         indent_print(depth, "Extend case other None")
         if len(self) == 0:
             return other

@@ -183,6 +183,13 @@ class TypeRegistry:
             # breaking these early versions
             # if isinstance(d, dict) and is_serialized_object_type(d):
             #     return deserialize_relocatable_object_type(d)
+
+            # Returning UnknownType instead of an error means that we can
+            # partially deserialize objects that have unknown types. For example
+            # if a user declares a type in their code, but that type is not available
+            # on a server deserializing an object, we won't crash. We'll just return
+            # partial data.
+            return UnknownType()
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
