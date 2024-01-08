@@ -80,8 +80,9 @@ class WeaveflowTracer(BaseTracer):
         root_span = self.run_processor.process_span(run)
         if root_span is None:
             return
-        model_dict = self.run_processor.process_model(run)
-        model_str = json.dumps(model_dict)
+        # model_dict = self.run_processor.process_model(run)
+        # print(json.dumps(run.json(), indent=2))
+        # model_str = json.dumps(model_dict)
         spans = stream_data_interfaces.wb_span_to_weave_spans(root_span)
         for span in spans:
             try:
