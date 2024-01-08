@@ -156,18 +156,28 @@ def _get_history3(run: wdt.Run, columns=None):
         artifact,
     )
 
+    # Make AWLs for each Parquet file
+    parquet_awls = []
+    for table in processed_history_pa_tables:
+        # For each table, include the subset of keys from flattend_object_type
+        # that are present in the table.
+        flattened_obj_type_matching_keys = {}
+        for k, v in flattened_object_type.property_types.items():
+            try:
+                table.schema.field(k)
+            except KeyError:
+                continue
+            flattened_obj_type_matching_keys[k] = v
+        parquet_awls.append(
+            ArrowWeaveList(
+                table,
+                types.TypedDict(flattened_obj_type_matching_keys),
+                artifact=artifact,
+            )
+        )
+
     # 5.a Now we concat the converted liveset and parquet files
-    concatted_awl = history_op_common.concat_awls(
-        [
-            live_data_awl,
-            *{
-                ArrowWeaveList(
-                    table, object_type=flattened_object_type, artifact=artifact
-                )
-                for table in processed_history_pa_tables
-            },
-        ]
-    )
+    concatted_awl = history_op_common.concat_awls([live_data_awl, *parquet_awls])
 
     if len(concatted_awl) == 0:
         return convert.to_arrow([], types.List(final_type), artifact=artifact)

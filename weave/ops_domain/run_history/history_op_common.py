@@ -9,7 +9,7 @@ from ... import weave_types as types
 from .. import wb_domain_types as wdt
 from ...ops_primitives import make_list
 from ...ops_arrow.list_ops import concat
-from ...ops_arrow import ArrowWeaveList
+from ...ops_arrow import ArrowWeaveList, make_vec_none, unsafe_awl_construction
 from ... import util
 from ... import errors
 from ... import io_service
@@ -377,9 +377,26 @@ def awl_from_local_parquet_path(
 
     # convert table to ArrowWeaveList
     with tracer.trace("make_awl") as span:
-        awl: ArrowWeaveList = ArrowWeaveList(
-            table, object_type=object_type, artifact=artifact
-        )
+        with unsafe_awl_construction("may contain null bytes column"):
+            awl: ArrowWeaveList = ArrowWeaveList(
+                table,
+                object_type=object_type,
+                artifact=artifact,
+                invalid_reason="may contain bytes column",
+            )
+
+            # We encountered some parquet files that were created by history store
+            # compaction that store a column of nulls with the bytes type. This
+            # replaces those with a column of nulls with a null type.
+            def _replace_null_bytes(col, path_type):
+                if col._arrow_data.type == pa.binary():
+                    if col._arrow_data.null_count == len(col._arrow_data):
+                        return make_vec_none(len(col._arrow_data))
+                    else:
+                        raise ValueError("Encountered binary column")
+                return col
+
+            awl = awl.map_column(_replace_null_bytes)
     return awl
 
 
