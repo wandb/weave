@@ -452,10 +452,6 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
         return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [_auto_publish(v, output_refs) for v in obj]
-    elif isinstance(obj, np.generic):
-        return obj.item()
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
     weave_type = types.TypeRegistry.type_of(obj)
     if not (
         types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
