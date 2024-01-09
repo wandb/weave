@@ -1,4 +1,4 @@
-wandb>=0.15.5
+wandb>=0.15.5,<=0.16.1
 sentry-sdk<1.29.0 # 1.29.0 adds monkey-patched GQL error handling which breaks our unit tests communicating with the server
 python-json-logger>=2.0.4
 numpy>=1.21
