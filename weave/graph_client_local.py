@@ -144,7 +144,7 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         with_digest_inputs["_digests"] = [ref.digest for ref in input_refs]
         return WeaveRunObj(run_id, op_name, inputs=with_digest_inputs)
 
-    def fail_run(self, run: Run, exception: Exception) -> None:
+    def fail_run(self, run: Run, exception: BaseException) -> None:
         raise NotImplementedError
 
     def finish_run(

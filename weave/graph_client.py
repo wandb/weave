@@ -83,7 +83,7 @@ class GraphClient(Protocol, Generic[R]):
         ...
 
     @abstractmethod
-    def fail_run(self, run: R, exception: Exception) -> None:
+    def fail_run(self, run: R, exception: BaseException) -> None:
         ...
 
     @abstractmethod
