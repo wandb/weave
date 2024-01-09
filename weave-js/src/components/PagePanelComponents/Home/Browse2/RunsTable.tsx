@@ -115,9 +115,7 @@ export const RunsTable: FC<{
             }
           ),
           v =>
-            typeof v === 'string' ||
-            typeof v === 'boolean' ||
-            typeof v === 'number'
+            typeof v === 'string' || typeof v === 'number'
               ? v
               : JSON.stringify(v)
         ),
@@ -132,9 +130,7 @@ export const RunsTable: FC<{
             }
           ),
           v =>
-            typeof v === 'string' ||
-            typeof v === 'boolean' ||
-            typeof v === 'number'
+            typeof v === 'string' || typeof v === 'number'
               ? v
               : JSON.stringify(v)
         ),
