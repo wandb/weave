@@ -1,6 +1,7 @@
 import pytest
 import weave
 import typing
+import numpy as np
 
 from .. import ref_base
 
@@ -184,3 +185,9 @@ def test_async_ops(cache_mode_minimal):
 
         assert len(async_op_add5.runs()) == 1
         assert len(async_op_add1.runs()) == 5
+
+
+def test_weaveflow_publish_numpy(user_by_api_key_in_env):
+    with weave.wandb_client("weaveflow_example"):
+        v = {"a": np.array([[1, 2, 3], [4, 5, 6]])}
+        ref = weave.publish(v, "dict-with-numpy")
