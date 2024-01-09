@@ -171,19 +171,12 @@ class TypeRegistry:
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            # Normally, we should just raise the error. However, the core team
-            # used earlier versions of Weaveflow ( before
-            # dc48fa16263d49d5accaca37515ab4c80efef1b6) which serialized
-            # "relocatable" objects without the "_relocatable" flag was added.
-            # As a result, we will hit this branch in such cases. In order to
-            # maintain backwards compat for these situations, we perform a less
-            # constrained check here. We use `is_serialized_object_type` instead
-            # of `is_relocatable_object_type` since it explicitly does not
-            # require the `_relocatable` flag.  This can be removed if we are ok
-            # breaking these early versions
-            # if isinstance(d, dict) and is_serialized_object_type(d):
-            #     return deserialize_relocatable_object_type(d)
-            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
+            # We used to raise WeaveServializeError here. Now we return UnknownType
+            # instead, so the server can load types that have types that are not
+            # present on the server within them (e.g. a user has defined a type in their
+            # code and published a top level object containing an attribute of that type,
+            # we want to be able to load the outer object without crashing)
+            return UnknownType()
         return type_.from_dict(d)
 
 

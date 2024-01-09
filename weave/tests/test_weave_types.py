@@ -525,7 +525,12 @@ def test_assign_dict_to_typeddict():
 
 
 def test_type_of_empty_array_union():
-    assert weave.type_of([{"a": []}, {"a": [1]},]) == weave.types.List(
+    assert weave.type_of(
+        [
+            {"a": []},
+            {"a": [1]},
+        ]
+    ) == weave.types.List(
         weave.types.TypedDict({"a": weave.types.List(weave.types.Int())})
     )
 
@@ -724,3 +729,15 @@ def test_union_auto_execute():
     assert weave.types.optional(weave.types.Timestamp()).assign_type(
         weave.types.Function(output_type=weave.types.optional(weave.types.Timestamp()))
     )
+
+
+def test_load_unknown_subobj_type():
+    t = weave.types.TypeRegistry.type_from_dict(
+        {
+            "type": "typedDict",
+            "propertyTypes": {"a": "int", "b": {"type": "some_unknown_type"}},
+        }
+    )
+    assert isinstance(t, types.TypedDict)
+    assert t.property_types["a"] == types.Int()
+    assert t.property_types["b"] == types.UnknownType()
