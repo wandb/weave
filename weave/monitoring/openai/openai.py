@@ -193,7 +193,7 @@ def patch(
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
 
         if _get_global_monitor() is not None:
-            info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
+            # info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
             mon = default_monitor()
 

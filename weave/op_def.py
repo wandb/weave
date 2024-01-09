@@ -381,14 +381,18 @@ class OpDef:
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
     def eager_call(_self, *args, **kwargs):
-        output_node = _self.lazy_call(*args, **kwargs)
         if (
             _self.name == "get"
             or _self.name == "root-project"
             or any(isinstance(n, graph.Node) for n in args)
         ) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
+            output_node = _self.lazy_call(*args, **kwargs)
             return output_node
-        return weave_internal.use(output_node)
+        from . import execute
+
+        sig = pyfunc_type_util.get_signature(_self.raw_resolve_fn)
+        params = sig.bind(*args, **kwargs)
+        return execute.execute_sync_op(_self, params.arguments)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
