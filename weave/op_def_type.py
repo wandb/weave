@@ -172,13 +172,18 @@ def resolve_var(fn: typing.Callable, var_name: str):
     return None
 
 
-def get_code_deps(fn: typing.Callable):
+def get_code_deps(fn: typing.Callable) -> typing.Optional[str]:
     # Generates repeats.
     source = textwrap.dedent(inspect.getsource(fn))
     try:
         parsed = ast.parse(source)
-    except IndentationError:
-        return ""
+    except SyntaxError:
+        if context_state.get_strict_op_saving():
+            raise
+        print(
+            "Warning: could not parse op source code. This op will not be reloadable, but calls to it will be tracked"
+        )
+        return
 
     visitor = ExternalVariableFinder()
     visitor.visit(parsed)
@@ -274,7 +279,11 @@ class OpDefType(types.Type):
                 + "\n\n"
             )
 
-            code += get_code_deps(obj.raw_resolve_fn)
+            code_deps = get_code_deps(obj.raw_resolve_fn)
+            if code_deps is None:
+                return
+
+            code += code_deps
 
             # Note the above two stanzas are in the order they are to ensure
             # this case works.
