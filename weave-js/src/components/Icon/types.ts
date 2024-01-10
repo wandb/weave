@@ -38,6 +38,7 @@ export const IconNames = {
   Copy: 'copy',
   CreditCardPayment: 'credit-card-payment',
   Cross: 'cross',
+  CrownPro: 'crown-pro',
   CubeContainer: 'cube-container',
   DashboardBlackboard: 'dashboard-blackboard',
   Date: 'date',

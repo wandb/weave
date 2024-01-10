@@ -88,7 +88,7 @@ const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
   variable: 2,
 } as const;
 
-type AdditionalProps = {
+export type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;

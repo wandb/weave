@@ -1,6 +1,7 @@
 import pytest
 import weave
 import typing
+import numpy as np
 
 from .. import ref_base
 
@@ -146,3 +147,47 @@ def test_weaveflow_object_wandb_with_opmethod(user_by_api_key_in_env):
         x = ATestObj(a=1)
         res = x.a_test_add(2)
         assert res == 3
+
+
+def test_weaveflow_nested_op(user_by_api_key_in_env):
+    with weave.wandb_client("weaveflow_example"):
+
+        @weave.op()
+        def adder(a: int, b: int) -> int:
+            return a + b
+
+        @weave.op()
+        def double_adder(a: int, b: int) -> int:
+            return adder(a, a) + adder(b, b)
+
+        res = double_adder(1, 2)
+        assert res == 6
+
+
+def test_async_ops(cache_mode_minimal):
+    with weave.local_client():
+
+        @weave.op()
+        async def async_op_add1(v: int) -> int:
+            return v + 1
+
+        @weave.op()
+        async def async_op_add5(v: int) -> int:
+            for i in range(5):
+                v = await async_op_add1(v)
+            return v
+
+        called = async_op_add5(10)
+        import asyncio
+
+        result = asyncio.run(called)
+        assert result == 15
+
+        assert len(async_op_add5.runs()) == 1
+        assert len(async_op_add1.runs()) == 5
+
+
+def test_weaveflow_publish_numpy(user_by_api_key_in_env):
+    with weave.wandb_client("weaveflow_example"):
+        v = {"a": np.array([[1, 2, 3], [4, 5, 6]])}
+        ref = weave.publish(v, "dict-with-numpy")

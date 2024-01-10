@@ -186,13 +186,14 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     ) -> artifact_wandb.WandbArtifactRef:
         from . import storage
 
-        return storage._direct_publish(
+        res = storage._direct_publish(
             obj,
             name=name,
             wb_entity_name=self.entity_name,
             wb_project_name=self.project_name,
             branch_name=branch_name,
         )
+        return res
 
     def create_run(
         self,
@@ -234,7 +235,7 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         # self.runs_st.log(span)
         return RunStreamTableSpan(span)
 
-    def fail_run(self, run: RunStreamTableSpan, exception: Exception) -> None:
+    def fail_run(self, run: RunStreamTableSpan, exception: BaseException) -> None:
         span = copy.copy(run._attrs)
         span["end_time_s"] = time.time()
         span["status_code"] = "ERROR"

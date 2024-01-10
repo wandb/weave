@@ -217,6 +217,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
     @property
     def _outer_type(self) -> types.Type:
+
         if self.path is None:
             return types.TypeRegistry.type_of(self.artifact)
 

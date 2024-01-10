@@ -30,6 +30,7 @@ from . import wandb_api
 from . import wandb_file_manager
 from . import server_error_handling
 from . import async_queue
+from . import context_state
 from typing import Any, Callable, Dict, TypeVar, Iterator
 
 
@@ -331,7 +332,8 @@ class Server:
             while True:
                 try:
                     req = await self.request_queue.async_get()
-                except RuntimeError:
+                except RuntimeError as e:
+                    print("IO SERVICE RuntimeError", e)
                     # this happens when the loop is shutting down
                     break
                 if req.name == "shutdown":
@@ -642,8 +644,16 @@ class ServerlessClient:
 
 
 def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
-    # uncomment this for local debugging
-    # return ServerlessClient(filesystem.get_filesystem())
+    if context_state.serverless_io_service():
+        # The io service can't be used during atexit handlers, you get an error like
+        # "cannot schedule new futures after shutdown". So it can't really be cleaned up
+        # appropriately...
+        # This is problematic for users of wandb_stream_table, which tries to flush any
+        # outstanding logs during atexit. If any of those require the io service, you get
+        # a hang. So we just use the serverless client when setting up weaveflow for now.
+        # TODO: this is still an issue for users of streamtable outside of weaveflow, and
+        # could be an issue on the weave server if we want clean / flushing shutdowns.
+        return ServerlessClient(filesystem.get_filesystem())
     return SyncClient(get_server(), filesystem.get_filesystem())
 
 

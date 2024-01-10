@@ -29,7 +29,7 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
-  useWeaveflowPeekAwareRouteContext,
+  useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from './Browse3/context';
@@ -549,7 +549,7 @@ const ObjectVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -587,7 +587,7 @@ const ObjectVersionRoutePageBinding = () => {
 const OpVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -621,7 +621,7 @@ const TypeVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -724,7 +724,7 @@ const CallsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -760,7 +760,7 @@ const ObjectVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -796,7 +796,7 @@ const TypeVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -832,7 +832,7 @@ const OpVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(

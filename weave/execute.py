@@ -8,6 +8,7 @@ import time
 import threading
 import typing
 import traceback
+import asyncio
 
 # Configuration
 from . import wandb_api
@@ -232,8 +233,6 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                             ),
                         )
                     )
-                    compiled_nodes = list(compile_results)
-                    publish_graph(compiled_nodes)
 
                     fg = forward_graph.ForwardGraph()
                     compile_results = compile_results.safe_apply(fg.add_node)
@@ -453,10 +452,6 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
         return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [_auto_publish(v, output_refs) for v in obj]
-    elif isinstance(obj, np.generic):
-        return obj.item()
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
     weave_type = types.TypeRegistry.type_of(obj)
     if not (
         types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
@@ -476,42 +471,13 @@ def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
     return _auto_publish(obj, refs), refs
 
 
-def publish_graph(
-    nodes: typing.List[graph.Node],
-):
-    """Publish all ops and ConstNodes found in graph"""
-    maybe_client = graph_client_context.get_graph_client()
-    if maybe_client is not None and context_state.eager_mode():
-        client = typing.cast("GraphClient", maybe_client)
-
-        def _publish_node(node: graph.Node):
-            if isinstance(node, graph.OutputNode):
-                op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-                if not op_def.location:
-                    # Only publish custom ops
-                    return
-                op_def_ref = storage._get_ref(op_def)
-                if not client.ref_is_own(op_def_ref):
-                    op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-            elif isinstance(node, graph.ConstNode) and not isinstance(
-                node.type, types.Function
-            ):
-                auto_publish(node.val)
-
-        graph.map_nodes_full(nodes, _publish_node)
-
-
 def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
     mon_span_inputs = {**inputs}
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode() and op_def.location:
         op_def_ref = storage._get_ref(op_def)
         if not client.ref_is_own(op_def_ref):
-            # This should have already been published by publish_graph if monitoring
-            # is turned on.
-            raise errors.WeaveInternalError(
-                "Found unpublished custom OpDef with monitoring turned on", op_def
-            )
+            op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
         mon_span_inputs, refs = auto_publish(inputs)
 
         # Memoization disabled for now.
@@ -526,17 +492,37 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
         try:
             with run_context.current_run(run):
                 res = op_def.resolve_fn(**inputs)
-        except Exception as e:
+        except BaseException as e:
             client.fail_run(run, e)
             print("Error running ", op_def.name)
             raise
-        if not parent_run:
-            print("View run:", run.ui_url)
         if isinstance(res, box.BoxedNone):
             res = None
-        output, output_refs = auto_publish(res)
 
-        client.finish_run(run, output, output_refs)
+        if asyncio.iscoroutine(res):
+
+            async def _run_async():
+                try:
+                    with run_context.current_run(run):
+                        output = await res
+                    output, output_refs = auto_publish(output)
+                    client.finish_run(run, output, output_refs)
+                    if not parent_run:
+                        print("🍩 View run:", run.ui_url)
+                    if isinstance(output, ref_base.Ref):
+                        return output.get()
+                    return output
+                except Exception as e:
+                    client.fail_run(run, e)
+                    raise
+
+            return _run_async()
+        else:
+            output, output_refs = auto_publish(res)
+
+            client.finish_run(run, output, output_refs)
+            if not parent_run:
+                print("🍩 View run:", run.ui_url)
 
     else:
         res = op_def.resolve_fn(**inputs)

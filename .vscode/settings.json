@@ -9,5 +9,8 @@
         "weave/frontend": true
     },
     "files.insertFinalNewline": true,
-    "black-formatter.importStrategy": "fromEnvironment"
+    "black-formatter.importStrategy": "fromEnvironment",
+    "cSpell.words": [
+        "Weaveflow"
+    ]
 }
