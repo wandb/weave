@@ -295,8 +295,7 @@ def weave_arrow_type_check(
     at: pa.DataType = arr.type
     if optional and pa.types.is_union(at):
         non_none_members = [
-            inner_col for inner_col in at
-            if not pa.types.is_null(inner_col.type)
+            inner_col for inner_col in at if not pa.types.is_null(inner_col.type)
         ]
         if len(non_none_members) == 1:
             at = non_none_members[0].type
