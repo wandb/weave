@@ -193,6 +193,11 @@ const ObjectVersionProducingCallsItem: React.FC<{
         entityName={producingCalls[0].entity()}
         projectName={producingCalls[0].project()}
         callId={producingCalls[0].callID()}
+        opName={
+          producingCalls[0].opVersion()?.op().name() ??
+          producingCalls[0].spanName() ??
+          ''
+        }
       />
     );
   }
@@ -205,6 +210,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
               entityName={call.entity()}
               projectName={call.project()}
               callId={call.callID()}
+              opName={call.opVersion()?.op().name() ?? call.spanName() ?? ''}
             />
           </li>
         );
