@@ -293,6 +293,15 @@ def weave_arrow_type_check(
 ) -> typing.Optional[str]:
     reasons: list[str] = []
     at: pa.DataType = arr.type
+    if optional and pa.types.is_union(at):
+        non_none_members = [
+            inner_col for inner_col in at
+            if not pa.types.is_null(inner_col.type)
+        ]
+        if len(non_none_members) == 1:
+            at = non_none_members[0].type
+        else:
+            at = pa.dense_union(non_none_members)
     if wt == types.Any():
         reasons.append("Any not allowed")
     elif isinstance(wt, types.UnionType):
@@ -332,12 +341,23 @@ def weave_arrow_type_check(
                         f"Union length mismatch: {len(wt.members)} != {len(at)}"
                     )
                 else:
-                    for i, w in enumerate(wt.members):
-                        reason = weave_arrow_type_check(
-                            w, arr.field(i), optional=optional
-                        )
-                        if reason is not None:
-                            reasons.append(f"Union member {i}: {reason}")
+                    for field_ndx, field_type in enumerate(arr.type):
+                        inner_reasons = []
+                        for mem_ndx, mem_type in enumerate(wt.members):
+                            reason = weave_arrow_type_check(
+                                mem_type, arr.field(field_ndx), optional=optional
+                            )
+                            if reason is not None:
+                                inner_reasons.append(
+                                    f"Union member {field_ndx}: {reason}"
+                                )
+                            else:
+                                break
+                        else:
+                            reason_inner = "\n".join(inner_reasons)
+                            reasons.append(
+                                f"No valid match for {field_ndx}: {reason_inner}"
+                            )
     elif optional and pa.types.is_null(at):
         pass
     else:
@@ -463,7 +483,7 @@ def weave_arrow_type_check(
 
     if reasons:
         indented_reasons = textwrap.indent("\n".join(reasons), "  ")
-        print("TYPE", type(wt))
+        # print("TYPE", type(wt))
         return f"{debug_types.short_type(wt)}, {str(at)[:50]}\n{indented_reasons}"
 
     return None
@@ -582,6 +602,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         arr = self._arrow_data
         type_match_summary = weave_arrow_type_check(self.object_type, arr)
         if type_match_summary != None:
+            type_match_summary = weave_arrow_type_check(self.object_type, arr)
             print()
             print("ArrowWeaveList VALIDATION ERROR")
             print()

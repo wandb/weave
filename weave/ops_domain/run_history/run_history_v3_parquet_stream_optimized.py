@@ -135,6 +135,14 @@ def _get_history3(run: wdt.Run, columns=None):
         history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
     ]
 
+    concatted_history_pa_arrays = []
+    if len(raw_history_pa_tables) > 0:
+        concatted_history_pa_arrays = [
+            history_op_common.concat_awls(
+                [ArrowWeaveList(t) for t in raw_history_pa_tables]
+            )._arrow_data
+        ]
+
     run_path = wb_util.RunPath(
         run["project"]["entity"]["name"],
         run["project"]["name"],
@@ -143,9 +151,13 @@ def _get_history3(run: wdt.Run, columns=None):
     (
         live_columns,
         live_columns_already_mapped,
-        processed_history_pa_tables,
+        processed_history_pa_arrays,
     ) = _process_all_columns(
-        flattened_object_type, raw_live_data, raw_history_pa_tables, run_path, artifact
+        flattened_object_type,
+        raw_live_data,
+        concatted_history_pa_arrays,
+        run_path,
+        artifact,
     )
 
     live_data_awl = _construct_live_data_awl(
@@ -157,27 +169,38 @@ def _get_history3(run: wdt.Run, columns=None):
     )
 
     # Make AWLs for each Parquet file
-    parquet_awls = []
-    for table in processed_history_pa_tables:
-        # For each table, include the subset of keys from flattend_object_type
-        # that are present in the table.
-        flattened_obj_type_matching_keys = {}
-        for k, v in flattened_object_type.property_types.items():
-            try:
-                table.schema.field(k)
-            except KeyError:
-                continue
-            flattened_obj_type_matching_keys[k] = v
-        parquet_awls.append(
-            ArrowWeaveList(
-                table,
-                types.TypedDict(flattened_obj_type_matching_keys),
-                artifact=artifact,
-            )
-        )
+    # parquet_awls: typing.List[ArrowWeaveList] = []
+    # for table in processed_history_pa_tables:
+    #     # For each table, include the subset of keys from flattend_object_type
+    #     # that are present in the table.
+    #     flattened_obj_type_matching_keys = {}
+    #     for k, v in flattened_object_type.property_types.items():
+    #         try:
+    #             table.schema.field(k)
+    #         except KeyError:
+    #             continue
+    #         flattened_obj_type_matching_keys[k] = v
+    #     parquet_awls.append(
+    #         ArrowWeaveList(
+    #             table,
+    #             types.TypedDict(flattened_obj_type_matching_keys),
+    #             artifact=artifact,
+    #         )
+    #     )
 
     # 5.a Now we concat the converted liveset and parquet files
-    concatted_awl = history_op_common.concat_awls([live_data_awl, *parquet_awls])
+    # concatted_awl = history_op_common.concat_awls([live_data_awl, *parquet_awls])
+    concatted_awl = history_op_common.concat_awls(
+        [
+            live_data_awl,
+            *{
+                ArrowWeaveList(
+                    array, object_type=flattened_object_type, artifact=artifact
+                )
+                for array in processed_history_pa_arrays
+            },
+        ]
+    )
 
     if len(concatted_awl) == 0:
         return convert.to_arrow([], types.List(final_type), artifact=artifact)
@@ -266,10 +289,6 @@ def _construct_live_data_awl(
     )
 
 
-def _pa_table_has_column(pa_table: pa.Table, col_name: str) -> bool:
-    return col_name in pa_table.column_names
-
-
 def _create_empty_column(
     table: pa.Table, col_type: types.Type, artifact: artifact_base.Artifact
 ) -> pa.Array:
@@ -278,29 +297,56 @@ def _create_empty_column(
     )._arrow_data
 
 
-def _update_pa_table_column(
-    table: pa.Table, col_name: str, arrow_col: pa.Array
-) -> pa.Table:
-    fields = [field.name for field in table.schema]
-    return table.set_column(fields.index(col_name), col_name, arrow_col)
+# def _update_pa_table_column(
+#     table: pa.Table, col_name: str, arrow_col: pa.Array
+# ) -> pa.Table:
+#     fields = [field.name for field in table.schema]
+#     return table.set_column(fields.index(col_name), col_name, arrow_col)
 
 
-def _new_pa_table_column(
-    table: pa.Table, col_name: str, arrow_col: pa.Array
-) -> pa.Table:
-    return table.append_column(col_name, arrow_col)
+# def _new_pa_table_column(
+#     table: pa.Table, col_name: str, arrow_col: pa.Array
+# ) -> pa.Table:
+#     return table.append_column(col_name, arrow_col)
+
+
+def _pa_array_has_column(pa_array: pa.StructArray, col_name: str) -> bool:
+    try:
+        pa_array.type.field(col_name)
+        return True
+    except KeyError:
+        return False
+
+
+def _new_pa_array_column(
+    array: pa.StructArray, col_name: str, arrow_col: pa.Array
+) -> pa.StructArray:
+    return _update_pa_array_column(array, col_name, arrow_col)
+
+
+def _update_pa_array_column(
+    array: pa.StructArray, col_name: str, arrow_col: pa.Array
+) -> pa.StructArray:
+    columns = []
+    field_names = []
+    for field in array.type:
+        if field.name != col_name:
+            columns.append(array.field(field.name))
+            field_names.append(field.name)
+
+    return pa.StructArray.from_arrays(columns + [arrow_col], field_names + [col_name])
 
 
 def _process_all_columns(
     flattened_object_type: types.TypedDict,
     raw_live_data: list[dict],
-    raw_history_pa_tables: list[pa.Table],
+    raw_history_pa_arrays: list[pa.StructArray],
     run_path: wb_util.RunPath,
     artifact: artifact_mem.MemArtifact,
 ):
     live_columns = {}
     live_columns_already_mapped = {}
-    processed_history_pa_tables = [*raw_history_pa_tables]
+    processed_history_pa_arrays = [*raw_history_pa_arrays]
 
     for col_name, col_type in flattened_object_type.property_types.items():
         raw_live_column = _extract_column_from_live_data(raw_live_data, col_name)
@@ -322,6 +368,8 @@ def _process_all_columns(
             # horribly inefficient and we should probably just move on from
             # legacy image files
             pass
+
+        # Part 1: Process the live data
         if _column_type_requires_in_memory_transformation(col_type):
             _non_vectorized_warning(
                 f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
@@ -329,51 +377,36 @@ def _process_all_columns(
             processed_live_column = _process_column_in_memory(raw_live_column, run_path)
             live_columns[col_name] = processed_live_column
 
-            for table_ndx, table in enumerate(processed_history_pa_tables):
-                if not _pa_table_has_column(table, col_name):
-                    new_table = _new_pa_table_column(
-                        table, col_name, _create_empty_column(table, col_type, artifact)
-                    )
-                else:
-                    new_table = _update_pa_table_column(
-                        table,
-                        col_name,
-                        _process_history_column_in_memory(
-                            table[col_name], col_type, run_path, artifact
-                        ),
-                    )
-                processed_history_pa_tables[table_ndx] = new_table
-
         elif _is_directly_convertible_type(col_type):
             live_columns_already_mapped[col_name] = raw_live_column
-            # Important that this runs before the else branch
-            continue
         else:
             processed_live_column = _reconstruct_original_live_data_col(raw_live_column)
             live_columns_already_mapped[col_name] = processed_live_column
 
-            for table_ndx, table in enumerate(processed_history_pa_tables):
-                if not _pa_table_has_column(table, col_name):
-                    new_table = _new_pa_table_column(
-                        table, col_name, _create_empty_column(table, col_type, artifact)
-                    )
-                else:
-                    new_col = _drop_types_from_encoded_types(
-                        ArrowWeaveList(
-                            table[col_name],
-                            None,
-                            artifact=artifact,
-                        )
-                    )
-                    arrow_col = new_col._arrow_data
-                    if types.Timestamp().assign_type(types.non_none(col_type)):
-                        arrow_col = arrow_col.cast("int64").cast(
-                            pa.timestamp("ms", tz="UTC")
-                        )
-                    new_table = _update_pa_table_column(table, col_name, arrow_col)
-                processed_history_pa_tables[table_ndx] = new_table
+        # Part 2: Process the history data
+        # First, iterate through the tables since each processing step is table-specific
+        for array_ndx, array in enumerate(processed_history_pa_arrays):
+            # If the column is not present in the table, then we need to add it
+            if not _pa_array_has_column(array, col_name):
+                new_array = _new_pa_array_column(
+                    array, col_name, _create_empty_column(array, col_type, artifact)
+                )
+            else:
+                # If the column is present, then we need to perform 1 of 3 operations:
+                # - In memory processing
+                # - No processing
+                # - Vectorized processing
+                # To maintain performance, we should apply this rule to each union leaf.
+                new_array = _update_pa_array_column(
+                    array,
+                    col_name,
+                    _process_history_column(
+                        array.field(col_name), col_type, run_path, artifact
+                    ),
+                )
+            processed_history_pa_arrays[array_ndx] = new_array
 
-    return live_columns, live_columns_already_mapped, processed_history_pa_tables
+    return live_columns, live_columns_already_mapped, processed_history_pa_arrays
 
 
 def _non_vectorized_warning(message: str):
@@ -581,6 +614,325 @@ def _process_live_object_in_memory(
     return live_data
 
 
+def _drop_encoded_type(history_column: pa.Array) -> pa.Array:
+    if _col_is_encoded_type(history_column):
+        history_column = history_column.field("_val")
+    return history_column
+
+
+def _col_is_encoded_type(history_column: pa.Array) -> bool:
+    if pa.types.is_struct(history_column.type):
+        if isinstance(history_column, pa.ChunkedArray):
+            history_column = history_column.combine_chunks()
+        if isinstance(history_column, pa.StructArray):
+            cols = [field.name for field in history_column.type]
+            if len(cols) == 2 and "_val" in cols and "_type" in cols:
+                return True
+    return False
+
+
+def _pyarrow_range(start: int, stop: int, step: int = 1) -> pa.Array:
+    return pa.array(range(start, stop, step), type=pa.int32())
+
+
+def _deduped_dense_union_array(
+    type_array: pa.Array, offset_array: pa.Array, arrays: list[pa.Array]
+):
+    union_arr =  pa.UnionArray.from_dense(
+        type_array,
+        offset_array,
+        arrays,
+    )
+    return _consolidate_matching_types_in_dense_union_array(_flatten_dense_union_array(union_arr))
+
+def _flatten_dense_union_array(array: pa.UnionArray) -> pa.Array:
+    starting_type_codes = array.type_codes
+    starting_offsets = array.offsets
+
+    final_types = []
+    final_arrays = []
+    final_type_codes = starting_type_codes
+    final_offsets = starting_offsets
+
+    array_type: pa.DenseUnionType = array.type
+
+    for inner_type_code, inner_field in enumerate(array_type):
+        inner_array = array.field(inner_type_code)
+        if pa.types.is_union(inner_field.type):
+            inner_array = _flatten_dense_union_array(inner_array)
+            for nested_type_code, nested_field in enumerate(inner_field.type):
+                nested_array = array.field(nested_type_code)
+                final_types.append(nested_field.type)
+                final_arrays.append(nested_array)
+                new_type_code = len(final_types) - 1
+                mask = pa.compute.equal(inner_array.type_codes, nested_type_code)
+                final_type_codes = pa.compute.replace_with_mask(
+                    final_type_codes,
+                    mask,
+                    pa.array([new_type_code] * len(array), type=pa.int8()),
+                )
+                # I don't think we need to change the offsets here
+
+        else:
+            final_types.append(inner_field.type)
+            final_arrays.append(inner_array)
+            new_type_code = len(final_types) - 1
+            mask = pa.compute.equal(starting_type_codes, inner_type_code)
+            final_type_codes = pa.compute.replace_with_mask(
+                final_type_codes,
+                mask,
+                pa.array([new_type_code] * len(array), type=pa.int8()),
+            )
+
+    return pa.UnionArray.from_dense(
+        final_type_codes,
+        final_offsets,
+        final_arrays,
+    )
+
+
+def _consolidate_matching_types_in_dense_union_array(array: pa.UnionArray) -> pa.UnionArray:
+    starting_type_codes = array.type_codes
+    starting_offsets = array.offsets
+
+    final_types = []
+    final_arrays = []
+    final_type_codes = starting_type_codes
+    final_offsets = starting_offsets
+
+    array_type: pa.DenseUnionType = array.type
+    for inner_type_code, inner_field in enumerate(array_type):
+        inner_array = array.field(inner_type_code)
+        if inner_field.type not in final_types:
+            final_types.append(inner_field.type)
+            final_arrays.append(inner_array)
+            new_type_code = len(final_types) - 1
+            mask = pa.compute.equal(starting_type_codes, inner_type_code)
+            final_type_codes = pa.compute.replace_with_mask(
+                final_type_codes,
+                mask,
+                pa.array([new_type_code] * len(array), type=pa.int8()),
+            )
+        else:
+            mask = pa.compute.equal(starting_type_codes, inner_type_code)
+            
+            new_type_code = final_types.index(inner_field.type)
+
+            final_type_codes = pa.compute.replace_with_mask(
+                final_type_codes,
+                mask,
+                pa.array([new_type_code] * len(array), type=pa.int8()),
+            )
+            final_arrays[new_type_code] = pa.concat_arrays([final_arrays[new_type_code], inner_array])
+            new_offsets = pa.compute.add(
+                pa.compute.filter(final_offsets),
+                len(final_arrays[new_type_code]),
+            )
+            final_offsets = pa.compute.replace_with_mask(
+                final_offsets,
+                mask,
+                new_offsets,
+            )
+    return pa.UnionArray.from_dense(
+        final_type_codes,
+        final_offsets,
+        final_arrays,
+    )
+
+
+
+
+
+def _map_encoded_type(history_column: pa.Array, mapper) -> pa.Array:
+    if _col_is_encoded_type(history_column):
+        type_column = history_column.field("_type")
+        dictionary_encoded = pa.compute.dictionary_encode(type_column)
+        mapped_cols = [pa.nulls(1)]
+        offsets = pa.compute.fill_null(
+            pa.compute.cast(pa.nulls(len(history_column)), pa.int32()), 0
+        )
+        # pa.compute.cumulative_sum(non_null)
+        for encoded_ndx, encoded_type_str in enumerate(
+            dictionary_encoded.dictionary.to_pylist()
+        ):
+            encoded_type = wandb_stream_table.maybe_history_type_to_weave_type(
+                encoded_type_str
+            )
+            mask = pa.compute.fill_null(
+                pa.compute.equal(dictionary_encoded.indices, encoded_ndx), False
+            )
+            selection = pa.compute.filter(history_column, mask)
+            mapped_cols.append(mapper(encoded_type, selection))
+            offsets = pa.compute.replace_with_mask(
+                offsets, mask, _pyarrow_range(0, len(selection))
+            )
+        if len(mapped_cols) == 0:
+            return history_column
+            # raise NotImplementedError()
+        elif len(mapped_cols) == 1:
+            return mapped_cols[0]
+        else:
+            return _deduped_dense_union_array(
+                pa.compute.cast(
+                    pa.compute.fill_null(dictionary_encoded.indices, 0), pa.int8()
+                ),
+                offsets,
+                mapped_cols,
+            )
+
+    return history_column
+
+
+def _process_history_column(
+    history_column: pa.Array,
+    col_type: types.Type,
+    run_path: wb_util.RunPath,
+    artifact: artifact_base.Artifact,
+) -> pa.Array:
+    # history_column = _drop_encoded_type(history_column)
+
+    if types.NoneType().assign_type(col_type):
+        # Nothing to do
+        return history_column
+    elif pa.types.is_null(history_column.type):
+        # Nothing to do
+        return history_column
+    non_none_type = types.non_none(col_type)
+    if types.union(
+        *[
+            types.Number(),
+            types.Int(),
+            types.Float(),
+            types.String(),
+            types.Boolean(),
+        ]
+    ).assign_type(non_none_type):
+        # Nothing to do
+        return history_column
+    elif isinstance(non_none_type, types.List):
+        # Process the flattened list
+        # First we want to ensure that the column is a list
+        if pa.types.is_list(history_column.type):
+            if isinstance(history_column, pa.ChunkedArray):
+                history_column = history_column.combine_chunks()
+            if isinstance(history_column, pa.ListArray):
+                offsets = history_column.offsets
+                flattened = history_column.flatten()
+                res = _process_history_column(
+                    flattened, non_none_type.object_type, run_path, artifact
+                )
+                return pa.ListArray.from_arrays(
+                    offsets, res, mask=pa.compute.is_null(history_column)
+                )
+
+        raise NotImplementedError()
+    elif isinstance(non_none_type, types.TypedDict):
+        # Process each column
+        if pa.types.is_struct(history_column.type):
+            if isinstance(history_column, pa.ChunkedArray):
+                history_column = history_column.combine_chunks()
+            if isinstance(history_column, pa.StructArray):
+                new_fields = {}
+                for field in history_column.type:
+                    new_fields[field.name] = _process_history_column(
+                        history_column.field(field.name),
+                        non_none_type.property_types[field.name],
+                        run_path,
+                        artifact,
+                    )
+                return pa.StructArray.from_arrays(
+                    [new_fields[field.name] for field in history_column.type],
+                    [field.name for field in history_column.type],
+                    mask=pa.compute.is_null(history_column),
+                )
+        raise NotImplementedError()
+    elif isinstance(non_none_type, types.UnionType):
+        # Process each member of the union
+        # Step 1: Map each member of the history col to exactly 1 member of the union
+        if isinstance(history_column, pa.ChunkedArray):
+            history_column = history_column.combine_chunks()
+        if not pa.types.is_union(history_column.type):
+            target_col = history_column
+            possible_members = []
+            for member in non_none_type.members:
+                if not types.is_custom_type(member):
+                    reason = weave_arrow_type_check(member, target_col)
+                    if reason is None or len(reason) == 0:
+                        possible_members.append(member)
+                elif _col_is_encoded_type(history_column):
+                    # Append member to possible_members if every encoded type is assignable to the member
+                    is_valid = True
+
+                    def mapper(encoded_weave_type, history_selection):
+                        nonlocal is_valid
+                        is_valid = is_valid and member.assign_type(encoded_weave_type)
+                        return history_selection
+
+                    _map_encoded_type(target_col, mapper)
+                    if is_valid:
+                        possible_members.append(member)
+            if len(possible_members) != 1:
+                raise NotImplementedError()
+            res = _process_history_column(
+                history_column, possible_members[0], run_path, artifact
+            )
+            return res
+        else:
+            new_fields = {}
+            for ndx, field in enumerate(history_column.type):
+                target_col = history_column.field(ndx)
+                if not (_col_is_encoded_type(target_col)):
+                    possible_members = []
+                    for member in non_none_type.members:
+                        # Skip custom types as they are handled in the encoded section
+                        if not types.is_custom_type(member):
+                            reason = weave_arrow_type_check(member, target_col)
+                            if reason is None or len(reason) == 0:
+                                possible_members.append(member)
+                    if len(possible_members) != 1:
+                        raise NotImplementedError()
+                    new_fields[field.name] = _process_history_column(
+                        target_col,
+                        possible_members[0],
+                        run_path,
+                        artifact,
+                    )
+                else:
+
+                    def mapper(encoded_weave_type, history_selection):
+                        possible_members = []
+                        for member in non_none_type.members:
+                            if types.is_custom_type(member):
+                                if member.assign_type(encoded_weave_type):
+                                    possible_members.append(member)
+                        if len(possible_members) != 1:
+                            raise NotImplementedError()
+                        return _process_history_column(
+                            history_selection,
+                            possible_members[0],
+                            run_path,
+                            artifact,
+                        )
+
+                    new_fields[field.name] = _map_encoded_type(target_col, mapper)
+            return _deduped_dense_union_array(
+                history_column.type_codes,
+                history_column.offsets,
+                [new_fields[field.name] for field in history_column.type],
+            )
+    elif isinstance(non_none_type, _weave_types_requiring_in_memory_transformation):
+        # Do in memory processing
+        _non_vectorized_warning(
+            f"Encountered a history column requiring non-vectorized, in-memory processing: {col_type}"
+        )
+        return _process_history_column_in_memory(
+            history_column, col_type, run_path, artifact
+        )
+    else:
+        # Process vectorized
+        return _process_history_column_vectorized(history_column, col_type, artifact)
+
+
 def _process_history_column_in_memory(
     history_column: pa.Array,
     col_type: types.Type,
@@ -595,6 +947,24 @@ def _process_history_column_in_memory(
         artifact=artifact,
     )
     return pa.chunked_array([awl._arrow_data])
+
+
+def _process_history_column_vectorized(
+    history_column: pa.Array,
+    col_type: types.Type,
+    artifact: artifact_base.Artifact,
+) -> pa.Array:
+    new_col = _drop_types_from_encoded_types(
+        ArrowWeaveList(
+            history_column,
+            None,
+            artifact=artifact,
+        )
+    )
+    arrow_col = new_col._arrow_data
+    if types.Timestamp().assign_type(types.non_none(col_type)):
+        arrow_col = arrow_col.cast("int64").cast(pa.timestamp("ms", tz="UTC"))
+    return arrow_col
 
 
 # Copy from common - need to merge back
