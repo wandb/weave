@@ -13,7 +13,7 @@ import moment from 'moment';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {useParams} from 'react-router-dom';
 
-import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
+import {CallLink} from '../Browse3/pages/common/Links';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
@@ -106,7 +106,7 @@ export const RunsTable: FC<{
         trace_id: call.trace_id,
         status_code: call.status_code,
         timestampMs: call.timestamp,
-        latency: monthRoundedTime(call.summary.latency_s, true),
+        latency: monthRoundedTime(call.summary.latency_s),
         ..._.mapValues(
           _.mapKeys(
             _.omitBy(args, v => v == null),
@@ -149,18 +149,28 @@ export const RunsTable: FC<{
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
-        field: 'timestampMs',
-        headerName: 'Timestamp',
-        width: 150,
-        minWidth: 150,
-        maxWidth: 150,
+        field: 'status_code',
+        headerName: '',
+        width: 50,
+        minWidth: 50,
+        maxWidth: 50,
         renderCell: cellParams => {
-          return moment(cellParams.row.timestampMs).format(
-            'YYYY-MM-DD HH:mm:ss'
+          return (
+            <Chip
+              label={' '}
+              // label={cellParams.row.status_code}
+              size="small"
+              color={
+                cellParams.row.status_code === 'SUCCESS'
+                  ? 'success'
+                  : cellParams.row.status_code === 'ERROR'
+                  ? 'error'
+                  : undefined
+              }
+            />
           );
         },
       },
-
       {
         flex: !showIO ? 1 : undefined,
         // width: 100,
@@ -172,11 +182,15 @@ export const RunsTable: FC<{
               entityName={params.entity}
               projectName={params.project}
               callId={rowParams.row.id}
+              opName={
+                rowParams.row.ormCall?.opVersion()?.op().name() ??
+                rowParams.row.ormCall?.spanName() ??
+                ''
+              }
             />
           );
         },
       },
-
       ...(orm
         ? [
             {
@@ -189,7 +203,6 @@ export const RunsTable: FC<{
                 if (cellParams.value == null) {
                   return '';
                 }
-
                 const color = {
                   train: 'success',
                   predict: 'info',
@@ -209,57 +222,51 @@ export const RunsTable: FC<{
           ]
         : []),
 
-      ...(orm
-        ? [
-            {
-              flex: !showIO ? 1 : undefined,
-              field: 'opVersion',
-              headerName: 'Name',
-              renderCell: (rowParams: any) => {
-                const opVersion = rowParams.row.ormCall?.opVersion();
-                if (opVersion == null) {
-                  return rowParams.row.ormCall?.spanName();
-                }
-                return (
-                  <OpVersionLink
-                    entityName={opVersion.entity()}
-                    projectName={opVersion.project()}
-                    opName={opVersion.op().name()}
-                    version={opVersion.version()}
-                  />
-                );
-              },
-            },
-          ]
-        : []),
       {
-        field: 'status_code',
-        headerName: 'Status',
+        field: 'timestampMs',
+        headerName: 'Called',
         width: 100,
         minWidth: 100,
         maxWidth: 100,
         renderCell: cellParams => {
-          return (
-            <Chip
-              label={cellParams.row.status_code}
-              size="small"
-              color={
-                cellParams.row.status_code === 'SUCCESS'
-                  ? 'success'
-                  : cellParams.row.status_code === 'ERROR'
-                  ? 'error'
-                  : undefined
-              }
-            />
-          );
+          // return moment(cellParams.row.timestampMs).format(
+          //   'YYYY-MM-DD HH:mm:ss'
+          // );
+          return moment(cellParams.row.timestampMs).fromNow();
         },
       },
+
+      ...(orm
+        ? [
+            // {
+            //   flex: !showIO ? 1 : undefined,
+            //   field: 'opVersion',
+            //   headerName: 'Name',
+            //   renderCell: (rowParams: any) => {
+            //     const opVersion = rowParams.row.ormCall?.opVersion();
+            //     if (opVersion == null) {
+            //       return rowParams.row.ormCall?.spanName();
+            //     }
+            //     return (
+            //
+            //         entityName={opVersion.entity()}
+            //         projectName={opVersion.project()}
+            //         opName={opVersion.op().name()}
+            //         version={opVersion.version()}
+            //         versionIndex={opVersion.versionIndex()}
+            //       />
+            //     );
+            //   },
+            // },
+          ]
+        : []),
+
       {
         field: 'latency',
         headerName: 'Latency',
-        width: 125,
-        minWidth: 125,
-        maxWidth: 125,
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
         // flex: !showIO ? 1 : undefined,
       },
     ];
