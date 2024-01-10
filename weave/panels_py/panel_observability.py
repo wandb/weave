@@ -22,6 +22,7 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
             "trace_id": types.optional(types.String()),
             "state": types.optional(types.String()),
             "error": types.optional(types.String()),
+            "priority": types.optional(types.Number()),
             "metrics": types.TypedDict(
                 {
                     "system": types.TypedDict(
@@ -100,6 +101,15 @@ def observability(
         }
     )
 
+    priority_names = weave.ops.dict_(
+        **{
+            0: "Critical",
+            1: "High",
+            2: "Medium",
+            3: "Low",
+        },
+    )
+
     varbar = panel_board.varbar(editable=False)
     source_data = input_node.map(
         lambda row: weave.ops.dict_(
@@ -114,6 +124,7 @@ def observability(
                 "trace_id": row["trace_id"],
                 "state": display_states.pick(row["state"]),
                 "error": row["error"],
+                "priority": priority_names.pick(row["priority"]),
                 "metrics": row["metrics"],
             }
         )
@@ -287,6 +298,7 @@ def observability(
                     ),
                     60,
                 ),
+                "priority": row["priority"][0],
             }
         ),
     )
@@ -315,6 +327,7 @@ def observability(
                 "Project": row["project_name"],
                 "Run ID": row["run_id"],
                 "Duration (m)": row["duration"],
+                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
@@ -410,6 +423,7 @@ def observability(
         ),
         "Runtime (s)",
     )
+    jobs_table.add_column(lambda row: row["priority"][0], "Priority")
     jobs_table.add_column(
         lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
         "Avg. CPU %",
