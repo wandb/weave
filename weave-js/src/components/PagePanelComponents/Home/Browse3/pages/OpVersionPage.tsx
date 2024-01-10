@@ -1,12 +1,6 @@
-import {Box, TextField, Typography} from '@material-ui/core';
-import * as globals from '@wandb/weave/common/css/globals.styles';
-import React, {useMemo} from 'react';
-import {Button} from 'semantic-ui-react';
+import React from 'react';
 
 import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
-import {StreamId} from '../../Browse2/callTree';
-import {useFirstCall, useOpSignature} from '../../Browse2/callTreeHooks';
-import {Paper} from '../../Browse2/CommonLib';
 import {CallsTable} from './CallsPage';
 import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
@@ -47,14 +41,14 @@ const OpVersionPageInner: React.FC<{
   const opName = opVersion.op().name();
   const opVersionHash = opVersion.version();
 
-  const streamId = useMemo(
-    () => ({
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    }),
-    [entity, project]
-  );
+  // const streamId = useMemo(
+  //   () => ({
+  //     entityName: entity,
+  //     projectName: project,
+  //     streamName: 'stream',
+  //   }),
+  //   [entity, project]
+  // );
 
   return (
     <SimplePageLayout
@@ -210,6 +204,7 @@ const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
               projectName={v.project()}
               opName={v.op().name()}
               version={v.version()}
+              versionIndex={v.versionIndex()}
             />
             <OpVersionOpTree opVersion={v} />
           </li>
@@ -219,38 +214,38 @@ const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
   );
 };
 
-const OpVersionExecute: React.FC<{
-  streamId: StreamId;
-  uri: string;
-}> = ({streamId, uri}) => {
-  const firstCall = useFirstCall(streamId, uri);
-  const opSignature = useOpSignature(streamId, uri);
-  return (
-    <Paper>
-      <Typography variant="h6" gutterBottom>
-        Call Op
-      </Typography>
-      <Box sx={{width: 400}}>
-        {opSignature.result != null &&
-          Object.keys(opSignature.result.inputTypes).map(k => (
-            <Box key={k} mb={2}>
-              <TextField
-                label={k}
-                fullWidth
-                value={
-                  firstCall.result != null
-                    ? firstCall.result.inputs[k]
-                    : undefined
-                }
-              />
-            </Box>
-          ))}
-      </Box>
-      <Box pt={1}>
-        <Button variant="outlined" sx={{backgroundColor: globals.lightYellow}}>
-          Execute
-        </Button>
-      </Box>
-    </Paper>
-  );
-};
+// const OpVersionExecute: React.FC<{
+//   streamId: StreamId;
+//   uri: string;
+// }> = ({streamId, uri}) => {
+//   const firstCall = useFirstCall(streamId, uri);
+//   const opSignature = useOpSignature(streamId, uri);
+//   return (
+//     <Paper>
+//       <Typography variant="h6" gutterBottom>
+//         Call Op
+//       </Typography>
+//       <Box sx={{width: 400}}>
+//         {opSignature.result != null &&
+//           Object.keys(opSignature.result.inputTypes).map(k => (
+//             <Box key={k} mb={2}>
+//               <TextField
+//                 label={k}
+//                 fullWidth
+//                 value={
+//                   firstCall.result != null
+//                     ? firstCall.result.inputs[k]
+//                     : undefined
+//                 }
+//               />
+//             </Box>
+//           ))}
+//       </Box>
+//       <Box pt={1}>
+//         <Button variant="outlined" sx={{backgroundColor: globals.lightYellow}}>
+//           Execute
+//         </Button>
+//       </Box>
+//     </Paper>
+//   );
+// };
