@@ -68,9 +68,10 @@ def refine_history3_with_columns_type(
     hidden=True,
 )
 def history3_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history3(
-        run, history_op_common.get_full_columns_prefixed(run, history_cols)
-    )
+    with tracer.trace("history3_with_columns"):
+        return _get_history3(
+            run, history_op_common.get_full_columns_prefixed(run, history_cols)
+        )
 
 
 @op(
@@ -114,83 +115,101 @@ def _get_history3(run: wdt.Run, columns=None):
     artifact = artifact_mem.MemArtifact()
 
     # 1. Get the flattened Weave-Type given HistoryKeys
-    flattened_object_type = history_op_common.refine_history_type(run, columns=columns)
-    final_type = _unflatten_history_object_type(flattened_object_type)
+    with tracer.trace("h3.get_type"):
+        flattened_object_type = history_op_common.refine_history_type(
+            run, columns=columns
+        )
+        final_type = _unflatten_history_object_type(flattened_object_type)
 
     # 2. Read in the live set
-    raw_live_data = _get_live_data_from_run(run, columns=columns)
+    with tracer.trace("h3.read_liveset"):
+        raw_live_data = _get_live_data_from_run(run, columns=columns)
 
     # 3.a: Raw-load each parquet file
-    raw_history_awl_tables = _read_raw_history_awl_tables(
-        run, columns=columns, artifact=artifact
-    )
+    with tracer.trace("h3.load_parquet"):
+        raw_history_awl_tables = _read_raw_history_awl_tables(
+            run, columns=columns, artifact=artifact
+        )
 
     # 3.b: Collapse unions
-    union_collapsed_awl_tables = [
-        _collapse_unions(awl) for awl in raw_history_awl_tables
-    ]
+    with tracer.trace("h3.collapse_unions"):
+        union_collapsed_awl_tables = [
+            _collapse_unions(awl) for awl in raw_history_awl_tables
+        ]
 
     # 4. Process all the data
-    raw_history_pa_tables = [
-        history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
-    ]
+    with tracer.trace("h3.awl_to_pa_table"):
+        raw_history_pa_tables = [
+            history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
+        ]
 
-    run_path = wb_util.RunPath(
-        run["project"]["entity"]["name"],
-        run["project"]["name"],
-        run["name"],
-    )
-    (
-        live_columns,
-        live_columns_already_mapped,
-        processed_history_pa_tables,
-    ) = _process_all_columns(
-        flattened_object_type, raw_live_data, raw_history_pa_tables, run_path, artifact
-    )
+    with tracer.trace("h3.process_all_columns"):
+        run_path = wb_util.RunPath(
+            run["project"]["entity"]["name"],
+            run["project"]["name"],
+            run["name"],
+        )
+        (
+            live_columns,
+            live_columns_already_mapped,
+            processed_history_pa_tables,
+        ) = _process_all_columns(
+            flattened_object_type,
+            raw_live_data,
+            raw_history_pa_tables,
+            run_path,
+            artifact,
+        )
 
-    live_data_awl = _construct_live_data_awl(
-        live_columns,
-        live_columns_already_mapped,
-        flattened_object_type,
-        len(raw_live_data),
-        artifact,
-    )
+    with tracer.trace("h3.construct_live_data_awl"):
+        live_data_awl = _construct_live_data_awl(
+            live_columns,
+            live_columns_already_mapped,
+            flattened_object_type,
+            len(raw_live_data),
+            artifact,
+        )
 
     # 5.a Now we concat the converted liveset and parquet files
-    concatted_awl = history_op_common.concat_awls(
-        [
-            live_data_awl,
-            *{
-                ArrowWeaveList(
-                    table, object_type=flattened_object_type, artifact=artifact
-                )
-                for table in processed_history_pa_tables
-            },
-        ]
-    )
+    with tracer.trace("h3.concat_awls"):
+        concatted_awl = history_op_common.concat_awls(
+            [
+                live_data_awl,
+                *{
+                    ArrowWeaveList(
+                        table, object_type=flattened_object_type, artifact=artifact
+                    )
+                    for table in processed_history_pa_tables
+                },
+            ]
+        )
 
     if len(concatted_awl) == 0:
         return convert.to_arrow([], types.List(final_type), artifact=artifact)
 
-    sorted_table = history_op_common.sort_history_pa_table(
-        history_op_common.awl_to_pa_table(concatted_awl)
-    )
+    with tracer.trace("h3.sort"):
+        sorted_table = history_op_common.sort_history_pa_table(
+            history_op_common.awl_to_pa_table(concatted_awl)
+        )
 
     # 6. Finally, unflatten the columns
-    final_array = _unflatten_pa_table(sorted_table)
+    with tracer.trace("h3.unflatten_pa_table"):
+        final_array = _unflatten_pa_table(sorted_table)
 
     # 7. Optionally: verify the AWL
-    reason = weave_arrow_type_check(final_type, final_array)
+    with tracer.trace("h3.weave_arrow_type_check"):
+        reason = weave_arrow_type_check(final_type, final_array)
 
     if reason != None:
         raise errors.WeaveWBHistoryTranslationError(
             f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
         )
-    return ArrowWeaveList(
-        final_array,
-        final_type,
-        artifact=artifact,
-    )
+    with tracer.trace("h3.return"):
+        return ArrowWeaveList(
+            final_array,
+            final_type,
+            artifact=artifact,
+        )
 
 
 def _construct_live_data_awl(
