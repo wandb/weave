@@ -1,4 +1,4 @@
-import {Box, Chip, ListItemText} from '@material-ui/core';
+import {ListItemText} from '@material-ui/core';
 import {
   Autocomplete,
   Checkbox,
@@ -11,13 +11,7 @@ import moment from 'moment';
 import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
-import {
-  CallsLink,
-  OpLink,
-  OpVersionLink,
-  OpVersionsLink,
-  TypeVersionsLink,
-} from './common/Links';
+import {OpVersionLink} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
@@ -101,6 +95,7 @@ export const FilterableOpVersionsTable: React.FC<{
                   projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
                   version={params.row.obj.version()}
+                  versionIndex={params.row.obj.versionIndex()}
                 />
               );
             },
@@ -113,27 +108,6 @@ export const FilterableOpVersionsTable: React.FC<{
         'version',
         WFHighLevelOpVersionFilter
       >,
-      createdAt: {
-        columnId: 'createdAt',
-        gridDisplay: {
-          columnLabel: 'Created',
-          columnValue: obj => obj.obj.createdAtMs(),
-          gridColDefOptions: {
-            renderCell: params => {
-              // return moment(params.value as number).format(
-              //   'YYYY-MM-DD HH:mm:ss'
-              // );
-              return moment(params.value as number).fromNow();
-            },
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        any,
-        number,
-        'createdAt',
-        WFHighLevelOpVersionFilter
-      >,
 
       opCategory: {
         columnId: 'opCategory',
@@ -144,6 +118,9 @@ export const FilterableOpVersionsTable: React.FC<{
             renderCell: params => {
               return <OpVersionCategoryChip opCategory={params.value as any} />;
             },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
           },
         },
         filterControls: {
@@ -171,6 +148,32 @@ export const FilterableOpVersionsTable: React.FC<{
         'opCategory',
         WFHighLevelOpVersionFilter
       >,
+
+      createdAt: {
+        columnId: 'createdAt',
+        gridDisplay: {
+          columnLabel: 'Created',
+          columnValue: obj => obj.obj.createdAtMs(),
+          gridColDefOptions: {
+            renderCell: params => {
+              // return moment(params.value as number).format(
+              //   'YYYY-MM-DD HH:mm:ss'
+              // );
+              return moment(params.value as number).fromNow();
+            },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
+          },
+        },
+      } as WFHighLevelDataColumn<
+        {obj: WFOpVersion},
+        any,
+        number,
+        'createdAt',
+        WFHighLevelOpVersionFilter
+      >,
+
       opName: {
         columnId: 'opName',
         // gridDisplay: {
