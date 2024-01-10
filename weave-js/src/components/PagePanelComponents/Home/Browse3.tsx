@@ -131,14 +131,14 @@ export const Browse3: FC<{
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
-  const weaveContext = useWeaveContext();
-  useEffect(() => {
-    const previousPolling = weaveContext.client.isPolling();
-    weaveContext.client.setPolling(true);
-    return () => {
-      weaveContext.client.setPolling(previousPolling);
-    };
-  }, [props.projectRoot, weaveContext]);
+  // const weaveContext = useWeaveContext();
+  // useEffect(() => {
+  //   const previousPolling = weaveContext.client.isPolling();
+  //   weaveContext.client.setPolling(true);
+  //   return () => {
+  //     weaveContext.client.setPolling(previousPolling);
+  //   };
+  // }, [props.projectRoot, weaveContext]);
   return (
     <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
       <Switch>
@@ -402,7 +402,10 @@ const useNaiveProjectDataConnection = (entity: string, project: string) => {
     if (
       objectsValue.result == null &&
       runsValue.result == null &&
-      feedbackValue.result == null
+      feedbackValue.result == null &&
+      objectsValue.loading &&
+      runsValue.loading &&
+      feedbackValue.loading
     ) {
       return null;
     }
@@ -414,9 +417,12 @@ const useNaiveProjectDataConnection = (entity: string, project: string) => {
     return connection;
   }, [
     entity,
+    feedbackValue.loading,
     feedbackValue.result,
+    objectsValue.loading,
     objectsValue.result,
     project,
+    runsValue.loading,
     runsValue.result,
   ]);
 };
