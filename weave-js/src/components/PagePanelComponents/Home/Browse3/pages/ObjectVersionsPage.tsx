@@ -429,6 +429,7 @@ const ObjectVersionsTable: React.FC<{
             projectName={outputFrom[0].project()}
             opName={outputFrom[0].opVersion().op().name()}
             version={outputFrom[0].opVersion().version()}
+            versionIndex={outputFrom[0].opVersion().versionIndex()}
           />
         );
       },
