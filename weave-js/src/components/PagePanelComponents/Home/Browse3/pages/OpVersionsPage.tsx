@@ -88,30 +88,10 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const columns = useMemo(() => {
     return {
-      createdAt: {
-        columnId: 'createdAt',
-        gridDisplay: {
-          columnLabel: 'Created At',
-          columnValue: obj => obj.obj.createdAtMs(),
-          gridColDefOptions: {
-            renderCell: params => {
-              return moment(params.value as number).format(
-                'YYYY-MM-DD HH:mm:ss'
-              );
-            },
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        any,
-        number,
-        'createdAt',
-        WFHighLevelOpVersionFilter
-      >,
       version: {
         columnId: 'version',
         gridDisplay: {
-          columnLabel: 'Version',
+          columnLabel: 'Op',
           columnValue: obj => obj.obj.version(),
           gridColDefOptions: {
             renderCell: params => {
@@ -121,7 +101,6 @@ export const FilterableOpVersionsTable: React.FC<{
                   projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
                   version={params.row.obj.version()}
-                  hideName
                 />
               );
             },
@@ -134,10 +113,32 @@ export const FilterableOpVersionsTable: React.FC<{
         'version',
         WFHighLevelOpVersionFilter
       >,
+      createdAt: {
+        columnId: 'createdAt',
+        gridDisplay: {
+          columnLabel: 'Created',
+          columnValue: obj => obj.obj.createdAtMs(),
+          gridColDefOptions: {
+            renderCell: params => {
+              // return moment(params.value as number).format(
+              //   'YYYY-MM-DD HH:mm:ss'
+              // );
+              return moment(params.value as number).fromNow();
+            },
+          },
+        },
+      } as WFHighLevelDataColumn<
+        {obj: WFOpVersion},
+        any,
+        number,
+        'createdAt',
+        WFHighLevelOpVersionFilter
+      >,
+
       opCategory: {
         columnId: 'opCategory',
         gridDisplay: {
-          columnLabel: 'Op Category',
+          columnLabel: 'Category',
           columnValue: obj => obj.obj.opCategory(),
           gridColDefOptions: {
             renderCell: params => {
@@ -172,21 +173,21 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       opName: {
         columnId: 'opName',
-        gridDisplay: {
-          columnLabel: 'Op',
-          columnValue: obj => obj.obj.op().name(),
-          gridColDefOptions: {
-            renderCell: params => {
-              return (
-                <OpLink
-                  entityName={params.row.obj.entity()}
-                  projectName={params.row.obj.project()}
-                  opName={params.value as any}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Op',
+        //   columnValue: obj => obj.obj.op().name(),
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       return (
+        //         <OpLink
+        //           entityName={params.row.obj.entity()}
+        //           projectName={params.row.obj.project()}
+        //           opName={params.value as any}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (filter.opName == null) {
@@ -214,31 +215,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       calls: {
         columnId: 'calls',
-        gridDisplay: {
-          columnLabel: 'Calls',
-          columnValue: obj => obj.obj.calls().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <CallsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  callCount={params.value as number}
-                  filter={{
-                    opVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Calls',
+        //   columnValue: obj => obj.obj.calls().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <CallsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           callCount={params.value as number}
+        //           filter={{
+        //             opVersions: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
       } as WFHighLevelDataColumn<
         {obj: WFOpVersion},
         string[],
@@ -248,31 +249,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       invokedByOpVersions: {
         columnId: 'invokedByOpVersions',
-        gridDisplay: {
-          columnLabel: 'Invoked By',
-          columnValue: obj => obj.obj.invokedBy().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    invokesOpVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Invoked By',
+        //   columnValue: obj => obj.obj.invokedBy().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <OpVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             invokesOpVersions: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -307,31 +308,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       invokesOpVersions: {
         columnId: 'invokesOpVersions',
-        gridDisplay: {
-          columnLabel: 'Invokes',
-          columnValue: obj => obj.obj.invokes().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    invokedByOpVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Invokes',
+        //   columnValue: obj => obj.obj.invokes().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <OpVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             invokedByOpVersions: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -366,31 +367,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       consumesTypeVersions: {
         columnId: 'consumesTypeVersions',
-        gridDisplay: {
-          columnLabel: 'Consumes Types',
-          columnValue: obj => obj.obj.inputTypesVersions().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <TypeVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    inputTo: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Consumes Types',
+        //   columnValue: obj => obj.obj.inputTypesVersions().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <TypeVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             inputTo: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -425,31 +426,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       producesTypeVersions: {
         columnId: 'producesTypeVersions',
-        gridDisplay: {
-          columnLabel: 'Produces Types',
-          columnValue: obj => obj.obj.outputTypeVersions().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <TypeVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    outputFrom: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Produces Types',
+        //   columnValue: obj => obj.obj.outputTypeVersions().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <TypeVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             outputFrom: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -499,11 +500,11 @@ export const FilterableOpVersionsTable: React.FC<{
       // >,
       versionIndex: {
         columnId: 'versionIndex',
-        gridDisplay: {
-          columnLabel: 'Version Index',
-          columnValue: obj => obj.obj.versionIndex(),
-          gridColDefOptions: {},
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Version Index',
+        //   columnValue: obj => obj.obj.versionIndex(),
+        //   gridColDefOptions: {},
+        // },
       } as WFHighLevelDataColumn<
         {obj: WFOpVersion},
         any,
@@ -513,29 +514,29 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       isLatest: {
         columnId: 'isLatest',
-        gridDisplay: {
-          columnLabel: 'Latest',
-          columnValue: obj => obj.obj.aliases().includes('latest'),
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value) {
-                return (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      width: '100%',
-                    }}>
-                    <Chip label="Yes" size="small" />
-                  </Box>
-                );
-              }
-              return '';
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Latest',
+        //   columnValue: obj => obj.obj.aliases().includes('latest'),
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value) {
+        //         return (
+        //           <Box
+        //             sx={{
+        //               display: 'flex',
+        //               alignItems: 'center',
+        //               justifyContent: 'center',
+        //               height: '100%',
+        //               width: '100%',
+        //             }}>
+        //             <Chip label="Yes" size="small" />
+        //           </Box>
+        //         );
+        //       }
+        //       return '';
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, {isLatest}) => {
             return !isLatest || obj.aliases().includes('latest') === isLatest;
