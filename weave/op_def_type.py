@@ -183,15 +183,13 @@ def get_code_deps(fn: typing.Callable):
     visitor = ExternalVariableFinder()
     visitor.visit(parsed)
     external_vars = list(visitor.external_vars)
-    print("GOT EXTERNAL VARS", external_vars)
 
     import_code = ""
     for var_name in external_vars:
         var_value = resolve_var(fn, var_name)
-        print("VAR", var_name, var_value)
         # var_value = fn.__globals__.get(var_name)
         if var_value is None:
-            if getattr(builtins, var_name):
+            if getattr(builtins, var_name, None):
                 # Its a builtin, carry on
                 continue
             message = f'could not resolve var "{var_name}" declared in body of op {fn}. This op will not be reloadable, but calls to it will be tracked'
@@ -204,8 +202,22 @@ def get_code_deps(fn: typing.Callable):
         if isinstance(var_value, py_types.ModuleType):
             import_code += f"import {var_value.__name__} as {var_name}\n"
         elif isinstance(var_value, py_types.FunctionType):
-            import_code += get_code_deps(var_value)
-            import_code += inspect.getsource(var_value)
+            if var_value.__module__ == fn.__module__:
+                # For now, if the function is in another module.
+                # we just import it. This is ok for libraries, but not
+                # if the user has functions declared within their
+                # package but outside of the op module.
+                # TODO: fix
+                import_code += get_code_deps(var_value)
+                import_code += inspect.getsource(var_value)
+            else:
+                import_code += (
+                    f"from {var_value.__module__} import {var_value.__name__}"
+                )
+                if var_value.__name__ != var_name:
+                    import_code += f"as {var_name}"
+                import_code += "\n"
+
         else:
             if (
                 hasattr(var_value, "__name__")
@@ -219,6 +231,7 @@ def get_code_deps(fn: typing.Callable):
                     import_code += f"as {var_name}"
                 import_code += "\n"
             else:
+                # TODO: This is where constant handling needs to go.
                 pass
                 # if context_state.get_strict_op_saving():
                 #     message = f"variable {var_name} declared in body of op {fn} not handled. This op will not be reloadable, but calls to it will be tracked"
