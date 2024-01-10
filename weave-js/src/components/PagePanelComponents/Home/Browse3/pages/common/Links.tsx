@@ -115,12 +115,16 @@ export const OpVersionLink: React.FC<{
   projectName: string;
   opName: string;
   version: string;
-  hideName?: boolean;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.hideName
-    ? props.version
-    : props.opName + ': ' + truncateID(props.version);
+  // const text = props.hideName
+  //   ? props.version
+  //   : props.opName + ': ' + truncateID(props.version);
+  let text = props.opName;
+  if (text.startsWith('op-')) {
+    text = text.slice(3);
+  }
+  text = text.replace(/-/g, ':');
   return (
     <Link
       to={peekingRouter.opVersionUIUrl(
