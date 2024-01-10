@@ -75,6 +75,16 @@ def arg_names(args: ast.arguments):
 
 
 class ExternalVariableFinder(ast.NodeVisitor):
+    """Given a an AST of a python function, find all external variable references.
+
+    External variable references are variables that are used in the function but
+    not created in the function.
+
+    The general strategy is to walk the AST keeping track of what variables are in
+    scope. Any variables loads we encounter that are not in the current scope are
+    external.
+    """
+
     def __init__(self):
         self.external_vars = {}
         self.scope_stack = [set()]  # Start with a global scope
@@ -173,7 +183,22 @@ def resolve_var(fn: typing.Callable, var_name: str):
 
 
 def get_code_deps(fn: typing.Callable) -> str:
-    """Given a python function, generate code that imports all the variables.
+    """Given a python function, return source code that contains the dependencies of that function.
+
+    This will:
+    - include any functions within the same module that are referenced within the function body
+    - import any modules that are referenced within the function body or any referenced function bodies
+
+    Current issues (to fix):
+    - does not handle constants in function closures. We need to serialize constants into json/the artifact
+      and have a way of fetching them in the generated code
+    - imported modules may be within the function's package, which doesn't work (any imported modules need
+      to be present in the loading code)
+    - doesn't serialize python requirements and other necessary system information
+
+    TODO:
+    - fix warnings / errors
+    - warn if relying on an in package module
 
     Raises:
       SyntaxError if the source of an encountered function could not be parsed
