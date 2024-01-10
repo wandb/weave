@@ -157,15 +157,6 @@ class ExternalVariableFinder(ast.NodeVisitor):
         ):
             self.external_vars[node.id] = True
 
-    def generic_visit(self, node):
-        """Visit a node and add a new scope if it's a new block."""
-        # print("GEN VISIT", node)
-        # if isinstance(node, (ast.For, ast.While, ast.If, ast.With, ast.Try)):
-        #     self.scope_stack.append(set())
-        super().generic_visit(node)
-        # if isinstance(node, (ast.For, ast.While, ast.If, ast.With, ast.Try)):
-        #     self.scope_stack.pop()
-
 
 def resolve_var(fn: typing.Callable, var_name: str):
     """Given a python function, resolve a non-local variable name."""
