@@ -8,6 +8,7 @@ from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 from .. import engine_trace
 from wandb.apis.public import api as wb_public
 
+
 def artifact_commithash_by_digest(
     entity_name: str, project_name: str, artifact_name: str, digest: str
 ) -> typing.Optional[str]:
