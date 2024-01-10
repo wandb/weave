@@ -1,19 +1,9 @@
 import {
-  AutoFixHigh,
   Category,
-  DashboardCustomize,
-  Dataset,
-  Layers,
   ManageHistory,
-  ModelTraining,
   NavigateBefore,
   NavigateNext,
-  Rule,
-  Scoreboard,
   Segment,
-  TableChart,
-  Tune,
-  TypeSpecimen,
   Undo,
 } from '@mui/icons-material';
 import {
