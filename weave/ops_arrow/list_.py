@@ -299,6 +299,7 @@ def weave_arrow_type_check(
         ]
         if len(non_none_members) == 1:
             at = non_none_members[0].type
+            arr = arr.field(int(non_none_members[0].name))
         else:
             at = pa.dense_union(non_none_members)
     if wt == types.Any():
@@ -331,6 +332,16 @@ def weave_arrow_type_check(
                     )
             if reason is not None:
                 reasons.append(f"Nullable member: {reason}")
+        # Super special case when dealing with unions of string and custom type (since the underlying pyarrow type is expected to be a string)
+        elif (
+            len(non_none_members) == 2
+            and any([isinstance(mem, types.String) for mem in non_none_members])
+            and any([types.is_custom_type(mem) for mem in non_none_members])
+        ):
+            for mem in non_none_members:
+                reason = weave_arrow_type_check(mem, arr, optional=optional)
+                if reason is not None:
+                    reasons.append(f"Union member: {reason}")
         else:
             if not pa.types.is_union(at):
                 reasons.append(f"Expected UnionType, got {at}")

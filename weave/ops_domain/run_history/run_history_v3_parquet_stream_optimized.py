@@ -119,6 +119,7 @@ def _get_history3(run: wdt.Run, columns=None):
 
     # 2. Read in the live set
     raw_live_data = _get_live_data_from_run(run, columns=columns)
+    raw_live_data = []
 
     # 3.a: Raw-load each parquet file
     raw_history_awl_tables = _read_raw_history_awl_tables(
@@ -160,13 +161,13 @@ def _get_history3(run: wdt.Run, columns=None):
         artifact,
     )
 
-    live_data_awl = _construct_live_data_awl(
-        live_columns,
-        live_columns_already_mapped,
-        flattened_object_type,
-        len(raw_live_data),
-        artifact,
-    )
+    # live_data_awl = _construct_live_data_awl(
+    #     live_columns,
+    #     live_columns_already_mapped,
+    #     flattened_object_type,
+    #     len(raw_live_data),
+    #     artifact,
+    # )
 
     # Make AWLs for each Parquet file
     # parquet_awls: typing.List[ArrowWeaveList] = []
@@ -192,7 +193,7 @@ def _get_history3(run: wdt.Run, columns=None):
     # concatted_awl = history_op_common.concat_awls([live_data_awl, *parquet_awls])
     concatted_awl = history_op_common.concat_awls(
         [
-            live_data_awl,
+            # live_data_awl,
             *{
                 ArrowWeaveList(
                     array, object_type=flattened_object_type, artifact=artifact
@@ -635,167 +636,6 @@ def _pyarrow_range(start: int, stop: int, step: int = 1) -> pa.Array:
     return pa.array(range(start, stop, step), type=pa.int32())
 
 
-def _deduped_dense_union_array(
-    type_array: pa.Array, offset_array: pa.Array, arrays: list[pa.Array]
-):
-    union_arr = pa.UnionArray.from_dense(
-        type_array,
-        offset_array,
-        arrays,
-    )
-    return _dedup_dense_union_array(union_arr)
-
-
-def _dedup_dense_union_array(union_arr: pa.UnionArray):
-    return _consolidate_matching_types_in_dense_union_array(
-        _flatten_dense_union_array(union_arr)
-    )
-
-
-def _flatten_dense_union_array(outer_array: pa.UnionArray) -> pa.Array:
-    final_arrays = [pa.nulls(1)]
-    final_type_codes = pa.compute.fill_null(
-        pa.compute.cast(pa.nulls(len(outer_array)), pa.int8()), 0
-    )
-    final_offsets = pa.compute.fill_null(
-        pa.compute.cast(pa.nulls(len(outer_array)), pa.int32()), 0
-    )
-    # final_arrays = []
-    # final_type_codes = outer_array.type_codes
-    # final_offsets = outer_array.offsets
-
-    # len(type_code_mask) == len(outer_array)
-    # len(offsets) == sum(type_code_mask == true)
-    # max(offsets) <= len(array)
-    def add_array_to_final(new_offsets, new_array, new_type_code_mask):
-        nonlocal final_arrays, final_type_codes, final_offsets
-        assert len(new_type_code_mask) == len(
-            outer_array
-        ), f"{len(new_type_code_mask)} != {len(outer_array)}"
-
-        if len(new_offsets) == 0:
-            return
-
-        new_type_code = len(final_arrays)
-        final_arrays.append(new_array)
-        final_offsets = pa.compute.replace_with_mask(
-            final_offsets,
-            new_type_code_mask,
-            new_offsets,
-        )
-        final_type_codes = pa.compute.replace_with_mask(
-            final_type_codes,
-            new_type_code_mask,
-            pa.array([new_type_code] * len(new_offsets), type=pa.int8()),
-        )
-        pass
-
-    for inner_type_code, inner_field in enumerate(outer_array.type):
-        inner_array = outer_array.field(inner_type_code)
-        inner_mask = pa.compute.equal(outer_array.type_codes, inner_type_code)
-        inner_offsets = pa.compute.filter(outer_array.offsets, inner_mask)
-        if pa.types.is_union(inner_field.type):
-            inner_array = _flatten_dense_union_array(inner_array)
-            for nested_type_code, nested_field in enumerate(inner_array.type):
-                nested_array = inner_array.field(nested_type_code)
-                nested_mask = pa.compute.equal(inner_array.type_codes, nested_type_code)
-                # nested_offsets = pa.compute.filter(inner_array.offsets, nested_mask)
-                # corrected_nested_offsets = pa.compute.take(nested_offsets, inner_offsets)
-
-                # corrected_mask = pa.compute.replace_with_mask(
-                #     inner_mask,
-                #     inner_mask,
-                #     nested_mask,
-                # )
-                corrected_mask = pa.compute.replace_with_mask(
-                    pa.compute.fill_null(
-                        pa.compute.cast(pa.nulls(len(inner_mask)), pa.bool_()), False
-                    ),
-                    inner_mask,
-                    pa.compute.take(nested_mask, inner_offsets),
-                )
-                corrected_offsets = pa.compute.take(inner_array.offsets, inner_offsets)
-
-                # inner_array.offsets
-                # expanded_offsets = pa.compute.take(inner_array.offsets, inner_offsets)
-                # expanded_array = pa.compute.take(inner_array.field(nested_type_code), inner_offsets)
-                # expanded_mask = pa.compute.take(pa.compute.equal(inner_array.type_codes, nested_type_code), inner_offsets)
-
-                add_array_to_final(corrected_offsets, nested_array, corrected_mask)
-        else:
-            add_array_to_final(inner_offsets, inner_array, inner_mask)
-
-    return pa.UnionArray.from_dense(final_type_codes, final_offsets, final_arrays)
-
-
-def _consolidate_matching_types_in_dense_union_array(
-    outer_array: pa.UnionArray,
-) -> pa.UnionArray:
-    final_types = [pa.null()]
-    final_arrays = [pa.nulls(1)]
-    final_type_codes = pa.compute.fill_null(
-        pa.compute.cast(pa.nulls(len(outer_array)), pa.int8()), 0
-    )
-    final_offsets = pa.compute.fill_null(
-        pa.compute.cast(pa.nulls(len(outer_array)), pa.int32()), 0
-    )
-
-    def add_array_to_final(new_offsets, new_array, new_type_code_mask):
-        if new_array.type not in final_types:
-            add_new_array_to_final(new_offsets, new_array, new_type_code_mask)
-        else:
-            append_array_to_final(new_offsets, new_array, new_type_code_mask)
-
-    def add_new_array_to_final(new_offsets, new_array, new_type_code_mask):
-        nonlocal final_types, final_arrays, final_type_codes, final_offsets
-        new_type_code = len(final_types)
-        final_types.append(new_array.type)
-        final_arrays.append(new_array)
-        final_type_codes = pa.compute.replace_with_mask(
-            final_type_codes,
-            new_type_code_mask,
-            pa.array([new_type_code] * len(new_offsets), type=pa.int8()),
-        )
-        final_offsets = pa.compute.replace_with_mask(
-            final_offsets,
-            new_type_code_mask,
-            new_offsets,
-        )
-
-    def append_array_to_final(new_offsets, new_array, new_type_code_mask):
-        nonlocal final_types, final_arrays, final_type_codes, final_offsets
-        new_type_code = final_types.index(new_array.type)
-        incremental_offset = len(final_arrays[new_type_code])
-        final_arrays[new_type_code] = pa.concat_arrays(
-            [final_arrays[new_type_code], new_array]
-        )
-        final_type_codes = pa.compute.replace_with_mask(
-            final_type_codes,
-            new_type_code_mask,
-            pa.array([new_type_code] * len(new_offsets), type=pa.int8()),
-        )
-        final_offsets = pa.compute.replace_with_mask(
-            final_offsets,
-            new_type_code_mask,
-            pa.compute.cast(
-                pa.compute.add(new_offsets, incremental_offset), pa.int32()
-            ),
-        )
-
-    array_type: pa.DenseUnionType = outer_array.type
-    for inner_type_code, inner_field in enumerate(array_type):
-        inner_array = outer_array.field(inner_type_code)
-        inner_mask = pa.compute.equal(outer_array.type_codes, inner_type_code)
-        add_array_to_final(
-            pa.compute.filter(outer_array.offsets, inner_mask), inner_array, inner_mask
-        )
-    return pa.UnionArray.from_dense(
-        final_type_codes,
-        final_offsets,
-        final_arrays,
-    )
-
-
 def _map_encoded_type(history_column: pa.Array, mapper) -> pa.Array:
     if _col_is_encoded_type(history_column):
         type_column = history_column.field("_type")
@@ -825,7 +665,7 @@ def _map_encoded_type(history_column: pa.Array, mapper) -> pa.Array:
         elif len(mapped_cols) == 1:
             return mapped_cols[0]
         else:
-            return _deduped_dense_union_array(
+            return convert.deduped_dense_union_array(
                 pa.compute.cast(
                     pa.compute.fill_null(
                         pa.compute.add(dictionary_encoded.indices, 1), 0
@@ -971,7 +811,7 @@ def _process_history_column(
                         )
 
                     new_fields[field.name] = _map_encoded_type(target_col, mapper)
-            return _deduped_dense_union_array(
+            return convert.deduped_dense_union_array(
                 history_column.type_codes,
                 history_column.offsets,
                 [new_fields[field.name] for field in history_column.type],
