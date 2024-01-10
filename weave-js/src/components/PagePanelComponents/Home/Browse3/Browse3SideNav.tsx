@@ -418,6 +418,21 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
   const sections: SectionType[] = useMemo(() => {
     return [
       {
+        title: 'Structure',
+        items: [
+          {
+            title: 'Operations', // 'Methods (OpDefVersions)',
+            selected: props.selectedCategory === 'ops',
+            icon: <ManageHistory />,
+            onClick: () => {
+              props.navigateToOpVersions({
+                isLatest: true,
+              });
+            },
+          },
+        ],
+      },
+      {
         title: 'Records',
         items: [
           {
@@ -435,30 +450,30 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
               });
             },
             // TODO: Get Feedback from team on this
-            children: [
-              {
-                title: 'Models',
-                icon: <Layers />,
-                selected: props.filterCategory === 'model',
-                onClick: () => {
-                  props.navigateToObjectVersions({
-                    typeCategory: 'model',
-                    latest: true,
-                  });
-                },
-              },
-              {
-                title: 'Datasets',
-                icon: <Dataset />,
-                selected: props.filterCategory === 'dataset',
-                onClick: () => {
-                  props.navigateToObjectVersions({
-                    typeCategory: 'dataset',
-                    latest: true,
-                  });
-                },
-              },
-            ],
+            // children: [
+            //   {
+            //     title: 'Models',
+            //     icon: <Layers />,
+            //     selected: props.filterCategory === 'model',
+            //     onClick: () => {
+            //       props.navigateToObjectVersions({
+            //         typeCategory: 'model',
+            //         latest: true,
+            //       });
+            //     },
+            //   },
+            //   {
+            //     title: 'Datasets',
+            //     icon: <Dataset />,
+            //     selected: props.filterCategory === 'dataset',
+            //     onClick: () => {
+            //       props.navigateToObjectVersions({
+            //         typeCategory: 'dataset',
+            //         latest: true,
+            //       });
+            //     },
+            //   },
+            // ],
           },
           {
             title: 'Calls', // 'Traces (Calls)',
@@ -478,95 +493,95 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
               });
             },
             // TODO: Get Feedback from team on this
-            children: [
-              {
-                title: 'Train',
-                selected: props.filterCategory === 'train',
-                icon: <ModelTraining />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'train'});
-                },
-              },
-              {
-                title: 'Predict',
-                selected: props.filterCategory === 'predict',
-                icon: <AutoFixHigh />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'predict'});
-                },
-              },
-              {
-                title: 'Score',
-                selected: props.filterCategory === 'score',
-                icon: <Scoreboard />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'score'});
-                },
-              },
-              {
-                title: 'Evaluate',
-                selected: props.filterCategory === 'evaluate',
-                icon: <Rule />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'evaluate'});
-                },
-              },
-              {
-                title: 'Tune',
-                selected: props.filterCategory === 'tune',
-                icon: <Tune />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'tune'});
-                },
-              },
-            ],
+            // children: [
+            //   {
+            //     title: 'Train',
+            //     selected: props.filterCategory === 'train',
+            //     icon: <ModelTraining />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'train'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Predict',
+            //     selected: props.filterCategory === 'predict',
+            //     icon: <AutoFixHigh />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'predict'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Score',
+            //     selected: props.filterCategory === 'score',
+            //     icon: <Scoreboard />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'score'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Evaluate',
+            //     selected: props.filterCategory === 'evaluate',
+            //     icon: <Rule />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'evaluate'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Tune',
+            //     selected: props.filterCategory === 'tune',
+            //     icon: <Tune />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'tune'});
+            //     },
+            //   },
+            // ],
           },
         ],
       },
-      {
-        title: 'Structure',
-        items: [
-          {
-            title: 'Types', // 'Classes (TypeVersions)',
-            selected: props.selectedCategory === 'types',
-            icon: <TypeSpecimen />,
-            onClick: () => {
-              props.navigateToTypeVersions();
-            },
-          },
-          {
-            title: 'Operations', // 'Methods (OpDefVersions)',
-            selected: props.selectedCategory === 'ops',
-            icon: <ManageHistory />,
-            onClick: () => {
-              props.navigateToOpVersions({
-                isLatest: true,
-              });
-            },
-          },
-        ],
-      },
-      {
-        title: 'Analytics',
-        items: [
-          {
-            title: 'Boards',
-            selected: props.selectedCategory === 'boards',
-            icon: <DashboardCustomize />,
-            onClick: () => {
-              props.navigateToBoards();
-            },
-          },
-          {
-            title: 'Tables',
-            selected: props.selectedCategory === 'tables',
-            icon: <TableChart />,
-            onClick: () => {
-              props.navigateToTables();
-            },
-          },
-        ],
-      },
+      // {
+      //   title: 'Structure',
+      //   items: [
+      //     {
+      //       title: 'Types', // 'Classes (TypeVersions)',
+      //       selected: props.selectedCategory === 'types',
+      //       icon: <TypeSpecimen />,
+      //       onClick: () => {
+      //         props.navigateToTypeVersions();
+      //       },
+      //     },
+      //     {
+      //       title: 'Operations', // 'Methods (OpDefVersions)',
+      //       selected: props.selectedCategory === 'ops',
+      //       icon: <ManageHistory />,
+      //       onClick: () => {
+      //         props.navigateToOpVersions({
+      //           isLatest: true,
+      //         });
+      //       },
+      //     },
+      //   ],
+      // },
+      // {
+      //   title: 'Analytics',
+      //   items: [
+      //     {
+      //       title: 'Boards',
+      //       selected: props.selectedCategory === 'boards',
+      //       icon: <DashboardCustomize />,
+      //       onClick: () => {
+      //         props.navigateToBoards();
+      //       },
+      //     },
+      //     {
+      //       title: 'Tables',
+      //       selected: props.selectedCategory === 'tables',
+      //       icon: <TableChart />,
+      //       onClick: () => {
+      //         props.navigateToTables();
+      //       },
+      //     },
+      //   ],
+      // },
     ];
   }, [props]);
   return sections;
