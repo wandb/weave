@@ -497,10 +497,9 @@ def observability(
         x=lambda row: row.count(),
         x_title="Count",
         y_title="Grouping",
-        y=lambda row: row["entity_name"],
+        y=lambda row: grouping_fn(row),
         label=lambda row: grouping_fn(row),
-        color=lambda row: grouping_fn(row),
-        groupby_dims=["label", "y"],
+        groupby_dims=["label"],
         mark="bar",
         no_legend=True,
     )
@@ -516,7 +515,7 @@ def observability(
                 **{
                     "trace_id": row["trace_id"][0],
                     "run_id": row["run_id"][-1],
-                    "user": row["entity_name"][0],
+                    "entity_name": row["entity_name"][0],
                     "project_name": row["project_name"][0],
                     "job": row["job"][0],
                     "duration": weave.ops.Number.__mul__(
@@ -548,6 +547,7 @@ def observability(
             **{
                 "Run ID": row["run_id"],
                 "Project": row["project_name"],
+                "User": row["entity_name"],
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "GPU util %": row["GPU util %"],
@@ -571,6 +571,7 @@ def observability(
             **{
                 "Run ID": row["run_id"],
                 "Project": row["project_name"],
+                "User": row["entity_name"],
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "CPU util %": row["CPU util %"],
@@ -594,6 +595,7 @@ def observability(
             **{
                 "Run ID": row["run_id"],
                 "Project": row["project_name"],
+                "User": row["entity_name"],
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "GPU memory (%)": row["GPU memory %"],
@@ -617,6 +619,7 @@ def observability(
             **{
                 "Run ID": row["run_id"],
                 "Project": row["project_name"],
+                "User": row["entity_name"],
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "Memory (MB)": row["Memory (MB)"],
@@ -645,12 +648,12 @@ def observability(
 
     # layout
     dashboard.add(
-        "Job_status",
+        "Job_run_status",
         state_transitions_plot,
         layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
     dashboard.add(
-        "Job_table",
+        "Job_run_table",
         jobs_table,
         layout=panels.GroupPanelLayout(x=0, y=6, w=24, h=8),
     )
@@ -684,7 +687,7 @@ def observability(
     selected_jobs.add_column(lambda row: row["c_4.Duration (s)"][0], "Duration (s)")
 
     dashboard.add(
-        "Selected_jobs",
+        "Selected_job_runs",
         selected_jobs,
         layout=panels.GroupPanelLayout(x=0, y=26, w=24, h=10),
     )
@@ -694,22 +697,22 @@ def observability(
         layout=panels.GroupPanelLayout(x=10, y=36, w=14, h=8),
     )
     dashboard.add(
-        "GPU_use_by_job",
+        "GPU_use_by_job_run",
         gpu_waste_by_user_plot,
         layout=panels.GroupPanelLayout(x=0, y=44, w=12, h=8),
     )
     dashboard.add(
-        "CPU_use_by_job",
+        "CPU_use_by_job_run",
         cpu_waste_by_user_plot,
         layout=panels.GroupPanelLayout(x=12, y=44, w=12, h=8),
     )
     dashboard.add(
-        "GPU_memory_by_job",
+        "GPU_memory_by_job_run",
         gpu_mem_by_user_plot,
         layout=panels.GroupPanelLayout(x=0, y=52, w=12, h=8),
     )
     dashboard.add(
-        "System_memory_by_job",
+        "System_memory_by_job_run",
         memory_by_user_plot,
         layout=panels.GroupPanelLayout(x=12, y=52, w=12, h=8),
     )
