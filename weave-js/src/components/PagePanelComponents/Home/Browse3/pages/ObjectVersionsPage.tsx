@@ -47,7 +47,8 @@ export const ObjectVersionsPage: React.FC<{
 }> = props => {
   return (
     <SimplePageLayout
-      title="Object Versions"
+      // title="Object Versions"
+      title="Objects"
       tabs={[
         {
           label: 'All',
