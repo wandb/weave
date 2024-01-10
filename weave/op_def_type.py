@@ -172,18 +172,16 @@ def resolve_var(fn: typing.Callable, var_name: str):
     return None
 
 
-def get_code_deps(fn: typing.Callable) -> typing.Optional[str]:
+def get_code_deps(fn: typing.Callable) -> str:
+    """Given a python function, generate code that imports all the variables.
+
+    Raises:
+      SyntaxError if the source of an encountered function could not be parsed
+      WeaveOpSerializeError for other unhandled cases
+    """
     # Generates repeats.
     source = textwrap.dedent(inspect.getsource(fn))
-    try:
-        parsed = ast.parse(source)
-    except SyntaxError:
-        if context_state.get_strict_op_saving():
-            raise
-        print(
-            "Warning: could not parse op source code. This op will not be reloadable, but calls to it will be tracked"
-        )
-        return
+    parsed = ast.parse(source)
 
     visitor = ExternalVariableFinder()
     visitor.visit(parsed)
@@ -197,13 +195,9 @@ def get_code_deps(fn: typing.Callable) -> typing.Optional[str]:
             if getattr(builtins, var_name, None):
                 # Its a builtin, carry on
                 continue
-            message = f'could not resolve var "{var_name}" declared in body of op {fn}. This op will not be reloadable, but calls to it will be tracked'
-
-            if context_state.get_strict_op_saving():
-                raise ValueError(message)
-            else:
-                print(f"Warning: {message}")
-                continue
+            raise errors.WeaveOpSerializeError(
+                f'Could not resolve var "{var_name}" declared in body of fn {fn}. This op will not be reloadable, but calls to it will be tracked'
+            )
         if isinstance(var_value, py_types.ModuleType):
             import_code += f"import {var_value.__name__} as {var_name}\n"
         elif isinstance(var_value, py_types.FunctionType):
@@ -236,14 +230,19 @@ def get_code_deps(fn: typing.Callable) -> typing.Optional[str]:
                     import_code += f"as {var_name}"
                 import_code += "\n"
             else:
-                # TODO: This is where constant handling needs to go.
                 pass
-                # if context_state.get_strict_op_saving():
-                #     message = f"variable {var_name} declared in body of op {fn} not handled. This op will not be reloadable, but calls to it will be tracked"
-                #     if context_state.get_strict_op_saving():
-                #         raise ValueError(message)
-                #     else:
-                #         print(f"Warning: {message}")
+                # from . import storage
+
+                # try:
+                #     print("VAR", var_name, var_value)
+                #     v = storage.to_python(var_value, wb_type=None)["_val"]
+                #     import_code += f"{var_name} = " + json.dumps(v) + "\n"
+                # except errors.WeaveTypeError:
+                #     # TODO: This is where constant handling needs to go.
+                #     # message = f"variable {var_name} declared in body of op {fn} not handled. This op will not be reloadable, but calls to it will be tracked"
+                #     raise errors.WeaveOpSerializeError(
+                #         f"Variable {var_name} declared in body of fn {fn} not handled. This op will not be reloadable, but calls to it will be tracked"
+                #     )
     return import_code
 
 
@@ -279,9 +278,14 @@ class OpDefType(types.Type):
                 + "\n\n"
             )
 
-            code_deps = get_code_deps(obj.raw_resolve_fn)
-            if code_deps is None:
-                return
+            try:
+                code_deps = get_code_deps(obj.raw_resolve_fn)
+            except (SyntaxError, errors.WeaveOpSerializeError) as e:
+                if context_state.get_strict_op_saving():
+                    raise e
+                else:
+                    print(f"Warning: {e}")
+                    return None
 
             code += code_deps
 
