@@ -9,7 +9,7 @@ import requests
 import logging
 
 from wandb import Artifact
-from wandb.apis import public as wb_public
+from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
 from . import urls
