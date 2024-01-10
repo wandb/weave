@@ -4,7 +4,6 @@ import {constString, opGet} from '../../../../../core';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {WeaveEditor} from '../../Browse2/WeaveEditors';
 import {CallsTable} from './CallsPage';
-import {useMakeNewBoard} from './common/hooks';
 import {CallLink, ObjectLink, TypeVersionLink} from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {
@@ -55,37 +54,37 @@ const ObjectVersionPageInner: React.FC<{
     const extraFields = refExtra.split('/');
     return nodeFromExtra(objNode, extraFields);
   }, [baseUri, refExtra]);
-  const {onMakeBoard} = useMakeNewBoard(itemNode);
+  // const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
     <SimplePageLayout
       title={objectName + ' : ' + objectVersionHash}
-      menuItems={[
-        {
-          label: 'Open in Board',
-          onClick: () => {
-            onMakeBoard();
-          },
-        },
-        {
-          label: '(Under Construction) Compare',
-          onClick: () => {
-            console.log('(Under Construction) Compare');
-          },
-        },
-        {
-          label: '(Under Construction) Process with Function',
-          onClick: () => {
-            console.log('(Under Construction) Process with Function');
-          },
-        },
-        {
-          label: '(Coming Soon) Add to Hub',
-          onClick: () => {
-            console.log('(Under Construction) Add to Hub');
-          },
-        },
-      ]}
+      // menuItems={[
+      //   {
+      //     label: 'Open in Board',
+      //     onClick: () => {
+      //       onMakeBoard();
+      //     },
+      //   },
+      //   {
+      //     label: '(Under Construction) Compare',
+      //     onClick: () => {
+      //       console.log('(Under Construction) Compare');
+      //     },
+      //   },
+      //   {
+      //     label: '(Under Construction) Process with Function',
+      //     onClick: () => {
+      //       console.log('(Under Construction) Process with Function');
+      //     },
+      //   },
+      //   {
+      //     label: '(Coming Soon) Add to Hub',
+      //     onClick: () => {
+      //       console.log('(Under Construction) Add to Hub');
+      //     },
+      //   },
+      // ]}
       tabs={[
         {
           label: 'Overview',
