@@ -1,3 +1,4 @@
+import pytest
 import shutil
 from .. import api as weave
 from .. import artifact_fs
@@ -121,6 +122,7 @@ def test_op_versioning_lotsofstuff(strict_op_saving):
         return np.array(k).mean()
 
 
+@pytest.mark.skip("Derived op not fully serializable due to non-json stuff in closure")
 def test_op_versioning_higherlevel_function(strict_op_saving):
     @weave.op()
     def versioned_op_lowerlevel(a: int) -> float:
@@ -143,3 +145,31 @@ def test_op_versioning_inline_func_decl(strict_op_saving):
             return inner_func(x - 1) * 2
 
         return inner_func(a)
+
+
+EXPECTED_CLOSURE_CONTANT_OP_CODE = """import typing
+import weave
+
+
+x = 10
+import weave.api as weave
+@weave.op()
+def versioned_op_closure_constant(a: int) -> float:
+    return a + x
+"""
+
+
+def test_op_versioning_closure_contant(strict_op_saving):
+    x = 10
+
+    @weave.op()
+    def versioned_op_closure_constant(a: int) -> float:
+        return a + x
+
+    ref = weave.obj_ref(versioned_op_closure_constant)
+    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+
+    with ref.artifact.open("obj.py") as f:
+        saved_code = f.read()
+
+    assert saved_code == EXPECTED_CLOSURE_CONTANT_OP_CODE

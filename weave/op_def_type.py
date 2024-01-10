@@ -182,7 +182,7 @@ def resolve_var(fn: typing.Callable, var_name: str):
     return None
 
 
-def get_code_deps(fn: typing.Callable) -> str:
+def get_code_deps(fn: typing.Callable) -> typing.Tuple[str, list[str]]:
     """Given a python function, return source code that contains the dependencies of that function.
 
     This will:
@@ -190,23 +190,30 @@ def get_code_deps(fn: typing.Callable) -> str:
     - import any modules that are referenced within the function body or any referenced function bodies
 
     Current issues (to fix):
-    - does not handle constants in function closures. We need to serialize constants into json/the artifact
-      and have a way of fetching them in the generated code
+    - only handles json serializable constants in function closures. We need to use Weave serialization
+      to save other values into the artifact and have a way of fetching them in the generated code
     - imported modules may be within the function's package, which doesn't work (any imported modules need
       to be present in the loading code)
     - doesn't serialize python requirements and other necessary system information
 
-    TODO:
-    - fix warnings / errors
-    - warn if relying on an in package module
+    Args:
+        fn: The Python function to analyze.
 
-    Raises:
-      SyntaxError if the source of an encountered function could not be parsed
-      WeaveOpSerializeError for other unhandled cases
+    Returns:
+        tupe: A tuple containing
+            import_code: str, the code that should be included in the generated code to ensure all
+                dependencies are available for the function body.
+            warnings: list[str], any warnings that occurred during the process.
     """
     # Generates repeats.
+    warnings: list[str] = []
+
     source = textwrap.dedent(inspect.getsource(fn))
-    parsed = ast.parse(source)
+    try:
+        parsed = ast.parse(source)
+    except SyntaxError:
+        warnings.append(f"Could not parse source of function {fn}.")
+        return "", warnings
 
     visitor = ExternalVariableFinder()
     visitor.visit(parsed)
@@ -220,10 +227,10 @@ def get_code_deps(fn: typing.Callable) -> str:
             if getattr(builtins, var_name, None):
                 # Its a builtin, carry on
                 continue
-            raise errors.WeaveOpSerializeError(
+            warnings.append(
                 f'Could not resolve var "{var_name}" declared in body of fn {fn}. This op will not be reloadable, but calls to it will be tracked'
             )
-        if isinstance(var_value, py_types.ModuleType):
+        elif isinstance(var_value, py_types.ModuleType):
             import_code += f"import {var_value.__name__} as {var_name}\n"
         elif isinstance(var_value, py_types.FunctionType):
             if var_value.__module__ == fn.__module__:
@@ -231,10 +238,13 @@ def get_code_deps(fn: typing.Callable) -> str:
                 # we just import it. This is ok for libraries, but not
                 # if the user has functions declared within their
                 # package but outside of the op module.
-                # TODO: fix
-                import_code += get_code_deps(var_value)
+                fn_code_deps, fn_warnings = get_code_deps(var_value)
+                warnings += fn_warnings
+                import_code += fn_code_deps
                 import_code += inspect.getsource(var_value)
             else:
+                if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
+                    pass
                 import_code += (
                     f"from {var_value.__module__} import {var_value.__name__}"
                 )
@@ -255,20 +265,17 @@ def get_code_deps(fn: typing.Callable) -> str:
                     import_code += f"as {var_name}"
                 import_code += "\n"
             else:
-                pass
-                # from . import storage
-
-                # try:
-                #     print("VAR", var_name, var_value)
-                #     v = storage.to_python(var_value, wb_type=None)["_val"]
-                #     import_code += f"{var_name} = " + json.dumps(v) + "\n"
-                # except errors.WeaveTypeError:
-                #     # TODO: This is where constant handling needs to go.
-                #     # message = f"variable {var_name} declared in body of op {fn} not handled. This op will not be reloadable, but calls to it will be tracked"
-                #     raise errors.WeaveOpSerializeError(
-                #         f"Variable {var_name} declared in body of fn {fn} not handled. This op will not be reloadable, but calls to it will be tracked"
-                #     )
-    return import_code
+                try:
+                    import_code += f"{var_name} = " + json.dumps(var_value) + "\n"
+                except TypeError:
+                    # TODO: This should use weave artifact serialization for non-json serializable objects.
+                    #     That way we can store numpy arrays, pytorch models, etc, that are captured by
+                    #     function closures. We'll need a special weave.local_ref() to see to look an
+                    #     object up from the current artifact context.
+                    warnings.append(
+                        f"Didn't serialize value of {var_name} needed by {fn}."
+                    )
+    return import_code, warnings
 
 
 def get_import_statements_for_annotations(func) -> list[str]:
@@ -303,14 +310,16 @@ class OpDefType(types.Type):
                 + "\n\n"
             )
 
-            try:
-                code_deps = get_code_deps(obj.raw_resolve_fn)
-            except (SyntaxError, errors.WeaveOpSerializeError) as e:
+            code_deps, warnings = get_code_deps(obj.raw_resolve_fn)
+            if warnings:
+                message = (
+                    f"Did not fully serialize op {obj}. This op may not be reloadable, but calls to it will be versioned.\n"
+                    + "\n  ".join(warnings)
+                )
                 if context_state.get_strict_op_saving():
-                    raise e
+                    raise errors.WeaveOpSerializeError(message)
                 else:
-                    print(f"Warning: {e}")
-                    return None
+                    print(message)
 
             code += code_deps
 
