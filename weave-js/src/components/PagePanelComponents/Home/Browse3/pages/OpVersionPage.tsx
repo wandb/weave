@@ -61,7 +61,20 @@ const OpVersionPageInner: React.FC<{
       title={opName + ' : ' + opVersionHash}
       tabs={[
         {
-          label: 'Overview',
+          label: 'Calls',
+          content: (
+            <CallsTable
+              entity={entity}
+              project={project}
+              frozenFilter={{
+                opVersions: [opName + ':' + opVersionHash],
+                traceRootsOnly: false,
+              }}
+            />
+          ),
+        },
+        {
+          label: 'Metadata',
           content: (
             <ScrollableTabContent>
               <SimpleKeyValueTable
@@ -114,19 +127,6 @@ const OpVersionPageInner: React.FC<{
           ),
         },
         {
-          label: 'Calls',
-          content: (
-            <CallsTable
-              entity={entity}
-              project={project}
-              frozenFilter={{
-                opVersions: [opName + ':' + opVersionHash],
-                traceRootsOnly: false,
-              }}
-            />
-          ),
-        },
-        {
           label: 'Invokes',
           content: (
             <FilterableOpVersionsTable
@@ -158,7 +158,16 @@ const OpVersionPageInner: React.FC<{
           label: 'Execute',
           content: (
             <ScrollableTabContent>
-              <OpVersionExecute streamId={streamId} uri={uri} />
+              <UnderConstruction
+                title="Execute"
+                message={
+                  <>
+                    This page will allow you to call this op version with
+                    specific inputs.
+                  </>
+                }
+              />
+              {/* <OpVersionExecute streamId={streamId} uri={uri} /> */}
             </ScrollableTabContent>
           ),
         },
