@@ -209,7 +209,6 @@ class OpDef:
     location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
     weave_fn: typing.Optional[graph.Node]
-    _decl_locals: typing.Dict[str, typing.Any]
     instance: typing.Union[None, graph.Node]
     hidden: bool
     pure: bool
@@ -254,7 +253,6 @@ class OpDef:
         weave_fn: typing.Optional[graph.Node] = None,
         *,
         plugins=None,
-        _decl_locals=None,  # These are python locals() from the enclosing scope.
     ):
         self.name = name
         self.input_type = input_type
@@ -271,7 +269,6 @@ class OpDef:
             if is_builtin is not None
             else context_state.get_loading_built_ins()
         )
-        self._decl_locals = _decl_locals
         self.version = None
         self.location = None
         self.instance = None
