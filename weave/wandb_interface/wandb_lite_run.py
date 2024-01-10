@@ -229,7 +229,8 @@ class InMemoryLazyLiteRun:
                 use_after_commit=False,
             )
             # wait for the artifact to be committed before returning the result
-            future.result()
+            if future is not None:
+                future.result()
         return res
 
     def upsert_project(self) -> None:
