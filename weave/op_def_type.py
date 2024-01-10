@@ -371,7 +371,7 @@ class OpDefType(types.Type):
                 # Weaveflow Merge: fromlist correctly imports submodules
                 mod = __import__(import_name, fromlist=[module_dir])
             except Exception as e:
-                print("Op loading exception. This might be fine!")
+                print("Op loading exception. This might be fine!", e)
                 import traceback
 
                 traceback.print_exc()
