@@ -2,16 +2,16 @@ import React from 'react';
 
 import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
 import {CallsTable} from './CallsPage';
-import {OpLink, OpVersionLink, TypeVersionLink} from './common/Links';
+import {
+  OpLink,
+  OpVersionLink,
+  opVersionText,
+  TypeVersionLink,
+} from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
-import {
-  ScrollableTabContent,
-  SimpleKeyValueTable,
-  SimplePageLayout,
-} from './common/SimplePageLayout';
+import {SimpleKeyValueTable, SimplePageLayout} from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
-import {FilterableOpVersionsTable} from './OpVersionsPage';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFOpVersion} from './wfInterface/types';
 
@@ -40,6 +40,10 @@ const OpVersionPageInner: React.FC<{
   const project = opVersion.project();
   const opName = opVersion.op().name();
   const opVersionHash = opVersion.version();
+  const opVersionIndex = opVersion.versionIndex();
+  const opInputTypes = opVersion.inputTypesVersions();
+  const opOutputTypes = opVersion.outputTypeVersions();
+  const opInvokes = opVersion.invokes();
 
   // const streamId = useMemo(
   //   () => ({
@@ -52,8 +56,79 @@ const OpVersionPageInner: React.FC<{
 
   return (
     <SimplePageLayout
-      title={opName + ' : ' + opVersionHash}
+      title={opVersionText(opName, opVersionIndex)}
+      headerContent={
+        <SimpleKeyValueTable
+          data={{
+            Name: (
+              <OpLink
+                entityName={opVersion.entity()}
+                projectName={opVersion.project()}
+                opName={opName}
+              />
+            ),
+            Category: (
+              <OpVersionCategoryChip opCategory={opVersion.opCategory()} />
+            ),
+            Version: opVersionIndex,
+            ...(opInputTypes.length > 0
+              ? {
+                  'Input Types': (
+                    <ul style={{margin: 0}}>
+                      {opInputTypes.map((t, i) => (
+                        <li key={i}>
+                          <TypeVersionLink
+                            entityName={t.entity()}
+                            projectName={t.project()}
+                            typeName={t.type().name()}
+                            version={t.version()}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  ),
+                }
+              : {}),
+            ...(opOutputTypes.length > 0
+              ? {
+                  'Output Types': (
+                    <ul style={{margin: 0}}>
+                      {opOutputTypes.map((t, i) => (
+                        <li key={i}>
+                          <TypeVersionLink
+                            entityName={t.entity()}
+                            projectName={t.project()}
+                            typeName={t.type().name()}
+                            version={t.version()}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  ),
+                }
+              : {}),
+            ...(opInvokes.length > 0
+              ? {'Call Tree': <OpVersionOpTree opVersion={opVersion} />}
+              : {}),
+          }}
+        />
+      }
       tabs={[
+        {
+          label: 'Code',
+          content: (
+            // <Box
+            //   sx={{
+            //     height: '100%',
+            //     width: '100%',
+            //     flexGrow: 1,
+            //     overflow: 'hidden',
+            //     pt: 4,
+            //   }}>
+            <Browse2OpDefCode uri={uri} />
+            // </Box>
+          ),
+        },
         {
           label: 'Calls',
           content: (
@@ -67,112 +142,103 @@ const OpVersionPageInner: React.FC<{
             />
           ),
         },
-        {
-          label: 'Metadata',
-          content: (
-            <ScrollableTabContent>
-              <SimpleKeyValueTable
-                data={{
-                  Name: (
-                    <OpLink
-                      entityName={opVersion.entity()}
-                      projectName={opVersion.project()}
-                      opName={opName}
-                    />
-                  ),
-                  Category: (
-                    <OpVersionCategoryChip
-                      opCategory={opVersion.opCategory()}
-                    />
-                  ),
-                  Version: opVersionHash,
-                  'Input Types': (
-                    <ul style={{margin: 0}}>
-                      {opVersion.inputTypesVersions().map((t, i) => (
-                        <li key={i}>
-                          <TypeVersionLink
-                            entityName={t.entity()}
-                            projectName={t.project()}
-                            typeName={t.type().name()}
-                            version={t.version()}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ),
-                  'Output Types': (
-                    <ul style={{margin: 0}}>
-                      {opVersion.outputTypeVersions().map((t, i) => (
-                        <li key={i}>
-                          <TypeVersionLink
-                            entityName={t.entity()}
-                            projectName={t.project()}
-                            typeName={t.type().name()}
-                            version={t.version()}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ),
-                  'Call Tree': <OpVersionOpTree opVersion={opVersion} />,
-                }}
-              />
-            </ScrollableTabContent>
-          ),
-        },
-        {
-          label: 'Invokes',
-          content: (
-            <FilterableOpVersionsTable
-              entity={opVersion.entity()}
-              project={opVersion.project()}
-              frozenFilter={{
-                invokedByOpVersions: [
-                  opVersion.op().name() + ':' + opVersion.version(),
-                ],
-              }}
-            />
-          ),
-        },
-        {
-          label: 'Invoked By',
-          content: (
-            <FilterableOpVersionsTable
-              entity={opVersion.entity()}
-              project={opVersion.project()}
-              frozenFilter={{
-                invokesOpVersions: [
-                  opVersion.op().name() + ':' + opVersion.version(),
-                ],
-              }}
-            />
-          ),
-        },
+        // {
+        //   label: 'Metadata',
+        //   content: (
+        //     <ScrollableTabContent>
+        //       <SimpleKeyValueTable
+        //         data={{
+        //           Name: (
+        //             <OpLink
+        //               entityName={opVersion.entity()}
+        //               projectName={opVersion.project()}
+        //               opName={opName}
+        //             />
+        //           ),
+        //           Category: (
+        //             <OpVersionCategoryChip
+        //               opCategory={opVersion.opCategory()}
+        //             />
+        //           ),
+        //           Version: opVersionHash,
+        //           'Input Types': (
+        //             <ul style={{margin: 0}}>
+        //               {opVersion.inputTypesVersions().map((t, i) => (
+        //                 <li key={i}>
+        //                   <TypeVersionLink
+        //                     entityName={t.entity()}
+        //                     projectName={t.project()}
+        //                     typeName={t.type().name()}
+        //                     version={t.version()}
+        //                   />
+        //                 </li>
+        //               ))}
+        //             </ul>
+        //           ),
+        //           'Output Types': (
+        //             <ul style={{margin: 0}}>
+        //               {opVersion.outputTypeVersions().map((t, i) => (
+        //                 <li key={i}>
+        //                   <TypeVersionLink
+        //                     entityName={t.entity()}
+        //                     projectName={t.project()}
+        //                     typeName={t.type().name()}
+        //                     version={t.version()}
+        //                   />
+        //                 </li>
+        //               ))}
+        //             </ul>
+        //           ),
+        //           'Call Tree': <OpVersionOpTree opVersion={opVersion} />,
+        //         }}
+        //       />
+        //     </ScrollableTabContent>
+        //   ),
+        // },
+        // {
+        //   label: 'Invokes',
+        //   content: (
+        //     <FilterableOpVersionsTable
+        //       entity={opVersion.entity()}
+        //       project={opVersion.project()}
+        //       frozenFilter={{
+        //         invokedByOpVersions: [
+        //           opVersion.op().name() + ':' + opVersion.version(),
+        //         ],
+        //       }}
+        //     />
+        //   ),
+        // },
+        // {
+        //   label: 'Invoked By',
+        //   content: (
+        //     <FilterableOpVersionsTable
+        //       entity={opVersion.entity()}
+        //       project={opVersion.project()}
+        //       frozenFilter={{
+        //         invokesOpVersions: [
+        //           opVersion.op().name() + ':' + opVersion.version(),
+        //         ],
+        //       }}
+        //     />
+        //   ),
+        // },
         {
           label: 'Execute',
           content: (
-            <ScrollableTabContent>
-              <UnderConstruction
-                title="Execute"
-                message={
-                  <>
-                    This page will allow you to call this op version with
-                    specific inputs.
-                  </>
-                }
-              />
-              {/* <OpVersionExecute streamId={streamId} uri={uri} /> */}
-            </ScrollableTabContent>
+            // <ScrollableTabContent><OpVersionExecute streamId={streamId} uri={uri} /> </ScrollableTabContent>
+            <UnderConstruction
+              title="Execute"
+              message={
+                <>
+                  This page will allow you to call this op version with specific
+                  inputs.
+                </>
+              }
+            />
           ),
         },
-        {
-          label: 'Code',
-          content: (
-            <ScrollableTabContent>
-              <Browse2OpDefCode uri={uri} />
-            </ScrollableTabContent>
-          ),
-        },
+
         {
           label: 'DAG',
           content: (
