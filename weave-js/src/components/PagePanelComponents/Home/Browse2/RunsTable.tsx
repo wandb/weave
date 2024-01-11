@@ -100,6 +100,7 @@ export const RunsTable: FC<{
       return {
         id: call.span_id,
         ormCall,
+        loading,
         opVersion: ormCall?.opVersion()?.op()?.name(),
         isRoot: ormCall?.parentCall() == null,
         opCategory: ormCall?.opVersion()?.opCategory(),
@@ -144,7 +145,7 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [orm?.projectConnection, spans]);
+  }, [orm?.projectConnection, spans, loading]);
 
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
@@ -457,9 +458,9 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  if (loading) {
-    return null;
-  }
+  // if (loading) {
+  //   return null;
+  // }
   return (
     <DataGridPro
       sx={{border: 0}}

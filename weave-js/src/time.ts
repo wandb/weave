@@ -106,13 +106,12 @@ export function monthRoundedTime(ns: number) {
   const m = Math.floor((ns % hour) / minute);
   const s = Math.floor(ns % minute);
   const ms = Math.floor((ns * 1000) % 1000);
-
   const moDisplay = mo > 0 ? mo + 'mo ' : '';
   const dDisplay = d > 0 ? d + 'd ' : '';
   const hDisplay = h > 0 ? h + 'h ' : '';
   const mDisplay = m > 0 ? m + 'm ' : '';
-  const sDisplay = s > 0 ? s + 's' : '';
-  const msDisplay = ns < 0 ? ms + 'ms' : '';
+  const sDisplay = s >= 1 ? s + 's' : '';
+  const msDisplay = ns < 1 ? ms + 'ms' : '';
   return [moDisplay, dDisplay, hDisplay, mDisplay, sDisplay, msDisplay]
     .filter(item => item !== '')
     .join(' ');
