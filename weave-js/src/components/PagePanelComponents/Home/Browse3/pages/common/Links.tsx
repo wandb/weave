@@ -73,12 +73,13 @@ export const ObjectVersionLink: React.FC<{
   projectName: string;
   objectName: string;
   version: string;
-  hideName?: boolean;
+  versionIndex: number;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.hideName
-    ? props.version
-    : props.objectName + ': ' + truncateID(props.version);
+  // const text = props.hideName
+  //   ? props.version
+  //   : props.objectName + ': ' + truncateID(props.version);
+  const text = props.objectName + ':v' + props.versionIndex;
   return (
     <Link
       to={peekingRouter.objectVersionUIUrl(
@@ -208,7 +209,7 @@ export const OpVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount} versions
+      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
@@ -227,7 +228,7 @@ export const TypeVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount} versions
+      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
