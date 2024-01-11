@@ -365,13 +365,17 @@ def observability(
                 "Project": row["project_name"][0],
                 "Run ID": row["run_id"][-1],
                 "Status": row["state"][-1],
-                "Duration (s)": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                "Duration (m)": weave.ops.Number.__truediv__(
+                    weave.ops.Number.__mul__(
+                        weave.ops.timedelta_total_seconds(
+                            weave.ops.datetime_sub(
+                                row[timestamp_col_name].max(),
+                                row[timestamp_col_name].min(),
+                            ),
                         ),
+                        1000,
                     ),
-                    1000,
+                    60,
                 ),
             }
         ),
@@ -416,21 +420,27 @@ def observability(
                 b=row["state"][-1] == "running",
             ),
             weave.ops.dict_(
-                a=weave.ops.timedelta_total_seconds(
-                    weave.ops.datetime_sub(
-                        row[timestamp_col_name].max(),
-                        row[timestamp_col_name].min(),
-                    )
+                a=weave.ops.Number.__truediv__(
+                    weave.ops.timedelta_total_seconds(
+                        weave.ops.datetime_sub(
+                            row[timestamp_col_name].max(),
+                            row[timestamp_col_name].min(),
+                        )
+                    ),
+                    60,
                 ),
-                b=weave.ops.timedelta_total_seconds(
-                    weave.ops.datetime_sub(
-                        weave.ops.from_number(weave.ops.datetime_now()),
-                        row[timestamp_col_name].min(),
-                    )
+                b=weave.ops.Number.__truediv__(
+                    weave.ops.timedelta_total_seconds(
+                        weave.ops.datetime_sub(
+                            weave.ops.from_number(weave.ops.datetime_now()),
+                            row[timestamp_col_name].min(),
+                        )
+                    ),
+                    60,
                 ),
             ),
         ),
-        "Runtime (s)",
+        "Runtime (m)",
     )
     jobs_table.add_column(lambda row: row["priority"][0], "Priority")
     jobs_table.add_column(
@@ -541,14 +551,17 @@ def observability(
                     "project_name": row["project_name"][0],
                     "job": row["job"][0],
                     "priority": row["priority"][0],
-                    "duration": weave.ops.Number.__mul__(
-                        weave.ops.timedelta_total_seconds(
-                            weave.ops.datetime_sub(
-                                row[timestamp_col_name].max(),
-                                row[timestamp_col_name].min(),
+                    "duration": weave.ops.Number.__truediv__(
+                        weave.ops.Number.__mul__(
+                            weave.ops.timedelta_total_seconds(
+                                weave.ops.datetime_sub(
+                                    row[timestamp_col_name].max(),
+                                    row[timestamp_col_name].min(),
+                                ),
                             ),
+                            1000,
                         ),
-                        1000,
+                        60,
                     ),
                     "GPU util %": row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
                     "CPU util %": row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
@@ -563,7 +576,7 @@ def observability(
     gpu_waste_by_user_plot = panels.Plot(
         metric_plot_data_mapped,
         x=lambda row: row["duration"],
-        x_title="Run duration",
+        x_title="Run duration (minutes)",
         y_title="GPU utilization (%)",
         y=lambda row: row["GPU util %"],
         tooltip=lambda row: weave.ops.dict_(
@@ -573,7 +586,7 @@ def observability(
                 "User": row["entity_name"],
                 "Job": row["job"],
                 "Priority": row["priority"],
-                "Duration (s)": row["duration"],
+                "Duration (m)": row["duration"],
                 "GPU util %": row["GPU util %"],
             }
         ),
@@ -588,7 +601,7 @@ def observability(
     cpu_waste_by_user_plot = panels.Plot(
         metric_plot_data_mapped,
         x=lambda row: row["duration"],
-        x_title="Run duration",
+        x_title="Run duration (minutes)",
         y_title="CPU utilization (%)",
         y=lambda row: row["CPU util %"],
         tooltip=lambda row: weave.ops.dict_(
@@ -598,7 +611,7 @@ def observability(
                 "User": row["entity_name"],
                 "Job": row["job"],
                 "Priority": row["priority"],
-                "Duration (s)": row["duration"],
+                "Duration (m)": row["duration"],
                 "CPU util %": row["CPU util %"],
             }
         ),
@@ -613,7 +626,7 @@ def observability(
     gpu_mem_by_user_plot = panels.Plot(
         metric_plot_data_mapped,
         x=lambda row: row["duration"],
-        x_title="Run duration",
+        x_title="Run duration (minutes)",
         y_title="GPU memory (%)",
         y=lambda row: row["GPU memory %"],
         tooltip=lambda row: weave.ops.dict_(
@@ -623,7 +636,7 @@ def observability(
                 "User": row["entity_name"],
                 "Job": row["job"],
                 "Priority": row["priority"],
-                "Duration (s)": row["duration"],
+                "Duration (m)": row["duration"],
                 "GPU memory (%)": row["GPU memory %"],
             }
         ),
@@ -638,7 +651,7 @@ def observability(
     memory_by_user_plot = panels.Plot(
         metric_plot_data_mapped,
         x=lambda row: row["duration"],
-        x_title="Run duration",
+        x_title="Run duration (minutes)",
         y_title="Memory usage (MB)",
         y=lambda row: row["Memory (MB)"],
         tooltip=lambda row: weave.ops.dict_(
@@ -648,7 +661,7 @@ def observability(
                 "User": row["entity_name"],
                 "Job": row["job"],
                 "Priority": row["priority"],
-                "Duration (s)": row["duration"],
+                "Duration (m)": row["duration"],
                 "Memory (MB)": row["Memory (MB)"],
             }
         ),
@@ -711,7 +724,7 @@ def observability(
     selected_jobs.add_column(lambda row: row["c_4.Status"][-1], "Status")
     selected_jobs.add_column(lambda row: row["c_2"].min(), "Start")
     selected_jobs.add_column(lambda row: row["c_2"].max(), "Stop")
-    selected_jobs.add_column(lambda row: row["c_4.Duration (s)"][0], "Duration (s)")
+    selected_jobs.add_column(lambda row: row["c_4.Duration (m)"][0], "Duration (m)")
 
     dashboard.add(
         "Selected_job_runs",
