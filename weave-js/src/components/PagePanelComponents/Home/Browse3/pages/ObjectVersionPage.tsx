@@ -187,16 +187,16 @@ const ObjectVersionProducingCallsItem: React.FC<{
   if (producingCalls.length === 0) {
     return <div>-</div>;
   } else if (producingCalls.length === 1) {
+    const call = producingCalls[0];
     return (
       <CallLink
-        entityName={producingCalls[0].entity()}
-        projectName={producingCalls[0].project()}
-        callId={producingCalls[0].callID()}
-        opName={
-          producingCalls[0].opVersion()?.op().name() ??
-          producingCalls[0].spanName() ??
-          ''
-        }
+        entityName={call.entity()}
+        projectName={call.project()}
+        callId={call.callID()}
+        simpleText={{
+          opName: call.spanName(),
+          versionIndex: call.opVersion()?.versionIndex() ?? 0,
+        }}
       />
     );
   }
@@ -209,7 +209,10 @@ const ObjectVersionProducingCallsItem: React.FC<{
               entityName={call.entity()}
               projectName={call.project()}
               callId={call.callID()}
-              opName={call.opVersion()?.op().name() ?? call.spanName() ?? ''}
+              simpleText={{
+                opName: call.spanName(),
+                versionIndex: call.opVersion()?.versionIndex() ?? 0,
+              }}
             />
           </li>
         );
