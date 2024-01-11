@@ -103,11 +103,11 @@ def observability(
 
     priority_names = weave.ops.dict_(
         **{
-            0: "Critical",
-            1: "High",
-            2: "Medium",
-            3: "Low",
-        },
+            "0": "Critical",
+            "1": "High",
+            "2": "Medium",
+            "3": "Low",
+        }
     )
 
     varbar = panel_board.varbar(editable=False)
@@ -124,7 +124,7 @@ def observability(
                 "trace_id": row["trace_id"],
                 "state": display_states.pick(row["state"]),
                 "error": row["error"],
-                "priority": priority_names.pick(row["priority"]),
+                "priority": row["priority"],
                 "metrics": row["metrics"],
             }
         )
@@ -317,21 +317,21 @@ def observability(
             weave.ops.timestamp_bins_nice(bin_range, num_buckets)
         ),
         x_title="Time",
-        y=lambda row: row["duration"],
+        y=lambda row: row["duration"].sum(),
         y_title="Time spent queued (m)",
         label=lambda row: grouping_fn(row),
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Job": row["job"],
-                "User": row["entity_name"],
-                "Project": row["project_name"],
-                "Run ID": row["run_id"],
-                "Duration (m)": row["duration"],
-                "Priority": row["priority"],
+                "Job (s)": weave.ops.join_to_str(row["job"].unique(), ","),
+                "User (s)": weave.ops.join_to_str(row["entity_name"].unique(), ","),
+                "Project (s)": weave.ops.join_to_str(row["project_name"].unique(), ","),
+                "Duration (m)": row["duration"].sum(),
+                "Run count": row.count(),
+                "Priority (s)": weave.ops.join_to_str(row["priority"].unique(), ","),
             }
         ),
         color_title="Grouping",
-        groupby_dims=["label", "x"],
+        groupby_dims=["x", "label"],
         mark="bar",
         domain_x=user_zoom_range,
     )
@@ -423,7 +423,6 @@ def observability(
         ),
         "Runtime (s)",
     )
-    jobs_table.add_column(lambda row: row["priority"][0], "Priority")
     jobs_table.add_column(
         lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
         "Avg. CPU %",
@@ -512,8 +511,7 @@ def observability(
         x_title="Count",
         y_title="Grouping",
         y=lambda row: grouping_fn(row),
-        label=lambda row: grouping_fn(row),
-        groupby_dims=["label"],
+        groupby_dims=["y"],
         mark="bar",
         no_legend=True,
     )
