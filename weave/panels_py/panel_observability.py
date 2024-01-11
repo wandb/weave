@@ -124,7 +124,16 @@ def observability(
                 "trace_id": row["trace_id"],
                 "state": display_states.pick(row["state"]),
                 "error": row["error"],
-                "priority": row["priority"],
+                "priority": weave.ops.cond(
+                    weave.ops.dict_(
+                        a=row["priority"].isNone(),
+                        b=row["priority"].isNone() == False,
+                    ),
+                    weave.ops.dict_(
+                        a=priority_names[2],
+                        b=priority_names[row["priority"]],
+                    ),
+                ),
                 "metrics": row["metrics"],
             }
         )
@@ -298,16 +307,7 @@ def observability(
                     ),
                     60,
                 ),
-                "priority": weave.ops.cond(
-                    weave.ops.dict_(
-                        a=row["priority"][0].isNone(),
-                        b=row["priority"][0].isNone() == False,
-                    ),
-                    weave.ops.dict_(
-                        a=weave.ops.make_const_node(types.NoneType(), None),
-                        b=priority_names[row["priority"][0]],
-                    ),
-                ),
+                "priority": row["priority"][0],
             }
         ),
     )
@@ -432,6 +432,7 @@ def observability(
         ),
         "Runtime (s)",
     )
+    jobs_table.add_column(lambda row: row["priority"][0], "Priority")
     jobs_table.add_column(
         lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
         "Avg. CPU %",
@@ -539,16 +540,7 @@ def observability(
                     "entity_name": row["entity_name"][0],
                     "project_name": row["project_name"][0],
                     "job": row["job"][0],
-                    "priority": weave.ops.cond(
-                        weave.ops.dict_(
-                            a=row["priority"][0].isNone(),
-                            b=row["priority"][0].isNone() == False,
-                        ),
-                        weave.ops.dict_(
-                            a=weave.ops.make_const_node(types.NoneType(), None),
-                            b=priority_names[row["priority"][0]],
-                        ),
-                    ),
+                    "priority": row["priority"][0],
                     "duration": weave.ops.Number.__mul__(
                         weave.ops.timedelta_total_seconds(
                             weave.ops.datetime_sub(
@@ -580,9 +572,9 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
+                "Priority": row["priority"],
                 "Duration (s)": row["duration"],
                 "GPU util %": row["GPU util %"],
-                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
@@ -605,9 +597,9 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
+                "Priority": row["priority"],
                 "Duration (s)": row["duration"],
                 "CPU util %": row["CPU util %"],
-                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
@@ -630,9 +622,9 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
+                "Priority": row["priority"],
                 "Duration (s)": row["duration"],
                 "GPU memory (%)": row["GPU memory %"],
-                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
@@ -655,9 +647,9 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
+                "Priority": row["priority"],
                 "Duration (s)": row["duration"],
                 "Memory (MB)": row["Memory (MB)"],
-                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
