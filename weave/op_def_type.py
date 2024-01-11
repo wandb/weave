@@ -1,3 +1,4 @@
+from _ast import AsyncFunctionDef, ExceptHandler
 import collections
 import textwrap
 import json
@@ -7,6 +8,8 @@ import typing
 import os
 import sys
 import ast
+import builtins
+from typing import Any
 
 from . import artifact_local
 from . import op_def
@@ -56,28 +59,218 @@ def generate_referenced_type_code(type_):
         return generate_referenced_type_code(type_.__args__[0])
 
 
-def get_code_deps(fn, decl_locals):
-    # Pretty horrible and hacky POC.
-    # Tries to pull in other functions and modules referenced in the function
-    # body. Generates a lot of repetition and not general. I just made it
-    # work for specific cases that exist in the example notebooks currently.
-    source = inspect.getsource(fn)
+def arg_names(args: ast.arguments):
+    arg_names = set()
+    for arg in args.args:
+        arg_names.add(arg.arg)
+    for arg in args.kwonlyargs:
+        arg_names.add(arg.arg)
+    for arg in args.posonlyargs:
+        arg_names.add(arg.arg)
+    if args.vararg:
+        arg_names.add(args.vararg.arg)
+    if args.kwarg:
+        arg_names.add(args.kwarg.arg)
+    return arg_names
+
+
+class ExternalVariableFinder(ast.NodeVisitor):
+    """Given a an AST of a python function, find all external variable references.
+
+    External variable references are variables that are used in the function but
+    not created in the function.
+
+    The general strategy is to walk the AST keeping track of what variables are in
+    scope. Any variables loads we encounter that are not in the current scope are
+    external.
+    """
+
+    def __init__(self):
+        self.external_vars = {}
+        self.scope_stack = [set()]  # Start with a global scope
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            self.scope_stack[-1].add(alias.asname or alias.name)
+
+    def visit_ImportFrom(self, node):
+        for alias in node.names:
+            self.scope_stack[-1].add(alias.asname or alias.name)
+
+    def visit_FunctionDef(self, node):
+        # Add function name to the current scope
+        self.scope_stack[-1].add(node.name)
+        # Add function arguments to new scope
+        self.scope_stack.append(arg_names(node.args))
+        self.generic_visit(node)
+        self.scope_stack.pop()  # Pop function scope when we exit the function
+
+    def visit_AsyncFunctionDef(self, node) -> Any:
+        self.scope_stack[-1].add(node.name)
+        self.scope_stack.append(arg_names(node.args))
+        self.generic_visit(node)
+        self.scope_stack.pop()  # Pop function scope when we exit the function
+
+    def visit_Lambda(self, node):
+        # Add function arguments to the current scope
+        self.scope_stack.append(arg_names(node.args))
+        self.generic_visit(node)
+        self.scope_stack.pop()  # Pop function scope when we exit the function
+
+    def visit_ListComp(self, node) -> Any:
+        # Change visit order, visit generators first which is where variable
+        # definitions happen
+        for generator in node.generators:
+            self.visit(generator)
+        self.visit(node.elt)
+
+    def visit_SetComp(self, node) -> Any:
+        # Change visit order, visit generators first which is where variable
+        # definitions happen
+        for generator in node.generators:
+            self.visit(generator)
+        self.visit(node.elt)
+
+    def visit_GeneratorExp(self, node) -> Any:
+        # Change visit order, visit generators first which is where variable
+        # definitions happen
+        for generator in node.generators:
+            self.visit(generator)
+        self.visit(node.elt)
+
+    def visit_DictComp(self, node) -> Any:
+        # Change visit order, visit generators first which is where variable
+        # definitions happen
+        for generator in node.generators:
+            self.visit(generator)
+        self.visit(node.key)
+        self.visit(node.value)
+
+    def visit_ExceptHandler(self, node: ExceptHandler) -> Any:
+        self.scope_stack[-1].add(node.name)
+        self.generic_visit(node)
+
+    def visit_Name(self, node):
+        # print("  VISIT NAME", node.id, node.ctx)
+        # If a variable is used (loaded) but not defined in any scope in the stack, and not builtin it's external
+        # TODO: we don't capture python version, but builtins can change from version to version!
+        if isinstance(node.ctx, ast.Store):
+            self.scope_stack[-1].add(node.id)
+        elif isinstance(node.ctx, ast.Load) and not any(
+            node.id in scope for scope in self.scope_stack
+        ):
+            self.external_vars[node.id] = True
+
+
+def resolve_var(fn: typing.Callable, var_name: str):
+    """Given a python function, resolve a non-local variable name."""
+    # First to see if the variable is in the closure
+    if fn.__closure__:
+        closure_vars = {}
+        # __code__.co_freevars is the closure variable names in order
+        for vn, closure_cell in zip(fn.__code__.co_freevars, fn.__closure__):
+            closure_vars[vn] = closure_cell.cell_contents
+        if var_name in closure_vars:
+            return closure_vars[var_name]
+    if var_name in fn.__globals__:
+        return fn.__globals__[var_name]
+    return None
+
+
+def get_code_deps(fn: typing.Callable) -> typing.Tuple[str, list[str]]:
+    """Given a python function, return source code that contains the dependencies of that function.
+
+    This will:
+    - include any functions within the same module that are referenced within the function body
+    - import any modules that are referenced within the function body or any referenced function bodies
+
+    Current issues (to fix):
+    - only handles json serializable constants in function closures. We need to use Weave serialization
+      to save other values into the artifact and have a way of fetching them in the generated code
+    - imported modules may be within the function's package, which doesn't work (any imported modules need
+      to be present in the loading code)
+    - doesn't serialize python requirements and other necessary system information
+
+    Args:
+        fn: The Python function to analyze.
+
+    Returns:
+        tupe: A tuple containing
+            import_code: str, the code that should be included in the generated code to ensure all
+                dependencies are available for the function body.
+            warnings: list[str], any warnings that occurred during the process.
+    """
+    # Generates repeats.
+    warnings: list[str] = []
+
+    source = textwrap.dedent(inspect.getsource(fn))
     try:
         parsed = ast.parse(source)
-    except IndentationError:
-        return ""
+    except SyntaxError:
+        warnings.append(f"Could not parse source of function {fn}.")
+        return "", warnings
+
+    visitor = ExternalVariableFinder()
+    visitor.visit(parsed)
+    external_vars = list(visitor.external_vars)
+
     import_code = ""
-    for node in ast.walk(parsed):
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
-            # A really bad way to check if a variable reference is for
-            # a module!
-            local_val = decl_locals.get(node.id)
-            if isinstance(local_val, py_types.ModuleType):
-                import_code += f"import {local_val.__name__} as {node.id}\n"
-            elif isinstance(local_val, py_types.FunctionType):
-                import_code += get_code_deps(local_val, decl_locals)
-                import_code += inspect.getsource(local_val)
-    return import_code
+    for var_name in external_vars:
+        var_value = resolve_var(fn, var_name)
+        # var_value = fn.__globals__.get(var_name)
+        if var_value is None:
+            if getattr(builtins, var_name, None):
+                # Its a builtin, carry on
+                continue
+            warnings.append(
+                f'Could not resolve var "{var_name}" declared in body of fn {fn}. This op will not be reloadable, but calls to it will be tracked'
+            )
+        elif isinstance(var_value, py_types.ModuleType):
+            import_code += f"import {var_value.__name__} as {var_name}\n"
+        elif isinstance(var_value, py_types.FunctionType):
+            if var_value.__module__ == fn.__module__:
+                # For now, if the function is in another module.
+                # we just import it. This is ok for libraries, but not
+                # if the user has functions declared within their
+                # package but outside of the op module.
+                fn_code_deps, fn_warnings = get_code_deps(var_value)
+                warnings += fn_warnings
+                import_code += fn_code_deps
+                import_code += inspect.getsource(var_value)
+            else:
+                if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
+                    pass
+                import_code += (
+                    f"from {var_value.__module__} import {var_value.__name__}"
+                )
+                if var_value.__name__ != var_name:
+                    import_code += f"as {var_name}"
+                import_code += "\n"
+
+        else:
+            if (
+                hasattr(var_value, "__name__")
+                and hasattr(var_value, "__module__")
+                and var_value.__module__ != fn.__module__
+            ):
+                import_code += (
+                    f"from {var_value.__module__} import {var_value.__name__}"
+                )
+                if var_value.__name__ != var_name:
+                    import_code += f"as {var_name}"
+                import_code += "\n"
+            else:
+                try:
+                    import_code += f"{var_name} = " + json.dumps(var_value) + "\n"
+                except TypeError:
+                    # TODO: This should use weave artifact serialization for non-json serializable objects.
+                    #     That way we can store numpy arrays, pytorch models, etc, that are captured by
+                    #     function closures. We'll need a special weave.local_ref() to see to look an
+                    #     object up from the current artifact context.
+                    warnings.append(
+                        f"Didn't serialize value of {var_name} needed by {fn}."
+                    )
+    return import_code, warnings
 
 
 def get_import_statements_for_annotations(func) -> list[str]:
@@ -100,6 +293,9 @@ class OpDefType(types.Type):
     instance_classes = op_def.OpDef
 
     def save_instance(self, obj: op_def.OpDef, artifact, name):
+        if obj.name.startswith("mapped_"):
+            # Skip mapped (derived ops)
+            return None
         if obj.is_builtin:
             with artifact.new_file(f"{name}.json") as f:
                 json.dump({"name": obj.name}, f)
@@ -112,9 +308,18 @@ class OpDefType(types.Type):
                 + "\n\n"
             )
 
-            # Try to figure out module imports from the function body
-            # (in a real hacky way as a POC)
-            code += get_code_deps(obj.raw_resolve_fn, obj._decl_locals)
+            code_deps, warnings = get_code_deps(obj.raw_resolve_fn)
+            if warnings:
+                message = (
+                    f"Did not fully serialize op {obj}. This op may not be reloadable, but calls to it will be versioned.\n"
+                    + "\n  ".join(warnings)
+                )
+                if context_state.get_strict_op_saving():
+                    raise errors.WeaveOpSerializeError(message)
+                else:
+                    print(message)
+
+            code += code_deps
 
             # Note the above two stanzas are in the order they are to ensure
             # this case works.
@@ -198,7 +403,7 @@ class OpDefType(types.Type):
                 # Weaveflow Merge: fromlist correctly imports submodules
                 mod = __import__(import_name, fromlist=[module_dir])
             except Exception as e:
-                print("Op loading exception. This might be fine!")
+                print("Op loading exception. This might be fine!", e)
                 import traceback
 
                 traceback.print_exc()

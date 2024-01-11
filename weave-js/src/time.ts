@@ -93,7 +93,7 @@ export class TimeDelta {
 // units from largest to smallest, down to seconds
 // largest unit in this timestamp will be months
 // e.g. 2mo 17d 2h 18m 6s
-export function monthRoundedTime(ns: number, includeMs?: boolean) {
+export function monthRoundedTime(ns: number) {
   // convenient units in seconds
   const minute = 60;
   const hour = minute * 60;
@@ -106,17 +106,12 @@ export function monthRoundedTime(ns: number, includeMs?: boolean) {
   const m = Math.floor((ns % hour) / minute);
   const s = Math.floor(ns % minute);
   const ms = Math.floor((ns * 1000) % 1000);
-
   const moDisplay = mo > 0 ? mo + 'mo ' : '';
   const dDisplay = d > 0 ? d + 'd ' : '';
   const hDisplay = h > 0 ? h + 'h ' : '';
   const mDisplay = m > 0 ? m + 'm ' : '';
-  let sDisplay = s >= 0 ? s + 's' : '';
-  let msDisplay = '';
-  if (includeMs) {
-    sDisplay = s > 0 ? s + 's' : '';
-    msDisplay = ms >= 0 ? ms + 'ms' : '';
-  }
+  const sDisplay = s >= 1 ? s + 's' : '';
+  const msDisplay = ns < 1 ? ms + 'ms' : '';
   return [moDisplay, dDisplay, hDisplay, mDisplay, sDisplay, msDisplay]
     .filter(item => item !== '')
     .join(' ');
