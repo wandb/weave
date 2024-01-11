@@ -138,20 +138,20 @@ const useCallTabs = (call: WFCall) => {
   ];
 };
 
-const callMenuItems = [
-  {
-    label: '(Under Construction) Open in Board',
-    onClick: () => {
-      console.log('TODO: Open in Board');
-    },
-  },
-  {
-    label: '(Under Construction) Compare',
-    onClick: () => {
-      console.log('TODO: Compare');
-    },
-  },
-];
+// const callMenuItems = [
+//   {
+//     label: '(Under Construction) Open in Board',
+//     onClick: () => {
+//       console.log('TODO: Open in Board');
+//     },
+//   },
+//   {
+//     label: '(Under Construction) Compare',
+//     onClick: () => {
+//       console.log('TODO: Compare');
+//     },
+//   },
+// ];
 
 const CallPageInnerHorizontal: React.FC<{
   call: WFCall;
@@ -210,7 +210,7 @@ const CallPageInnerHorizontal: React.FC<{
                 <SimplePageLayoutContext.Provider value={{}}>
                   <SimplePageLayout
                     title={title}
-                    menuItems={callMenuItems}
+                    // menuItems={callMenuItems}
                     tabs={callTabs}
                   />
                 </SimplePageLayoutContext.Provider>
@@ -241,7 +241,7 @@ const CallPageInnerVertical: React.FC<{
             setVerticalLayout(false);
           },
         },
-        ...callMenuItems,
+        // ...callMenuItems,
       ]}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
