@@ -457,6 +457,9 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
+  if (loading) {
+    return null;
+  }
   return (
     <DataGridPro
       sx={{border: 0}}
