@@ -1,4 +1,4 @@
-from _ast import AsyncFunctionDef
+from _ast import AsyncFunctionDef, ExceptHandler
 import collections
 import textwrap
 import json
@@ -146,6 +146,10 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.visit(node.key)
         self.visit(node.value)
 
+    def visit_ExceptHandler(self, node: ExceptHandler) -> Any:
+        self.scope_stack[-1].add(node.name)
+        self.generic_visit(node)
+
     def visit_Name(self, node):
         # print("  VISIT NAME", node.id, node.ctx)
         # If a variable is used (loaded) but not defined in any scope in the stack, and not builtin it's external
@@ -289,6 +293,9 @@ class OpDefType(types.Type):
     instance_classes = op_def.OpDef
 
     def save_instance(self, obj: op_def.OpDef, artifact, name):
+        if obj.name.startswith("mapped_"):
+            # Skip mapped (derived ops)
+            return None
         if obj.is_builtin:
             with artifact.new_file(f"{name}.json") as f:
                 json.dump({"name": obj.name}, f)

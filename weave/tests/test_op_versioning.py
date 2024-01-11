@@ -173,3 +173,15 @@ def test_op_versioning_closure_contant(strict_op_saving):
         saved_code = f.read()
 
     assert saved_code == EXPECTED_CLOSURE_CONTANT_OP_CODE
+
+
+def test_op_versioning_exception(strict_op_saving):
+    # Just ensure this doesn't raise by running it.
+    @weave.op()
+    def versioned_op_exception(a: int) -> float:
+        try:
+            x = 1 / 0
+        except Exception as e:
+            print("E", e)
+            return 9999
+        return x
