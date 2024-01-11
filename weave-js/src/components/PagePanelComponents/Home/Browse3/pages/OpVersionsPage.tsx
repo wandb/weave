@@ -7,9 +7,9 @@ import {
   ListItemButton,
   TextField,
 } from '@mui/material';
-import moment from 'moment';
 import React, {useCallback, useMemo} from 'react';
 
+import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
@@ -196,10 +196,12 @@ export const FilterableOpVersionsTable: React.FC<{
           columnValue: obj => obj.obj.createdAtMs(),
           gridColDefOptions: {
             renderCell: params => {
-              // return moment(params.value as number).format(
-              //   'YYYY-MM-DD HH:mm:ss'
-              // );
-              return moment(params.value as number).fromNow();
+              return (
+                <Timestamp
+                  value={(params.value as number) / 1000}
+                  format="relative"
+                />
+              );
             },
             width: 100,
             minWidth: 100,
