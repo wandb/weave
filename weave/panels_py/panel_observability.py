@@ -101,7 +101,7 @@ def observability(
         }
     )
 
-    priority_names = weave.ops.dict_(
+    priority_names = weave.ops.make_list(
         **{
             "0": "Critical",
             "1": "High",
@@ -298,7 +298,16 @@ def observability(
                     ),
                     60,
                 ),
-                "priority": row["priority"][0],
+                "priority": weave.ops.cond(
+                    weave.ops.dict_(
+                        a=row["priority"][0].isNone(),
+                        b=row["priority"][0].isNone() == False,
+                    ),
+                    weave.ops.dict_(
+                        a=weave.ops.make_const_node(types.NoneType(), None),
+                        b=priority_names[row["priority"][0]],
+                    ),
+                ),
             }
         ),
     )
@@ -530,6 +539,16 @@ def observability(
                     "entity_name": row["entity_name"][0],
                     "project_name": row["project_name"][0],
                     "job": row["job"][0],
+                    "priority": weave.ops.cond(
+                        weave.ops.dict_(
+                            a=row["priority"][0].isNone(),
+                            b=row["priority"][0].isNone() == False,
+                        ),
+                        weave.ops.dict_(
+                            a=weave.ops.make_const_node(types.NoneType(), None),
+                            b=priority_names[row["priority"][0]],
+                        ),
+                    ),
                     "duration": weave.ops.Number.__mul__(
                         weave.ops.timedelta_total_seconds(
                             weave.ops.datetime_sub(
@@ -563,6 +582,7 @@ def observability(
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "GPU util %": row["GPU util %"],
+                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
@@ -587,6 +607,7 @@ def observability(
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "CPU util %": row["CPU util %"],
+                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
@@ -611,6 +632,7 @@ def observability(
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "GPU memory (%)": row["GPU memory %"],
+                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
@@ -635,6 +657,7 @@ def observability(
                 "Job": row["job"],
                 "Duration (s)": row["duration"],
                 "Memory (MB)": row["Memory (MB)"],
+                "Priority": row["priority"],
             }
         ),
         color_title="Grouping",
