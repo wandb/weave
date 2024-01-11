@@ -111,6 +111,15 @@ export const OpLink: React.FC<{
   );
 };
 
+export const opVersionText = (opName: string, versionIndex: number) => {
+  let text = opName;
+  if (text.startsWith('op-')) {
+    text = text.slice(3);
+  }
+  text += ':v' + versionIndex;
+  return text;
+};
+
 export const OpVersionLink: React.FC<{
   entityName: string;
   projectName: string;
@@ -122,11 +131,7 @@ export const OpVersionLink: React.FC<{
   // const text = props.hideName
   //   ? props.version
   //   : props.opName + ': ' + truncateID(props.version);
-  let text = props.opName;
-  if (text.startsWith('op-')) {
-    text = text.slice(3);
-  }
-  text += ':v' + props.versionIndex;
+  const text = opVersionText(props.opName, props.versionIndex);
   return (
     <Link
       to={peekingRouter.opVersionUIUrl(
@@ -143,11 +148,20 @@ export const OpVersionLink: React.FC<{
 export const CallLink: React.FC<{
   entityName: string;
   projectName: string;
-  opName: string;
   callId: string;
+  simpleText?: {
+    opName: string;
+    versionIndex: number;
+  };
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.opName + ':' + truncateID(props.callId);
+  let text = truncateID(props.callId);
+  if (props.simpleText) {
+    text = opVersionText(
+      props.simpleText.opName,
+      props.simpleText.versionIndex
+    );
+  }
   return (
     <Link
       to={peekingRouter.callUIUrl(
