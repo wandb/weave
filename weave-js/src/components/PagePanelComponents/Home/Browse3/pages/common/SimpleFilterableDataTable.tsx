@@ -174,6 +174,9 @@ export const FilterableTable = <
         columns={dataGridColumns}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
+        initialState={{
+          sorting: {sortModel: [{field: 'createdAt', sort: 'desc'}]},
+        }}
       />
     </FilterLayoutTemplate>
   );

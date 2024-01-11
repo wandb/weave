@@ -2,6 +2,7 @@
 # TODO: remove uses of this and delete.
 
 from wandb.apis import public
+from wandb.apis.public.api import gql
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
 import logging
 import typing
@@ -41,7 +42,7 @@ def query_with_retry(
     for attempt_no in range(num_timeout_retries + 1):
         try:
             return wandb_public_api().client.execute(
-                public.gql(query_str),
+                gql(query_str),
                 variable_values=variables,
             )
         except exceptions.Timeout as e:

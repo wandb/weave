@@ -49,7 +49,6 @@ def serve(
     env: str,
     port: int,
 ) -> None:
-    print(f"Serving {model_ref}")
     parsed_ref = uris.WeaveURI.parse(model_ref).to_ref()
     if not isinstance(parsed_ref, artifact_wandb.WandbArtifactRef):
         raise ValueError(f"Expected a wandb artifact ref, got {parsed_ref}")

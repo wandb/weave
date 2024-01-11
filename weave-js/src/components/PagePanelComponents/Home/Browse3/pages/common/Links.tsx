@@ -73,12 +73,13 @@ export const ObjectVersionLink: React.FC<{
   projectName: string;
   objectName: string;
   version: string;
-  hideName?: boolean;
+  versionIndex: number;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.hideName
-    ? props.version
-    : props.objectName + ': ' + truncateID(props.version);
+  // const text = props.hideName
+  //   ? props.version
+  //   : props.objectName + ': ' + truncateID(props.version);
+  const text = props.objectName + ':v' + props.versionIndex;
   return (
     <Link
       to={peekingRouter.objectVersionUIUrl(
@@ -115,12 +116,17 @@ export const OpVersionLink: React.FC<{
   projectName: string;
   opName: string;
   version: string;
-  hideName?: boolean;
+  versionIndex: number;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.hideName
-    ? props.version
-    : props.opName + ': ' + truncateID(props.version);
+  // const text = props.hideName
+  //   ? props.version
+  //   : props.opName + ': ' + truncateID(props.version);
+  let text = props.opName;
+  if (text.startsWith('op-')) {
+    text = text.slice(3);
+  }
+  text += ':v' + props.versionIndex;
   return (
     <Link
       to={peekingRouter.opVersionUIUrl(
@@ -137,10 +143,11 @@ export const OpVersionLink: React.FC<{
 export const CallLink: React.FC<{
   entityName: string;
   projectName: string;
+  opName: string;
   callId: string;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-
+  const text = props.opName + ':' + truncateID(props.callId);
   return (
     <Link
       to={peekingRouter.callUIUrl(
@@ -149,7 +156,7 @@ export const CallLink: React.FC<{
         '',
         props.callId
       )}>
-      {truncateID(props.callId)}
+      {text}
     </Link>
   );
 };
@@ -202,7 +209,7 @@ export const OpVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount} versions
+      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
@@ -221,7 +228,7 @@ export const TypeVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount} versions
+      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };

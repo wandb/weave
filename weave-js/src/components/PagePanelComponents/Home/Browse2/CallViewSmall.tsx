@@ -54,7 +54,7 @@ export const CallViewSmall: FC<{
             />
           </Box>
           <Typography variant="body2" component="span">
-            {monthRoundedTime(call.summary.latency_s, true)}
+            {monthRoundedTime(call.summary.latency_s)}
           </Typography>
         </CallEl>
       </Typography>
