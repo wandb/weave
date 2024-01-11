@@ -65,12 +65,25 @@ const OpVersionPageInner: React.FC<{
         <SimpleKeyValueTable
           data={{
             Name: (
-              <OpLink
-                entityName={entity}
-                projectName={project}
-                opName={opName}
-              />
+              <>
+                <OpLink
+                  entityName={entity}
+                  projectName={project}
+                  opName={opName}
+                />{' '}
+                [
+                <OpVersionsLink
+                  entity={entity}
+                  project={project}
+                  filter={{
+                    opName,
+                  }}
+                  versionCount={opVersionCount}
+                />
+                ]
+              </>
             ),
+            Version: <>{opVersionIndex}</>,
             Calls: (
               <CallsLink
                 entity={entity}
@@ -85,20 +98,7 @@ const OpVersionPageInner: React.FC<{
             Category: (
               <OpVersionCategoryChip opCategory={opVersion.opCategory()} />
             ),
-            Version: (
-              <>
-                {opVersionIndex} [
-                <OpVersionsLink
-                  entity={entity}
-                  project={project}
-                  filter={{
-                    opName,
-                  }}
-                  versionCount={opVersionCount}
-                />
-                ]
-              </>
-            ),
+
             ...(opInputTypes.length > 0
               ? {
                   'Input Types': (
