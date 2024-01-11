@@ -5,6 +5,7 @@ import {
   CallsLink,
   OpLink,
   OpVersionLink,
+  OpVersionsLink,
   opVersionText,
   TypeVersionLink,
 } from './common/Links';
@@ -39,6 +40,7 @@ const OpVersionPageInner: React.FC<{
   const entity = opVersion.entity();
   const project = opVersion.project();
   const opName = opVersion.op().name();
+  const opVersionCount = opVersion.op().opVersions().length;
   const opVersionHash = opVersion.version();
   const opVersionIndex = opVersion.versionIndex();
   const opInputTypes = opVersion.inputTypesVersions();
@@ -82,7 +84,20 @@ const OpVersionPageInner: React.FC<{
             Category: (
               <OpVersionCategoryChip opCategory={opVersion.opCategory()} />
             ),
-            Version: opVersionIndex,
+            Version: (
+              <>
+                {opVersionIndex} [
+                <OpVersionsLink
+                  entity={entity}
+                  project={project}
+                  filter={{
+                    opName: opName,
+                  }}
+                  versionCount={opVersionCount}
+                />
+                ]
+              </>
+            ),
             ...(opInputTypes.length > 0
               ? {
                   'Input Types': (
