@@ -1,8 +1,6 @@
 import {
   Autocomplete,
-  Box,
   Checkbox,
-  Chip,
   FormControl,
   ListItem,
   ListItemButton,
@@ -20,14 +18,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
-import {
-  CallsLink,
-  ObjectLink,
-  ObjectVersionLink,
-  ObjectVersionsLink,
-  OpVersionLink,
-  TypeVersionLink,
-} from './common/Links';
+import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
@@ -343,14 +334,7 @@ const ObjectVersionsTable: React.FC<{
     });
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
-    basicField('createdAt', 'Created At', {
-      width: 150,
-      renderCell: params => {
-        return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
-      },
-    }),
-
-    basicField('version', 'Version', {
+    basicField('version', 'Object', {
       renderCell: params => {
         // Icon to indicate navigation to the object version
         return (
@@ -359,7 +343,7 @@ const ObjectVersionsTable: React.FC<{
             projectName={params.row.obj.project()}
             objectName={params.row.obj.object().name()}
             version={params.row.obj.version()}
-            hideName
+            versionIndex={params.row.obj.versionIndex()}
           />
         );
       },
@@ -372,76 +356,83 @@ const ObjectVersionsTable: React.FC<{
         );
       },
     }),
-    basicField('object', 'Object', {
-      renderCell: params => (
-        <ObjectLink
-          entityName={params.row.obj.entity()}
-          projectName={params.row.obj.project()}
-          objectName={params.value as string}
-        />
-      ),
-    }),
-
-    basicField('typeVersion', 'Type Version', {
-      renderCell: params => (
-        <TypeVersionLink
-          entityName={params.row.obj.entity()}
-          projectName={params.row.obj.project()}
-          typeName={params.row.obj.typeVersion().type().name()}
-          version={params.row.obj.typeVersion().version()}
-        />
-      ),
-    }),
-    basicField('inputTo', 'Input To', {
+    basicField('createdAt', 'Created', {
       width: 100,
       renderCell: params => {
-        if (params.value === 0) {
-          return '';
-        }
-
-        return (
-          <CallsLink
-            entity={params.row.obj.entity()}
-            project={params.row.obj.project()}
-            callCount={params.value}
-            filter={{
-              inputObjectVersions: [
-                params.row.obj.object().name() + ':' + params.row.obj.version(),
-              ],
-            }}
-          />
-        );
+        // return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
+        return moment(params.value as number).fromNow();
       },
     }),
-    basicField('outputFrom', 'Output From', {
-      width: 100,
-      renderCell: params => {
-        if (!params.value) {
-          return '';
-        }
-        const outputFrom = params.row.obj.outputFrom();
-        if (outputFrom.length === 0) {
-          return '';
-        }
-        // if (outputFrom.length === 1) {
-        return (
-          <OpVersionLink
-            entityName={outputFrom[0].entity()}
-            projectName={outputFrom[0].project()}
-            opName={outputFrom[0].opVersion().op().name()}
-            version={outputFrom[0].opVersion().version()}
-            versionIndex={outputFrom[0].opVersion().versionIndex()}
-          />
-        );
-      },
-    }),
-    basicField('versionIndex', 'Version', {
-      width: 100,
-    }),
+    // basicField('object', 'Object', {
+    //   renderCell: params => (
+    //     <ObjectLink
+    //       entityName={params.row.obj.entity()}
+    //       projectName={params.row.obj.project()}
+    //       objectName={params.value as string}
+    //     />
+    //   ),
+    // }),
 
-    ...[
-      props.usingLatestFilter
-        ? basicField('peerVersions', 'Peer Versions', {
+    // basicField('typeVersion', 'Type Version', {
+    //   renderCell: params => (
+    //     <TypeVersionLink
+    //       entityName={params.row.obj.entity()}
+    //       projectName={params.row.obj.project()}
+    //       typeName={params.row.obj.typeVersion().type().name()}
+    //       version={params.row.obj.typeVersion().version()}
+    //     />
+    //   ),
+    // }),
+    // basicField('inputTo', 'Input To', {
+    //   width: 100,
+    //   renderCell: params => {
+    //     if (params.value === 0) {
+    //       return '';
+    //     }
+
+    //     return (
+    //       <CallsLink
+    //         entity={params.row.obj.entity()}
+    //         project={params.row.obj.project()}
+    //         callCount={params.value}
+    //         filter={{
+    //           inputObjectVersions: [
+    //             params.row.obj.object().name() + ':' + params.row.obj.version(),
+    //           ],
+    //         }}
+    //       />
+    //     );
+    //   },
+    // }),
+    // basicField('outputFrom', 'Output From', {
+    //   width: 100,
+    //   renderCell: params => {
+    //     if (!params.value) {
+    //       return '';
+    //     }
+    //     const outputFrom = params.row.obj.outputFrom();
+    //     if (outputFrom.length === 0) {
+    //       return '';
+    //     }
+    //     // if (outputFrom.length === 1) {
+    //     return (
+    //       <OpVersionLink
+    //         entityName={outputFrom[0].entity()}
+    //         projectName={outputFrom[0].project()}
+    //         opName={outputFrom[0].opVersion().op().name()}
+    //         version={outputFrom[0].opVersion().version()}
+    //         versionIndex={outputFrom[0].opVersion().versionIndex()}
+    //       />
+    //     );
+    //   },
+    // }),
+    // basicField('versionIndex', 'Version', {
+    //   width: 100,
+    // }),
+
+    ...(props.usingLatestFilter
+      ? [
+          basicField('peerVersions', 'Versions', {
             width: 100,
             renderCell: params => {
               return (
@@ -457,28 +448,29 @@ const ObjectVersionsTable: React.FC<{
                 />
               );
             },
-          })
-        : basicField('isLatest', 'Latest', {
-            width: 100,
-            renderCell: params => {
-              if (params.value) {
-                return (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      width: '100%',
-                    }}>
-                    <Chip label="Yes" size="small" />
-                  </Box>
-                );
-              }
-              return '';
-            },
           }),
-    ],
+        ]
+      : []),
+    // : [basicField('isLatest', 'Latest', {
+    //     width: 100,
+    //     renderCell: params => {
+    //       if (params.value) {
+    //         return (
+    //           <Box
+    //             sx={{
+    //               display: 'flex',
+    //               alignItems: 'center',
+    //               justifyContent: 'center',
+    //               height: '100%',
+    //               width: '100%',
+    //             }}>
+    //             <Chip label="Yes" size="small" />
+    //           </Box>
+    //         );
+    //       }
+    //       return '';
+    //     },
+    //   }),]
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
   return (
