@@ -3,6 +3,7 @@ import React, {useMemo} from 'react';
 import {constString, opGet} from '../../../../../core';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {WeaveEditor} from '../../Browse2/WeaveEditors';
+import {WFHighLevelCallFilter} from './CallsPage';
 import {
   CallLink,
   CallsLink,
@@ -298,14 +299,32 @@ const ObjectVersionConsumingCallsItem: React.FC<{
   const consumingCalls = props.objectVersion.inputTo().filter(call => {
     return call.opVersion() != null;
   });
-  const consumingCallGroups = useMemo(() => {
+  return (
+    <GroupedCalls
+      calls={consumingCalls}
+      partialFilter={{
+        inputObjectVersions: [
+          props.objectVersion.object().name() +
+            ':' +
+            props.objectVersion.version(),
+        ],
+      }}
+    />
+  );
+};
+
+export const GroupedCalls: React.FC<{
+  calls: WFCall[];
+  partialFilter?: WFHighLevelCallFilter;
+}> = ({calls, partialFilter}) => {
+  const callGroups = useMemo(() => {
     const groups: {
       [key: string]: {
         opVersion: WFOpVersion;
         calls: WFCall[];
       };
     } = {};
-    consumingCalls.forEach(call => {
+    calls.forEach(call => {
       const opVersion = call.opVersion();
       if (opVersion == null) {
         return;
@@ -321,69 +340,61 @@ const ObjectVersionConsumingCallsItem: React.FC<{
       groups[key].calls.push(call);
     });
     return groups;
-  }, [consumingCalls]);
+  }, [calls]);
 
-  if (consumingCalls.length === 0) {
+  if (calls.length === 0) {
     return <div>-</div>;
-  } else if (Object.keys(consumingCallGroups).length === 1) {
-    const call = consumingCalls[0];
-    return (
-      <CallLink
-        entityName={call.entity()}
-        projectName={call.project()}
-        callId={call.callID()}
-        simpleText={{
-          opName: call.spanName(),
-          versionIndex: call.opVersion()?.versionIndex() ?? 0,
-        }}
-      />
-    );
+  } else if (Object.keys(callGroups).length === 1) {
+    const key = Object.keys(callGroups)[0];
+    const val = callGroups[key];
+    return <OpVersionCallsLink val={val} partialFilter={partialFilter} />;
   }
   return (
     <ul
       style={{
         margin: 0,
       }}>
-      {Object.entries(consumingCallGroups).map(([key, val], ndx) => {
+      {Object.entries(callGroups).map(([key, val], ndx) => {
         return (
           <li key={key}>
-            <OpVersionLink
-              entityName={val.opVersion.entity()}
-              projectName={val.opVersion.project()}
-              opName={val.opVersion.op().name()}
-              version={val.opVersion.version()}
-              versionIndex={val.opVersion.versionIndex()}
-            />{' '}
-            [
-            <CallsLink
-              entity={val.opVersion.entity()}
-              project={val.opVersion.project()}
-              callCount={val.calls.length}
-              filter={{
-                opVersions: [
-                  val.opVersion.op().name() + ':' + val.opVersion.version(),
-                ],
-                inputObjectVersions: [
-                  props.objectVersion.object().name() +
-                    ':' +
-                    props.objectVersion.version(),
-                ],
-              }}
-              neverPeek
-            />
-            ]
-            {/* <CallLink
-              entityName={call.entity()}
-              projectName={call.project()}
-              callId={call.callID()}
-              simpleText={{
-                opName: call.spanName(),
-                versionIndex: call.opVersion()?.versionIndex() ?? 0,
-              }}
-            /> */}
+            <OpVersionCallsLink val={val} partialFilter={partialFilter} />;
           </li>
         );
       })}
     </ul>
+  );
+};
+
+const OpVersionCallsLink: React.FC<{
+  val: {
+    opVersion: WFOpVersion;
+    calls: WFCall[];
+  };
+  partialFilter?: WFHighLevelCallFilter;
+}> = ({val, partialFilter}) => {
+  return (
+    <>
+      <OpVersionLink
+        entityName={val.opVersion.entity()}
+        projectName={val.opVersion.project()}
+        opName={val.opVersion.op().name()}
+        version={val.opVersion.version()}
+        versionIndex={val.opVersion.versionIndex()}
+      />{' '}
+      [
+      <CallsLink
+        entity={val.opVersion.entity()}
+        project={val.opVersion.project()}
+        callCount={val.calls.length}
+        filter={{
+          opVersions: [
+            val.opVersion.op().name() + ':' + val.opVersion.version(),
+          ],
+          ...(partialFilter ?? {}),
+        }}
+        neverPeek
+      />
+      ]
+    </>
   );
 };
