@@ -11,7 +11,7 @@ import moment from 'moment';
 import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
-import {OpVersionLink} from './common/Links';
+import {OpVersionLink, OpVersionsLink} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
@@ -177,6 +177,29 @@ export const FilterableOpVersionsTable: React.FC<{
 
       opName: {
         columnId: 'opName',
+        // This grid display does not match the data for the column
+        // ... a bit of a hack
+        gridDisplay: {
+          columnLabel: 'Versions',
+          columnValue: obj => obj.obj.op().name(),
+          gridColDefOptions: {
+            renderCell: params => {
+              return (
+                <OpVersionsLink
+                  entity={params.row.obj.entity()}
+                  project={params.row.obj.project()}
+                  versionCount={params.row.obj.op().opVersions().length}
+                  filter={{
+                    opName: params.row.obj.op().name(),
+                  }}
+                />
+              );
+            },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
+          },
+        },
         // gridDisplay: {
         //   columnLabel: 'Op',
         //   columnValue: obj => obj.obj.op().name(),
@@ -242,6 +265,9 @@ export const FilterableOpVersionsTable: React.FC<{
         //         />
         //       );
         //     },
+        //     width: 100,
+        //     minWidth: 100,
+        //     maxWidth: 100,
         //   },
         // },
       } as WFHighLevelDataColumn<
