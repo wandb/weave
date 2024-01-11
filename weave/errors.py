@@ -165,3 +165,7 @@ class WeaveMissingOpDefError(WeaveBaseError):
 
 class WeaveMergeArtifactSpecError(WeaveBaseError):
     pass
+
+
+class WeaveOpSerializeError(WeaveBaseError):
+    pass

@@ -302,3 +302,21 @@ _serverless_io_service: contextvars.ContextVar[bool] = contextvars.ContextVar(
 
 def serverless_io_service() -> bool:
     return _serverless_io_service.get()
+
+
+# Throw an error if op saving encounters an unknonwn condition.
+# The default behavior is to warn.
+_strict_op_saving: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_strict_op_saving", default=False
+)
+
+
+def get_strict_op_saving() -> bool:
+    return _strict_op_saving.get()
+
+
+@contextlib.contextmanager
+def strict_op_saving(enabled: bool):
+    token = _strict_op_saving.set(enabled)
+    yield _strict_op_saving.get()
+    _strict_op_saving.reset(token)

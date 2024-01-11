@@ -1,5 +1,6 @@
 import typing
 import datetime
+import inspect
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import Optional
@@ -128,7 +129,10 @@ def object_method_app(
 
     @app.post(f"/{method_name}", summary=method_name)
     async def method_route(item: Item) -> dict:  # type: ignore
-        result = bound_method_op(**item.dict())  # type: ignore
+        if inspect.iscoroutinefunction(bound_method_op.raw_resolve_fn):
+            result = await bound_method_op(**item.dict())  # type: ignore
+        else:
+            result = bound_method_op(**item.dict())  # type: ignore
         return {"result": result}
 
     return app
