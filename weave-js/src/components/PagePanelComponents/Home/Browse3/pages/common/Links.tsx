@@ -180,11 +180,12 @@ export const CallsLink: React.FC<{
   project: string;
   callCount: number;
   filter?: WFHighLevelCallFilter;
+  neverPeek?: boolean;
 }> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
+  const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
+  const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
-    <Link
-      to={peekingRouter.callsUIUrl(props.entity, props.project, props.filter)}>
+    <Link to={router.callsUIUrl(props.entity, props.project, props.filter)}>
       {props.callCount} calls
     </Link>
   );

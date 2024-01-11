@@ -1,8 +1,8 @@
 import React from 'react';
 
 import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
-import {CallsTable} from './CallsPage';
 import {
+  CallsLink,
   OpLink,
   OpVersionLink,
   opVersionText,
@@ -44,6 +44,7 @@ const OpVersionPageInner: React.FC<{
   const opInputTypes = opVersion.inputTypesVersions();
   const opOutputTypes = opVersion.outputTypeVersions();
   const opInvokes = opVersion.invokes();
+  const opVersionFilterId = opName + ':' + opVersionHash;
 
   // const streamId = useMemo(
   //   () => ({
@@ -62,9 +63,20 @@ const OpVersionPageInner: React.FC<{
           data={{
             Name: (
               <OpLink
-                entityName={opVersion.entity()}
-                projectName={opVersion.project()}
+                entityName={entity}
+                projectName={project}
                 opName={opName}
+              />
+            ),
+            Calls: (
+              <CallsLink
+                entity={entity}
+                project={project}
+                callCount={10}
+                filter={{
+                  opVersions: [opVersionFilterId],
+                }}
+                neverPeek
               />
             ),
             Category: (
@@ -129,19 +141,19 @@ const OpVersionPageInner: React.FC<{
             // </Box>
           ),
         },
-        {
-          label: 'Calls',
-          content: (
-            <CallsTable
-              entity={entity}
-              project={project}
-              frozenFilter={{
-                opVersions: [opName + ':' + opVersionHash],
-                traceRootsOnly: false,
-              }}
-            />
-          ),
-        },
+        // {
+        //   label: 'Calls',
+        //   content: (
+        //     <CallsTable
+        //       entity={entity}
+        //       project={project}
+        //       frozenFilter={{
+        //         opVersions: [opName + ':' + opVersionHash],
+        //         traceRootsOnly: false,
+        //       }}
+        //     />
+        //   ),
+        // },
         // {
         //   label: 'Metadata',
         //   content: (
