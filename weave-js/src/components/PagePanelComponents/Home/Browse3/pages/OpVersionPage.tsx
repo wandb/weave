@@ -42,6 +42,7 @@ const OpVersionPageInner: React.FC<{
   const opName = opVersion.op().name();
   const opVersionCount = opVersion.op().opVersions().length;
   const opVersionHash = opVersion.version();
+  const opVersionCallCount = opVersion.calls().length;
   const opVersionIndex = opVersion.versionIndex();
   const opInputTypes = opVersion.inputTypesVersions();
   const opOutputTypes = opVersion.outputTypeVersions();
@@ -74,7 +75,7 @@ const OpVersionPageInner: React.FC<{
               <CallsLink
                 entity={entity}
                 project={project}
-                callCount={10}
+                callCount={opVersionCallCount}
                 filter={{
                   opVersions: [opVersionFilterId],
                 }}
@@ -91,7 +92,7 @@ const OpVersionPageInner: React.FC<{
                   entity={entity}
                   project={project}
                   filter={{
-                    opName: opName,
+                    opName,
                   }}
                   versionCount={opVersionCount}
                 />
