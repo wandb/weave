@@ -442,9 +442,7 @@ const ObjectVersionsTable: React.FC<{
                   filter={{
                     objectName: params.row.obj.object().name(),
                   }}
-                  versionsCount={
-                    params.row.obj.object().objectVersions().length
-                  }
+                  versionCount={params.row.obj.object().objectVersions().length}
                 />
               );
             },
