@@ -159,6 +159,7 @@ export const RunsTable: FC<{
           return (
             <Chip
               label={' '}
+              sx={{height: '20px', lineHeight: 2}}
               // label={cellParams.row.status_code}
               size="small"
               color={
@@ -229,6 +230,7 @@ export const RunsTable: FC<{
                 }[cellParams.row.opCategory + ''];
                 return (
                   <Chip
+                    sx={{height: '20px', lineHeight: 2}}
                     label={cellParams.row.opCategory}
                     size="small"
                     color={color as any}
