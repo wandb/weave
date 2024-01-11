@@ -40,7 +40,7 @@ from .context import (
     use_fixed_server_port,
     use_frontend_devmode,
     # eager_execution,
-    # lazy_execution,
+    use_lazy_execution,
 )
 from .server import capture_weave_server_logs
 from .val_const import const
