@@ -298,27 +298,29 @@ export const RunsTable: FC<{
       const attributesGrouping = buildTree(attributesOrder, 'attributes');
       colGroupingModel.push(attributesGrouping);
       for (const key of attributesOrder) {
-        cols.push({
-          flex: 1,
-          minWidth: 150,
-          field: 'attributes.' + key,
-          headerName: key.split('.').slice(-1)[0],
-          renderCell: cellParams => {
-            if (
-              typeof cellParams.row['attributes.' + key] === 'string' &&
-              cellParams.row['attributes.' + key].startsWith(
-                'wandb-artifact:///'
-              )
-            ) {
-              return (
-                <SmallRef
-                  objRef={parseRef(cellParams.row['attributes.' + key])}
-                />
-              );
-            }
-            return cellParams.row['attributes.' + key];
-          },
-        });
+        if (!key.startsWith('_')) {
+          cols.push({
+            flex: 1,
+            minWidth: 150,
+            field: 'attributes.' + key,
+            headerName: key.split('.').slice(-1)[0],
+            renderCell: cellParams => {
+              if (
+                typeof cellParams.row['attributes.' + key] === 'string' &&
+                cellParams.row['attributes.' + key].startsWith(
+                  'wandb-artifact:///'
+                )
+              ) {
+                return (
+                  <SmallRef
+                    objRef={parseRef(cellParams.row['attributes.' + key])}
+                  />
+                );
+              }
+              return cellParams.row['attributes.' + key];
+            },
+          });
+        }
       }
 
       const inputOrder =
