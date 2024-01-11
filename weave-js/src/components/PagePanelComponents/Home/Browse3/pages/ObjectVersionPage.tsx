@@ -87,7 +87,15 @@ const ObjectVersionPageInner: React.FC<{
       // ]}
       tabs={[
         {
-          label: 'Overview',
+          label: 'Values',
+          content: (
+            <ScrollableTabContent>
+              <WeaveEditor objType={objectName} node={itemNode} />
+            </ScrollableTabContent>
+          ),
+        },
+        {
+          label: 'Metadata',
           content: (
             <ScrollableTabContent>
               <SimpleKeyValueTable
@@ -121,14 +129,6 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }}
               />
-            </ScrollableTabContent>
-          ),
-        },
-        {
-          label: 'Values',
-          content: (
-            <ScrollableTabContent>
-              <WeaveEditor objType={objectName} node={itemNode} />
             </ScrollableTabContent>
           ),
         },
