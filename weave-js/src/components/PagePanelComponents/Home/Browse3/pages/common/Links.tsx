@@ -202,11 +202,13 @@ export const ObjectVersionsLink: React.FC<{
   project: string;
   versionCount: number;
   filter?: WFHighLevelObjectVersionFilter;
+  neverPeek?: boolean;
 }> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
+  const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
+  const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
     <Link
-      to={peekingRouter.objectVersionsUIUrl(
+      to={router.objectVersionsUIUrl(
         props.entity,
         props.project,
         props.filter
@@ -221,15 +223,13 @@ export const OpVersionsLink: React.FC<{
   project: string;
   versionCount: number;
   filter?: WFHighLevelOpVersionFilter;
+  neverPeek?: boolean;
 }> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
+  const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
+  const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
     <Link
-      to={peekingRouter.opVersionsUIUrl(
-        props.entity,
-        props.project,
-        props.filter
-      )}>
+      to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
       {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
