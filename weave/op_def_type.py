@@ -256,7 +256,7 @@ def get_code_deps(
                 # we just import it. This is ok for libraries, but not
                 # if the user has functions declared within their
                 # package but outside of the op module.
-                fn_code_deps, fn_warnings = get_code_deps(var_value)
+                fn_code_deps, fn_warnings = get_code_deps(var_value, artifact)
                 warnings += fn_warnings
                 import_code += fn_code_deps
                 import_code += inspect.getsource(var_value)

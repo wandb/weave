@@ -210,7 +210,9 @@ _loading_artifact: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
-def loading_artifact(artifact: FilesystemArtifact):
+def loading_artifact(
+    artifact: FilesystemArtifact,
+) -> typing.Generator[typing.Optional[FilesystemArtifact], None, None]:
     token = _loading_artifact.set(artifact)
     try:
         yield _loading_artifact.get()
