@@ -208,6 +208,7 @@ export const IconNames = {
   VersionsLayers: 'versions-layers',
   VertexGCP: 'vertex-gcp',
   VideoPlay: 'video-play',
+  ViewGlasses: 'view-glasses',
   Wandb: 'wandb',
   Warning: 'warning',
   WarningAlt: 'warning-alt',
