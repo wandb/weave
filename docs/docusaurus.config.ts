@@ -61,16 +61,10 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'tutorialSidebar',
           position: 'left',
-          label: 'Tutorial',
+          label: 'Documentation',
         },
         {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
-          position: 'left',
-          label: 'TBD: API Reference',
-        },
-        {
-          href: 'https://github.com/facebook/docusaurus',
+          href: 'https://github.com/wandb/weave',
           label: 'GitHub',
           position: 'right',
         },
@@ -83,8 +77,8 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Tutorial',
-              to: '/docs/intro',
+              label: 'Documentation',
+              to: '/docs/tutorial-basics/create-a-page',
             },
           ],
         },

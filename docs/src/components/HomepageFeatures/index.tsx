@@ -6,26 +6,29 @@ type FeatureItem = {
   title: string;
   subtitle: string;
   link: string;
+  background: string;
 };
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Introduction',
-    subtitle: 'Start here',
-    link: '/intro',
+    title: 'Try Weave',
+    subtitle: 'Track your first LLM application',
+    link: '/docs/tutorial-basics/quickstart',
+    background: 'linear-gradient(135deg, #6e8efb, #a777e3)'
   },
   {
-    title: 'Quickstart',
-    subtitle: 'Get up and running with a short example',
-    link: '/quickstart',
+    title: 'Why Weave?',
+    subtitle: 'Learn what problems Weave helps with',
+    link: '/docs/category/get-started',
+    background: 'linear-gradient(135deg, #fb6ef2, #e377a4)'
   }
 ];
 
-function Feature({ title, subtitle, link }: FeatureItem) {
+function Feature({ title, subtitle, link, background }: FeatureItem) {
   return (
     <a
       href={link}
-      className={clsx('col col--4', styles.featureButton)}>
+      className={clsx('col col--4', styles.featureButton)} style={{ background: background }}>
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
         <h3>{title}</h3>
         <p>{subtitle}</p>

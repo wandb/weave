@@ -1,7 +1,6 @@
 /* styles.module.css */
 .featureButton {
   display: grid;
-  background: linear-gradient(135deg, #6e8efb, #a777e3); /* Example gradient background */
   text-align: left;
   padding: 20px;        
   margin: 1%;
@@ -37,6 +36,7 @@
     flex-direction: column;
   }
   .container {
-    padding-top: 10%;
+    padding: 15%;
+    padding-bottom: 50%;
   }
 }
