@@ -1,9 +1,6 @@
-import {FilterList, LastPage, OpenInNew} from '@mui/icons-material';
-import {Badge, Box, List} from '@mui/material';
-import IconButton from '@mui/material/IconButton';
+import {Box} from '@mui/material';
 import {DataGridPro, GridColDef, GridValidRowModel} from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 
 type FilterableTablePropsType<
   DataRowType extends GridValidRowModel,
@@ -168,7 +165,16 @@ export const FilterableTable = <
       showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
       filterListItems={filterListItems}>
       <DataGridPro
-        sx={{border: 0}}
+        sx={{
+          borderRight: 0,
+          borderLeft: 0,
+          borderBottom: 0,
+          '& .MuiDataGrid-columnHeaders': {
+            backgroundColor: '#FAFAFA',
+            color: '#979a9e',
+          },
+        }}
+        columnHeaderHeight={40}
         rows={dataGridRowData}
         rowHeight={38}
         columns={dataGridColumns}
@@ -188,8 +194,8 @@ export const FilterLayoutTemplate: React.FC<{
   showPopoutButton?: boolean;
   filterListItems: React.ReactNode;
 }> = props => {
-  const [isOpen, setIsOpen] = useState(false);
-  const history = useHistory();
+  // const [isOpen, setIsOpen] = useState(false);
+  // const history = useHistory();
   return (
     <Box
       sx={{
@@ -197,97 +203,27 @@ export const FilterLayoutTemplate: React.FC<{
         width: '100%',
         height: '100%',
         display: 'flex',
-        flexDirection: 'row',
+        flexDirection: 'column',
       }}>
-      {props.children}
       <Box
         sx={{
           flex: '0 0 auto',
-          height: '100%',
-          width: isOpen ? '240px' : '55px',
+          width: '100%',
           transition: 'width 0.1s ease-in-out',
           display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          borderLeft: '1px solid #e0e0e0',
+          flexDirection: 'row',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          gap: '8px',
+          p: 1,
+          '& li': {
+            padding: 0,
+            minWidth: '200px',
+          },
         }}>
-        {isOpen ? (
-          <>
-            <Box
-              sx={{
-                pl: 1,
-                pr: 1,
-                height: 56,
-                flex: '0 0 auto',
-                borderBottom: '1px solid #e0e0e0',
-                position: 'sticky',
-                top: 0,
-                zIndex: 1,
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-              <Box sx={{flex: '0 0 auto'}}>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setIsOpen(o => !o);
-                  }}>
-                  <LastPage />
-                </IconButton>
-                {props.filterPopoutTargetUrl && props.showPopoutButton && (
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      if (props.filterPopoutTargetUrl) {
-                        history.push(props.filterPopoutTargetUrl);
-                      }
-                    }}>
-                    <OpenInNew />
-                  </IconButton>
-                )}
-              </Box>
-              <Box sx={{flex: '0 0 auto', pr: 1}}>Filters</Box>
-            </Box>
-            <List
-              sx={{width: '100%', maxWidth: 360, bgcolor: 'background.paper'}}>
-              {props.filterListItems}
-            </List>
-          </>
-        ) : (
-          <Box
-            sx={{
-              height: 56,
-              flex: '0 0 auto',
-              borderBottom: '1px solid #e0e0e0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            {props.showFilterIndicator ? (
-              <Badge color="primary" variant="dot">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setIsOpen(o => !o);
-                  }}>
-                  <FilterList />
-                </IconButton>
-              </Badge>
-            ) : (
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setIsOpen(o => !o);
-                }}>
-                <FilterList />
-              </IconButton>
-            )}
-          </Box>
-        )}
+        {props.filterListItems}
       </Box>
+      {props.children}
     </Box>
   );
 };
