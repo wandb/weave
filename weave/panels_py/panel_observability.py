@@ -567,8 +567,8 @@ def observability(
         x_title="Count",
         y_title="Grouping",
         y=lambda row: grouping_fn(row),
-        color=lambda row: grouping_fn(row),
-        groupby_dims=["y"],
+        label=lambda row: grouping_fn(row),
+        groupby_dims=["label"],
         mark="bar",
         no_legend=True,
     )
