@@ -366,7 +366,12 @@ def find_last_weave_op_function(source_code: str):
 
 def dedupe_list(original_list: list[str]) -> list[str]:
     seen = set()
-    return [x for x in original_list if not (x in seen or seen.add(x))]
+    deduped = []
+    for x in original_list:
+        if x not in seen:
+            deduped.append(x)
+            seen.add(x)
+    return deduped
 
 
 class OpDefType(types.Type):
