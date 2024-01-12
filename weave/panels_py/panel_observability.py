@@ -103,10 +103,10 @@ def observability(
 
     priority_names = weave.ops.make_list(
         **{
-            "0": "Critical",
-            "1": "High",
-            "2": "Medium",
-            "3": "Low",
+            "0": weave.ops.make_const_node(types.String(), "Critical"),
+            "1": weave.ops.make_const_node(types.String(), "High"),
+            "2": weave.ops.make_const_node(types.String(), "Medium"),
+            "3": weave.ops.make_const_node(types.String(), "Low"),
         }
     )
 
@@ -149,13 +149,13 @@ def observability(
     )
 
     group_by_user = weave_internal.define_fn(
-        {"row": input_node.type.object_type}, lambda row: row["entity_name"]
+        {"row": source_data.type.object_type}, lambda row: row["entity_name"]
     )
 
     grouping_fn = varbar.add(
         "grouping_fn",
         weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["entity_name"]
+            {"row": source_data.type.object_type}, lambda row: row["entity_name"]
         ),
         hidden=True,
     )
