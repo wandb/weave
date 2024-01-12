@@ -550,6 +550,7 @@ const InputToFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes('inputTo')}
           renderInput={params => <TextField {...params} label="Input To" />}
@@ -587,6 +588,7 @@ const OutputFromFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'outputFrom'
