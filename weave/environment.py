@@ -88,8 +88,16 @@ def cache_mode() -> CacheMode:
 # cache misses. A high number will result in a large cache size which may cause infrastructure issues.
 # if unset, the cache will write to a path that will not be cleaned up by the default cleanup task
 def cache_duration_days() -> int:
-    return os.getenv("WEAVE_CACHE_DURATION_DAYS", 0)
+    return int(os.getenv("WEAVE_CACHE_DURATION_DAYS", 0))
 
+def cache_deletion_buffer_days() -> int:
+    return int(os.getenv("WEAVE_CACHE_DELETION_BUFFER_DAYS", 1))
+
+def weave_cache_timestamp() -> str:
+    return os.environ.get('WEAVE_CACHE_TIMESTAMP', '0')
+
+def set_weave_cache_timestamp(timestamp: str) -> None:
+    os.environ['WEAVE_CACHE_TIMESTAMP'] = timestamp
 
 def wandb_production() -> bool:
     return os.getenv("WEAVE_ENV") == "wandb_production"

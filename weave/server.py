@@ -67,6 +67,10 @@ class HandleRequestResponse:
 def handle_request(
     request, deref=False, serialize_fn=storage.to_python
 ) -> HandleRequestResponse:
+    if not cache.is_current_cache_valid():
+        logging.info("Invalidating cache")
+        cache.set_cache_timestamp()
+
     start_time = time.time()
     tracer = engine_trace.tracer()
     # Need to add wandb_api.from_environment, which sets up the wandb api
@@ -83,9 +87,8 @@ def handle_request(
         with tracer.trace("request:execute"):
             with execute.top_level_stats() as stats:
                 with context.execution_client():
-                    with cache.time_interval_cache_prefix():
-                        with gql_json_cache.gql_json_cache_context():
-                            result = nodes.batch_map(execute.execute_nodes)
+                    with gql_json_cache.gql_json_cache_context():
+                        result = nodes.batch_map(execute.execute_nodes)
 
         with tracer.trace("request:deref"):
             if deref:
@@ -108,6 +111,7 @@ def handle_request(
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     tag_store.clear_tag_store()
+
     return HandleRequestResponse(result, nodes)
 
 

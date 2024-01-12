@@ -1,13 +1,13 @@
 import typing
 import datetime
 import time
-import contextlib
+import os
+import shutil
 
 from . import engine_trace
 from . import wandb_api
 from . import environment
 from . import errors
-from . import context_state
 
 statsd = engine_trace.statsd()  # type: ignore
 
@@ -21,38 +21,69 @@ so it is easier for the caller to know when a cache interval will no longer be u
 For another example, if we want a bucket interval of 7 days, then here are some example values:
 system time             bucketed time
 11:22 Jan 1 1970       00:00 Jan 8 1970
-23:59 Jan 7 1970       00:00 Jan 8 1970
+23:59 Jan 7 1970       00:00 Jan 14 1970
 00:00 Jan 8 1970       00:00 Jan 15 1970
-16:00 Jan 12 1970      00:00 Jan 15 1970
-12:00 Jan 3 2024       00:00 Jan 4 2024
+16:00 Jan 12 1970      00:00 Jan 19 1970
+12:00 Jan 3 2024       00:00 Jan 10 2024
 """
-def bucket_timestamp(interval_days: int) -> datetime.datetime:
+def bucket_timestamp(interval_days: int) -> int:
+    if interval_days == 0:
+        return 0
     now = time.time()
     interval_seconds = interval_days * 24 * 60 * 60
     num_intervals = int(now / interval_seconds)
     # use the bucket end time because this makes it easy to know when a cache interval will no longer be used
     bucket_end_time = (num_intervals + 1) * interval_seconds
-    return datetime.datetime.fromtimestamp(bucket_end_time, datetime.timezone.utc)
+    return int(datetime.datetime.fromtimestamp(bucket_end_time, datetime.timezone.utc).timestamp())
 
-@contextlib.contextmanager
-def time_interval_cache_prefix() -> typing.Generator[None, None, None]:
-    # generate a cache prefix by chunking the current time into intervals. By default
-    # the intervals will be 1 week long. This can be configured by an environment variable in the future
-    # TODO: add support for parse the cache interval from env var
+def is_current_cache_valid() -> bool:
+    return int(environment.weave_cache_timestamp()) > int(datetime.datetime.now().timestamp())
+
+def set_cache_timestamp() -> None:    
     duration = environment.cache_duration_days()
-    if duration == 0:
-        return
-    year, week, _ = datetime.datetime.now().isocalendar()
-    cache_prefix = f"{year}-{week}"
-    token = context_state._cache_prefix_context.set(cache_prefix)
-    try:
-        yield
-    finally:
-        context_state._cache_prefix_context.reset(token)
+    new_cache_timestamp = bucket_timestamp(duration)
+    
+    print(f"Creating new cache that expires at {new_cache_timestamp}")
+    environment.set_weave_cache_timestamp(str(new_cache_timestamp))
 
+def clear_cache():
+        # Read the directory address and threshold from the environment variable
+        directory_path = environment.weave_filesystem_dir()
+
+        now = datetime.datetime.now().timestamp()
+        # buffer is in seconds
+        buffer = 60 * 60 * 24 * environment.cache_deletion_buffer_days # days of buffer
+
+        # Validate the directory path
+        if not directory_path:
+            print("WEAVE_PYTHON_CACHE is not set.")
+            return
+        if not os.path.isdir(directory_path):
+            print(f"{directory_path} is not a valid directory.")
+            return
+
+
+        # for each cache in the directory, check if its expired past the buffer
+        for item in os.listdir(directory_path):
+            if environment.weave_cache_timestamp() == item:
+                continue
+            try: 
+                item_timestamp = int(item)
+                item_path = os.path.join(directory_path, item)
+
+                # If the item is expired and we are past the buffer, delete it
+                if item_timestamp + buffer < now:
+                    # Delete the data
+                    shutil.rmtree(item_path)
+                    print(f"Deleted {item}.")
+            except:
+                print(f"Error deleting {item}.", flush=True)
+                continue  
 
 def get_cache_prefix() -> typing.Optional[str]:
-    return context_state._cache_prefix_context.get()
+    if environment.weave_cache_timestamp() == "0":
+        return None # No clearing cache
+    return environment.weave_cache_timestamp()
 
 
 def get_user_cache_key() -> typing.Optional[str]:
