@@ -218,7 +218,10 @@ export const FilterLayoutTemplate: React.FC<{
           p: 1,
           '& li': {
             padding: 0,
-            minWidth: '200px',
+            minWidth: '150px',
+          },
+          '& input, & label, & .MuiTypography-root': {
+            fontSize: '0.875rem',
           },
         }}>
         {props.filterListItems}
