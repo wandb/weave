@@ -283,10 +283,15 @@ def get_code_deps(
                     import_code += f"as {var_name}"
                 import_code += "\n"
             else:
-                json_val = storage.to_json_with_refs(
-                    var_value, artifact, path=[var_name]
-                )
                 try:
+                    json_val = storage.to_json_with_refs(
+                        var_value, artifact, path=[var_name]
+                    )
+                except (errors.WeaveTypeError, errors.WeaveSerializeError) as e:
+                    warnings.append(
+                        f"Didn't serialize value of {var_name} needed by {fn}. Encountered: {e}"
+                    )
+                else:
                     import_code += (
                         f"{var_name} = "
                         + json.dumps(json_val, cls=RefJSONEncoder, indent=4)
@@ -297,14 +302,6 @@ def get_code_deps(
                     )
                     import_code = import_code.replace(
                         f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', ""
-                    )
-                except TypeError:
-                    # TODO: This should use weave artifact serialization for non-json serializable objects.
-                    #     That way we can store numpy arrays, pytorch models, etc, that are captured by
-                    #     function closures. We'll need a special weave.local_ref() to see to look an
-                    #     object up from the current artifact context.
-                    warnings.append(
-                        f"Didn't serialize value of {var_name} needed by {fn}."
                     )
     return import_code, warnings
 

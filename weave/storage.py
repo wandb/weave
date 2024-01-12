@@ -474,7 +474,12 @@ def to_json_with_refs(
             for i, v in enumerate(obj)
         ]
     elif isinstance(obj, op_def.OpDef):
-        gc = graph_client_context.require_graph_client()
+        try:
+            gc = graph_client_context.require_graph_client()
+        except errors.WeaveInitError:
+            raise errors.WeaveSerializeError(
+                "Can't serialize OpDef with a client initialization"
+            )
         return gc.save_object(obj, obj.name, "latest")
     else:
         res = artifact.set("/".join(path), wb_type, obj)
