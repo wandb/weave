@@ -26,7 +26,9 @@ ALL_MODULES = (
     "shawn",
     "replicate",
     "openai",
-    "py",
+    # By declares a weave type for the python type "type" and causes problems
+    # with op serialization
+    # "py",
     "langchain",
     "umap",
     "hdbscan",
