@@ -7,6 +7,7 @@ import {
   ListItemButton,
   TextField,
 } from '@mui/material';
+import _ from 'lodash';
 import moment from 'moment';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
@@ -20,7 +21,6 @@ import {
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
-import _ from 'lodash';
 
 export type WFHighLevelOpVersionFilter = {
   opCategory?: HackyOpCategory | null;
