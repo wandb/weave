@@ -7,6 +7,7 @@ import {
   ListItemText,
   TextField,
 } from '@mui/material';
+import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {CallFilter} from '../../Browse2/callTree';
@@ -59,34 +60,6 @@ export const CallsTable: React.FC<{
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
-  const opVersionOptions = useMemo(() => {
-    const versions = orm.projectConnection.opVersions();
-    // Note: this excludes the named ones without op versions
-    const options = versions.map(v => v.op().name() + ':' + v.version());
-    return options;
-  }, [orm.projectConnection]);
-  const objectVersionOptions = useMemo(() => {
-    const versions = orm.projectConnection.objectVersions();
-    const options = versions.map(v => v.object().name() + ':' + v.version());
-    return options;
-  }, [orm.projectConnection]);
-  const parentIdOptions = useMemo(() => {
-    const calls = orm.projectConnection.calls();
-    const options = calls
-      .map(v => v.parentCall()?.callID())
-      .filter(v => v != null);
-    return options;
-  }, [orm.projectConnection]);
-  const traceIdOptions = useMemo(() => {
-    const calls = orm.projectConnection.calls();
-    const options = Array.from(
-      new Set(calls.map(v => v.traceID()).filter(v => v != null))
-    );
-    return options;
-  }, [orm.projectConnection]);
-  const opCategoryOptions = useMemo(() => {
-    return orm.projectConnection.opCategories();
-  }, [orm.projectConnection]);
 
   const [filterState, setFilterState] = useState<WFHighLevelCallFilter>(
     props.initialFilter ?? {}
@@ -110,7 +83,8 @@ export const CallsTable: React.FC<{
   const effectiveFilter = useMemo(() => {
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);
-  const useLowLevelFilter: CallFilter = useMemo(() => {
+
+  const lowLevelFilter: CallFilter = useMemo(() => {
     const opUrisFromVersions =
       (effectiveFilter.opVersions
         ?.map(uri => {
@@ -159,8 +133,86 @@ export const CallsTable: React.FC<{
       projectName: props.project,
       streamName: 'stream',
     },
-    useLowLevelFilter
+    lowLevelFilter
   );
+
+  // # TODO: All of these need to be handled much more logically since
+  // we need to calculate the options based on everything except a specific filter.
+  const opVersionOptions = useMemo(() => {
+    if (runs.loading) {
+      const versions = orm.projectConnection.opVersions();
+      // Note: this excludes the named ones without op versions
+      const options = versions.map(v => v.op().name() + ':' + v.version());
+      return options;
+    }
+    return _.uniq(
+      runs.result.map(r => {
+        const version = orm.projectConnection.call(r.span_id)?.opVersion();
+        if (!version) {
+          return null;
+        }
+        return version.op().name() + ':' + version.version();
+      })
+    ).filter(v => v != null) as string[];
+  }, [orm.projectConnection, runs.loading, runs.result]);
+  const consumesObjectVersionOptions = useMemo(() => {
+    if (runs.loading) {
+      const versions = orm.projectConnection.objectVersions();
+      const options = versions.map(v => v.object().name() + ':' + v.version());
+      return options;
+    }
+    return _.uniq(
+      runs.result.flatMap(r => {
+        const inputs = orm.projectConnection.call(r.span_id)?.inputs();
+        if (!inputs) {
+          return null;
+        }
+        return inputs.map(i => i.object().name() + ':' + i.version());
+      })
+    ).filter(v => v != null);
+  }, [orm.projectConnection, runs.loading, runs.result]);
+  const parentIdOptions = useMemo(() => {
+    if (runs.loading) {
+      const calls = orm.projectConnection.calls();
+      const options = calls
+        .map(v => v.parentCall()?.callID())
+        .filter(v => v != null);
+      return options;
+    }
+    return _.uniq(
+      runs.result.map(r =>
+        orm.projectConnection.call(r.span_id)?.parentCall()?.callID()
+      )
+    ).filter(v => v != null);
+  }, [orm.projectConnection, runs.loading, runs.result]);
+  const traceIdOptions = useMemo(() => {
+    if (runs.loading) {
+      const calls = orm.projectConnection.calls();
+      const options = Array.from(
+        new Set(calls.map(v => v.traceID()).filter(v => v != null))
+      );
+      return options;
+    }
+    return _.uniq(
+      runs.result.map(r => orm.projectConnection.call(r.span_id)?.traceID())
+    ).filter(v => v != null);
+  }, [orm.projectConnection, runs.loading, runs.result]);
+  const opCategoryOptions = useMemo(() => {
+    if (runs.loading) {
+      return orm.projectConnection.opCategories();
+    }
+    return _.uniq(
+      runs.result.map(r =>
+        orm.projectConnection.call(r.span_id)?.opVersion()?.opCategory()
+      )
+    ).filter(v => v != null);
+  }, [orm.projectConnection, runs.loading, runs.result]);
+  const traceRootsEnabled = useMemo(() => {
+    if (runs.loading) {
+      return true;
+    }
+    return runs.result.some(r => r.parent_id == null);
+  }, [runs.loading, runs.result]);
 
   return (
     <FilterLayoutTemplate
@@ -173,27 +225,6 @@ export const CallsTable: React.FC<{
       )}
       filterListItems={
         <>
-          <ListItem
-            secondaryAction={
-              <Checkbox
-                edge="end"
-                checked={!!effectiveFilter.traceRootsOnly}
-                onChange={() => {
-                  setFilter({
-                    ...filter,
-                    traceRootsOnly: !effectiveFilter.traceRootsOnly,
-                  });
-                }}
-              />
-            }
-            disabled={Object.keys(props.frozenFilter ?? {}).includes(
-              'traceRootsOnly'
-            )}
-            disablePadding>
-            <ListItemButton>
-              <ListItemText primary={`Trace Roots Only`} />
-            </ListItemButton>
-          </ListItem>
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
@@ -202,7 +233,7 @@ export const CallsTable: React.FC<{
                   'opCategory'
                 )}
                 renderInput={params => (
-                  <TextField {...params} label="Op Category" />
+                  <TextField {...params} label="Category" />
                 )}
                 value={effectiveFilter.opCategory ?? null}
                 onChange={(event, newValue) => {
@@ -220,6 +251,7 @@ export const CallsTable: React.FC<{
               <Autocomplete
                 size={'small'}
                 multiple
+                limitTags={1}
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'opVersions'
                 )}
@@ -231,7 +263,8 @@ export const CallsTable: React.FC<{
                   });
                 }}
                 renderInput={params => (
-                  <TextField {...params} label="Op Version" />
+                  <TextField {...params} label="Op" />
+                  // <TextField {...params} label="Op Version" />
                 )}
                 options={opVersionOptions}
               />
@@ -241,12 +274,14 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
+                limitTags={1}
                 multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'inputObjectVersions'
                 )}
                 renderInput={params => (
-                  <TextField {...params} label="Consumes Objects" />
+                  <TextField {...params} label="Inputs" />
+                  // <TextField {...params} label="Consumes Objects" />
                 )}
                 value={effectiveFilter.inputObjectVersions ?? []}
                 onChange={(event, newValue) => {
@@ -255,7 +290,7 @@ export const CallsTable: React.FC<{
                     inputObjectVersions: newValue,
                   });
                 }}
-                options={objectVersionOptions}
+                options={consumesObjectVersionOptions}
               />
             </FormControl>
           </ListItem>
@@ -266,9 +301,7 @@ export const CallsTable: React.FC<{
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'traceId'
                 )}
-                renderInput={params => (
-                  <TextField {...params} label="Trace Id" />
-                )}
+                renderInput={params => <TextField {...params} label="Trace" />}
                 value={effectiveFilter.traceId ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
@@ -287,9 +320,7 @@ export const CallsTable: React.FC<{
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'parentId'
                 )}
-                renderInput={params => (
-                  <TextField {...params} label="Parent Id" />
-                )}
+                renderInput={params => <TextField {...params} label="Parent" />}
                 value={effectiveFilter.parentId ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
@@ -300,6 +331,28 @@ export const CallsTable: React.FC<{
                 options={parentIdOptions}
               />
             </FormControl>
+          </ListItem>
+          <ListItem
+            secondaryAction={
+              <Checkbox
+                edge="end"
+                checked={!!effectiveFilter.traceRootsOnly}
+                onChange={() => {
+                  setFilter({
+                    ...filter,
+                    traceRootsOnly: !effectiveFilter.traceRootsOnly,
+                  });
+                }}
+              />
+            }
+            disabled={
+              !traceRootsEnabled ||
+              Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
+            }
+            disablePadding>
+            <ListItemButton>
+              <ListItemText primary={`Trace Roots Only`} />
+            </ListItemButton>
           </ListItem>
         </>
       }>
