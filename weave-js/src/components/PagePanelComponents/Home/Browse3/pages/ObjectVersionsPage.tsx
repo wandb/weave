@@ -185,25 +185,6 @@ export const FilterableObjectVersionsTable: React.FC<{
       )}
       filterListItems={
         <>
-          <ListItem
-            secondaryAction={
-              <Checkbox
-                edge="end"
-                checked={!!effectiveFilter.latest}
-                onChange={() => {
-                  setFilter({
-                    ...filter,
-                    latest: !effectiveFilter.latest,
-                  });
-                }}
-              />
-            }
-            disabled={Object.keys(props.frozenFilter ?? {}).includes('latest')}
-            disablePadding>
-            <ListItemButton>
-              <ListItemText primary={`Latest Only`} />
-            </ListItemButton>
-          </ListItem>
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
@@ -212,7 +193,8 @@ export const FilterableObjectVersionsTable: React.FC<{
                   'objectName'
                 )}
                 renderInput={params => (
-                  <TextField {...params} label="Object Name" />
+                  // <TextField {...params} label="Object Name" />
+                  <TextField {...params} label="Name" />
                 )}
                 value={effectiveFilter.objectName ?? null}
                 onChange={(event, newValue) => {
@@ -234,7 +216,8 @@ export const FilterableObjectVersionsTable: React.FC<{
                   'typeCategory'
                 )}
                 renderInput={params => (
-                  <TextField {...params} label="Type Category" />
+                  <TextField {...params} label="Category" />
+                  // <TextField {...params} label="Type Category" />
                 )}
                 value={effectiveFilter.typeCategory ?? null}
                 onChange={(event, newValue) => {
@@ -252,6 +235,7 @@ export const FilterableObjectVersionsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
+                limitTags={1}
                 multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'typeVersions'
@@ -263,9 +247,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                     typeVersions: newValue,
                   });
                 }}
-                renderInput={params => (
-                  <TextField {...params} label="Type Versions" />
-                )}
+                renderInput={params => <TextField {...params} label="Type" />}
                 options={typeVersionOptions}
               />
             </FormControl>
@@ -274,6 +256,7 @@ export const FilterableObjectVersionsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
+                limitTags={1}
                 multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'inputToOpVersions'
@@ -291,6 +274,25 @@ export const FilterableObjectVersionsTable: React.FC<{
                 options={opVersionOptions}
               />
             </FormControl>
+          </ListItem>
+          <ListItem
+            secondaryAction={
+              <Checkbox
+                edge="end"
+                checked={!!effectiveFilter.latest}
+                onChange={() => {
+                  setFilter({
+                    ...filter,
+                    latest: !effectiveFilter.latest,
+                  });
+                }}
+              />
+            }
+            disabled={Object.keys(props.frozenFilter ?? {}).includes('latest')}
+            disablePadding>
+            <ListItemButton>
+              <ListItemText primary={`Latest Only`} />
+            </ListItemButton>
           </ListItem>
         </>
       }>
@@ -443,6 +445,7 @@ const ObjectVersionsTable: React.FC<{
                     objectName: params.row.obj.object().name(),
                   }}
                   versionCount={params.row.obj.object().objectVersions().length}
+                  neverPeek
                 />
               );
             },
@@ -479,7 +482,18 @@ const ObjectVersionsTable: React.FC<{
           sortModel: [{field: 'createdAt', sort: 'desc'}],
         },
       }}
-      sx={{border: 0}}
+      sx={{
+        // borderTop: 1,
+        borderRight: 0,
+        borderLeft: 0,
+        borderBottom: 0,
+
+        '& .MuiDataGrid-columnHeaders': {
+          backgroundColor: '#FAFAFA',
+          color: '#979a9e',
+        },
+      }}
+      columnHeaderHeight={40}
       rowHeight={38}
       columns={columns}
       experimentalFeatures={{columnGrouping: true}}
