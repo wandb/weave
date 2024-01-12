@@ -444,19 +444,55 @@ def observability(
     )
     jobs_table.add_column(lambda row: row["priority"][0], "Priority")
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
         "Avg. CPU %",
     )
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
         "Avg. GPU %",
     )
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
         "Avg. GPU mem. %",
     )
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["memory"][-1],
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["memory"][-1],
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
         "Avg. mem (MB)",
     )
 
