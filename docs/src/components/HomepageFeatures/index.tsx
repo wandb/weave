@@ -13,13 +13,13 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Try Weave',
     subtitle: 'Track your first LLM application',
-    link: '/docs/tutorial-basics/quickstart',
+    link: '/docs/get-started/quickstart',
     background: 'linear-gradient(135deg, #6e8efb, #a777e3)'
   },
   {
     title: 'Why Weave?',
     subtitle: 'Learn what problems Weave helps with',
-    link: '/docs/category/get-started',
+    link: '/docs/get-started/overview',
     background: 'linear-gradient(135deg, #fb6ef2, #e377a4)'
   }
 ];

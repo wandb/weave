@@ -78,7 +78,7 @@ const config: Config = {
           items: [
             {
               label: 'Documentation',
-              to: '/docs/tutorial-basics/create-a-page',
+              to: '/docs/category/get-started',
             },
           ],
         },
@@ -86,21 +86,17 @@ const config: Config = {
           title: 'Community',
           items: [
             {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-            },
-            {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
+              label: 'Forum',
+              href: 'https://community.wandb.ai'
             },
             {
               label: 'Twitter',
-              href: 'https://twitter.com/docusaurus',
+              href: 'https://twitter.com/weights_biases',
             },
           ],
         },
         {
-          title: 'More',
+          title: 'Github',
           items: [
             {
               label: 'Weave',
@@ -109,7 +105,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+      copyright: `Weave by W&B`,
     },
     prism: {
       theme: prismThemes.github,
